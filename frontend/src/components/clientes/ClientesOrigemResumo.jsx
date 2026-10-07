@@ -58,7 +58,7 @@ export default function ClientesOrigemResumo({ filtros, onChange, resumo, loadin
             <table className="mt-2 w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-slate-500">
-                  <th className="py-2">Origem</th>
+                  <th className="py-2">Canal de origem</th>
                   <th className="text-right">Clientes</th>
                   <th className="text-right">Participação</th>
                 </tr>

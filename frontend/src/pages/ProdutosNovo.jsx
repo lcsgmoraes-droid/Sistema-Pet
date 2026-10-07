@@ -21,6 +21,7 @@ import useProdutosNovoTributacao from "../hooks/useProdutosNovoTributacao";
 import useProdutosNovoVariacoes from "../hooks/useProdutosNovoVariacoes";
 import useProdutosNovoPageComposition from "../hooks/useProdutosNovoPageComposition";
 import api from "../api";
+import ProdutoHistoricoPanel from "../components/produto/ProdutoHistoricoPanel";
 import { formatarMoeda, formatarData } from "../api/produtos";
 import { calcularMargemSobreVenda, calcularPrecoVendaPorMargem } from "../utils/produtoMargem";
 
@@ -169,7 +170,7 @@ export default function ProdutosNovo() {
   const [opcoesTratamentos, setOpcoesTratamentos] = useState([]);
   const [opcoesSabores, setOpcoesSabores] = useState([]);
   const [opcoesApresentacoes, setOpcoesApresentacoes] = useState([]);
-  const [produtoOrigemGranel, setProdutoOrigemGranel] = useState(null);
+  const [produtosOrigemGranel, setProdutosOrigemGranel] = useState([]);
   const [granelVinculos, setGranelVinculos] = useState([]);
 
   useEffect(() => {
@@ -440,8 +441,10 @@ export default function ProdutosNovo() {
     salvarFiscal,
     salvando,
     setSalvando,
-    produtoOrigemGranel,
+    produtosOrigemGranel,
+    setProdutosOrigemGranel,
     granelVinculos,
+    setGranelVinculos,
   });
 
   const { handleGerarSKU, handleGerarCodigoBarras } = useProdutosNovoCodigos({
@@ -676,8 +679,8 @@ export default function ProdutosNovo() {
       removerRegraRecorrencia,
     },
     racaoState: {
-      produtoOrigemGranel,
-      setProdutoOrigemGranel,
+      produtosOrigemGranel,
+      setProdutosOrigemGranel,
       granelVinculos,
       handleCriarOpcaoRacao,
       handleApresentacaoPesoChange,
@@ -813,6 +816,8 @@ export default function ProdutosNovo() {
   return (
     <>
       <ProdutosNovoMainContent handleSubmit={handleSubmit} {...mainContentProps} />
+
+      {isEdicao ? <ProdutoHistoricoPanel produtoId={id} /> : null}
 
       <ProdutosNovoModalsLayer
         {...modalsLayerProps}

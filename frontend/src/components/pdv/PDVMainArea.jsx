@@ -119,6 +119,9 @@ export default function PDVMainArea(props) {
     onSelecionarFuncionario,
     onToggleVendaComissionada,
     vendaComissionada,
+    vendedorObrigatorio,
+    gerarComissao,
+    onGerarComissaoChange,
     onNovaVenda,
   } = props;
 
@@ -314,6 +317,9 @@ export default function PDVMainArea(props) {
             onSelecionarFuncionario={onSelecionarFuncionario}
             onToggleVendaComissionada={onToggleVendaComissionada}
             vendaComissionada={vendaComissionada}
+            vendedorObrigatorio={vendedorObrigatorio}
+            gerarComissao={gerarComissao}
+            onGerarComissaoChange={onGerarComissaoChange}
           />
         </div>
 

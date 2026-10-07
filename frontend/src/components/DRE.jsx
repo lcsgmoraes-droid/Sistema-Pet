@@ -148,6 +148,17 @@ const DRE = () => {
     return periodo || formatarMesLocal();
   };
 
+  const obterParametrosDRE = (periodoAlvo = periodo) => {
+    const [ano, mes] = normalizarPeriodo(periodoAlvo).split("-");
+    return {
+      ano,
+      mes,
+      mes_inicial: mesInicial || undefined,
+      data_final: dataFinal || undefined,
+      canais: canaisSelecionados.join(","),
+    };
+  };
+
   const carregarDRE = async (periodoAlvo = periodo) => {
     const requestId = dreRequestIdRef.current + 1;
     dreRequestIdRef.current = requestId;
@@ -156,19 +167,8 @@ const DRE = () => {
     dreAbortRef.current = controller;
     setLoading(true);
     try {
-      const [ano, mes] = normalizarPeriodo(periodoAlvo).split("-");
-
-      // Enviar os canais selecionados para o backend
-      const canaisParam = canaisSelecionados.join(",");
-
       const response = await api.get(`/financeiro/dre/canais`, {
-        params: {
-          ano,
-          mes,
-          mes_inicial: mesInicial || undefined,
-          data_final: dataFinal || undefined,
-          canais: canaisParam,
-        },
+        params: obterParametrosDRE(periodoAlvo),
         timeout: DRE_REQUEST_TIMEOUT_MS,
         signal: controller.signal,
       });
@@ -286,11 +286,12 @@ const DRE = () => {
 
   const exportarPDF = async () => {
     try {
-      const [ano, mes] = normalizarPeriodo(periodo).split("-");
+      const params = obterParametrosDRE();
+      const { ano, mes } = params;
       toast.loading("Gerando PDF...", { id: "pdf" });
 
       const response = await api.get(`/financeiro/dre/export/pdf`, {
-        params: { ano, mes },
+        params,
         responseType: "blob",
         timeout: DRE_REQUEST_TIMEOUT_MS,
       });
@@ -312,11 +313,12 @@ const DRE = () => {
 
   const exportarExcel = async () => {
     try {
-      const [ano, mes] = normalizarPeriodo(periodo).split("-");
+      const params = obterParametrosDRE();
+      const { ano, mes } = params;
       toast.loading("Gerando Excel...", { id: "excel" });
 
       const response = await api.get(`/financeiro/dre/export/excel`, {
-        params: { ano, mes },
+        params,
         responseType: "blob",
         timeout: DRE_REQUEST_TIMEOUT_MS,
       });
@@ -360,6 +362,7 @@ const DRE = () => {
       loading={loading}
       loadingDetalhes={loadingDetalhes}
       modalClassificarOpen={modalClassificarOpen}
+      parametrosDRE={obterParametrosDRE()}
       periodo={periodo}
       periodoAcumulado={mesInicial !== null}
       setChatIAAberto={setChatIAAberto}

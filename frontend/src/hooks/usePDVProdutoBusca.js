@@ -80,7 +80,7 @@ export function usePDVProdutoBusca({
       const response = await getProdutosVendaveis(
         {
           busca: termoNormalizado,
-          page_size: 12,
+          page_size: 30,
           contar_total: false,
           incluir_imagens: false,
         },

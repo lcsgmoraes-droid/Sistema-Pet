@@ -62,6 +62,7 @@ from app.grupo_comercial_models import (
 from app.bling_connection_models import BlingCompanyTenantLink, BlingConnection
 from app.models_cadastros import (
     Cliente,
+    ClienteContato,
     Especie,
     FornecedorGrupo,
     Pet,

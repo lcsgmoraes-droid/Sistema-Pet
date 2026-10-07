@@ -20,6 +20,7 @@ const DEFAULT_FORM = {
   mensagem_venda_critica: "🚨 CRITICO: Margem muito baixa! Venda com prejuizo!",
   aliquota_imposto_padrao: 7,
   caixa_compartilhado: false,
+  vendedor_obrigatorio_pdv: false,
   dias_tolerancia_atraso: 5,
   crediario_encargos_automaticos: false,
   crediario_multa_percentual: 2,
@@ -67,6 +68,7 @@ export default function ConfiguracaoGeralNegocio() {
           margem_alerta_minima: Number(data.margem_alerta_minima ?? 15),
           aliquota_imposto_padrao: Number(data.aliquota_imposto_padrao ?? 7),
           caixa_compartilhado: Boolean(data.caixa_compartilhado),
+          vendedor_obrigatorio_pdv: Boolean(data.vendedor_obrigatorio_pdv),
           dias_tolerancia_atraso: Number(data.dias_tolerancia_atraso ?? 5),
           crediario_encargos_automaticos: Boolean(data.crediario_encargos_automaticos),
           crediario_multa_percentual: Number(data.crediario_multa_percentual ?? 2),
@@ -157,6 +159,7 @@ export default function ConfiguracaoGeralNegocio() {
         mensagem_venda_critica: form.mensagem_venda_critica,
         aliquota_imposto_padrao: Number(form.aliquota_imposto_padrao),
         caixa_compartilhado: Boolean(form.caixa_compartilhado),
+        vendedor_obrigatorio_pdv: Boolean(form.vendedor_obrigatorio_pdv),
         dias_tolerancia_atraso: Number(form.dias_tolerancia_atraso),
         crediario_encargos_automaticos: Boolean(form.crediario_encargos_automaticos),
         crediario_multa_percentual: Number(form.crediario_multa_percentual),
@@ -214,7 +217,7 @@ export default function ConfiguracaoGeralNegocio() {
         </Link>
         <h1 className="text-3xl font-bold text-gray-900">Configuracoes Gerais do Negocio</h1>
         <p className="text-gray-600 mt-2">
-          Defina margens do PDV, mensagens de alerta e metas operacionais.
+          Defina as regras do PDV, mensagens de alerta e metas operacionais.
         </p>
       </div>
 
@@ -254,6 +257,23 @@ export default function ConfiguracaoGeralNegocio() {
             acesso de quem ainda usa as credenciais antigas.
           </p>
         </div>
+      </div>
+
+      <div className="rounded-lg bg-white p-6 shadow-md">
+        <h2 className="text-xl font-semibold text-gray-800">Vendedor no PDV</h2>
+        <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-800">
+          <input
+            type="checkbox"
+            checked={form.vendedor_obrigatorio_pdv}
+            onChange={(event) => onChange("vendedor_obrigatorio_pdv", event.target.checked)}
+            className="h-4 w-4"
+          />
+          Exigir indicação do vendedor em cada venda
+        </label>
+        <p className="mt-2 text-sm text-gray-600">
+          Quando ativado, a venda só pode ser salva após selecionar um vendedor. A comissão continua
+          opcional e é configurada separadamente na venda.
+        </p>
       </div>
 
       <fieldset className="rounded-lg bg-white p-6 shadow-md">

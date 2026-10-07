@@ -1,5 +1,6 @@
-import { Building2, KeyRound, LogOut, Mail, UserCheck, UserX } from "lucide-react";
+import { Building2, KeyRound, LogOut, Mail, Trash2, UserCheck, UserX } from "lucide-react";
 import BotaoMenuAcoes from "../v2/BotaoMenuAcoes/BotaoMenuAcoes";
+import InputCheckbox from "../v2/InputCheckbox/InputCheckbox";
 import DataTable from "../ui/DataTable";
 import Panel from "../ui/Panel";
 import StatusBadge from "../ui/StatusBadge";
@@ -18,12 +19,15 @@ function formatPessoaTipo(tiposCadastro) {
 
 export default function UsuariosTable({
   loading,
+  onDelete,
   onForcarLogout,
   onManageCredentials,
   onRecriarSenha,
+  onToggleCrediario,
   onToggleStatus,
   onVincularLoja,
   paginacaoRodape,
+  savingLiberacaoId,
   usuarios,
 }) {
   const columns = [
@@ -64,6 +68,12 @@ export default function UsuariosTable({
               label: usuario.is_active ? "Desativar acesso" : "Ativar acesso",
               tom: usuario.is_active ? "perigo" : "neutro",
               onClick: () => onToggleStatus(usuario.user_id, usuario.is_active),
+            },
+            {
+              icon: Trash2,
+              label: "Excluir acesso definitivamente",
+              tom: "perigo",
+              onClick: () => onDelete(usuario),
             },
           ]}
         />
@@ -119,6 +129,22 @@ export default function UsuariosTable({
       ),
     },
     {
+      key: "liberacao_crediario",
+      header: "Pode liberar venda bloqueada",
+      align: "center",
+      render: (usuario) => (
+        <div className="inline-flex items-center gap-2 text-xs text-slate-700">
+          <InputCheckbox
+            rotulo={`Autorizar ${usuario.nome || usuario.email || usuario.user_id} a liberar venda com crediário atrasado`}
+            checked={Boolean(usuario.pode_liberar_venda_crediario_atrasado)}
+            disabled={savingLiberacaoId === usuario.user_id}
+            onChange={(event) => onToggleCrediario(usuario, event.target.checked)}
+          />
+          <span>{usuario.pode_liberar_venda_crediario_atrasado ? "Concedida" : "Não concedida"}</span>
+        </div>
+      ),
+    },
+    {
       key: "status",
       header: "Status",
       align: "center",
@@ -140,7 +166,7 @@ export default function UsuariosTable({
         getRowKey={(usuario) => usuario.user_id}
         loading={loading}
         loadingMessage="Carregando usuarios..."
-        tableClassName="min-w-[860px]"
+        tableClassName="min-w-[1060px]"
       />
       {paginacaoRodape}
     </Panel>

@@ -34,9 +34,6 @@ from app.produto_mestre_models import (  # noqa
     ProdutoMestre,
 )
 
-# Pet mestre (Checkpoint 3)
-from app.pet_mestre_models import PetMestre  # noqa
-
 # Pessoa mestre (Checkpoint 4)
 from app.pessoa_mestre_models import PessoaMestre  # noqa
 

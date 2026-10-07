@@ -84,10 +84,12 @@ class GestorDREResumo(BaseModel):
     criterio: str
     receita_bruta: float = 0
     descontos: float = 0
+    devolucoes: float = 0
     impostos: float = 0
     deducoes_total: float = 0
     receita_liquida: float = 0
     cmv: float = 0
+    custo_servicos: float = 0
     despesas_variaveis: float = 0
     despesas_operacionais: float = 0
     despesas_fixas_operacionais: float = 0
@@ -307,10 +309,12 @@ def _resumo_dre(
         criterio=criterio,
         receita_bruta=round(float(totais.get("receita_bruta", 0)), 2),
         descontos=round(float(totais.get("descontos", 0)), 2),
+        devolucoes=round(float(totais.get("devolucoes", 0)), 2),
         impostos=round(float(totais.get("impostos", 0)), 2),
         deducoes_total=round(float(totais.get("deducoes_total", 0)), 2),
         receita_liquida=round(float(totais.get("receita_liquida", 0)), 2),
         cmv=round(float(totais.get("cmv", 0)), 2),
+        custo_servicos=round(float(totais.get("custo_servicos", 0)), 2),
         despesas_variaveis=round(despesas_variaveis, 2),
         despesas_operacionais=round(despesas_operacionais, 2),
         despesas_fixas_operacionais=round(

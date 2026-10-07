@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.audit_log import log_action, log_create, log_delete, log_update
 from app.auth.dependencies import get_current_user_and_tenant
+from app.services.cliente_historico_service import registrar_alteracoes_cliente
 from app.clientes.common import (
     _anexar_metadados_criacao_cliente,
     _obter_cliente_ou_404,
@@ -23,6 +24,10 @@ from app.clientes.common import (
     gerar_codigo_cliente,
     tipos_cadastro_da_pessoa,
 )
+from app.clientes.contatos import (
+    validar_contatos_adicionais,
+    salvar_contatos_adicionais,
+)
 from app.clientes.schemas import (
     ClienteCreate,
     ClienteResponse,
@@ -30,12 +35,13 @@ from app.clientes.schemas import (
     ClienteUpdate,
 )
 from app.db import get_session
-from app.models import AppAccessProfile, Cliente, Role, User, UserTenant
+from app.models import AppAccessProfile, Cliente, ClienteContato, Role, User, UserTenant
 from app.segmentacao_models import ClienteSegmento
 from app.vendas_models import Venda
 from app.partner_utils import get_all_accessible_tenant_ids
 from app.security.permissions_decorator import require_permission
 from app.security.permissions_service import check_permission
+from app.security.crediario_override import definir_liberacao_crediario
 from app.services.cliente_alertas_pdv import normalizar_alertas_pdv
 from app.services.cliente_origem import (
     filtrar_origem_periodo,
@@ -72,7 +78,12 @@ def create_cliente(
 ):
     """Criar novo cliente/fornecedor."""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
-    access_fields = {"auth_user_id", "app_login", "app_access_profiles"}
+    access_fields = {
+        "auth_user_id",
+        "app_login",
+        "app_access_profiles",
+        "pode_liberar_venda_crediario_atrasado",
+    }
     if access_fields.intersection(cliente_data.model_fields_set):
         check_permission(
             db,
@@ -87,9 +98,22 @@ def create_cliente(
 
     codigo = gerar_codigo_cliente(db, cliente_data.tipo_pessoa, tenant_id)
     dados_payload = cliente_data.model_dump()
+    contatos_adicionais = cliente_data.contatos_adicionais
+    dados_payload.pop("contatos_adicionais", None)
+    validar_contatos_adicionais(
+        db,
+        tenant_id,
+        None,
+        contatos_adicionais,
+        cliente_data.celular,
+        cliente_data.telefone,
+    )
     auth_user_id = dados_payload.pop("auth_user_id", None)
     app_login = dados_payload.pop("app_login", None)
     app_access_profiles = dados_payload.pop("app_access_profiles", [])
+    pode_liberar_crediario = dados_payload.pop(
+        "pode_liberar_venda_crediario_atrasado", False
+    )
     if auth_user_id is not None and app_login is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -151,6 +175,7 @@ def create_cliente(
             auth_user_id=auth_user_id,
         ),
         tenant_id=tenant_id,
+        origem_tenant_id=tenant_id,
         codigo=codigo,
         **dados_cliente,
     )
@@ -158,6 +183,7 @@ def create_cliente(
     db.add(novo_cliente)
     try:
         db.flush()
+        salvar_contatos_adicionais(db, novo_cliente, contatos_adicionais)
         sync_cliente_app_access_profiles(
             db,
             tenant_id=tenant_id,
@@ -166,6 +192,14 @@ def create_cliente(
             granted_by_user_id=current_user.id,
             linked_user_id=novo_cliente.auth_user_id,
         )
+        if pode_liberar_crediario:
+            definir_liberacao_crediario(
+                db,
+                tenant_id=tenant_id,
+                user_id=novo_cliente.auth_user_id,
+                autorizado=True,
+                actor_user_id=current_user.id,
+            )
         db.commit()
     except IntegrityError as exc:
         db.rollback()
@@ -212,7 +246,7 @@ def listar_usuarios_para_acesso_app(
         .all()
     )
     usuarios: dict[int, dict] = {}
-    for user, _vinculo, role in rows:
+    for user, vinculo, role in rows:
         item = usuarios.setdefault(
             user.id,
             {
@@ -220,6 +254,9 @@ def listar_usuarios_para_acesso_app(
                 "nome": user.nome,
                 "email": user.email,
                 "username": user.username,
+                "pode_liberar_venda_crediario_atrasado": bool(
+                    vinculo.pode_liberar_venda_crediario_atrasado
+                ),
                 "perfis_sistema": [],
             },
         )
@@ -347,6 +384,41 @@ def get_cliente(
     return cliente
 
 
+@detail_router.get("/{cliente_id}/historico-alteracoes")
+def listar_historico_cliente(
+    cliente_id: int,
+    limite: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Alteracoes de campos de uma pessoa: data, usuario, campo, valor anterior e novo."""
+    from app.models_cadastros import ClienteHistoricoAlteracao
+
+    _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    _obter_cliente_ou_404(db, cliente_id, tenant_id)
+    linhas = (
+        db.query(ClienteHistoricoAlteracao, User.nome, User.email)
+        .outerjoin(User, User.id == ClienteHistoricoAlteracao.user_id)
+        .filter(ClienteHistoricoAlteracao.cliente_id == cliente_id)
+        .order_by(ClienteHistoricoAlteracao.alterado_em.desc(), ClienteHistoricoAlteracao.id.desc())
+        .limit(limite)
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "campo": registro.campo,
+                "valor_anterior": registro.valor_anterior,
+                "valor_novo": registro.valor_novo,
+                "alterado_em": registro.alterado_em.isoformat() if registro.alterado_em else None,
+                "usuario": nome or email,
+                "tenant_id": str(registro.tenant_id),
+            }
+            for registro, nome, email in linhas
+        ]
+    }
+
+
 @detail_router.put("/{cliente_id}")
 def update_cliente(
     cliente_id: int,
@@ -365,9 +437,33 @@ def update_cliente(
     _validar_documentos_unicos_update(db, cliente, cliente_data, cliente_id, tenant_id)
 
     dados_payload = cliente_data.model_dump(exclude_unset=True)
+    contatos_adicionais = (
+        cliente_data.contatos_adicionais
+        if "contatos_adicionais" in dados_payload
+        else None
+    )
+    dados_payload.pop("contatos_adicionais", None)
+    if contatos_adicionais is not None:
+        validar_contatos_adicionais(
+            db,
+            tenant_id,
+            cliente_id,
+            contatos_adicionais,
+            cliente_data.celular
+            if cliente_data.celular is not None
+            else cliente.celular,
+            cliente_data.telefone
+            if cliente_data.telefone is not None
+            else cliente.telefone,
+        )
     auth_user_informado = "auth_user_id" in dados_payload
     perfis_informados = "app_access_profiles" in dados_payload
-    if {"auth_user_id", "app_login", "app_access_profiles"}.intersection(dados_payload):
+    if {
+        "auth_user_id",
+        "app_login",
+        "app_access_profiles",
+        "pode_liberar_venda_crediario_atrasado",
+    }.intersection(dados_payload):
         check_permission(
             db,
             current_user.id,
@@ -378,6 +474,9 @@ def update_cliente(
     auth_user_id = dados_payload.pop("auth_user_id", None)
     app_login = dados_payload.pop("app_login", None)
     app_access_profiles = dados_payload.pop("app_access_profiles", None)
+    pode_liberar_crediario = dados_payload.pop(
+        "pode_liberar_venda_crediario_atrasado", None
+    )
     if auth_user_id is not None and app_login is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -464,6 +563,16 @@ def update_cliente(
         )
     for field, value in update_data.items():
         setattr(cliente, field, value)
+    if contatos_adicionais is not None:
+        salvar_contatos_adicionais(db, cliente, contatos_adicionais)
+    registrar_alteracoes_cliente(
+        db,
+        cliente_id=cliente.id,
+        tenant_id=tenant_id,
+        user_id=current_user.id,
+        antes=old_data,
+        depois=update_data,
+    )
 
     if auth_user_informado:
         cliente.auth_user_id = _validar_conta_app(
@@ -492,6 +601,15 @@ def update_cliente(
             profile_types=perfis_para_sincronizar or [],
             granted_by_user_id=current_user.id,
             linked_user_id=cliente.auth_user_id,
+        )
+
+    if pode_liberar_crediario is not None:
+        definir_liberacao_crediario(
+            db,
+            tenant_id=tenant_id,
+            user_id=cliente.auth_user_id,
+            autorizado=pode_liberar_crediario,
+            actor_user_id=current_user.id,
         )
 
     if cliente.ativo and not cliente.codigo:
@@ -571,9 +689,14 @@ def delete_cliente(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Desativar cliente (soft delete)."""
+    """Desativar cliente (soft delete). So a loja de origem pode desativar."""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
+    if str(cliente.origem_tenant_id) != str(tenant_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Somente a loja de origem pode excluir este cadastro.",
+        )
 
     cliente.ativo = False
     cliente.updated_at = dt.utcnow()
@@ -886,6 +1009,13 @@ def _aplicar_filtro_busca(query, search):
             Cliente.email.ilike(like),
             Cliente.telefone.ilike(like),
             Cliente.celular.ilike(like),
+            Cliente.contatos_adicionais.any(
+                (ClienteContato.tenant_id == Cliente.tenant_id)
+                & (
+                    ClienteContato.numero.ilike(like)
+                    | ClienteContato.vinculo.ilike(like)
+                )
+            ),
         ]
         palavra_digitos = "".join(ch for ch in palavra if ch.isdigit())
         if palavra_digitos:
@@ -894,6 +1024,10 @@ def _aplicar_filtro_busca(query, search):
                 [
                     telefone_digitos.ilike(like_digitos),
                     celular_digitos.ilike(like_digitos),
+                    Cliente.contatos_adicionais.any(
+                        (ClienteContato.tenant_id == Cliente.tenant_id)
+                        & ClienteContato.numero_digitos.ilike(like_digitos)
+                    ),
                 ]
             )
         query = query.filter(or_(*filtros))
@@ -921,22 +1055,29 @@ def _ordenar_query_listagem(query, search):
                 (func.lower(Cliente.codigo) == termo_lower, 1),
                 (_somente_digitos_coluna(Cliente.telefone) == termo_digitos, 2),
                 (_somente_digitos_coluna(Cliente.celular) == termo_digitos, 3),
-                (Cliente.codigo.ilike(f"{termo_digitos}%"), 4),
+                (
+                    Cliente.contatos_adicionais.any(
+                        (ClienteContato.tenant_id == Cliente.tenant_id)
+                        & (ClienteContato.numero_digitos == termo_digitos)
+                    ),
+                    4,
+                ),
+                (Cliente.codigo.ilike(f"{termo_digitos}%"), 5),
                 (
                     _somente_digitos_coluna(Cliente.telefone).ilike(
                         f"{termo_digitos}%"
                     ),
-                    5,
+                    6,
                 ),
                 (
                     _somente_digitos_coluna(Cliente.celular).ilike(f"{termo_digitos}%"),
-                    6,
+                    7,
                 ),
-                (func.lower(Cliente.nome) == termo_lower, 7),
-                (Cliente.nome.ilike(f"{termo_busca}%"), 8),
-                (Cliente.nome_fantasia.ilike(f"{termo_busca}%"), 9),
-                (Cliente.razao_social.ilike(f"{termo_busca}%"), 10),
-                else_=11,
+                (func.lower(Cliente.nome) == termo_lower, 8),
+                (Cliente.nome.ilike(f"{termo_busca}%"), 9),
+                (Cliente.nome_fantasia.ilike(f"{termo_busca}%"), 10),
+                (Cliente.razao_social.ilike(f"{termo_busca}%"), 11),
+                else_=12,
             ),
             Cliente.nome,
         )
@@ -1033,12 +1174,21 @@ def _montar_resposta_update(cliente: Cliente) -> dict:
         "codigo": cliente.codigo,
         "nome": cliente.nome,
         "tipos_cadastro": tipos_cadastro_da_pessoa(cliente),
+        "is_cliente": cliente.is_cliente,
+        "is_fornecedor": cliente.is_fornecedor,
+        "is_veterinario": cliente.is_veterinario,
+        "is_funcionario": cliente.is_funcionario,
+        "origem_tenant_id": str(cliente.origem_tenant_id) if cliente.origem_tenant_id else None,
         "tipo_pessoa": cliente.tipo_pessoa,
         "cpf": cliente.cpf,
         "cnpj": cliente.cnpj,
         "email": cliente.email,
         "telefone": cliente.telefone,
         "celular": cliente.celular,
+        "contatos_adicionais": [
+            {"id": contato.id, "numero": contato.numero, "vinculo": contato.vinculo}
+            for contato in cliente.contatos_adicionais
+        ],
         "parceiro_ativo": cliente.parceiro_ativo
         if hasattr(cliente, "parceiro_ativo")
         else False,
@@ -1055,6 +1205,9 @@ def _montar_resposta_update(cliente: Cliente) -> dict:
         "auth_user_email": getattr(cliente, "auth_user_email", None),
         "auth_user_username": getattr(cliente, "auth_user_username", None),
         "app_access_profiles": getattr(cliente, "app_access_profiles", []),
+        "pode_liberar_venda_crediario_atrasado": getattr(
+            cliente, "pode_liberar_venda_crediario_atrasado", False
+        ),
     }
 
 

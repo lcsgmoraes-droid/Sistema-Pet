@@ -30,7 +30,6 @@ from app.evolucao_corepet import registrar_uso_funcionalidade
 from app.security.permissions_decorator import require_any_permission
 from app.especie_raca_mestre_models import EspecieMestre, RacaMestre
 from app.produto_mestre_models import ProdutoMestre
-from app.pet_mestre_models import PetMestre
 from app.pessoa_mestre_models import PessoaMestre
 
 router = APIRouter(prefix="/grupos-comerciais", tags=["Grupos Comerciais"])
@@ -79,10 +78,26 @@ def listar_mestres_grupo(
 
     return {
         "produtos": _linhas(ProdutoMestre),
-        "pets": _linhas(PetMestre),
         "pessoas": _linhas(PessoaMestre),
         "especies": _linhas(EspecieMestre),
         "racas": _linhas(RacaMestre),
+    }
+
+
+@router.get("/{grupo_id}/duplicidades")
+@require_any_permission(PERMISSOES_CONFIG_EMPRESA)
+def listar_duplicidades_grupo(
+    grupo_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Pares de pessoas (CPF/CNPJ) e produtos (codigo de barras/GTIN) repetidos entre lojas do grupo."""
+    from app.services.grupo_duplicados_service import pessoas_duplicadas, produtos_duplicados
+
+    _usuario, _empresa_id = user_and_tenant
+    return {
+        "pessoas": pessoas_duplicadas(db, grupo_id),
+        "produtos": produtos_duplicados(db, grupo_id),
     }
 
 

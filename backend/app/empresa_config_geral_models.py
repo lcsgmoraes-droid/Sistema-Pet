@@ -87,6 +87,9 @@ class EmpresaConfigGeral(BaseTenantModel):
     caixa_compartilhado = Column(
         Boolean, default=False, nullable=False, server_default="false"
     )
+    vendedor_obrigatorio_pdv = Column(
+        Boolean, default=False, nullable=False, server_default="false"
+    )
 
     # Dias para considerar contas como vencidas
     dias_tolerancia_atraso = Column(Integer, default=5)
@@ -176,6 +179,7 @@ class EmpresaConfigGeral(BaseTenantModel):
                 else 5
             ),
             "caixa_compartilhado": bool(self.caixa_compartilhado),
+            "vendedor_obrigatorio_pdv": bool(self.vendedor_obrigatorio_pdv),
             "crediario_encargos_automaticos": bool(self.crediario_encargos_automaticos),
             "crediario_multa_percentual": float(self.crediario_multa_percentual or 0),
             "crediario_juros_mensal_percentual": float(

@@ -106,13 +106,6 @@ export function campaignAllowsSaleChannel(campaign, saleChannel) {
   return configuredChannels.includes(channel);
 }
 
-export function getCashbackBonusParamKey(saleChannel) {
-  const channel = normalizeBenefitChannel(saleChannel);
-  if (channel === "app") return "app_bonus_percent";
-  if (channel === "ecommerce") return "ecommerce_bonus_percent";
-  return "pdv_bonus_percent";
-}
-
 export function formatBenefitChannelsSummary(params = {}) {
   const configuredChannels = getConfiguredBenefitChannels(params);
   const channels = configuredChannels || DEFAULT_BENEFIT_CHANNELS;

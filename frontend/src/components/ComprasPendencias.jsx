@@ -26,7 +26,7 @@ function formatarData(valor, comHora = false) {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-    ...(comHora ? { hour: "2-digit", minute: "2-digit" } : {}),
+    ...(comHora ? { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" } : {}),
   });
 }
 

@@ -310,6 +310,7 @@ def aplicar_filtros_ordenacao_rotas(
     )
     ordenacoes = {
         "data": data_referencia,
+        "criacao": RotaEntrega.created_at,
         "data_conclusao": data_referencia,
         "numero": RotaEntrega.numero,
         "entregador": entregador_nome,
@@ -360,7 +361,9 @@ def listar_rotas(
         .filter(RotaEntrega.tenant_id == tenant_id)
     )
 
-    if status:
+    if status == "em_execucao":
+        query = query.filter(RotaEntrega.status.in_(["em_rota", "em_andamento"]))
+    elif status:
         query = query.filter(RotaEntrega.status == status)
     else:
         # Se não especificou status, mostra apenas rotas ativas (exclui concluídas)
@@ -405,9 +408,8 @@ def listar_vendas_pendentes_entrega(
     CRITÉRIO: tem_entrega = true E status_entrega = 'pendente', 'pronto' ou NULL
     Exclui vendas que já estão em rota, entregues ou canceladas.
 
-    Retorna em ordem:
-    1. Vendas com ordem_entrega_otimizada (já otimizadas)
-    2. Vendas novas sem ordem (cronológico)
+    Retorna as vendas mais recentes primeiro. A ordem otimizada continua
+    disponível no campo ordem_otimizada, sem alterar a ordem da lista.
 
     Economiza chamadas à API: só otimiza quando usuário clicar no botão.
     """
@@ -419,12 +421,7 @@ def listar_vendas_pendentes_entrega(
     vendas = (
         db.query(Venda)
         .filter(*filtros_venda_entrega_operacional(tenant_id))
-        .order_by(
-            # Primeiro: vendas com ordem otimizada
-            Venda.ordem_entrega_otimizada.asc().nullslast(),
-            # Depois: vendas novas por data
-            Venda.created_at.asc(),
-        )
+        .order_by(Venda.data_venda.desc(), Venda.id.desc())
         .all()
     )
 

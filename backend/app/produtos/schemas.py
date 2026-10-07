@@ -1,3 +1,4 @@
+from uuid import UUID
 """Schemas Pydantic do modulo de produtos.
 
 Mantem os contratos de request/response fora do arquivo de rotas.
@@ -499,6 +500,7 @@ class ProdutoResponse(ProdutoBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    origem_tenant_id: Optional[UUID] = None
     estoque_atual: Optional[float] = 0
     controlar_estoque: bool = True
     markup_percentual: Optional[float] = None  # Campo calculado

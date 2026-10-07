@@ -53,6 +53,110 @@ def _load_existing_snapshot(raw_snapshot: Any) -> Optional[Dict[str, Any]]:
     return None
 
 
+def snapshot_tem_taxa_mista_pendente(venda: Any, snapshot: Dict[str, Any]) -> bool:
+    """Identifica a taxa local gravada que o calculo antigo deixou de somar."""
+    taxa_gateway = snapshot.get("taxa_gateway")
+    if taxa_gateway is None or _round_money(
+        snapshot.get("taxa_cartao")
+    ) != _round_money(taxa_gateway):
+        return False
+
+    return any(
+        not (
+            getattr(pagamento, "gateway_provider", None)
+            and getattr(pagamento, "gateway_fee_amount", None) is not None
+        )
+        and _as_float(getattr(pagamento, "valor_taxa_prevista", None)) > 0
+        for pagamento in list(getattr(venda, "pagamentos", []) or [])
+    )
+
+
+def ajustar_snapshot_taxa_mista(venda: Any, snapshot: Dict[str, Any]) -> Dict[str, Any]:
+    """Corrige apenas taxa e totais derivados, preservando os demais custos congelados."""
+    if not snapshot_tem_taxa_mista_pendente(venda, snapshot):
+        return snapshot
+
+    taxa_local = _round_money(
+        sum(
+            _as_float(getattr(pagamento, "valor_taxa_prevista", None))
+            for pagamento in list(getattr(venda, "pagamentos", []) or [])
+            if not (
+                getattr(pagamento, "gateway_provider", None)
+                and getattr(pagamento, "gateway_fee_amount", None) is not None
+            )
+        )
+    )
+    if taxa_local <= 0:
+        return snapshot
+
+    corrigido = dict(snapshot)
+    corrigido["taxa_cartao"] = _round_money(
+        _as_float(snapshot.get("taxa_cartao")) + taxa_local
+    )
+    corrigido["venda_liquida"] = _round_money(
+        _as_float(snapshot.get("venda_liquida")) - taxa_local
+    )
+    corrigido["lucro"] = _round_money(_as_float(snapshot.get("lucro")) - taxa_local)
+    venda_bruta = _as_float(snapshot.get("venda_bruta"))
+    custo_total = _as_float(snapshot.get("custo_produtos"))
+    corrigido["margem_sobre_venda"] = (
+        round(corrigido["lucro"] / venda_bruta * 100, 1) if venda_bruta > 0 else 0.0
+    )
+    corrigido["margem_sobre_custo"] = (
+        round(corrigido["lucro"] / custo_total * 100, 1) if custo_total > 0 else 0.0
+    )
+
+    itens = snapshot.get("itens")
+    if isinstance(itens, list) and itens:
+        base_itens = sum(max(_as_float(item.get("venda_bruta")), 0) for item in itens)
+        if base_itens > 0:
+            restante = taxa_local
+            itens_corrigidos = []
+            for indice, item in enumerate(itens):
+                taxa_item = (
+                    restante
+                    if indice == len(itens) - 1
+                    else _round_money(
+                        taxa_local
+                        * max(_as_float(item.get("venda_bruta")), 0)
+                        / base_itens
+                    )
+                )
+                restante = _round_money(restante - taxa_item)
+                item_corrigido = dict(item)
+                item_corrigido["taxa_cartao"] = _round_money(
+                    _as_float(item.get("taxa_cartao")) + taxa_item
+                )
+                item_corrigido["valor_liquido"] = _round_money(
+                    _as_float(item.get("valor_liquido")) - taxa_item
+                )
+                item_corrigido["lucro"] = _round_money(
+                    _as_float(item.get("lucro")) - taxa_item
+                )
+                receita_item = _as_float(item.get("venda_bruta"))
+                custo_item = _as_float(item.get("custo_total"))
+                quantidade = _as_float(item.get("quantidade"))
+                item_corrigido["margem_sobre_venda"] = (
+                    round(item_corrigido["lucro"] / receita_item * 100, 1)
+                    if receita_item > 0
+                    else 0.0
+                )
+                item_corrigido["margem_sobre_custo"] = (
+                    round(item_corrigido["lucro"] / custo_item * 100, 1)
+                    if custo_item > 0
+                    else 0.0
+                )
+                item_corrigido["lucro_unitario"] = (
+                    _round_money(item_corrigido["lucro"] / quantidade)
+                    if quantidade > 0
+                    else 0.0
+                )
+                itens_corrigidos.append(item_corrigido)
+            corrigido["itens"] = itens_corrigidos
+
+    return corrigido
+
+
 def _get_formas_pagamento_map(db: Session, tenant_id: Any) -> Dict[str, FormaPagamento]:
     formas = (
         db.query(FormaPagamento)
@@ -71,6 +175,11 @@ def _resolve_taxa_cartao_total(
     taxa_total = 0.0
 
     for pagamento in list(getattr(venda, "pagamentos", []) or []):
+        taxa_gateway = getattr(pagamento, "gateway_fee_amount", None)
+        if getattr(pagamento, "gateway_provider", None) and taxa_gateway is not None:
+            taxa_total += _as_float(taxa_gateway)
+            continue
+
         taxa_aplicada = getattr(pagamento, "valor_taxa_prevista", None)
         if taxa_aplicada is not None:
             taxa_total += _as_float(taxa_aplicada)
@@ -262,18 +371,14 @@ def _resolve_cashback_resgatado(
     venda_id: int,
 ) -> float:
     try:
-        from app.campaigns.models import CashbackTransaction
-
-        total = (
-            db.query(func.sum(CashbackTransaction.amount))
-            .filter(
-                CashbackTransaction.tenant_id == tenant_id,
-                CashbackTransaction.amount < 0,
-                CashbackTransaction.source_id == venda_id,
-            )
-            .scalar()
+        from app.vendas.cashback_financeiro import (
+            cashback_resgatado_liquido_por_venda,
         )
-        return _round_money(abs(total or 0))
+
+        total = cashback_resgatado_liquido_por_venda(
+            db, tenant_id=tenant_id, venda_ids=[venda_id]
+        ).get(venda_id, 0)
+        return _round_money(total)
     except Exception as exc:
         logger.warning("Falha ao buscar cashback da venda %s: %s", venda_id, exc)
         return 0.0
@@ -399,11 +504,7 @@ def build_venda_rentabilidade_snapshot(
     )
 
     gateway_financials = _resolve_gateway_financials(venda)
-    taxa_cartao_total = (
-        gateway_financials["taxa_gateway"]
-        if gateway_financials["taxa_gateway"] is not None
-        else _resolve_taxa_cartao_total(venda, formas_pagamento_map)
-    )
+    taxa_cartao_total = _resolve_taxa_cartao_total(venda, formas_pagamento_map)
     comissao_total = _resolve_comissao_total(db, tenant_id, venda.id, comissao_total)
     impostos_percentual = _resolve_impostos_percentual(
         db, tenant_id, impostos_percentual
@@ -506,6 +607,7 @@ def build_venda_rentabilidade_snapshot(
         produto = getattr(item, "produto", None)
         itens_snapshot.append(
             {
+                "venda_item_id": getattr(item, "id", None),
                 "produto_id": getattr(item, "produto_id", None),
                 "produto_nome": getattr(produto, "nome", None) or "Produto removido",
                 "quantidade": _round_money(item_base["quantidade"]),
@@ -608,7 +710,7 @@ def get_or_build_venda_rentabilidade_snapshot(
             getattr(venda, "rentabilidade_snapshot", None)
         )
         if existing and int(existing.get("snapshot_version") or 0) == SNAPSHOT_VERSION:
-            return existing
+            return ajustar_snapshot_taxa_mista(venda, existing)
 
     snapshot = build_venda_rentabilidade_snapshot(
         venda,

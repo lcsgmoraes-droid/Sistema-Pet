@@ -60,9 +60,13 @@ def test_rotas_de_tributacao_repassam_usuario_e_tenant_explicitamente():
 
 
 def test_calculos_dre_resolvem_tenant_ativo_antes_de_calcular_impostos():
-    expected = "tenant_id=tenant_id_para_escrita_dre(self.db, usuario_id)"
     for source in DRE_SOURCES:
-        assert expected in source
+        assert "tenant_id_para_escrita_dre(self.db, usuario_id)" in source
+        assert "calcular_impostos(" in source
+        assert (
+            "tenant_id=tenant_id_para_escrita_dre(self.db, usuario_id)" in source
+            or "tenant_id=tenant_id," in source
+        )
 
 
 def test_modelo_configuracao_tributaria_declara_unicidade_por_tenant():

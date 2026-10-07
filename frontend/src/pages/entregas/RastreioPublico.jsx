@@ -4,6 +4,7 @@ import axios from "axios";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { formatBRL } from "../../utils/formatters";
+import { getAccessToken } from "../../auth/tokenStorage";
 
 const apiPublica = axios.create({ baseURL: "/api" });
 const TRAIL_LIMIT = 50;
@@ -54,6 +55,7 @@ function createVehicleIcon() {
 export default function RastreioPublico() {
   const { token } = useParams();
   const [dados, setDados] = useState(null);
+  const [detalhesPrivados, setDetalhesPrivados] = useState(null);
   const [erro, setErro] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const mapaRef = useRef(null);
@@ -78,6 +80,26 @@ export default function RastreioPublico() {
       setCarregando(false);
     }
   }, [token]);
+
+  useEffect(() => {
+    const rotaId = dados?.rota_id;
+    const accessToken = getAccessToken();
+    if (!rotaId || !accessToken) return;
+    let ativo = true;
+    axios
+      .get(`/api/rotas-entrega/${rotaId}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      .then((response) => {
+        if (ativo) setDetalhesPrivados({ rotaId, paradas: response.data?.paradas || [] });
+      })
+      .catch(() => {
+        if (ativo) setDetalhesPrivados(null);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [dados?.rota_id]);
 
   useEffect(() => {
     if (!token) return;
@@ -349,40 +371,59 @@ export default function RastreioPublico() {
 
         <div style={styles.paradasBox}>
           <h3 style={styles.paradasTitulo}>Sequencia de entregas</h3>
-          {dados.paradas.map((parada) => (
-            <div key={parada.ordem} style={styles.paradaItem(parada.status)}>
-              <div style={styles.paradaOrdem}>{parada.ordem}</div>
-              <div style={styles.paradaInfo}>
-                <div style={styles.paradaEndereco}>{parada.endereco}</div>
-                {parada.status === "entregue" && Number(parada.distancia_trecho_real_km) > 0 && (
-                  <div style={styles.paradaDistanciaReal}>
-                    {`Trecho: ${formatarKm(parada.distancia_trecho_real_km)}`}
-                    {parada.distancia_acumulada_real_km > 0
-                      ? ` • Acumulado: ${formatarKm(parada.distancia_acumulada_real_km)}`
-                      : ""}
+          {detalhesPrivados?.rotaId !== dados.rota_id && (
+            <p style={{ color: "#64748b", fontSize: 12, marginTop: 0 }}>
+              Os dados das outras entregas ficam ocultos no link público para proteger os clientes.
+            </p>
+          )}
+          {dados.paradas.map((parada) => {
+            const detalhe =
+              detalhesPrivados?.rotaId === dados.rota_id
+                ? detalhesPrivados.paradas.find((item) => item.ordem === parada.ordem)
+                : null;
+            return (
+              <div key={parada.ordem} style={styles.paradaItem(parada.status)}>
+                <div style={styles.paradaOrdem}>{parada.ordem}</div>
+                <div style={styles.paradaInfo}>
+                  <div style={styles.paradaEndereco}>
+                    {detalhe?.cliente_nome || parada.endereco}
                   </div>
-                )}
-                <div style={styles.paradaStatusRow}>
-                  <span style={styles.paradaStatus(parada.status)}>
-                    {getParadaStatusIcon(parada.status)}{" "}
-                    {parada.status === "entregue"
-                      ? "Entregue"
-                      : parada.status === "tentativa"
-                        ? "Tentativa"
-                        : "A caminho"}
-                  </span>
-                  {parada.data_entrega && (
-                    <span style={styles.paradaHora}>
-                      {new Date(parada.data_entrega).toLocaleTimeString("pt-BR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
+                  {detalhe && (
+                    <div style={{ fontSize: 12, color: "#475569", marginTop: 3 }}>
+                      {detalhe.numero_venda ? `Venda ${detalhe.numero_venda} · ` : ""}
+                      {detalhe.endereco || "Endereço não informado"}
+                    </div>
                   )}
+                  {parada.status === "entregue" && Number(parada.distancia_trecho_real_km) > 0 && (
+                    <div style={styles.paradaDistanciaReal}>
+                      {`Trecho: ${formatarKm(parada.distancia_trecho_real_km)}`}
+                      {parada.distancia_acumulada_real_km > 0
+                        ? ` • Acumulado: ${formatarKm(parada.distancia_acumulada_real_km)}`
+                        : ""}
+                    </div>
+                  )}
+                  <div style={styles.paradaStatusRow}>
+                    <span style={styles.paradaStatus(parada.status)}>
+                      {getParadaStatusIcon(parada.status)}{" "}
+                      {parada.status === "entregue"
+                        ? "Entregue"
+                        : parada.status === "tentativa"
+                          ? "Tentativa"
+                          : "A caminho"}
+                    </span>
+                    {parada.data_entrega && (
+                      <span style={styles.paradaHora}>
+                        {new Date(parada.data_entrega).toLocaleTimeString("pt-BR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {distanciaRetornoReal > 0 && (
             <div style={{ ...styles.paradaItem("entregue"), opacity: 0.82 }}>

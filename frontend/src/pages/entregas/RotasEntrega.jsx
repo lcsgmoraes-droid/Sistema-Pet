@@ -4,45 +4,71 @@ import { toast } from "react-hot-toast";
 import api from "../../api";
 import { api as apiServices } from "../../services/api";
 import { confirmarCorePet } from "../../services/corepetDialog";
-import MonitoramentoEntregadores from "./MonitoramentoEntregadores";
+import "./Entregas.css";
 import RotaCard from "./RotaCard";
 import {
-  agruparRotasPorEntregador,
   calcularTempoEstimado,
-  filtrarRotasEmAndamento,
+  filtrarRotasPorStatus,
   formatarTempo,
   getStatusColor,
   getStatusLabel,
-  montarDestinoMapaRota,
+  ordenarRotasRecentes,
+  separarRotasAtivas,
+  statusApiRotas,
 } from "./rotasEntregaUtils";
+
+const FILTROS_STATUS = [
+  ["ativas", "Todas ativas"],
+  ["pendente", "Aguardando início"],
+  ["em_execucao", "Em andamento"],
+  ["concluida", "Concluídas"],
+  ["cancelada", "Canceladas"],
+];
 
 export default function RotasEntrega() {
   const navigate = useNavigate();
   const [rotas, setRotas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filtroStatus, setFiltroStatus] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState("ativas");
+  const [busca, setBusca] = useState("");
+  const [buscaAplicada, setBuscaAplicada] = useState("");
+  const [entregadorId, setEntregadorId] = useState("");
+  const [entregadores, setEntregadores] = useState([]);
   const [rotaExpandida, setRotaExpandida] = useState(null);
   const [metodoKm, setMetodoKm] = useState("auto_rota"); // default seguro
 
   useEffect(() => {
     carregarRotas();
-    // Carregar config de entrega para saber o método configurado
+  }, [filtroStatus, buscaAplicada, entregadorId]);
+
+  useEffect(() => {
     apiServices
       .get("/configuracoes/entregas")
       .then((r) => setMetodoKm(r.data?.metodo_km_entrega || "auto_rota"))
-      .catch(() => {}); // silencioso — usa default se falhar
-  }, [filtroStatus]);
+      .catch(() => {});
+    apiServices
+      .get("/clientes/", { params: { is_entregador: true, limit: 200 } })
+      .then((r) => {
+        const lista = r.data?.items || r.data?.clientes || r.data || [];
+        setEntregadores(Array.isArray(lista) ? lista : []);
+      })
+      .catch(() => {});
+  }, []);
 
   async function carregarRotas() {
     try {
       setLoading(true);
       const params = new URLSearchParams();
-      if (filtroStatus) {
-        params.append("status", filtroStatus);
-      }
+      const statusApi = statusApiRotas(filtroStatus);
+      if (statusApi) params.append("status", statusApi);
+      if (buscaAplicada) params.append("busca", buscaAplicada);
+      if (entregadorId) params.append("entregador_id", entregadorId);
+      params.append("direcao", "desc");
+      params.append("ordenar_por", "criacao");
+      params.append("limite", "500");
 
       const response = await api.get(`/rotas-entrega/?${params.toString()}`);
-      setRotas(response.data);
+      setRotas(ordenarRotasRecentes(filtrarRotasPorStatus(response.data, filtroStatus)));
     } catch (err) {
       console.error("Erro ao carregar rotas:", err);
       toast.error("Erro ao carregar rotas de entrega");
@@ -161,18 +187,21 @@ export default function RotasEntrega() {
     }
   }
 
-  function abrirMapaRota(rota) {
-    const destino = montarDestinoMapaRota(rota);
-    if (destino?.url) {
-      window.open(destino.url, "_blank", "noopener,noreferrer");
-      return;
-    }
-
-    toast.error("Esta rota ainda não tem localizacao ou endereco para abrir no mapa.");
+  function abrirRastreioRota(rota) {
+    navigate(`/entregas/rastreamento?rota=${encodeURIComponent(rota.id)}`);
   }
 
-  const rotasEmAndamento = filtrarRotasEmAndamento(rotas);
-  const monitoramentoEntregadores = agruparRotasPorEntregador(rotasEmAndamento);
+  const gruposAtivos = separarRotasAtivas(rotas);
+  const secoes =
+    filtroStatus === "ativas"
+      ? [
+          {
+            titulo: "Rotas ativas",
+            descricao: "Última rota criada primeiro, com a situação de cada uma no cartão",
+            rotas,
+          },
+        ]
+      : [{ titulo: FILTROS_STATUS.find(([id]) => id === filtroStatus)?.[1], rotas }];
 
   if (loading) {
     return (
@@ -188,7 +217,9 @@ export default function RotasEntrega() {
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
           <h1>Rotas de Entrega</h1>
-          <p style={{ color: "#666", marginBottom: 20 }}>Rotas criadas e em andamento</p>
+          <p style={{ color: "#666", marginBottom: 20 }}>
+            Acompanhe as rotas ativas e consulte as concluídas no arquivo.
+          </p>
         </div>
         <button
           type="button"
@@ -200,71 +231,136 @@ export default function RotasEntrega() {
         </button>
       </div>
 
-      <div
-        style={{
-          marginBottom: 20,
-          display: "flex",
-          gap: 10,
-          alignItems: "center",
-        }}
-      >
-        <label>
-          Filtrar por status:
+      <nav className="rotas-filtros-status" aria-label="Situação das rotas">
+        {FILTROS_STATUS.map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={filtroStatus === id}
+            className={filtroStatus === id ? "ativo" : ""}
+            onClick={() => setFiltroStatus(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      <div className="rotas-filtros-detalhes">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            setBuscaAplicada(busca.trim());
+          }}
+        >
+          <label htmlFor="busca-rotas">Buscar rota, venda, cliente ou endereço</label>
+          <div>
+            <input
+              id="busca-rotas"
+              value={busca}
+              onChange={(event) => setBusca(event.target.value)}
+              placeholder="Digite para buscar"
+            />
+            <button type="submit" className="btn-secondary">
+              Buscar
+            </button>
+          </div>
+        </form>
+        <label htmlFor="entregador-rotas">
+          Entregador
           <select
-            value={filtroStatus}
-            onChange={(e) => setFiltroStatus(e.target.value)}
-            style={{ marginLeft: 10, padding: "5px 10px" }}
+            id="entregador-rotas"
+            value={entregadorId}
+            onChange={(event) => setEntregadorId(event.target.value)}
           >
             <option value="">Todos</option>
-            <option value="pendente">Pendente</option>
-            <option value="em_rota">Em Rota</option>
-            <option value="em_andamento">Em Andamento</option>
-            <option value="concluida">Concluída</option>
-            <option value="cancelada">Cancelada</option>
+            {entregadores.map((entregador) => (
+              <option key={entregador.id} value={entregador.id}>
+                {entregador.nome_fantasia || entregador.nome}
+              </option>
+            ))}
           </select>
         </label>
-
-        <button onClick={carregarRotas} className="btn-secondary" style={{ marginLeft: "auto" }}>
+        <button onClick={carregarRotas} className="btn-secondary">
           🔄 Atualizar
         </button>
       </div>
 
-      <MonitoramentoEntregadores
-        grupos={monitoramentoEntregadores}
-        onAbrirMapaRota={abrirMapaRota}
-      />
+      {filtroStatus === "ativas" && (
+        <div className="rotas-resumo-etapas">
+          <button type="button" onClick={() => setFiltroStatus("em_execucao")}>
+            <strong>{gruposAtivos.emAndamento.length}</strong>
+            <span>Em andamento</span>
+          </button>
+          <button type="button" onClick={() => setFiltroStatus("pendente")}>
+            <strong>{gruposAtivos.pendentes.length}</strong>
+            <span>Aguardando início</span>
+          </button>
+        </div>
+      )}
+
+      {filtroStatus === "concluida" && (
+        <p className="rotas-arquivo-aviso">
+          As rotas concluídas ficam guardadas aqui. Para consultar períodos antigos e resultados,
+          abra o{" "}
+          <button type="button" onClick={() => navigate("/entregas/historico")}>
+            Histórico de Entregas
+          </button>
+          .
+        </p>
+      )}
 
       {!Array.isArray(rotas) || rotas.length === 0 ? (
         <div className="empty-state">
-          <p>Nenhuma rota encontrada</p>
-          <button
-            onClick={() => navigate("/entregas/abertas")}
-            className="btn-primary"
-            style={{ marginTop: 10 }}
-          >
-            Criar Nova Rota
-          </button>
+          <p>
+            {buscaAplicada || entregadorId
+              ? "Nenhuma rota corresponde aos filtros."
+              : "Nenhuma rota nesta situação."}
+          </p>
+          {(filtroStatus === "ativas" || filtroStatus === "pendente") && (
+            <button
+              onClick={() => navigate("/entregas/abertas")}
+              className="btn-primary"
+              style={{ marginTop: 10 }}
+            >
+              Criar Nova Rota
+            </button>
+          )}
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 15 }}>
-          {rotas.map((rota) => (
-            <RotaCard
-              key={rota.id}
-              rota={rota}
-              expandida={rotaExpandida === rota.id}
-              onToggleExpand={() => toggleRotaExpandida(rota.id)}
-              onReordenar={reordenarParadas}
-              onIniciarRota={iniciarRota}
-              onExcluirRota={excluirRota}
-              onReverterInicio={reverterInicioRota}
-              getStatusColor={getStatusColor}
-              getStatusLabel={getStatusLabel}
-              calcularTempoEstimado={calcularTempoEstimado}
-              formatarTempo={formatarTempo}
-              metodoKm={metodoKm}
-            />
-          ))}
-        </div>
+        secoes.map(
+          (secao) =>
+            secao.rotas.length > 0 && (
+              <section key={secao.titulo} className="rotas-secao">
+                <div className="rotas-secao-cabecalho">
+                  <div>
+                    <h2>{secao.titulo}</h2>
+                    {secao.descricao && <p>{secao.descricao}</p>}
+                  </div>
+                  <span>{secao.rotas.length} rota(s)</span>
+                </div>
+                <div className="rotas-secao-lista">
+                  {secao.rotas.map((rota) => (
+                    <RotaCard
+                      key={rota.id}
+                      rota={rota}
+                      expandida={rotaExpandida === rota.id}
+                      onToggleExpand={() => toggleRotaExpandida(rota.id)}
+                      onReordenar={reordenarParadas}
+                      onIniciarRota={iniciarRota}
+                      onExcluirRota={excluirRota}
+                      onReverterInicio={reverterInicioRota}
+                      onAbrirRastreio={abrirRastreioRota}
+                      getStatusColor={getStatusColor}
+                      getStatusLabel={getStatusLabel}
+                      calcularTempoEstimado={calcularTempoEstimado}
+                      formatarTempo={formatarTempo}
+                      metodoKm={metodoKm}
+                    />
+                  ))}
+                </div>
+              </section>
+            ),
+        )
       )}
     </div>
   );

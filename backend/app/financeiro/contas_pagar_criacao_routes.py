@@ -65,7 +65,7 @@ async def criar_conta_pagar(
             user_id=current_user.id,
             tenant_id=tenant_id,
         )
-        if aplicar_classificacao_aprendida_conta_pagar(
+        if conta.afeta_dre and aplicar_classificacao_aprendida_conta_pagar(
             db, tenant_id, conta_pre_classificacao
         ):
             conta.categoria_id = conta_pre_classificacao.categoria_id
@@ -76,12 +76,15 @@ async def criar_conta_pagar(
         # ============================
         # CLASSIFICACAO DRE
         # ============================
-        conta.dre_subcategoria_id = _resolver_dre_subcategoria_conta_pagar(
-            db,
-            tenant_id,
-            dre_subcategoria_id=conta.dre_subcategoria_id,
-            categoria_id=conta.categoria_id,
-        )
+        if conta.afeta_dre:
+            conta.dre_subcategoria_id = _resolver_dre_subcategoria_conta_pagar(
+                db,
+                tenant_id,
+                dre_subcategoria_id=conta.dre_subcategoria_id,
+                categoria_id=conta.categoria_id,
+            )
+        else:
+            conta.dre_subcategoria_id = None
 
         tipo_despesa_id = conta.tipo_despesa_id
         if conta.nota_entrada_id and not tipo_despesa_id:
@@ -97,6 +100,7 @@ async def criar_conta_pagar(
                 fornecedor_id=conta.fornecedor_id,
                 categoria_id=conta.categoria_id,
                 dre_subcategoria_id=conta.dre_subcategoria_id,
+                afeta_dre=conta.afeta_dre,
                 canal=conta.canal,
                 tipo_despesa_id=tipo_despesa_id,
                 valor_original=conta.valor_original,
@@ -135,6 +139,7 @@ async def criar_conta_pagar(
                     fornecedor_id=conta.fornecedor_id,
                     categoria_id=conta.categoria_id,
                     dre_subcategoria_id=conta.dre_subcategoria_id,
+                    afeta_dre=conta.afeta_dre,
                     canal=conta.canal,
                     tipo_despesa_id=tipo_despesa_id,
                     valor_original=valor_parcela,
@@ -162,6 +167,7 @@ async def criar_conta_pagar(
                 fornecedor_id=conta.fornecedor_id,
                 categoria_id=conta.categoria_id,
                 dre_subcategoria_id=conta.dre_subcategoria_id,
+                afeta_dre=conta.afeta_dre,
                 canal=conta.canal,
                 tipo_despesa_id=tipo_despesa_id,
                 valor_original=conta.valor_original,
@@ -220,6 +226,8 @@ async def criar_conta_pagar(
         # ATUALIZAR DRE EM TEMPO REAL
         # ============================
         for conta_criada in contas_criadas:
+            if not conta_criada.afeta_dre:
+                continue
             try:
                 atualizar_dre_por_lancamento(
                     db=db,
@@ -239,6 +247,8 @@ async def criar_conta_pagar(
         # RECONCILIAÇÃO DAS SIMPLES NACIONAL
         # ============================
         for conta_criada in contas_criadas:
+            if not conta_criada.afeta_dre:
+                continue
             try:
                 # Verificar se é DAS Simples Nacional
                 categoria = (
@@ -290,6 +300,8 @@ async def criar_conta_pagar(
         # RECONCILIAÇÃO DE PROVISÕES TRABALHISTAS
         # ============================
         for conta_criada in contas_criadas:
+            if not conta_criada.afeta_dre:
+                continue
             try:
                 categoria = (
                     db.query(CategoriaFinanceira)

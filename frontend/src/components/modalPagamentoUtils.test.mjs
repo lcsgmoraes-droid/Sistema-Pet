@@ -555,8 +555,8 @@ test("calcula previa de cashback, carimbos e recompra elegiveis por canal", () =
     cashbackPrevisto: [
       {
         campanha: "Cashback Ouro",
-        percentual: 5,
-        valor: 5,
+        percentual: 3,
+        valor: 3,
       },
     ],
     carimbosPrevistos: [
@@ -1180,5 +1180,20 @@ test("monta observacoes com justificativa de margem sem duplicar bloco existente
       justificativaTexto: "Autorizado pelo gerente",
     }),
     observacoes,
+  );
+});
+
+test("forma de cartão legada limita bandeira quando operadora não possui regras", () => {
+  assert.deepEqual(
+    obterBandeirasDisponiveis({ taxas: [], modalidade: "credito", bandeiraLegada: "mastercard" }),
+    ["Mastercard"],
+  );
+});
+
+test("regras da operadora continuam sendo fonte das parcelas disponíveis", () => {
+  const taxas = [{ modalidade: "credito", bandeira: "outros", parcelas: 2 }];
+  assert.deepEqual(
+    obterParcelasDisponiveis({ taxas, modalidade: "credito", bandeira: "Visa", maxParcelas: 6 }),
+    [2],
   );
 });

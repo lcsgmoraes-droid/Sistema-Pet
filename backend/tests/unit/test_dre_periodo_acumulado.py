@@ -30,10 +30,17 @@ def test_endpoint_dre_repassa_intervalo_anual_para_todos_os_calculos(monkeypatch
     def agregar_contas(db, mes, ano, tenant_id, dados_canais, **kwargs):
         chamadas.append(("contas", mes, ano, tenant_id, kwargs))
 
+    def agregar_recebiveis(db, mes, ano, tenant_id, dados_canais, **kwargs):
+        chamadas.append(("recebiveis", mes, ano, tenant_id, kwargs))
+
     def agregar_fretes(db, mes, ano, tenant_id, dados_canais, **kwargs):
         chamadas.append(("fretes", mes, ano, tenant_id, kwargs))
 
     monkeypatch.setattr(routes, "obter_vendas_por_canal", obter_vendas)
+    monkeypatch.setattr(
+        routes, "agregar_contas_receber_manuais_por_canal", agregar_recebiveis
+    )
+    monkeypatch.setattr(routes, "agregar_devolucoes_por_canal", agregar_contas)
     monkeypatch.setattr(routes, "agregar_contas_pagar_por_canal", agregar_contas)
     monkeypatch.setattr(routes, "agregar_fretes_sobre_compras", agregar_fretes)
 
@@ -51,7 +58,13 @@ def test_endpoint_dre_repassa_intervalo_anual_para_todos_os_calculos(monkeypatch
     assert resposta.mes_inicial == 1
     assert resposta.mes == 8
     assert resposta.data_final == date(2026, 8, 14)
-    assert [chamada[0] for chamada in chamadas] == ["vendas", "contas", "fretes"]
+    assert [chamada[0] for chamada in chamadas] == [
+        "vendas",
+        "contas",
+        "recebiveis",
+        "contas",
+        "fretes",
+    ]
     for _, mes, ano, tenant_id, kwargs in chamadas:
         assert (mes, ano, tenant_id) == (8, 2026, "tenant-teste")
         assert kwargs == {

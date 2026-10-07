@@ -5,6 +5,7 @@ import { confirmarCorePet } from "../../services/corepetDialog";
 import useShiftRangeSelection from "../../hooks/useShiftRangeSelection";
 import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import SaleReference from "../../components/ui/SaleReference";
+import { formatMoneyBRL } from "../../utils/formatters";
 import "./Entregas.css";
 
 export default function EntregasAbertas() {
@@ -241,7 +242,7 @@ export default function EntregasAbertas() {
     <div className="page">
       <h1>Entregas em Aberto</h1>
       <p style={{ color: "#666", marginBottom: 20 }}>
-        Vendas com entrega que estão aguardando iniciar a rota
+        Vendas com entrega que estão aguardando iniciar a rota · mais recentes primeiro
       </p>
 
       {!Array.isArray(vendas) || vendas.length === 0 ? (
@@ -301,7 +302,7 @@ export default function EntregasAbertas() {
                     }
                   />
                 </th>
-                <th>Ordem</th>
+                <th>Lista</th>
                 <th>Venda</th>
                 <th>Data da Venda</th>
                 <th>Cliente</th>
@@ -382,8 +383,8 @@ export default function EntregasAbertas() {
                   <td style={{ maxWidth: 300, fontSize: "0.9em" }}>
                     {venda.endereco_entrega || "N/A"}
                   </td>
-                  <td>R$ {parseFloat(venda.taxa_entrega || 0).toFixed(2)}</td>
-                  <td>R$ {parseFloat(venda.total || 0).toFixed(2)}</td>
+                  <td>{formatMoneyBRL(venda.taxa_entrega || 0)}</td>
+                  <td>{formatMoneyBRL(venda.total || 0)}</td>
                   <td>
                     <span
                       style={{

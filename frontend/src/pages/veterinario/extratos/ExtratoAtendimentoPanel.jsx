@@ -118,7 +118,7 @@ export default function ExtratoAtendimentoPanel({ contexto, titulo = "Extrato do
             className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
           >
             <FileText size={15} />
-            PDF
+            PDF do extrato
           </button>
           <button
             type="button"
@@ -127,29 +127,34 @@ export default function ExtratoAtendimentoPanel({ contexto, titulo = "Extrato do
             className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
           >
             <FileSpreadsheet size={15} />
-            Excel
+            Excel do extrato
           </button>
         </div>
       </div>
 
       {erro && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{erro}</p>}
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        {EXTRATO_COLUNAS.map((coluna) => (
-          <label
-            key={coluna.chave}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600"
-          >
-            <input
-              type="checkbox"
-              checked={colunasSelecionadas.includes(coluna.chave)}
-              onChange={() => toggleColuna(coluna.chave)}
-              className={checkboxClass}
-            />
-            {coluna.titulo}
-          </label>
-        ))}
-      </div>
+      <details className="mt-4">
+        <summary className="cursor-pointer text-xs font-medium text-gray-600">
+          Personalizar colunas do PDF e Excel
+        </summary>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {EXTRATO_COLUNAS.map((coluna) => (
+            <label
+              key={coluna.chave}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600"
+            >
+              <input
+                type="checkbox"
+                checked={colunasSelecionadas.includes(coluna.chave)}
+                onChange={() => toggleColuna(coluna.chave)}
+                className={checkboxClass}
+              />
+              {coluna.titulo}
+            </label>
+          ))}
+        </div>
+      </details>
 
       <div className="mt-4 overflow-x-auto">
         <table className="min-w-full text-left text-sm">

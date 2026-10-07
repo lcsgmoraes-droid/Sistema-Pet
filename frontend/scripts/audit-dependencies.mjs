@@ -7,6 +7,16 @@ const minimumSeverity = severityOrder.moderate;
 const allowedAdvisories = new Map([
   ["GHSA-QWWW-VCR4-C8H2", "O frontend é uma SPA Vite e não usa o modo RSC/Server Actions afetado."],
 ]);
+const buildOnlyBracesAdvisory = "GHSA-VFJ7-8CJW-P6XM";
+const buildOnlyBracesPackages = new Set([
+  "braces",
+  "chokidar",
+  "fast-glob",
+  "micromatch",
+  "tailwindcss",
+]);
+const packageManifest = JSON.parse(readFileSync("package.json", "utf8"));
+const packageLock = JSON.parse(readFileSync("package-lock.json", "utf8"));
 const rscApiPatterns = [
   /\bcreateRequestHandler\b/,
   /\bServerRouter\b/,
@@ -87,6 +97,26 @@ const usesRsc = sourceUsesRsc(path.resolve("src"));
 const blocked = [];
 const ignored = [];
 
+function isBuildOnlyBracesExposure(name, vulnerability, advisoryIds) {
+  // A falha exige um padrao de glob controlado pelo atacante. Nesta arvore,
+  // braces chega apenas pelo Tailwind 3 usado no build de arquivos do repositorio.
+  // Se algum pacote afetado passar a ser dependencia de runtime, a excecao cai.
+  if (
+    advisoryIds.size !== 1 ||
+    !advisoryIds.has(buildOnlyBracesAdvisory) ||
+    !buildOnlyBracesPackages.has(name) ||
+    !packageManifest.devDependencies?.tailwindcss ||
+    packageManifest.dependencies?.tailwindcss
+  ) {
+    return false;
+  }
+  return (
+    Array.isArray(vulnerability.nodes) &&
+    vulnerability.nodes.length > 0 &&
+    vulnerability.nodes.every((node) => packageLock.packages?.[node]?.dev === true)
+  );
+}
+
 for (const [name, vulnerability] of Object.entries(vulnerabilities)) {
   if ((severityOrder[vulnerability.severity] ?? 99) < minimumSeverity) continue;
 
@@ -95,8 +125,17 @@ for (const [name, vulnerability] of Object.entries(vulnerabilities)) {
     advisoryIds.size > 0 &&
     [...advisoryIds].every((advisoryId) => allowedAdvisories.has(advisoryId));
 
-  if (onlyAllowed && !usesRsc) {
-    ignored.push({ name, advisoryIds: [...advisoryIds] });
+  const rscException = onlyAllowed && !usesRsc;
+  const buildOnlyException = isBuildOnlyBracesExposure(name, vulnerability, advisoryIds);
+
+  if (rscException || buildOnlyException) {
+    ignored.push({
+      name,
+      advisoryIds: [...advisoryIds],
+      reason: buildOnlyException
+        ? "Atinge apenas dependências de desenvolvimento do Tailwind usadas no build com padrões controlados pelo repositório."
+        : allowedAdvisories.get([...advisoryIds][0]),
+    });
   } else {
     blocked.push({ name, severity: vulnerability.severity, advisoryIds: [...advisoryIds] });
   }
@@ -104,9 +143,7 @@ for (const [name, vulnerability] of Object.entries(vulnerabilities)) {
 
 for (const item of ignored) {
   for (const advisoryId of item.advisoryIds) {
-    console.warn(
-      `Exceção documentada: ${item.name} / ${advisoryId}. ${allowedAdvisories.get(advisoryId)}`,
-    );
+    console.warn(`Exceção documentada: ${item.name} / ${advisoryId}. ${item.reason}`);
   }
 }
 

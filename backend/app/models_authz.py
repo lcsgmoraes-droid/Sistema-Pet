@@ -62,6 +62,9 @@ class UserTenant(BaseTenantModel):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     role_id = Column(Integer, ForeignKey("roles.id"), nullable=False, index=True)
     is_active = Column(Boolean, nullable=False, server_default="true")
+    pode_liberar_venda_crediario_atrasado = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

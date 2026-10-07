@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -68,7 +70,7 @@ def test_onboarding_apply_creates_default_copy_for_tenant(onboarding_session):
     assert _count(onboarding_session, "especies", TENANT_A) == 2
     assert _count(onboarding_session, "racas", TENANT_A) == 2
     assert _count(onboarding_session, "dre_categorias", TENANT_A) == 12
-    assert _count(onboarding_session, "tipo_despesas", TENANT_A) == 19
+    assert _count(onboarding_session, "tipo_despesas", TENANT_A) == 17
     assert _count(onboarding_session, "categorias", TENANT_A) == 2
     assert _count(onboarding_session, "linhas_racao", TENANT_A) == 4
     assert _count(onboarding_session, "portes_animal", TENANT_A) == 6
@@ -93,6 +95,122 @@ def test_onboarding_apply_creates_default_copy_for_tenant(onboarding_session):
     assert all(escopo == "AMBOS" for _tipo_custo, escopo in enum_values)
 
 
+def test_new_onboarding_separates_stock_purchases_from_sales_cmv(onboarding_session):
+    onboarding_session.execute(
+        text(
+            """
+            INSERT INTO template_items (
+                bundle_code, bundle_version, item_type, template_code,
+                name, payload, sort_order, active
+            ) VALUES (
+                'petshop-br', 'v2', 'financial_category', 'fin_cmv',
+                'CMV', :payload, 410, 1
+            )
+            """
+        ),
+        {
+            "payload": json.dumps(
+                {"nome": "CMV", "dre_subcategory_code": "dre_cmv_produtos"}
+            )
+        },
+    )
+    onboarding_session.execute(
+        text(
+            """
+            INSERT INTO categorias_financeiras (
+                tenant_id, user_id, nome, tipo, dre_subcategoria_id
+            ) VALUES (:tenant_id, 1, 'CMV', 'despesa', 77)
+            """
+        ),
+        {"tenant_id": TENANT_A},
+    )
+    onboarding_session.commit()
+
+    result = onboard_tenant_defaults(
+        onboarding_session,
+        tenant_id=TENANT_B,
+        user_id=2,
+        dry_run=False,
+        strict_required=True,
+    )
+    onboarding_session.commit()
+
+    assert result["bundle_version"] == "v3"
+    assert result["warnings"] == []
+    assert onboarding_session.execute(
+        text(
+            """
+            SELECT nome, dre_subcategoria_id
+            FROM categorias_financeiras
+            WHERE tenant_id = :tenant_id
+            """
+        ),
+        {"tenant_id": TENANT_A},
+    ).one() == ("CMV", 77)
+    legacy_payload = onboarding_session.execute(
+        text(
+            """
+            SELECT payload FROM template_items
+            WHERE bundle_version = 'v2' AND template_code = 'fin_cmv'
+            """
+        )
+    ).scalar_one()
+    assert json.loads(legacy_payload)["dre_subcategory_code"] == "dre_cmv_produtos"
+
+    compra = onboarding_session.execute(
+        text(
+            """
+            SELECT nome, dre_subcategoria_id
+            FROM categorias_financeiras
+            WHERE tenant_id = :tenant_id AND nome = 'Produto para Revenda'
+            """
+        ),
+        {"tenant_id": TENANT_B},
+    ).one()
+    assert compra == ("Produto para Revenda", None)
+    assert (
+        onboarding_session.execute(
+            text(
+                """
+            SELECT COUNT(*) FROM tipo_despesas
+            WHERE tenant_id = :tenant_id AND nome IN ('CMV', 'Produto para Revenda')
+            """
+            ),
+            {"tenant_id": TENANT_B},
+        ).scalar_one()
+        == 0
+    )
+    assert (
+        onboarding_session.execute(
+            text(
+                """
+            SELECT COUNT(*)
+            FROM categorias_financeiras AS categoria
+            JOIN dre_subcategorias AS subcategoria
+              ON subcategoria.id = categoria.dre_subcategoria_id
+            WHERE categoria.tenant_id = :tenant_id
+              AND subcategoria.nome = 'CMV - Produtos'
+            """
+            ),
+            {"tenant_id": TENANT_B},
+        ).scalar_one()
+        == 0
+    )
+    assert onboarding_session.execute(
+        text(
+            """
+            SELECT subcategoria.nome
+            FROM dre_subcategorias AS subcategoria
+            JOIN dre_categorias AS categoria ON categoria.id = subcategoria.categoria_id
+            WHERE categoria.tenant_id = :tenant_id
+              AND categoria.nome = 'Custo das Mercadorias Vendidas'
+            ORDER BY subcategoria.nome
+            """
+        ),
+        {"tenant_id": TENANT_B},
+    ).scalars().all() == ["CMV - Produtos", "Fretes sobre Compras"]
+
+
 def test_onboarding_is_idempotent_for_same_tenant(onboarding_session):
     onboard_tenant_defaults(
         onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False
@@ -112,7 +230,7 @@ def test_onboarding_is_idempotent_for_same_tenant(onboarding_session):
     assert _count(onboarding_session, "linhas_racao", TENANT_A) == 4
     assert _count(onboarding_session, "vet_catalogo_procedimentos", TENANT_A) == 70
     assert _count(onboarding_session, "dre_categorias", TENANT_A) == 12
-    assert _count(onboarding_session, "tipo_despesas", TENANT_A) == 19
+    assert _count(onboarding_session, "tipo_despesas", TENANT_A) == 17
     assert _count(onboarding_session, "tenant_template_installs") == 1
 
 
@@ -228,9 +346,9 @@ def test_onboarding_item_mapping_survives_tenant_dre_category_edit(onboarding_se
 
     assert second["created"] == {}
     assert second["skipped"]["dre_categories"] == 12
-    assert second["skipped"]["dre_subcategories"] == 38
+    assert second["skipped"]["dre_subcategories"] == 37
     assert _count(onboarding_session, "dre_categorias", TENANT_A) == 12
-    assert _count(onboarding_session, "dre_subcategorias", TENANT_A) == 38
+    assert _count(onboarding_session, "dre_subcategorias", TENANT_A) == 37
     assert (
         onboarding_session.execute(
             text(
@@ -259,8 +377,8 @@ def test_onboarding_creates_isolated_copies_for_each_tenant(onboarding_session):
     assert _count(onboarding_session, "formas_pagamento", TENANT_B) == 5
     assert _count(onboarding_session, "dre_categorias", TENANT_A) == 12
     assert _count(onboarding_session, "dre_categorias", TENANT_B) == 12
-    assert _count(onboarding_session, "tipo_despesas", TENANT_A) == 19
-    assert _count(onboarding_session, "tipo_despesas", TENANT_B) == 19
+    assert _count(onboarding_session, "tipo_despesas", TENANT_A) == 17
+    assert _count(onboarding_session, "tipo_despesas", TENANT_B) == 17
     assert _count(onboarding_session, "vet_catalogo_procedimentos", TENANT_A) == 70
     assert _count(onboarding_session, "vet_catalogo_procedimentos", TENANT_B) == 70
 

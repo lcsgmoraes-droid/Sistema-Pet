@@ -26,6 +26,7 @@ Parâmetros esperados em campaign.params:
 
 import logging
 from datetime import date, timedelta
+from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
@@ -80,6 +81,7 @@ class QuickRepurchaseHandler:
 
         payload = event.payload or {}
         customer_id = payload.get("customer_id")
+        venda_id = payload.get("venda_id")
         venda_total = float(payload.get("venda_total", 0))
 
         if not customer_id:
@@ -117,6 +119,7 @@ class QuickRepurchaseHandler:
                     Coupon.customer_id == customer_id,
                     Coupon.campaign_id == campaign.id,
                     Coupon.created_at >= cooldown_since,
+                    Coupon.status != CouponStatusEnum.voided,
                 )
                 .first()
             )
@@ -141,6 +144,14 @@ class QuickRepurchaseHandler:
                 discount_percent=discount_percent,
                 valid_days=coupon_valid_days,
                 channel=params.get("coupon_channel", "pdv"),
+                meta={
+                    "source_kind": "quick_repurchase",
+                    "source_venda_id": int(venda_id) if venda_id else None,
+                    "source_event_id": event.id,
+                    "min_purchase_value_snapshot": str(
+                        Decimal(str(params.get("min_purchase_value", 0) or 0))
+                    ),
+                },
             )
             from app.models import Cliente
 

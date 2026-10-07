@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { FiX } from "react-icons/fi";
 import toast from "react-hot-toast";
 import api from "../../api";
+import { useAuth } from "../../contexts/AuthContext";
 import BotaoCancelar from "../v2/BotaoCancelar/BotaoCancelar";
 import BotaoSalva from "../v2/BotaoSalva/BotaoSalva";
 import InputCheckGroup from "../v2/InputCheckGroup/InputCheckGroup";
@@ -92,6 +93,8 @@ function validar(formData) {
 }
 
 export default function ClientePessoaCriarModal({ aberto, tipoInicial, onCriado, onFechar }) {
+  const { user } = useAuth();
+  const lojaOrigemNome = user?.tenant?.login_name || user?.tenant?.name || "Loja atual";
   const [formData, setFormData] = useState(() => formDataInicial(tipoInicial));
   const [tocados, setTocados] = useState({});
   const [enviando, setEnviando] = useState(false);
@@ -215,6 +218,14 @@ export default function ClientePessoaCriarModal({ aberto, tipoInicial, onCriado,
 
         <form id="pessoa-criar-form" onSubmit={handleSubmit} noValidate className="space-y-4 p-6">
           <p className="text-sm font-medium text-gray-600">Cadastro básico</p>
+
+          <InputTexto
+            id="pessoa-loja-origem"
+            label="Loja de origem"
+            value={lojaOrigemNome}
+            readOnly
+            help="Loja em que você está operando. Fica registrada no cadastro e não pode ser alterada depois."
+          />
 
           {duplicado ? (
             <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">

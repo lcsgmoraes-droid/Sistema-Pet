@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import api from "../api";
 import { debugLog, debugWarn } from "../utils/debug";
 
 export function usePDVComissaoEstado({
@@ -11,22 +12,26 @@ export function usePDVComissaoEstado({
   carregarFuncionariosComissao,
 }) {
   const [vendaComissionada, setVendaComissionada] = useState(false);
+  const [gerarComissao, setGerarComissao] = useState(false);
   const [funcionarioComissao, setFuncionarioComissao] = useState(null);
 
   useEffect(() => {
     setVendaAtual((prev) => ({
       ...prev,
-      funcionario_id: funcionarioComissao?.id || null,
+      vendedor_funcionario_id: funcionarioComissao?.id || null,
+      funcionario_id: gerarComissao ? funcionarioComissao?.id || null : null,
     }));
-  }, [funcionarioComissao, setVendaAtual]);
+  }, [funcionarioComissao, gerarComissao, setVendaAtual]);
 
   const handleToggleVendaComissionada = (checked) => {
     setVendaComissionada(checked);
     if (!checked) {
+      setGerarComissao(false);
       setFuncionarioComissao(null);
       setVendaAtual((prev) => ({
         ...prev,
         funcionario_id: null,
+        vendedor_funcionario_id: null,
       }));
       setBuscaFuncionario("");
       setFuncionariosSugeridos([]);
@@ -48,7 +53,8 @@ export function usePDVComissaoEstado({
     setFuncionarioComissao(funcionario);
     setVendaAtual((prev) => ({
       ...prev,
-      funcionario_id: funcionario?.id || null,
+      vendedor_funcionario_id: funcionario?.id || null,
+      funcionario_id: gerarComissao ? funcionario?.id || null : null,
     }));
     setFuncionariosSugeridos([]);
     setBuscaFuncionario("");
@@ -59,23 +65,26 @@ export function usePDVComissaoEstado({
     setVendaAtual((prev) => ({
       ...prev,
       funcionario_id: null,
+      vendedor_funcionario_id: null,
     }));
     setBuscaFuncionario("");
   };
 
   const limparComissao = () => {
     setVendaComissionada(false);
+    setGerarComissao(false);
     setFuncionarioComissao(null);
     setVendaAtual((prev) => ({
       ...prev,
       funcionario_id: null,
+      vendedor_funcionario_id: null,
     }));
     setBuscaFuncionario("");
     setFuncionariosSugeridos([]);
   };
 
-  const sincronizarComissaoDaVenda = async (funcionarioId) => {
-    debugLog("Venda carregada - funcionario_id:", funcionarioId);
+  const sincronizarComissaoDaVenda = async (funcionarioId, comissionadoId = null) => {
+    debugLog("Venda carregada - vendedor_funcionario_id:", funcionarioId);
 
     if (!funcionarioId) {
       debugLog("Venda sem funcionario_id - limpando estados de comissao");
@@ -85,12 +94,21 @@ export function usePDVComissaoEstado({
 
     try {
       const funcionarios = await carregarFuncionariosComissao();
-      const funcionarioCarregado = funcionarios.find(
+      let funcionarioCarregado = funcionarios.find(
         (funcionario) => funcionario.id === funcionarioId,
       );
+      if (!funcionarioCarregado) {
+        try {
+          const response = await api.get(`/funcionarios/${funcionarioId}`);
+          funcionarioCarregado = response.data;
+        } catch {
+          // O cadastro pode ser um parceiro antigo indisponível na lista atual.
+        }
+      }
 
       if (funcionarioCarregado) {
         setVendaComissionada(true);
+        setGerarComissao(Boolean(comissionadoId));
         setFuncionarioComissao(funcionarioCarregado);
         debugLog("Funcionario comissao carregado:", funcionarioCarregado);
       } else {
@@ -103,6 +121,8 @@ export function usePDVComissaoEstado({
 
   return {
     vendaComissionada,
+    gerarComissao,
+    setGerarComissao,
     funcionarioComissao,
     funcionariosSugeridos,
     buscaFuncionario,

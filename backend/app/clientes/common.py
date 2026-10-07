@@ -4,7 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import AppAccessProfile, Cliente, User
+from app.models import AppAccessProfile, Cliente, User, UserTenant
 
 
 def _somente_digitos_coluna(coluna):
@@ -111,10 +111,17 @@ def _validar_tenant_e_obter_usuario(user_and_tenant):
 
 
 def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
-    """Busca cliente com validacao de tenant e retorna 404 se nao encontrado."""
+    """Busca cadastro de pessoa visivel para a loja: a propria ou, por grupo comercial, as demais do grupo."""
+    from sqlalchemy import or_
+
+    from app.tenancy.filters import pessoa_visivel_no_grupo
+
     cliente = (
         db.query(Cliente)
-        .filter(Cliente.id == cliente_id, Cliente.tenant_id == tenant_id)
+        .filter(
+            Cliente.id == cliente_id,
+            or_(Cliente.tenant_id == tenant_id, pessoa_visivel_no_grupo(Cliente, tenant_id)),
+        )
         .first()
     )
 
@@ -144,10 +151,19 @@ def _anexar_metadados_criacao_cliente(db: Session, clientes):
         if getattr(cliente, "auth_user_id", None)
     }
     usuarios_app_por_id = {}
+    liberacao_crediario_por_conta = {}
     if auth_user_ids:
         usuarios_app_por_id = {
             usuario.id: usuario
             for usuario in db.query(User).filter(User.id.in_(auth_user_ids)).all()
+        }
+        liberacao_crediario_por_conta = {
+            (str(vinculo.tenant_id), vinculo.user_id): bool(
+                vinculo.pode_liberar_venda_crediario_atrasado
+            )
+            for vinculo in db.query(UserTenant)
+            .filter(UserTenant.user_id.in_(auth_user_ids))
+            .all()
         }
 
     cliente_ids = [cliente.id for cliente in lista if getattr(cliente, "id", None)]
@@ -206,22 +222,32 @@ def _anexar_metadados_criacao_cliente(db: Session, clientes):
             "app_access_profiles",
             perfis_por_cliente.get(getattr(cliente, "id", None), []),
         )
+        setattr(
+            cliente,
+            "pode_liberar_venda_crediario_atrasado",
+            liberacao_crediario_por_conta.get(
+                (str(cliente.tenant_id), cliente.auth_user_id), False
+            ),
+        )
     return clientes
 
 
 def gerar_codigo_cliente(db: Session, tipo_pessoa: str, tenant_id: int) -> str:
     """
-    Gera codigo unico e crescente para o cliente neste tenant.
-    Pega o maior codigo numerico existente, ativo ou inativo, e soma 1.
+    Gera codigo unico e crescente para o cadastro de pessoa dentro do grupo comercial.
+    Pega o maior codigo numerico existente entre as lojas do grupo, e soma 1.
     """
     from sqlalchemy import cast as sqcast
     from sqlalchemy import func as sqlfunc
     from sqlalchemy.dialects.postgresql import BIGINT
 
+    from app.services.grupo_codigos import ids_uuid_do_grupo, trava_codigos_do_grupo
+
+    trava_codigos_do_grupo(db, tenant_id, "codigo_pessoa")
     resultado = (
         db.query(sqlfunc.max(sqcast(Cliente.codigo, BIGINT)))
         .filter(
-            Cliente.tenant_id == tenant_id,
+            Cliente.tenant_id.in_(ids_uuid_do_grupo(db, tenant_id)),
             Cliente.codigo.op("~")("^[0-9]+$"),
         )
         .scalar()

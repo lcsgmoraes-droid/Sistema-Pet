@@ -85,8 +85,8 @@ export default function useProdutosNovoPageComposition({
     sucessorInfo,
   } = predecessorState;
   const {
-    produtoOrigemGranel,
-    setProdutoOrigemGranel,
+    produtosOrigemGranel,
+    setProdutosOrigemGranel,
     granelVinculos,
     handleApresentacaoPesoChange,
     handleClassificacaoRacaoChange,
@@ -225,8 +225,8 @@ export default function useProdutosNovoPageComposition({
 
   const racaoTabProps = {
     formData,
-    produtoOrigemGranel,
-    setProdutoOrigemGranel,
+    produtosOrigemGranel,
+    setProdutosOrigemGranel,
     granelVinculos,
     handleChange,
     handleApresentacaoPesoChange,

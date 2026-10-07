@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.empresa_config_geral_models import EmpresaConfigGeral
 from app.financeiro_models import ContaReceber, FormaPagamento
 from app.security.permissions_service import check_permission
+from app.security.crediario_override import obter_vinculo_ativo
 from app.audit_log import log_action
 
 
@@ -66,7 +67,17 @@ def validar_bloqueio_crediario(
                 raise HTTPException(
                     400, "Não foi possível identificar a liberação desta venda."
                 )
-            check_permission(db, user_id, "configuracoes.editar", tenant_id)
+            vinculo = obter_vinculo_ativo(db, tenant_id, user_id)
+            if not vinculo or not vinculo.pode_liberar_venda_crediario_atrasado:
+                try:
+                    check_permission(db, user_id, "usuarios.manage", tenant_id)
+                except HTTPException as exc:
+                    if exc.status_code != 403:
+                        raise
+                    raise HTTPException(
+                        403,
+                        "Este usuário não está autorizado a liberar vendas bloqueadas por crediário.",
+                    ) from exc
             log_action(
                 db,
                 user_id,

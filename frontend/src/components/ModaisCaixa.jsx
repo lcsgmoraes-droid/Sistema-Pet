@@ -5,6 +5,8 @@ import api from "../api";
 import CurrencyInput from "./CurrencyInput";
 import FornecedorSelector from "./fornecedores/FornecedorSelector";
 import { useEscapeToClose } from "../utils/modalEscape";
+import { formatMoneyBRL } from "../utils/formatters";
+import ImpressaoTermicaCaixa from "./caixa/ImpressaoTermicaCaixa";
 
 const validarCaixaAtual = async (caixaIdEsperado) => {
   const caixaAtual = await obterCaixaAberto();
@@ -21,12 +23,14 @@ const validarCaixaAtual = async (caixaIdEsperado) => {
 /**
  * Modal de Suprimento - Entrada de valores no caixa
  */
-export function ModalSuprimento({ caixaId, onClose, onSucesso }) {
+export function ModalSuprimento({ caixaId, numeroCaixa, onClose, onSucesso }) {
   const [valor, setValor] = useState("");
   const [contaOrigem, setContaOrigem] = useState("");
   const [descricao, setDescricao] = useState("");
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
+  const [movimentoSalvo, setMovimentoSalvo] = useState(null);
+  const [imprimir, setImprimir] = useState(false);
 
   const handleSalvar = async () => {
     const valorNum = parseFloat(valor);
@@ -38,14 +42,15 @@ export function ModalSuprimento({ caixaId, onClose, onSucesso }) {
     setLoading(true);
     try {
       await validarCaixaAtual(caixaId);
-      await adicionarMovimentacao(caixaId, {
+      const movimento = await adicionarMovimentacao(caixaId, {
         tipo: "suprimento",
         valor: valorNum,
         forma_pagamento: "Dinheiro",
         conta_origem_nome: contaOrigem || "Não informado",
         descricao: descricao,
       });
-      onSucesso();
+      setMovimentoSalvo(movimento);
+      setImprimir(true);
     } catch (error) {
       setErro(error.response?.data?.detail || error.message || "Erro ao adicionar suprimento");
     } finally {
@@ -54,88 +59,102 @@ export function ModalSuprimento({ caixaId, onClose, onSucesso }) {
   };
 
   return (
-    <ModalBase
-      titulo="Suprimento para o caixa"
-      icone={TrendingUp}
-      corIcone="green"
-      onClose={onClose}
-      erro={erro}
-    >
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Origem do dinheiro (opcional)
-          </label>
-          <select
-            value={contaOrigem}
-            onChange={(e) => setContaOrigem(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Nao informar</option>
-            <option value="Dinheiro em mãos">Dinheiro em mãos</option>
-            <option value="Caixa geral">Caixa geral</option>
-            <option value="Banco">Banco</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Valor*</label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-            <input
-              type="number"
-              step="0.01"
-              value={valor}
-              onChange={(e) => setValor(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              autoFocus
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Motivo / observacao
-          </label>
-          <textarea
-            value={descricao}
-            onChange={(e) => setDescricao(e.target.value)}
-            rows={3}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            placeholder="Motivo do suprimento..."
+    <>
+      <ModalBase
+        titulo="Suprimento para o caixa"
+        icone={TrendingUp}
+        corIcone="green"
+        onClose={movimentoSalvo ? onSucesso : onClose}
+        erro={erro}
+      >
+        {movimentoSalvo ? (
+          <ComprovanteSalvo
+            movimento={movimentoSalvo}
+            onImprimir={() => setImprimir(true)}
+            onConcluir={onSucesso}
           />
-        </div>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Origem do dinheiro (opcional)
+              </label>
+              <select
+                value={contaOrigem}
+                onChange={(e) => setContaOrigem(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Nao informar</option>
+                <option value="Dinheiro em mãos">Dinheiro em mãos</option>
+                <option value="Caixa geral">Caixa geral</option>
+                <option value="Banco">Banco</option>
+              </select>
+            </div>
 
-        <div className="flex space-x-3 pt-4">
-          <button
-            onClick={onClose}
-            disabled={loading}
-            className="flex-1 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors"
-          >
-            Fechar
-          </button>
-          <button
-            onClick={handleSalvar}
-            disabled={loading}
-            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
-          >
-            {loading ? "Salvando..." : "Salvar"}
-          </button>
-        </div>
-      </div>
-    </ModalBase>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Valor*</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
+                <CurrencyInput
+                  value={valor}
+                  onChange={setValor}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Motivo / observacao
+              </label>
+              <textarea
+                value={descricao}
+                onChange={(e) => setDescricao(e.target.value)}
+                rows={3}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="Motivo do suprimento..."
+              />
+            </div>
+
+            <div className="flex space-x-3 pt-4">
+              <button
+                onClick={onClose}
+                disabled={loading}
+                className="flex-1 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors"
+              >
+                Fechar
+              </button>
+              <button
+                onClick={handleSalvar}
+                disabled={loading}
+                className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+              >
+                {loading ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </div>
+        )}
+      </ModalBase>
+      <ImpressaoTermicaCaixa
+        documento={imprimir ? { movimento: movimentoSalvo, numeroCaixa } : null}
+        onAfterPrint={() => setImprimir(false)}
+      />
+    </>
   );
 }
 
 /**
  * Modal de Sangria - Retirada de valores do caixa
  */
-export function ModalSangria({ caixaId, saldoAtual, onClose, onSucesso }) {
+export function ModalSangria({ caixaId, numeroCaixa, saldoAtual, onClose, onSucesso }) {
   const [valor, setValor] = useState("");
   const [contaDestino, setContaDestino] = useState("");
   const [descricao, setDescricao] = useState("");
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
+  const [movimentoSalvo, setMovimentoSalvo] = useState(null);
+  const [imprimir, setImprimir] = useState(false);
 
   const handleSalvar = async () => {
     const valorNum = parseFloat(valor);
@@ -147,14 +166,15 @@ export function ModalSangria({ caixaId, saldoAtual, onClose, onSucesso }) {
     setLoading(true);
     try {
       await validarCaixaAtual(caixaId);
-      await adicionarMovimentacao(caixaId, {
+      const movimento = await adicionarMovimentacao(caixaId, {
         tipo: "sangria",
         valor: valorNum,
         forma_pagamento: "Dinheiro",
         conta_destino_nome: contaDestino || "Não informado",
         descricao: descricao,
       });
-      onSucesso();
+      setMovimentoSalvo(movimento);
+      setImprimir(true);
     } catch (error) {
       setErro(error.response?.data?.detail || error.message || "Erro ao adicionar sangria");
     } finally {
@@ -163,82 +183,128 @@ export function ModalSangria({ caixaId, saldoAtual, onClose, onSucesso }) {
   };
 
   return (
-    <ModalBase
-      titulo="Sangria no caixa"
-      icone={TrendingDown}
-      corIcone="orange"
-      onClose={onClose}
-      erro={erro}
-    >
-      <div className="space-y-4">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-          <div className="text-sm text-blue-800">
-            <strong>Em caixa:</strong> R$ {saldoAtual.toFixed(2)}
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Valor da Sangria*</label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-            <input
-              type="number"
-              step="0.01"
-              value={valor}
-              onChange={(e) => setValor(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              autoFocus
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Destino do dinheiro (opcional)
-          </label>
-          <select
-            value={contaDestino}
-            onChange={(e) => setContaDestino(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Nao informar</option>
-            <option value="Cofre">Cofre</option>
-            <option value="Banco">Banco</option>
-            <option value="Outro caixa">Outro caixa</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Motivo / observacao
-          </label>
-          <textarea
-            value={descricao}
-            onChange={(e) => setDescricao(e.target.value)}
-            rows={3}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            placeholder="Motivo da sangria..."
+    <>
+      <ModalBase
+        titulo="Sangria no caixa"
+        icone={TrendingDown}
+        corIcone="orange"
+        onClose={movimentoSalvo ? onSucesso : onClose}
+        erro={erro}
+      >
+        {movimentoSalvo ? (
+          <ComprovanteSalvo
+            movimento={movimentoSalvo}
+            onImprimir={() => setImprimir(true)}
+            onConcluir={onSucesso}
           />
-        </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+              <div className="text-sm text-blue-800">
+                <strong>Em caixa:</strong> {formatMoneyBRL(saldoAtual)}
+              </div>
+            </div>
 
-        <div className="flex space-x-3 pt-4">
-          <button
-            onClick={onClose}
-            disabled={loading}
-            className="flex-1 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors"
-          >
-            Fechar
-          </button>
-          <button
-            onClick={handleSalvar}
-            disabled={loading}
-            className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors"
-          >
-            {loading ? "Salvando..." : "Salvar"}
-          </button>
-        </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Valor da Sangria*
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
+                <CurrencyInput
+                  value={valor}
+                  onChange={setValor}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Destino do dinheiro (opcional)
+              </label>
+              <select
+                value={contaDestino}
+                onChange={(e) => setContaDestino(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Nao informar</option>
+                <option value="Cofre">Cofre</option>
+                <option value="Banco">Banco</option>
+                <option value="Outro caixa">Outro caixa</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Motivo / observacao
+              </label>
+              <textarea
+                value={descricao}
+                onChange={(e) => setDescricao(e.target.value)}
+                rows={3}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="Motivo da sangria..."
+              />
+            </div>
+
+            <div className="flex space-x-3 pt-4">
+              <button
+                onClick={onClose}
+                disabled={loading}
+                className="flex-1 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors"
+              >
+                Fechar
+              </button>
+              <button
+                onClick={handleSalvar}
+                disabled={loading}
+                className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors"
+              >
+                {loading ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </div>
+        )}
+      </ModalBase>
+      <ImpressaoTermicaCaixa
+        documento={imprimir ? { movimento: movimentoSalvo, numeroCaixa } : null}
+        onAfterPrint={() => setImprimir(false)}
+      />
+    </>
+  );
+}
+
+function ComprovanteSalvo({ movimento, onImprimir, onConcluir }) {
+  return (
+    <div className="space-y-4">
+      <p className="font-semibold text-green-700">
+        Lançamento registrado. Imprima e colha as assinaturas.
+      </p>
+      <div className="rounded-lg border bg-gray-50 p-4">
+        <p>Comprovante #{movimento.id}</p>
+        <p>
+          Valor: <strong>{formatMoneyBRL(movimento.valor)}</strong>
+        </p>
       </div>
-    </ModalBase>
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={onImprimir}
+          className="flex-1 rounded-lg border border-gray-300 px-4 py-2 font-medium"
+        >
+          Imprimir novamente
+        </button>
+        <button
+          type="button"
+          onClick={onConcluir}
+          className="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white"
+        >
+          Concluir
+        </button>
+      </div>
+    </div>
   );
 }
 

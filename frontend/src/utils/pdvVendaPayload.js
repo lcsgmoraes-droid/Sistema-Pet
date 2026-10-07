@@ -5,6 +5,12 @@ function normalizarNumero(valor) {
 
 export function montarItensVendaPayload(vendaAtual) {
   return (vendaAtual.itens || []).map((item) => ({
+    item_id:
+      item.venda_id != null &&
+      vendaAtual.id != null &&
+      Number(item.venda_id) === Number(vendaAtual.id)
+        ? item.id
+        : null,
     tipo: item.tipo,
     produto_id: item.produto_id,
     servico_descricao: item.servico_descricao,
@@ -39,6 +45,7 @@ export function montarPayloadVenda(vendaAtual, entregadorSelecionado = null) {
   return {
     cliente_id: vendaAtual.cliente?.id || null,
     funcionario_id: vendaAtual.funcionario_id || null,
+    vendedor_funcionario_id: vendaAtual.vendedor_funcionario_id || null,
     itens: montarItensVendaPayload(vendaAtual),
     desconto_valor: normalizarNumero(vendaAtual.desconto_valor),
     desconto_percentual: normalizarNumero(vendaAtual.desconto_percentual),

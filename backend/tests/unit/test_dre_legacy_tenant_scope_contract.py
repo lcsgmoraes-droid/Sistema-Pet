@@ -6,14 +6,9 @@ from app import dre_base_routes, dre_calculos
 def test_dre_legado_filtra_receitas_e_despesas_por_tenant():
     source = inspect.getsource(dre_base_routes.gerar_dre)
 
-    assert "_current_user, tenant_id = user_and_tenant" in source
-    assert "Venda.tenant_id == tenant_id" in source
-    assert "calcular_cmv(db, mes, ano, tenant_id)" in source
-    assert "obter_despesas_por_categoria(db, mes, ano, tenant_id)" in source
-    assert "calcular_taxas_cartao(db, mes, ano, tenant_id)" in source
-    bloco_frete = source.split("frete_compras = calcular_frete_notas_entrada(", 1)[1]
-    bloco_frete = bloco_frete.split(")  # Frete de notas de entrada", 1)[0]
-    assert "tenant_id" in bloco_frete
+    assert "_dre_para_exportacao(" in source
+    assert "user_and_tenant=user_and_tenant" in source
+    assert 'canais=",".join(CANAIS_CONFIG)' in source
 
 
 def test_dre_detalhado_filtra_despesas_e_receitas_por_tenant():
@@ -29,6 +24,10 @@ def test_helpers_dre_legado_exigem_tenant_id():
     assert "tenant_id" in inspect.signature(dre_calculos.calcular_cmv).parameters
     assert (
         "tenant_id"
+        in inspect.signature(dre_calculos.calcular_custo_servicos).parameters
+    )
+    assert (
+        "tenant_id"
         in inspect.signature(dre_calculos.calcular_frete_notas_entrada).parameters
     )
     assert (
@@ -41,13 +40,13 @@ def test_helpers_dre_legado_exigem_tenant_id():
 
 
 def test_helpers_dre_legado_filtram_modelos_por_tenant():
-    cmv = inspect.getsource(dre_calculos.calcular_cmv)
+    custos = inspect.getsource(dre_calculos._calcular_custo_itens_por_natureza)
     frete = inspect.getsource(dre_calculos.calcular_frete_notas_entrada)
     despesas = inspect.getsource(dre_calculos.obter_despesas_por_categoria)
     taxas = inspect.getsource(dre_calculos.calcular_taxas_cartao)
 
-    assert "Venda.tenant_id == tenant_id" in cmv
-    assert "VendaItem.tenant_id == tenant_id" in cmv
+    assert "Venda.tenant_id == tenant_id" in custos
+    assert "VendaItem.tenant_id == tenant_id" in custos
     assert "NotaEntrada.tenant_id == tenant_id" in frete
     assert "DRESubcategoria.tenant_id == tenant_id" in despesas
     assert "ContaPagar.tenant_id == tenant_id" in despesas

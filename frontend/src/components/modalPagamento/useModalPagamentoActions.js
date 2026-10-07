@@ -33,6 +33,8 @@ export function useModalPagamentoActions({
   justificativaTexto,
   margemCriticaAtual,
   moduloFiscalAtivo,
+  naoGerarBeneficios,
+  justificativaBeneficios,
   nsuCartao,
   numeroParcelas,
   onConfirmar,
@@ -247,6 +249,10 @@ export function useModalPagamentoActions({
       const opcoesFinalizacao = {
         cupom_code: cupomParaFinalizar?.code || null,
         cupom_discount_applied: cupomParaFinalizar?.discount_applied ?? null,
+        nao_gerar_beneficios: naoGerarBeneficios,
+        justificativa_nao_gerar_beneficios: naoGerarBeneficios
+          ? justificativaBeneficios.trim()
+          : null,
       };
       let resultado;
       try {
@@ -262,7 +268,7 @@ export function useModalPagamentoActions({
         }
         const motivo = await perguntarCorePet({
           titulo: "Liberar venda bloqueada",
-          mensagem: `${detalhe}\n\nUm usuário com permissão para editar configurações pode liberar esta venda. Informe o motivo:`,
+          mensagem: `${detalhe}\n\nUm administrador ou usuário autorizado em Administração > Usuários pode liberar esta venda. Informe o motivo:`,
           placeholder: "Motivo da liberação (mínimo de 10 caracteres)",
           confirmarTexto: "Liberar esta venda",
         });

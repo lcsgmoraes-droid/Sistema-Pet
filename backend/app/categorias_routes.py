@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
+from app.categorias_integridade import normalizar_nome_categoria
 from app.financeiro_models import CategoriaFinanceira
 from app.domain.validators.dre_validator import validar_categoria_financeira_dre
 from app.utils.logger import logger
@@ -59,6 +60,7 @@ class CategoriaFinanceiraResponse(BaseModel):
     nivel: int = 0
     caminho_completo: str = ""
     tem_subcategorias: bool = False
+    pode_editar: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -70,11 +72,16 @@ def calcular_nivel_categoria(categoria: CategoriaFinanceira, db: Session) -> int
     """Calcula o nível hierárquico da categoria"""
     nivel = 0
     pai_id = categoria.categoria_pai_id
-    while pai_id:
+    visitados = {categoria.id}
+    while pai_id and pai_id not in visitados:
+        visitados.add(pai_id)
         nivel += 1
         pai = (
             db.query(CategoriaFinanceira)
-            .filter(CategoriaFinanceira.id == pai_id)
+            .filter(
+                CategoriaFinanceira.id == pai_id,
+                CategoriaFinanceira.tenant_id == categoria.tenant_id,
+            )
             .first()
         )
         if pai:
@@ -88,11 +95,16 @@ def obter_caminho_completo(categoria: CategoriaFinanceira, db: Session) -> str:
     """Retorna o caminho completo da categoria (ex: Despesas > Salários > FGTS)"""
     caminho = [categoria.nome]
     pai_id = categoria.categoria_pai_id
+    visitados = {categoria.id}
 
-    while pai_id:
+    while pai_id and pai_id not in visitados:
+        visitados.add(pai_id)
         pai = (
             db.query(CategoriaFinanceira)
-            .filter(CategoriaFinanceira.id == pai_id)
+            .filter(
+                CategoriaFinanceira.id == pai_id,
+                CategoriaFinanceira.tenant_id == categoria.tenant_id,
+            )
             .first()
         )
         if pai:
@@ -105,12 +117,15 @@ def obter_caminho_completo(categoria: CategoriaFinanceira, db: Session) -> str:
 
 
 def categoria_para_response(
-    categoria: CategoriaFinanceira, db: Session
+    categoria: CategoriaFinanceira, db: Session, usuario_id: int
 ) -> CategoriaFinanceiraResponse:
     """Converte CategoriaFinanceira para Response com informações adicionais"""
     tem_subcategorias = (
         db.query(CategoriaFinanceira)
-        .filter(CategoriaFinanceira.categoria_pai_id == categoria.id)
+        .filter(
+            CategoriaFinanceira.categoria_pai_id == categoria.id,
+            CategoriaFinanceira.tenant_id == categoria.tenant_id,
+        )
         .count()
         > 0
     )
@@ -129,6 +144,33 @@ def categoria_para_response(
         nivel=calcular_nivel_categoria(categoria, db),
         caminho_completo=obter_caminho_completo(categoria, db),
         tem_subcategorias=tem_subcategorias,
+        pode_editar=categoria.user_id == usuario_id,
+    )
+
+
+def _nome_financeiro_duplicado(
+    db: Session,
+    *,
+    tenant_id,
+    tipo: str,
+    categoria_pai_id: int | None,
+    nome: str,
+    ignorar_id: int | None = None,
+) -> bool:
+    query = db.query(CategoriaFinanceira).filter(
+        CategoriaFinanceira.tenant_id == tenant_id,
+        CategoriaFinanceira.tipo == tipo,
+        CategoriaFinanceira.ativo.is_(True),
+    )
+    if categoria_pai_id is None:
+        query = query.filter(CategoriaFinanceira.categoria_pai_id.is_(None))
+    else:
+        query = query.filter(CategoriaFinanceira.categoria_pai_id == categoria_pai_id)
+    nome_normalizado = normalizar_nome_categoria(nome)
+    return any(
+        categoria.id != ignorar_id
+        and normalizar_nome_categoria(categoria.nome) == nome_normalizado
+        for categoria in query.all()
     )
 
 
@@ -160,7 +202,7 @@ def listar_categorias(
     logger.info("filter_ativas", f"  ✅ Apenas Ativas: {apenas_ativas}")
     logger.info("filter_raiz", f"  🌳 Apenas Raiz: {apenas_raiz}")
     query = db.query(CategoriaFinanceira).filter(
-        CategoriaFinanceira.user_id == current_user.id
+        CategoriaFinanceira.tenant_id == tenant_id
     )
 
     if tipo:
@@ -184,7 +226,9 @@ def listar_categorias(
             "categoria_mais", f"    ... e mais {len(categorias) - 5} categorias"
         )
 
-    resultado = [categoria_para_response(cat, db) for cat in categorias]
+    resultado = [
+        categoria_para_response(cat, db, current_user.id) for cat in categorias
+    ]
     logger.info("resultado_final", f"  ✅ Retornando {len(resultado)} categorias\n")
 
     return resultado
@@ -200,10 +244,10 @@ def listar_categorias_arvore(
     """
     Retorna todas as categorias hierarquicamente
     """
-    current_user, _tenant_id = user_and_tenant
+    current_user, tenant_id = user_and_tenant
 
     query = db.query(CategoriaFinanceira).filter(
-        CategoriaFinanceira.user_id == current_user.id
+        CategoriaFinanceira.tenant_id == tenant_id
     )
 
     if tipo:
@@ -215,7 +259,9 @@ def listar_categorias_arvore(
     categorias = query.all()
 
     # Ordenar por nível e nome para exibição hierárquica
-    categorias_response = [categoria_para_response(cat, db) for cat in categorias]
+    categorias_response = [
+        categoria_para_response(cat, db, current_user.id) for cat in categorias
+    ]
     categorias_response.sort(key=lambda x: (x.nivel, x.caminho_completo))
 
     return categorias_response
@@ -228,14 +274,14 @@ def obter_categoria(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Retorna uma categoria específica"""
-    current_user, _tenant_id = user_and_tenant
+    current_user, tenant_id = user_and_tenant
 
     categoria = (
         db.query(CategoriaFinanceira)
         .filter(
             and_(
                 CategoriaFinanceira.id == categoria_id,
-                CategoriaFinanceira.user_id == current_user.id,
+                CategoriaFinanceira.tenant_id == tenant_id,
             )
         )
         .first()
@@ -244,7 +290,7 @@ def obter_categoria(
     if not categoria:
         raise HTTPException(status_code=404, detail="Categoria não encontrada")
 
-    return categoria_para_response(categoria, db)
+    return categoria_para_response(categoria, db, current_user.id)
 
 
 @router.post("", response_model=CategoriaFinanceiraResponse)
@@ -255,6 +301,9 @@ def criar_categoria(
 ):
     """Cria uma nova categoria financeira"""
     current_user, tenant_id = user_and_tenant
+    nome = categoria_data.nome.strip()
+    if not normalizar_nome_categoria(nome):
+        raise HTTPException(status_code=400, detail="Informe o nome da categoria")
 
     # Validar categoria pai se fornecida
     if categoria_data.categoria_pai_id:
@@ -264,6 +313,7 @@ def criar_categoria(
                 and_(
                     CategoriaFinanceira.id == categoria_data.categoria_pai_id,
                     CategoriaFinanceira.user_id == current_user.id,
+                    CategoriaFinanceira.tenant_id == tenant_id,
                 )
             )
             .first()
@@ -279,8 +329,17 @@ def criar_categoria(
                 detail="Categoria pai deve ser do mesmo tipo (receita/despesa)",
             )
 
+    if categoria_data.ativo and _nome_financeiro_duplicado(
+        db,
+        tenant_id=tenant_id,
+        tipo=categoria_data.tipo,
+        categoria_pai_id=categoria_data.categoria_pai_id,
+        nome=nome,
+    ):
+        raise HTTPException(status_code=409, detail="Categoria financeira já existe")
+
     categoria = CategoriaFinanceira(
-        **categoria_data.model_dump(),
+        **{**categoria_data.model_dump(), "nome": nome},
         user_id=current_user.id,
         tenant_id=tenant_id,
     )
@@ -299,7 +358,7 @@ def criar_categoria(
     db.commit()
     db.refresh(categoria)
 
-    return categoria_para_response(categoria, db)
+    return categoria_para_response(categoria, db, current_user.id)
 
 
 @router.put("/{categoria_id}", response_model=CategoriaFinanceiraResponse)
@@ -318,6 +377,7 @@ def atualizar_categoria(
             and_(
                 CategoriaFinanceira.id == categoria_id,
                 CategoriaFinanceira.user_id == current_user.id,
+                CategoriaFinanceira.tenant_id == tenant_id,
             )
         )
         .first()
@@ -326,30 +386,89 @@ def atualizar_categoria(
     if not categoria:
         raise HTTPException(status_code=404, detail="Categoria não encontrada")
 
-    # Atualizar apenas campos fornecidos
+    # Validar a árvore e o nome antes de aplicar qualquer alteração.
     update_data = categoria_data.model_dump(exclude_unset=True)
-
-    # Validar categoria pai se fornecida
-    if "categoria_pai_id" in update_data and update_data["categoria_pai_id"]:
-        # Não permitir categoria ser pai de si mesma
-        if update_data["categoria_pai_id"] == categoria_id:
-            raise HTTPException(
-                status_code=400, detail="Categoria não pode ser pai de si mesma"
-            )
-
-        pai = (
-            db.query(CategoriaFinanceira)
-            .filter(
-                and_(
-                    CategoriaFinanceira.id == update_data["categoria_pai_id"],
-                    CategoriaFinanceira.user_id == current_user.id,
-                )
-            )
-            .first()
+    if "nome" in update_data:
+        if not update_data["nome"] or not normalizar_nome_categoria(
+            update_data["nome"]
+        ):
+            raise HTTPException(status_code=400, detail="Informe o nome da categoria")
+        update_data["nome"] = update_data["nome"].strip()
+    if "tipo" in update_data and update_data["tipo"] != categoria.tipo:
+        raise HTTPException(
+            status_code=400,
+            detail="O tipo da categoria não pode ser alterado após a criação",
         )
 
-        if not pai:
-            raise HTTPException(status_code=404, detail="Categoria pai não encontrada")
+    tipo_novo = update_data.get("tipo", categoria.tipo)
+    pai_id_novo = update_data.get("categoria_pai_id", categoria.categoria_pai_id)
+    nome_novo = update_data.get("nome", categoria.nome)
+    ativo_novo = update_data.get("ativo", categoria.ativo)
+
+    if "categoria_pai_id" in update_data or "tipo" in update_data:
+        if pai_id_novo:
+            pai = (
+                db.query(CategoriaFinanceira)
+                .filter(
+                    CategoriaFinanceira.id == pai_id_novo,
+                    CategoriaFinanceira.user_id == current_user.id,
+                    CategoriaFinanceira.tenant_id == tenant_id,
+                )
+                .first()
+            )
+            if not pai:
+                raise HTTPException(
+                    status_code=404, detail="Categoria pai não encontrada"
+                )
+            if pai.tipo != tipo_novo:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Categoria pai deve ser do mesmo tipo (receita/despesa)",
+                )
+
+            visitados = set()
+            ancestral_id = pai_id_novo
+            while ancestral_id:
+                if ancestral_id == categoria_id or ancestral_id in visitados:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Categoria não pode criar ciclo na árvore",
+                    )
+                visitados.add(ancestral_id)
+                ancestral = (
+                    db.query(CategoriaFinanceira)
+                    .filter(
+                        CategoriaFinanceira.id == ancestral_id,
+                        CategoriaFinanceira.tenant_id == tenant_id,
+                    )
+                    .first()
+                )
+                if not ancestral:
+                    raise HTTPException(
+                        status_code=400, detail="Árvore de categorias inválida"
+                    )
+                ancestral_id = ancestral.categoria_pai_id
+
+    chave_alterada = (
+        normalizar_nome_categoria(nome_novo)
+        != normalizar_nome_categoria(categoria.nome)
+        or tipo_novo != categoria.tipo
+        or pai_id_novo != categoria.categoria_pai_id
+        or (ativo_novo and not categoria.ativo)
+    )
+    if (
+        ativo_novo
+        and chave_alterada
+        and _nome_financeiro_duplicado(
+            db,
+            tenant_id=tenant_id,
+            tipo=tipo_novo,
+            categoria_pai_id=pai_id_novo,
+            nome=nome_novo,
+            ignorar_id=categoria_id,
+        )
+    ):
+        raise HTTPException(status_code=409, detail="Categoria financeira já existe")
 
     for key, value in update_data.items():
         setattr(categoria, key, value)
@@ -364,6 +483,7 @@ def atualizar_categoria(
             .filter(
                 CategoriaFinanceira.categoria_pai_id == categoria_id,
                 CategoriaFinanceira.user_id == current_user.id,
+                CategoriaFinanceira.tenant_id == tenant_id,
             )
             .all()
         )
@@ -382,7 +502,7 @@ def atualizar_categoria(
     db.commit()
     db.refresh(categoria)
 
-    return categoria_para_response(categoria, db)
+    return categoria_para_response(categoria, db, current_user.id)
 
 
 @router.delete("/{categoria_id}")
@@ -392,7 +512,7 @@ def deletar_categoria(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Desativa uma categoria (soft delete)"""
-    current_user, _tenant_id = user_and_tenant
+    current_user, tenant_id = user_and_tenant
 
     categoria = (
         db.query(CategoriaFinanceira)
@@ -400,6 +520,7 @@ def deletar_categoria(
             and_(
                 CategoriaFinanceira.id == categoria_id,
                 CategoriaFinanceira.user_id == current_user.id,
+                CategoriaFinanceira.tenant_id == tenant_id,
             )
         )
         .first()
@@ -414,6 +535,7 @@ def deletar_categoria(
         .filter(
             and_(
                 CategoriaFinanceira.categoria_pai_id == categoria_id,
+                CategoriaFinanceira.tenant_id == tenant_id,
                 CategoriaFinanceira.ativo.is_(True),
             )
         )
@@ -443,15 +565,15 @@ def listar_subcategorias_dre_da_categoria(
     """
     from app.dre_plano_contas_models import DRESubcategoria
 
-    current_user, tenant_id = user_and_tenant
+    _current_user, tenant_id = user_and_tenant
 
-    # Verificar se a categoria existe e pertence ao usuário
+    # Consultas de categorias financeiras são compartilhadas dentro do tenant.
     categoria = (
         db.query(CategoriaFinanceira)
         .filter(
             and_(
                 CategoriaFinanceira.id == categoria_id,
-                CategoriaFinanceira.user_id == current_user.id,
+                CategoriaFinanceira.tenant_id == tenant_id,
             )
         )
         .first()

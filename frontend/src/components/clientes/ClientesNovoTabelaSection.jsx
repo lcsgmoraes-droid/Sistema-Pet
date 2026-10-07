@@ -114,7 +114,7 @@ function PessoaMobileCard({
       <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
         {cliente.is_cliente && (
           <div>
-            <dt className="text-slate-500">Origem</dt>
+            <dt className="text-slate-500">Canal de origem</dt>
             <dd className="text-slate-700">{nomeOrigemCliente(cliente.origem_cliente)}</dd>
           </div>
         )}
@@ -338,7 +338,7 @@ const ClientesNovoTabelaSection = ({
                       Pets
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                      Origem
+                      Canal de origem
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
                       Acoes

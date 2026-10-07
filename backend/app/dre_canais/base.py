@@ -10,7 +10,10 @@ from sqlalchemy import func, or_
 from app.dre_plano_contas_models import DRESubcategoria
 from app.financeiro_models import ContaPagar
 from app.vendas_models import Venda, VendaItem
-from app.services.venda_rentabilidade_snapshot_service import SNAPSHOT_VERSION
+from app.services.venda_rentabilidade_snapshot_service import (
+    SNAPSHOT_VERSION,
+    ajustar_snapshot_taxa_mista,
+)
 
 
 CANAIS_CONFIG = {
@@ -129,7 +132,11 @@ def _snapshot_pronto(venda: Venda) -> Optional[Dict[str, Any]]:
         version = int(snapshot.get("snapshot_version") or 0)
     except (TypeError, ValueError):
         version = 0
-    return snapshot if version >= SNAPSHOT_VERSION else None
+    return (
+        ajustar_snapshot_taxa_mista(venda, snapshot)
+        if version >= SNAPSHOT_VERSION
+        else None
+    )
 
 
 def _campo_zero() -> Decimal:
@@ -141,11 +148,15 @@ def _novo_canal() -> Dict:
         "receita_produtos": _campo_zero(),
         "receita_servicos": _campo_zero(),
         "receita_frete": _campo_zero(),
+        "receita_outras": _campo_zero(),
         "descontos": _campo_zero(),
+        "devolucoes": _campo_zero(),
         "impostos": _campo_zero(),
         "cmv": _campo_zero(),
+        "custo_servicos": _campo_zero(),
         "cmv_estimado": _campo_zero(),
         "itens_cmv_estimado": [],
+        "itens_cmv_atribuido": [],
         "percentual_cmv_estimado": _campo_zero(),
         "origem_percentual_cmv_estimado": None,
         "fretes_compras": _campo_zero(),
@@ -349,19 +360,23 @@ def _classificar_conta_dre(texto: str) -> str:
 
 
 ORIGENS_DRE = {
-    "receita_bruta_total": "Soma de produtos, servicos e frete das vendas do periodo nos canais selecionados. Usa a data da venda no regime de competencia.",
+    "receita_bruta_total": "Soma das vendas e das contas a receber manuais classificadas como receita no periodo, sem duplicar contas geradas pelo PDV.",
     "receita_produtos": "Vem dos itens de produto vendidos no periodo. Frete, servicos e descontos ficam em linhas separadas.",
     "receita_servicos": "Vem dos itens marcados como servico nas vendas do periodo.",
     "receita_frete": "Frete/taxa de entrega cobrada do cliente na venda, tratado como receita do periodo.",
-    "deducoes_total": "Soma dos descontos comerciais e dos impostos estimados sobre as vendas.",
+    "receita_outras": "Contas a receber sem venda vinculada, classificadas em subcategoria de receita pela data de emissao.",
+    "deducoes_total": "Soma dos descontos comerciais, devolucoes registradas e impostos estimados sobre as vendas.",
     "descontos": "Descontos concedidos na venda. Cupons/cashback identificados como campanha sao reclassificados na linha de campanhas.",
+    "devolucoes": "Valor efetivamente devolvido ao cliente em dinheiro ou credito, pela data da devolucao. Registros anteriores ao evento estruturado exigem conciliacao manual.",
     "impostos": "Imposto por competencia, calculado pela aliquota fiscal configurada sobre venda bruta e frete.",
     "receita_liquida_total": "Receita bruta menos deducoes da receita.",
-    "cmv_total": "Soma do CMV confirmado, do custo provisoriamente estimado para produtos sem custo e dos fretes sobre compras classificados no periodo.",
-    "cmv": "Custo dos produtos vendidos. Prioriza movimentacao de estoque/FIFO e usa custo do cadastro do produto quando nao houver movimento.",
+    "custos_diretos_total": "Soma do CMV de produtos, custo dos servicos prestados, CMV provisoriamente estimado e fretes sobre compras classificados no periodo.",
+    "cmv_total": "Soma do CMV confirmado de produtos, do custo provisoriamente estimado para produtos sem custo e dos fretes sobre compras classificados no periodo.",
+    "cmv": "Custo dos produtos vendidos, liquido dos estornos de custo original comprovado em devolucoes do periodo.",
+    "custo_servicos": "Custo dos servicos vendidos, liquido dos estornos de custo original comprovado em devolucoes do periodo.",
     "cmv_estimado": "Custo provisório de produtos vendidos sem custo confiável. Usa a proporção ponderada entre custo confirmado e venda bruta dos demais produtos do mesmo canal e período; não altera o cadastro do produto.",
     "fretes_compras": "Contas a pagar classificadas como Fretes sobre Compras pela data de emissao.",
-    "lucro_bruto_total": "Receita liquida menos CMV e fretes sobre compras.",
+    "lucro_bruto_total": "Receita liquida menos CMV de produtos, custo dos servicos prestados e fretes sobre compras.",
     "despesas_variaveis_total": "Soma dos custos variaveis ligados a venda: cartao, marketplace, entrega, operacional, comissoes e campanhas.",
     "taxas_cartao": "Taxas das formas de pagamento configuradas, calculadas sobre os pagamentos das vendas.",
     "taxas_marketplace": "Contas a pagar classificadas como taxas de marketplace pela data de emissao.",

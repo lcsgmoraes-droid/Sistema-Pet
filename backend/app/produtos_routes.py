@@ -26,6 +26,7 @@ from .produtos.cadastro_routes import (
     router as cadastro_router,
 )
 from .produtos.catalogos_routes import router as catalogos_router
+from .produtos.historico_routes import router as historico_router
 from .produtos.codigo_sku_routes import (
     gerar_codigo_barras,
     gerar_sku,
@@ -131,6 +132,7 @@ router.include_router(listagem_router)
 router.include_router(variacoes_fusao_router)
 router.include_router(aliases_sku_router)
 router.include_router(cadastro_router)
+router.include_router(historico_router)
 router.include_router(atualizacao_lote_router)
 router.include_router(estado_router)
 

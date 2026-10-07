@@ -3,7 +3,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, or_
+from sqlalchemy import case, func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -11,7 +11,7 @@ from app.audit_log import log_create
 from app.clientes.common import gerar_codigo_cliente, tipos_cadastro_da_pessoa
 from app.db import get_session
 from app.evolucao_corepet import registrar_uso_funcionalidade
-from app.models import Cliente, User
+from app.models import Cliente, ClienteContato, User
 from app.routes.ecommerce_auth import _get_current_ecommerce_user
 from app.services.cliente_origem import opcoes_origem_cliente
 
@@ -138,6 +138,13 @@ def buscar_clientes_funcionario_pdv(
         Cliente.cnpj.ilike(f"%{termo}%"),
         Cliente.telefone.ilike(f"%{termo}%"),
         Cliente.celular.ilike(f"%{termo}%"),
+        Cliente.contatos_adicionais.any(
+            (ClienteContato.tenant_id == Cliente.tenant_id)
+            & (
+                ClienteContato.numero.ilike(f"%{termo}%")
+                | ClienteContato.vinculo.ilike(f"%{termo}%")
+            )
+        ),
     ]
     if termo_digits:
         filtros.extend(
@@ -146,6 +153,10 @@ def buscar_clientes_funcionario_pdv(
                 cnpj_digits.ilike(f"%{termo_digits}%"),
                 telefone_digits.ilike(f"%{termo_digits}%"),
                 celular_digits.ilike(f"%{termo_digits}%"),
+                Cliente.contatos_adicionais.any(
+                    (ClienteContato.tenant_id == Cliente.tenant_id)
+                    & ClienteContato.numero_digitos.ilike(f"%{termo_digits}%")
+                ),
             ]
         )
 
@@ -156,7 +167,22 @@ def buscar_clientes_funcionario_pdv(
             Cliente.ativo.is_(True),
             or_(*filtros),
         )
-        .order_by(Cliente.nome.asc(), Cliente.id.asc())
+        .order_by(
+            case(
+                (
+                    Cliente.contatos_adicionais.any(
+                        (ClienteContato.tenant_id == Cliente.tenant_id)
+                        & (ClienteContato.numero_digitos == termo_digits)
+                    ),
+                    0,
+                ),
+                else_=1,
+            )
+            if termo_digits
+            else Cliente.nome.asc(),
+            Cliente.nome.asc(),
+            Cliente.id.asc(),
+        )
         .limit(20)
         .all()
     )

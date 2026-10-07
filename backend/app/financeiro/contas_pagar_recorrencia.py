@@ -119,6 +119,7 @@ def _gerar_contas_recorrentes_ate_janela(
             fornecedor_id=conta_origem.fornecedor_id,
             categoria_id=conta_origem.categoria_id,
             dre_subcategoria_id=conta_origem.dre_subcategoria_id,
+            afeta_dre=conta_origem.afeta_dre,
             canal=conta_origem.canal,
             tipo_despesa_id=conta_origem.tipo_despesa_id,
             valor_original=conta_origem.valor_original,
@@ -297,6 +298,7 @@ def _aplicar_edicao_recorrencia_futura(
         "fornecedor_id",
         "categoria_id",
         "dre_subcategoria_id",
+        "afeta_dre",
         "tipo_despesa_id",
         "canal",
         "valor_original",
@@ -332,6 +334,10 @@ def _aplicar_edicao_recorrencia_futura(
             futura.categoria_id = conta.categoria_id
         if "dre_subcategoria_id" in campos:
             futura.dre_subcategoria_id = conta.dre_subcategoria_id
+        if "afeta_dre" in campos:
+            futura.afeta_dre = conta.afeta_dre
+            if not futura.afeta_dre:
+                futura.dre_subcategoria_id = None
         if "tipo_despesa_id" in campos:
             futura.tipo_despesa_id = conta.tipo_despesa_id
         if "canal" in campos:

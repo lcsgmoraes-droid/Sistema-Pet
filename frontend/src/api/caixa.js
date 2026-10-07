@@ -111,3 +111,15 @@ export const obterVendasCaixa = async (caixaId, formaPagamento = null) => {
   const response = await api.get(`/caixas/${caixaId}/vendas`, { params });
   return response.data;
 };
+
+export const baixarPdfCaixa = async (caixaId, numeroCaixa) => {
+  const response = await api.get(`/caixas/${caixaId}/pdf`, { responseType: "blob" });
+  const url = URL.createObjectURL(response.data);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `Caixa_${numeroCaixa}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};

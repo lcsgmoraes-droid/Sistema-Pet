@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { X, RotateCcw } from "lucide-react";
 import api from "../api";
+import { confirmarCorePet } from "../services/corepetDialog";
 import ModalDevolucaoSections from "./devolucao/ModalDevolucaoSections";
 import { getStatusBuscaDevolucao } from "../utils/pdvReturnEligibility";
+import { criarMapaSaldosDevolucao, quantidadeDisponivelDevolucao } from "../utils/pdvReturnBalance";
 
 const STATUS_BUSCA_DEVOLUCAO = getStatusBuscaDevolucao().join(",");
 
@@ -10,6 +12,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
   const [passo, setPasso] = useState(1); // 1: listar vendas, 2: selecionar itens
   const [vendas, setVendas] = useState([]);
   const [vendaSelecionada, setVendaSelecionada] = useState(null);
+  const [saldosItens, setSaldosItens] = useState({});
   const [itensSelecionados, setItensSelecionados] = useState({});
   const [quantidades, setQuantidades] = useState({});
   const [motivo, setMotivo] = useState("");
@@ -17,6 +20,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
   const vendaInicialCarregadaRef = useRef(null);
+  const operacaoDevolucaoRef = useRef(null);
 
   // 🆕 Estados para devolução de KIT
   const [modoDevolucaoKit, setModoDevolucaoKit] = useState({}); // {itemId: 'kit_inteiro' | 'componentes'}
@@ -88,8 +92,13 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
 
     try {
       // Buscar detalhes completos da venda
-      const response = await api.get(`/vendas/${venda.id}`);
+      const [response, respostaSaldos] = await Promise.all([
+        api.get(`/vendas/${venda.id}`),
+        api.get(`/vendas/${venda.id}/devolucao/saldos`),
+      ]);
+      const saldos = criarMapaSaldosDevolucao(response.data, respostaSaldos.data);
       setVendaSelecionada(response.data);
+      setSaldosItens(saldos);
       setItensSelecionados({});
       setModoDevolucaoKit({});
       setComponentesSelecionados({});
@@ -97,10 +106,10 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
       setMotivo("");
       setErro("");
 
-      // Inicializar quantidades com o máximo disponível
+      // Inicializar cada item com o saldo que ainda pode ser devolvido.
       const qtds = {};
       response.data.itens.forEach((item) => {
-        qtds[item.id] = item.quantidade;
+        qtds[item.id] = quantidadeDisponivelDevolucao(saldos, item.id);
       });
       setQuantidades(qtds);
 
@@ -114,6 +123,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
   };
 
   const toggleItem = (itemId) => {
+    if (quantidadeDisponivelDevolucao(saldosItens, itemId) <= 0) return;
     const wasSelected = itensSelecionados[itemId];
 
     setItensSelecionados((prev) => ({
@@ -142,8 +152,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
   };
 
   const handleQuantidadeChange = (itemId, valor) => {
-    const item = vendaSelecionada.itens.find((i) => i.id === itemId);
-    const qtdMaxima = item.quantidade;
+    const qtdMaxima = quantidadeDisponivelDevolucao(saldosItens, itemId);
     const qtdNova = Math.min(Math.max(0, parseFloat(valor) || 0), qtdMaxima);
 
     setQuantidades((prev) => ({
@@ -311,6 +320,15 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
       return;
     }
 
+    if (
+      itensDevolucao.some(
+        (item) => item.quantidade > quantidadeDisponivelDevolucao(saldosItens, item.item_id),
+      )
+    ) {
+      setErro("A quantidade selecionada supera o saldo disponível para devolução");
+      return;
+    }
+
     if (!motivo.trim()) {
       setErro("Informe o motivo da devolução");
       return;
@@ -323,26 +341,71 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
 
     setLoading(true);
     setErro("");
+    const assinaturaOperacao = JSON.stringify({
+      vendaId: vendaSelecionada.id,
+      itens: itensDevolucao,
+      motivo,
+      gerarCredito,
+      caixaId,
+    });
+    let registroEnviado = false;
 
     try {
+      let valorPrevisto;
+      if (operacaoDevolucaoRef.current?.assinatura === assinaturaOperacao) {
+        // A resposta pode ter se perdido depois do commit. Reenvie a mesma operação.
+        valorPrevisto = operacaoDevolucaoRef.current.valorPrevisto;
+      } else {
+        const previa = await api.post(`/vendas/${vendaSelecionada.id}/devolucao/previa`, {
+          itens: itensDevolucao,
+        });
+        valorPrevisto = previa.data.valor_total_devolucao;
+        if (!Number.isFinite(Number(valorPrevisto)) || Number(valorPrevisto) <= 0) {
+          throw new Error("Não foi possível conferir o valor líquido da devolução");
+        }
+        const valorFormatado = Number(valorPrevisto).toLocaleString("pt-BR", {
+          style: "currency",
+          currency: "BRL",
+        });
+        const confirmado = await confirmarCorePet({
+          titulo: "Confirmar devolução",
+          mensagem: `Confirmar ${gerarCredito ? "crédito ao cliente" : "reembolso em dinheiro"} de ${valorFormatado}? Este é o valor líquido após os descontos da venda.${vendaSelecionada.cliente_id ? " Os benefícios de cashback e fidelidade desta venda serão recalculados." : ""} O imposto da venda não será estornado automaticamente na DRE; confira o documento fiscal.`,
+          confirmarTexto: "Confirmar devolução",
+        });
+        if (!confirmado) return;
+
+        operacaoDevolucaoRef.current = {
+          assinatura: assinaturaOperacao,
+          chave: globalThis.crypto.randomUUID(),
+          valorPrevisto,
+        };
+      }
+
+      registroEnviado = true;
       await api.post(`/vendas/${vendaSelecionada.id}/devolucao`, {
         caixa_id: caixaId,
         itens: itensDevolucao,
         motivo: motivo,
         gerar_credito: gerarCredito,
+        valor_previsto: valorPrevisto,
+        chave_operacao: operacaoDevolucaoRef.current.chave,
       });
 
+      operacaoDevolucaoRef.current = null;
       alert("Devolução registrada com sucesso!");
       onSucesso();
     } catch (error) {
+      if (registroEnviado && error.response?.status >= 400 && error.response.status < 500) {
+        operacaoDevolucaoRef.current = null;
+      }
       console.error("Erro ao registrar devolução:", error);
-      setErro(error.response?.data?.detail || "Erro ao registrar devolução");
+      setErro(error.response?.data?.detail || error.message || "Erro ao registrar devolução");
     } finally {
       setLoading(false);
     }
   };
 
-  const calcularTotalDevolucao = () => {
+  const calcularValorBrutoSelecionado = () => {
     if (!vendaSelecionada) return 0;
 
     let total = 0;
@@ -415,7 +478,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
         </div>
 
         <ModalDevolucaoSections
-          calcularTotalDevolucao={calcularTotalDevolucao}
+          calcularValorBrutoSelecionado={calcularValorBrutoSelecionado}
           componentesSelecionados={componentesSelecionados}
           erro={erro}
           filtros={filtros}
@@ -433,6 +496,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
           onClose={onClose}
           passo={passo}
           quantidades={quantidades}
+          saldosItens={saldosItens}
           quantidadesComponentes={quantidadesComponentes}
           selecionarVenda={selecionarVenda}
           setErro={setErro}

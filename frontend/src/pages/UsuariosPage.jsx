@@ -1,6 +1,8 @@
 import { Plus, Users } from "lucide-react";
-import UsuarioModal from "../components/usuarios/UsuarioModal";
+import UsuarioAcessoInicialModal from "../components/usuarios/UsuarioAcessoInicialModal";
 import UsuarioCredenciaisModal from "../components/usuarios/UsuarioCredenciaisModal";
+import UsuarioLojaLoginCard from "../components/usuarios/UsuarioLojaLoginCard";
+import UsuarioModal from "../components/usuarios/UsuarioModal";
 import UsuarioVincularLojaModal from "../components/usuarios/UsuarioVincularLojaModal";
 import UsuariosTable from "../components/usuarios/UsuariosTable";
 import BotaoInteracao from "../components/v2/BotaoInteracao/BotaoInteracao";
@@ -18,13 +20,18 @@ const OPCOES_STATUS = [
 
 export default function UsuariosPage() {
   const {
+    alterarLiberacaoCrediario,
     criarUsuario,
     credenciais,
     credenciaisError,
+    excluirUsuario,
     fecharCredenciais,
     filtroPerfil,
     filtroStatus,
     forcarLogout,
+    gerarNovaSenha,
+    generatedPassword,
+    initialAccessCredentials,
     itensPorPagina,
     limparErroServidor,
     loading,
@@ -41,24 +48,27 @@ export default function UsuariosPage() {
     recriarSenha,
     roles,
     rolesUsuariosDiretos,
-    searchTerm,
-    setFiltroPerfil,
-    setFiltroStatus,
-    setItensPorPagina,
-    setNovoUsuario,
-    setCredenciais,
-    setPaginaAtual,
-    setSearchTerm,
-    showModal,
     salvarCredenciais,
     salvarPerfisApp,
     savingCredentials,
+    savingLiberacaoId,
     savingPerfisApp,
+    searchTerm,
+    setCredenciais,
+    setFiltroPerfil,
+    setFiltroStatus,
+    setInitialAccessCredentials,
+    setItensPorPagina,
+    setNovoUsuario,
+    setPaginaAtual,
+    setSearchTerm,
+    showModal,
+    tenantLoginReference,
     toggleStatus,
     totalPaginas,
     totalUsuariosFiltrados,
-    usuarioServerErrors,
     usuarioCredenciais,
+    usuarioServerErrors,
     usuarios,
     vincularLojaUsuario,
   } = useUsuariosPage();
@@ -87,7 +97,7 @@ export default function UsuariosPage() {
       <PageHeader
         icon={Users}
         title="Usuarios"
-        subtitle="Gerencie usuarios, perfis e acessos do tenant atual."
+        subtitle="Gerencie usuários, perfis e autorizações individuais desta loja."
         actions={
           <BotaoInteracao icon={Plus} onClick={onAbrirModalUsuario}>
             Novo usuario
@@ -95,15 +105,19 @@ export default function UsuariosPage() {
         }
       />
 
+      <UsuarioLojaLoginCard tenantReference={tenantLoginReference} />
+
       <Panel padding="md">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_320px_280px]">
-          <InputTexto
-            id="usuarios-busca"
-            label="Buscar"
-            value={searchTerm}
-            onChange={setSearchTerm}
-            placeholder="Buscar por nome, celular, usuário ou e-mail..."
-          />
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <div className="md:col-span-2 lg:col-span-1">
+            <InputTexto
+              id="usuarios-busca"
+              label="Buscar"
+              value={searchTerm}
+              onChange={setSearchTerm}
+              placeholder="Buscar por nome, celular, usuário ou e-mail..."
+            />
+          </div>
           <InputComboboxMultiplo
             id="usuarios-filtro-perfil"
             label="Perfil"
@@ -127,12 +141,15 @@ export default function UsuariosPage() {
 
       <UsuariosTable
         loading={loading}
+        onDelete={excluirUsuario}
         onForcarLogout={forcarLogout}
         onManageCredentials={onAbrirCredenciais}
         onRecriarSenha={recriarSenha}
+        onToggleCrediario={alterarLiberacaoCrediario}
         onToggleStatus={toggleStatus}
         onVincularLoja={onAbrirVincularLoja}
         paginacaoRodape={paginacao("bottom")}
+        savingLiberacaoId={savingLiberacaoId}
         usuarios={usuarios}
       />
 
@@ -150,15 +167,18 @@ export default function UsuariosPage() {
       <UsuarioCredenciaisModal
         credenciais={credenciais}
         erro={credenciaisError}
+        generatedPassword={generatedPassword}
         loading={savingCredentials}
         onChange={setCredenciais}
         onClose={fecharCredenciais}
+        onGenerate={gerarNovaSenha}
+        onSalvarPerfisApp={salvarPerfisApp}
         onSubmit={salvarCredenciais}
         perfisApp={perfisApp}
         pessoaVinculada={pessoaVinculadaCredenciais}
-        onSalvarPerfisApp={salvarPerfisApp}
-        savingPerfisApp={savingPerfisApp}
         roles={rolesUsuariosDiretos}
+        savingPerfisApp={savingPerfisApp}
+        tenantReference={tenantLoginReference}
         usuario={usuarioCredenciais}
       />
 
@@ -169,6 +189,11 @@ export default function UsuariosPage() {
           onAlterado={onUsuarioVinculadoLoja}
         />
       ) : null}
+
+      <UsuarioAcessoInicialModal
+        credentials={initialAccessCredentials}
+        onClose={() => setInitialAccessCredentials(null)}
+      />
     </div>
   );
 }

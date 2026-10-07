@@ -15,6 +15,8 @@ from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.campaigns.cashback_wallet import get_cashback_wallet, lock_cashback_customer
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -194,6 +196,11 @@ def processar_pagamentos_finalizacao(
         CashbackSourceTypeEnum,
         CashbackTransaction,
     )
+    from app.campaigns.cashback_limit import (
+        cashback_amount_brl,
+        cashback_available_in_sale,
+        cashback_use_limit_percent,
+    )
     from app.financeiro_models import (
         CategoriaFinanceira,
         FormaPagamento,
@@ -211,6 +218,27 @@ def processar_pagamentos_finalizacao(
     from app.vendas_models import Venda, VendaPagamento
 
     movimentacoes_caixa_ids: List[int] = []
+    tem_cashback = any(
+        str(pagamento.get("forma_pagamento") or "").strip().lower() == "cashback"
+        for pagamento in pagamentos
+    )
+    cashback_percent = (
+        cashback_use_limit_percent(db, tenant_id) if tem_cashback else None
+    )
+    cashback_ja_usado = Decimal("0")
+    if cashback_percent is not None:
+        cashback_ja_usado = Decimal(
+            str(
+                db.query(func.coalesce(func.sum(VendaPagamento.valor), 0))
+                .filter(
+                    VendaPagamento.tenant_id == tenant_id,
+                    VendaPagamento.venda_id == venda.id,
+                    func.lower(VendaPagamento.forma_pagamento) == "cashback",
+                )
+                .scalar()
+            )
+        )
+    cashback_novos = Decimal("0")
 
     for pag_data in pagamentos:
         operadora_id = pag_data.get("operadora_id")
@@ -449,7 +477,13 @@ def processar_pagamentos_finalizacao(
                     detail="Crédito só pode ser usado em vendas com cliente vinculado",
                 )
 
-            cliente = db.query(Cliente).filter_by(id=venda.cliente_id).first()
+            cliente = (
+                db.query(Cliente)
+                .filter_by(id=venda.cliente_id, tenant_id=tenant_id)
+                .populate_existing()
+                .with_for_update()
+                .first()
+            )
             if not cliente:
                 raise HTTPException(status_code=404, detail="Cliente não encontrado")
 
@@ -480,17 +514,33 @@ def processar_pagamentos_finalizacao(
                     detail="Cashback só pode ser usado em vendas com cliente vinculado",
                 )
 
-            saldo_raw = (
-                db.query(func.sum(CashbackTransaction.amount))
-                .filter(
-                    CashbackTransaction.tenant_id == tenant_id,
-                    CashbackTransaction.customer_id == venda.cliente_id,
+            if cashback_percent is not None:
+                disponivel_na_venda = cashback_available_in_sale(
+                    venda.total, cashback_percent, cashback_ja_usado + cashback_novos
                 )
-                .scalar()
-            )
-            saldo_disponivel = float(saldo_raw or 0)
+                if Decimal(str(pag_data["valor"])) > disponivel_na_venda:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"Cashback limitado a {str(cashback_percent).replace('.', ',')}% da venda. "
+                            f"Disponível nesta compra: {cashback_amount_brl(disponivel_na_venda)}"
+                        ),
+                    )
 
-            if pag_data["valor"] > saldo_disponivel + 0.01:
+            try:
+                lock_cashback_customer(
+                    db, tenant_id=tenant_id, customer_id=venda.cliente_id
+                )
+            except LookupError as exc:
+                raise HTTPException(
+                    status_code=404, detail="Cliente não encontrado"
+                ) from exc
+            saldo_disponivel = get_cashback_wallet(
+                db, tenant_id=tenant_id, customer_id=venda.cliente_id
+            ).available
+
+            valor_cashback = Decimal(str(pag_data["valor"])).quantize(Decimal("0.01"))
+            if valor_cashback <= 0 or valor_cashback > saldo_disponivel:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Cashback insuficiente. Disponível: R$ {saldo_disponivel:.2f}",
@@ -499,13 +549,15 @@ def processar_pagamentos_finalizacao(
             debit = CashbackTransaction(
                 tenant_id=tenant_id,
                 customer_id=venda.cliente_id,
-                amount=-Decimal(str(pag_data["valor"])),
+                amount=-valor_cashback,
                 source_type=CashbackSourceTypeEnum.redemption,
                 source_id=venda.id,
                 description=f"Resgate em venda {venda.numero_venda}",
                 tx_type="debit",
             )
             db.add(debit)
+            db.flush()
+            cashback_novos += Decimal(str(pag_data["valor"]))
 
             cat_campanha = (
                 db.query(CategoriaFinanceira)

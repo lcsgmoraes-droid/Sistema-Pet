@@ -2,12 +2,15 @@ import { useState, useEffect } from "react";
 import api from "../api";
 import { toast } from "react-hot-toast";
 import ModalNovaContaReceberContent from "./contasReceber/ModalNovaContaReceberContent";
+import { normalizarListaClientes } from "./contasReceber/contasReceberFilterHelpers";
+import { garantirCategoriaDRE } from "../utils/dreCategoriaFinanceira";
 
 const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
   const [loading, setLoading] = useState(false);
   const [clientes, setClientes] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [subcategoriasDRE, setSubcategoriasDRE] = useState([]);
+  const [categoriasDRE, setCategoriasDRE] = useState([]);
   const [previewParcelas, setPreviewParcelas] = useState([]);
   const [intervaloParcelas, setIntervaloParcelas] = useState(30);
   const [showModalCategoria, setShowModalCategoria] = useState(false);
@@ -53,15 +56,16 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
 
   const carregarDados = async () => {
     try {
-      const [clientesRes, categoriasRes, subcategoriasDRERes] = await Promise.all([
+      const [clientesRes, categoriasRes, subcategoriasDRERes, categoriasDRERes] = await Promise.all([
         api.get("/clientes/?is_cliente=true"),
         api.get("/categorias-financeiras"),
         api.get("/dre/subcategorias"),
+        api.get("/dre/categorias"),
       ]);
 
       console.log("📦 Categorias recebidas:", categoriasRes.data);
 
-      setClientes(clientesRes.data);
+      setClientes(normalizarListaClientes(clientesRes.data));
 
       // Filtrar categorias: Mostrar APENAS receitas/entradas
       const categoriasReceita = categoriasRes.data.filter((c) => {
@@ -80,6 +84,7 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
 
       setCategorias(categoriasReceita);
       setSubcategoriasDRE(subcategoriasDRERes.data || []);
+      setCategoriasDRE(categoriasDRERes.data || []);
 
       console.log("✅ Categorias de RECEITA setadas:", categoriasReceita.length);
       console.log("📋 Lista completa:", categoriasReceita);
@@ -129,24 +134,26 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
   };
 
   const adicionarSubcategoriaNova = () => {
-    setFormCategoria({
-      ...formCategoria,
-      novasSubcategorias: [
-        ...formCategoria.novasSubcategorias,
-        { nome: "", descricao: "", ativo: true },
-      ],
-    });
+    setFormCategoria((atual) => ({
+      ...atual,
+      novasSubcategorias: [...atual.novasSubcategorias, { nome: "", descricao: "", ativo: true }],
+    }));
   };
 
   const atualizarSubcategoriaNova = (index, field, value) => {
-    const novasSubs = [...formCategoria.novasSubcategorias];
-    novasSubs[index][field] = value;
-    setFormCategoria({ ...formCategoria, novasSubcategorias: novasSubs });
+    setFormCategoria((atual) => ({
+      ...atual,
+      novasSubcategorias: atual.novasSubcategorias.map((subcategoria, subIndex) =>
+        subIndex === index ? { ...subcategoria, [field]: value } : subcategoria,
+      ),
+    }));
   };
 
   const removerSubcategoriaNova = (index) => {
-    const novasSubs = formCategoria.novasSubcategorias.filter((_, i) => i !== index);
-    setFormCategoria({ ...formCategoria, novasSubcategorias: novasSubs });
+    setFormCategoria((atual) => ({
+      ...atual,
+      novasSubcategorias: atual.novasSubcategorias.filter((_, i) => i !== index),
+    }));
   };
 
   const handleKeyDownSubcategoria = (e, index) => {
@@ -164,6 +171,7 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
       return;
     }
 
+    let categoriaId;
     try {
       const response = await api.post("/categorias-financeiras", {
         nome: formCategoria.nome,
@@ -174,32 +182,40 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
         ativo: formCategoria.ativo,
       });
 
-      const categoriaId = response.data.id;
-      toast.success("Categoria criada com sucesso!");
+      categoriaId = response.data.id;
 
       // Criar subcategorias se houver
+      let primeiraSubDREId = null;
       if (formCategoria.novasSubcategorias.length > 0) {
         const subsValidas = formCategoria.novasSubcategorias.filter((sub) => sub.nome.trim());
-        for (const sub of subsValidas) {
-          try {
-            await api.post("/dre/subcategorias", {
-              categoria_id: categoriaId,
-              nome: sub.nome,
+        if (subsValidas.length > 0) {
+          const categoriaDREId = await garantirCategoriaDRE(api, {
+            nome: formCategoria.nome,
+            tipo: formCategoria.tipo,
+          });
+          for (const sub of subsValidas) {
+            const subResp = await api.post("/dre/subcategorias", {
+              categoria_id: categoriaDREId,
+              categoria_financeira_id: categoriaId,
+              nome: sub.nome.trim(),
               tipo_custo: "direto",
               escopo_rateio: "ambos",
             });
-          } catch (subError) {
-            console.error("Erro ao criar subcategoria:", subError);
+            primeiraSubDREId ||= subResp.data.id;
           }
-        }
-        if (subsValidas.length > 0) {
-          toast.success(`${subsValidas.length} subcategoria(s) criada(s)!`);
+          await api.put(`/categorias-financeiras/${categoriaId}`, {
+            dre_subcategoria_id: primeiraSubDREId,
+          });
         }
       }
 
       // Atualizar lista de categorias e selecionar a nova
       await carregarDados();
-      setDados({ ...dados, categoria_id: categoriaId });
+      setDados((atual) => ({
+        ...atual,
+        categoria_id: categoriaId,
+        dre_subcategoria_id: primeiraSubDREId,
+      }));
       setShowModalCategoria(false);
       setFormCategoria({
         nome: "",
@@ -210,9 +226,15 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
         ativo: true,
         novasSubcategorias: [],
       });
+      toast.success("Categoria e subcategorias salvas com sucesso!");
     } catch (error) {
       console.error("Erro ao salvar categoria:", error);
-      toast.error(error.response?.data?.detail || "Erro ao salvar categoria");
+      toast.error(
+        categoriaId
+          ? "Categoria criada, mas houve erro nas subcategorias. Reabra a categoria para concluir."
+          : error.response?.data?.detail || "Erro ao salvar categoria",
+      );
+      if (categoriaId) await carregarDados();
     }
   };
 
@@ -233,6 +255,10 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
 
     if (!dados.descricao || !dados.valor_original || !dados.data_vencimento) {
       toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
+    if (!subcategoriasReceita.some((sub) => sub.id === dados.dre_subcategoria_id)) {
+      toast.error("Selecione uma subcategoria DRE de receita para esta conta");
       return;
     }
 
@@ -262,11 +288,22 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
     }
   };
 
+  const idsCategoriasReceita = new Set(
+    categoriasDRE
+      .filter((categoria) => categoria.natureza === "receita")
+      .map((categoria) => categoria.id),
+  );
+  const subcategoriasReceita = subcategoriasDRE.filter(
+    (subcategoria) =>
+      subcategoria.ativo !== false && idsCategoriasReceita.has(subcategoria.categoria_id),
+  );
+
   const resetForm = () => {
     setDados({
       descricao: "",
       cliente_id: null,
       categoria_id: null,
+      dre_subcategoria_id: null,
       valor_original: "",
       data_emissao: new Date().toISOString().split("T")[0],
       data_vencimento: new Date().toISOString().split("T")[0],
@@ -312,7 +349,7 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
       setPreviewParcelas={setPreviewParcelas}
       setShowModalCategoria={setShowModalCategoria}
       showModalCategoria={showModalCategoria}
-      subcategoriasDRE={subcategoriasDRE}
+      subcategoriasDRE={subcategoriasReceita}
     />
   );
 };

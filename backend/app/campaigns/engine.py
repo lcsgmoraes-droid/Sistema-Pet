@@ -90,6 +90,46 @@ class CampaignEngine:
                 return
 
             try:
+                if event.event_type == "purchase_completed":
+                    if (event.payload or {}).get("venda_id"):
+                        from app.vendas_models import Venda
+
+                        venda = (
+                            self.db.query(Venda)
+                            .filter(
+                                Venda.id == int(event.payload["venda_id"]),
+                                Venda.tenant_id == event.tenant_id,
+                            )
+                            .first()
+                        )
+                        if venda is not None and venda.nao_gerar_beneficios:
+                            event.status = "skipped"
+                            event.processed_at = datetime.now()
+                            self.db.commit()
+                            return
+                    from app.campaigns.sale_return_service import prepare_purchase_event
+
+                    effective_payload = (
+                        prepare_purchase_event(
+                            self.db,
+                            tenant_id=event.tenant_id,
+                            payload=event.payload or {},
+                        )
+                        if (event.payload or {}).get("venda_id")
+                        else None
+                    )
+                    if effective_payload is None:
+                        logger.info(
+                            "[CampaignEngine] Compra %s sem saldo elegivel; evento %s ignorado",
+                            (event.payload or {}).get("venda_id"),
+                            event.id,
+                        )
+                        event.status = "skipped"
+                        event.processed_at = datetime.now()
+                        self.db.commit()
+                        return
+                    event.payload = effective_payload
+
                 # Buscar campanhas ativas para este tenant
                 campaigns = self._get_active_campaigns(
                     tenant_id=event.tenant_id,

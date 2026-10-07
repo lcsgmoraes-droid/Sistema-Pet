@@ -7,6 +7,7 @@ import { isNodeForgePatched } from "./patch-node-forge.mjs";
 const severityOrder = { info: 0, low: 1, moderate: 2, high: 3, critical: 4 };
 const minimumSeverity = severityOrder.moderate;
 const patchedNodeForgeAdvisory = "GHSA-86W9-CPQP-85RV";
+const metroBracesAdvisory = "GHSA-VFJ7-8CJW-P6XM";
 const allowedAdvisories = new Map([
   [
     "GHSA-W3RX-R6R6-PGPR",
@@ -22,32 +23,59 @@ const imageSizeImportPatterns = [
   /\brequire\(\s*["']image-size(?:\/[^"']*)?["']\s*\)/,
   /\bimport\(\s*["']image-size(?:\/[^"']*)?["']\s*\)/,
 ];
+const buildGlobImportPatterns = [
+  /\bfrom\s+["'](?:braces|micromatch|metro-file-map|@expo\/metro-file-map)(?:\/[^"']*)?["']/,
+  /\brequire\(\s*["'](?:braces|micromatch|metro-file-map|@expo\/metro-file-map)(?:\/[^"']*)?["']\s*\)/,
+  /\bimport\(\s*["'](?:braces|micromatch|metro-file-map|@expo\/metro-file-map)(?:\/[^"']*)?["']\s*\)/,
+  /\bimport\s+["'](?:braces|micromatch|metro-file-map|@expo\/metro-file-map)(?:\/[^"']*)?["']/,
+];
 
-function sourceUsesImageSize(directory) {
+function sourceUsesPatterns(directory, patterns) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     const entryPath = path.join(directory, entry.name);
     if (entry.isDirectory()) {
-      if (sourceUsesImageSize(entryPath)) return true;
+      if (sourceUsesPatterns(entryPath, patterns)) return true;
       continue;
     }
     if (!/\.(?:js|jsx|mjs|ts|tsx)$/.test(entry.name)) continue;
     const source = readFileSync(entryPath, "utf8");
-    if (imageSizeImportPatterns.some((pattern) => pattern.test(source)))
-      return true;
+    if (patterns.some((pattern) => pattern.test(source))) return true;
   }
   return false;
 }
 
-function applicationUsesImageSize() {
+function applicationUsesPatterns(patterns) {
   const sourceDirectory = path.resolve("src");
-  if (sourceUsesImageSize(sourceDirectory)) return true;
+  if (sourceUsesPatterns(sourceDirectory, patterns)) return true;
 
   for (const entryFile of ["App.tsx", "index.js"]) {
     const source = readFileSync(path.resolve(entryFile), "utf8");
-    if (imageSizeImportPatterns.some((pattern) => pattern.test(source)))
-      return true;
+    if (patterns.some((pattern) => pattern.test(source))) return true;
   }
   return false;
+}
+
+function bracesUsedOnlyByMetroFileMaps() {
+  const packages = JSON.parse(
+    readFileSync("package-lock.json", "utf8"),
+  ).packages;
+  const parentsOf = (name) =>
+    Object.entries(packages)
+      .filter(
+        ([, item]) =>
+          item.dependencies?.[name] || item.optionalDependencies?.[name],
+      )
+      .map(([packagePath]) => packagePath)
+      .sort();
+  return (
+    JSON.stringify(parentsOf("braces")) ===
+      JSON.stringify(["node_modules/micromatch"]) &&
+    JSON.stringify(parentsOf("micromatch")) ===
+      JSON.stringify([
+        "node_modules/@expo/metro-file-map",
+        "node_modules/metro-file-map",
+      ])
+  );
 }
 
 function runNpmAudit() {
@@ -101,7 +129,12 @@ function advisoryIdsByVulnerability(vulnerabilities) {
 
 export function evaluateAudit(
   report,
-  { sourceImportsImageSize = false, nodeForgePatched = false } = {},
+  {
+    sourceImportsImageSize = false,
+    sourceImportsBuildGlobs = false,
+    metroOnlyBracesChain = false,
+    nodeForgePatched = false,
+  } = {},
 ) {
   const vulnerabilities = report?.vulnerabilities || {};
   const advisoryIdsByName = advisoryIdsByVulnerability(vulnerabilities);
@@ -118,6 +151,9 @@ export function evaluateAudit(
       [...advisoryIds].every(
         (advisoryId) =>
           (allowedAdvisories.has(advisoryId) && !sourceImportsImageSize) ||
+          (advisoryId === metroBracesAdvisory &&
+            metroOnlyBracesChain &&
+            !sourceImportsBuildGlobs) ||
           (advisoryId === patchedNodeForgeAdvisory && nodeForgePatched),
       );
 
@@ -155,7 +191,9 @@ function main() {
   }
 
   const { blocked, ignored } = evaluateAudit(report, {
-    sourceImportsImageSize: applicationUsesImageSize(),
+    sourceImportsImageSize: applicationUsesPatterns(imageSizeImportPatterns),
+    sourceImportsBuildGlobs: applicationUsesPatterns(buildGlobImportPatterns),
+    metroOnlyBracesChain: bracesUsedOnlyByMetroFileMaps(),
     nodeForgePatched: isNodeForgePatched(),
   });
 
@@ -165,6 +203,10 @@ function main() {
   for (const advisoryId of ignoredAdvisories) {
     if (advisoryId === patchedNodeForgeAdvisory) {
       console.warn(`Backport verificado: node-forge / ${advisoryId}.`);
+    } else if (advisoryId === metroBracesAdvisory) {
+      console.warn(
+        `Excecao documentada: braces / ${advisoryId}. Uso restrito aos mapas de arquivos do Metro durante a montagem do bundle.`,
+      );
     } else {
       console.warn(
         `Excecao documentada: image-size / ${advisoryId}. ${allowedAdvisories.get(advisoryId)}`,

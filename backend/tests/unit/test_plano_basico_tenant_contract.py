@@ -135,6 +135,9 @@ class _FakeQuery:
             return SimpleNamespace(
                 id="tenant-selecionado",
                 plan="basico",
+                plan_pet=None,
+                plan_vet=None,
+                plan_grooming=None,
                 modulos_ativos='["campanhas"]',
             )
         return None

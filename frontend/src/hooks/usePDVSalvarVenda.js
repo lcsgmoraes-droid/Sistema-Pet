@@ -33,6 +33,8 @@ export function usePDVSalvarVenda({
   temCaixaAberto,
   entregadorSelecionado,
   vendaComissionada,
+  vendedorObrigatorio,
+  gerarComissao,
   funcionarioComissao,
   limparVenda,
   carregarVendasRecentes,
@@ -48,13 +50,28 @@ export function usePDVSalvarVenda({
       return;
     }
 
+    if (vendedorObrigatorio === null) {
+      toast.error("Aguarde o carregamento das regras do PDV.");
+      return;
+    }
+
+    if ((vendaComissionada || vendedorObrigatorio) && !funcionarioComissao) {
+      toast.error("Selecione o vendedor antes de salvar a venda.");
+      return;
+    }
+
     if (loading) return;
 
     setLoading(true);
     try {
       const vendaParaPayload = {
         ...vendaAtual,
-        funcionario_id: vendaComissionada ? funcionarioComissao?.id || null : null,
+        vendedor_funcionario_id:
+          vendaComissionada || vendedorObrigatorio ? funcionarioComissao?.id || null : null,
+        funcionario_id:
+          (vendaComissionada || vendedorObrigatorio) && gerarComissao
+            ? funcionarioComissao?.id || null
+            : null,
       };
       const payloadVenda = montarPayloadVenda(vendaParaPayload, entregadorSelecionado);
 

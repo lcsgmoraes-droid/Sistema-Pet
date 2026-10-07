@@ -235,7 +235,7 @@ export default function UsuarioModal({
             }}
             whatsapp={novoUsuario.celular_whatsapp}
             onChangeWhatsapp={(celular_whatsapp) => atualizarCampo("celular_whatsapp", celular_whatsapp)}
-            help="Sera o login do usuário"
+            help="Será o login do usuário no ERP e no app CorePet, após selecionar a loja."
           />
 
           <InputCombobox

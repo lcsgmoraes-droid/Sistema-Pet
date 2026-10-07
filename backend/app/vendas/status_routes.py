@@ -134,7 +134,12 @@ def reabrir_venda(
     invalidate_venda_rentabilidade_snapshot(venda)
 
     from app.campaigns.coupon_service import reverse_coupon_redemptions_for_sale
+    from app.campaigns.cashback_sale_reversal import reverse_cashback_for_sale
     from app.campaigns.loyalty_service import void_loyalty_stamps_for_sale
+    from app.vendas.cashback_financeiro import (
+        cancelar_despesas_cashback_venda,
+        remover_pagamentos_cashback_venda,
+    )
     from app.services.business_audit_service import (
         build_sale_reopened_metadata,
         log_business_event,
@@ -152,6 +157,17 @@ def reabrir_venda(
         tenant_id=tenant_id,
         venda_id=venda.id,
         reason="Venda reaberta para edicao",
+    )
+    remover_pagamentos_cashback_venda(db, tenant_id=tenant_id, venda_id=venda.id)
+    if venda.cliente_id:
+        reverse_cashback_for_sale(
+            db,
+            tenant_id=tenant_id,
+            sale_id=venda.id,
+            customer_id=venda.cliente_id,
+        )
+    cancelar_despesas_cashback_venda(
+        db, tenant_id=tenant_id, numero_venda=venda.numero_venda
     )
 
     log_business_event(
@@ -188,7 +204,13 @@ def reabrir_venda(
     return venda.to_dict()
 
 
-@router.patch("/{venda_id}/status")
+@router.patch(
+    "/{venda_id}/status",
+    responses={
+        400: {"description": "Status inválido ou reativação de venda cancelada"},
+        404: {"description": "Venda não encontrada"},
+    },
+)
 def atualizar_status_venda(
     venda_id: int,
     status_data: dict,
@@ -199,7 +221,12 @@ def atualizar_status_venda(
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     # Buscar a venda
-    venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
+    venda = (
+        db.query(Venda)
+        .filter_by(id=venda_id, tenant_id=tenant_id)
+        .with_for_update()
+        .first()
+    )
 
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
@@ -210,6 +237,12 @@ def atualizar_status_venda(
         raise HTTPException(status_code=400, detail="Status não informado")
 
     status_anterior = venda.status
+    status_cashback_ativos = {"finalizada", "baixa_parcial", "pago_nf"}
+    if status_anterior == "cancelada" and novo_status in status_cashback_ativos:
+        raise HTTPException(
+            status_code=400,
+            detail="Venda cancelada não pode ser reativada como paga.",
+        )
     venda.status = novo_status
     venda.updated_at = datetime.now()
 
@@ -221,13 +254,10 @@ def atualizar_status_venda(
             persist_if_missing=True,
             force_refresh=True,
         )
-    elif novo_status == "aberta":
-        invalidate_venda_rentabilidade_snapshot(venda)
-
-    if status_anterior in ["finalizada", "baixa_parcial"] and novo_status not in [
-        "finalizada",
-        "baixa_parcial",
-    ]:
+    if (
+        status_anterior in status_cashback_ativos
+        and novo_status not in status_cashback_ativos
+    ):
         from app.campaigns.coupon_service import reverse_coupon_redemptions_for_sale
         from app.campaigns.loyalty_service import void_loyalty_stamps_for_sale
 
@@ -243,6 +273,25 @@ def atualizar_status_venda(
             venda_id=venda.id,
             reason=f"Status alterado para {novo_status}",
         )
+    if novo_status not in status_cashback_ativos:
+        from app.campaigns.cashback_sale_reversal import reverse_cashback_for_sale
+        from app.vendas.cashback_financeiro import (
+            cancelar_despesas_cashback_venda,
+            remover_pagamentos_cashback_venda,
+        )
+
+        remover_pagamentos_cashback_venda(db, tenant_id=tenant_id, venda_id=venda.id)
+        if venda.cliente_id:
+            reverse_cashback_for_sale(
+                db,
+                tenant_id=tenant_id,
+                sale_id=venda.id,
+                customer_id=venda.cliente_id,
+            )
+        cancelar_despesas_cashback_venda(
+            db, tenant_id=tenant_id, numero_venda=venda.numero_venda
+        )
+        invalidate_venda_rentabilidade_snapshot(venda)
     # 🆕 GERAR COMISSÕES se estiver finalizando a venda (apenas se funcionário/veterinário foi selecionado)
     if (
         novo_status == "finalizada"

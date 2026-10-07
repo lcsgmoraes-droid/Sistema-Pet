@@ -23,6 +23,7 @@ from app.services.venda_rentabilidade_snapshot_service import (
 from app.utils.logger import logger as struct_logger
 from app.vendas.comissoes import _gerar_comissoes_pendentes_venda, _total_pago_venda
 from app.vendas.edicao_estoque import ajustar_estoque_edicao_venda
+from app.vendas.edicao_itens import atualizar_itens_venda_aberta
 from app.vendas.pagamento_entrega_previsto import (
     normalizar_pagamento_entrega_previsto,
     validar_valor_para_troco,
@@ -33,10 +34,35 @@ from app.vendas.regras import (
 )
 from app.vendas.routes_common import _validar_tenant_e_obter_usuario
 from app.vendas.schemas import CriarVendaRequest
+from app.vendas.vendedor_obrigatorio import exigir_vendedor_pdv
 from app.vendas_models import Venda, VendaItem
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def validar_vendedor_funcionario(
+    db: Session, tenant_id, vendedor_funcionario_id: Optional[int]
+):
+    if vendedor_funcionario_id is None:
+        return
+    existe = (
+        db.query(Cliente.id)
+        .filter(
+            Cliente.id == vendedor_funcionario_id,
+            Cliente.tenant_id == tenant_id,
+            Cliente.ativo.is_(True),
+            or_(
+                Cliente.tipo_cadastro == "funcionario",
+                Cliente.parceiro_ativo.is_(True),
+            ),
+        )
+        .first()
+    )
+    if not existe:
+        raise HTTPException(
+            status_code=400, detail="Vendedor não encontrado nesta empresa"
+        )
 
 
 def normalizar_status_filtro_vendas(status: Optional[str]) -> list[str]:
@@ -199,6 +225,19 @@ async def criar_venda(
 
     from app.caixa.revisao import validar_revisao_caixa
 
+    vendedor_informado_id = dados.vendedor_funcionario_id or dados.funcionario_id
+    exigir_vendedor_pdv(db, tenant_id, vendedor_informado_id)
+    validar_vendedor_funcionario(db, tenant_id, vendedor_informado_id)
+    if (
+        dados.funcionario_id
+        and dados.vendedor_funcionario_id
+        and dados.funcionario_id != dados.vendedor_funcionario_id
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="O vendedor e o comissionado devem ser a mesma pessoa",
+        )
+
     caixa_revisao = validar_revisao_caixa(
         db,
         caixa_id=dados.caixa_revisao_id,
@@ -254,6 +293,7 @@ async def criar_venda(
         "cliente_id": dados.cliente_id,
         "vendedor_id": dados.vendedor_id,
         "funcionario_id": dados.funcionario_id,
+        "vendedor_funcionario_id": vendedor_informado_id,
         "itens": [item.dict() for item in dados.itens],
         "desconto_valor": dados.desconto_valor,
         "desconto_percentual": dados.desconto_percentual,
@@ -330,12 +370,26 @@ def atualizar_venda(
 ):
     """Atualiza uma venda existente (somente vendas abertas)"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    if (
+        dados.funcionario_id
+        and dados.vendedor_funcionario_id
+        and dados.funcionario_id != dados.vendedor_funcionario_id
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="O vendedor e o comissionado devem ser a mesma pessoa",
+        )
 
     # Buscar venda
     venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
 
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
+
+    vendedor_informado_id = dados.vendedor_funcionario_id or dados.funcionario_id
+    exigir_vendedor_pdv(db, tenant_id, vendedor_informado_id, canal=venda.canal)
+    if vendedor_informado_id != (venda.vendedor_funcionario_id or venda.funcionario_id):
+        validar_vendedor_funcionario(db, tenant_id, vendedor_informado_id)
 
     # Só permite atualizar vendas abertas
     if venda.status != "aberta":
@@ -445,6 +499,7 @@ def atualizar_venda(
     venda.funcionario_id = (
         dados.funcionario_id
     )  # ✅ Funcionário/Veterinário que recebe comissão
+    venda.vendedor_funcionario_id = vendedor_informado_id
 
     logger.info(f"   funcionario_id novo: {venda.funcionario_id}")
 
@@ -478,6 +533,7 @@ def atualizar_venda(
     # Ajustar o estoque pela diferença entre os itens antigos e os novos.
     # A finalização não baixa novamente vendas que já estavam abertas.
     itens_antigos = db.query(VendaItem).filter_by(venda_id=venda.id).all()
+    saidas_ajuste = {}
     resolucoes_produtos = ajustar_estoque_edicao_venda(
         venda=venda,
         itens_antigos=itens_antigos,
@@ -485,70 +541,18 @@ def atualizar_venda(
         current_user=current_user,
         tenant_id=tenant_id,
         db=db,
+        saidas_ajuste=saidas_ajuste,
     )
-
-    # Excluir itens antigos
-    db.query(VendaItem).filter_by(venda_id=venda.id).delete()
-
-    # Criar novos itens
-    from app.vendas.racao_previsao import validar_previsao_fim_racao
-
-    for item_data in dados.itens:
-        produto_catalogo = None
-        if item_data.produto_id:
-            produto_resolvido = resolucoes_produtos.get(int(item_data.produto_id))
-            produto_catalogo = produto_resolvido.produto if produto_resolvido else None
-        else:
-            produto_resolvido = None
-        previsao_racao = validar_previsao_fim_racao(
-            item_data,
-            produto=produto_catalogo,
-            cliente_id=dados.cliente_id,
-        )
-
-        # 🔒 ISOLAMENTO MULTI-TENANT: tenant_id obrigatório
-        item = VendaItem(
-            venda_id=venda.id,
-            tenant_id=tenant_id,  # ✅ Garantir isolamento entre empresas
-            tipo=item_data.tipo,
-            produto_id=item_data.produto_id,
-            servico_descricao=item_data.servico_descricao
-            or (
-                produto_catalogo.nome
-                if produto_resolvido is not None and produto_resolvido.compartilhado
-                else None
-            ),
-            estoque_origem_tenant_id=(
-                produto_resolvido.tenant_origem_id
-                if produto_resolvido is not None and produto_resolvido.compartilhado
-                else None
-            ),
-            estoque_compartilhado_id=(
-                produto_resolvido.compartilhamento_id
-                if produto_resolvido is not None
-                else None
-            ),
-            estoque_origem_nome=(
-                produto_resolvido.empresa_origem_nome
-                if produto_resolvido is not None
-                else None
-            ),
-            quantidade=item_data.quantidade,
-            preco_unitario=item_data.preco_unitario,
-            desconto_item=item_data.desconto_item or 0,
-            subtotal=item_data.subtotal,
-            lote_id=item_data.lote_id,
-            pet_id=item_data.pet_id,
-            protocolo_recorrencia_id=(
-                None
-                if item_data.ignorar_recorrencia
-                else item_data.protocolo_recorrencia_id
-            ),
-            ignorar_recorrencia=item_data.ignorar_recorrencia,
-            racao_data_prevista_fim=previsao_racao.data_prevista,
-            racao_prazo_estimado_dias=previsao_racao.prazo_dias,
-        )
-        db.add(item)
+    atualizar_itens_venda_aberta(
+        venda_id=venda.id,
+        cliente_id=dados.cliente_id,
+        tenant_id=tenant_id,
+        itens_antigos=itens_antigos,
+        itens_novos=dados.itens,
+        resolucoes_produtos=resolucoes_produtos,
+        saidas_ajuste=saidas_ajuste,
+        db=db,
+    )
 
     db.commit()
     db.refresh(venda)

@@ -453,6 +453,8 @@ class EstoqueService:
             "estoque_novo": estoque_novo,
             "lotes_consumidos": lotes_consumidos,
             "movimentacao_id": movimentacao.id,
+            "custo_unitario": movimentacao.custo_unitario,
+            "valor_total": movimentacao.valor_total,
             "produto_nome": produto.nome,
         }
 

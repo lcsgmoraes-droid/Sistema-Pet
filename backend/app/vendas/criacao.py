@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.utils.timezone import now_brasilia
+from app.vendas.custo_original import registrar_custo_original_saida
 
 logger = logging.getLogger(__name__)
 
@@ -160,6 +161,8 @@ def criar_venda(
             cliente_id=payload.get("cliente_id"),
             vendedor_id=payload.get("vendedor_id") or user_id,
             funcionario_id=payload.get("funcionario_id"),
+            vendedor_funcionario_id=payload.get("vendedor_funcionario_id")
+            or payload.get("funcionario_id"),
             subtotal=float(subtotal_itens),
             desconto_valor=float(desconto_valor),  # Desconto aplicado na venda
             desconto_percentual=payload.get("desconto_percentual", 0) or 0,
@@ -375,7 +378,6 @@ def criar_venda(
             .filter(
                 CategoriaFinanceira.nome.ilike("%vendas%"),
                 CategoriaFinanceira.tipo == "receita",
-                CategoriaFinanceira.user_id == user_id,
                 CategoriaFinanceira.tenant_id == tenant_id,
             )
             .first()
@@ -483,6 +485,9 @@ def criar_venda(
                             venda_item=item if not compartilhado else None,
                         )
 
+                    registrar_custo_original_saida(
+                        item, resultados, tenant_estoque_uuid
+                    )
                     estoque_baixado.extend(resultados)
                     logger.info(
                         f"📦 Estoque baixado ao criar venda: {produto.nome} -{item.quantidade}"

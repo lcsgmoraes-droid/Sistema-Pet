@@ -15,6 +15,7 @@ test("mostra a identificacao da loja e o usuario logado", () => {
   });
 
   assert.equal(identity.tenantLabel, "viralatas");
+  assert.equal(identity.displayName, "Jefferson");
   assert.equal(identity.userLabel, "jefferson");
   assert.equal(identity.avatarInitial, "J");
 });
@@ -26,6 +27,7 @@ test("formata celular de acesso e usa o nome da loja como fallback", () => {
   });
 
   assert.equal(identity.tenantLabel, "Casa de Racao Vira Lata");
+  assert.equal(identity.displayName, "(18) 99740-1641");
   assert.equal(identity.userLabel, "(18) 99740-1641");
 });
 
@@ -36,6 +38,7 @@ test("mantem email para contas antigas e evita valores vazios", () => {
   });
 
   assert.equal(identity.tenantLabel, "Aumigos Pet Shop");
+  assert.equal(identity.displayName, "gerente@exemplo.com");
   assert.equal(identity.userLabel, "gerente@exemplo.com");
   assert.equal(identity.avatarInitial, "G");
 });

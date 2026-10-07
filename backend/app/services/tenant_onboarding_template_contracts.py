@@ -5,7 +5,7 @@ from typing import Any
 
 
 DEFAULT_BUNDLE_CODE = "petshop-br"
-DEFAULT_BUNDLE_VERSION = "v2"
+DEFAULT_BUNDLE_VERSION = "v3"
 ITEM_INSTALL_TARGET_TABLES = {
     "formas_pagamento",
     "contas_bancarias",

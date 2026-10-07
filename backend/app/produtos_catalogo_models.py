@@ -18,9 +18,11 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import UUID as PgUUID
+from sqlalchemy.orm import relationship, validates
 
-from .base_models import BaseTenantModel
+from .base_models import BaseTenantModel, TenantScoped
+from .db import Base
 from .services.product_image_storage import build_product_thumbnail_url
 
 
@@ -244,6 +246,14 @@ class Produto(BaseTenantModel):
     ncm = Column(String(8), nullable=True)
     cest = Column(String(7), nullable=True)
     gtin_ean = Column(String(20), nullable=True)
+    origem_tenant_id = Column(PgUUID(as_uuid=True), nullable=True, index=True)
+
+    @validates("origem_tenant_id")
+    def _origem_imutavel(self, key, valor):
+        atual = self.__dict__.get("origem_tenant_id")
+        if atual is not None and valor != atual:
+            raise ValueError("A loja de origem do produto e definida na criacao e nao pode ser alterada.")
+        return valor
     gtin_ean_tributario = Column(String(20), nullable=True)
     origem = Column(String(1), nullable=True)  # 0-8
     perfil_tributario = Column(String(50), nullable=True)
@@ -541,3 +551,20 @@ def _aplicar_invariantes_servico_orm(_mapper, _connection, produto: Produto) -> 
         return
     for campo, valor in dados.items():
         setattr(produto, campo, valor)
+
+
+class ProdutoHistoricoAlteracao(TenantScoped, Base):
+    __tablename__ = "produtos_historico_alteracoes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    produto_id = Column(
+        Integer,
+        ForeignKey("produtos.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    campo = Column(String(100), nullable=False)
+    valor_anterior = Column(Text, nullable=True)
+    valor_novo = Column(Text, nullable=True)
+    alterado_em = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

@@ -4,6 +4,9 @@ from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+from fastapi import HTTPException
+
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
@@ -186,3 +189,30 @@ def test_baixa_lote_garante_conta_receber_antes_de_registrar_recebimento():
 
     assert "if not conta_receber:" in bloco
     assert "_criar_conta_receber_faltante_baixa_lote(" in bloco
+    assert "ContaReceber.tenant_id == tenant_id" in bloco
+    assert '"vencido", "vencida"' in bloco
+
+
+def test_baixa_lote_compara_centavos_exatos_para_quitacao():
+    from app.clientes.financeiro_baixa_lote_routes import (
+        _saldo_venda,
+        _validar_valor_baixa,
+    )
+
+    vendas = [
+        SimpleNamespace(total=Decimal("100.01"), pagamentos=[]),
+        SimpleNamespace(
+            total=Decimal("100.00"),
+            pagamentos=[SimpleNamespace(valor=Decimal("33.55"))],
+        ),
+    ]
+    saldos = [_saldo_venda(venda)[1] for venda in vendas]
+    assert saldos == [Decimal("100.01"), Decimal("66.45")]
+    saldo_total = sum(saldos)
+    assert saldo_total == Decimal("166.46")
+
+    _validar_valor_baixa(Decimal("166.46"), saldo_total)
+    _validar_valor_baixa(Decimal("166.45"), saldo_total)
+
+    with pytest.raises(HTTPException, match="excede o saldo devedor"):
+        _validar_valor_baixa(Decimal("166.47"), saldo_total)

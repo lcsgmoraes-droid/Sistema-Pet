@@ -1,4 +1,4 @@
-import { normalizeDisplayText } from "./categoriasFinanceirasUtils";
+import { normalizeDisplayText, podeClassificarCustoPeDRE } from "./categoriasFinanceirasUtils";
 
 export default function CategoriasFinanceirasExpandedPanel({
   cat,
@@ -27,35 +27,37 @@ export default function CategoriasFinanceirasExpandedPanel({
                   {normalizeDisplayText(filha.nome)}
                 </div>
               </div>
-              <div className="flex gap-1">
-                <button
-                  onClick={() =>
-                    handleQuickTipoCusto(filha.id, filha.tipo_custo === "fixo" ? null : "fixo")
-                  }
-                  className={`px-2 py-1 rounded text-xs font-medium border transition-colors ${
-                    filha.tipo_custo === "fixo"
-                      ? "bg-orange-500 text-white border-orange-500"
-                      : "bg-white text-gray-600 border-gray-300 hover:border-orange-400 hover:text-orange-600"
-                  }`}
-                >
-                  🔒 Fixo
-                </button>
-                <button
-                  onClick={() =>
-                    handleQuickTipoCusto(
-                      filha.id,
-                      filha.tipo_custo === "variavel" ? null : "variavel",
-                    )
-                  }
-                  className={`px-2 py-1 rounded text-xs font-medium border transition-colors ${
-                    filha.tipo_custo === "variavel"
-                      ? "bg-blue-500 text-white border-blue-500"
-                      : "bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:text-blue-600"
-                  }`}
-                >
-                  📈 Variável
-                </button>
-              </div>
+              {filha.pode_editar && (
+                <div className="flex gap-1">
+                  <button
+                    onClick={() =>
+                      handleQuickTipoCusto(filha.id, filha.tipo_custo === "fixo" ? null : "fixo")
+                    }
+                    className={`px-2 py-1 rounded text-xs font-medium border transition-colors ${
+                      filha.tipo_custo === "fixo"
+                        ? "bg-orange-500 text-white border-orange-500"
+                        : "bg-white text-gray-600 border-gray-300 hover:border-orange-400 hover:text-orange-600"
+                    }`}
+                  >
+                    🔒 Fixo
+                  </button>
+                  <button
+                    onClick={() =>
+                      handleQuickTipoCusto(
+                        filha.id,
+                        filha.tipo_custo === "variavel" ? null : "variavel",
+                      )
+                    }
+                    className={`px-2 py-1 rounded text-xs font-medium border transition-colors ${
+                      filha.tipo_custo === "variavel"
+                        ? "bg-blue-500 text-white border-blue-500"
+                        : "bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:text-blue-600"
+                    }`}
+                  >
+                    📈 Variável
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </>
@@ -92,7 +94,7 @@ export default function CategoriasFinanceirasExpandedPanel({
                     {sub.custo_pe === "fixo" ? "🔒 Fixo" : "📈 Variável"}
                   </span>
                 )}
-                {cat.tipo_custo === "ambos" && (
+                {podeClassificarCustoPeDRE(cat, sub) && (
                   <div className="flex gap-1">
                     <button
                       onClick={() =>

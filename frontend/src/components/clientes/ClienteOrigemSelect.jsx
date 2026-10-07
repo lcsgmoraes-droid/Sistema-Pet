@@ -41,7 +41,7 @@ export default function ClienteOrigemSelect({ value, onChange, filtro = false, d
     <div>
       <InputCombobox
         id={id}
-        label="Origem do cliente"
+        label="Canal de origem"
         opcoes={opcoesCombobox}
         value={nova ? "__nova__" : selecionado}
         disabled={disabled}

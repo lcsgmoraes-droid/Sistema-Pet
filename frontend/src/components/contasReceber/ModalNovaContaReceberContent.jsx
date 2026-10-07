@@ -92,12 +92,18 @@ export default function ModalNovaContaReceberContent({
                 <div className="flex gap-2">
                   <select
                     value={dados.categoria_id || ""}
-                    onChange={(e) =>
-                      setDados({
-                        ...dados,
-                        categoria_id: e.target.value ? parseInt(e.target.value) : null,
-                      })
-                    }
+                    onChange={(e) => {
+                      const categoriaId = e.target.value ? parseInt(e.target.value, 10) : null;
+                      const categoria = categorias.find((item) => item.id === categoriaId);
+                      const subPrincipal = subcategoriasDRE.find(
+                        (sub) => sub.id === categoria?.dre_subcategoria_id,
+                      );
+                      setDados((atual) => ({
+                        ...atual,
+                        categoria_id: categoriaId,
+                        dre_subcategoria_id: subPrincipal?.id || null,
+                      }));
+                    }}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Selecione...</option>
@@ -132,7 +138,7 @@ export default function ModalNovaContaReceberContent({
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="">Sem classificação DRE</option>
+                  <option value="">Selecione uma subcategoria de receita</option>
                   {subcategoriasDRE.map((sub) => (
                     <option key={sub.id} value={sub.id}>
                       {sub.nome}

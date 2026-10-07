@@ -1,5 +1,6 @@
 import re
 
+from fastapi import HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -14,6 +15,11 @@ def _digits_only(value: str | None) -> str:
     return re.sub(r"\D+", "", str(value or ""))
 
 
+def _phone_digits(value: str | None) -> str:
+    digits = _digits_only(value)
+    return digits[2:] if len(digits) == 13 and digits.startswith("55") else digits
+
+
 def _is_operational_cliente(cliente: Cliente | None) -> bool:
     if not cliente or getattr(cliente, "ativo", True) is False:
         return False
@@ -26,8 +32,8 @@ def _is_operational_cliente(cliente: Cliente | None) -> bool:
 
 def _cliente_phones_digits(cliente: Cliente) -> set[str]:
     phones = {
-        _digits_only(getattr(cliente, "telefone", None)),
-        _digits_only(getattr(cliente, "celular", None)),
+        _phone_digits(getattr(cliente, "telefone", None)),
+        _phone_digits(getattr(cliente, "celular", None)),
     }
     return {phone for phone in phones if phone}
 
@@ -44,7 +50,9 @@ def _identity_match_reasons(
         reasons.add("cpf")
     if email and (getattr(cliente, "email", None) or "").strip().lower() == email:
         reasons.add("email")
-    if telefone_digits and telefone_digits in _cliente_phones_digits(cliente):
+    if telefone_digits and _phone_digits(telefone_digits) in _cliente_phones_digits(
+        cliente
+    ):
         reasons.add("telefone")
     return reasons
 
@@ -85,7 +93,7 @@ def _select_preferred_cliente(
 ) -> Cliente | None:
     email_normalized = (email or "").strip().lower()
     cpf_digits = _digits_only(cpf)
-    telefone_digits = _digits_only(telefone)
+    telefone_digits = _phone_digits(telefone)
     if not email_normalized and not cpf_digits and not telefone_digits:
         return None
 
@@ -250,7 +258,7 @@ def _find_cliente_match(
     if email:
         candidates.extend(base_query.filter(Cliente.email == email).all())
 
-    telefone_digits = _digits_only(telefone)
+    telefone_digits = _phone_digits(telefone)
     if telefone_digits:
         candidates.extend(
             base_query.filter(
@@ -419,6 +427,12 @@ def _get_or_create_cliente_for_user(
         db.add(cliente)
         db.flush()
     else:
+        linked_user_id = getattr(cliente, "auth_user_id", None)
+        if linked_user_id and linked_user_id != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A pessoa ja possui outra conta de acesso; revise o vinculo no ERP.",
+            )
         cliente.auth_user_id = user.id
         if getattr(cliente, "ativo", True) is False:
             cliente.ativo = True

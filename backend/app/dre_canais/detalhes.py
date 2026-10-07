@@ -9,9 +9,13 @@ from sqlalchemy.orm import Session, selectinload
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.dre_canais.agregacao import (
+    _devolucoes_periodo_query,
+    _contas_receber_manuais_query,
+    _valor_recebivel_competencia,
     _preparar_snapshots_vendas,
     _subcategorias_contas_map,
     _valor_snapshot_campo,
+    agregar_devolucoes_por_canal,
     obter_vendas_por_canal,
 )
 from app.dre_canais.base import (
@@ -28,13 +32,18 @@ from app.dre_canais.base import (
     _periodo_meses,
     _texto_conta,
 )
+from app.dre_canais.contas import (
+    classificacoes_contas_pagar,
+    eh_compra_estoque,
+    filtros_contas_pagar_dre,
+    ids_fretes_sobre_compras,
+)
 from app.dre_canais.folha import (
     calcular_resumo_folha_gerencial,
     canal_provisao_folha,
 )
 from app.dre_canais.schemas import DREDetalheItem, DREDetalheResponse
-from app.dre_plano_contas_models import DRESubcategoria
-from app.financeiro_models import ContaPagar
+from app.financeiro_models import ContaPagar, ContaReceber
 from app.vendas_models import Venda, VendaItem
 
 router = APIRouter()
@@ -47,6 +56,7 @@ CAMPOS_DETALHE_VENDAS = {
     "descontos",
     "impostos",
     "cmv",
+    "custo_servicos",
     "cmv_estimado",
     "taxas_cartao",
     "repasse_entrega",
@@ -65,6 +75,57 @@ CAMPOS_DETALHE_CONTAS = {
     "despesas_financeiras",
     "outras_despesas",
 }
+
+CAMPOS_DETALHE_RECEBIVEIS = {"receita_outras"}
+CAMPOS_DETALHE_DEVOLUCOES = {"devolucoes"}
+
+
+def _detalhes_devolucoes_campo(
+    db: Session,
+    mes: int,
+    ano: int,
+    tenant_id: str,
+    canal: str,
+    campo: str,
+    mes_inicial: Optional[int] = None,
+    data_final: Optional[date] = None,
+) -> List[DREDetalheItem]:
+    inicio, fim = _periodo_meses(mes_inicial or mes, mes, ano, data_final)
+    eventos = _devolucoes_periodo_query(db, tenant_id, inicio, fim).all()
+    detalhes = []
+    for evento in eventos:
+        if _normalizar_canal(evento.canal) != canal:
+            continue
+        if campo == "devolucoes":
+            valor = _decimal(evento.valor_devolvido)
+        elif campo == "cmv":
+            valor = -_decimal(evento.custo_produtos_estornado)
+        else:
+            valor = -_decimal(evento.custo_servicos_estornado)
+        if abs(valor) <= Decimal("0.004"):
+            continue
+        detalhes.append(
+            DREDetalheItem(
+                id=f"devolucao-{evento.id}",
+                origem_tipo="devolucao_venda",
+                origem_label="Devolucao de venda",
+                data=_data_iso(evento.data_competencia),
+                descricao=f"Devolucao da venda #{evento.venda_id}",
+                contraparte=evento.forma_estorno,
+                documento=str(evento.venda_id),
+                valor=float(valor),
+                valor_auxiliar=float(_decimal(evento.valor_devolvido)),
+                link="/financeiro/vendas",
+                meta={
+                    "canal": canal,
+                    "devolucao_id": evento.id,
+                    "motivo": evento.motivo,
+                    "custo_pendente": bool(evento.custo_pendente),
+                    "itens": evento.itens or [],
+                },
+            )
+        )
+    return detalhes
 
 
 def _paginar_detalhes(
@@ -97,24 +158,50 @@ def _detalhes_cmv_estimado(
         mes_inicial=mes_inicial,
         data_final=data_final,
     )
-    itens = list(dados_canais.get(canal, {}).get("itens_cmv_estimado", []) or [])
+    agregar_devolucoes_por_canal(
+        db,
+        mes,
+        ano,
+        tenant_id,
+        dados_canais,
+        mes_inicial=mes_inicial,
+        data_final=data_final,
+    )
+    dados = dados_canais.get(canal, {})
+    itens = list(dados.get("itens_cmv_estimado", []) or [])
+    itens.extend(dados.get("itens_cmv_estornado", []) or [])
     detalhes = []
     for indice, item in enumerate(itens):
         codigo = item.get("produto_codigo")
         nome = item.get("produto_nome") or "Produto removido"
         numero_venda = item.get("numero_venda") or f"#{item.get('venda_id')}"
         percentual = _decimal(item.get("percentual_custo", 0))
+        devolucao_id = item.get("devolucao_id")
+        origem_estorno = item.get("origem_cmv_estornado")
+        if origem_estorno == "custo_atribuido_sem_comprovante":
+            origem_label = "Estorno provisório de CMV sem custo comprovado"
+        elif devolucao_id:
+            origem_label = "Estorno de custo provisório"
+        else:
+            origem_label = "Custo provisório"
+        contraparte = (
+            f"Venda {numero_venda} • CMV anterior sem comprovante"
+            if origem_estorno == "custo_atribuido_sem_comprovante"
+            else f"Venda {numero_venda} • custo aplicado {float(percentual):.2f}%"
+        )
         detalhes.append(
             DREDetalheItem(
                 id=(
                     f"cmv-estimado-{item.get('venda_id')}-"
-                    f"{item.get('produto_id')}-{indice}"
+                    f"{item.get('venda_item_id')}-{devolucao_id or 'venda'}-{indice}"
                 ),
-                origem_tipo="estimativa_cmv",
-                origem_label="Custo provisório",
+                origem_tipo=(
+                    "estorno_estimativa_cmv" if devolucao_id else "estimativa_cmv"
+                ),
+                origem_label=origem_label,
                 data=item.get("data"),
                 descricao=f"{codigo} - {nome}" if codigo else nome,
-                contraparte=f"Venda {numero_venda} • custo aplicado {float(percentual):.2f}%",
+                contraparte=contraparte,
                 documento=str(numero_venda),
                 valor=float(_decimal(item.get("valor_estimado", 0))),
                 valor_auxiliar=float(_decimal(item.get("valor_venda", 0))),
@@ -126,6 +213,8 @@ def _detalhes_cmv_estimado(
                     "percentual_custo": float(percentual),
                     "origem_percentual": item.get("origem_percentual"),
                     "provisorio": True,
+                    "devolucao_id": devolucao_id,
+                    "origem_cmv_estornado": origem_estorno,
                 },
             )
         )
@@ -220,6 +309,61 @@ def _detalhes_vendas_campo(
             )
         )
 
+    if campo in {"cmv", "custo_servicos"}:
+        detalhes.extend(
+            _detalhes_devolucoes_campo(
+                db,
+                mes,
+                ano,
+                tenant_id,
+                canal,
+                campo,
+                mes_inicial=mes_inicial,
+                data_final=data_final,
+            )
+        )
+
+    detalhes.sort(key=lambda item: item.data or "", reverse=True)
+    return detalhes
+
+
+def _detalhes_recebiveis_manuais(
+    db: Session,
+    mes: int,
+    ano: int,
+    tenant_id: str,
+    canal: str,
+    mes_inicial: Optional[int] = None,
+    data_final: Optional[date] = None,
+) -> List[DREDetalheItem]:
+    inicio, fim = _periodo_meses(mes_inicial or mes, mes, ano, data_final)
+    contas = (
+        _contas_receber_manuais_query(db, tenant_id, inicio, fim)
+        .options(selectinload(ContaReceber.cliente))
+        .all()
+    )
+    detalhes = []
+    for conta in contas:
+        if _normalizar_canal(getattr(conta, "canal", None)) != canal:
+            continue
+        valor = _valor_recebivel_competencia(conta)
+        if abs(valor) <= Decimal("0.004"):
+            continue
+        detalhes.append(
+            DREDetalheItem(
+                id=f"conta-receber-{conta.id}",
+                origem_tipo="conta_receber",
+                origem_label="Conta a receber",
+                data=_data_iso(getattr(conta, "data_emissao", None)),
+                descricao=getattr(conta, "descricao", "") or f"Conta #{conta.id}",
+                contraparte=getattr(getattr(conta, "cliente", None), "nome", None),
+                documento=getattr(conta, "documento", None),
+                status=getattr(conta, "status", None),
+                valor=float(valor),
+                link="/financeiro/contas-receber",
+                meta={"canal": canal},
+            )
+        )
     detalhes.sort(key=lambda item: item.data or "", reverse=True)
     return detalhes
 
@@ -235,53 +379,42 @@ def _detalhes_contas_campo(
     data_final: Optional[date] = None,
 ) -> List[DREDetalheItem]:
     inicio, fim = _periodo_meses(mes_inicial or mes, mes, ano, data_final)
+    frete_ids = ids_fretes_sobre_compras(db, tenant_id)
     if campo == "fretes_compras":
-        if canal != "loja_fisica":
-            return []
-        subcategoria_frete_compras = (
-            db.query(DRESubcategoria)
-            .filter(
-                DRESubcategoria.tenant_id == tenant_id,
-                DRESubcategoria.nome == "Fretes sobre Compras",
-            )
-            .first()
-        )
-        if not subcategoria_frete_compras:
+        if not frete_ids:
             return []
         contas = (
             db.query(ContaPagar)
             .options(selectinload(ContaPagar.fornecedor))
             .filter(
-                and_(
-                    ContaPagar.tenant_id == tenant_id,
-                    ContaPagar.data_emissao >= inicio,
-                    ContaPagar.data_emissao < fim,
-                    ContaPagar.status != "cancelado",
-                    ContaPagar.dre_subcategoria_id == subcategoria_frete_compras.id,
-                )
+                *filtros_contas_pagar_dre(tenant_id, inicio, fim),
+                ContaPagar.dre_subcategoria_id.in_(frete_ids),
             )
             .all()
         )
-        subcategorias = {subcategoria_frete_compras.id: subcategoria_frete_compras}
+        contas = [
+            conta
+            for conta in contas
+            if _normalizar_canal(getattr(conta, "canal", None)) == canal
+        ]
+        subcategorias = _subcategorias_contas_map(db, tenant_id, contas)
     else:
         contas_base = (
             db.query(ContaPagar)
             .options(selectinload(ContaPagar.fornecedor))
-            .filter(
-                and_(
-                    ContaPagar.tenant_id == tenant_id,
-                    ContaPagar.data_emissao >= inicio,
-                    ContaPagar.data_emissao < fim,
-                    ContaPagar.status != "cancelado",
-                    ContaPagar.afeta_dre.is_(True),
-                    ContaPagar.nota_entrada_id.is_(None),
-                )
-            )
+            .filter(*filtros_contas_pagar_dre(tenant_id, inicio, fim))
             .all()
         )
         subcategorias = _subcategorias_contas_map(db, tenant_id, contas_base)
+        tipos, categorias = classificacoes_contas_pagar(db, tenant_id, contas_base)
         contas = []
+        contas_folha = []
         for conta in contas_base:
+            if conta.dre_subcategoria_id in frete_ids or eh_compra_estoque(
+                conta, tipos, categorias
+            ):
+                continue
+            contas_folha.append(conta)
             if _normalizar_canal(getattr(conta, "canal", None)) != canal:
                 continue
             subcategoria = subcategorias.get(
@@ -338,7 +471,7 @@ def _detalhes_contas_campo(
             mes,
             ano,
             tenant_id,
-            contas_base,
+            contas_folha,
             subcategorias,
             mes_inicial=mes_inicial,
             data_final=data_final,
@@ -434,7 +567,12 @@ def detalhar_linha_dre_por_canal(
 
     campo = (campo or "").strip()
     canal = _normalizar_canal(canal)
-    if campo not in CAMPOS_DETALHE_VENDAS and campo not in CAMPOS_DETALHE_CONTAS:
+    if (
+        campo not in CAMPOS_DETALHE_VENDAS
+        and campo not in CAMPOS_DETALHE_CONTAS
+        and campo not in CAMPOS_DETALHE_RECEBIVEIS
+        and campo not in CAMPOS_DETALHE_DEVOLUCOES
+    ):
         raise HTTPException(
             status_code=400, detail="Linha da DRE sem detalhamento disponivel"
         )
@@ -442,6 +580,27 @@ def detalhar_linha_dre_por_canal(
     _, tenant_id = user_and_tenant
     if campo in CAMPOS_DETALHE_VENDAS:
         detalhes = _detalhes_vendas_campo(
+            db,
+            mes,
+            ano,
+            tenant_id,
+            canal,
+            campo,
+            mes_inicial=mes_inicial,
+            data_final=data_final,
+        )
+    elif campo in CAMPOS_DETALHE_RECEBIVEIS:
+        detalhes = _detalhes_recebiveis_manuais(
+            db,
+            mes,
+            ano,
+            tenant_id,
+            canal,
+            mes_inicial=mes_inicial,
+            data_final=data_final,
+        )
+    elif campo in CAMPOS_DETALHE_DEVOLUCOES:
+        detalhes = _detalhes_devolucoes_campo(
             db,
             mes,
             ano,

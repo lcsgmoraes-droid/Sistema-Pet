@@ -1,16 +1,35 @@
 import os
 import json
 from types import SimpleNamespace
+from uuid import uuid4
+
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL") or "sqlite:///./test.db"
 os.environ["DEBUG"] = "false"
 
+import app.db.base  # noqa: E402,F401
 from app.notas_entrada.produtos import (  # noqa: E402
     _aplicar_codigos_barras_item_no_produto,
     _codigos_barras_nf,
     _montar_divergencia_codigo_barras_item,
+    encontrar_produto_similar,
     normalizar_codigo_barras,
 )
+from app.produtos_models import Produto, ProdutoFornecedor  # noqa: E402
+from app.tenancy.context import set_current_tenant  # noqa: E402
+
+
+@pytest.fixture
+def nota_db():
+    engine = create_engine("sqlite://")
+    Produto.__table__.create(engine)
+    ProdutoFornecedor.__table__.create(engine)
+    with Session(engine) as session:
+        yield session
+    engine.dispose()
 
 
 def test_codigos_barras_nf_ignora_sem_gtin_e_prefere_ean_tributario():
@@ -85,3 +104,83 @@ def test_aplicar_codigos_barras_nf_guarda_eans_alternativos_sem_sobrescrever():
         "17890000000005",
         "7890000000006",
     ]
+
+
+def test_xml_nao_vincula_produto_com_sku_liberado_pelo_ean(nota_db):
+    tenant_id = uuid4()
+    set_current_tenant(tenant_id)
+    antigo = Produto(
+        tenant_id=tenant_id,
+        user_id=1,
+        codigo="__LIBERADO__87975__abc",
+        nome="Produto antigo",
+        ativo=False,
+        codigo_barras="7890000000001",
+        gtin_ean="7890000000001",
+    )
+    nota_db.add(antigo)
+    nota_db.flush()
+
+    produto, confianca, foi_inativo, origem, referencia = encontrar_produto_similar(
+        "Produto novo", "2040", nota_db, tenant_id=tenant_id, ean="7890000000001"
+    )
+
+    assert (produto, confianca, foi_inativo, origem, referencia) == (
+        None,
+        0,
+        False,
+        None,
+        None,
+    )
+
+
+def test_xml_prioriza_novo_produto_com_sku_reutilizado(nota_db):
+    tenant_id = uuid4()
+    set_current_tenant(tenant_id)
+    antigo = Produto(
+        tenant_id=tenant_id,
+        user_id=1,
+        codigo="__LIBERADO__87975__abc",
+        nome="Produto antigo",
+        ativo=False,
+        codigo_barras="7890000000001",
+    )
+    novo = Produto(
+        tenant_id=tenant_id,
+        user_id=1,
+        codigo="2040",
+        nome="Produto novo",
+        ativo=True,
+    )
+    nota_db.add_all([antigo, novo])
+    nota_db.flush()
+
+    produto, _, foi_inativo, origem, referencia = encontrar_produto_similar(
+        "Produto novo", "2040", nota_db, tenant_id=tenant_id, ean="7890000000001"
+    )
+
+    assert produto.id == novo.id
+    assert foi_inativo is False
+    assert (origem, referencia) == ("sku", "2040")
+
+
+def test_xml_preserva_vinculo_de_produto_inativo_sem_sku_liberado(nota_db):
+    tenant_id = uuid4()
+    set_current_tenant(tenant_id)
+    inativo = Produto(
+        tenant_id=tenant_id,
+        user_id=1,
+        codigo="2040",
+        nome="Produto temporariamente inativo",
+        ativo=False,
+    )
+    nota_db.add(inativo)
+    nota_db.flush()
+
+    produto, _, foi_inativo, origem, referencia = encontrar_produto_similar(
+        "Produto temporariamente inativo", "2040", nota_db, tenant_id=tenant_id
+    )
+
+    assert produto.id == inativo.id
+    assert foi_inativo is True
+    assert (origem, referencia) == ("sku", "2040")

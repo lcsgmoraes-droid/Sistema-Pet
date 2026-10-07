@@ -180,6 +180,7 @@ class ProdutoService:
 
         # 🔒 ISOLAMENTO MULTI-TENANT: Adicionar tenant_id obrigatório
         dados_limpos["tenant_id"] = tenant_id
+        dados_limpos["origem_tenant_id"] = tenant_id
 
         logger.info(
             f"💾 ProdutoService: Criando produto tipo '{tipo_produto}' com {len(dados_limpos)} campos"

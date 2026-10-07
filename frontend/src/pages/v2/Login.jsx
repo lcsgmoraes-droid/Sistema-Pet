@@ -24,6 +24,7 @@ const Login = () => {
   const [rememberLogin, setRememberLogin] = useState(Boolean(rememberedLogin));
   const { cancelTenantSelection, login, selectTenant } = useAuth();
   const navigate = useNavigate();
+  const senhaAlterada = new URLSearchParams(window.location.search).get("senha") === "alterada";
   const digitandoTelefone = looksLikePhoneLoginInput(identifier);
   const loginComUsuario = Boolean(
     identifier.trim() && !identifier.includes("@") && !digitandoTelefone,
@@ -107,6 +108,15 @@ const Login = () => {
           />
           <p className="mt-2 text-slate-600">Gestão integrada para petshops</p>
         </div>
+
+        {senhaAlterada && !error ? (
+          <div
+            role="status"
+            className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"
+          >
+            Senha alterada com sucesso. Entre com sua nova senha.
+          </div>
+        ) : null}
 
         {error ? (
           <div className="mb-6 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">

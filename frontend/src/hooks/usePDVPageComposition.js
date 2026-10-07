@@ -103,6 +103,9 @@ export function usePDVPageComposition({
   handleSelecionarFuncionarioComissao,
   handleToggleVendaComissionada,
   vendaComissionada,
+  vendedorObrigatorio,
+  gerarComissao,
+  setGerarComissao,
   handleNovaVenda,
   painelClienteAberto,
   setPainelClienteAberto,
@@ -318,6 +321,9 @@ export function usePDVPageComposition({
     onSelecionarFuncionario: handleSelecionarFuncionarioComissao,
     onToggleVendaComissionada: handleToggleVendaComissionada,
     vendaComissionada,
+    vendedorObrigatorio,
+    gerarComissao,
+    onGerarComissaoChange: setGerarComissao,
     onNovaVenda: handleNovaVenda,
   };
 

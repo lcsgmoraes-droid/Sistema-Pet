@@ -1,8 +1,12 @@
+from copy import deepcopy
 from types import SimpleNamespace
 
+from app.dre_canais.base import _snapshot_pronto
 from app.services.venda_rentabilidade_snapshot_service import (
     SNAPSHOT_VERSION,
+    ajustar_snapshot_taxa_mista,
     build_venda_rentabilidade_snapshot,
+    get_or_build_venda_rentabilidade_snapshot,
 )
 
 
@@ -155,6 +159,118 @@ def test_snapshot_usa_taxa_real_do_gateway_quando_pagamento_online_tem_dados_mp(
     assert snapshot["gateway_payment_ids"] == ["1387729134"]
     assert snapshot["venda_liquida"] == 3.75
     assert snapshot["itens"][0]["taxa_cartao"] == 0.23
+
+
+def test_snapshot_soma_taxas_de_gateway_e_pagamentos_locais_na_mesma_venda():
+    venda = SimpleNamespace(
+        id=127,
+        numero_venda="202610050001",
+        status="finalizada",
+        data_venda=None,
+        cliente=SimpleNamespace(nome="Cliente QA"),
+        subtotal=100,
+        desconto_valor=0,
+        taxa_entrega=0,
+        valor_taxa_entregador=0,
+        tem_entrega=False,
+        entregador_id=None,
+        cupom_code=None,
+        cupom_discount_applied=None,
+        itens=[
+            SimpleNamespace(
+                produto_id=10,
+                quantidade=1,
+                preco_unitario=100,
+                produto=SimpleNamespace(nome="Produto QA", preco_custo=0),
+            )
+        ],
+        pagamentos=[
+            SimpleNamespace(
+                forma_pagamento="pix",
+                valor=40,
+                gateway_provider="mercadopago",
+                gateway_fee_amount=1,
+                valor_taxa_prevista=9,
+            ),
+            SimpleNamespace(
+                forma_pagamento="cartao_credito",
+                valor=30,
+                valor_taxa_prevista=2,
+            ),
+            SimpleNamespace(forma_pagamento="cartao_debito", valor=20),
+            SimpleNamespace(forma_pagamento="dinheiro", valor=10),
+        ],
+    )
+
+    snapshot = build_venda_rentabilidade_snapshot(
+        venda,
+        db=SimpleNamespace(query=lambda *_args, **_kwargs: None),
+        tenant_id="tenant-qa",
+        impostos_percentual=0,
+        formas_pagamento_map={
+            "cartao_credito": SimpleNamespace(taxa_percentual=99, taxa_fixa=10),
+            "cartao_debito": SimpleNamespace(taxa_percentual=1, taxa_fixa=0),
+        },
+        custo_campanha=0,
+        cupom_desconto=0,
+        comissao_total=0,
+        estoque_custos_por_produto={},
+    )
+
+    assert snapshot["taxa_gateway"] == 1
+    assert snapshot["taxa_cartao"] == 3.2  # gateway 1 + credito 2 + debito 0.2
+    assert snapshot["venda_liquida"] == 96.8
+    assert snapshot["itens"][0]["taxa_cartao"] == 3.2
+
+
+def test_snapshot_historico_misto_corrige_so_taxa_e_totais_derivados_uma_vez():
+    antigo = {
+        "snapshot_version": SNAPSHOT_VERSION,
+        "taxa_gateway": 1,
+        "taxa_cartao": 1,
+        "venda_bruta": 100,
+        "venda_liquida": 79,
+        "lucro": 49,
+        "custo_produtos": 30,
+        "imposto": 10,
+        "desconto": 5,
+        "itens": [
+            {
+                "venda_bruta": 100,
+                "taxa_cartao": 1,
+                "valor_liquido": 79,
+                "lucro": 49,
+                "custo_total": 30,
+                "quantidade": 1,
+            }
+        ],
+    }
+    original = deepcopy(antigo)
+    venda = SimpleNamespace(
+        status="finalizada",
+        rentabilidade_snapshot=antigo,
+        pagamentos=[
+            SimpleNamespace(gateway_provider="mercadopago", gateway_fee_amount=1),
+            SimpleNamespace(valor_taxa_prevista=2),
+        ],
+    )
+
+    corrigido = _snapshot_pronto(venda)
+    assert corrigido["taxa_cartao"] == 3
+    assert corrigido["venda_liquida"] == 77
+    assert corrigido["lucro"] == 47
+    assert corrigido["itens"][0]["taxa_cartao"] == 3
+    assert corrigido["itens"][0]["lucro"] == 47
+    assert corrigido["imposto"] == antigo["imposto"]
+    assert corrigido["desconto"] == antigo["desconto"]
+    assert corrigido["custo_produtos"] == antigo["custo_produtos"]
+    assert antigo == original
+    assert ajustar_snapshot_taxa_mista(venda, corrigido) is corrigido
+    assert _snapshot_pronto(venda) == corrigido
+    assert (
+        get_or_build_venda_rentabilidade_snapshot(venda, db=None, tenant_id="tenant-qa")
+        == corrigido
+    )
 
 
 def test_snapshot_preserva_taxa_aplicada_na_venda_mesmo_se_cadastro_mudar():

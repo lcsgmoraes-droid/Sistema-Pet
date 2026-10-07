@@ -8,8 +8,9 @@ from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth import verify_password
+from app.auth import get_current_user, hash_password, verify_password
 from app.auth.auth_multitenant_schemas import (
+    ChangePasswordRequest,
     LoginRequest,
     LoginResponse,
     RegisterRequest,
@@ -32,6 +33,7 @@ from app.services.auth_security import (
     is_user_locked,
     register_account_created,
     register_failed_login,
+    register_password_changed,
     register_successful_login,
     remaining_lock_seconds,
 )
@@ -50,7 +52,7 @@ from app.services.tenant_login_name_service import (
     get_primary_tenant_login_name_value,
     resolve_tenant_id_by_login_name,
 )
-from app.session_manager import create_session
+from app.session_manager import create_session, revoke_all_sessions
 from app.tenancy.context import clear_tenant_context, set_tenant_context
 from app.tenancy.rls import (
     sync_rls_auth_email,
@@ -62,6 +64,29 @@ from app.tenancy.rls import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+@router.post("/change-password")
+def change_password(
+    payload: ChangePasswordRequest,
+    request: Request,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    if not verify_password(payload.senha_atual, current_user.hashed_password or ""):
+        raise HTTPException(status_code=400, detail="Senha atual incorreta")
+    if verify_password(payload.nova_senha, current_user.hashed_password or ""):
+        raise HTTPException(
+            status_code=400, detail="A nova senha deve ser diferente da atual"
+        )
+
+    current_user.hashed_password = hash_password(payload.nova_senha)
+    current_user.reset_token = None
+    current_user.reset_token_expires = None
+    register_password_changed(db, current_user, request, "self_change")
+    revoke_all_sessions(db, current_user.id, reason="password_change")
+    db.commit()
+    return {"message": "Senha alterada com sucesso. Entre novamente."}
 
 
 def _tenant_reference_filters(tenant_reference: str):

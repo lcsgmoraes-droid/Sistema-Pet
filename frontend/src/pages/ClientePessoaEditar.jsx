@@ -19,6 +19,7 @@ import ClientePessoaAlertasPdvSection from "../components/clientes/ClientePessoa
 import ClientePessoaComplementaresTab from "../components/clientes/ClientePessoaComplementaresTab";
 import ClientePessoaContatosTab from "../components/clientes/ClientePessoaContatosTab";
 import ClientePessoaDadosGeraisTab from "../components/clientes/ClientePessoaDadosGeraisTab";
+import ClientePessoaHistoricoPanel from "../components/clientes/ClientePessoaHistoricoPanel";
 import ClientePessoaEnderecoModal from "../components/clientes/ClientePessoaEnderecoModal";
 import ClientePessoaEnderecoTab from "../components/clientes/ClientePessoaEnderecoTab";
 import ClientePessoaFinanceiroTab from "../components/clientes/ClientePessoaFinanceiroTab";
@@ -482,6 +483,8 @@ export default function ClientePessoaEditar() {
           {abaAtiva === "dados-gerais" ? (
             <div className="space-y-8">
               <ClientePessoaDadosGeraisTab erros={erros} formData={formData} setFormData={setFormData} />
+
+              <ClientePessoaHistoricoPanel clienteId={clienteId} origemTenantId={cliente?.origem_tenant_id} versao={cliente} />
 
               <div className="border-t border-slate-200 pt-6 dark:border-slate-700">
                 <h3 className="mb-4 text-base font-semibold text-slate-900 dark:text-slate-100">

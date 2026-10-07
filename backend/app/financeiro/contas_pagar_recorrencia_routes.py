@@ -251,6 +251,8 @@ async def processar_recorrencias_contas_pagar(
             continue
 
     for conta_criada in contas_criadas:
+        if not conta_criada.afeta_dre:
+            continue
         try:
             atualizar_dre_por_lancamento(
                 db=db,

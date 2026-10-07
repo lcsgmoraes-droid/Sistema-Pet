@@ -79,6 +79,11 @@ class ResetPasswordRequest(BaseModel):
     nova_senha: str = Field(min_length=8)
 
 
+class ChangePasswordRequest(BaseModel):
+    senha_atual: str
+    nova_senha: str = Field(min_length=8)
+
+
 class VerifyEmailRequest(BaseModel):
     token: str
     email: EmailStr | None = None

@@ -1,10 +1,11 @@
 """Rotas de cadastro, detalhe e edicao completa de produtos."""
 
 import logging
+from app.services.produto_historico_service import registrar_alteracoes_produto
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, joinedload
 
@@ -26,6 +27,7 @@ from app.produtos.schemas import (
     ProdutoUpdate,
 )
 from app.produtos.validators import (
+    _validar_codigo_barras_unico,
     _validar_sku_unico,
     _validar_tenant_e_obter_usuario,
     _validar_chaves_aliases,
@@ -39,6 +41,7 @@ from app.produtos_models import (
     ProdutoKitComponente,
     ProdutoProtocoloRecorrencia,
 )
+from app.models import User
 from app.security.permissions_decorator import require_permission
 from app.services.produto_service import ProdutoService
 from app.services.ofertas_estudio_ai import resolver_chave_openai_tenant
@@ -111,20 +114,7 @@ def criar_produto(
 
     # Verificar se código de barras já existe
     if produto.codigo_barras:
-        existe_barcode = (
-            db.query(Produto)
-            .filter(
-                Produto.codigo_barras == produto.codigo_barras,
-                Produto.tenant_id == tenant_id,
-            )
-            .first()
-        )
-
-        if existe_barcode:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Código de barras '{produto.codigo_barras}' já cadastrado",
-            )
+        _validar_codigo_barras_unico(db, produto.codigo_barras, tenant_id)
 
     # Verificar se categoria existe
     if produto.categoria_id:
@@ -495,21 +485,9 @@ def atualizar_produto(
         produto_update.codigo_barras
         and produto_update.codigo_barras != produto.codigo_barras
     ):
-        existe_barcode = (
-            db.query(Produto)
-            .filter(
-                Produto.codigo_barras == produto_update.codigo_barras,
-                Produto.tenant_id == tenant_id,
-                Produto.id != produto_id,
-            )
-            .first()
+        _validar_codigo_barras_unico(
+            db, produto_update.codigo_barras, tenant_id, produto_id=produto_id
         )
-
-        if existe_barcode:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Código de barras '{produto_update.codigo_barras}' já cadastrado",
-            )
 
     # Extrair dados
     dados_recebidos = produto_update.model_dump(exclude_unset=True)
@@ -678,8 +656,17 @@ def atualizar_produto(
     custo_componente_alterado = "preco_custo" in dados_recebidos
     preco_venda_componente_anterior = float(getattr(produto, "preco_venda", 0) or 0)
 
+    antes_historico = {key: getattr(produto, key, None) for key in dados_recebidos}
     for key, value in dados_recebidos.items():
         setattr(produto, key, value)
+    registrar_alteracoes_produto(
+        db,
+        produto_id=produto.id,
+        tenant_id=tenant_id,
+        user_id=current_user.id,
+        antes=antes_historico,
+        depois=dados_recebidos,
+    )
 
     if not bool(produto.ativo) or produto.situacao is False:
         produto.anunciar_ecommerce = False

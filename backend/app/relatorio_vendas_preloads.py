@@ -191,21 +191,16 @@ def _carregar_cashback_por_venda(db: Session, tenant_id, venda_ids: list[int]) -
         return {}
 
     try:
-        from app.campaigns.models import CashbackTransaction
-
-        resgates = (
-            db.query(
-                CashbackTransaction.source_id, func.sum(CashbackTransaction.amount)
-            )
-            .filter(
-                CashbackTransaction.tenant_id == tenant_id,
-                CashbackTransaction.amount < 0,
-                CashbackTransaction.source_id.in_(venda_ids),
-            )
-            .group_by(CashbackTransaction.source_id)
-            .all()
+        from app.vendas.cashback_financeiro import (
+            cashback_resgatado_liquido_por_venda,
         )
-        return {row[0]: float(abs(row[1])) for row in resgates}
+
+        return {
+            venda_id: float(total)
+            for venda_id, total in cashback_resgatado_liquido_por_venda(
+                db, tenant_id=tenant_id, venda_ids=venda_ids
+            ).items()
+        }
     except Exception as exc:
         logger.warning(
             f"Erro ao buscar cashback por venda (tabela pode nao existir): {exc}"

@@ -1,6 +1,7 @@
 """Exportacoes PDF e Excel da DRE."""
 
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from io import BytesIO
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -9,15 +10,102 @@ from sqlalchemy.orm import Session
 
 from .auth.dependencies import get_current_user_and_tenant
 from .db import get_session
-from .dre_base_routes import gerar_dre
+from .dre_canais.routes import gerar_dre_por_canais
+from .dre_schemas import DREResponse
 
 router = APIRouter(prefix="/financeiro/dre", tags=["DRE"])
+
+
+def _dre_para_exportacao(
+    *,
+    ano: int,
+    mes: int,
+    mes_inicial: int | None,
+    data_final: date | None,
+    canais: str,
+    db: Session,
+    user_and_tenant,
+) -> DREResponse:
+    """Usa a mesma fonte e os mesmos filtros da DRE exibida por canais."""
+    dre_canais = gerar_dre_por_canais(
+        ano=ano,
+        mes=mes,
+        mes_inicial=mes_inicial,
+        data_final=data_final,
+        canais=canais,
+        db=db,
+        user_and_tenant=user_and_tenant,
+    )
+    totais = dre_canais.totais
+
+    def valor_total(campo: str) -> Decimal:
+        return Decimal(str(totais.get(campo, 0) or 0))
+
+    def valor_linhas(campo: str) -> Decimal:
+        return sum(
+            (
+                Decimal(str(linha.valor))
+                for linha in dre_canais.linhas
+                if linha.campo == campo and linha.canal != "total"
+            ),
+            Decimal("0"),
+        )
+
+    despesas_pessoal = valor_linhas("despesas_pessoal")
+    despesas_administrativas = valor_linhas("despesas_administrativas")
+    taxas_cartao = valor_linhas("taxas_cartao")
+    despesas_operacionais = valor_total("despesas_operacionais")
+    receita_liquida = valor_total("receita_liquida")
+    resultado_operacional = valor_total("resultado_operacional")
+
+    return DREResponse(
+        periodo=dre_canais.periodo,
+        mes=mes,
+        ano=ano,
+        receita_bruta=valor_total("receita_bruta"),
+        vendas_produtos=valor_total("vendas_produtos"),
+        vendas_servicos=valor_total("vendas_servicos"),
+        receita_frete=valor_total("receita_frete"),
+        outras_receitas=valor_total("outras_receitas"),
+        deducoes_total=valor_total("deducoes_total"),
+        descontos=valor_total("descontos"),
+        devolucoes=valor_total("devolucoes"),
+        receita_liquida=receita_liquida,
+        cmv=valor_total("cmv"),
+        custo_servicos=valor_total("custo_servicos"),
+        lucro_bruto=valor_total("lucro_bruto"),
+        margem_bruta=float(totais.get("margem_bruta", 0) or 0),
+        despesas_operacionais=despesas_operacionais,
+        despesas_pessoal=despesas_pessoal,
+        despesas_administrativas=despesas_administrativas,
+        taxas_cartao=taxas_cartao,
+        outras_despesas=(
+            despesas_operacionais
+            - despesas_pessoal
+            - despesas_administrativas
+            - taxas_cartao
+        ),
+        resultado_operacional=resultado_operacional,
+        margem_operacional=(
+            round(float(resultado_operacional / receita_liquida * 100), 2)
+            if receita_liquida > 0
+            else 0
+        ),
+        resultado_financeiro=Decimal("0"),
+        receitas_financeiras=Decimal("0"),
+        despesas_financeiras=Decimal("0"),
+        lucro_liquido=valor_total("lucro_liquido"),
+        margem_liquida=float(totais.get("margem_liquida", 0) or 0),
+    )
 
 
 @router.get("/export/pdf")
 async def exportar_dre_pdf(
     ano: int = Query(...),
     mes: int = Query(...),
+    mes_inicial: int | None = None,
+    data_final: date | None = None,
+    canais: str = "",
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
@@ -42,7 +130,15 @@ async def exportar_dre_pdf(
         )
 
     # Buscar dados da DRE
-    dre = gerar_dre(ano=ano, mes=mes, db=db, user_and_tenant=user_and_tenant)
+    dre = _dre_para_exportacao(
+        ano=ano,
+        mes=mes,
+        mes_inicial=mes_inicial,
+        data_final=data_final,
+        canais=canais,
+        db=db,
+        user_and_tenant=user_and_tenant,
+    )
 
     # Nomes dos meses
     meses = [
@@ -86,7 +182,7 @@ async def exportar_dre_pdf(
     subtitle_style = ParagraphStyle(
         "Subtitle", parent=styles["Normal"], fontSize=12, alignment=TA_CENTER
     )
-    periodo_text = f"Período: {mes_nome}/{ano}"
+    periodo_text = f"Período: {dre.periodo}"
     elements.append(Paragraph(periodo_text, subtitle_style))
     elements.append(Spacer(1, 10 * mm))
 
@@ -113,6 +209,7 @@ async def exportar_dre_pdf(
             formatar_moeda(dre.vendas_servicos),
             f"{(float(dre.vendas_servicos) / float(dre.receita_bruta) * 100 if float(dre.receita_bruta) > 0 else 0):.2f}%",
         ],
+        ["  Receita de Frete", formatar_moeda(dre.receita_frete), ""],
         [
             "  Outras Receitas",
             formatar_moeda(dre.outras_receitas),
@@ -122,10 +219,15 @@ async def exportar_dre_pdf(
         [
             "(-) DEDUÇÕES",
             formatar_moeda(dre.deducoes_total),
-            f"{dre.margem_bruta - 100:.2f}%",
+            f"-{(float(dre.deducoes_total) / float(dre.receita_bruta) * 100 if float(dre.receita_bruta) > 0 else 0):.2f}%",
         ],
         ["  Descontos", formatar_moeda(dre.descontos), ""],
-        ["  Devoluções", formatar_moeda(dre.devolucoes), ""],
+        ["  Devoluções de Vendas", formatar_moeda(dre.devolucoes), ""],
+        [
+            "  Impostos sobre Vendas",
+            formatar_moeda(dre.deducoes_total - dre.descontos - dre.devolucoes),
+            "",
+        ],
         ["", "", ""],
         [
             "(=) RECEITA LÍQUIDA",
@@ -134,6 +236,7 @@ async def exportar_dre_pdf(
         ],
         ["", "", ""],
         ["(-) CMV (Custo Mercadorias Vendidas)", formatar_moeda(dre.cmv), ""],
+        ["(-) Custo dos Serviços Prestados", formatar_moeda(dre.custo_servicos), ""],
         ["", "", ""],
         [
             "(=) LUCRO BRUTO",
@@ -168,6 +271,15 @@ async def exportar_dre_pdf(
         ],
     ]
 
+    indices_totais = {
+        linha[0]: indice for indice, linha in enumerate(dre_data) if linha and linha[0]
+    }
+    receita_bruta_idx = indices_totais["RECEITA BRUTA"]
+    receita_liquida_idx = indices_totais["(=) RECEITA LÍQUIDA"]
+    lucro_bruto_idx = indices_totais["(=) LUCRO BRUTO"]
+    resultado_operacional_idx = indices_totais["(=) RESULTADO OPERACIONAL"]
+    lucro_liquido_idx = indices_totais["(=) LUCRO LÍQUIDO"]
+
     dre_table = Table(dre_data, colWidths=[100 * mm, 40 * mm, 30 * mm])
     dre_table.setStyle(
         TableStyle(
@@ -181,24 +293,74 @@ async def exportar_dre_pdf(
                 ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
                 ("BOTTOMPADDING", (0, 0), (-1, 0), 10),
                 # Totais principais (negrito)
-                ("FONTNAME", (0, 2), (0, 2), "Helvetica-Bold"),  # RECEITA BRUTA
-                ("FONTNAME", (0, 11), (0, 11), "Helvetica-Bold"),  # RECEITA LÍQUIDA
-                ("FONTNAME", (0, 15), (0, 15), "Helvetica-Bold"),  # LUCRO BRUTO
                 (
                     "FONTNAME",
-                    (0, 23),
-                    (0, 23),
+                    (0, receita_bruta_idx),
+                    (0, receita_bruta_idx),
                     "Helvetica-Bold",
-                ),  # RESULTADO OPERACIONAL
-                ("FONTNAME", (0, 29), (0, 29), "Helvetica-Bold"),  # LUCRO LÍQUIDO
-                ("FONTSIZE", (0, 29), (-1, 29), 12),  # LUCRO LÍQUIDO maior
+                ),
+                (
+                    "FONTNAME",
+                    (0, receita_liquida_idx),
+                    (0, receita_liquida_idx),
+                    "Helvetica-Bold",
+                ),
+                (
+                    "FONTNAME",
+                    (0, lucro_bruto_idx),
+                    (0, lucro_bruto_idx),
+                    "Helvetica-Bold",
+                ),
+                (
+                    "FONTNAME",
+                    (0, resultado_operacional_idx),
+                    (0, resultado_operacional_idx),
+                    "Helvetica-Bold",
+                ),
+                (
+                    "FONTNAME",
+                    (0, lucro_liquido_idx),
+                    (0, lucro_liquido_idx),
+                    "Helvetica-Bold",
+                ),
+                ("FONTSIZE", (0, lucro_liquido_idx), (-1, lucro_liquido_idx), 12),
                 # Background nos totais
-                ("BACKGROUND", (0, 2), (-1, 2), colors.lightblue),
-                ("BACKGROUND", (0, 11), (-1, 11), colors.lightgreen),
-                ("BACKGROUND", (0, 15), (-1, 15), colors.lightyellow),
-                ("BACKGROUND", (0, 23), (-1, 23), colors.lightcyan),
-                ("BACKGROUND", (0, 29), (-1, 29), colors.HexColor("#10b981")),
-                ("TEXTCOLOR", (0, 29), (-1, 29), colors.whitesmoke),
+                (
+                    "BACKGROUND",
+                    (0, receita_bruta_idx),
+                    (-1, receita_bruta_idx),
+                    colors.lightblue,
+                ),
+                (
+                    "BACKGROUND",
+                    (0, receita_liquida_idx),
+                    (-1, receita_liquida_idx),
+                    colors.lightgreen,
+                ),
+                (
+                    "BACKGROUND",
+                    (0, lucro_bruto_idx),
+                    (-1, lucro_bruto_idx),
+                    colors.lightyellow,
+                ),
+                (
+                    "BACKGROUND",
+                    (0, resultado_operacional_idx),
+                    (-1, resultado_operacional_idx),
+                    colors.lightcyan,
+                ),
+                (
+                    "BACKGROUND",
+                    (0, lucro_liquido_idx),
+                    (-1, lucro_liquido_idx),
+                    colors.HexColor("#10b981"),
+                ),
+                (
+                    "TEXTCOLOR",
+                    (0, lucro_liquido_idx),
+                    (-1, lucro_liquido_idx),
+                    colors.whitesmoke,
+                ),
                 # Grid
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
                 ("FONTSIZE", (0, 1), (-1, -1), 9),
@@ -235,6 +397,9 @@ async def exportar_dre_pdf(
 async def exportar_dre_excel(
     ano: int = Query(...),
     mes: int = Query(...),
+    mes_inicial: int | None = None,
+    data_final: date | None = None,
+    canais: str = "",
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
@@ -249,7 +414,15 @@ async def exportar_dre_excel(
         )
 
     # Buscar dados da DRE
-    dre = gerar_dre(ano=ano, mes=mes, db=db, user_and_tenant=user_and_tenant)
+    dre = _dre_para_exportacao(
+        ano=ano,
+        mes=mes,
+        mes_inicial=mes_inicial,
+        data_final=data_final,
+        canais=canais,
+        db=db,
+        user_and_tenant=user_and_tenant,
+    )
 
     # Nomes dos meses
     meses = [
@@ -300,7 +473,7 @@ async def exportar_dre_excel(
     ws["A1"].alignment = Alignment(horizontal="center")
 
     # Período
-    ws["A2"] = f"Período: {mes_nome}/{ano}"
+    ws["A2"] = f"Período: {dre.periodo}"
     ws.merge_cells("A2:C2")
     ws["A2"].alignment = Alignment(horizontal="center")
 
@@ -352,15 +525,23 @@ async def exportar_dre_excel(
         dre.vendas_servicos,
         f"{(float(dre.vendas_servicos) / float(dre.receita_bruta) * 100 if float(dre.receita_bruta) > 0 else 0):.2f}%",
     )
+    add_row("  Receita de Frete", dre.receita_frete)
     add_row(
         "  Outras Receitas",
         dre.outras_receitas,
         f"{(float(dre.outras_receitas) / float(dre.receita_bruta) * 100 if float(dre.receita_bruta) > 0 else 0):.2f}%",
     )
     row += 1  # Linha em branco
-    add_row("(-) DEDUÇÕES", dre.deducoes_total, f"{dre.margem_bruta - 100:.2f}%")
+    add_row(
+        "(-) DEDUÇÕES",
+        dre.deducoes_total,
+        f"-{(float(dre.deducoes_total) / float(dre.receita_bruta) * 100 if float(dre.receita_bruta) > 0 else 0):.2f}%",
+    )
     add_row("  Descontos", dre.descontos)
-    add_row("  Devoluções", dre.devolucoes)
+    add_row("  Devoluções de Vendas", dre.devolucoes)
+    add_row(
+        "  Impostos sobre Vendas", dre.deducoes_total - dre.descontos - dre.devolucoes
+    )
     row += 1
     add_row(
         "(=) RECEITA LÍQUIDA",
@@ -370,6 +551,7 @@ async def exportar_dre_excel(
     )
     row += 1
     add_row("(-) CMV (Custo Mercadorias Vendidas)", dre.cmv)
+    add_row("(-) Custo dos Serviços Prestados", dre.custo_servicos)
     row += 1
     add_row(
         "(=) LUCRO BRUTO", dre.lucro_bruto, f"{dre.margem_bruta:.2f}%", is_total=True

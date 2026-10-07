@@ -1,6 +1,7 @@
 """Rotas de consulta de clientes e extratos de campanhas."""
 
 from datetime import date, datetime, timezone
+from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -8,7 +9,12 @@ from sqlalchemy import func as sqlfunc, or_ as sql_or_
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
+from app.campaigns.cashback_limit import cashback_use_limit_percent
 from app.campaigns.loyalty_service import summarize_loyalty_balances_for_customer
+from app.campaigns.cashback_wallet import (
+    get_cashback_wallet,
+    get_tenant_cashback_liability,
+)
 from app.campaigns.models import (
     Campaign,
     CashbackSourceTypeEnum,
@@ -133,24 +139,36 @@ def gestor_clientes_por_tipo(
         }
 
     elif tipo == "cashback":
-        subq = (
-            db.query(
-                CashbackTransaction.customer_id,
-                sqlfunc.sum(CashbackTransaction.amount).label("saldo"),
-            )
+        customer_ids = [
+            row[0]
+            for row in db.query(CashbackTransaction.customer_id)
             .filter(CashbackTransaction.tenant_id == tenant_id)
-            .group_by(CashbackTransaction.customer_id)
-            .having(sqlfunc.sum(CashbackTransaction.amount) > 0)
-            .subquery()
-        )
-        rows = (
-            db.query(Cliente, subq.c.saldo)
-            .join(subq, Cliente.id == subq.c.customer_id)
-            .filter(Cliente.tenant_id == tenant_id, Cliente.ativo.is_(True))
-            .order_by(subq.c.saldo.desc())
-            .limit(limit)
+            .distinct()
+            .all()
+        ]
+        if not customer_ids:
+            return {"clientes": []}
+        clientes = (
+            db.query(Cliente)
+            .filter(
+                Cliente.tenant_id == tenant_id,
+                Cliente.ativo.is_(True),
+                Cliente.id.in_(customer_ids),
+            )
             .all()
         )
+        rows = [
+            (
+                cliente,
+                get_cashback_wallet(
+                    db, tenant_id=tenant_id, customer_id=cliente.id
+                ).available,
+            )
+            for cliente in clientes
+        ]
+        rows = [(cliente, saldo) for cliente, saldo in rows if saldo > 0]
+        rows.sort(key=lambda item: (-item[1], (item[0].nome or "").lower()))
+        rows = rows[:limit]
         return {
             "clientes": [
                 {
@@ -248,27 +266,11 @@ def saldo_cliente(
     """
     _, tenant_id = user_and_tenant
 
-    # Saldo cashback = soma de todos os lançamentos.
-    # Lançamentos com expires_at no passado e tx_type='credit' são ignorados
-    # (o job de expiração já insere um lançamento negativo para eles,
-    # mas enquanto isso não aconteceu, excluímos manualmente da soma).
-    now_utc = datetime.now(timezone.utc)
-    saldo_raw = (
-        db.query(sqlfunc.sum(CashbackTransaction.amount))
-        .filter(
-            CashbackTransaction.tenant_id == tenant_id,
-            CashbackTransaction.customer_id == customer_id,
-            # Inclui lançamentos sem prazo OU com prazo ainda no futuro
-            # OU lançamentos negativos (debit/expired/reversal) — sempre contam
-            sql_or_(
-                CashbackTransaction.expires_at.is_(None),
-                CashbackTransaction.expires_at > now_utc,
-                CashbackTransaction.tx_type != "credit",
-            ),
-        )
-        .scalar()
+    saldo_cashback = float(
+        get_cashback_wallet(db, tenant_id=tenant_id, customer_id=customer_id).available
     )
-    saldo_cashback = float(saldo_raw or 0)
+    cashback_limit_percent = cashback_use_limit_percent(db, tenant_id)
+    now_utc = datetime.now(timezone.utc)
 
     loyalty_summary = summarize_loyalty_balances_for_customer(
         db,
@@ -316,6 +318,11 @@ def saldo_cliente(
     return {
         "customer_id": customer_id,
         "saldo_cashback": saldo_cashback,
+        "cashback_use_limit_percent": (
+            float(cashback_limit_percent)
+            if cashback_limit_percent is not None
+            else None
+        ),
         "total_carimbos": loyalty_summary["total_carimbos"],
         "total_carimbos_brutos": loyalty_summary["total_carimbos_brutos"],
         "carimbos_comprometidos_total": loyalty_summary["carimbos_comprometidos_total"],
@@ -434,36 +441,22 @@ def extrato_cashback(
         .filter(
             CashbackTransaction.tenant_id == tenant_id,
             CashbackTransaction.customer_id == customer_id,
+            CashbackTransaction.tx_type != "closed",
         )
-        .order_by(CashbackTransaction.created_at.desc())
+        .order_by(CashbackTransaction.id.desc())
         .limit(limit)
         .all()
     )
 
-    # Saldo atual (reaproveitando a mesma lógica do /saldo)
-    saldo_raw = (
-        db.query(sqlfunc.sum(CashbackTransaction.amount))
-        .filter(
-            CashbackTransaction.tenant_id == tenant_id,
-            CashbackTransaction.customer_id == customer_id,
-            sql_or_(
-                CashbackTransaction.expires_at.is_(None),
-                CashbackTransaction.expires_at > now_utc,
-                CashbackTransaction.tx_type != "credit",
-            ),
-        )
-        .scalar()
+    wallet = get_cashback_wallet(
+        db, tenant_id=tenant_id, customer_id=customer_id, as_of=now_utc
     )
-    saldo_atual = float(saldo_raw or 0)
+    saldo_atual = float(wallet.available)
 
     items = []
     for t in txs:
         # Determina se este crédito específico está expirado
-        is_expired_credit = (
-            t.tx_type == "credit"
-            and t.expires_at is not None
-            and t.expires_at <= now_utc
-        )
+        is_expired_credit = wallet.expected_expiration_by_credit.get(t.id, 0) > 0
         items.append(
             {
                 "id": t.id,
@@ -502,21 +495,10 @@ def sugestao_cashback(
     _, tenant_id = user_and_tenant
     now_utc = datetime.now(timezone.utc)
 
-    # Saldo disponível
-    saldo_raw = (
-        db.query(sqlfunc.sum(CashbackTransaction.amount))
-        .filter(
-            CashbackTransaction.tenant_id == tenant_id,
-            CashbackTransaction.customer_id == customer_id,
-            sql_or_(
-                CashbackTransaction.expires_at.is_(None),
-                CashbackTransaction.expires_at > now_utc,
-                CashbackTransaction.tx_type != "credit",
-            ),
-        )
-        .scalar()
+    wallet = get_cashback_wallet(
+        db, tenant_id=tenant_id, customer_id=customer_id, as_of=now_utc
     )
-    saldo = float(saldo_raw or 0)
+    saldo = float(wallet.available)
 
     # Ticket médio das últimas 10 compras (via cashback transactions de crédito)
     ultimas_compras = (
@@ -547,12 +529,17 @@ def sugestao_cashback(
     valor_com_cashback = max(0.0, round(ticket_sugerido - saldo, 2))
 
     # Próximo cashback que vai expirar
+    creditos_com_saldo = [
+        credit_id
+        for credit_id, restante in wallet.remaining_by_credit.items()
+        if restante > 0
+    ]
     proximo_expirando = (
         db.query(CashbackTransaction)
         .filter(
             CashbackTransaction.tenant_id == tenant_id,
             CashbackTransaction.customer_id == customer_id,
-            CashbackTransaction.tx_type == "credit",
+            CashbackTransaction.id.in_(creditos_com_saldo),
             CashbackTransaction.expires_at.isnot(None),
             CashbackTransaction.expires_at > now_utc,
         )
@@ -566,7 +553,7 @@ def sugestao_cashback(
         "valor_com_cashback": valor_com_cashback,
         "economia": min(saldo, ticket_sugerido),
         "proximo_expirando": {
-            "amount": float(proximo_expirando.amount),
+            "amount": float(wallet.remaining_by_credit[proximo_expirando.id]),
             "expires_at": proximo_expirando.expires_at.isoformat(),
             "dias_restantes": max(0, (proximo_expirando.expires_at - now_utc).days),
         }
@@ -595,12 +582,11 @@ def relatorio_campanhas(
     """
     from app.models import Cliente
     from app.vendas_models import Venda
+    from app.vendas.cashback_financeiro import cashback_resgatado_liquido_por_transacao
 
     _, tenant_id = user_and_tenant
 
-    q = db.query(CashbackTransaction).filter(
-        CashbackTransaction.tenant_id == tenant_id,
-    )
+    q = db.query(CashbackTransaction).filter(CashbackTransaction.tenant_id == tenant_id)
 
     if data_inicio:
         q = q.filter(
@@ -613,11 +599,27 @@ def relatorio_campanhas(
             <= datetime.combine(data_fim, datetime.max.time())
         )
     if tipo == "credito":
-        q = q.filter(CashbackTransaction.amount > 0)
+        q = q.filter(CashbackTransaction.source_type == CashbackSourceTypeEnum.campaign)
     elif tipo == "resgate":
-        q = q.filter(CashbackTransaction.amount < 0)
+        q = q.filter(
+            CashbackTransaction.source_type == CashbackSourceTypeEnum.redemption
+        )
 
-    transacoes = q.order_by(CashbackTransaction.created_at.desc()).limit(500).all()
+    transacoes = []
+    total_creditado = Decimal("0.00")
+    resgate_ids = []
+    for t in q.order_by(CashbackTransaction.id.desc()).yield_per(500):
+        if t.source_type == CashbackSourceTypeEnum.campaign:
+            total_creditado += Decimal(str(t.amount))
+        elif t.source_type == CashbackSourceTypeEnum.redemption:
+            resgate_ids.append(t.id)
+        if len(transacoes) < 500:
+            transacoes.append(t)
+    resgate_liquido = cashback_resgatado_liquido_por_transacao(
+        db,
+        tenant_id=tenant_id,
+        redemption_ids=resgate_ids,
+    )
 
     # Buscar nomes de clientes em lote
     customer_ids = list({t.customer_id for t in transacoes})
@@ -634,7 +636,13 @@ def relatorio_campanhas(
         clientes_map = {c.id: c.nome for c in clientes}
 
     # Buscar números de venda em lote (source_id é venda_id para resgates)
-    venda_ids = list({t.source_id for t in transacoes if t.source_id and t.amount < 0})
+    venda_ids = list(
+        {
+            t.source_id
+            for t in transacoes
+            if t.source_id and t.source_type == CashbackSourceTypeEnum.redemption
+        }
+    )
     vendas_map = {}
     if venda_ids:
         vendas = (
@@ -649,7 +657,21 @@ def relatorio_campanhas(
 
     resultado = []
     for t in transacoes:
-        eh_resgate = t.amount < 0
+        eh_resgate = t.source_type == CashbackSourceTypeEnum.redemption
+        valor = resgate_liquido.get(t.id, 0) if eh_resgate else abs(t.amount)
+        if eh_resgate and valor <= 0:
+            continue
+        tipo_movimento = (
+            "resgate"
+            if eh_resgate
+            else "estorno"
+            if t.source_type == CashbackSourceTypeEnum.reversal
+            else "expiracao"
+            if t.source_type == CashbackSourceTypeEnum.expiration
+            else "credito"
+            if t.source_type == CashbackSourceTypeEnum.campaign
+            else "ajuste"
+        )
         resultado.append(
             {
                 "id": t.id,
@@ -658,8 +680,8 @@ def relatorio_campanhas(
                 "cliente_nome": clientes_map.get(
                     t.customer_id, f"Cliente #{t.customer_id}"
                 ),
-                "tipo": "resgate" if eh_resgate else "credito",
-                "valor": float(abs(t.amount)),
+                "tipo": tipo_movimento,
+                "valor": float(valor),
                 "source_type": t.source_type.value if t.source_type else None,
                 "venda_id": t.source_id if eh_resgate else None,
                 "numero_venda": vendas_map.get(t.source_id)
@@ -670,14 +692,13 @@ def relatorio_campanhas(
         )
 
     # Totais
-    total_creditado = sum(r["valor"] for r in resultado if r["tipo"] == "credito")
-    total_resgatado = sum(r["valor"] for r in resultado if r["tipo"] == "resgate")
+    total_resgatado = sum(resgate_liquido.values())
 
     return {
         "transacoes": resultado,
-        "total_creditado": round(total_creditado, 2),
+        "total_creditado": round(float(total_creditado), 2),
         "total_resgatado": round(total_resgatado, 2),
-        "saldo_total": round(total_creditado - total_resgatado, 2),
+        "saldo_total": float(get_tenant_cashback_liability(db, tenant_id=tenant_id)),
     }
 
 

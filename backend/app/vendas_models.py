@@ -51,6 +51,9 @@ class Venda(BaseTenantModel):
     funcionario_id = Column(
         Integer, ForeignKey("clientes.id"), nullable=True
     )  # Funcionário comissionado
+    vendedor_funcionario_id = Column(
+        Integer, ForeignKey("clientes.id"), nullable=True, index=True
+    )
 
     # Valores
     subtotal = Column(DECIMAL(10, 2), nullable=False)
@@ -59,6 +62,14 @@ class Venda(BaseTenantModel):
     cupom_code = Column(String(100), nullable=True, index=True)
     cupom_discount_applied = Column(DECIMAL(10, 2), nullable=True)
     total = Column(DECIMAL(10, 2), nullable=False)
+    nao_gerar_beneficios = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    justificativa_nao_gerar_beneficios = Column(Text, nullable=True)
+    beneficios_bloqueados_em = Column(DateTime, nullable=True)
+    beneficios_bloqueados_por_id = Column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
 
     # Entrega
     tem_entrega = Column(Boolean, default=False)
@@ -188,6 +199,9 @@ class Venda(BaseTenantModel):
     vendedor = relationship(
         "User", foreign_keys=[vendedor_id], backref="vendas_realizadas"
     )
+    vendedor_funcionario = relationship(
+        "Cliente", foreign_keys=[vendedor_funcionario_id]
+    )
     entregador = relationship(
         "Cliente", foreign_keys=[entregador_id], backref="entregas_realizadas"
     )
@@ -265,6 +279,11 @@ class Venda(BaseTenantModel):
             "cliente": cliente_dict,
             "vendedor_id": self.vendedor_id,
             "funcionario_id": self.funcionario_id,
+            "vendedor_funcionario_id": self.vendedor_funcionario_id
+            or self.funcionario_id,
+            "vendedor_funcionario_nome": self.vendedor_funcionario.nome
+            if self.vendedor_funcionario
+            else None,
             "subtotal": safe_decimal_to_float(self.subtotal),
             "desconto_valor": safe_decimal_to_float(self.desconto_valor) or 0,
             "desconto_percentual": safe_decimal_to_float(self.desconto_percentual) or 0,
@@ -273,6 +292,12 @@ class Venda(BaseTenantModel):
                 self.cupom_discount_applied
             ),
             "total": safe_decimal_to_float(self.total),
+            "nao_gerar_beneficios": bool(self.nao_gerar_beneficios),
+            "justificativa_nao_gerar_beneficios": self.justificativa_nao_gerar_beneficios,
+            "beneficios_bloqueados_em": safe_datetime_to_iso(
+                self.beneficios_bloqueados_em
+            ),
+            "beneficios_bloqueados_por_id": self.beneficios_bloqueados_por_id,
             "valor_total": safe_decimal_to_float(
                 self.total
             ),  # Alias para compatibilidade
@@ -410,6 +435,11 @@ class VendaItem(BaseTenantModel):
     desconto_item = Column(DECIMAL(10, 2), default=0)
     subtotal = Column(DECIMAL(10, 2), nullable=False)
 
+    # Comprovante prospectivo da baixa de estoque, gravado uma unica vez na
+    # transacao da venda. Snapshots de rentabilidade e movimentos podem ser
+    # reprocessados; este registro nao acompanha essas atualizacoes.
+    custo_original_saida = Column(JSON, nullable=True)
+
     # Referência ao lote (FIFO)
     lote_id = Column(Integer, ForeignKey("produto_lotes.id"), nullable=True)
 
@@ -446,6 +476,7 @@ class VendaItem(BaseTenantModel):
 
         result = {
             "id": self.id,
+            "venda_id": self.venda_id,
             "tipo": self.tipo,
             "produto_id": self.produto_id,
             "estoque_compartilhado": bool(self.estoque_origem_tenant_id),

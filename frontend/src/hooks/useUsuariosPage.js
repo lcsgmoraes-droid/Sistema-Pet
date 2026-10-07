@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api";
+import { useAuth } from "../contexts/AuthContext";
 import { confirmarCorePet } from "../services/corepetDialog";
+import { buildInitialAccessCredentials, resolveTenantLoginReference } from "../utils/usuarioAcessoInicial";
 import { isBrazilianMobileLogin, normalizeBrazilianLoginPhone } from "../utils/loginPhone";
 
 const USUARIO_INICIAL = {
@@ -17,7 +19,7 @@ const USUARIO_INICIAL = {
   lojas_adicionais: [],
 };
 
-const CREDENCIAIS_INICIAIS = { login_phone: "", role_id: "" };
+const CREDENCIAIS_INICIAIS = { login_phone: "", new_password: "", role_id: "" };
 
 function isClienteRole(role) {
   return (role?.nome || "").trim().toLocaleLowerCase("pt-BR") === "cliente";
@@ -96,6 +98,7 @@ function campoDoErroServidor(mensagem) {
 }
 
 export default function useUsuariosPage() {
+  const { user } = useAuth();
   const [usuarios, setUsuarios] = useState([]);
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -107,6 +110,9 @@ export default function useUsuariosPage() {
   const [credenciais, setCredenciais] = useState(CREDENCIAIS_INICIAIS);
   const [credenciaisError, setCredenciaisError] = useState("");
   const [savingCredentials, setSavingCredentials] = useState(false);
+  const [savingLiberacaoId, setSavingLiberacaoId] = useState(null);
+  const [initialAccessCredentials, setInitialAccessCredentials] = useState(null);
+  const [generatedPassword, setGeneratedPassword] = useState("");
   const [perfisApp, setPerfisApp] = useState([]);
   const [pessoaVinculadaCredenciais, setPessoaVinculadaCredenciais] = useState(null);
   const [savingPerfisApp, setSavingPerfisApp] = useState(false);
@@ -150,6 +156,10 @@ export default function useUsuariosPage() {
     (paginaSegura - 1) * itensPorPagina,
     paginaSegura * itensPorPagina,
   );
+  const tenantLoginReference = resolveTenantLoginReference(
+    user,
+    typeof window === "undefined" ? null : window.localStorage.getItem("selectedTenant"),
+  );
 
   async function carregarUsuarios() {
     try {
@@ -174,6 +184,27 @@ export default function useUsuariosPage() {
     }
   }
 
+  async function alterarLiberacaoCrediario(usuario, autorizado) {
+    setSavingLiberacaoId(usuario.user_id);
+    try {
+      await api.patch(`/usuarios/${usuario.user_id}/liberacao-crediario`, { autorizado });
+      setUsuarios((atuais) =>
+        atuais.map((item) =>
+          item.user_id === usuario.user_id
+            ? { ...item, pode_liberar_venda_crediario_atrasado: autorizado }
+            : item,
+        ),
+      );
+      toast.success(
+        autorizado ? "Usuário autorizado a liberar vendas bloqueadas." : "Autorização removida.",
+      );
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Não foi possível alterar a autorização.");
+    } finally {
+      setSavingLiberacaoId(null);
+    }
+  }
+
   async function toggleStatus(userId, isActive) {
     const acao = isActive ? "desativar acesso" : "ativar acesso";
     if (!(await confirmarCorePet(`Confirma ${acao} deste usuario?`))) return;
@@ -187,6 +218,26 @@ export default function useUsuariosPage() {
     } catch (error) {
       console.error("Erro ao alterar status:", error);
       toast.error(error.response?.data?.detail || "Nao foi possivel alterar o status do usuario.");
+    }
+  }
+
+  async function excluirUsuario(usuario) {
+    const nome = usuario.nome || usuario.login_phone || usuario.email || `ID ${usuario.user_id}`;
+    if (
+      !(await confirmarCorePet(
+        `Excluir definitivamente o acesso de ${nome}? A conta sai da lista e o celular/e-mail ficam livres. O historico de operacoes sera preservado.`,
+      ))
+    )
+      return;
+
+    try {
+      await api.delete(`/usuarios/${usuario.user_id}`, {
+        data: { confirmacao: "EXCLUIR" },
+      });
+      toast.success("Acesso excluido. Celular e e-mail liberados.");
+      await carregarUsuarios();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Nao foi possivel excluir o acesso.");
     }
   }
 
@@ -255,6 +306,14 @@ export default function useUsuariosPage() {
           tenant_id,
         })),
       });
+      setInitialAccessCredentials(
+        buildInitialAccessCredentials({
+          tenant: tenantLoginReference,
+          loginPhone,
+          password: novoUsuario.password,
+          personName: novoUsuario.nome,
+        }),
+      );
       toast.success("Usuario criado com sucesso.");
       resetarModalUsuario();
       carregarUsuarios();
@@ -285,9 +344,11 @@ export default function useUsuariosPage() {
     setUsuarioCredenciais(usuario);
     setCredenciais({
       login_phone: usuario.login_phone || "",
+      new_password: "",
       role_id: usuario.role_id || "",
     });
     setCredenciaisError("");
+    setGeneratedPassword("");
     setPerfisApp([]);
     setPessoaVinculadaCredenciais(
       usuario.pessoa_id ? { id: usuario.pessoa_id, nome: usuario.pessoa_nome } : null,
@@ -304,6 +365,7 @@ export default function useUsuariosPage() {
     setUsuarioCredenciais(null);
     setCredenciais({ ...CREDENCIAIS_INICIAIS });
     setCredenciaisError("");
+    setGeneratedPassword("");
     setPerfisApp([]);
     setPessoaVinculadaCredenciais(null);
   }
@@ -330,10 +392,22 @@ export default function useUsuariosPage() {
 
   async function salvarCredenciais(event) {
     event.preventDefault();
+    await atualizarCredenciais(false);
+  }
+
+  async function gerarNovaSenha() {
+    await atualizarCredenciais(true);
+  }
+
+  async function atualizarCredenciais(gerarSenha) {
     if (!usuarioCredenciais) return;
     const loginPhone = normalizeBrazilianLoginPhone(credenciais.login_phone);
     if (!isBrazilianMobileLogin(credenciais.login_phone)) {
       setCredenciaisError("Informe um celular valido com DDD.");
+      return;
+    }
+    if (!gerarSenha && credenciais.new_password && credenciais.new_password.length < 8) {
+      setCredenciaisError("A nova senha deve ter no minimo 8 caracteres.");
       return;
     }
     if (!credenciais.role_id) {
@@ -343,15 +417,23 @@ export default function useUsuariosPage() {
 
     setSavingCredentials(true);
     setCredenciaisError("");
+    setGeneratedPassword("");
     try {
-      await api.patch(`/usuarios/${usuarioCredenciais.user_id}/credenciais`, {
+      const response = await api.patch(`/usuarios/${usuarioCredenciais.user_id}/credenciais`, {
         login_phone: loginPhone,
+        new_password: gerarSenha ? null : credenciais.new_password || null,
+        generate_password: gerarSenha,
         role_id: Number(credenciais.role_id),
       });
-      setCredenciais((current) => ({ ...current, login_phone: loginPhone }));
+      setCredenciais((current) => ({ ...current, login_phone: loginPhone, new_password: "" }));
       await carregarUsuarios();
-      toast.success("Acesso atualizado com sucesso.");
-      fecharCredenciais();
+      if (response.data?.generated_password) {
+        setGeneratedPassword(response.data.generated_password);
+        toast.success("Nova senha gerada. Copie antes de fechar.");
+      } else {
+        toast.success("Acesso atualizado com sucesso.");
+        fecharCredenciais();
+      }
     } catch (error) {
       setCredenciaisError(
         error.response?.data?.detail || "Nao foi possivel atualizar o acesso deste usuario.",
@@ -416,10 +498,18 @@ export default function useUsuariosPage() {
     salvarPerfisApp,
     savingCredentials,
     savingPerfisApp,
+    savingLiberacaoId,
+    setInitialAccessCredentials,
+    initialAccessCredentials,
+    tenantLoginReference,
     toggleStatus,
     totalPaginas,
     totalUsuariosFiltrados,
     usuarioServerErrors,
+    alterarLiberacaoCrediario,
+    excluirUsuario,
+    generatedPassword,
+    gerarNovaSenha,
     usuarioCredenciais,
     usuarios: usuariosPaginados,
     vincularLojaUsuario,
