@@ -1,6 +1,7 @@
 export {
   calcularIntervaloPeriodoRapido,
   calcularValorFinalPagamentoContasPagar,
+  calcularSaldoRestanteContasPagar,
   carregarFormasPagamentoContasPagar,
   criarFiltrosDespesasCaixaContasPagar,
   criarFiltrosContasPagarDaUrl,
