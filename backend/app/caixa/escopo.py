@@ -57,7 +57,12 @@ def buscar_caixa_aberto(
 
 
 def buscar_caixa_acessivel(
-    db: Session, *, caixa_id: int, tenant_id, usuario_id: int, bloquear_caixa: bool = False
+    db: Session,
+    *,
+    caixa_id: int,
+    tenant_id,
+    usuario_id: int,
+    bloquear_caixa: bool = False,
 ) -> tuple[Caixa | None, bool]:
     """Busca um caixa por id respeitando o modo definido pela empresa."""
     compartilhado = caixa_compartilhado_habilitado(db, tenant_id)

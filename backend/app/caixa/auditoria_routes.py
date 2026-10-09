@@ -9,7 +9,11 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
-from app.caixa.auditoria import assinatura_item, registrar_evento_caixa, reunir_espelhos_baixa_lote
+from app.caixa.auditoria import (
+    assinatura_item,
+    registrar_evento_caixa,
+    reunir_espelhos_baixa_lote,
+)
 from app.caixa.escopo import buscar_caixa_acessivel
 from app.caixa.recebimentos import filtro_pagamentos_caixa
 from app.db import get_session
@@ -29,6 +33,7 @@ class ConferenciaItemSchema(BaseModel):
 
 def _itens_caixa(db, caixa_id, usuario_e_tenant):
     from app.caixa_routes import listar_movimentacoes_caixa, listar_vendas_caixa
+
     usuario, tenant_id = usuario_e_tenant
     caixa, _ = buscar_caixa_acessivel(
         db, caixa_id=caixa_id, tenant_id=tenant_id, usuario_id=usuario.id
@@ -48,7 +53,9 @@ def _itens_caixa(db, caixa_id, usuario_e_tenant):
         .all()
     )
     return {
-        "venda": listar_vendas_caixa(caixa_id, db=db, current_user_and_tenant=usuario_e_tenant),
+        "venda": listar_vendas_caixa(
+            caixa_id, db=db, current_user_and_tenant=usuario_e_tenant
+        ),
         "movimentacao": listar_movimentacoes_caixa(
             caixa_id, db=db, current_user_and_tenant=usuario_e_tenant
         )["movimentacoes"],
@@ -58,7 +65,8 @@ def _itens_caixa(db, caixa_id, usuario_e_tenant):
                 "venda_id": pagamento.venda_id,
                 "venda_numero": pagamento.venda.numero_venda,
                 "data_movimento": pagamento.data_pagamento.isoformat()
-                if pagamento.data_pagamento else None,
+                if pagamento.data_pagamento
+                else None,
                 "tipo": "recebimento",
                 "descricao": f"Recebimento da venda {pagamento.venda.numero_venda}",
                 "natureza": "entrada",
@@ -92,7 +100,9 @@ def obter_auditoria_caixa(
             AuditLog.tenant_id == tenant_id,
             AuditLog.entity_type == "caixa",
             AuditLog.entity_id == caixa_id,
-            AuditLog.action.in_(["caixa_fechado", "caixa_reaberto", "caixa_conferencia"]),
+            AuditLog.action.in_(
+                ["caixa_fechado", "caixa_reaberto", "caixa_conferencia"]
+            ),
         )
         .order_by(AuditLog.timestamp.desc(), AuditLog.id.desc())
         .all()
@@ -111,12 +121,14 @@ def obter_auditoria_caixa(
             "anterior": json.loads(evento.old_value) if evento.old_value else None,
         }
         if evento.action == "caixa_conferencia":
-            conferencias.setdefault(f'{dados["tipo_item"]}:{dados["item_id"]}', registro)
+            conferencias.setdefault(
+                f"{dados['tipo_item']}:{dados['item_id']}", registro
+            )
         historico.append(registro)
     for tipo, registros in itens.items():
         for item in registros:
             assinatura = assinatura_item(item)
-            conferencia = conferencias.get(f'{tipo}:{item["id"]}')
+            conferencia = conferencias.get(f"{tipo}:{item['id']}")
             item["assinatura"] = assinatura
             item["conferencia"] = conferencia
             item["conferido"] = bool(
@@ -125,7 +137,9 @@ def obter_auditoria_caixa(
                 and conferencia["dados"].get("assinatura") == assinatura
             )
     return {
-        "resumo": obter_resumo_caixa(caixa_id, db=db, current_user_and_tenant=current_user_and_tenant),
+        "resumo": obter_resumo_caixa(
+            caixa_id, db=db, current_user_and_tenant=current_user_and_tenant
+        ),
         "vendas": itens["venda"],
         "movimentacoes": itens["movimentacao"],
         "pagamentos": itens["pagamento"],
@@ -149,7 +163,9 @@ def conferir_item_caixa(
     if item is None:
         raise HTTPException(404, "O lançamento não pertence a este caixa")
     if assinatura_item(item) != dados.assinatura:
-        raise HTTPException(409, "O lançamento mudou. Atualize o caixa antes de conferir.")
+        raise HTTPException(
+            409, "O lançamento mudou. Atualize o caixa antes de conferir."
+        )
     registrar_evento_caixa(
         db,
         caixa_id=caixa_id,

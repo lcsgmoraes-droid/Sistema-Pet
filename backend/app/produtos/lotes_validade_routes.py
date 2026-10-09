@@ -62,10 +62,13 @@ def informar_lote_validade(
         or (produto.tipo_produto == "KIT" and produto.tipo_kit == "VIRTUAL")
     ):
         raise HTTPException(
-            status_code=400, detail="Este cadastro não possui estoque próprio para identificar lotes"
+            status_code=400,
+            detail="Este cadastro não possui estoque próprio para identificar lotes",
         )
     if dados.data_fabricacao and dados.data_fabricacao > dados.data_validade:
-        raise HTTPException(status_code=400, detail="A fabricação não pode ser posterior à validade")
+        raise HTTPException(
+            status_code=400, detail="A fabricação não pode ser posterior à validade"
+        )
 
     lotes = (
         db.query(ProdutoLote)
@@ -77,18 +80,34 @@ def informar_lote_validade(
         .with_for_update()
         .all()
     )
-    lote = next((item for item in lotes if item.id == dados.lote_id), None) if dados.lote_id else None
+    lote = (
+        next((item for item in lotes if item.id == dados.lote_id), None)
+        if dados.lote_id
+        else None
+    )
     if dados.lote_id and lote is None:
-        raise HTTPException(status_code=404, detail="Lote não encontrado para este produto")
-    mesmo_nome = next((item for item in lotes if item.nome_lote == dados.nome_lote), None)
+        raise HTTPException(
+            status_code=404, detail="Lote não encontrado para este produto"
+        )
+    mesmo_nome = next(
+        (item for item in lotes if item.nome_lote == dados.nome_lote), None
+    )
     if lote and mesmo_nome and mesmo_nome.id != lote.id:
-        raise HTTPException(status_code=400, detail="Já existe outro lote com este número")
+        raise HTTPException(
+            status_code=400, detail="Já existe outro lote com este número"
+        )
     # Reenviar o mesmo número define sua quantidade; nunca soma outra vez.
     lote = lote or mesmo_nome
     if not lote and dados.quantidade <= 0:
-        raise HTTPException(status_code=400, detail="Informe uma quantidade maior que zero para o novo lote")
+        raise HTTPException(
+            status_code=400,
+            detail="Informe uma quantidade maior que zero para o novo lote",
+        )
     if lote and dados.quantidade < float(lote.quantidade_reservada or 0):
-        raise HTTPException(status_code=400, detail="A quantidade não pode ser menor que a reserva deste lote")
+        raise HTTPException(
+            status_code=400,
+            detail="A quantidade não pode ser menor que a reserva deste lote",
+        )
 
     quantidade_outros = sum(
         max(0, float(item.quantidade_disponivel or 0))
@@ -98,8 +117,13 @@ def informar_lote_validade(
     total_identificado = quantidade_outros + dados.quantidade
     estoque_atual = max(0, float(produto.estoque_atual or 0))
     # Permite corrigir para baixo um cadastro antigo que já excedia o estoque.
-    total_anterior = quantidade_outros + (float(lote.quantidade_disponivel or 0) if lote else 0)
-    if total_identificado > estoque_atual + 1e-6 and total_identificado > total_anterior + 1e-6:
+    total_anterior = quantidade_outros + (
+        float(lote.quantidade_disponivel or 0) if lote else 0
+    )
+    if (
+        total_identificado > estoque_atual + 1e-6
+        and total_identificado > total_anterior + 1e-6
+    ):
         raise HTTPException(
             status_code=400,
             detail="As quantidades dos lotes excedem o estoque atual. Corrija os lotes existentes ou registre a entrada de estoque primeiro.",
@@ -120,7 +144,9 @@ def informar_lote_validade(
         db.add(lote)
     else:
         quantidade_consumida = max(
-            0, float(lote.quantidade_inicial or 0) - float(lote.quantidade_disponivel or 0)
+            0,
+            float(lote.quantidade_inicial or 0)
+            - float(lote.quantidade_disponivel or 0),
         )
         lote.quantidade_inicial = quantidade_consumida + dados.quantidade
 
@@ -128,7 +154,9 @@ def informar_lote_validade(
     lote.quantidade_disponivel = dados.quantidade
     lote.data_validade = datetime.combine(dados.data_validade, hora.min)
     lote.data_fabricacao = (
-        datetime.combine(dados.data_fabricacao, hora.min) if dados.data_fabricacao else None
+        datetime.combine(dados.data_fabricacao, hora.min)
+        if dados.data_fabricacao
+        else None
     )
     # Uma correção de identificação não deve liberar um lote bloqueado/vencido.
     if lote.status in ("ativo", "esgotado"):

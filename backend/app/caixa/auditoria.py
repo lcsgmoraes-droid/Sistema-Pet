@@ -11,7 +11,9 @@ from app.utils.timezone import as_brasilia_naive
 
 def assinatura_item(item: dict) -> str:
     return hashlib.sha256(
-        json.dumps(item, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")
+        json.dumps(item, sort_keys=True, ensure_ascii=False, default=str).encode(
+            "utf-8"
+        )
     ).hexdigest()
 
 
@@ -33,10 +35,16 @@ def reunir_espelhos_baixa_lote(movimentacoes, pagamentos):
             for pagamento in disponiveis:
                 if not pagamento.get("data_movimento"):
                     continue
-                segundos = abs((
-                    as_brasilia_naive(datetime.fromisoformat(movimento["data_movimento"]))
-                    - as_brasilia_naive(datetime.fromisoformat(pagamento["data_movimento"]))
-                ).total_seconds())
+                segundos = abs(
+                    (
+                        as_brasilia_naive(
+                            datetime.fromisoformat(movimento["data_movimento"])
+                        )
+                        - as_brasilia_naive(
+                            datetime.fromisoformat(pagamento["data_movimento"])
+                        )
+                    ).total_seconds()
+                )
                 if (
                     pagamento["venda_id"] == movimento.get("venda_id")
                     and str(pagamento["forma_pagamento"]).strip().casefold() == forma
@@ -57,8 +65,12 @@ def snapshot_caixa(db, caixa_id, usuario_e_tenant):
     from app.caixa_routes import obter_resumo_caixa, listar_vendas_caixa
 
     return {
-        "resumo": obter_resumo_caixa(caixa_id, db=db, current_user_and_tenant=usuario_e_tenant),
-        "vendas": listar_vendas_caixa(caixa_id, db=db, current_user_and_tenant=usuario_e_tenant),
+        "resumo": obter_resumo_caixa(
+            caixa_id, db=db, current_user_and_tenant=usuario_e_tenant
+        ),
+        "vendas": listar_vendas_caixa(
+            caixa_id, db=db, current_user_and_tenant=usuario_e_tenant
+        ),
     }
 
 
@@ -73,8 +85,12 @@ def registrar_evento_caixa(
         action=acao,
         entity_type="caixa",
         entity_id=caixa_id,
-        old_value=json.dumps(anterior, ensure_ascii=False, default=str) if anterior else None,
-        new_value=json.dumps({**(novo or {}), "usuario_nome": nome}, ensure_ascii=False, default=str),
+        old_value=json.dumps(anterior, ensure_ascii=False, default=str)
+        if anterior
+        else None,
+        new_value=json.dumps(
+            {**(novo or {}), "usuario_nome": nome}, ensure_ascii=False, default=str
+        ),
         details=motivo,
         timestamp=datetime.now(timezone.utc),
     )

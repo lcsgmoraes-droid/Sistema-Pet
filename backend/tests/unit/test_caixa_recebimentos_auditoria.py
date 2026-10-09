@@ -36,16 +36,23 @@ def caixa_session():
     schema = "test_caixa_" + uuid4().hex
     engine = create_engine(pg_url or "sqlite://")
     tables = [
-        Caixa.__table__, MovimentacaoCaixa.__table__, Venda.__table__,
-        VendaPagamento.__table__, VendaItem.__table__, AuditLog.__table__,
-        EmpresaConfigGeral.__table__, ContaReceber.__table__,
+        Caixa.__table__,
+        MovimentacaoCaixa.__table__,
+        Venda.__table__,
+        VendaPagamento.__table__,
+        VendaItem.__table__,
+        AuditLog.__table__,
+        EmpresaConfigGeral.__table__,
+        ContaReceber.__table__,
     ]
     if pg_url:
         assert engine.url.host in {"127.0.0.1", "localhost"}
         with engine.begin() as conn:
             conn.execute(CreateSchema(schema))
         engine.dispose()
-        engine = create_engine(pg_url, connect_args={"options": f"-csearch_path={schema}"})
+        engine = create_engine(
+            pg_url, connect_args={"options": f"-csearch_path={schema}"}
+        )
         for table in tables:
             for coluna in table.columns:
                 if isinstance(coluna.type, Enum):
@@ -72,50 +79,100 @@ def recebimentos(caixa_session, tenant_context):
     tenant_context(tenant_id)
     usuario = SimpleNamespace(id=91, nome="Operador", email="operador@example.test")
     original = Caixa(
-        tenant_id=tenant_id, numero_caixa=1, usuario_id=usuario.id,
-        usuario_nome=usuario.nome, status="fechado", valor_abertura=100,
-        data_abertura=datetime(2026, 10, 8, 8), data_fechamento=datetime(2026, 10, 8, 20),
-        valor_informado=100, valor_esperado=100,
+        tenant_id=tenant_id,
+        numero_caixa=1,
+        usuario_id=usuario.id,
+        usuario_nome=usuario.nome,
+        status="fechado",
+        valor_abertura=100,
+        data_abertura=datetime(2026, 10, 8, 8),
+        data_fechamento=datetime(2026, 10, 8, 20),
+        valor_informado=100,
+        valor_esperado=100,
     )
     atual = Caixa(
-        tenant_id=tenant_id, numero_caixa=2, usuario_id=usuario.id,
-        usuario_nome=usuario.nome, status="aberto", valor_abertura=100,
+        tenant_id=tenant_id,
+        numero_caixa=2,
+        usuario_id=usuario.id,
+        usuario_nome=usuario.nome,
+        status="aberto",
+        valor_abertura=100,
         data_abertura=datetime(2026, 10, 9, 8),
     )
     db_session.add_all([original, atual])
     db_session.flush()
     venda = Venda(
-        tenant_id=tenant_id, numero_venda="V-ANTIGA", vendedor_id=usuario.id, user_id=usuario.id,
-        caixa_id=original.id, subtotal=90, total=90, status="finalizada",
-        data_venda=datetime(2026, 10, 8, 10), canal="loja_fisica",
+        tenant_id=tenant_id,
+        numero_venda="V-ANTIGA",
+        vendedor_id=usuario.id,
+        user_id=usuario.id,
+        caixa_id=original.id,
+        subtotal=90,
+        total=90,
+        status="finalizada",
+        data_venda=datetime(2026, 10, 8, 10),
+        canal="loja_fisica",
     )
     db_session.add(venda)
     db_session.flush()
     pagamentos = [
-        VendaPagamento(tenant_id=tenant_id, venda_id=venda.id, caixa_id=original.id,
-                       forma_pagamento="PIX", valor=30, data_pagamento=datetime(2026, 10, 8, 10)),
-        VendaPagamento(tenant_id=tenant_id, venda_id=venda.id, caixa_id=atual.id,
-                       forma_pagamento="PIX", valor=40, data_pagamento=datetime(2026, 10, 9, 12)),
-        VendaPagamento(tenant_id=tenant_id, venda_id=venda.id, caixa_id=atual.id,
-                       forma_pagamento="Dinheiro", valor=20, data_pagamento=datetime(2026, 10, 9, 12)),
+        VendaPagamento(
+            tenant_id=tenant_id,
+            venda_id=venda.id,
+            caixa_id=original.id,
+            forma_pagamento="PIX",
+            valor=30,
+            data_pagamento=datetime(2026, 10, 8, 10),
+        ),
+        VendaPagamento(
+            tenant_id=tenant_id,
+            venda_id=venda.id,
+            caixa_id=atual.id,
+            forma_pagamento="PIX",
+            valor=40,
+            data_pagamento=datetime(2026, 10, 9, 12),
+        ),
+        VendaPagamento(
+            tenant_id=tenant_id,
+            venda_id=venda.id,
+            caixa_id=atual.id,
+            forma_pagamento="Dinheiro",
+            valor=20,
+            data_pagamento=datetime(2026, 10, 9, 12),
+        ),
     ]
     movimento = MovimentacaoCaixa(
-        tenant_id=tenant_id, caixa_id=atual.id, tipo="venda", valor=20,
-        forma_pagamento="Dinheiro", venda_id=venda.id, usuario_id=usuario.id,
-        usuario_nome=usuario.nome, data_movimento=datetime(2026, 10, 9, 12),
+        tenant_id=tenant_id,
+        caixa_id=atual.id,
+        tipo="venda",
+        valor=20,
+        forma_pagamento="Dinheiro",
+        venda_id=venda.id,
+        usuario_id=usuario.id,
+        usuario_nome=usuario.nome,
+        data_movimento=datetime(2026, 10, 9, 12),
     )
     db_session.add_all([*pagamentos, movimento])
     db_session.flush()
     return SimpleNamespace(
-        db=db_session, auth=(usuario, tenant_id), venda=venda, original=original,
-        atual=atual, pagamentos=pagamentos, movimento=movimento,
+        db=db_session,
+        auth=(usuario, tenant_id),
+        venda=venda,
+        original=original,
+        atual=atual,
+        pagamentos=pagamentos,
+        movimento=movimento,
     )
 
 
 def test_venda_antiga_recebida_hoje_aparece_so_no_caixa_recebedor(recebimentos):
     caso = recebimentos
-    atual = obter_resumo_caixa(caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth)
-    original = obter_resumo_caixa(caso.original.id, db=caso.db, current_user_and_tenant=caso.auth)
+    atual = obter_resumo_caixa(
+        caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
+    original = obter_resumo_caixa(
+        caso.original.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
 
     assert atual["total_recebido"] == 60
     assert atual["total_vendido"] == 0
@@ -126,7 +183,10 @@ def test_venda_antiga_recebida_hoje_aparece_so_no_caixa_recebedor(recebimentos):
     assert caso.venda.caixa_id == caso.original.id
 
     detalhes = listar_vendas_caixa(
-        caso.atual.id, forma_pagamento="PIX", db=caso.db, current_user_and_tenant=caso.auth
+        caso.atual.id,
+        forma_pagamento="PIX",
+        db=caso.db,
+        current_user_and_tenant=caso.auth,
     )
     assert len(detalhes) == 1
     assert detalhes[0]["venda_id"] == caso.venda.id
@@ -135,13 +195,19 @@ def test_venda_antiga_recebida_hoje_aparece_so_no_caixa_recebedor(recebimentos):
 
 
 @pytest.mark.parametrize("status", ["aberta", "cancelada"])
-def test_recebimentos_continuam_auditaveis_quando_status_venda_muda(recebimentos, status):
+def test_recebimentos_continuam_auditaveis_quando_status_venda_muda(
+    recebimentos, status
+):
     caso = recebimentos
     caso.venda.status = status
     caso.db.flush()
-    resumo = obter_resumo_caixa(caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth)
+    resumo = obter_resumo_caixa(
+        caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
     assert resumo["total_recebido"] == 60
-    auditoria = obter_auditoria_caixa(caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth)
+    auditoria = obter_auditoria_caixa(
+        caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
     assert auditoria["vendas"][0]["valor_nesta_forma"] == 60
     assert len(auditoria["movimentacoes"]) == 1
     assert len(auditoria["pagamentos"]) == 1
@@ -151,7 +217,9 @@ def test_pagamento_estornado_nao_compoe_resumo(recebimentos):
     caso = recebimentos
     caso.pagamentos[1].status = "estornado"
     caso.db.flush()
-    resumo = obter_resumo_caixa(caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth)
+    resumo = obter_resumo_caixa(
+        caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
     assert resumo["total_recebido"] == 20
     assert "PIX" not in resumo["recebimentos_por_forma_pagamento"]
 
@@ -159,60 +227,98 @@ def test_pagamento_estornado_nao_compoe_resumo(recebimentos):
 def test_auditoria_reune_espelho_pix_legado_mas_preserva_extrato(recebimentos):
     caso = recebimentos
     espelho = MovimentacaoCaixa(
-        tenant_id=caso.auth[1], caixa_id=caso.atual.id, tipo="venda", categoria="venda",
+        tenant_id=caso.auth[1],
+        caixa_id=caso.atual.id,
+        tipo="venda",
+        categoria="venda",
         descricao=f"Baixa venda #{caso.venda.id} - Cliente avulso",
-        forma_pagamento="PIX", valor=40, venda_id=caso.venda.id,
-        usuario_id=caso.auth[0].id, usuario_nome=caso.auth[0].nome,
+        forma_pagamento="PIX",
+        valor=40,
+        venda_id=caso.venda.id,
+        usuario_id=caso.auth[0].id,
+        usuario_nome=caso.auth[0].nome,
         data_movimento=datetime(2026, 10, 9, 12, 0, 0, 500000),
     )
     caso.db.add(espelho)
     caso.db.flush()
-    auditoria = obter_auditoria_caixa(caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth)
+    auditoria = obter_auditoria_caixa(
+        caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
     assert len(auditoria["movimentacoes"]) == 1
     assert len(auditoria["pagamentos"]) == 1
     assert auditoria["espelhos_pagamentos"][0]["id"] == espelho.id
     assert auditoria["espelhos_pagamentos"][0]["pagamento_id"] == caso.pagamentos[1].id
     assert auditoria["resumo"]["total_recebido"] == 60
-    assert caso.db.query(MovimentacaoCaixa).filter_by(caixa_id=caso.atual.id).count() == 2
+    assert (
+        caso.db.query(MovimentacaoCaixa).filter_by(caixa_id=caso.atual.id).count() == 2
+    )
 
 
-def test_movimento_eletronico_sem_espelho_comprovado_continua_na_auditoria(recebimentos):
+def test_movimento_eletronico_sem_espelho_comprovado_continua_na_auditoria(
+    recebimentos,
+):
     caso = recebimentos
-    caso.db.add(MovimentacaoCaixa(
-        tenant_id=caso.auth[1], caixa_id=caso.atual.id, tipo="venda", categoria="venda",
-        descricao=f"Baixa venda #{caso.venda.id} - Cliente avulso",
-        forma_pagamento="PIX", valor=41, venda_id=caso.venda.id,
-        usuario_id=caso.auth[0].id, usuario_nome=caso.auth[0].nome,
-        data_movimento=datetime(2026, 10, 9, 12),
-    ))
+    caso.db.add(
+        MovimentacaoCaixa(
+            tenant_id=caso.auth[1],
+            caixa_id=caso.atual.id,
+            tipo="venda",
+            categoria="venda",
+            descricao=f"Baixa venda #{caso.venda.id} - Cliente avulso",
+            forma_pagamento="PIX",
+            valor=41,
+            venda_id=caso.venda.id,
+            usuario_id=caso.auth[0].id,
+            usuario_nome=caso.auth[0].nome,
+            data_movimento=datetime(2026, 10, 9, 12),
+        )
+    )
     caso.db.flush()
-    auditoria = obter_auditoria_caixa(caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth)
+    auditoria = obter_auditoria_caixa(
+        caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
     assert len(auditoria["movimentacoes"]) == 2
     assert auditoria["espelhos_pagamentos"] == []
 
 
 def test_conferencia_persiste_e_mudanca_exige_nova_conferencia(recebimentos):
     caso = recebimentos
-    auditoria = obter_auditoria_caixa(caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth)
+    auditoria = obter_auditoria_caixa(
+        caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
     pagamento = auditoria["pagamentos"][0]
     conferir_item_caixa(
         caso.atual.id,
-        ConferenciaItemSchema(tipo_item="pagamento", item_id=pagamento["id"],
-                             conferido=True, assinatura=pagamento["assinatura"]),
-        db=caso.db, current_user_and_tenant=caso.auth,
+        ConferenciaItemSchema(
+            tipo_item="pagamento",
+            item_id=pagamento["id"],
+            conferido=True,
+            assinatura=pagamento["assinatura"],
+        ),
+        db=caso.db,
+        current_user_and_tenant=caso.auth,
     )
-    revisado = obter_auditoria_caixa(caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth)
+    revisado = obter_auditoria_caixa(
+        caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
     assert revisado["pagamentos"][0]["conferido"]
     caso.pagamentos[1].valor = 35
     caso.db.flush()
-    atualizado = obter_auditoria_caixa(caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth)
+    atualizado = obter_auditoria_caixa(
+        caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
     assert not atualizado["pagamentos"][0]["conferido"]
     with pytest.raises(HTTPException) as erro:
         conferir_item_caixa(
             caso.atual.id,
-            ConferenciaItemSchema(tipo_item="pagamento", item_id=pagamento["id"],
-                                 conferido=True, assinatura=pagamento["assinatura"]),
-            db=caso.db, current_user_and_tenant=caso.auth,
+            ConferenciaItemSchema(
+                tipo_item="pagamento",
+                item_id=pagamento["id"],
+                conferido=True,
+                assinatura=pagamento["assinatura"],
+            ),
+            db=caso.db,
+            current_user_and_tenant=caso.auth,
         )
     assert erro.value.status_code == 409
 
@@ -227,12 +333,18 @@ def test_reabertura_preserva_fechamento_completo_e_justificativa(recebimentos):
     caso.atual.usuario_fechamento_id = caso.auth[0].id
     caso.db.flush()
     resultado = reabrir_caixa(
-        caso.atual.id, ReabrirCaixaSchema(motivo="Recontagem dos valores de caixa"),
-        db=caso.db, current_user_and_tenant=caso.auth,
+        caso.atual.id,
+        ReabrirCaixaSchema(motivo="Recontagem dos valores de caixa"),
+        db=caso.db,
+        current_user_and_tenant=caso.auth,
     )
     assert resultado["status"] == "aberto"
     assert resultado["data_fechamento"] is None
-    evento = caso.db.query(AuditLog).filter_by(action="caixa_reaberto", entity_id=caso.atual.id).one()
+    evento = (
+        caso.db.query(AuditLog)
+        .filter_by(action="caixa_reaberto", entity_id=caso.atual.id)
+        .one()
+    )
     anterior = json.loads(evento.old_value)
     assert anterior["resumo"]["caixa"]["valor_informado"] == 119
     assert anterior["resumo"]["caixa"]["diferenca"] == -1
@@ -245,8 +357,10 @@ def test_reabertura_nao_cria_segundo_caixa_ativo(recebimentos):
     caso = recebimentos
     with pytest.raises(HTTPException) as erro:
         reabrir_caixa(
-            caso.original.id, ReabrirCaixaSchema(motivo="Recontagem dos valores de caixa"),
-            db=caso.db, current_user_and_tenant=caso.auth,
+            caso.original.id,
+            ReabrirCaixaSchema(motivo="Recontagem dos valores de caixa"),
+            db=caso.db,
+            current_user_and_tenant=caso.auth,
         )
     assert erro.value.status_code == 400
     assert caso.original.status == "fechado"
@@ -257,27 +371,45 @@ def test_caixa_antigo_reaberto_nao_absorve_recebimento_legado_ambiguo(recebiment
     caso.atual.status = "fechado"
     caso.atual.data_fechamento = datetime(2026, 10, 9, 20)
     caso.atual.valor_informado = 120
-    caso.db.add_all([
-        Caixa(
-            tenant_id=caso.auth[1], numero_caixa=3, usuario_id=92,
-            usuario_nome="Outro operador", status="fechado", valor_abertura=0,
-            data_abertura=datetime(2026, 10, 9, 8),
-            data_fechamento=datetime(2026, 10, 9, 20), valor_informado=0,
-        ),
-        VendaPagamento(
-            tenant_id=caso.auth[1], venda_id=caso.venda.id, caixa_id=None,
-            forma_pagamento="PIX", valor=12, data_pagamento=datetime(2026, 10, 9, 15),
-        ),
-    ])
+    caso.db.add_all(
+        [
+            Caixa(
+                tenant_id=caso.auth[1],
+                numero_caixa=3,
+                usuario_id=92,
+                usuario_nome="Outro operador",
+                status="fechado",
+                valor_abertura=0,
+                data_abertura=datetime(2026, 10, 9, 8),
+                data_fechamento=datetime(2026, 10, 9, 20),
+                valor_informado=0,
+            ),
+            VendaPagamento(
+                tenant_id=caso.auth[1],
+                venda_id=caso.venda.id,
+                caixa_id=None,
+                forma_pagamento="PIX",
+                valor=12,
+                data_pagamento=datetime(2026, 10, 9, 15),
+            ),
+        ]
+    )
     caso.db.flush()
     reabrir_caixa(
-        caso.original.id, ReabrirCaixaSchema(motivo="Conferência do caixa anterior"),
-        db=caso.db, current_user_and_tenant=caso.auth,
+        caso.original.id,
+        ReabrirCaixaSchema(motivo="Conferência do caixa anterior"),
+        db=caso.db,
+        current_user_and_tenant=caso.auth,
     )
-    resumo = obter_resumo_caixa(caso.original.id, db=caso.db, current_user_and_tenant=caso.auth)
+    resumo = obter_resumo_caixa(
+        caso.original.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
     assert resumo["total_recebido"] == 30
     detalhes = listar_vendas_caixa(
-        caso.original.id, forma_pagamento="PIX", db=caso.db, current_user_and_tenant=caso.auth,
+        caso.original.id,
+        forma_pagamento="PIX",
+        db=caso.db,
+        current_user_and_tenant=caso.auth,
     )
     assert [item["valor_nesta_forma"] for item in detalhes] == [30]
 
@@ -285,19 +417,28 @@ def test_caixa_antigo_reaberto_nao_absorve_recebimento_legado_ambiguo(recebiment
 def test_auditoria_nao_expoe_caixa_de_outro_usuario_ou_empresa(recebimentos):
     caso = recebimentos
     for auth in [
-        (SimpleNamespace(id=92, nome="Outro", email="outro@example.test"), caso.auth[1]),
+        (
+            SimpleNamespace(id=92, nome="Outro", email="outro@example.test"),
+            caso.auth[1],
+        ),
         (caso.auth[0], uuid4()),
     ]:
         with pytest.raises(HTTPException) as erro:
-            obter_auditoria_caixa(caso.atual.id, db=caso.db, current_user_and_tenant=auth)
+            obter_auditoria_caixa(
+                caso.atual.id, db=caso.db, current_user_and_tenant=auth
+            )
         assert erro.value.status_code == 404
 
 
 @pytest.mark.parametrize("primeiro", ["recebimento", "fechamento"])
-def test_fechamento_e_recebimento_serializam_mesmo_caixa_no_postgres(recebimentos, monkeypatch, primeiro):
+def test_fechamento_e_recebimento_serializam_mesmo_caixa_no_postgres(
+    recebimentos, monkeypatch, primeiro
+):
     caso = recebimentos
     if caso.db.bind.dialect.name != "postgresql":
-        pytest.skip("Executar com TEST_RECEBIVEIS_POSTGRES_URL local para verificar locks reais")
+        pytest.skip(
+            "Executar com TEST_RECEBIVEIS_POSTGRES_URL local para verificar locks reais"
+        )
     import asyncio
     import time
     from concurrent.futures import ThreadPoolExecutor
@@ -322,24 +463,33 @@ def test_fechamento_e_recebimento_serializam_mesmo_caixa_no_postgres(recebimento
     monkeypatch.setattr(caixa_routes, "registrar_evento_caixa", registrar_com_pausa)
 
     def receber(segundo=False):
-        with contexto(caso.auth[1]), Session(caso.db.bind, expire_on_commit=False) as db:
+        with (
+            contexto(caso.auth[1]),
+            Session(caso.db.bind, expire_on_commit=False) as db,
+        ):
             if segundo:
                 caixa_em_cache = db.get(Caixa, caso.atual.id)
                 assert caixa_em_cache.status == "aberto"
                 pid_segundo.put(db.execute(text("SELECT pg_backend_pid()")).scalar())
             try:
                 CaixaService.validar_caixa_aberto(
-                    user_id=caso.auth[0].id, tenant_id=caso.auth[1],
-                    caixa_id=caso.atual.id, db=db,
+                    user_id=caso.auth[0].id,
+                    tenant_id=caso.auth[1],
+                    caixa_id=caso.atual.id,
+                    db=db,
                 )
                 if primeiro == "recebimento":
                     entrou.set()
                     assert liberar.wait(5)
                 CaixaService.registrar_movimentacao_venda(
-                    caixa_id=caso.atual.id, venda_id=caso.venda.id,
-                    venda_numero=caso.venda.numero_venda, valor=7,
-                    user_id=caso.auth[0].id, user_nome=caso.auth[0].nome,
-                    tenant_id=caso.auth[1], db=db,
+                    caixa_id=caso.atual.id,
+                    venda_id=caso.venda.id,
+                    venda_numero=caso.venda.numero_venda,
+                    valor=7,
+                    user_id=caso.auth[0].id,
+                    user_nome=caso.auth[0].nome,
+                    tenant_id=caso.auth[1],
+                    db=db,
                 )
                 db.commit()
                 return 200
@@ -348,18 +498,25 @@ def test_fechamento_e_recebimento_serializam_mesmo_caixa_no_postgres(recebimento
                 return exc.status_code
 
     def fechar(segundo=False):
-        with contexto(caso.auth[1]), Session(caso.db.bind, expire_on_commit=False) as db:
+        with (
+            contexto(caso.auth[1]),
+            Session(caso.db.bind, expire_on_commit=False) as db,
+        ):
             if segundo:
                 caixa_em_cache = db.get(Caixa, caso.atual.id)
                 assert caixa_em_cache.status == "aberto"
                 pid_segundo.put(db.execute(text("SELECT pg_backend_pid()")).scalar())
-            return asyncio.run(caixa_routes.fechar_caixa.__wrapped__(
-                caixa_id=caso.atual.id,
-                dados=caixa_routes.FecharCaixaSchema(
-                    valor_informado=127 if primeiro == "recebimento" else 120,
-                ),
-                request=None, db=db, current_user_and_tenant=caso.auth,
-            ))
+            return asyncio.run(
+                caixa_routes.fechar_caixa.__wrapped__(
+                    caixa_id=caso.atual.id,
+                    dados=caixa_routes.FecharCaixaSchema(
+                        valor_informado=127 if primeiro == "recebimento" else 120,
+                    ),
+                    request=None,
+                    db=db,
+                    current_user_and_tenant=caso.auth,
+                )
+            )
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         primeira = pool.submit(receber if primeiro == "recebimento" else fechar)
@@ -371,7 +528,9 @@ def test_fechamento_e_recebimento_serializam_mesmo_caixa_no_postgres(recebimento
             with caso.db.bind.connect() as conn:
                 for _ in range(40):
                     bloqueado = conn.execute(
-                        text("SELECT wait_event_type='Lock' FROM pg_stat_activity WHERE pid=:pid"),
+                        text(
+                            "SELECT wait_event_type='Lock' FROM pg_stat_activity WHERE pid=:pid"
+                        ),
                         {"pid": pid},
                     ).scalar()
                     if bloqueado:
@@ -391,8 +550,15 @@ def test_fechamento_e_recebimento_serializam_mesmo_caixa_no_postgres(recebimento
             assert resultado_segundo == 400
     caso.db.expire_all()
     assert caso.atual.status == "fechado"
-    evento = caso.db.query(AuditLog).filter_by(
-        action="caixa_fechado", entity_id=caso.atual.id,
-    ).one()
+    evento = (
+        caso.db.query(AuditLog)
+        .filter_by(
+            action="caixa_fechado",
+            entity_id=caso.atual.id,
+        )
+        .one()
+    )
     snapshot = json.loads(evento.new_value)["resumo"]
-    assert snapshot["totais"]["saldo_atual"] == (127 if primeiro == "recebimento" else 120)
+    assert snapshot["totais"]["saldo_atual"] == (
+        127 if primeiro == "recebimento" else 120
+    )

@@ -10,5 +10,7 @@ def filtro_pagamentos_caixa(caixa):
     # muda. Legados só entram quando a migração conseguiu atribuí-los com segurança.
     return and_(
         VendaPagamento.caixa_id == caixa.id,
-        func.coalesce(VendaPagamento.status, "").notin_(["estornado", "recusado", "cancelado"]),
+        func.coalesce(VendaPagamento.status, "").notin_(
+            ["estornado", "recusado", "cancelado"]
+        ),
     )

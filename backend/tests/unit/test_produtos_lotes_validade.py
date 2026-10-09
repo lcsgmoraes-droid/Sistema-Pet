@@ -61,7 +61,11 @@ class DBFake:
         self.added, self.commits = [], 0
 
     def query(self, model):
-        return QueryFake(produto=self.produto) if model is routes.Produto else QueryFake(lotes=self.lotes)
+        return (
+            QueryFake(produto=self.produto)
+            if model is routes.Produto
+            else QueryFake(lotes=self.lotes)
+        )
 
     def add(self, obj):
         obj.id = 123 + len(self.added)
@@ -82,8 +86,15 @@ class DBFake:
 @pytest.fixture
 def setup_rota(monkeypatch):
     produto = SimpleNamespace(
-        id=10, nome="Produto teste", estoque_atual=10, preco_custo=7, controle_lote=False,
-        controlar_estoque=True, is_parent=False, tipo_produto="SIMPLES", tipo_kit=None,
+        id=10,
+        nome="Produto teste",
+        estoque_atual=10,
+        preco_custo=7,
+        controle_lote=False,
+        controlar_estoque=True,
+        is_parent=False,
+        tipo_produto="SIMPLES",
+        tipo_kit=None,
     )
     db = DBFake(produto, [])
     acessos = []
@@ -101,7 +112,9 @@ def informar(db, **kwargs):
     payload = dict(nome_lote="LOTE-X", quantidade=4, data_validade=date(2026, 12, 1))
     payload.update(kwargs)
     return routes.informar_lote_validade(
-        10, routes.LoteValidadeRequest(**payload), db=db,
+        10,
+        routes.LoteValidadeRequest(**payload),
+        db=db,
         user_and_tenant=(SimpleNamespace(id=1), "tenant-loja"),
     )
 
@@ -181,7 +194,9 @@ def test_lote_identificado_vencido_nao_baixa_estoque_na_rotina_automatica(setup_
     lote = informar(db, data_validade=date(2026, 10, 1))
     resultado = EstoqueValidadeService.processar_lotes_em_risco(
         db=db,
-        tenant=SimpleNamespace(id="tenant-catalogo", protecao_validade_ativa=True, dias_alerta_validade=15),
+        tenant=SimpleNamespace(
+            id="tenant-catalogo", protecao_validade_ativa=True, dias_alerta_validade=15
+        ),
         user_id=1,
         agora=datetime(2026, 10, 9),
     )
@@ -197,22 +212,41 @@ def test_nao_e_possivel_bloquear_lote_de_identificacao_diretamente(setup_rota):
     lote = informar(db)
     with pytest.raises(ValueError, match="identificação"):
         EstoqueValidadeService.bloquear_lote(
-            db=db, tenant_id="tenant-catalogo", user_id=1, produto=produto, lote=lote,
+            db=db,
+            tenant_id="tenant-catalogo",
+            user_id=1,
+            produto=produto,
+            lote=lote,
         )
     assert produto.estoque_atual == 10
     assert db.added == [lote]
 
 
-def test_fifo_permite_venda_com_identificacao_parcial_e_usa_custo_atual(monkeypatch, setup_rota):
+def test_fifo_permite_venda_com_identificacao_parcial_e_usa_custo_atual(
+    monkeypatch, setup_rota
+):
     produto, db, _ = setup_rota
     lote = informar(db, quantidade=2)
     produto.preco_custo = 15  # A indicação da validade não congela custo de entrada.
-    monkeypatch.setattr(EstoqueService, "_validar_ou_registrar_estoque_negativo", lambda **kwargs: None)
-    monkeypatch.setattr(EstoqueService, "_ajustar_estoque_canal_online", lambda *args, **kwargs: None)
-    monkeypatch.setattr(EstoqueService, "_resolver_user_id_operacao", lambda **kwargs: kwargs["user_id"])
+    monkeypatch.setattr(
+        EstoqueService, "_validar_ou_registrar_estoque_negativo", lambda **kwargs: None
+    )
+    monkeypatch.setattr(
+        EstoqueService, "_ajustar_estoque_canal_online", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        EstoqueService, "_resolver_user_id_operacao", lambda **kwargs: kwargs["user_id"]
+    )
     resultado = EstoqueService.baixar_estoque(
-        produto_id=10, quantidade=5, motivo="venda", referencia_id=20, referencia_tipo="venda",
-        user_id=1, db=db, tenant_id="tenant-catalogo", sincronizar=False,
+        produto_id=10,
+        quantidade=5,
+        motivo="venda",
+        referencia_id=20,
+        referencia_tipo="venda",
+        user_id=1,
+        db=db,
+        tenant_id="tenant-catalogo",
+        sincronizar=False,
     )
     assert resultado["estoque_novo"] == 5
     assert resultado["custo_unitario"] == 15
@@ -232,14 +266,18 @@ def test_correcao_de_lote_de_entrada_preserva_origem_e_custo(setup_rota):
 
 
 @pytest.mark.parametrize("controle_anterior", [False, True])
-def test_informar_lote_preserva_configuracao_anterior_de_controle(setup_rota, controle_anterior):
+def test_informar_lote_preserva_configuracao_anterior_de_controle(
+    setup_rota, controle_anterior
+):
     produto, db, _ = setup_rota
     produto.controle_lote = controle_anterior
     informar(db)
     assert produto.controle_lote is controle_anterior
 
 
-def test_identificacao_parcial_nao_limita_fracionamento_consumo_clinico_ou_publicacao(monkeypatch, setup_rota):
+def test_identificacao_parcial_nao_limita_fracionamento_consumo_clinico_ou_publicacao(
+    monkeypatch, setup_rota
+):
     produto, db, _ = setup_rota
     produto.estoque_atual = 30
     produto.ativo = True
@@ -253,10 +291,19 @@ def test_identificacao_parcial_nao_limita_fracionamento_consumo_clinico_ou_publi
     assert produto_publicavel(produto, datetime(2026, 10, 9)) is True
 
     # O consumo clínico usa o saldo do produto, sem exigir os 30 em lotes.
-    assert _consumir_lotes_insumo(db, tenant_id="tenant-catalogo", produto=produto, quantidade=8) == []
+    assert (
+        _consumir_lotes_insumo(
+            db, tenant_id="tenant-catalogo", produto=produto, quantidade=8
+        )
+        == []
+    )
     # O fracionamento pode abrir oito unidades, incluindo três ainda sem identificação.
     consumidos, custo_total = _lotes_origem_para_consumo(
-        db, tenant_id="tenant-catalogo", produto=produto, quantidade=8, lote_origem_id=None,
+        db,
+        tenant_id="tenant-catalogo",
+        produto=produto,
+        quantidade=8,
+        lote_origem_id=None,
     )
     assert consumidos[0]["quantidade"] == 5
     assert custo_total == 8 * produto.preco_custo
@@ -264,8 +311,13 @@ def test_identificacao_parcial_nao_limita_fracionamento_consumo_clinico_ou_publi
     # Depois de consumir a identificação, as outras unidades seguem publicáveis.
     assert produto_publicavel(produto, datetime(2026, 10, 9)) is True
 
-    monkeypatch.setattr("app.produtos.lotes_routes._resolver_tenant_produto_catalogo", lambda *args: ("tenant-catalogo", None))
-    listado = listar_lotes(10, db=db, user_and_tenant=(SimpleNamespace(id=1), "tenant-loja"))
+    monkeypatch.setattr(
+        "app.produtos.lotes_routes._resolver_tenant_produto_catalogo",
+        lambda *args: ("tenant-catalogo", None),
+    )
+    listado = listar_lotes(
+        10, db=db, user_and_tenant=(SimpleNamespace(id=1), "tenant-loja")
+    )
     assert listado == [lote]  # O modal consegue listar mesmo com controle_lote=false.
 
 
@@ -317,7 +369,14 @@ def test_correcao_nao_pode_renomear_para_outro_lote(setup_rota):
     assert lote.nome_lote == "LOTE-X"
 
 
-@pytest.mark.parametrize("atributos", [dict(controlar_estoque=False), dict(is_parent=True), dict(tipo_produto="KIT", tipo_kit="VIRTUAL")])
+@pytest.mark.parametrize(
+    "atributos",
+    [
+        dict(controlar_estoque=False),
+        dict(is_parent=True),
+        dict(tipo_produto="KIT", tipo_kit="VIRTUAL"),
+    ],
+)
 def test_rejeita_cadastros_sem_estoque_proprio(setup_rota, atributos):
     produto, db, _ = setup_rota
     for chave, valor in atributos.items():
@@ -330,7 +389,9 @@ def test_rejeita_cadastros_sem_estoque_proprio(setup_rota, atributos):
 @pytest.mark.parametrize("quantidade", [-1, float("nan"), float("inf")])
 def test_schema_rejeita_quantidades_invalidas(quantidade):
     with pytest.raises(ValidationError):
-        routes.LoteValidadeRequest(nome_lote="X", quantidade=quantidade, data_validade="2026-12-01")
+        routes.LoteValidadeRequest(
+            nome_lote="X", quantidade=quantidade, data_validade="2026-12-01"
+        )
 
 
 def test_endpoint_serializa_lote_e_datas(setup_rota):
@@ -338,10 +399,18 @@ def test_endpoint_serializa_lote_e_datas(setup_rota):
     app = FastAPI()
     app.include_router(routes.router, prefix="/produtos")
     app.dependency_overrides[routes.get_session] = lambda: db
-    app.dependency_overrides[routes.get_current_user_and_tenant] = lambda: (SimpleNamespace(id=1), "tenant-loja")
-    response = TestClient(app).put("/produtos/10/lotes-validade", json={
-        "nome_lote": "X", "quantidade": 5, "data_validade": "2026-12-01",
-    })
+    app.dependency_overrides[routes.get_current_user_and_tenant] = lambda: (
+        SimpleNamespace(id=1),
+        "tenant-loja",
+    )
+    response = TestClient(app).put(
+        "/produtos/10/lotes-validade",
+        json={
+            "nome_lote": "X",
+            "quantidade": 5,
+            "data_validade": "2026-12-01",
+        },
+    )
     assert response.status_code == 200, response.text
     assert response.json()["quantidade_disponivel"] == 5
     assert response.json()["data_validade"] == "2026-12-01T00:00:00"

@@ -52,7 +52,9 @@ class EstoqueValidadeService:
         origem: str = "rotina",
     ) -> EstoqueValidadeBloqueio:
         if getattr(lote, "apenas_identificacao", False):
-            raise ValueError("Lote de identificação não permite baixa automática por validade")
+            raise ValueError(
+                "Lote de identificação não permite baixa automática por validade"
+            )
         agora = agora or _agora_utc()
         quantidade_lote = max(_to_float(getattr(lote, "quantidade_disponivel", 0)), 0)
         quantidade_vendavel = max(_to_float(getattr(produto, "estoque_atual", 0)), 0)

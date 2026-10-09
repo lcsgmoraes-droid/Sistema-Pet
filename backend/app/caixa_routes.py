@@ -324,7 +324,10 @@ async def criar_movimentacao(
     current_user, tenant_id = current_user_and_tenant
 
     caixa, _ = buscar_caixa_acessivel(
-        db, caixa_id=caixa_id, tenant_id=tenant_id, usuario_id=current_user.id,
+        db,
+        caixa_id=caixa_id,
+        tenant_id=tenant_id,
+        usuario_id=current_user.id,
         bloquear_caixa=True,
     )
 
@@ -441,7 +444,10 @@ async def fechar_caixa(
     current_user, tenant_id = current_user_and_tenant
 
     caixa, compartilhado = buscar_caixa_acessivel(
-        db, caixa_id=caixa_id, tenant_id=tenant_id, usuario_id=current_user.id,
+        db,
+        caixa_id=caixa_id,
+        tenant_id=tenant_id,
+        usuario_id=current_user.id,
         bloquear_caixa=True,
     )
 
@@ -484,7 +490,10 @@ async def fechar_caixa(
     caixa.status = "fechado"
 
     registrar_evento_caixa(
-        db, caixa_id=caixa.id, usuario=current_user, tenant_id=tenant_id,
+        db,
+        caixa_id=caixa.id,
+        usuario=current_user,
+        tenant_id=tenant_id,
         acao="caixa_fechado",
         novo=snapshot_caixa(db, caixa.id, current_user_and_tenant),
         motivo=dados.observacoes_fechamento,
@@ -506,7 +515,9 @@ def reabrir_caixa(
     """Reabrir um caixa fechado"""
     current_user, tenant_id = current_user_and_tenant
     if len(dados.motivo.strip()) < 10:
-        raise HTTPException(400, "Descreva o motivo da reabertura com pelo menos 10 caracteres.")
+        raise HTTPException(
+            400, "Descreva o motivo da reabertura com pelo menos 10 caracteres."
+        )
 
     caixa_aberto, compartilhado = buscar_caixa_aberto(
         db,
@@ -526,7 +537,10 @@ def reabrir_caixa(
         )
 
     caixa, _ = buscar_caixa_acessivel(
-        db, caixa_id=caixa_id, tenant_id=tenant_id, usuario_id=current_user.id,
+        db,
+        caixa_id=caixa_id,
+        tenant_id=tenant_id,
+        usuario_id=current_user.id,
         bloquear_caixa=True,
     )
 
@@ -540,8 +554,12 @@ def reabrir_caixa(
         )
 
     registrar_evento_caixa(
-        db, caixa_id=caixa.id, usuario=current_user, tenant_id=tenant_id,
-        acao="caixa_reaberto", motivo=dados.motivo.strip(),
+        db,
+        caixa_id=caixa.id,
+        usuario=current_user,
+        tenant_id=tenant_id,
+        acao="caixa_reaberto",
+        motivo=dados.motivo.strip(),
         anterior=snapshot_caixa(db, caixa.id, current_user_and_tenant),
         novo={"status": "aberto"},
     )
@@ -832,23 +850,28 @@ def listar_vendas_caixa(
         )
         recebimentos = {}
         for pagamento in pagamentos_caixa:
-            recebimentos.setdefault(pagamento.venda_id, []).append({
-                "id": pagamento.id,
-                "tipo": "pagamento",
-                "forma_pagamento": pagamento.forma_pagamento,
-                "valor": float(moeda(pagamento.valor)),
-                "data_recebimento": pagamento.data_pagamento.isoformat()
-                if pagamento.data_pagamento else None,
-            })
+            recebimentos.setdefault(pagamento.venda_id, []).append(
+                {
+                    "id": pagamento.id,
+                    "tipo": "pagamento",
+                    "forma_pagamento": pagamento.forma_pagamento,
+                    "valor": float(moeda(pagamento.valor)),
+                    "data_recebimento": pagamento.data_pagamento.isoformat()
+                    if pagamento.data_pagamento
+                    else None,
+                }
+            )
         for movimento in dinheiro_caixa:
             if movimento.venda_id:
-                recebimentos.setdefault(movimento.venda_id, []).append({
-                    "id": movimento.id,
-                    "tipo": "movimentacao",
-                    "forma_pagamento": "Dinheiro",
-                    "valor": float(moeda(movimento.valor)),
-                    "data_recebimento": movimento.data_movimento.isoformat(),
-                })
+                recebimentos.setdefault(movimento.venda_id, []).append(
+                    {
+                        "id": movimento.id,
+                        "tipo": "movimentacao",
+                        "forma_pagamento": "Dinheiro",
+                        "valor": float(moeda(movimento.valor)),
+                        "data_recebimento": movimento.data_movimento.isoformat(),
+                    }
+                )
         vendas = (
             db.query(Venda)
             .filter(
@@ -865,18 +888,27 @@ def listar_vendas_caixa(
                 "numero_venda": venda.numero_venda,
                 "cliente_nome": venda.cliente.nome if venda.cliente else "Consumidor",
                 "total": float(venda.total),
-                "valor_nesta_forma": float(sum(
-                    (moeda(item["valor"]) for item in recebimentos.get(venda.id, [])),
-                    moeda(0),
-                )),
-                "data_venda": venda.data_venda.date().isoformat() if venda.data_venda else None,
+                "valor_nesta_forma": float(
+                    sum(
+                        (
+                            moeda(item["valor"])
+                            for item in recebimentos.get(venda.id, [])
+                        ),
+                        moeda(0),
+                    )
+                ),
+                "data_venda": venda.data_venda.date().isoformat()
+                if venda.data_venda
+                else None,
                 "status": venda.status,
                 "caixa_origem_id": venda.caixa_id,
                 "recebimentos": recebimentos.get(venda.id, []),
                 "itens": [
                     {
                         "id": item.id,
-                        "produto_nome": item.produto.nome if item.produto else item.servico_descricao,
+                        "produto_nome": item.produto.nome
+                        if item.produto
+                        else item.servico_descricao,
                         "quantidade": float(item.quantidade),
                         "subtotal": float(item.subtotal),
                     }
@@ -921,7 +953,8 @@ def listar_vendas_caixa(
             if pagamento.venda.data_venda
             else None,
             "data_recebimento": pagamento.data_pagamento.isoformat()
-            if pagamento.data_pagamento else None,
+            if pagamento.data_pagamento
+            else None,
         }
         for pagamento in pagamentos
     ]
