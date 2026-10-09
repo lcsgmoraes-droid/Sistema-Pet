@@ -15,7 +15,7 @@ from app.caixa.auditoria import (
     reunir_espelhos_baixa_lote,
 )
 from app.caixa.escopo import buscar_caixa_acessivel
-from app.caixa.recebimentos import filtro_pagamentos_caixa
+from app.caixa.recebimentos import filtro_recebimentos_caixa
 from app.db import get_session
 from app.models import AuditLog
 from app.vendas_models import Venda, VendaPagamento
@@ -44,7 +44,7 @@ def _itens_caixa(db, caixa_id, usuario_e_tenant):
         db.query(VendaPagamento)
         .join(Venda, VendaPagamento.venda_id == Venda.id)
         .filter(
-            filtro_pagamentos_caixa(caixa),
+            filtro_recebimentos_caixa(caixa),
             Venda.tenant_id == tenant_id,
             VendaPagamento.tenant_id == tenant_id,
             func.lower(func.trim(VendaPagamento.forma_pagamento)) != "dinheiro",

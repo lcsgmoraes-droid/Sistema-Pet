@@ -14,7 +14,11 @@ from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.idempotency import idempotent  # ← IDEMPOTÊNCIA
 from app.caixa_models import Caixa, MovimentacaoCaixa
-from app.caixa.recebimentos import filtro_pagamentos_caixa
+from app.caixa.recebimentos import (
+    carregar_pagamentos_vendas,
+    filtro_recebimentos_caixa,
+    resumir_pagamentos_vendas_caixa,
+)
 from app.caixa.auditoria import registrar_evento_caixa, snapshot_caixa
 from app.caixa.auditoria_routes import router as auditoria_router
 from app.utils.timezone import now_brasilia
@@ -630,7 +634,7 @@ def obter_resumo_caixa(
         )
         .join(Venda, VendaPagamento.venda_id == Venda.id)
         .filter(
-            filtro_pagamentos_caixa(caixa),
+            filtro_recebimentos_caixa(caixa),
             Venda.tenant_id == tenant_id,
             VendaPagamento.tenant_id == tenant_id,
             func.lower(func.trim(VendaPagamento.forma_pagamento)) != "dinheiro",
@@ -691,6 +695,7 @@ def obter_resumo_caixa(
         "totais": totais,
         "vendas_por_forma_pagamento": vendas_por_forma,
         "recebimentos_por_data_venda": recebimentos_por_data_venda,
+        **resumir_pagamentos_vendas_caixa(db, caixa_id=caixa_id, tenant_id=tenant_id),
         **indicadores,
     }
 
@@ -831,7 +836,7 @@ def listar_vendas_caixa(
             db.query(VendaPagamento)
             .join(Venda, VendaPagamento.venda_id == Venda.id)
             .filter(
-                filtro_pagamentos_caixa(caixa),
+                filtro_recebimentos_caixa(caixa),
                 Venda.tenant_id == tenant_id,
                 VendaPagamento.tenant_id == tenant_id,
                 func.lower(func.trim(VendaPagamento.forma_pagamento)) != "dinheiro",
@@ -881,6 +886,9 @@ def listar_vendas_caixa(
             .order_by(Venda.data_venda.desc())
             .all()
         )
+        pagamentos_vendas = carregar_pagamentos_vendas(
+            db, venda_ids=[venda.id for venda in vendas], tenant_id=tenant_id
+        )
         return [
             {
                 "id": venda.id,
@@ -903,6 +911,7 @@ def listar_vendas_caixa(
                 "status": venda.status,
                 "caixa_origem_id": venda.caixa_id,
                 "recebimentos": recebimentos.get(venda.id, []),
+                "pagamentos": pagamentos_vendas.get(venda.id, []),
                 "itens": [
                     {
                         "id": item.id,
@@ -927,7 +936,7 @@ def listar_vendas_caixa(
         db.query(VendaPagamento)
         .join(Venda, VendaPagamento.venda_id == Venda.id)
         .filter(
-            filtro_pagamentos_caixa(caixa),
+            filtro_recebimentos_caixa(caixa),
             Venda.tenant_id == tenant_id,
             VendaPagamento.tenant_id == tenant_id,
             VendaPagamento.forma_pagamento == forma_pagamento,

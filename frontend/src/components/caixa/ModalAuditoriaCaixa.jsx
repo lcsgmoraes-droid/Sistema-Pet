@@ -2,7 +2,15 @@ import { useEffect, useState } from "react";
 import { RefreshCw, X } from "lucide-react";
 import { conferirItemCaixa, obterAuditoriaCaixa } from "../../api/caixa";
 import { formatMoneyBRL } from "../../utils/formatters";
+import {
+  FILTRO_SEM_PAGAMENTOS,
+  filtrarLancamentosAuditoria,
+  filtrarVendasAuditoria,
+  formasAuditoria,
+} from "../../utils/auditoriaCaixaUtils";
 import SaleReference from "../ui/SaleReference";
+import AuditoriaCaixaPagamentosVenda from "./AuditoriaCaixaPagamentosVenda";
+import AuditoriaCaixaResumoFormas from "./AuditoriaCaixaResumoFormas";
 
 const formatarData = (data) => (data ? new Date(data).toLocaleString("pt-BR") : "—");
 const rotulosHistorico = {
@@ -70,17 +78,18 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
           : "Conferir"}
     </label>
   );
-  const caixa = auditoria?.resumo.caixa;
-  const formas = auditoria?.resumo.vendas_por_forma_pagamento || {};
-  const vendas = (auditoria?.vendas || []).filter(
-    (venda) => !forma || venda.recebimentos.some((item) => item.forma_pagamento === forma),
-  );
-  const lancamentos = [
-    ...(auditoria?.movimentacoes || []).map((item) => ({ ...item, tipo_item: "movimentacao" })),
-    ...(auditoria?.pagamentos || []).map((item) => ({ ...item, tipo_item: "pagamento" })),
-  ]
-    .filter((item) => !forma || item.forma_pagamento === forma)
-    .sort((a, b) => (b.data_movimento || "").localeCompare(a.data_movimento || ""));
+  const caixa = auditoria?.resumo?.caixa;
+  const formas = formasAuditoria(auditoria || {});
+  const vendasTodas = auditoria?.vendas || [];
+  const vendas = filtrarVendasAuditoria(vendasTodas, forma);
+  const pagamentosSemCaixa = auditoria?.resumo?.pagamentos_vendas_sem_caixa;
+  const lancamentos = filtrarLancamentosAuditoria(
+    [
+      ...(auditoria?.movimentacoes || []).map((item) => ({ ...item, tipo_item: "movimentacao" })),
+      ...(auditoria?.pagamentos || []).map((item) => ({ ...item, tipo_item: "pagamento" })),
+    ],
+    forma,
+  ).sort((a, b) => (b.data_movimento || "").localeCompare(a.data_movimento || ""));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -128,7 +137,7 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
               <div className="grid gap-3 sm:grid-cols-3">
                 {[
                   ["Vendas registradas neste caixa", auditoria.resumo.total_vendido],
-                  ["Recebido neste caixa", auditoria.resumo.total_recebido],
+                  ["Recebimentos vinculados a este caixa", auditoria.resumo.total_recebido],
                   ["Saldo físico em dinheiro", auditoria.resumo.totais.saldo_atual],
                 ].map(([titulo, valor]) => (
                   <div key={titulo} className="rounded-lg border p-3">
@@ -137,7 +146,28 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
                   </div>
                 ))}
               </div>
-              <p className="mt-4 text-sm font-medium">Resumo por forma de pagamento</p>
+              {pagamentosSemCaixa?.quantidade > 0 && (
+                <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  {pagamentosSemCaixa.quantidade} registros de pagamento destas vendas não têm caixa
+                  de recebimento identificado ({formatMoneyBRL(pagamentosSemCaixa.total)}). Eles
+                  aparecem nas vendas e no resumo dos pagamentos. Esse valor não representa
+                  diferença ou saldo a receber: pagamentos em dinheiro podem já estar comprovados
+                  pelas movimentações do caixa.
+                </p>
+              )}
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <AuditoriaCaixaResumoFormas
+                  titulo="Pagamentos registrados nas vendas deste caixa"
+                  descricao="Registros ativos de vendas finalizadas, com baixa parcial ou NF paga. Inclui pagamentos a prazo e pagamentos feitos em outros caixas."
+                  formas={auditoria.resumo.pagamentos_vendas_por_forma_pagamento}
+                />
+                <AuditoriaCaixaResumoFormas
+                  titulo="Recebimentos vinculados a este caixa"
+                  descricao="Considera os recebimentos vinculados e as movimentações comprovadas de dinheiro."
+                  formas={auditoria.resumo.recebimentos_por_forma_pagamento}
+                />
+              </div>
+              <p className="mt-4 text-sm font-medium">Filtrar por forma de pagamento</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -146,18 +176,23 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
                 >
                   Todas as formas
                 </button>
-                {Object.entries(formas).map(([nome, dados]) => (
+                {formas.map(({ chave, rotulo }) => (
                   <button
-                    key={nome}
+                    key={chave}
                     type="button"
-                    onClick={() => setForma(nome)}
-                    className={`rounded border px-3 py-2 text-sm ${forma === nome ? "border-blue-600 bg-blue-50" : ""}`}
+                    onClick={() => setForma(chave)}
+                    className={`rounded border px-3 py-2 text-sm ${forma === chave ? "border-blue-600 bg-blue-50" : ""}`}
                   >
-                    {nome}: {formatMoneyBRL(dados.total)}
-                    {["crediário", "crediario", "boleto"].includes(nome.toLowerCase()) &&
-                      " (a prazo)"}
+                    {rotulo}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => setForma(FILTRO_SEM_PAGAMENTOS)}
+                  className={`rounded border px-3 py-2 text-sm ${forma === FILTRO_SEM_PAGAMENTOS ? "border-blue-600 bg-blue-50" : ""}`}
+                >
+                  Sem pagamentos registrados
+                </button>
               </div>
               <nav className="my-4 flex gap-3 border-b" aria-label="Seções da auditoria">
                 {[
@@ -177,6 +212,9 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
               </nav>
               {aba === "vendas" && (
                 <div className="space-y-3">
+                  <p className="text-sm text-gray-600">
+                    {vendas.length} de {vendasTodas.length} vendas nesta seleção.
+                  </p>
                   {vendas.length === 0 && (
                     <p className="py-6 text-center text-gray-500">Nenhuma venda nesta seleção.</p>
                   )}
@@ -189,23 +227,30 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
                             {venda.cliente_nome} · {venda.status} · Venda de{" "}
                             {venda.data_venda?.split("-").reverse().join("/")}
                           </p>
-                          {venda.caixa_origem_id !== caixa.id && (
+                          {venda.caixa_origem_id == null ? (
                             <p className="text-sm text-amber-700">
-                              Venda de outro caixa, recebida neste caixa.
+                              Caixa de origem da venda não informado.
                             </p>
+                          ) : (
+                            Number(venda.caixa_origem_id) !== Number(caixa.id) && (
+                              <p className="text-sm text-amber-700">
+                                Venda de outro caixa, com lançamento neste caixa.
+                              </p>
+                            )
                           )}
                         </div>
                         <div className="text-right">
                           <p>Total da venda: {formatMoneyBRL(venda.total)}</p>
                           <p className="font-semibold">
-                            Lançado neste caixa: {formatMoneyBRL(venda.valor_nesta_forma)}
+                            Lançamentos neste caixa: {formatMoneyBRL(venda.valor_nesta_forma)}
                           </p>
                           {checkbox("venda", venda)}
                         </div>
                       </div>
+                      <AuditoriaCaixaPagamentosVenda venda={venda} caixaId={caixa.id} />
                       <details className="mt-3">
                         <summary className="cursor-pointer text-sm font-medium text-blue-700">
-                          Ver produtos e recebimentos
+                          Ver produtos da venda
                         </summary>
                         <div className="mt-2 space-y-1 text-sm">
                           {venda.itens.map((item) => (
@@ -215,16 +260,6 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
                                 maximumFractionDigits: 3,
                               })}{" "}
                               un. · {formatMoneyBRL(item.subtotal)}
-                            </p>
-                          ))}
-                          <p className="pt-2 font-medium">Recebimentos neste caixa</p>
-                          {venda.recebimentos.length === 0 && (
-                            <p className="text-gray-500">Sem recebimentos neste caixa.</p>
-                          )}
-                          {venda.recebimentos.map((item) => (
-                            <p key={`${item.tipo}:${item.id}`}>
-                              {item.forma_pagamento} · {formatMoneyBRL(item.valor)} ·{" "}
-                              {formatarData(item.data_recebimento)}
                             </p>
                           ))}
                         </div>

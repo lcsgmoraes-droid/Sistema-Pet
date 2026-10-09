@@ -121,6 +121,8 @@ def test_recebimento_em_outro_caixa_e_historico_auditavel(api: E2EApi):
         assert resumo["total_vendido"] == 0
         assert resumo["totais"]["saldo_atual"] == 115
         assert resumo["recebimentos_por_forma_pagamento"]["PIX"]["total"] == 10
+        assert resumo["pagamentos_vendas_por_forma_pagamento"] == {}
+        assert resumo["pagamentos_vendas_sem_caixa"]["quantidade"] == 0
         assert any(
             item["venda_id"] == venda_id
             for item in _get(api, f"/caixas/{original['id']}/vendas")
@@ -128,6 +130,20 @@ def test_recebimento_em_outro_caixa_e_historico_auditavel(api: E2EApi):
         original_depois = _get(api, f"/caixas/{original['id']}/resumo")
         assert original_depois["total_recebido"] == resumo_original["total_recebido"]
         assert original_depois["total_vendido"] == resumo_original["total_vendido"]
+        assert original_depois["pagamentos_vendas_por_forma_pagamento"]["PIX"][
+            "total"
+        ] == pytest.approx(
+            resumo_original["pagamentos_vendas_por_forma_pagamento"]["PIX"]["total"]
+            + 10
+        )
+        assert original_depois["pagamentos_vendas_por_forma_pagamento"]["Dinheiro"][
+            "total"
+        ] == pytest.approx(
+            resumo_original["pagamentos_vendas_por_forma_pagamento"]
+            .get("Dinheiro", {})
+            .get("total", 0)
+            + 15
+        )
         detalhe = _get(api, f"/caixas/{atual['id']}/vendas?forma_pagamento=PIX")
         assert len(detalhe) == 1 and detalhe[0]["venda_id"] == venda_id
         assert detalhe[0]["valor_nesta_forma"] == 10
@@ -138,6 +154,13 @@ def test_recebimento_em_outro_caixa_e_historico_auditavel(api: E2EApi):
         assert len(auditoria["movimentacoes"]) == 1
         assert len(auditoria["pagamentos"]) == 1
         item = auditoria["vendas"][0]
+        assert [pagamento["valor"] for pagamento in item["pagamentos"]] == [5, 10, 15]
+        assert [pagamento["caixa_id"] for pagamento in item["pagamentos"]] == [
+            original["id"],
+            atual["id"],
+            atual["id"],
+        ]
+        assert sum(recebimento["valor"] for recebimento in item["recebimentos"]) == 25
         conferencia = {
             "tipo_item": "venda",
             "item_id": item["id"],
@@ -198,3 +221,143 @@ def test_recebimento_em_outro_caixa_e_historico_auditavel(api: E2EApi):
         aberto = _get(api, "/caixas/aberto")
         if aberto and aberto["id"] == atual["id"]:
             _fechar(api, atual["id"])
+
+
+def test_auditoria_venda_mista_quatro_formas_mantem_caixa_aberto(api: E2EApi):
+    if urlparse(api.config.base_url).hostname not in {"127.0.0.1", "localhost", "::1"}:
+        pytest.skip("Esta jornada cria dados somente na homologação local.")
+    me = _get(api, "/auth/me-multitenant")
+    if me["tenant"]["name"] != "CorePet Homologacao Local":
+        pytest.skip("Esta jornada exige a empresa fictícia CorePet Homologacao Local.")
+    api.config = replace(
+        api.config, prefix=f"E2E-PB-AUD4-{uuid4().int % 10000000000:010d}"
+    )
+    _ensure_caixa_aberto(api)
+    caixa = _get(api, "/caixas/aberto")
+    anterior = _get(api, f"/caixas/{caixa['id']}/resumo")
+    cliente_id = _create_cliente(api)
+    produto_id, estoque_inicial = _create_produto(api)
+    formas = _get(api, "/financeiro/formas-pagamento")
+    credito = next(f for f in formas if f["ativo"] and f["tipo"] == "cartao_credito")
+    debito = next(f for f in formas if f["ativo"] and f["tipo"] == "cartao_debito")
+    operadora = api.expect(
+        "POST",
+        "/operadoras-cartao",
+        {201},
+        "auditoria.operadora_ficticia",
+        json={
+            "nome": api.config.prefix,
+            "codigo": api.config.prefix,
+            "padrao": False,
+            "bandeira_padrao": "visa",
+        },
+    ).json()
+    api.expect(
+        "PUT",
+        f"/operadoras-cartao/{operadora['id']}/taxas",
+        {200},
+        "auditoria.taxas_ficticias",
+        json={
+            "taxas": [
+                {
+                    "bandeira": "visa",
+                    "modalidade": modalidade,
+                    "parcelas": 1,
+                    "taxa_percentual": 0,
+                    "prazo_recebimento_dias": 1,
+                }
+                for modalidade in ["credito", "debito"]
+            ]
+        },
+    )
+    venda = api.expect(
+        "POST",
+        "/vendas",
+        {200, 201},
+        "auditoria.venda_mista",
+        json={
+            "cliente_id": cliente_id,
+            "itens": [
+                {
+                    "tipo": "produto",
+                    "produto_id": produto_id,
+                    "quantidade": 1,
+                    "preco_unitario": 100,
+                    "desconto_item": 0,
+                    "subtotal": 100,
+                }
+            ],
+            "desconto_venda_valor": 0,
+            "observacoes": api.config.prefix,
+            "tem_entrega": False,
+        },
+    ).json()
+    pagamentos = [
+        {"forma_pagamento": "Dinheiro", "valor": 10, "numero_parcelas": 1},
+        {"forma_pagamento": "PIX", "valor": 20, "numero_parcelas": 1},
+    ]
+    for forma, valor, modalidade in [(credito, 30, "credito"), (debito, 40, "debito")]:
+        pagamentos.append(
+            {
+                "forma_pagamento": forma["nome"],
+                "forma_pagamento_id": forma["id"],
+                "valor": valor,
+                "numero_parcelas": 1,
+                "operadora_id": operadora["id"],
+                "bandeira": "visa",
+                "modalidade_cartao": modalidade,
+                "nsu_cartao": uuid4().hex[:12],
+            }
+        )
+    api.expect(
+        "POST",
+        f"/vendas/{venda['id']}/finalizar",
+        {200},
+        "auditoria.quatro_formas",
+        json={
+            "pagamentos": pagamentos,
+            "nao_gerar_beneficios": True,
+            "justificativa_sem_beneficios": "Teste local exclusivo de auditoria de caixa",
+        },
+    )
+    auditoria = _get(api, f"/caixas/{caixa['id']}/auditoria")
+    item = next(item for item in auditoria["vendas"] if item["id"] == venda["id"])
+    assert item["total"] == item["valor_nesta_forma"] == 100
+    assert len(item["pagamentos"]) == len(item["recebimentos"]) == 4
+    assert all(pagamento["caixa_id"] == caixa["id"] for pagamento in item["pagamentos"])
+    esperado = {
+        pagamento["forma_pagamento"]: pagamento["valor"] for pagamento in pagamentos
+    }
+    assert {
+        pagamento["forma_pagamento"]: pagamento["valor"]
+        for pagamento in item["pagamentos"]
+    } == esperado
+    resumo = auditoria["resumo"]
+    assert resumo["total_vendido"] == pytest.approx(anterior["total_vendido"] + 100)
+    assert resumo["total_recebido"] == pytest.approx(anterior["total_recebido"] + 100)
+    assert resumo["totais"]["saldo_atual"] == pytest.approx(
+        anterior["totais"]["saldo_atual"] + 10
+    )
+    for forma, valor in esperado.items():
+        for campo in [
+            "pagamentos_vendas_por_forma_pagamento",
+            "recebimentos_por_forma_pagamento",
+        ]:
+            total_anterior = anterior[campo].get(forma, {}).get("total", 0)
+            assert resumo[campo][forma]["total"] == pytest.approx(
+                total_anterior + valor
+            )
+    assert (
+        resumo["pagamentos_vendas_sem_caixa"] == anterior["pagamentos_vendas_sem_caixa"]
+    )
+    assert (
+        float(_get(api, f"/produtos/{produto_id}")["estoque_atual"])
+        == estoque_inicial - 1
+    )
+    assert _get(api, "/caixas/aberto")["id"] == caixa["id"]
+    print(
+        f"AUDITORIA_QUATRO_FORMAS caixa={caixa['id']} numero={caixa['numero_caixa']} "
+        f"venda={venda['id']} numero_venda={venda['numero_venda']} "
+        f"cliente={cliente_id} produto={produto_id} nome={api.config.prefix} "
+        "total=100 dinheiro=10 pix=20 credito=30 debito=40 caixa_aberto=true"
+    )

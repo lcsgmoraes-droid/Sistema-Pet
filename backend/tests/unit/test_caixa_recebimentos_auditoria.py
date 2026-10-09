@@ -430,6 +430,306 @@ def test_auditoria_nao_expoe_caixa_de_outro_usuario_ou_empresa(recebimentos):
         assert erro.value.status_code == 404
 
 
+def test_auditoria_legada_exibe_29_pagamentos_sem_inferir_caixa(
+    caixa_session, tenant_context
+):
+    db = caixa_session
+    tenant_id = uuid4()
+    tenant_context(tenant_id)
+    usuario = SimpleNamespace(id=91, nome="Operador", email="operador@example.test")
+    alvo = Caixa(
+        tenant_id=tenant_id,
+        numero_caixa=227,
+        usuario_id=usuario.id,
+        usuario_nome=usuario.nome,
+        status="fechado",
+        valor_abertura=100,
+        data_abertura=datetime(2026, 10, 8, 9, 14),
+        data_fechamento=datetime(2026, 10, 8, 18, 32),
+    )
+    sobreposto = Caixa(
+        tenant_id=tenant_id,
+        numero_caixa=11,
+        usuario_id=92,
+        usuario_nome="Outro operador",
+        status="aberto",
+        valor_abertura=0,
+        data_abertura=datetime(2026, 3, 10, 8),
+    )
+    db.add_all([alvo, sobreposto])
+    db.flush()
+    formas = {
+        "Dinheiro": [64.44] * 6 + [64.46],
+        "Cartão de crédito": [113.79] * 7 + [113.82],
+        "Cartão de débito": [140.52] * 5,
+        "PIX": [131.68] * 8 + [131.73],
+    }
+    for forma, valores in formas.items():
+        for valor in valores:
+            venda = Venda(
+                tenant_id=tenant_id,
+                numero_venda=f"LG-{uuid4().hex[:12]}",
+                vendedor_id=usuario.id,
+                user_id=usuario.id,
+                caixa_id=alvo.id,
+                subtotal=valor,
+                total=valor,
+                status="finalizada",
+                data_venda=datetime(2026, 10, 8, 10),
+                canal="loja_fisica",
+            )
+            db.add(venda)
+            db.flush()
+            db.add(
+                VendaPagamento(
+                    tenant_id=tenant_id,
+                    venda_id=venda.id,
+                    caixa_id=None,
+                    forma_pagamento=forma,
+                    valor=valor,
+                    status="pendente",
+                    data_pagamento=datetime(2026, 10, 8, 10),
+                )
+            )
+            if forma == "Dinheiro":
+                db.add(
+                    MovimentacaoCaixa(
+                        tenant_id=tenant_id,
+                        caixa_id=alvo.id,
+                        venda_id=venda.id,
+                        tipo="venda",
+                        forma_pagamento=forma,
+                        valor=valor,
+                        usuario_id=usuario.id,
+                        usuario_nome=usuario.nome,
+                        data_movimento=datetime(2026, 10, 8, 10),
+                    )
+                )
+    db.flush()
+    auditoria = obter_auditoria_caixa(
+        alvo.id, db=db, current_user_and_tenant=(usuario, tenant_id)
+    )
+    resumo = auditoria["resumo"]
+    assert len(auditoria["vendas"]) == 29
+    assert all(len(venda["pagamentos"]) == 1 for venda in auditoria["vendas"])
+    assert all(
+        venda["pagamentos"][0]["caixa_id"] is None
+        and venda["pagamentos"][0]["status"] == "pendente"
+        for venda in auditoria["vendas"]
+    )
+    assert resumo["total_vendido"] == 3249.22
+    assert resumo["total_recebido"] == 451.10
+    assert resumo["totais"]["saldo_atual"] == 551.10
+    assert auditoria["pagamentos"] == []
+    assert len(auditoria["movimentacoes"]) == 7
+    esperados = {
+        "Dinheiro": (7, 451.10),
+        "Cartão de crédito": (8, 910.35),
+        "Cartão de débito": (5, 702.60),
+        "PIX": (9, 1185.17),
+    }
+    for forma, (quantidade, total) in esperados.items():
+        assert resumo["pagamentos_vendas_por_forma_pagamento"][forma] == {
+            "quantidade": quantidade,
+            "total": total,
+            "tipo_contagem": "pagamento",
+        }
+    assert resumo["pagamentos_vendas_sem_caixa"] == {
+        "quantidade": 29,
+        "total": 3249.22,
+        "por_forma_pagamento": resumo["pagamentos_vendas_por_forma_pagamento"],
+    }
+    assert (
+        db.query(VendaPagamento).filter(VendaPagamento.caixa_id.is_(None)).count() == 29
+    )
+
+
+def test_composicao_mista_nao_confunde_recebimento_em_outro_dia(recebimentos):
+    caso = recebimentos
+    original = obter_auditoria_caixa(
+        caso.original.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
+    atual = obter_auditoria_caixa(
+        caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
+    assert [item["id"] for item in original["vendas"][0]["pagamentos"]] == [
+        pagamento.id for pagamento in caso.pagamentos
+    ]
+    assert original["vendas"][0]["pagamentos"] == atual["vendas"][0]["pagamentos"]
+    assert (
+        original["resumo"]["pagamentos_vendas_por_forma_pagamento"]["PIX"]["total"]
+        == 70
+    )
+    assert (
+        original["resumo"]["pagamentos_vendas_por_forma_pagamento"]["Dinheiro"]["total"]
+        == 20
+    )
+    assert original["resumo"]["total_recebido"] == 30
+    assert atual["resumo"]["pagamentos_vendas_por_forma_pagamento"] == {}
+    assert atual["resumo"]["pagamentos_vendas_sem_caixa"]["total"] == 0
+    assert atual["resumo"]["total_recebido"] == 60
+    assert original["vendas"][0]["valor_nesta_forma"] == 30
+    assert atual["vendas"][0]["valor_nesta_forma"] == 60
+
+
+@pytest.mark.parametrize(
+    "status", [" Estornado ", "RECUSADO", " Cancelado ", "CANCELADA"]
+)
+def test_status_excluido_normalizado_continua_no_historico_sem_somar(
+    recebimentos, status
+):
+    caso = recebimentos
+    caso.pagamentos[1].status = status
+    caso.db.flush()
+    original = obter_auditoria_caixa(
+        caso.original.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
+    atual = obter_auditoria_caixa(
+        caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
+    assert len(original["vendas"][0]["pagamentos"]) == 3
+    assert original["vendas"][0]["pagamentos"][1]["status"] == status
+    assert (
+        original["resumo"]["pagamentos_vendas_por_forma_pagamento"]["PIX"]["total"]
+        == 30
+    )
+    assert atual["resumo"]["total_recebido"] == 20
+    assert atual["pagamentos"] == []
+
+
+def test_pagamentos_com_tenant_incorreto_nao_entram_na_venda_ou_resumo(recebimentos):
+    caso = recebimentos
+    # Simula uma associação legada inconsistente; o guard ORM já recusa novos
+    # registros assim, mas a leitura precisa proteger também bancos existentes.
+    caso.db.execute(
+        VendaPagamento.__table__.insert().values(
+            tenant_id=uuid4(),
+            venda_id=caso.venda.id,
+            caixa_id=caso.original.id,
+            forma_pagamento="PIX",
+            valor=999,
+            data_pagamento=datetime(2026, 10, 8, 10),
+        )
+    )
+    auditoria = obter_auditoria_caixa(
+        caso.original.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
+    assert len(auditoria["vendas"][0]["pagamentos"]) == 3
+    assert (
+        auditoria["resumo"]["pagamentos_vendas_por_forma_pagamento"]["PIX"]["total"]
+        == 70
+    )
+    assert auditoria["resumo"]["total_recebido"] == 30
+
+
+def test_pagamento_em_outro_caixa_invalida_conferencia_da_venda(recebimentos):
+    caso = recebimentos
+    auditoria = obter_auditoria_caixa(
+        caso.original.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
+    venda = auditoria["vendas"][0]
+    dados = ConferenciaItemSchema(
+        tipo_item="venda",
+        item_id=venda["id"],
+        conferido=True,
+        assinatura=venda["assinatura"],
+    )
+    conferir_item_caixa(
+        caso.original.id, dados, db=caso.db, current_user_and_tenant=caso.auth
+    )
+    revisada = obter_auditoria_caixa(
+        caso.original.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
+    assert revisada["vendas"][0]["conferido"]
+    caso.pagamentos[1].valor = 35
+    caso.db.flush()
+    atualizada = obter_auditoria_caixa(
+        caso.original.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
+    assert atualizada["resumo"]["total_recebido"] == 30
+    assert not atualizada["vendas"][0]["conferido"]
+    with pytest.raises(HTTPException) as erro:
+        conferir_item_caixa(
+            caso.original.id, dados, db=caso.db, current_user_and_tenant=caso.auth
+        )
+    assert erro.value.status_code == 409
+
+
+def test_composicao_inclui_planos_a_prazo_sem_contar_como_recebimento(recebimentos):
+    caso = recebimentos
+    venda = Venda(
+        tenant_id=caso.auth[1],
+        numero_venda="MISTA-A-PRAZO",
+        vendedor_id=caso.auth[0].id,
+        user_id=caso.auth[0].id,
+        caixa_id=caso.atual.id,
+        subtotal=120,
+        total=120,
+        status="baixa_parcial",
+        data_venda=datetime(2026, 10, 9, 12),
+        canal="loja_fisica",
+    )
+    caso.db.add(venda)
+    caso.db.flush()
+    for forma, valor, caixa_id in [
+        ("Crediário", 70, caso.atual.id),
+        ("Boleto", 20, None),
+        ("PIX", 30, caso.atual.id),
+    ]:
+        caso.db.add(
+            VendaPagamento(
+                tenant_id=caso.auth[1],
+                venda_id=venda.id,
+                caixa_id=caixa_id,
+                forma_pagamento=forma,
+                valor=valor,
+                status="pendente",
+                data_pagamento=datetime(2026, 10, 9, 12),
+            )
+        )
+    caso.db.flush()
+    auditoria = obter_auditoria_caixa(
+        caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
+    resumo = auditoria["resumo"]
+    item = next(item for item in auditoria["vendas"] if item["id"] == venda.id)
+    assert len(item["pagamentos"]) == 3
+    assert item["valor_nesta_forma"] == 30
+    assert [recebimento["forma_pagamento"] for recebimento in item["recebimentos"]] == [
+        "PIX"
+    ]
+    assert all(
+        pagamento["forma_pagamento"] == "PIX" for pagamento in auditoria["pagamentos"]
+    )
+    assert set(resumo["pagamentos_vendas_por_forma_pagamento"]) == {
+        "Crediário",
+        "Boleto",
+        "PIX",
+    }
+    assert resumo["total_vendido"] == 120
+    assert resumo["total_recebido"] == 90
+    assert set(resumo["recebimentos_por_forma_pagamento"]) == {"Dinheiro", "PIX"}
+    assert resumo["pagamentos_vendas_sem_caixa"]["total"] == 20
+    plano = next(
+        pagamento
+        for pagamento in item["pagamentos"]
+        if pagamento["forma_pagamento"] == "Crediário"
+    )
+    with pytest.raises(HTTPException) as erro:
+        conferir_item_caixa(
+            caso.atual.id,
+            ConferenciaItemSchema(
+                tipo_item="pagamento",
+                item_id=plano["id"],
+                conferido=True,
+                assinatura="0" * 64,
+            ),
+            db=caso.db,
+            current_user_and_tenant=caso.auth,
+        )
+    assert erro.value.status_code == 404
+
+
 @pytest.mark.parametrize("primeiro", ["recebimento", "fechamento"])
 def test_fechamento_e_recebimento_serializam_mesmo_caixa_no_postgres(
     recebimentos, monkeypatch, primeiro
