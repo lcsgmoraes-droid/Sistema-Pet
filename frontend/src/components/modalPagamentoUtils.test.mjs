@@ -1027,6 +1027,15 @@ test("valida pagamento antes de adicionar", () => {
 
   assert.equal(
     validarPagamentoParaAdicionar({
+      formaPagamento: { id: 2, tipo: "cartao_debito" },
+      valor: 179.9,
+      valorRestante: 0,
+    }),
+    "Esta venda já está totalmente paga",
+  );
+
+  assert.equal(
+    validarPagamentoParaAdicionar({
       formaPagamento: {
         id: 9,
         tipo: "crediario",

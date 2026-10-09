@@ -542,6 +542,10 @@ export function validarPagamentoParaAdicionar({
     return "Informe o valor recebido";
   }
 
+  if (valorRestante !== undefined && Math.round(Number(valorRestante) * 100) <= 0) {
+    return "Esta venda já está totalmente paga";
+  }
+
   if (
     ["credito_cliente", "cashback"].includes(formaPagamento.id) &&
     valorRestante !== undefined &&

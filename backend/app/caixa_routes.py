@@ -650,6 +650,7 @@ def obter_resumo_caixa(
             filtro_recebimentos_caixa(caixa),
             Venda.tenant_id == tenant_id,
             VendaPagamento.tenant_id == tenant_id,
+            VendaPagamento.valor > 0,
             func.lower(func.trim(VendaPagamento.forma_pagamento)) != "dinheiro",
         )
     )
@@ -964,6 +965,7 @@ def listar_vendas_caixa(
             filtro_recebimentos_caixa(caixa),
             Venda.tenant_id == tenant_id,
             VendaPagamento.tenant_id == tenant_id,
+            VendaPagamento.valor > 0,
             VendaPagamento.forma_pagamento == forma_pagamento,
         )
         .order_by(VendaPagamento.data_pagamento.desc())

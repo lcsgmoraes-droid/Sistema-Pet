@@ -6,6 +6,7 @@ deixar ``finalizacao.py`` focado na transacao principal da venda.
 """
 
 import logging
+import math
 import re
 from datetime import date as _date
 from decimal import Decimal
@@ -71,6 +72,13 @@ def _calcular_pagamentos_finalizacao(
     total_ja_pago = sum(
         float(p.valor) for p in pagamentos_existentes if pagamento_valido_para_saldo(p)
     )
+    for pagamento in pagamentos_novos:
+        valor = float(pagamento.get("valor") or 0)
+        if not math.isfinite(valor) or valor < 0.01:
+            raise HTTPException(
+                status_code=400,
+                detail="O valor de cada pagamento deve ser maior que zero",
+            )
     total_novos_pagamentos = sum(float(p.get("valor") or 0) for p in pagamentos_novos)
     valor_restante_bruto = total_venda_float - total_ja_pago
 
