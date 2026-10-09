@@ -12,6 +12,7 @@ from app.services.push_devices import load_user_push_targets
 from ..auth.dependencies import get_current_user_and_tenant
 from ..db import get_session
 from ..models import Cliente, Pet, User
+from ..security.permissions_decorator import require_permission_dependency
 from ..veterinario_agendamentos import (
     _agendamento_to_dict,
     _consulta_tem_conteudo_clinico,
@@ -30,7 +31,9 @@ from ..veterinario_schemas import (
     AgendamentoUpdate,
 )
 
-router = APIRouter()
+router = APIRouter(
+    dependencies=[Depends(require_permission_dependency("veterinario.acessar"))]
+)
 
 
 def _validar_consulta_origem_agendamento(
