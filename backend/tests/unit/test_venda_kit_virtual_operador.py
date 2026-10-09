@@ -28,9 +28,14 @@ def test_kit_virtual_baixa_componente_cadastrado_por_outro_usuario(monkeypatch):
     query_produto = MagicMock()
     query_produto.filter.return_value.first.return_value = produto_componente
     db = MagicMock()
-    db.query.side_effect = lambda model: (
-        query_componentes if model is ProdutoKitComponente else query_produto
-    )
+
+    def query_model(model):
+        if model is ProdutoKitComponente:
+            return query_componentes
+        assert model is Produto
+        return query_produto
+
+    db.query.side_effect = query_model
     baixas = []
 
     def baixar_estoque(**kwargs):
