@@ -34,6 +34,22 @@ def test_calcular_pagamentos_finalizacao_exige_pagamento_quando_venda_nao_esta_q
     assert "Informe pelo menos uma forma de pagamento" in exc.value.detail
 
 
+@pytest.mark.parametrize("valor", [0, -1, 0.001])
+def test_calcular_pagamentos_finalizacao_rejeita_item_sem_valor(valor):
+    with pytest.raises(HTTPException) as exc:
+        _calcular_pagamentos_finalizacao(
+            total_venda=Decimal("179.90"),
+            pagamentos_existentes=[],
+            pagamentos_novos=[
+                {"forma_pagamento": "Cartão de débito", "valor": 179.90},
+                {"forma_pagamento": "Cartão de débito", "valor": valor},
+            ],
+        )
+
+    assert exc.value.status_code == 400
+    assert "cada pagamento" in exc.value.detail
+
+
 def test_calcular_pagamentos_finalizacao_rejeita_novo_pagamento_em_venda_ja_quitada():
     existente = SimpleNamespace(valor=Decimal("90.00"))
 

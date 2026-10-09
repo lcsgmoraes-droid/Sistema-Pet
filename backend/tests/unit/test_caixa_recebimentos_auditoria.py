@@ -194,6 +194,37 @@ def test_venda_antiga_recebida_hoje_aparece_so_no_caixa_recebedor(recebimentos):
     assert detalhes[0]["data_recebimento"].startswith("2026-10-09")
 
 
+def test_pagamentos_zerados_historicos_nao_contam_no_fechamento(recebimentos):
+    caso = recebimentos
+    for _ in range(2):
+        caso.db.add(
+            VendaPagamento(
+                tenant_id=caso.auth[1],
+                venda_id=caso.venda.id,
+                caixa_id=caso.atual.id,
+                forma_pagamento="PIX",
+                valor=0,
+                data_pagamento=datetime(2026, 10, 9, 13),
+            )
+        )
+    caso.db.flush()
+
+    resumo = obter_resumo_caixa(
+        caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
+    detalhes = listar_vendas_caixa(
+        caso.atual.id,
+        forma_pagamento="PIX",
+        db=caso.db,
+        current_user_and_tenant=caso.auth,
+    )
+
+    assert resumo["recebimentos_por_forma_pagamento"]["PIX"]["quantidade"] == 1
+    assert resumo["recebimentos_por_forma_pagamento"]["PIX"]["total"] == 40
+    assert [item["valor_nesta_forma"] for item in detalhes] == [40]
+    assert caso.db.query(VendaPagamento).filter_by(venda_id=caso.venda.id).count() == 5
+
+
 @pytest.mark.parametrize("status", ["aberta", "cancelada"])
 def test_recebimentos_continuam_auditaveis_quando_status_venda_muda(
     recebimentos, status
