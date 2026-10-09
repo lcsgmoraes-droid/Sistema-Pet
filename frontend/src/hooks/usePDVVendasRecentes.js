@@ -5,6 +5,13 @@ import { debugLog } from "../utils/debug";
 import { getTipoDevolucaoVenda } from "../utils/pdvReturnEligibility";
 import { useModulos } from "../contexts/ModulosContext";
 
+const formatarDataLocal = (data) =>
+  [
+    data.getFullYear(),
+    String(data.getMonth() + 1).padStart(2, "0"),
+    String(data.getDate()).padStart(2, "0"),
+  ].join("-");
+
 export function usePDVVendasRecentes() {
   const { moduloAtivo } = useModulos();
   const moduloEcommerceAtivo = moduloAtivo("ecommerce");
@@ -31,7 +38,9 @@ export function usePDVVendasRecentes() {
       const hoje = new Date();
       let dataInicio;
 
-      if (filtroVendas === "24h") {
+      if (filtroVendas === "hoje") {
+        dataInicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+      } else if (filtroVendas === "24h") {
         dataInicio = new Date(hoje.getTime() - 24 * 60 * 60 * 1000);
       } else if (filtroVendas === "7d") {
         dataInicio = new Date(hoje.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -40,8 +49,8 @@ export function usePDVVendasRecentes() {
       }
 
       const params = {
-        data_inicio: dataInicio.toISOString().split("T")[0],
-        data_fim: hoje.toISOString().split("T")[0],
+        data_inicio: formatarDataLocal(dataInicio),
+        data_fim: formatarDataLocal(hoje),
         per_page: 50,
       };
 
