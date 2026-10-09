@@ -172,7 +172,9 @@ class ContasReceberService:
                 if isinstance(pag, dict)
                 else getattr(pag, "forma_pagamento_id", None)
             )
-            forma_query = db.query(FormaPagamento)
+            forma_query = db.query(FormaPagamento).filter(
+                FormaPagamento.tenant_id == venda.tenant_id
+            )
             if forma_pag_id:
                 forma_pag = forma_query.filter(
                     FormaPagamento.id == forma_pag_id
@@ -545,6 +547,8 @@ class ContasReceberService:
             >>> logger.info(f"Baixadas {len(resultado['contas_baixadas'])} contas")
         """
         from app.financeiro_models import ContaReceber, Recebimento, FormaPagamento
+        from app.financeiro.recebiveis_operadora import TIPOS_RECEBIVEL_OPERADORA
+        from sqlalchemy import and_, or_
 
         logger.debug(
             f"💰 Baixando contas da venda #{venda_numero} - "
@@ -554,10 +558,21 @@ class ContasReceberService:
         # Buscar contas pendentes/parciais da venda
         contas_originais = (
             db.query(ContaReceber)
+            .outerjoin(
+                FormaPagamento,
+                and_(
+                    FormaPagamento.id == ContaReceber.forma_pagamento_id,
+                    FormaPagamento.tenant_id == ContaReceber.tenant_id,
+                ),
+            )
             .filter(
                 ContaReceber.venda_id == venda_id,
                 ContaReceber.tenant_id == tenant_id,
                 ContaReceber.status.in_(["pendente", "parcial", "vencido"]),
+                or_(
+                    FormaPagamento.tipo.is_(None),
+                    FormaPagamento.tipo.notin_(TIPOS_RECEBIVEL_OPERADORA),
+                ),
             )
             .order_by(ContaReceber.data_vencimento)
             .all()

@@ -40,6 +40,10 @@ def test_cashback_uses_only_rank_percent_even_with_old_channel_bonus_saved(monke
     monkeypatch.setattr(
         cashback_module, "_notify_cashback_award", lambda *args, **kwargs: None
     )
+    monkeypatch.setattr(
+        "app.campaigns.sale_return_service.remaining_sale_amount",
+        lambda *args, **kwargs: Decimal("100.00"),
+    )
     campaign = SimpleNamespace(
         id=10,
         tenant_id="11111111-1111-4111-8111-111111111111",

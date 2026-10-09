@@ -150,7 +150,8 @@ class CaixaService:
         else:
             query = query.filter(Caixa.usuario_id == user_id)
 
-        caixa_aberto = query.first()
+        # Compartilha a trava com o fechamento até o commit do recebimento.
+        caixa_aberto = query.populate_existing().with_for_update().first()
 
         if not caixa_aberto:
             logger.warning(

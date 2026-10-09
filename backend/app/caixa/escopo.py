@@ -36,6 +36,7 @@ def buscar_caixa_aberto(
     tenant_id,
     usuario_id: int,
     bloquear_config: bool = False,
+    bloquear_caixa: bool = False,
 ) -> tuple[Caixa | None, bool]:
     """Busca o caixa aberto acessivel e informa se o modo e compartilhado."""
     compartilhado = caixa_compartilhado_habilitado(
@@ -48,12 +49,15 @@ def buscar_caixa_aberto(
         compartilhado=compartilhado,
     )
     prioridade_usuario_atual = case((Caixa.usuario_id == usuario_id, 0), else_=1)
-    caixa = query.order_by(prioridade_usuario_atual.asc(), Caixa.id.desc()).first()
+    query = query.order_by(prioridade_usuario_atual.asc(), Caixa.id.desc())
+    if bloquear_caixa:
+        query = query.populate_existing().with_for_update()
+    caixa = query.first()
     return caixa, compartilhado
 
 
 def buscar_caixa_acessivel(
-    db: Session, *, caixa_id: int, tenant_id, usuario_id: int
+    db: Session, *, caixa_id: int, tenant_id, usuario_id: int, bloquear_caixa: bool = False
 ) -> tuple[Caixa | None, bool]:
     """Busca um caixa por id respeitando o modo definido pela empresa."""
     compartilhado = caixa_compartilhado_habilitado(db, tenant_id)
@@ -63,4 +67,6 @@ def buscar_caixa_acessivel(
         usuario_id=usuario_id,
         compartilhado=compartilhado,
     )
+    if bloquear_caixa:
+        query = query.populate_existing().with_for_update()
     return query.first(), compartilhado

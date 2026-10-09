@@ -237,6 +237,292 @@ def test_duas_baixas_parciais_criam_apenas_recebimentos_novos(cenario):
     )
 
 
+def test_novo_pagamento_apos_reabertura_nao_liquida_repasse_antigo_da_operadora(
+    cenario,
+):
+    """Reproduz os valores da divergência observada na Loja 1."""
+    cenario.db.add(
+        FormaPagamento(
+            id=3,
+            tenant_id=cenario.tenant,
+            nome="Cartão de débito",
+            tipo="cartao_debito",
+            prazo_dias=1,
+            ativo=True,
+            user_id=1,
+        )
+    )
+    cenario.db.add(
+        VendaPagamento(
+            venda_id=1,
+            tenant_id=cenario.tenant,
+            forma_pagamento_id=3,
+            forma_pagamento="Cartão de débito",
+            valor=Decimal("38.90"),
+        )
+    )
+    conta_cartao = ContaReceber(
+        tenant_id=cenario.tenant,
+        venda_id=1,
+        forma_pagamento_id=3,
+        descricao="Repasse cartão",
+        dre_subcategoria_id=1,
+        canal="loja_fisica",
+        valor_original=Decimal("38.90"),
+        valor_final=Decimal("38.90"),
+        valor_recebido=0,
+        status="pendente",
+        user_id=1,
+        data_emissao=date.today(),
+        data_vencimento=date.today(),
+    )
+    cenario.db.add(conta_cartao)
+    cenario.venda.total = Decimal("95.80")
+    cenario.venda.subtotal = Decimal("95.80")
+    cenario.db.commit()
+    cenario.finalizar(56.90)
+    assert conta_cartao.status == "pendente"
+    assert conta_cartao.valor_recebido == 0
+    assert cenario.db.query(func.sum(ContaReceber.valor_final)).scalar() == Decimal(
+        "95.80"
+    )
+    assert cenario.db.query(func.sum(Recebimento.valor_recebido)).scalar() == Decimal(
+        "56.90"
+    )
+
+
+@pytest.mark.parametrize("tipo", ["cartao_debito", "cartao_credito"])
+def test_devolucao_permite_cartao_pago_com_repasse_ainda_pendente(cenario, tipo):
+    from app.vendas.devolucoes_routes import _validar_recebiveis_liquidados
+
+    forma = cenario.db.get(FormaPagamento, 1)
+    forma.tipo = tipo
+    forma.prazo_dias = 1
+    cenario.db.add(
+        VendaPagamento(
+            venda_id=1,
+            tenant_id=cenario.tenant,
+            forma_pagamento_id=1,
+            forma_pagamento="Cartão",
+            valor=135,
+        )
+    )
+    cenario.db.add(
+        ContaReceber(
+            tenant_id=cenario.tenant,
+            venda_id=1,
+            forma_pagamento_id=1,
+            descricao="Repasse cartão",
+            dre_subcategoria_id=1,
+            canal="loja_fisica",
+            valor_original=135,
+            valor_final=135,
+            valor_recebido=0,
+            status="pendente",
+            user_id=1,
+            data_emissao=date.today(),
+            data_vencimento=date.today(),
+        )
+    )
+    cenario.db.flush()
+    _validar_recebiveis_liquidados(cenario.db, 1, cenario.tenant)
+    assert cenario.db.query(ContaReceber).one().valor_recebido == 0
+
+    forma.tipo = "crediario"
+    cenario.db.flush()
+    with pytest.raises(HTTPException) as erro:
+        _validar_recebiveis_liquidados(cenario.db, 1, cenario.tenant)
+    assert erro.value.status_code == 409
+
+    forma.tipo = tipo
+    cenario.db.query(VendaPagamento).one().status = "estornado"
+    cenario.db.flush()
+    with pytest.raises(HTTPException) as erro:
+        _validar_recebiveis_liquidados(cenario.db, 1, cenario.tenant)
+    assert erro.value.status_code == 409
+
+
+def _conta_repasse_pendente(cenario, *, forma_id=1, valor="135"):
+    conta = ContaReceber(
+        tenant_id=cenario.tenant,
+        venda_id=cenario.venda.id,
+        forma_pagamento_id=forma_id,
+        descricao="Repasse de cartao ainda pendente",
+        dre_subcategoria_id=1,
+        canal="loja_fisica",
+        valor_original=Decimal(valor),
+        valor_final=Decimal(valor),
+        valor_recebido=Decimal("0"),
+        status="pendente",
+        user_id=1,
+        data_emissao=date.today(),
+        data_vencimento=date.today(),
+    )
+    cenario.db.add(conta)
+    return conta
+
+
+def _assert_devolucao_exige_conciliacao(cenario):
+    from app.vendas.devolucoes_routes import _validar_recebiveis_liquidados
+
+    with pytest.raises(HTTPException) as erro:
+        _validar_recebiveis_liquidados(cenario.db, cenario.venda.id, cenario.tenant)
+    assert erro.value.status_code == 409
+    assert "recebivel em aberto" in erro.value.detail
+
+
+@pytest.mark.parametrize("tipo", ["cartao_debito", "cartao_credito"])
+@pytest.mark.parametrize("pago", ["0", "134.99"])
+def test_devolucao_bloqueia_repasse_sem_pagamento_integral_no_cartao(
+    cenario, tipo, pago
+):
+    cenario.db.get(FormaPagamento, 1).tipo = tipo
+    conta = _conta_repasse_pendente(cenario)
+    cenario.db.add(
+        VendaPagamento(
+            tenant_id=cenario.tenant,
+            venda_id=cenario.venda.id,
+            forma_pagamento_id=1,
+            forma_pagamento="Cartao",
+            valor=Decimal(pago),
+            status="confirmado",
+        )
+    )
+    cenario.db.flush()
+
+    _assert_devolucao_exige_conciliacao(cenario)
+
+    assert conta.status == "pendente"
+    assert conta.valor_recebido == 0
+
+
+@pytest.mark.parametrize(
+    "status_crediario,recebido", [("pendente", "0"), ("parcial", "10")]
+)
+def test_devolucao_bloqueia_venda_mista_com_crediario_ainda_aberto(
+    cenario, status_crediario, recebido
+):
+    cenario.db.get(FormaPagamento, 1).tipo = "cartao_credito"
+    cenario.db.get(FormaPagamento, 2).tipo = "crediario"
+    _conta_repasse_pendente(cenario, valor="100")
+    conta_crediario = _conta_repasse_pendente(cenario, forma_id=2, valor="35")
+    conta_crediario.status = status_crediario
+    conta_crediario.valor_recebido = Decimal(recebido)
+    cenario.db.add_all(
+        [
+            VendaPagamento(
+                tenant_id=cenario.tenant,
+                venda_id=cenario.venda.id,
+                forma_pagamento_id=1,
+                forma_pagamento="Cartao",
+                valor=Decimal("100"),
+                status="confirmado",
+            ),
+            VendaPagamento(
+                tenant_id=cenario.tenant,
+                venda_id=cenario.venda.id,
+                forma_pagamento_id=2,
+                forma_pagamento="Crediario",
+                valor=Decimal("35"),
+                status="confirmado",
+            ),
+        ]
+    )
+    cenario.db.flush()
+
+    _assert_devolucao_exige_conciliacao(cenario)
+
+    assert conta_crediario.valor_recebido == Decimal(recebido)
+    assert conta_crediario.status == status_crediario
+
+
+def test_devolucao_nao_usa_pagamento_cartao_de_outra_venda(cenario):
+    cenario.db.get(FormaPagamento, 1).tipo = "cartao_credito"
+    _conta_repasse_pendente(cenario)
+    outra_venda = Venda(
+        tenant_id=cenario.tenant,
+        numero_venda="OUTRA-VENDA",
+        user_id=1,
+        vendedor_id=1,
+        subtotal=135,
+        total=135,
+        status="finalizada",
+    )
+    cenario.db.add(outra_venda)
+    cenario.db.flush()
+    cenario.db.add(
+        VendaPagamento(
+            tenant_id=cenario.tenant,
+            venda_id=outra_venda.id,
+            forma_pagamento_id=1,
+            forma_pagamento="Cartao",
+            valor=135,
+            status="confirmado",
+        )
+    )
+    cenario.db.flush()
+
+    _assert_devolucao_exige_conciliacao(cenario)
+
+
+def test_devolucao_nao_usa_pagamento_cartao_de_outro_tenant(cenario, tenant_context):
+    cenario.db.get(FormaPagamento, 1).tipo = "cartao_credito"
+    _conta_repasse_pendente(cenario)
+    cenario.db.flush()
+    outro_tenant = uuid4()
+    tenant_context(outro_tenant)
+    # Simula um vinculo legado inconsistente; o filtro explicito deve rejeita-lo.
+    cenario.db.add(
+        VendaPagamento(
+            tenant_id=outro_tenant,
+            venda_id=cenario.venda.id,
+            forma_pagamento_id=1,
+            forma_pagamento="Cartao",
+            valor=135,
+            status="confirmado",
+        )
+    )
+    cenario.db.flush()
+    tenant_context(cenario.tenant)
+
+    _assert_devolucao_exige_conciliacao(cenario)
+
+    assert cenario.db.query(VendaPagamento).count() == 0
+
+
+def test_devolucao_nao_aceita_forma_cartao_cadastrada_em_outro_tenant(
+    cenario, tenant_context
+):
+    outro_tenant = uuid4()
+    tenant_context(outro_tenant)
+    forma_alheia = FormaPagamento(
+        tenant_id=outro_tenant,
+        nome="Cartao de outra empresa",
+        tipo="cartao_credito",
+        prazo_dias=1,
+        ativo=True,
+        user_id=1,
+    )
+    cenario.db.add(forma_alheia)
+    cenario.db.flush()
+    forma_id = forma_alheia.id
+    tenant_context(cenario.tenant)
+    _conta_repasse_pendente(cenario, forma_id=forma_id)
+    cenario.db.add(
+        VendaPagamento(
+            tenant_id=cenario.tenant,
+            venda_id=cenario.venda.id,
+            forma_pagamento_id=forma_id,
+            forma_pagamento="Cartao",
+            valor=135,
+            status="confirmado",
+        )
+    )
+    cenario.db.flush()
+
+    _assert_devolucao_exige_conciliacao(cenario)
+
+
 def test_pagamento_retroativo_corrige_caixa_fechado_sem_mudar_caixa_atual(cenario):
     momento = datetime(2026, 9, 4, 15, 30)
     cenario.venda.total = Decimal("30")

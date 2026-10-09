@@ -45,9 +45,7 @@ export default function useProdutosNovoPageComposition({
   } = kitState;
   const {
     entradaData,
-    handleEditarLote,
     handleEntradaEstoque,
-    handleExcluirLote,
     handleSalvarEdicaoLote,
     loteEmEdicao,
     lotes,
@@ -191,11 +189,9 @@ export default function useProdutosNovoPageComposition({
     formatarData,
     formatarMoeda,
     handleChange,
-    handleEditarLote,
-    handleExcluirLote,
     isEdicao,
     lotes,
-    setModalEntrada,
+    salvando,
   };
 
   const fornecedoresTabProps = {

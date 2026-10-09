@@ -136,6 +136,9 @@ def reabrir_venda(
     from app.campaigns.coupon_service import reverse_coupon_redemptions_for_sale
     from app.campaigns.cashback_sale_reversal import reverse_cashback_for_sale
     from app.campaigns.loyalty_service import void_loyalty_stamps_for_sale
+    from app.campaigns.sale_reopening_service import (
+        void_quick_repurchase_coupons_for_sale,
+    )
     from app.vendas.cashback_financeiro import (
         cancelar_despesas_cashback_venda,
         remover_pagamentos_cashback_venda,
@@ -158,6 +161,7 @@ def reabrir_venda(
         venda_id=venda.id,
         reason="Venda reaberta para edicao",
     )
+    void_quick_repurchase_coupons_for_sale(db, tenant_id=tenant_id, venda_id=venda.id)
     remover_pagamentos_cashback_venda(db, tenant_id=tenant_id, venda_id=venda.id)
     if venda.cliente_id:
         reverse_cashback_for_sale(
@@ -260,6 +264,9 @@ def atualizar_status_venda(
     ):
         from app.campaigns.coupon_service import reverse_coupon_redemptions_for_sale
         from app.campaigns.loyalty_service import void_loyalty_stamps_for_sale
+        from app.campaigns.sale_reopening_service import (
+            void_quick_repurchase_coupons_for_sale,
+        )
 
         reverse_coupon_redemptions_for_sale(
             db,
@@ -273,6 +280,10 @@ def atualizar_status_venda(
             venda_id=venda.id,
             reason=f"Status alterado para {novo_status}",
         )
+        if novo_status == "aberta":
+            void_quick_repurchase_coupons_for_sale(
+                db, tenant_id=tenant_id, venda_id=venda.id
+            )
     if novo_status not in status_cashback_ativos:
         from app.campaigns.cashback_sale_reversal import reverse_cashback_for_sale
         from app.vendas.cashback_financeiro import (

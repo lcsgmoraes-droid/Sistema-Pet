@@ -645,6 +645,8 @@ class VendaPagamento(BaseTenantModel):
     venda_id = Column(
         Integer, ForeignKey("vendas.id", ondelete="CASCADE"), nullable=False
     )
+    # O recebimento pertence ao caixa que recebeu, mesmo em vendas de dias anteriores.
+    caixa_id = Column(Integer, ForeignKey("caixas.id"), nullable=True, index=True)
 
     # Forma de Pagamento
     forma_pagamento = Column(
@@ -707,6 +709,7 @@ class VendaPagamento(BaseTenantModel):
     def to_dict(self):
         return {
             "id": self.id,
+            "caixa_id": self.caixa_id,
             "forma_pagamento": self.forma_pagamento,
             "forma_pagamento_id": self.forma_pagamento_id,
             "valor": safe_decimal_to_float(self.valor),

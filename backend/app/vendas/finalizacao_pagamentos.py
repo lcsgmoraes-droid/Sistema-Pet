@@ -16,6 +16,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.campaigns.cashback_wallet import get_cashback_wallet, lock_cashback_customer
+from app.utils.timezone import now_brasilia
 
 logger = logging.getLogger(__name__)
 
@@ -449,6 +450,7 @@ def processar_pagamentos_finalizacao(
                 )
 
         pagamento = VendaPagamento(
+            caixa_id=caixa_aberto_id,
             **_montar_campos_venda_pagamento(
                 venda_id=venda.id,
                 tenant_id=tenant_id,
@@ -460,8 +462,7 @@ def processar_pagamentos_finalizacao(
                 taxa_aplicada=taxa_aplicada,
             )
         )
-        if data_ocorrencia is not None:
-            pagamento.data_pagamento = data_ocorrencia
+        pagamento.data_pagamento = data_ocorrencia or now_brasilia()
         db.add(pagamento)
         db.flush()
 

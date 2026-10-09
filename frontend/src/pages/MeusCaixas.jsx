@@ -12,12 +12,13 @@ import {
   Printer,
   Users,
 } from "lucide-react";
-import { listarCaixas, obterCaixaAberto, obterResumoCaixa, reabrirCaixa } from "../api/caixa";
+import { listarCaixas, obterCaixaAberto, obterResumoCaixa } from "../api/caixa";
 import ImpressaoResumoCaixa from "../components/caixa/ImpressaoResumoCaixa";
 import ImpressaoTermicaCaixa from "../components/caixa/ImpressaoTermicaCaixa";
 import ModalMovimentacoesCaixa from "../components/ModalMovimentacoesCaixa";
+import ModalAuditoriaCaixa from "../components/caixa/ModalAuditoriaCaixa";
+import ModalReabrirCaixa from "../components/caixa/ModalReabrirCaixa";
 import { getAccessToken } from "../auth/tokenStorage";
-import { confirmarCorePet } from "../services/corepetDialog";
 import { useAuth } from "../contexts/AuthContext";
 import { formatMoneyBRL } from "../utils/formatters";
 
@@ -33,6 +34,8 @@ export default function MeusCaixas() {
   const [resumoImpressao, setResumoImpressao] = useState(null);
   const [resumoTermico, setResumoTermico] = useState(null);
   const [caixaExtrato, setCaixaExtrato] = useState(null);
+  const [caixaAuditoria, setCaixaAuditoria] = useState(null);
+  const [caixaReabertura, setCaixaReabertura] = useState(null);
   const [filtros, setFiltros] = useState({
     data_inicio: "",
     data_fim: "",
@@ -61,19 +64,6 @@ export default function MeusCaixas() {
       alert("Erro ao carregar histórico de caixas");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleReabrir = async (caixaId) => {
-    if (!(await confirmarCorePet("Deseja realmente reabrir este caixa?"))) return;
-
-    try {
-      await reabrirCaixa(caixaId);
-      alert("Caixa reaberto com sucesso!");
-      navigate("/pdv"); // Redirecionar para o PDV
-    } catch (error) {
-      console.error("Erro ao reabrir caixa:", error);
-      alert(error.response?.data?.detail || "Erro ao reabrir caixa");
     }
   };
 
@@ -382,17 +372,28 @@ export default function MeusCaixas() {
                   )}
 
                   {/* Ações */}
+                  <button
+                    type="button"
+                    onClick={() => setCaixaAuditoria(caixa.id)}
+                    className="mb-4 rounded-lg bg-blue-50 px-4 py-2 font-medium text-blue-700"
+                  >
+                    Auditar vendas e lançamentos
+                  </button>
                   {caixa.status === "fechado" && (
                     <div className="border-t pt-4 flex flex-wrap gap-3">
-                      {!caixaAberto && (
-                        <button
-                          onClick={() => handleReabrir(caixa.id)}
-                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                        >
-                          <RefreshCw className="w-4 h-4" />
-                          Reabrir Caixa
-                        </button>
-                      )}
+                      <button
+                        onClick={() => setCaixaReabertura(caixa)}
+                        disabled={Boolean(caixaAberto)}
+                        title={
+                          caixaAberto
+                            ? "Feche o caixa atual antes de reabrir este caixa."
+                            : undefined
+                        }
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        Reabrir Caixa
+                      </button>
                       {user?.is_admin && (
                         <button
                           onClick={() => {
@@ -506,6 +507,16 @@ export default function MeusCaixas() {
       />
       {caixaExtrato && (
         <ModalMovimentacoesCaixa caixaId={caixaExtrato} onClose={() => setCaixaExtrato(null)} />
+      )}
+      {caixaAuditoria && (
+        <ModalAuditoriaCaixa caixaId={caixaAuditoria} onClose={() => setCaixaAuditoria(null)} />
+      )}
+      {caixaReabertura && (
+        <ModalReabrirCaixa
+          caixa={caixaReabertura}
+          onClose={() => setCaixaReabertura(null)}
+          onSuccess={() => navigate("/pdv")}
+        />
       )}
     </div>
   );
