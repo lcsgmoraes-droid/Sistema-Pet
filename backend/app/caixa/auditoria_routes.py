@@ -6,7 +6,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, contains_eager
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.caixa.auditoria import (
@@ -43,6 +43,7 @@ def _itens_caixa(db, caixa_id, usuario_e_tenant):
     pagamentos = (
         db.query(VendaPagamento)
         .join(Venda, VendaPagamento.venda_id == Venda.id)
+        .options(contains_eager(VendaPagamento.venda).lazyload(Venda.contas_receber))
         .filter(
             filtro_recebimentos_caixa(caixa),
             Venda.tenant_id == tenant_id,
@@ -138,7 +139,10 @@ def obter_auditoria_caixa(
             )
     return {
         "resumo": obter_resumo_caixa(
-            caixa_id, db=db, current_user_and_tenant=current_user_and_tenant
+            caixa_id,
+            db=db,
+            current_user_and_tenant=current_user_and_tenant,
+            compact=True,
         ),
         "vendas": itens["venda"],
         "movimentacoes": itens["movimentacao"],

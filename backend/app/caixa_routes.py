@@ -2,11 +2,11 @@
 Rotas para o Sistema de Controle de Caixa
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Annotated, Optional
 from datetime import datetime, date, timezone
 from pydantic import BaseModel, Field
 
@@ -126,8 +126,10 @@ def _validar_referencia_abertura(dados: AbrirCaixaSchema, caixa_anterior) -> Non
         )
 
 
-def _serializar_caixa(caixa: Caixa, *, compartilhado: bool) -> dict:
-    dados = caixa.to_dict()
+def _serializar_caixa(
+    caixa: Caixa, *, compartilhado: bool, compact: bool = False
+) -> dict:
+    dados = caixa.to_dict(incluir_movimentacoes=False) if compact else caixa.to_dict()
     dados["compartilhado"] = compartilhado
     return dados
 
@@ -230,6 +232,7 @@ async def abrir_caixa(
 def obter_caixa_aberto(
     db: Session = Depends(get_session),
     current_user_and_tenant=Depends(get_current_user_and_tenant),
+    compact: bool = False,
 ):
     """Obter o caixa aberto acessivel ao usuario atual."""
     current_user, tenant_id = current_user_and_tenant
@@ -241,7 +244,7 @@ def obter_caixa_aberto(
     if not caixa:
         return None
 
-    return _serializar_caixa(caixa, compartilhado=compartilhado)
+    return _serializar_caixa(caixa, compartilhado=compartilhado, compact=compact)
 
 
 @router.get("/conferencia-abertura")
@@ -270,6 +273,9 @@ def listar_caixas(
     status_filter: Optional[str] = None,
     db: Session = Depends(get_session),
     current_user_and_tenant=Depends(get_current_user_and_tenant),
+    compact: bool = False,
+    limit: Annotated[Optional[int], Query(ge=1, le=100)] = None,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ):
     """Listar caixas acessiveis ao usuario conforme a configuracao da empresa."""
     current_user, tenant_id = current_user_and_tenant
@@ -291,9 +297,15 @@ def listar_caixas(
     if status_filter:
         query = query.filter(Caixa.status == status_filter)
 
-    caixas = query.order_by(Caixa.data_abertura.desc()).all()
+    query = query.order_by(Caixa.data_abertura.desc(), Caixa.id.desc()).offset(offset)
+    if limit is not None:
+        query = query.limit(limit)
+    caixas = query.all()
 
-    return [_serializar_caixa(caixa, compartilhado=compartilhado) for caixa in caixas]
+    return [
+        _serializar_caixa(caixa, compartilhado=compartilhado, compact=compact)
+        for caixa in caixas
+    ]
 
 
 @router.get("/{caixa_id}")
@@ -589,6 +601,7 @@ def obter_resumo_caixa(
     caixa_id: int,
     db: Session = Depends(get_session),
     current_user_and_tenant=Depends(get_current_user_and_tenant),
+    compact: bool = False,
 ):
     """Obter resumo do caixa com totais"""
     current_user, tenant_id = current_user_and_tenant
@@ -691,7 +704,7 @@ def obter_resumo_caixa(
     indicadores = indicadores_vendas_recebimentos(total_vendido, vendas_por_forma)
 
     return {
-        "caixa": _serializar_caixa(caixa, compartilhado=compartilhado),
+        "caixa": _serializar_caixa(caixa, compartilhado=compartilhado, compact=compact),
         "totais": totais,
         "vendas_por_forma_pagamento": vendas_por_forma,
         "recebimentos_por_data_venda": recebimentos_por_data_venda,
@@ -831,6 +844,10 @@ def listar_vendas_caixa(
 
     if not forma_pagamento:
         from sqlalchemy import or_
+        from sqlalchemy.orm import lazyload, selectinload, with_loader_criteria
+        from app.models import Cliente
+        from app.produtos_models import Produto
+        from app.vendas_models import VendaItem
 
         pagamentos_caixa = (
             db.query(VendaPagamento)
@@ -879,6 +896,14 @@ def listar_vendas_caixa(
                 )
         vendas = (
             db.query(Venda)
+            .options(
+                selectinload(Venda.cliente),
+                selectinload(Venda.itens).selectinload(VendaItem.produto),
+                lazyload(Venda.contas_receber),
+                with_loader_criteria(Cliente, Cliente.tenant_id == tenant_id),
+                with_loader_criteria(VendaItem, VendaItem.tenant_id == tenant_id),
+                with_loader_criteria(Produto, Produto.tenant_id == tenant_id),
+            )
             .filter(
                 Venda.tenant_id == tenant_id,
                 or_(Venda.caixa_id == caixa_id, Venda.id.in_(list(recebimentos))),

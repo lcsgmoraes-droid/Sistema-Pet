@@ -1,6 +1,19 @@
 import { rotuloFormaPagamento } from "./pdvPaymentDisplay.js";
 
 export const FILTRO_SEM_PAGAMENTOS = "__sem_pagamentos__";
+export const TAMANHO_PAGINA_AUDITORIA = 25;
+
+export function paginarAuditoria(itens = [], pagina = 1) {
+  const totalPaginas = Math.max(1, Math.ceil(itens.length / TAMANHO_PAGINA_AUDITORIA));
+  const paginaAtual = Math.min(Math.max(Math.trunc(Number(pagina)) || 1, 1), totalPaginas);
+  const inicio = (paginaAtual - 1) * TAMANHO_PAGINA_AUDITORIA;
+  return {
+    itens: itens.slice(inicio, inicio + TAMANHO_PAGINA_AUDITORIA),
+    pagina: paginaAtual,
+    total: itens.length,
+    totalPaginas,
+  };
+}
 
 export function chaveFormaAuditoria(pagamento = {}) {
   return rotuloFormaPagamento(pagamento)

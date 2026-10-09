@@ -3,8 +3,15 @@
  */
 
 import api from "../api";
+import { criarConsultaCaixaAberto } from "../utils/caixaAbertoRequest";
 
-let caixaAbertoEmAndamento = null;
+const consultarCaixaAberto = criarConsultaCaixaAberto(async ({ compact, signal }) => {
+  const response = await api.get("/caixas/aberto", {
+    ...(compact ? { params: { compact: true } } : {}),
+    ...(signal ? { signal } : {}),
+  });
+  return response.data;
+});
 
 /**
  * Abrir novo caixa
@@ -17,18 +24,7 @@ export const abrirCaixa = async (dados) => {
 /**
  * Obter caixa aberto do usuário atual
  */
-export const obterCaixaAberto = () => {
-  if (!caixaAbertoEmAndamento) {
-    caixaAbertoEmAndamento = api
-      .get("/caixas/aberto")
-      .then((response) => response.data)
-      .finally(() => {
-        caixaAbertoEmAndamento = null;
-      });
-  }
-
-  return caixaAbertoEmAndamento;
-};
+export const obterCaixaAberto = (opcoes = {}) => consultarCaixaAberto(opcoes);
 
 /**
  * Obter o ultimo fechamento do usuario para conferir o valor da proxima abertura.
@@ -58,8 +54,11 @@ export const validarCaixaAtual = async (caixaIdEsperado) => {
 /**
  * Listar caixas
  */
-export const listarCaixas = async (params = {}) => {
-  const response = await api.get("/caixas", { params });
+export const listarCaixas = async (params = {}, opcoes = {}) => {
+  const response = await api.get("/caixas", {
+    params,
+    ...(opcoes.signal ? { signal: opcoes.signal } : {}),
+  });
   return response.data;
 };
 

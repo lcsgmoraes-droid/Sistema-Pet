@@ -21,12 +21,26 @@ import ModalReabrirCaixa from "../components/caixa/ModalReabrirCaixa";
 import { getAccessToken } from "../auth/tokenStorage";
 import { useAuth } from "../contexts/AuthContext";
 import { formatMoneyBRL } from "../utils/formatters";
+import {
+  iniciarConsultaCaixas,
+  mensagemErroConsultaCaixas,
+  parametrosHistoricoCaixas,
+  podeReabrirCaixa,
+  separarPaginaCaixas,
+} from "../utils/meusCaixasUtils";
 
 export default function MeusCaixas() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [caixas, setCaixas] = useState([]);
   const [caixaAberto, setCaixaAberto] = useState(null);
+  const [statusCaixaAberto, setStatusCaixaAberto] = useState("carregando");
+  const [erroCaixaAberto, setErroCaixaAberto] = useState("");
+  const [tentativaCaixaAberto, setTentativaCaixaAberto] = useState(0);
+  const [erroHistorico, setErroHistorico] = useState("");
+  const [tentativaHistorico, setTentativaHistorico] = useState(0);
+  const [pagina, setPagina] = useState(0);
+  const [temProximaPagina, setTemProximaPagina] = useState(false);
   const [caixaRevisao, setCaixaRevisao] = useState(null);
   const [dataOcorrencia, setDataOcorrencia] = useState("");
   const [motivoRevisao, setMotivoRevisao] = useState("");
@@ -43,29 +57,52 @@ export default function MeusCaixas() {
   });
 
   useEffect(() => {
-    carregarCaixas();
-  }, [filtros]);
+    const consulta = iniciarConsultaCaixas({
+      consultar: (signal) => listarCaixas(parametrosHistoricoCaixas(filtros, pagina), { signal }),
+      onIniciar: () => {
+        setLoading(true);
+        setErroHistorico("");
+      },
+      onSucesso: (resposta) => {
+        const resultado = separarPaginaCaixas(resposta);
+        setCaixas(resultado.caixas);
+        setTemProximaPagina(resultado.temProximaPagina);
+      },
+      onErro: (erro) =>
+        setErroHistorico(
+          mensagemErroConsultaCaixas(erro, "Não foi possível carregar o histórico de caixas."),
+        ),
+      onFim: () => setLoading(false),
+    });
+    return consulta.cancelar;
+  }, [filtros, pagina, tentativaHistorico]);
 
-  const carregarCaixas = async () => {
-    try {
-      setLoading(true);
-      const params = {};
+  useEffect(() => {
+    const consulta = iniciarConsultaCaixas({
+      consultar: (signal) => obterCaixaAberto({ compact: true, signal }),
+      onIniciar: () => {
+        setStatusCaixaAberto("carregando");
+        setErroCaixaAberto("");
+      },
+      onSucesso: (aberto) => {
+        setCaixaAberto(aberto);
+        setStatusCaixaAberto("pronto");
+      },
+      onErro: (erro) => {
+        setStatusCaixaAberto("erro");
+        setErroCaixaAberto(
+          mensagemErroConsultaCaixas(erro, "Não foi possível verificar se há caixa aberto."),
+        );
+      },
+    });
+    return consulta.cancelar;
+  }, [tentativaCaixaAberto]);
 
-      if (filtros.data_inicio) params.data_inicio = filtros.data_inicio;
-      if (filtros.data_fim) params.data_fim = filtros.data_fim;
-      if (filtros.status) params.status_filter = filtros.status;
-
-      const response = await listarCaixas(params);
-      const aberto = await obterCaixaAberto().catch(() => ({ desconhecido: true }));
-      setCaixas(response);
-      setCaixaAberto(aberto);
-    } catch (error) {
-      console.error("Erro ao carregar caixas:", error);
-      alert("Erro ao carregar histórico de caixas");
-    } finally {
-      setLoading(false);
-    }
+  const atualizarFiltros = (novosFiltros) => {
+    setFiltros(novosFiltros);
+    setPagina(0);
   };
+  const reaberturaPermitida = podeReabrirCaixa(statusCaixaAberto, caixaAberto);
 
   const iniciarRevisao = (event) => {
     event.preventDefault();
@@ -183,8 +220,9 @@ export default function MeusCaixas() {
             <label className="block text-sm font-medium text-gray-700 mb-2">Data Início</label>
             <input
               type="date"
+              aria-label="Data início do histórico de caixas"
               value={filtros.data_inicio}
-              onChange={(e) => setFiltros({ ...filtros, data_inicio: e.target.value })}
+              onChange={(e) => atualizarFiltros({ ...filtros, data_inicio: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -193,8 +231,9 @@ export default function MeusCaixas() {
             <label className="block text-sm font-medium text-gray-700 mb-2">Data Fim</label>
             <input
               type="date"
+              aria-label="Data fim do histórico de caixas"
               value={filtros.data_fim}
-              onChange={(e) => setFiltros({ ...filtros, data_fim: e.target.value })}
+              onChange={(e) => atualizarFiltros({ ...filtros, data_fim: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -202,8 +241,9 @@ export default function MeusCaixas() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
             <select
+              aria-label="Status do histórico de caixas"
               value={filtros.status}
-              onChange={(e) => setFiltros({ ...filtros, status: e.target.value })}
+              onChange={(e) => atualizarFiltros({ ...filtros, status: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Todos</option>
@@ -214,7 +254,7 @@ export default function MeusCaixas() {
 
           <div className="flex items-end">
             <button
-              onClick={() => setFiltros({ data_inicio: "", data_fim: "", status: "" })}
+              onClick={() => atualizarFiltros({ data_inicio: "", data_fim: "", status: "" })}
               className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
             >
               Limpar Filtros
@@ -223,11 +263,43 @@ export default function MeusCaixas() {
         </div>
       </div>
 
+      {statusCaixaAberto === "carregando" && (
+        <p role="status" className="mb-4 text-sm text-gray-600">
+          Consultando caixa aberto. A reabertura ficará disponível após essa verificação.
+        </p>
+      )}
+      {erroCaixaAberto && (
+        <div
+          role="alert"
+          className="mb-4 flex flex-wrap items-center gap-3 rounded-lg bg-amber-50 p-4 text-sm text-amber-900"
+        >
+          <p>{erroCaixaAberto} A reabertura permanece bloqueada até a verificação.</p>
+          <button
+            type="button"
+            onClick={() => setTentativaCaixaAberto((tentativa) => tentativa + 1)}
+            className="rounded border border-amber-300 px-3 py-2 font-medium"
+          >
+            Tentar novamente verificar caixa aberto
+          </button>
+        </div>
+      )}
+
       {/* Lista de Caixas */}
       {loading ? (
         <div className="text-center py-12">
           <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
           <p className="mt-4 text-gray-600">Carregando caixas...</p>
+        </div>
+      ) : erroHistorico ? (
+        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-6 text-red-800">
+          <p>{erroHistorico}</p>
+          <button
+            type="button"
+            onClick={() => setTentativaHistorico((tentativa) => tentativa + 1)}
+            className="mt-3 rounded border border-red-300 px-4 py-2 font-medium"
+          >
+            Tentar novamente
+          </button>
         </div>
       ) : caixas.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-lg shadow-sm">
@@ -382,12 +454,16 @@ export default function MeusCaixas() {
                   {caixa.status === "fechado" && (
                     <div className="border-t pt-4 flex flex-wrap gap-3">
                       <button
-                        onClick={() => setCaixaReabertura(caixa)}
-                        disabled={Boolean(caixaAberto)}
+                        onClick={() => {
+                          if (reaberturaPermitida) setCaixaReabertura(caixa);
+                        }}
+                        disabled={!reaberturaPermitida}
                         title={
-                          caixaAberto
-                            ? "Feche o caixa atual antes de reabrir este caixa."
-                            : undefined
+                          statusCaixaAberto !== "pronto"
+                            ? "Aguarde a verificação do caixa aberto antes de reabrir."
+                            : caixaAberto
+                              ? "Feche o caixa atual antes de reabrir este caixa."
+                              : undefined
                         }
                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
@@ -441,6 +517,33 @@ export default function MeusCaixas() {
           })}
         </div>
       )}
+      <nav
+        aria-label="Páginas do histórico de caixas"
+        className="mt-6 flex flex-wrap items-center justify-between gap-3"
+      >
+        <p className="text-sm text-gray-600">
+          Página {pagina + 1}
+          {!loading && !erroHistorico ? ` · ${caixas.length} caixas` : ""}
+        </p>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            disabled={loading || pagina === 0}
+            onClick={() => setPagina((atual) => Math.max(0, atual - 1))}
+            className="rounded-lg border border-gray-300 px-4 py-2 font-medium disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Página anterior
+          </button>
+          <button
+            type="button"
+            disabled={loading || Boolean(erroHistorico) || !temProximaPagina}
+            onClick={() => setPagina((atual) => atual + 1)}
+            className="rounded-lg border border-gray-300 px-4 py-2 font-medium disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Próxima página
+          </button>
+        </div>
+      </nav>
       {caixaRevisao && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <form

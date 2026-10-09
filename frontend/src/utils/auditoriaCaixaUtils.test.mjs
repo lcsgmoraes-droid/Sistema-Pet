@@ -6,8 +6,46 @@ import {
   filtrarLancamentosAuditoria,
   filtrarVendasAuditoria,
   formasAuditoria,
+  paginarAuditoria,
   pagamentosVendaAuditoria,
 } from "./auditoriaCaixaUtils.js";
+
+test("auditoria percorre todas as vendas com no máximo 25 por página sem perder referências", () => {
+  const registros = Array.from({ length: 72 }, (_, id) => ({ id, assinatura: `assinatura-${id}` }));
+  const paginas = [1, 2, 3].map((pagina) => paginarAuditoria(registros, pagina));
+  assert.ok(paginas.every((pagina) => pagina.itens.length <= 25 && pagina.total === 72));
+  assert.deepEqual(
+    paginas.flatMap((pagina) => pagina.itens),
+    registros,
+  );
+  assert.equal(paginas[1].itens[0], registros[25]);
+  assert.equal(registros.length, 72);
+});
+
+test("auditoria limita a página quando a seleção fica menor e mantém filtros completos", () => {
+  const registros = Array.from({ length: 60 }, (_, id) => ({
+    id,
+    pagamentos: [{ forma_pagamento: id < 3 ? "Pix" : "Dinheiro", valor: 10 }],
+  }));
+  const selecionadas = filtrarVendasAuditoria(registros, "pix");
+  const pagina = paginarAuditoria(selecionadas, 3);
+  assert.equal(pagina.pagina, 1);
+  assert.equal(pagina.total, 3);
+  assert.deepEqual(
+    pagina.itens.map((item) => item.id),
+    [0, 1, 2],
+  );
+  assert.equal(formasAuditoria({ vendas: registros }).length, 2);
+});
+
+test("auditoria sem registros mantém página válida e não mostra itens de outra seleção", () => {
+  assert.deepEqual(paginarAuditoria([], 4), {
+    itens: [],
+    pagina: 1,
+    total: 0,
+    totalPaginas: 1,
+  });
+});
 
 const vendas = [
   {
