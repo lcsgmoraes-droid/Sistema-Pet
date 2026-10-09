@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import api from "../api";
@@ -13,6 +13,8 @@ import {
 import { rejeicaoResponsavelTecnico } from "../utils/fiscalRejectionGuidance.mjs";
 import { confirmarCorePet, perguntarCorePet } from "../services/corepetDialog";
 import { obterTotalRecebidoExistente } from "../components/modalPagamentoUtils";
+import { normalizarDescontosVenda } from "../utils/pdvDescontosUtils";
+import { cancelarEdicaoVenda } from "../utils/pdvCancelarEdicaoVenda";
 
 async function carregarPagamentosDaVenda(vendaId) {
   try {
@@ -74,9 +76,12 @@ function montarVendaReaberta(vendaAtualizada, clienteCompleto, { pagamentos, tot
     itens: vendaAtualizada.itens || [],
     subtotal: parseFloat(vendaAtualizada.subtotal || vendaAtualizada.total),
     desconto_valor: parseFloat(vendaAtualizada.desconto_valor || 0),
+    desconto_venda_valor: vendaAtualizada.desconto_venda_valor,
+    desconto_origem_legado: vendaAtualizada.desconto_origem_legado,
     desconto_percentual: parseFloat(vendaAtualizada.desconto_percentual || 0),
     cupom_code: vendaAtualizada.cupom_code || null,
     cupom_discount_applied: vendaAtualizada.cupom_discount_applied ?? null,
+    cupons_detalhes: vendaAtualizada.cupons_detalhes || [],
     total: parseFloat(vendaAtualizada.total),
     observacoes: vendaAtualizada.observacoes || "",
     status: "aberta",
@@ -112,36 +117,41 @@ export function usePDVVendaFinalizacao({
 }) {
   const navigate = useNavigate();
   const [statusOriginalVenda, setStatusOriginalVenda] = useState(null);
+  useEffect(() => {
+    setStatusOriginalVenda((anterior) =>
+      anterior && (anterior.vendaId !== vendaAtual.id || anterior.status === vendaAtual.status)
+        ? null
+        : anterior,
+    );
+  }, [vendaAtual.id, vendaAtual.status]);
 
   const habilitarEdicao = () => {
     setModoVisualizacao(false);
   };
 
   const cancelarEdicao = async () => {
-    if (!vendaAtual.id) {
-      limparVenda();
-      return;
+    try {
+      setLoading(true);
+      await cancelarEdicaoVenda({
+        vendaAtual,
+        restauracao: statusOriginalVenda,
+        restaurarStatus: (vendaId, status) => api.patch(`/vendas/${vendaId}/status`, { status }),
+        recarregarContextoCliente: recarregarContextoClienteAtual,
+        limparRestauracao: () => setStatusOriginalVenda(null),
+        limparVenda,
+        carregarVendasRecentes,
+      });
+    } catch (error) {
+      console.error("Erro ao restaurar status:", error);
+      const detalhe = error.response?.data?.detail;
+      toast.error(
+        typeof detalhe === "string"
+          ? `Não foi possível cancelar a edição: ${detalhe}. A venda permanece na tela para tentar novamente.`
+          : "Não foi possível cancelar a edição. A venda permanece na tela para tentar novamente.",
+      );
+    } finally {
+      setLoading(false);
     }
-
-    if (statusOriginalVenda && vendaAtual.status !== statusOriginalVenda) {
-      try {
-        setLoading(true);
-        await api.patch(`/vendas/${vendaAtual.id}/status`, {
-          status: statusOriginalVenda,
-        });
-
-        debugLog(
-          `\u2705 Status restaurado para: ${statusOriginalVenda} (altera\u00e7\u00f5es descartadas)`,
-        );
-      } catch (error) {
-        console.error("Erro ao restaurar status:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    setStatusOriginalVenda(null);
-    limparVenda();
   };
 
   const excluirVenda = async () => {
@@ -195,13 +205,13 @@ export function usePDVVendaFinalizacao({
 
     if (!confirmar) return;
 
-    setStatusOriginalVenda(vendaAtual.status);
+    setStatusOriginalVenda({ vendaId: vendaAtual.id, status: vendaAtual.status });
 
     try {
       setLoading(true);
       await api.post(`/vendas/${vendaAtual.id}/reabrir`);
 
-      const vendaAtualizada = await buscarVenda(vendaAtual.id);
+      const vendaAtualizada = normalizarDescontosVenda(await buscarVenda(vendaAtual.id));
       const pagamentosVenda = await carregarPagamentosDaVenda(vendaAtual.id);
 
       let clienteCompleto = null;
@@ -289,7 +299,7 @@ export function usePDVVendaFinalizacao({
   };
 
   const recarregarVendaAtualComPagamentos = async (vendaId) => {
-    const vendaAtualizada = await buscarVenda(vendaId);
+    const vendaAtualizada = normalizarDescontosVenda(await buscarVenda(vendaId));
     const { pagamentos, totalPago } = await carregarPagamentosDaVenda(vendaId);
 
     setVendaAtual({

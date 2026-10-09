@@ -53,6 +53,7 @@ export function usePDVVendaAcoes({
       itens: [],
       subtotal: 0,
       desconto_valor: 0,
+      desconto_venda_valor: 0,
       desconto_percentual: 0,
       cupom_code: null,
       cupom_discount_applied: null,

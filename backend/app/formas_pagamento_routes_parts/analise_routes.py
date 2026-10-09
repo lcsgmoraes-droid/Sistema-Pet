@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -12,6 +12,12 @@ from app.empresa_config_geral_models import EmpresaConfigGeral
 from app.financeiro_models import FormaPagamento
 from app.formas_pagamento_models import ConfiguracaoImposto
 from app.services.card_fee_service import resolve_card_fee
+from app.services.venda_descontos import (
+    bruto_item,
+    ratear_descontos_venda,
+    resumo_descontos_venda,
+)
+from app.vendas.regras import calcular_totais_venda
 from app.produtos_models import Produto
 from app.security.permissions_decorator import require_any_permission
 from app.utils.logger import logger
@@ -54,20 +60,52 @@ def analisar_venda(
     - Resultado (lucro e margem)
     - Alertas e sugestões
     """
+    itens_simulados = [
+        {
+            "produto_id": item.produto_id,
+            "quantidade": item.quantidade,
+            "preco_unitario": item.preco_venda,
+            "desconto_item": item.desconto_item,
+        }
+        for item in dados.items
+    ]
+    total_produtos = sum(item.preco_venda * item.quantidade for item in dados.items)
+    subtotal = total_produtos - dados.desconto - dados.taxa_entrega
+    if dados.desconto_venda_valor is not None:
+        try:
+            totais = calcular_totais_venda(
+                itens_simulados,
+                dados.desconto,
+                0,
+                dados.taxa_entrega,
+                desconto_venda_valor=dados.desconto_venda_valor,
+                cupom_discount_applied=dados.cupom_discount_applied,
+            )
+            total_produtos = float(
+                sum((bruto_item(item) for item in itens_simulados), Decimal("0"))
+            )
+            dados.desconto = totais["desconto_valor"]
+            subtotal = totais["total"]
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    venda_simulada = {
+        "itens": itens_simulados,
+        "desconto_valor": dados.desconto,
+        "desconto_venda_valor": dados.desconto_venda_valor,
+        "cupom_discount_applied": dados.cupom_discount_applied,
+    }
+    composicao = {
+        "total_produtos": float(total_produtos),
+        "desconto": float(dados.desconto),
+        "taxa_entrega": float(dados.taxa_entrega),
+        "subtotal": float(subtotal),
+        **resumo_descontos_venda(venda_simulada),
+        "cupom_discount_applied": float(dados.cupom_discount_applied or 0),
+    }
     try:
         current_user, tenant_id = user_and_tenant
 
         # ===== 1. COMPOSIÇÃO FINANCEIRA =====
-        total_produtos = sum(item.preco_venda * item.quantidade for item in dados.items)
-        subtotal = total_produtos - dados.desconto - dados.taxa_entrega
-
-        composicao = {
-            "total_produtos": float(total_produtos),
-            "desconto": float(dados.desconto),
-            "taxa_entrega": float(dados.taxa_entrega),
-            "subtotal": float(subtotal),
-        }
-
         logger.info(f"📊 Analisando venda - Subtotal: R$ {subtotal:.2f}")
 
         # ===== 2. BUSCAR CUSTOS DOS PRODUTOS =====
@@ -234,23 +272,23 @@ def analisar_venda(
                     calcular_comissao_item,
                 )
 
-                soma_brutos = sum(
-                    Decimal(str(item.preco_venda)) * Decimal(str(item.quantidade))
-                    for item, _, _ in itens_para_comissao
-                )
-                desconto_total = Decimal(str(dados.desconto or 0))
+                descontos_por_item = {
+                    id(item): parte["total"]
+                    for item, parte in zip(
+                        dados.items, ratear_descontos_venda(venda_simulada)
+                    )
+                }
                 soma_liquidos = Decimal("0")
                 itens_normalizados = []
 
                 for item, produto, custo_item in itens_para_comissao:
-                    valor_bruto = Decimal(str(item.preco_venda)) * Decimal(
-                        str(item.quantidade)
+                    valor_bruto = bruto_item(
+                        {
+                            "quantidade": item.quantidade,
+                            "preco_unitario": item.preco_venda,
+                        }
                     )
-                    desconto_item = (
-                        desconto_total * (valor_bruto / soma_brutos)
-                        if soma_brutos > 0
-                        else Decimal("0")
-                    )
+                    desconto_item = descontos_por_item[id(item)]
                     valor_liquido = valor_bruto - desconto_item
                     soma_liquidos += valor_liquido
                     itens_normalizados.append(
@@ -481,20 +519,8 @@ def analisar_venda(
         logger.error(f"❌ ERRO CRÍTICO em analisar_venda: {str(e)}", exc_info=True)
 
         # Retornar resposta com valores padrão para não quebrar o frontend
-        total_produtos = (
-            sum(item.preco_venda * item.quantidade for item in dados.items)
-            if dados.items
-            else 0
-        )
-        subtotal = total_produtos - dados.desconto - dados.taxa_entrega
-
         return AnaliseVendaResponse(
-            composicao={
-                "total_produtos": float(total_produtos),
-                "desconto": float(dados.desconto),
-                "taxa_entrega": float(dados.taxa_entrega),
-                "subtotal": float(subtotal),
-            },
+            composicao=composicao,
             deducoes={
                 "comissao": {"valor": 0.0, "percentual": 0.0, "tipo": "percentual"},
                 "taxa_percentual": 0.0,

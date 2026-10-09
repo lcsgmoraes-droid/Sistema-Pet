@@ -144,6 +144,19 @@ def consumir_cupom_finalizacao(
         )
 
     venda_total_para_cupom = float(venda.total or 0)
+    if getattr(venda, "desconto_venda_valor", None) is not None:
+        if (
+            abs(
+                float(cupom_discount_resolvido or 0)
+                - float(venda.cupom_discount_applied or 0)
+            )
+            > 0.01
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Salve o cupom aplicado antes de finalizar a venda.",
+            )
+        venda_total_para_cupom -= float(venda.taxa_entrega or 0)
     if cupom_discount_resolvido:
         venda_total_para_cupom += float(cupom_discount_resolvido or 0)
 

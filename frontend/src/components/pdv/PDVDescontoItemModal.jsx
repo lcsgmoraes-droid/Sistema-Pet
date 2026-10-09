@@ -1,5 +1,9 @@
 import { X } from "lucide-react";
 import { resolveMediaUrl } from "../../utils/mediaUrl";
+import CurrencyInput from "../CurrencyInput";
+import { formatBRL, formatMoneyBRL } from "../../utils/formatters";
+import { recalcularItemComPrecoEDesconto } from "../../utils/pdvDescontoItensUtils";
+import { arredondarDinheiro } from "../../utils/pdvCarrinhoItensUtils";
 
 function obterImagemDetalheItem(item) {
   return (
@@ -22,16 +26,16 @@ export default function PDVDescontoItemModal({
     return null;
   }
 
-  const totalBruto = itemEditando.preco * itemEditando.quantidade;
-  const descontoCalculado =
-    itemEditando.tipoDesconto === "valor"
-      ? itemEditando.descontoValor
-      : (totalBruto * itemEditando.descontoPercentual) / 100;
+  const totalBruto = arredondarDinheiro(itemEditando.preco * itemEditando.quantidade);
+  const descontoCalculado = recalcularItemComPrecoEDesconto(
+    itemEditando,
+    itemEditando,
+  ).desconto_valor;
   const percentualEquivalente =
     itemEditando.tipoDesconto === "percentual"
       ? itemEditando.descontoPercentual
       : totalBruto > 0
-        ? (itemEditando.descontoValor / totalBruto) * 100
+        ? (descontoCalculado / totalBruto) * 100
         : 0;
   const imagemProduto = resolveMediaUrl(obterImagemDetalheItem(itemEditando));
 
@@ -82,14 +86,12 @@ export default function PDVDescontoItemModal({
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-2.5 text-gray-500">R$</span>
-                <input
-                  type="number"
-                  step="0.01"
+                <CurrencyInput
                   value={itemEditando.preco}
-                  onChange={(e) =>
+                  onChange={(valor) =>
                     onChangeItem({
                       ...itemEditando,
-                      preco: parseFloat(e.target.value) || 0,
+                      preco: valor,
                     })
                   }
                   className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-3 focus:ring-2 focus:ring-blue-500"
@@ -114,7 +116,7 @@ export default function PDVDescontoItemModal({
                 <span className="absolute left-3 top-2.5 text-gray-500">R$</span>
                 <input
                   type="text"
-                  value={totalBruto.toFixed(2)}
+                  value={formatBRL(totalBruto)}
                   readOnly
                   className="w-full rounded-lg border border-gray-300 bg-gray-100 py-2 pl-10 pr-3"
                 />
@@ -168,55 +170,64 @@ export default function PDVDescontoItemModal({
               <span className="absolute left-3 top-2.5 text-gray-500">
                 {itemEditando.tipoDesconto === "valor" ? "R$" : "%"}
               </span>
-              <input
-                type="number"
-                step="0.01"
-                value={
-                  itemEditando.tipoDesconto === "valor"
-                    ? itemEditando.descontoValor
-                    : itemEditando.descontoPercentual
-                }
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value) || 0;
-                  if (itemEditando.tipoDesconto === "valor") {
+              {itemEditando.tipoDesconto === "valor" ? (
+                <CurrencyInput
+                  value={itemEditando.descontoValor}
+                  onChange={(valor) => onChangeItem({ ...itemEditando, descontoValor: valor })}
+                  maxValue={totalBruto}
+                  className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-3 focus:ring-2 focus:ring-blue-500"
+                />
+              ) : (
+                <input
+                  type="number"
+                  step="0.01"
+                  value={
+                    itemEditando.tipoDesconto === "valor"
+                      ? itemEditando.descontoValor
+                      : itemEditando.descontoPercentual
+                  }
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    if (itemEditando.tipoDesconto === "valor") {
+                      onChangeItem({
+                        ...itemEditando,
+                        descontoValor: val,
+                      });
+                      return;
+                    }
+
                     onChangeItem({
                       ...itemEditando,
-                      descontoValor: val,
+                      descontoPercentual: val,
                     });
-                    return;
-                  }
-
-                  onChangeItem({
-                    ...itemEditando,
-                    descontoPercentual: val,
-                  });
-                }}
-                className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-3 focus:ring-2 focus:ring-blue-500"
-                placeholder="0.00"
-              />
+                  }}
+                  className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-3 focus:ring-2 focus:ring-blue-500"
+                  placeholder="0.00"
+                />
+              )}
             </div>
           </div>
 
           <div className="rounded-lg bg-blue-50 p-4">
             <div className="flex justify-between text-sm">
               <span className="text-gray-700">Total bruto</span>
-              <span className="font-medium">R$ {totalBruto.toFixed(2)}</span>
+              <span className="font-medium">{formatMoneyBRL(totalBruto)}</span>
             </div>
             {(itemEditando.descontoValor > 0 || itemEditando.descontoPercentual > 0) && (
               <>
                 <div className="mt-1 flex justify-between text-sm text-red-600">
-                  <span>Desconto</span>
-                  <span className="font-medium">- R$ {descontoCalculado.toFixed(2)}</span>
+                  <span>Desconto manual deste produto</span>
+                  <span className="font-medium">- {formatMoneyBRL(descontoCalculado)}</span>
                 </div>
                 <div className="mt-1 flex justify-between text-sm text-orange-600">
-                  <span>{percentualEquivalente.toFixed(2)}% de desconto</span>
+                  <span>{formatBRL(percentualEquivalente)}% de desconto</span>
                 </div>
               </>
             )}
             <div className="mt-2 flex justify-between border-t border-blue-200 pt-2 text-lg font-bold">
               <span>Total liquido</span>
               <span className="text-green-600">
-                R$ {(totalBruto - descontoCalculado).toFixed(2)}
+                {formatMoneyBRL(totalBruto - descontoCalculado)}
               </span>
             </div>
           </div>

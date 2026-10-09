@@ -11,7 +11,6 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.financeiro_models import ContaReceber
 from app.services.venda_rentabilidade_snapshot_service import (
-    get_or_build_venda_rentabilidade_snapshot,
     invalidate_venda_rentabilidade_snapshot,
 )
 from app.vendas.routes_common import _validar_tenant_e_obter_usuario
@@ -180,7 +179,7 @@ def excluir_pagamento(
 
     # ⚠️ IMPORTANTE: Se venda está finalizada/baixa_parcial, não pode excluir pagamento
     # Usuário deve REABRIR a venda primeiro!
-    if venda.status in ["finalizada", "baixa_parcial"]:
+    if venda.status != "aberta":
         raise HTTPException(
             status_code=400,
             detail='Não é possível excluir pagamentos de uma venda finalizada. Reabra a venda primeiro através do botão "Reabrir Venda".',
@@ -226,31 +225,10 @@ def excluir_pagamento(
         f"DEBUG excluir_pagamento: total_pago={total_pago}, total_venda={total_venda}"
     )
 
-    # Atualizar status da venda
-    if total_pago == 0:
-        venda.status = "aberta"
-        logger.info("DEBUG: Mudou status para ABERTA (total_pago = 0)")
-        invalidate_venda_rentabilidade_snapshot(venda)
-    elif total_pago >= total_venda:
-        venda.status = "finalizada"
-        logger.info("DEBUG: Mudou status para FINALIZADA (total_pago >= total_venda)")
-        get_or_build_venda_rentabilidade_snapshot(
-            venda,
-            db,
-            tenant_id,
-            persist_if_missing=True,
-            force_refresh=True,
-        )
-    else:
-        venda.status = "baixa_parcial"
-        logger.info("DEBUG: Mudou status para BAIXA_PARCIAL")
-        get_or_build_venda_rentabilidade_snapshot(
-            venda,
-            db,
-            tenant_id,
-            persist_if_missing=True,
-            force_refresh=True,
-        )
+    # A exclusão integra a edição da venda reaberta. Mesmo com saldo suficiente,
+    # o fechamento deve passar pela finalização para reaplicar cupons/benefícios.
+    venda.status = "aberta"
+    invalidate_venda_rentabilidade_snapshot(venda)
 
     db.commit()
 

@@ -489,6 +489,154 @@ def preparar_venda_cartao_pendente(api, prefix=None):
     }
 
 
+def test_salvar_venda_reaberta_paga_fecha_pelo_orquestrador_com_cupom_e_carimbos(
+    api, regras_beneficios
+):
+    caixa = _local_com_caixa_aberto(api)
+    prefix = "E2E-SALVAR-PAGA-" + uuid4().hex[:12]
+    cliente = _cliente(api, prefix)
+    produto = _produto(api, prefix, preco=20)
+    vendedor = api.expect(
+        "POST",
+        "/clientes/",
+        {200, 201},
+        "salvar.vendedor_ficticio",
+        json={
+            "nome": prefix + "-VENDEDOR",
+            "tipo_cadastro": "funcionario",
+            "tipo_pessoa": "PF",
+        },
+    ).json()
+    cupom = api.expect(
+        "POST",
+        "/campanhas/cupons/manual",
+        {200, 201},
+        "salvar.cupom_exclusivo",
+        json={
+            "coupon_type": "fixed",
+            "discount_value": 5,
+            "channel": "pdv",
+            "customer_id": cliente["id"],
+            "motivo": prefix,
+        },
+    ).json()
+
+    def dados(quantidade, item_id=None):
+        item = _item(produto["id"], quantidade, 20, item_id=item_id)
+        item["desconto_item"] = 5
+        return {
+            "cliente_id": cliente["id"],
+            "funcionario_id": vendedor["id"],
+            "vendedor_funcionario_id": vendedor["id"],
+            "itens": [item],
+            "desconto_venda_valor": 5,
+            "cupom_code": cupom["code"],
+            "cupom_discount_applied": 5,
+            "observacoes": prefix,
+            "tem_entrega": False,
+        }
+
+    venda = api.expect(
+        "POST", "/vendas", {200, 201}, "salvar.criar", json=dados(3)
+    ).json()
+    venda_id = venda["id"]
+    _finalizar(api, venda_id, [{"forma_pagamento": "PIX", "valor": 45}])
+    _saldo_esperado(api, cliente["id"], "4.50", 4)
+    recebimentos = _get(api, f"/vendas/{venda_id}/pagamentos")["pagamentos"]
+    original = recebimentos[0]
+    recompensa = _get(
+        api,
+        "/campanhas/cupons",
+        customer_id=cliente["id"],
+        campaign_id=regras_beneficios["id"],
+    )[0]
+
+    for quantidade, total, cashback, carimbos, via_patch in (
+        (2, 25, "2.50", 2, False),
+        (4, 65, "6.50", 6, False),
+        (3, 45, "4.50", 4, True),
+    ):
+        api.expect(
+            "POST", f"/vendas/{venda_id}/reabrir", {200}, "salvar.reabrir", json={}
+        )
+        _saldo_esperado(api, cliente["id"], 0, 0)
+        atual = _get(api, f"/vendas/{venda_id}")
+        editada = api.expect(
+            "PUT",
+            f"/vendas/{venda_id}",
+            {200},
+            "salvar.editar_paga_com_vendedor",
+            json=dados(quantidade, atual["itens"][0]["id"]),
+        ).json()
+        assert editada["status"] == "aberta" and editada["total"] == total
+        _saldo_esperado(api, cliente["id"], 0, 0)
+        cupons = _get(api, "/campanhas/cupons", customer_id=cliente["id"])
+        assert next(c for c in cupons if c["id"] == cupom["id"])["status"] == "active"
+        assert (
+            _get(api, f"/produtos/{produto['id']}")["estoque_atual"] == 20 - quantidade
+        )
+        pagamentos = _get(api, f"/vendas/{venda_id}/pagamentos")
+        assert pagamentos["pagamentos"] == recebimentos
+
+        if quantidade == 4:
+            assert (
+                pagamentos["total_recebido"] == 45
+                and pagamentos["valor_restante"] == 20
+            )
+            for caminho, payload in (
+                ("status", {"status": "finalizada"}),
+                ("finalizar", {"pagamentos": []}),
+            ):
+                api.expect(
+                    "PATCH" if caminho == "status" else "POST",
+                    f"/vendas/{venda_id}/{caminho}",
+                    {400},
+                    "salvar.saldo_pendente_nao_fecha",
+                    json=payload,
+                )
+                assert _get(api, f"/vendas/{venda_id}")["status"] == "aberta"
+            venda = _finalizar(api, venda_id, [{"forma_pagamento": "PIX", "valor": 20}])
+            recebimentos = _get(api, f"/vendas/{venda_id}/pagamentos")["pagamentos"]
+            assert len(recebimentos) == 2 and recebimentos[0] == original
+        elif via_patch:
+            for _ in range(2):
+                resposta = api.expect(
+                    "PATCH",
+                    f"/vendas/{venda_id}/status",
+                    {200},
+                    "salvar.cancelar_edicao_compativel",
+                    json={"status": "finalizada"},
+                ).json()
+                assert resposta == {"success": True, "status": "finalizada"}
+            venda = _get(api, f"/vendas/{venda_id}")
+        else:
+            # Mesma sequência do botão Salvar: PUT → GET pagamentos → POST sem nova baixa.
+            assert pagamentos["total_recebido"] >= total
+            venda = _finalizar(api, venda_id, [])
+
+        assert venda["status"] == "finalizada" and venda["total"] == total
+        _saldo_esperado(api, cliente["id"], cashback, carimbos)
+        assert _get(api, f"/vendas/{venda_id}/pagamentos")["pagamentos"] == recebimentos
+        assert (
+            _get(api, f"/produtos/{produto['id']}")["estoque_atual"] == 20 - quantidade
+        )
+        cupons = _get(api, "/campanhas/cupons", customer_id=cliente["id"])
+        assert next(c for c in cupons if c["id"] == cupom["id"])["status"] == "used"
+        recompra = next(c for c in cupons if c["id"] == recompensa["id"])
+        assert recompra["code"] == recompensa["code"]
+        assert recompra["status"] == ("active" if total >= 30 else "voided")
+
+    auditoria = _get(api, f"/caixas/{caixa['id']}/auditoria")
+    recebidos = [p for p in auditoria["pagamentos"] if p["venda_id"] == venda_id]
+    assert len(recebidos) == 2 and sum(p["valor"] for p in recebidos) == 65
+    assert not [m for m in auditoria["movimentacoes"] if m["venda_id"] == venda_id]
+    print(
+        f"SALVAR_PAGA venda={venda_id} numero={venda['numero_venda']} cliente={cliente['id']} "
+        "totais=45,25,65,45 cashback=4.5,2.5,6.5,4.5 carimbos=4,2,6,4 "
+        "recebimentos=45+20 estoque=17 cupons_reconsumidos patch_idempotente"
+    )
+
+
 def test_cartao_com_repasse_pendente_devolve_credito_uma_vez(api):
     cenario = preparar_venda_cartao_pendente(api)
     venda, cliente, produto = (cenario[key] for key in ("venda", "cliente", "produto"))

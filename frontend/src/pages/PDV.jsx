@@ -57,13 +57,17 @@ export default function PDV() {
   const { user } = useAuth();
   const { iniciarTour } = useTour("pdv", tourPDV, { delay: 1200 });
   const [vendedorObrigatorio, setVendedorObrigatorio] = useState(null);
+  const [mostrarEnderecoCliente, setMostrarEnderecoCliente] = useState(false);
 
   useEffect(() => {
     let ativo = true;
     api
       .get("/empresa/config/pdv")
       .then(({ data }) => {
-        if (ativo) setVendedorObrigatorio(Boolean(data.vendedor_obrigatorio_pdv));
+        if (ativo) {
+          setVendedorObrigatorio(Boolean(data.vendedor_obrigatorio_pdv));
+          setMostrarEnderecoCliente(Boolean(data.mostrar_endereco_cliente_pdv));
+        }
       })
       .catch(() => {
         if (ativo) toast.error("Não foi possível carregar a regra de vendedor do PDV.");
@@ -83,6 +87,7 @@ export default function PDV() {
     itens: [],
     subtotal: 0,
     desconto_valor: 0,
+    desconto_venda_valor: 0,
     desconto_percentual: 0,
     cupom_code: null,
     cupom_discount_applied: null,
@@ -334,6 +339,7 @@ export default function PDV() {
   });
   const { salvarVenda } = usePDVSalvarVenda({
     vendaAtual,
+    setVendaAtual,
     loading,
     setLoading,
     temCaixaAberto,
@@ -344,6 +350,7 @@ export default function PDV() {
     funcionarioComissao,
     limparVenda,
     carregarVendasRecentes: () => carregarVendasRecentes(),
+    recarregarContextoClienteAtual,
   });
   const {
     mostrarModalDescontoItem,
@@ -519,6 +526,7 @@ export default function PDV() {
     clientesSugeridos,
     copiadoClienteCampo,
     setBuscarCliente,
+    mostrarEnderecoCliente,
     copiarCampoCliente,
     limparClienteSelecionado,
     selecionarCliente,

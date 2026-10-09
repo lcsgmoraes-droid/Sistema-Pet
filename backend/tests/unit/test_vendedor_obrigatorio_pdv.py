@@ -55,10 +55,16 @@ def test_regra_de_vendedor_e_isolada_por_empresa():
     exigir_vendedor_pdv(db, tenant_opcional, None)
     assert get_config_pdv.__wrapped__(
         user_and_tenant=(None, tenant_opcional), db=db
-    ) == {"vendedor_obrigatorio_pdv": False}
+    ) == {
+        "vendedor_obrigatorio_pdv": False,
+        "mostrar_endereco_cliente_pdv": False,
+    }
     assert get_config_pdv.__wrapped__(
         user_and_tenant=(None, tenant_obrigatorio), db=db
-    ) == {"vendedor_obrigatorio_pdv": True}
+    ) == {
+        "vendedor_obrigatorio_pdv": True,
+        "mostrar_endereco_cliente_pdv": False,
+    }
 
 
 def test_preferencia_e_opcional_por_padrao():
@@ -67,5 +73,6 @@ def test_preferencia_e_opcional_por_padrao():
     db = FakeSession([])
     exigir_vendedor_pdv(db, tenant_id, None)
     assert get_config_pdv.__wrapped__(user_and_tenant=(None, tenant_id), db=db) == {
-        "vendedor_obrigatorio_pdv": False
+        "vendedor_obrigatorio_pdv": False,
+        "mostrar_endereco_cliente_pdv": False,
     }

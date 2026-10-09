@@ -7,6 +7,7 @@ function montarItensAnalise(itens = []) {
     produto_id: item.produto_id,
     quantidade: item.quantidade,
     preco_venda: item.preco_unitario || item.preco_venda,
+    desconto_item: item.desconto_valor ?? item.desconto_item ?? 0,
     custo: item.custo,
   }));
 }
@@ -41,6 +42,8 @@ export function usePDVVendaAnalise(vendaAtual) {
     await executarAnalise({
       items: montarItensAnalise(vendaAtual.itens),
       desconto: vendaAtual.desconto_valor || 0,
+      desconto_venda_valor: vendaAtual.desconto_venda_valor ?? null,
+      cupom_discount_applied: vendaAtual.cupom_discount_applied ?? null,
       taxa_entrega: vendaAtual.entrega?.taxa_entrega_total || 0,
       forma_pagamento_id: vendaAtual.forma_pagamento_id || null,
       parcelas: vendaAtual.parcelas || 1,
@@ -59,6 +62,8 @@ export function usePDVVendaAnalise(vendaAtual) {
       const response = await api.post("/formas-pagamento/analisar-venda", {
         items: montarItensAnalise(venda.itens),
         desconto: venda.desconto_valor || 0,
+        desconto_venda_valor: venda.desconto_venda_valor ?? null,
+        cupom_discount_applied: venda.cupom_discount_applied ?? null,
         taxa_entrega: venda.entrega?.taxa_entrega_total || 0,
         forma_pagamento_id: venda.forma_pagamento_id || null,
         parcelas: venda.parcelas || 1,
@@ -82,6 +87,8 @@ export function usePDVVendaAnalise(vendaAtual) {
     await executarAnalise({
       items: montarItensAnalise(vendaAtual.itens),
       desconto: vendaAtual.desconto_valor || 0,
+      desconto_venda_valor: vendaAtual.desconto_venda_valor ?? null,
+      cupom_discount_applied: vendaAtual.cupom_discount_applied ?? null,
       taxa_entrega: vendaAtual.entrega?.taxa_entrega_total || 0,
       formas_pagamento: formasPagamento,
       vendedor_id: vendaAtual.funcionario_id,

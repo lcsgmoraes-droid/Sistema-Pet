@@ -141,6 +141,7 @@ export default function ModalPagamentoView({
               {/* Coluna Direita - Resumo */}
               <div className="space-y-6">
                 <ModalPagamentoResumoLateral
+                  venda={venda}
                   valorTotal={valorTotal}
                   valorPago={valorPago}
                   valorRestante={valorRestante}

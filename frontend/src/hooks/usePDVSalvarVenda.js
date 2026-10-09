@@ -1,34 +1,13 @@
 import api from "../api";
-import { criarVenda } from "../api/vendas";
+import { atualizarVenda, criarVenda, finalizarVenda } from "../api/vendas";
 import { toast } from "react-hot-toast";
 import { montarPayloadVenda } from "../utils/pdvVendaPayload";
 import { debugLog } from "../utils/debug";
-import { obterTotalRecebidoExistente } from "../components/modalPagamentoUtils";
-
-function calcularStatusPorPagamento(totalPago, totalVenda) {
-  if (totalPago >= totalVenda - 0.01) {
-    return "finalizada";
-  }
-
-  if (totalPago > 0) {
-    return "baixa_parcial";
-  }
-
-  return "aberta";
-}
-
-async function buscarTotalPago(vendaId) {
-  try {
-    const responsePagamentos = await api.get(`/vendas/${vendaId}/pagamentos`);
-    return obterTotalRecebidoExistente(responsePagamentos.data);
-  } catch (error) {
-    console.error("Erro ao buscar pagamentos:", error);
-    return 0;
-  }
-}
+import { montarVendaPersistidaParaEdicao, salvarEdicaoVenda } from "../utils/pdvSalvarEdicaoVenda";
 
 export function usePDVSalvarVenda({
   vendaAtual,
+  setVendaAtual,
   loading,
   setLoading,
   temCaixaAberto,
@@ -39,6 +18,7 @@ export function usePDVSalvarVenda({
   funcionarioComissao,
   limparVenda,
   carregarVendasRecentes,
+  recarregarContextoClienteAtual,
 }) {
   const salvarVenda = async () => {
     if (vendaAtual.itens.length === 0) {
@@ -77,25 +57,40 @@ export function usePDVSalvarVenda({
       const payloadVenda = montarPayloadVenda(vendaParaPayload, entregadorSelecionado);
 
       if (vendaAtual.id) {
-        await api.put(`/vendas/${vendaAtual.id}`, payloadVenda);
+        const resultado = await salvarEdicaoVenda({
+          vendaAtual,
+          payloadVenda,
+          atualizarVenda,
+          buscarPagamentos: async (vendaId) =>
+            (await api.get(`/vendas/${vendaId}/pagamentos`)).data,
+          finalizarVenda,
+          onVendaPersistida: (persistida) =>
+            setVendaAtual((prev) =>
+              prev.id === persistida.id ? montarVendaPersistidaParaEdicao(prev, persistida) : prev,
+            ),
+        });
 
         debugLog("🚨 DEBUG - Payload sendo enviado:", {
           payload: payloadVenda,
           vendaAtual_completo: vendaAtual,
         });
 
-        const totalPago = await buscarTotalPago(vendaAtual.id);
-        const novoStatus = calcularStatusPorPagamento(totalPago, vendaAtual.total);
-
-        if (vendaAtual.status !== novoStatus) {
-          await api.patch(`/vendas/${vendaAtual.id}/status`, {
-            status: novoStatus,
-          });
-          debugLog(`✅ Status atualizado: ${vendaAtual.status} → ${novoStatus}`);
+        if (resultado.finalizada) {
+          await recarregarContextoClienteAtual?.();
+          toast.success("Venda atualizada e finalizada com os pagamentos já registrados.");
+          limparVenda();
+        } else {
+          setVendaAtual((prev) =>
+            prev.id === resultado.venda.id
+              ? montarVendaPersistidaParaEdicao(
+                  prev,
+                  { ...resultado.venda, status: "aberta" },
+                  resultado.recebido,
+                )
+              : prev,
+          );
+          toast.success("Alterações salvas. Registre o saldo restante para finalizar a venda.");
         }
-
-        toast.success("Venda atualizada com sucesso.");
-        limparVenda();
       } else {
         debugLog("🚀 CRIANDO VENDA - payload consolidado");
         debugLog("Desconto valor:", payloadVenda.desconto_valor);

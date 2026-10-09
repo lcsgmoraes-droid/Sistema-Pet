@@ -55,6 +55,7 @@ function ClienteLookup({
   buscarCliente,
   buscarClientePorCodigoExato,
   clientesSugeridos,
+  mostrarEnderecoCliente,
   modoVisualizacao,
   onAbrirCadastroCliente,
   onBuscarClienteChange,
@@ -67,6 +68,7 @@ function ClienteLookup({
           className="w-full sm:flex-1"
           disabled={modoVisualizacao}
           minChars={0}
+          mostrarEndereco={mostrarEnderecoCliente}
           onChange={onBuscarClienteChange}
           onKeyDown={(e) => {
             if (e.key !== "Enter") return;
@@ -450,6 +452,7 @@ export default function PDVClienteCard({
   clientesSugeridos,
   copiadoClienteCampo,
   destaqueVenda,
+  mostrarEnderecoCliente = false,
   modoVisualizacao,
   onAbrirCadastroCliente,
   onAbrirHistoricoCliente,
@@ -510,6 +513,7 @@ export default function PDVClienteCard({
           buscarCliente={buscarCliente}
           buscarClientePorCodigoExato={buscarClientePorCodigoExato}
           clientesSugeridos={clientesSugeridos}
+          mostrarEnderecoCliente={mostrarEnderecoCliente}
           modoVisualizacao={modoVisualizacao}
           onAbrirCadastroCliente={onAbrirCadastroCliente}
           onBuscarClienteChange={onBuscarClienteChange}

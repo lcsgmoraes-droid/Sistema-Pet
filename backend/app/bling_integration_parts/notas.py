@@ -132,6 +132,7 @@ class BlingNotasMixin:
         desconto_total = (
             desconto_itens
             if desconto_itens > 0
+            and getattr(venda, "desconto_venda_valor", None) is None
             else Decimal(str(venda.desconto_valor or 0))
         ).quantize(centavo, rounding=ROUND_HALF_UP)
         taxa_entrega = getattr(venda, "taxa_entrega_total", None)

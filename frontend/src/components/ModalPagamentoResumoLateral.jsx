@@ -1,7 +1,9 @@
 import { Trash2, Wallet, X } from "lucide-react";
 import { formatBRL, formatMoneyBRL } from "../utils/formatters";
+import { resumirDescontosVenda } from "../utils/pdvDescontosUtils";
 
 export default function ModalPagamentoResumoLateral({
+  venda,
   valorTotal,
   valorPago,
   valorRestante,
@@ -22,12 +24,41 @@ export default function ModalPagamentoResumoLateral({
   excluirPagamentoExistente,
   removerPagamento,
 }) {
+  const descontos = resumirDescontosVenda(venda);
   return (
     <>
       <div className="bg-gray-50 rounded-lg p-4">
         <h3 className="font-semibold text-gray-900 mb-4">Resumo da Venda</h3>
 
         <div className="space-y-3">
+          {venda?.desconto_venda_valor == null && descontos.total > 0 && (
+            <div className="flex justify-between text-orange-600 text-sm">
+              <span>Descontos anteriores:</span>
+              <span>- {formatMoneyBRL(descontos.total)}</span>
+            </div>
+          )}
+          {venda?.desconto_venda_valor != null && descontos.itens > 0 && (
+            <div className="flex justify-between text-orange-600 text-sm">
+              <span>Desconto nos produtos:</span>
+              <span>- {formatMoneyBRL(descontos.itens)}</span>
+            </div>
+          )}
+          {venda?.desconto_venda_valor != null && descontos.global > 0 && (
+            <div className="flex justify-between text-orange-600 text-sm">
+              <span>Desconto na venda:</span>
+              <span>- {formatMoneyBRL(descontos.global)}</span>
+            </div>
+          )}
+          {descontos.cupom > 0 && (
+            <div className="flex justify-between text-purple-600 text-sm">
+              <span>
+                {venda?.desconto_venda_valor == null
+                  ? "Campanha/cupom (já incluído):"
+                  : "Desconto por campanha/cupom:"}
+              </span>
+              <span>- {formatMoneyBRL(descontos.cupom)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-gray-600">
             <span>Total da Venda:</span>
             <span className="font-medium">{formatMoneyBRL(valorTotal)}</span>

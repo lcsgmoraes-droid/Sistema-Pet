@@ -1,6 +1,9 @@
 import { X } from "lucide-react";
+import CurrencyInput from "../CurrencyInput";
+import { formatMoneyBRL } from "../../utils/formatters";
 
 export default function PDVDescontoTotalModal({
+  baseDescontoTotal,
   itens,
   onAplicar,
   onClose,
@@ -9,10 +12,8 @@ export default function PDVDescontoTotalModal({
   tipoDescontoTotal,
   valorDescontoTotal,
 }) {
-  const totalBruto = itens.reduce(
-    (sum, item) => sum + (item.preco_unitario || item.preco_venda) * item.quantidade,
-    0,
-  );
+  const totalBruto =
+    baseDescontoTotal ?? itens.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
   const descontoPreview =
     tipoDescontoTotal === "valor"
       ? Math.min(valorDescontoTotal, totalBruto)
@@ -22,7 +23,7 @@ export default function PDVDescontoTotalModal({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
         <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <h3 className="text-xl font-bold text-gray-900">💰 Aplicar desconto</h3>
+          <h3 className="text-xl font-bold text-gray-900">Desconto manual na venda</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X size={24} />
           </button>
@@ -30,8 +31,8 @@ export default function PDVDescontoTotalModal({
 
         <div className="p-6 space-y-4">
           <div className="bg-gray-100 p-4 rounded-lg">
-            <div className="text-sm text-gray-600">Total bruto (sem desconto)</div>
-            <div className="text-2xl font-bold text-gray-900">R$ {totalBruto.toFixed(2)}</div>
+            <div className="text-sm text-gray-600">Valor após descontos dos produtos e cupons</div>
+            <div className="text-2xl font-bold text-gray-900">{formatMoneyBRL(totalBruto)}</div>
           </div>
 
           <div>
@@ -66,26 +67,35 @@ export default function PDVDescontoTotalModal({
               <span className="absolute left-3 top-3 text-gray-500">
                 {tipoDescontoTotal === "valor" ? "R$" : "%"}
               </span>
-              <input
-                type="number"
-                step="0.01"
-                value={valorDescontoTotal}
-                onChange={(e) => setValorDescontoTotal(parseFloat(e.target.value) || 0)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                placeholder="0.00"
-              />
+              {tipoDescontoTotal === "valor" ? (
+                <CurrencyInput
+                  value={valorDescontoTotal}
+                  onChange={setValorDescontoTotal}
+                  maxValue={totalBruto}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              ) : (
+                <input
+                  type="number"
+                  step="0.01"
+                  value={valorDescontoTotal}
+                  onChange={(e) => setValorDescontoTotal(parseFloat(e.target.value) || 0)}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="0.00"
+                />
+              )}
             </div>
           </div>
 
           <div className="bg-blue-50 p-4 rounded-lg">
             <div className="flex justify-between text-sm mb-1">
               <span className="text-gray-700">Desconto</span>
-              <span className="text-red-600 font-medium">- R$ {descontoPreview.toFixed(2)}</span>
+              <span className="text-red-600 font-medium">- {formatMoneyBRL(descontoPreview)}</span>
             </div>
             <div className="flex justify-between items-baseline border-t border-blue-200 pt-2 mt-2">
               <span className="text-sm text-gray-700">Total líquido</span>
               <span className="text-2xl font-bold text-green-600">
-                R$ {Math.max(0, totalBruto - descontoPreview).toFixed(2)}
+                {formatMoneyBRL(Math.max(0, totalBruto - descontoPreview))}
               </span>
             </div>
           </div>

@@ -56,6 +56,7 @@ export default function PDVMainArea(props) {
     buscarCliente,
     buscarClientePorCodigoExato,
     clientesSugeridos,
+    mostrarEnderecoCliente,
     copiadoClienteCampo,
     onBuscarClienteChange,
     onCopiarCampoCliente,
@@ -221,6 +222,7 @@ export default function PDVMainArea(props) {
             buscarCliente={buscarCliente}
             buscarClientePorCodigoExato={buscarClientePorCodigoExato}
             clientesSugeridos={clientesSugeridos}
+            mostrarEnderecoCliente={mostrarEnderecoCliente}
             copiadoClienteCampo={copiadoClienteCampo}
             destaqueVenda={destaqueVenda}
             modoVisualizacao={modoVisualizacao}
