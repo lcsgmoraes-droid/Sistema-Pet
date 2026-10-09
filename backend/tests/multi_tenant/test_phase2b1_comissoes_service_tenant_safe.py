@@ -68,6 +68,8 @@ def _create_schema(session):
             total NUMERIC,
             status TEXT,
             desconto_valor NUMERIC,
+            desconto_venda_valor NUMERIC(10, 2),
+            cupom_discount_applied NUMERIC(10, 2),
             taxa_entrega NUMERIC,
             tem_entrega BOOLEAN,
             data_venda TEXT,
@@ -83,6 +85,7 @@ def _create_schema(session):
             produto_id INTEGER NOT NULL,
             quantidade NUMERIC,
             preco_unitario NUMERIC,
+            desconto_item NUMERIC(10, 2),
             subtotal NUMERIC,
             tenant_id TEXT NOT NULL
         )
@@ -212,9 +215,10 @@ def _seed_base_data(session):
         session.execute(
             text("""
                 INSERT INTO venda_itens (
-                    venda_id, produto_id, quantidade, preco_unitario, subtotal, tenant_id
+                    venda_id, produto_id, quantidade, preco_unitario,
+                    desconto_item, subtotal, tenant_id
                 )
-                VALUES (:venda_id, :produto_id, 1, 100, 100, :tenant_id)
+                VALUES (:venda_id, :produto_id, 1, 100, 0, 100, :tenant_id)
             """),
             {"venda_id": VENDA_ID, "produto_id": PRODUTO_ID, "tenant_id": tenant_id},
         )
