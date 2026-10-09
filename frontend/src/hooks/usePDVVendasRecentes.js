@@ -12,11 +12,24 @@ const formatarDataLocal = (data) =>
     String(data.getDate()).padStart(2, "0"),
   ].join("-");
 
+const FILTRO_VENDAS_STORAGE_KEY = "pdv_vendas_recentes_periodo";
+const PERIODOS_VALIDOS = new Set(["hoje", "24h", "7d", "30d"]);
+
+const carregarFiltroVendasSalvo = () => {
+  if (typeof window === "undefined") return "24h";
+  try {
+    const salvo = window.localStorage.getItem(FILTRO_VENDAS_STORAGE_KEY);
+    return PERIODOS_VALIDOS.has(salvo) ? salvo : "24h";
+  } catch {
+    return "24h";
+  }
+};
+
 export function usePDVVendasRecentes() {
   const { moduloAtivo } = useModulos();
   const moduloEcommerceAtivo = moduloAtivo("ecommerce");
   const [vendasRecentes, setVendasRecentes] = useState([]);
-  const [filtroVendas, setFiltroVendas] = useState("24h");
+  const [filtroVendas, setFiltroVendas] = useState(carregarFiltroVendasSalvo);
   const [filtroStatus, setFiltroStatus] = useState("todas");
   const [confirmandoRetirada, setConfirmandoRetirada] = useState({
     vendaId: null,
@@ -28,6 +41,14 @@ export function usePDVVendasRecentes() {
   const [driveAlertVisible, setDriveAlertVisible] = useState(false);
   const vendasPollingRef = useRef(false);
   const drivePollingRef = useRef(false);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(FILTRO_VENDAS_STORAGE_KEY, filtroVendas);
+    } catch {
+      // O filtro continua funcionando quando o navegador bloqueia o armazenamento.
+    }
+  }, [filtroVendas]);
 
   const carregarVendasRecentes = async ({ force = false } = {}) => {
     if (vendasPollingRef.current) return;
