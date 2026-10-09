@@ -39,8 +39,8 @@ from app import (  # noqa: F401
     ecommerceai_integration_models,
     ofertas_estudio_models,
 )
-from app.models import User, UserTenant
-from app.vendas_models import Venda, VendaPagamento
+from app.models import AuditLog, User, UserTenant
+from app.vendas_models import Venda, VendaItem, VendaPagamento
 from app.tenancy.context import set_current_tenant, clear_current_tenant
 
 UTC = timezone.utc
@@ -54,8 +54,10 @@ def dados_caixa():
         User,
         UserTenant,
         Venda,
+        VendaItem,
         MovimentacaoCaixa,
         VendaPagamento,
+        AuditLog,
         ContaReceber,
         EmpresaConfigGeral,
     ):
@@ -414,6 +416,7 @@ def test_formas_do_caixa_conciliam_dinheiro_e_incluem_venda_com_nf(dados_caixa):
                 id=id_,
                 tenant_id=tenant,
                 venda_id=venda_id,
+                caixa_id=caixa.id,
                 forma_pagamento=forma,
                 valor=valor,
                 data_pagamento=datetime(2026, 9, 4, 12),
