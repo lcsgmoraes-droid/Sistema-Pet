@@ -1,14 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RefreshCw, X } from "lucide-react";
 import { conferirItemCaixa, obterAuditoriaCaixa } from "../../api/caixa";
 import { formatMoneyBRL } from "../../utils/formatters";
 import {
   FILTRO_SEM_PAGAMENTOS,
+  TAMANHO_PAGINA_AUDITORIA,
   filtrarLancamentosAuditoria,
   filtrarVendasAuditoria,
   formasAuditoria,
+  paginarAuditoria,
 } from "../../utils/auditoriaCaixaUtils";
 import SaleReference from "../ui/SaleReference";
+import PaginationControls from "../ui/PaginationControls";
 import AuditoriaCaixaPagamentosVenda from "./AuditoriaCaixaPagamentosVenda";
 import AuditoriaCaixaResumoFormas from "./AuditoriaCaixaResumoFormas";
 
@@ -26,6 +29,8 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
   const [aba, setAba] = useState("vendas");
   const [forma, setForma] = useState("");
   const [salvando, setSalvando] = useState(null);
+  const [pagina, setPagina] = useState(1);
+  const inicioLista = useRef(null);
 
   const carregar = async () => {
     setLoading(true);
@@ -40,6 +45,7 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
   };
 
   useEffect(() => {
+    setPagina(1);
     carregar();
   }, [caixaId]);
 
@@ -90,6 +96,28 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
     ],
     forma,
   ).sort((a, b) => (b.data_movimento || "").localeCompare(a.data_movimento || ""));
+  const itensAba =
+    aba === "vendas" ? vendas : aba === "lancamentos" ? lancamentos : auditoria?.historico || [];
+  const dadosPagina = paginarAuditoria(itensAba, pagina);
+  const paginacao = (
+    <PaginationControls
+      currentPage={dadosPagina.pagina}
+      totalItems={dadosPagina.total}
+      itemsPerPage={TAMANHO_PAGINA_AUDITORIA}
+      pageSizeOptions={[TAMANHO_PAGINA_AUDITORIA]}
+      itemName={aba === "vendas" ? "vendas" : aba === "lancamentos" ? "lançamentos" : "eventos"}
+      disabled={salvando !== null}
+      className="my-4"
+      onPageChange={(proximaPagina) => {
+        setPagina(proximaPagina);
+        inicioLista.current?.scrollIntoView({ block: "start" });
+      }}
+    />
+  );
+  const mudarForma = (novaForma) => {
+    setForma(novaForma);
+    setPagina(1);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -171,7 +199,7 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => setForma("")}
+                  onClick={() => mudarForma("")}
                   className={`rounded border px-3 py-2 text-sm ${!forma ? "border-blue-600 bg-blue-50" : ""}`}
                 >
                   Todas as formas
@@ -180,7 +208,7 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
                   <button
                     key={chave}
                     type="button"
-                    onClick={() => setForma(chave)}
+                    onClick={() => mudarForma(chave)}
                     className={`rounded border px-3 py-2 text-sm ${forma === chave ? "border-blue-600 bg-blue-50" : ""}`}
                   >
                     {rotulo}
@@ -188,7 +216,7 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
                 ))}
                 <button
                   type="button"
-                  onClick={() => setForma(FILTRO_SEM_PAGAMENTOS)}
+                  onClick={() => mudarForma(FILTRO_SEM_PAGAMENTOS)}
                   className={`rounded border px-3 py-2 text-sm ${forma === FILTRO_SEM_PAGAMENTOS ? "border-blue-600 bg-blue-50" : ""}`}
                 >
                   Sem pagamentos registrados
@@ -203,13 +231,17 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
                   <button
                     key={id}
                     type="button"
-                    onClick={() => setAba(id)}
+                    onClick={() => {
+                      setAba(id);
+                      setPagina(1);
+                    }}
                     className={`border-b-2 px-3 py-2 ${aba === id ? "border-blue-600 text-blue-700" : "border-transparent"}`}
                   >
                     {nome}
                   </button>
                 ))}
               </nav>
+              <div ref={inicioLista}>{paginacao}</div>
               {aba === "vendas" && (
                 <div className="space-y-3">
                   <p className="text-sm text-gray-600">
@@ -218,7 +250,7 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
                   {vendas.length === 0 && (
                     <p className="py-6 text-center text-gray-500">Nenhuma venda nesta seleção.</p>
                   )}
-                  {vendas.map((venda) => (
+                  {dadosPagina.itens.map((venda) => (
                     <div key={venda.id} className="rounded-lg border p-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
@@ -281,7 +313,7 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
                       Nenhum lançamento nesta seleção.
                     </p>
                   )}
-                  {lancamentos.map((item) => (
+                  {dadosPagina.itens.map((item) => (
                     <div
                       key={`${item.tipo_item}:${item.id}`}
                       className="flex flex-wrap justify-between gap-3 rounded-lg border p-4"
@@ -320,7 +352,7 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
                       Nenhuma conferência ou reabertura registrada ainda.
                     </p>
                   )}
-                  {auditoria.historico.map((evento) => {
+                  {dadosPagina.itens.map((evento) => {
                     const snapshot = evento.anterior?.resumo || evento.dados.resumo;
                     return (
                       <div key={evento.id} className="rounded-lg border p-4">
@@ -359,6 +391,7 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
                   })}
                 </div>
               )}
+              {dadosPagina.totalPaginas > 1 && paginacao}
             </>
           ) : null}
         </div>
