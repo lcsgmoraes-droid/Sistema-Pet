@@ -79,7 +79,9 @@ def _calcular_pagamentos_finalizacao(
     if valor_restante_bruto <= 0.01 and total_novos_pagamentos > 0.01:
         raise HTTPException(status_code=400, detail="Venda já está totalmente paga")
 
-    if total_novos_pagamentos > valor_restante_bruto + 0.01:
+    # A edição pode reduzir o total abaixo do valor recebido anteriormente.
+    # Sem pagamento novo, a refinalização preserva esse histórico financeiro.
+    if total_novos_pagamentos > max(0, valor_restante_bruto) + 0.01:
         raise HTTPException(
             status_code=400,
             detail=(
@@ -460,7 +462,7 @@ def processar_pagamentos_finalizacao(
                 bandeira=bandeira,
                 operadora_id=operadora_id,
                 taxa_aplicada=taxa_aplicada,
-            )
+            ),
         )
         pagamento.data_pagamento = data_ocorrencia or now_brasilia()
         db.add(pagamento)

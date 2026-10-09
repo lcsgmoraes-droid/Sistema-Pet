@@ -33,6 +33,7 @@ const publicarEventoCaixa = (tipo) => {
 export default function MenuCaixa({
   abrirDevolucaoSignal = 0,
   onAbrirCaixa,
+  onDevolucaoSucesso,
   vendaParaDevolucao = null,
 }) {
   const [caixaAberto, setCaixaAberto] = useState(null);
@@ -136,6 +137,11 @@ export default function MenuCaixa({
     setModalAtivo(null);
     publicarEventoCaixa("movimentacao");
     carregarCaixa({ force: true });
+  };
+
+  const handleDevolucaoSucesso = (devolucao) => {
+    handleOperacaoSucesso();
+    void onDevolucaoSucesso?.(devolucao);
   };
 
   const handleCaixaAberto = async () => {
@@ -462,7 +468,7 @@ export default function MenuCaixa({
           caixaId={caixaAberto.id}
           vendaInicial={vendaAtualPodeAbrirDevolucao ? vendaParaDevolucao : null}
           onClose={() => setModalAtivo(null)}
-          onSucesso={handleOperacaoSucesso}
+          onSucesso={handleDevolucaoSucesso}
         />
       )}
 

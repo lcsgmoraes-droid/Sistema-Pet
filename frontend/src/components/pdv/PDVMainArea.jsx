@@ -32,6 +32,7 @@ export default function PDVMainArea(props) {
     onAbrirOportunidades,
     onToggleAssistente,
     abrirDevolucaoSignal,
+    onDevolucaoSucesso,
     caixaKey,
     onAbrirCaixa,
     onNavigateMeusCaixas,
@@ -182,6 +183,7 @@ export default function PDVMainArea(props) {
         onAbrirOportunidades={onAbrirOportunidades}
         onToggleAssistente={onToggleAssistente}
         abrirDevolucaoSignal={abrirDevolucaoSignal}
+        onDevolucaoSucesso={onDevolucaoSucesso}
         menuCaixaKey={caixaKey}
         onAbrirCaixa={onAbrirCaixa}
         onNavigateMeusCaixas={onNavigateMeusCaixas}

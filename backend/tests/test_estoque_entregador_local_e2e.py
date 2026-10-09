@@ -118,3 +118,84 @@ def test_cadastro_entregador_sem_acerto_persiste_sem_periodicidade(api):
     assert salvo["tipo_acerto_entrega"] is None
     assert salvo["dia_semana_acerto"] is None
     assert salvo["dia_mes_acerto"] is None
+
+
+def test_lancar_rota_com_entregador_sem_acerto(api):
+    identidade = api.expect(
+        "GET", "/auth/me-multitenant", {200}, "rota.identidade"
+    ).json()
+    assert identidade["tenant"]["name"] == "CorePet Homologacao Local"
+    assert api.expect("GET", "/caixas/aberto", {200}, "rota.caixa_aberto").json()
+    nome = "E2E-SEM-ACERTO-" + uuid4().hex[:12]
+    entregador = api.expect(
+        "POST",
+        "/clientes/",
+        {200, 201},
+        "rota.entregador_sem_acerto",
+        json={
+            "nome": nome,
+            "tipo_cadastro": "fornecedor",
+            "tipo_pessoa": "PF",
+            "telefone": "11987654321",
+            "is_entregador": True,
+            "entregador_ativo": True,
+            "tipo_acerto_entrega": None,
+            "dia_semana_acerto": None,
+            "dia_mes_acerto": None,
+        },
+    ).json()
+    cliente_id = jornada_basica._create_cliente(api)
+    produto_id, _ = jornada_basica._create_produto(api)
+    venda = api.expect(
+        "POST",
+        "/vendas",
+        {200, 201},
+        "rota.venda_ficticia",
+        json={
+            "cliente_id": cliente_id,
+            "itens": [
+                {
+                    "tipo": "produto",
+                    "produto_id": produto_id,
+                    "quantidade": 1,
+                    "preco_unitario": 10,
+                    "subtotal": 10,
+                }
+            ],
+            "tem_entrega": True,
+            "entregador_id": entregador["id"],
+            "endereco_entrega": "Destino fictício da homologação local",
+            "taxa_entrega": 0,
+            "observacoes": nome,
+        },
+    ).json()
+    rota = api.expect(
+        "POST",
+        "/rotas-entrega/",
+        {200, 201},
+        "rota.lancar_sem_acerto",
+        json={
+            "venda_id": venda["id"],
+            "entregador_id": entregador["id"],
+            "endereco_destino": "Destino fictício da homologação local",
+            "distancia_prevista": 1,
+            "observacoes": nome,
+        },
+    ).json()
+    salva = api.expect(
+        "GET", f"/rotas-entrega/{rota['id']}", {200}, "rota.reler"
+    ).json()
+    assert salva["status"] == "pendente"
+    assert salva["entregador_id"] == entregador["id"]
+    assert len(salva["paradas"]) == 1
+    assert salva["paradas"][0]["venda_id"] == venda["id"]
+    venda_salva = api.expect(
+        "GET", f"/vendas/{venda['id']}", {200}, "rota.venda_reler"
+    ).json()
+    assert venda_salva["status_entrega"] == "em_rota"
+    pessoa = api.expect(
+        "GET", f"/clientes/{entregador['id']}", {200}, "rota.acerto_continua_opcional"
+    ).json()
+    assert pessoa["tipo_acerto_entrega"] is None
+    assert pessoa["dia_semana_acerto"] is None
+    assert pessoa["dia_mes_acerto"] is None

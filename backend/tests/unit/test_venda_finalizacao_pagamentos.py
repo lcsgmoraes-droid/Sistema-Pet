@@ -46,3 +46,29 @@ def test_calcular_pagamentos_finalizacao_rejeita_novo_pagamento_em_venda_ja_quit
 
     assert exc.value.status_code == 400
     assert "totalmente paga" in exc.value.detail
+
+
+@pytest.mark.parametrize("total_editado", [Decimal("20.00"), Decimal("0.00")])
+def test_reducao_preserva_pagamentos_anteriores_e_permite_refinalizar(total_editado):
+    resultado = _calcular_pagamentos_finalizacao(
+        total_venda=total_editado,
+        pagamentos_existentes=[SimpleNamespace(valor=Decimal("60.00"))],
+        pagamentos_novos=[],
+    )
+    assert resultado == {
+        "total_ja_pago": 60.0,
+        "total_novos_pagamentos": 0.0,
+        "total_pagamentos": 60.0,
+        "valor_restante": 0.0,
+    }
+
+
+def test_reducao_nao_autoriza_receber_novo_pagamento():
+    with pytest.raises(HTTPException) as exc:
+        _calcular_pagamentos_finalizacao(
+            total_venda=Decimal("20.00"),
+            pagamentos_existentes=[SimpleNamespace(valor=Decimal("60.00"))],
+            pagamentos_novos=[{"forma_pagamento": "PIX", "valor": 1}],
+        )
+    assert exc.value.status_code == 400
+    assert "totalmente paga" in exc.value.detail

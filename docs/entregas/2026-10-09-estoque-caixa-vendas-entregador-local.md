@@ -42,7 +42,7 @@ Próxima ação: revisão de Lucas no ambiente local; publicação depende de pe
 
 ## Integridade e migrations
 
-Head única: `zzzl20261009a1`.
+Head única: `zzzm20261009a1`.
 
 - `zzzk20261009a1`: adiciona `venda_pagamentos.caixa_id`. O backfill associa
   somente recebimento em loja física cuja data identifica um único caixa do
@@ -52,6 +52,10 @@ Head única: `zzzl20261009a1`.
   falso para lotes existentes. Novas identificações não acionam baixa automática
   por vencimento, não mudam custo e não ativam controle obrigatório de lotes.
   Lotes reais de entrada preservam sua regra anterior.
+- `zzzm20261009a1`: adiciona `configuracoes_entrega.metodo_km_entrega` quando
+  ausente, com padrão `auto_rota`. Preserva a configuração dos ambientes legados
+  que já receberam a coluna pelo endpoint de configurações. A criação de uma
+  rota passa a funcionar em banco migrado sem abrir antes essa tela.
 - Escritores e fechamento compartilham bloqueio da linha do caixa. A devolução
   em dinheiro adota a mesma ordem Caixa → Venda.
 - Auditoria do fechamento, reabertura e conferência é gravada na mesma transação
@@ -113,6 +117,79 @@ repetidas, devolução posterior, cashback usado/expirado e isolamento por tenan
 Falhas encontradas nas primeiras jornadas foram corrigidas: fixtures compartilhadas
 dos testes, preparação de saldo pelo endpoint real de entrada e dupla baixa de
 estoque na última parcela. A execução final das quatro jornadas passou.
+
+## Aceite adicional pelo sistema — 09/10/2026, 11h04–11h24
+
+Pedido adicional de Lucas: executar os testes no sistema e explicar a Loja 1.
+Chrome conectado ao perfil existente, em uma aba exclusivamente local. A tela
+identificou a empresa fictícia “CorePet Homologacao Local”.
+
+Testes pela interface:
+
+- **Caixa nº 6 / ID 7:** auditoria exibiu a venda de outro caixa recebida neste,
+  seus produtos e o resumo por forma (PIX R$ 10 e dinheiro R$ 15). Conferência
+  individual dos lançamentos persistiu no histórico. O caixa fechado foi
+  reaberto com motivo pela tela, preservando o fechamento anterior.
+- **Produto ID 68 / SKU UI-VALIDADE-1791554829320:** cadastro pela tela e atalho
+  “Salvar e abrir lançamentos de estoque e lotes” funcionaram. Depois de uma
+  entrada real de 5 unidades, informar e repetir `LOTE-UI-01`, quantidade 3,
+  validade 09/10/2030 manteve saldo 5, custo R$ 6 e somente uma movimentação
+  (a entrada real). A identificação permaneceu única.
+- **Fornecedor/entregador ID 22:** salvo pela tela como pessoa física com “Sem
+  acerto”. Reabrir o cadastro confirmou entregador ativo e opção persistida.
+- **Devoluções de cartão:** vendas fictícias `202610090009` e `202610090018`
+  aceitaram a devolução por crédito de R$ 56,90 com repasse da operadora ainda
+  pendente. Na segunda, já com o ajuste adicional de interface, crédito,
+  carimbos, cupom e status atualizaram imediatamente sem recarregar o navegador.
+  O botão de recebimento ficou desabilitado na devolução total.
+
+Jornadas HTTP adicionais:
+
+- `tests/test_caixa_baixa_lote_e2e.py`: **1 passou**. Duas vendas fictícias
+  datadas em 07/10 e 08/10, originadas no caixa 1, receberam PIX R$ 12 e dinheiro
+  R$ 18 no caixa ID 7. Foram 3 pagamentos vinculados ao caixa atual e somente
+  1 movimento físico de dinheiro. A auditoria não duplicou PIX, o caixa original
+  não ganhou recebimento retroativo e o estoque não foi baixado novamente.
+- `tests/test_beneficios_devolucao_local_e2e.py`: **2 passaram**. Venda alterada
+  de R$ 40 → 60 → 20 → 10 → 10 acompanhou cashback R$ 4 → 6 → 2 → 1 → 1 e
+  carimbos 4 → 6 → 2 → 1 → 1. Remoção de produto, redução abaixo do valor já pago
+  e nova finalização sem pagamento não duplicaram benefícios. Cupom de recompra
+  foi suspenso abaixo do mínimo e preservou identidade/validade. Devolução de
+  cartão manteve o repasse pendente, recompôs estoque e gerou crédito uma vez,
+  mesmo ao repetir a operação; não gerou movimento de caixa. Parâmetros
+  temporários das campanhas foram restaurados e a campanha exclusiva arquivada.
+- `tests/test_estoque_entregador_local_e2e.py::test_lancar_rota_com_entregador_sem_acerto`:
+  **1 passou**. Uma venda de entrega e sua rota foram criadas, relidas e
+  vinculadas ao entregador sem periodicidade, mantendo a opção “Sem acerto”.
+
+Falhas adicionais encontradas e corrigidas:
+
+- Finalizar novamente uma venda reduzida abaixo do valor já recebido rejeitava
+  até `pagamentos=[]`. A comparação agora considera saldo mínimo zero, conserva
+  pagamentos anteriores e continua rejeitando nova entrada numa venda já paga.
+- O sucesso da devolução recarregava somente o caixa. Agora também atualiza a
+  venda exibida e o crédito/contexto do cliente; devolução de outra venda
+  preserva o carrinho atual. Devoluções parciais continuam permitindo recebimento.
+- O lançamento de rota falhava com HTTP 500 porque faltava a coluna de método
+  de KM em banco criado exclusivamente por migrations. A nova migration resolve
+  a ausência e respeita configurações legadas.
+
+Verificações finais desta etapa:
+
+- **31 passaram**, sem skips: testes de pagamentos/finalização/atomicidade em
+  PostgreSQL descartável, incluindo concorrência, e migration de método de KM.
+  Incluem 4 novas instâncias de finalização e 2 cenários novos de migration.
+- **10 testes Node passaram** nos fluxos de saldo/atualização/estados de devolução.
+- Ruff, ESLint sem avisos, verificação de formato e `git diff --check`: passaram.
+- Backend e frontend de homologação reconstruídos a partir do código local;
+  migration `zzzm20261009a1` aplicada; build Vite e health checks passaram.
+- Evidências visuais salvas nos arquivos `auditoria-caixa-local.png`,
+  `lote-validade-local.png`, `entregador-sem-acerto-local.png` e
+  `devolucao-atualizada-local.png` na pasta de visualizações desta conversa.
+
+Somando as jornadas anteriores e adicionais, **8 testes HTTP distintos passaram**.
+Nenhuma alteração foi enviada ao GitHub ou aplicada em produção. O PostgreSQL
+descartável dos testes foi parado; o sistema de homologação local permanece disponível.
 
 ## Recuperação do Docker local
 

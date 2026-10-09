@@ -18,6 +18,7 @@ export function usePDVPageComposition({
   abrirPainelOportunidades,
   alternarPainelAssistente,
   abrirDevolucaoSignal,
+  handleDevolucaoSucesso,
   caixaKey,
   setMostrarModalAbrirCaixa,
   modoVisualizacao,
@@ -220,6 +221,7 @@ export function usePDVPageComposition({
       void alternarPainelAssistente();
     },
     abrirDevolucaoSignal,
+    onDevolucaoSucesso: handleDevolucaoSucesso,
     caixaKey,
     onAbrirCaixa: () => setMostrarModalAbrirCaixa(true),
     onNavigateMeusCaixas: () => navigate("/meus-caixas"),

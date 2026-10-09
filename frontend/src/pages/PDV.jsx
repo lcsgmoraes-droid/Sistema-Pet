@@ -36,6 +36,7 @@ import { useTour } from "../hooks/useTour";
 import { tourPDV } from "../tours/tourDefinitions";
 import { getGuiaClassNames } from "../utils/guiaHighlight";
 import { obterContextoRevisaoCaixa } from "../utils/caixaRevisao";
+import { recarregarPDVAposDevolucao } from "../utils/pdvReturnRefresh";
 
 export default function PDV() {
   const navigate = useNavigate();
@@ -455,6 +456,23 @@ export default function PDV() {
     limparVenda,
   });
 
+  const handleDevolucaoSucesso = async (devolucao) => {
+    try {
+      await recarregarPDVAposDevolucao({
+        devolucao,
+        vendaAtual,
+        carregarVendaEspecifica,
+        buscarClientePorId,
+        setVendaAtual,
+        recarregarContextoClientePorId,
+        carregarVendasRecentes,
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar o PDV após a devolução:", error);
+      toast.error("Devolução registrada. Não foi possível atualizar os dados do PDV.");
+    }
+  };
+
   const { driveAlertProps, containerStyle, mainAreaProps, overlayProps } = usePDVPageComposition({
     navigate,
     destaqueAbrirCaixa,
@@ -475,6 +493,7 @@ export default function PDV() {
     abrirPainelOportunidades,
     alternarPainelAssistente,
     abrirDevolucaoSignal,
+    handleDevolucaoSucesso,
     caixaKey,
     setMostrarModalAbrirCaixa,
     modoVisualizacao,

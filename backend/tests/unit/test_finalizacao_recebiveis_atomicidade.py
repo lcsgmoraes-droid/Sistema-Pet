@@ -237,6 +237,23 @@ def test_duas_baixas_parciais_criam_apenas_recebimentos_novos(cenario):
     )
 
 
+def test_reducao_abaixo_do_valor_pago_refinaliza_sem_repetir_recebimento(cenario):
+    cenario.finalizar(135)
+    cenario.venda.status = "aberta"
+    cenario.venda.total = Decimal("20")
+    cenario.db.commit()
+    resultado = cenario.finalizar()
+    assert cenario.venda.status == "finalizada"
+    assert cenario.db.query(VendaPagamento).count() == 1
+    assert cenario.db.query(ContaReceber).count() == 1
+    assert cenario.db.query(Recebimento).count() == 1
+    assert cenario.db.query(func.sum(Recebimento.valor_recebido)).scalar() == Decimal(
+        "135"
+    )
+    assert resultado["operacoes"]["contas_criadas"] == []
+    assert cenario.db.query(LancamentoManual).filter_by(status="previsto").count() == 0
+
+
 def test_novo_pagamento_apos_reabertura_nao_liquida_repasse_antigo_da_operadora(
     cenario,
 ):
