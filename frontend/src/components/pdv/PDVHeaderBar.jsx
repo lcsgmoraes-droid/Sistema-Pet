@@ -224,11 +224,7 @@ export default function PDVHeaderBar({
 
           <ActionButton
             onClick={onAbrirModalPagamento}
-            disabled={
-              loading ||
-              !podeRegistrarRecebimentoVenda(vendaAtual) ||
-              !temCaixaAberto
-            }
+            disabled={loading || !podeRegistrarRecebimentoVenda(vendaAtual) || !temCaixaAberto}
             icon={CreditCard}
             intent="create"
             size="lg"
