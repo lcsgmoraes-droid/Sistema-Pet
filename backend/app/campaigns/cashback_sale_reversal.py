@@ -308,19 +308,9 @@ def _sale_reward_credits(db, *, tenant_id, customer_id, executions):
 
 
 def _revoke_credit_if_unspent(db, *, tenant_id, sale_id, customer_id, credit, wallet):
-    already_reversed = (
-        db.query(CashbackTransaction.id)
-        .filter(
-            CashbackTransaction.tenant_id == tenant_id,
-            CashbackTransaction.customer_id == customer_id,
-            CashbackTransaction.source_type == CashbackSourceTypeEnum.reversal,
-            CashbackTransaction.source_id == credit.id,
-            CashbackTransaction.amount < 0,
-        )
-        .first()
-    )
-    if already_reversed:
-        return
+    # A prior partial return may have reversed only part of this lot. The
+    # replayed remaining amount, under the customer lock, makes retries safe
+    # while allowing a reopening to revoke the rest of that same reward.
     remaining = wallet.remaining_by_credit.get(credit.id, Decimal("0.00"))
     if remaining <= 0:
         return

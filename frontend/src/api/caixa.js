@@ -90,8 +90,18 @@ export const fecharCaixa = async (caixaId, dados) => {
 /**
  * Reabrir caixa
  */
-export const reabrirCaixa = async (caixaId) => {
-  const response = await api.post(`/caixas/${caixaId}/reabrir`);
+export const reabrirCaixa = async (caixaId, motivo) => {
+  const response = await api.post(`/caixas/${caixaId}/reabrir`, { motivo });
+  return response.data;
+};
+
+export const obterAuditoriaCaixa = async (caixaId) => {
+  const response = await api.get(`/caixas/${caixaId}/auditoria`);
+  return response.data;
+};
+
+export const conferirItemCaixa = async (caixaId, dados) => {
+  const response = await api.post(`/caixas/${caixaId}/auditoria/conferencia`, dados);
   return response.data;
 };
 

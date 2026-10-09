@@ -2,6 +2,7 @@ import { Search } from "lucide-react";
 import { useRef } from "react";
 
 import useRevealFloatingPanel from "../../hooks/useRevealFloatingPanel";
+import { formatarEnderecoPrincipalCliente } from "../../utils/enderecoCliente";
 
 function defaultPessoaLabel(pessoa) {
   return pessoa?.nome || pessoa?.razao_social || pessoa?.fantasia || "Pessoa";
@@ -34,6 +35,7 @@ export default function PessoaSelector({
   inputClassName = "",
   inputRef,
   minChars = 2,
+  mostrarEndereco = false,
   name,
   onChange,
   onFocus,
@@ -107,6 +109,11 @@ export default function PessoaSelector({
                 {defaultPessoaMeta(pessoa, searchValue) && (
                   <div className="text-sm text-gray-500">
                     {defaultPessoaMeta(pessoa, searchValue)}
+                  </div>
+                )}
+                {mostrarEndereco && formatarEnderecoPrincipalCliente(pessoa) && (
+                  <div className="mt-1 break-words text-xs text-gray-600">
+                    Endereço: {formatarEnderecoPrincipalCliente(pessoa)}
                   </div>
                 )}
                 {pessoa?.pets?.length > 0 && (

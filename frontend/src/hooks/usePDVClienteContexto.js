@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api from "../api";
 import { useModulos } from "../contexts/ModulosContext";
 import { copyTextToClipboard } from "../utils/clipboard";
 import { incluirPetNoClienteSelecionado } from "../utils/pdvClientePets";
+import { criarAtualizadorSaldoCampanhas } from "../utils/pdvCampanhasRefresh";
 
 export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
   const { moduloAtivo } = useModulos();
@@ -10,6 +11,31 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
   const [copiadoClienteCampo, setCopiadoClienteCampo] = useState("");
   const [vendasEmAbertoInfo, setVendasEmAbertoInfo] = useState(null);
   const [saldoCampanhas, setSaldoCampanhas] = useState(null);
+  const atualizadorCampanhas = useMemo(
+    () =>
+      criarAtualizadorSaldoCampanhas({
+        buscarSaldo: async (clienteId, options) => {
+          const response = await api.get(`/campanhas/clientes/${clienteId}/saldo`, options);
+          return response.data;
+        },
+        onSaldo: setSaldoCampanhas,
+        onInicio: (clienteId) =>
+          setSaldoCampanhas((prev) => ({
+            ...(String(prev?.customer_id) === String(clienteId) ? prev : {}),
+            customer_id: clienteId,
+            beneficios_atualizando: true,
+            beneficios_erro_atualizacao: false,
+            beneficios_consulta_limite: false,
+          })),
+        onErro: () =>
+          setSaldoCampanhas((prev) => ({
+            ...prev,
+            beneficios_atualizando: false,
+            beneficios_erro_atualizacao: true,
+          })),
+      }),
+    [],
+  );
 
   const carregarVendasEmAbertoCliente = async (clienteId) => {
     if (!clienteId) {
@@ -33,24 +59,22 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
 
   const carregarSaldoCampanhasCliente = async (clienteId) => {
     if (!moduloCampanhasAtivo) {
+      atualizadorCampanhas.cancelar();
       setSaldoCampanhas(null);
       return;
     }
 
     if (!clienteId) {
+      atualizadorCampanhas.cancelar();
       setSaldoCampanhas(null);
       return;
     }
 
-    try {
-      const response = await api.get(`/campanhas/clientes/${clienteId}/saldo`);
-      setSaldoCampanhas(response.data);
-    } catch {
-      setSaldoCampanhas(null);
-    }
+    await atualizadorCampanhas.atualizar(clienteId);
   };
 
   const limparClienteSelecionado = () => {
+    atualizadorCampanhas.cancelar();
     setVendaAtual((prev) => ({
       ...prev,
       cliente: null,
@@ -94,6 +118,7 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
 
   const recarregarContextoClientePorId = async (clienteId) => {
     if (!clienteId) {
+      atualizadorCampanhas.cancelar();
       setSaldoCampanhas(null);
       setVendasEmAbertoInfo(null);
       return;
@@ -112,14 +137,16 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
   };
 
   useEffect(() => {
+    atualizadorCampanhas.cancelar();
     const clienteId = vendaAtual.cliente?.id;
     if (!clienteId) {
       setSaldoCampanhas(null);
       setVendasEmAbertoInfo(null);
-      return;
+      return () => atualizadorCampanhas.cancelar();
     }
 
     void recarregarContextoClientePorId(clienteId);
+    return () => atualizadorCampanhas.cancelar();
   }, [moduloCampanhasAtivo, vendaAtual.cliente?.id]);
 
   return {

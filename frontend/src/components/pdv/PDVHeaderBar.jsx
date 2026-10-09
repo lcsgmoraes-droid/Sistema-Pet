@@ -17,6 +17,7 @@ import MenuCaixa from "../MenuCaixa";
 import ActionButton from "../ui/ActionButton";
 import IconActionButton from "../ui/IconActionButton";
 import PageHeader from "../ui/PageHeader";
+import { podeRegistrarRecebimentoVenda } from "../../utils/pdvReturnEligibility";
 
 export default function PDVHeaderBar({
   destaqueAbrirCaixa,
@@ -36,6 +37,7 @@ export default function PDVHeaderBar({
   onAbrirOportunidades,
   onToggleAssistente,
   abrirDevolucaoSignal,
+  onDevolucaoSucesso,
   menuCaixaKey,
   onAbrirCaixa,
   onNavigateMeusCaixas,
@@ -157,6 +159,7 @@ export default function PDVHeaderBar({
             <MenuCaixa
               key={menuCaixaKey}
               abrirDevolucaoSignal={abrirDevolucaoSignal}
+              onDevolucaoSucesso={onDevolucaoSucesso}
               onAbrirCaixa={onAbrirCaixa}
               vendaParaDevolucao={vendaAtual}
             />
@@ -221,12 +224,7 @@ export default function PDVHeaderBar({
 
           <ActionButton
             onClick={onAbrirModalPagamento}
-            disabled={
-              loading ||
-              vendaAtual.status === "finalizada" ||
-              vendaAtual.status === "pago_nf" ||
-              !temCaixaAberto
-            }
+            disabled={loading || !podeRegistrarRecebimentoVenda(vendaAtual) || !temCaixaAberto}
             icon={CreditCard}
             intent="create"
             size="lg"

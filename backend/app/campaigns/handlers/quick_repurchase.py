@@ -25,7 +25,7 @@ Parâmetros esperados em campaign.params:
 """
 
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -39,6 +39,7 @@ from app.campaigns.models import (
     CouponStatusEnum,
 )
 from app.campaigns.app_push import enqueue_campaign_push
+from app.campaigns.audit import log_campaign_event
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,46 @@ def _quick_repurchase_cooldown_days(params: dict | None) -> int:
         return max(0, int(float(raw_value)))
     except (TypeError, ValueError):
         return 60
+
+
+def _restore_sale_coupon(db, *, campaign, coupon, venda_total, source_event_id) -> int:
+    """Restore the same benefit after editing, keeping its value and expiry."""
+    meta = coupon.meta or {}
+    if (
+        coupon.status != CouponStatusEnum.voided
+        or meta.get("voided_reason") != "venda_reaberta"
+        or meta.get("min_purchase_value_snapshot") is None
+    ):
+        return 0
+    if Decimal(str(venda_total)) < Decimal(str(meta["min_purchase_value_snapshot"])):
+        return 0
+    expiry = coupon.valid_until
+    if expiry is not None:
+        if expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        if expiry <= datetime.now(timezone.utc):
+            coupon.status = CouponStatusEnum.expired
+            return 0
+    coupon.status = CouponStatusEnum.active
+    coupon.meta = {
+        **meta,
+        "reactivated_at": datetime.now(timezone.utc).isoformat(),
+        "reactivated_source_event_id": source_event_id,
+    }
+    log_campaign_event(
+        db=db,
+        tenant_id=campaign.tenant_id,
+        event="campaign.coupon.reactivated",
+        entity_type="campaign_coupons",
+        entity_id=coupon.id,
+        metadata={
+            "source_venda_id": meta["source_venda_id"],
+            "source_event_id": source_event_id,
+            "reason": "venda_refinalizada",
+        },
+        details=f"Cupom {coupon.code} reativado apos edicao da venda #{meta['source_venda_id']}",
+    )
+    return 1
 
 
 class QuickRepurchaseHandler:
@@ -89,6 +130,36 @@ class QuickRepurchaseHandler:
 
         params = campaign.params or {}
         min_purchase = float(params.get("min_purchase_value", 0))
+
+        if venda_id:
+            issued_coupons = (
+                db.query(Coupon)
+                .filter(
+                    Coupon.tenant_id == campaign.tenant_id,
+                    Coupon.customer_id == customer_id,
+                    Coupon.campaign_id == campaign.id,
+                )
+                .with_for_update()
+                .all()
+            )
+            source_coupons = [
+                coupon
+                for coupon in issued_coupons
+                if (coupon.meta or {}).get("source_kind") == "quick_repurchase"
+                and str((coupon.meta or {}).get("source_venda_id")) == str(venda_id)
+            ]
+            if source_coupons:
+                # A used/expired sale benefit cannot become another coupon,
+                # even with cooldown=0 or a repeated purchase event.
+                coupon = max(source_coupons, key=lambda row: row.id)
+                rewarded = _restore_sale_coupon(
+                    db,
+                    campaign=campaign,
+                    coupon=coupon,
+                    venda_total=venda_total,
+                    source_event_id=event.id,
+                )
+                return {"evaluated": 1, "rewarded": rewarded, "errors": 0}
 
         # Verifica valor mínimo
         if min_purchase > 0 and venda_total < min_purchase:
@@ -155,7 +226,13 @@ class QuickRepurchaseHandler:
             )
             from app.models import Cliente
 
-            cliente = db.query(Cliente).filter(Cliente.id == customer_id).first()
+            cliente = (
+                db.query(Cliente)
+                .filter(
+                    Cliente.id == customer_id, Cliente.tenant_id == campaign.tenant_id
+                )
+                .first()
+            )
             if cliente:
                 from collections import defaultdict
 

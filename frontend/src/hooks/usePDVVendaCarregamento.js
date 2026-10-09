@@ -5,6 +5,8 @@ import { buscarVenda, listarVendas } from "../api/vendas";
 import { debugLog } from "../utils/debug";
 import { extrairCamposFiscaisVenda } from "../utils/pdvFiscalStatus";
 import { perguntarCorePet } from "../services/corepetDialog";
+import { obterTotalRecebidoExistente } from "../components/modalPagamentoUtils";
+import { normalizarDescontosVenda } from "../utils/pdvDescontosUtils";
 
 function criarEntregaVazia() {
   return {
@@ -21,7 +23,7 @@ async function carregarPagamentosVenda(vendaId) {
     const responsePagamentos = await api.get(`/vendas/${vendaId}/pagamentos`);
     return {
       pagamentos: responsePagamentos.data.pagamentos || [],
-      totalPago: responsePagamentos.data.total_pago || 0,
+      totalPago: obterTotalRecebidoExistente(responsePagamentos.data),
     };
   } catch (error) {
     console.error("Erro ao buscar pagamentos:", error);
@@ -68,7 +70,7 @@ export function usePDVVendaCarregamento({
     const carregamento = (async () => {
       try {
         setLoading(true);
-        const venda = await buscarVenda(vendaIdNormalizado);
+        const venda = normalizarDescontosVenda(await buscarVenda(vendaIdNormalizado));
 
         if (!venda) {
           alert("Venda nao encontrada");
@@ -102,9 +104,12 @@ export function usePDVVendaCarregamento({
           itens: venda.itens || [],
           subtotal: venda.subtotal || 0,
           desconto_valor: venda.desconto_valor || 0,
+          desconto_venda_valor: venda.desconto_venda_valor,
+          desconto_origem_legado: venda.desconto_origem_legado,
           desconto_percentual: venda.desconto_percentual || 0,
           cupom_code: venda.cupom_code || null,
           cupom_discount_applied: venda.cupom_discount_applied ?? null,
+          cupons_detalhes: venda.cupons_detalhes || [],
           total: venda.total || 0,
           observacoes: venda.observacoes || "",
           funcionario_id: venda.funcionario_id || null,
@@ -220,7 +225,7 @@ export function usePDVVendaCarregamento({
 
   const reabrirVenda = async (venda) => {
     try {
-      const vendaCompleta = await buscarVenda(venda.id);
+      const vendaCompleta = normalizarDescontosVenda(await buscarVenda(venda.id));
 
       let clienteCompleto = null;
       if (vendaCompleta.cliente_id) {
@@ -244,9 +249,12 @@ export function usePDVVendaCarregamento({
         itens: vendaCompleta.itens || [],
         subtotal: parseFloat(vendaCompleta.subtotal || vendaCompleta.total),
         desconto_valor: parseFloat(vendaCompleta.desconto_valor || 0),
+        desconto_venda_valor: vendaCompleta.desconto_venda_valor,
+        desconto_origem_legado: vendaCompleta.desconto_origem_legado,
         desconto_percentual: parseFloat(vendaCompleta.desconto_percentual || 0),
         cupom_code: vendaCompleta.cupom_code || null,
         cupom_discount_applied: vendaCompleta.cupom_discount_applied ?? null,
+        cupons_detalhes: vendaCompleta.cupons_detalhes || [],
         total: parseFloat(vendaCompleta.total),
         observacoes: vendaCompleta.observacoes || "",
         status: vendaCompleta.status,

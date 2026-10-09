@@ -16,6 +16,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.campaigns.cashback_wallet import get_cashback_wallet, lock_cashback_customer
+from app.utils.timezone import now_brasilia
+from app.vendas.status_pagamento import pagamento_valido_para_saldo
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +68,9 @@ def _calcular_pagamentos_finalizacao(
     pagamentos_novos: List[Dict[str, Any]],
 ) -> Dict[str, float]:
     total_venda_float = float(total_venda or 0)
-    total_ja_pago = sum(float(p.valor) for p in pagamentos_existentes)
+    total_ja_pago = sum(
+        float(p.valor) for p in pagamentos_existentes if pagamento_valido_para_saldo(p)
+    )
     total_novos_pagamentos = sum(float(p.get("valor") or 0) for p in pagamentos_novos)
     valor_restante_bruto = total_venda_float - total_ja_pago
 
@@ -78,7 +82,9 @@ def _calcular_pagamentos_finalizacao(
     if valor_restante_bruto <= 0.01 and total_novos_pagamentos > 0.01:
         raise HTTPException(status_code=400, detail="Venda já está totalmente paga")
 
-    if total_novos_pagamentos > valor_restante_bruto + 0.01:
+    # A edição pode reduzir o total abaixo do valor recebido anteriormente.
+    # Sem pagamento novo, a refinalização preserva esse histórico financeiro.
+    if total_novos_pagamentos > max(0, valor_restante_bruto) + 0.01:
         raise HTTPException(
             status_code=400,
             detail=(
@@ -138,6 +144,19 @@ def consumir_cupom_finalizacao(
         )
 
     venda_total_para_cupom = float(venda.total or 0)
+    if getattr(venda, "desconto_venda_valor", None) is not None:
+        if (
+            abs(
+                float(cupom_discount_resolvido or 0)
+                - float(venda.cupom_discount_applied or 0)
+            )
+            > 0.01
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Salve o cupom aplicado antes de finalizar a venda.",
+            )
+        venda_total_para_cupom -= float(venda.taxa_entrega or 0)
     if cupom_discount_resolvido:
         venda_total_para_cupom += float(cupom_discount_resolvido or 0)
 
@@ -449,6 +468,7 @@ def processar_pagamentos_finalizacao(
                 )
 
         pagamento = VendaPagamento(
+            caixa_id=caixa_aberto_id,
             **_montar_campos_venda_pagamento(
                 venda_id=venda.id,
                 tenant_id=tenant_id,
@@ -458,10 +478,9 @@ def processar_pagamentos_finalizacao(
                 bandeira=bandeira,
                 operadora_id=operadora_id,
                 taxa_aplicada=taxa_aplicada,
-            )
+            ),
         )
-        if data_ocorrencia is not None:
-            pagamento.data_pagamento = data_ocorrencia
+        pagamento.data_pagamento = data_ocorrencia or now_brasilia()
         db.add(pagamento)
         db.flush()
 

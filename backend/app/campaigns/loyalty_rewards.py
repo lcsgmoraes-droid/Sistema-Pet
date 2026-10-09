@@ -303,12 +303,14 @@ def _revoke_loyalty_reward(
 
 
 def _append_note(existing: str | None, message: str) -> str:
-    base = (existing or "").strip()
-    if not base:
-        return message
-    if message in base:
-        return base
-    return f"{base} | {message}"
+    # notes é um resumo limitado pelo VARCHAR(500). O histórico integral de
+    # cada ajuste permanece nos eventos campaign.loyalty.stamps_synced.
+    parts = [part for part in (existing or "").strip().split(" | ") if part]
+    if message and message not in parts:
+        parts.append(message)
+    while len(parts) > 1 and len(" | ".join(parts)) > 500:
+        parts.pop(0)
+    return " | ".join(parts)[:500]
 
 
 def _load_loyalty_executions(

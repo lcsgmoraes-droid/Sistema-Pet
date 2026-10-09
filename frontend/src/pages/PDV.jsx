@@ -36,6 +36,7 @@ import { useTour } from "../hooks/useTour";
 import { tourPDV } from "../tours/tourDefinitions";
 import { getGuiaClassNames } from "../utils/guiaHighlight";
 import { obterContextoRevisaoCaixa } from "../utils/caixaRevisao";
+import { recarregarPDVAposDevolucao } from "../utils/pdvReturnRefresh";
 
 export default function PDV() {
   const navigate = useNavigate();
@@ -56,13 +57,17 @@ export default function PDV() {
   const { user } = useAuth();
   const { iniciarTour } = useTour("pdv", tourPDV, { delay: 1200 });
   const [vendedorObrigatorio, setVendedorObrigatorio] = useState(null);
+  const [mostrarEnderecoCliente, setMostrarEnderecoCliente] = useState(false);
 
   useEffect(() => {
     let ativo = true;
     api
       .get("/empresa/config/pdv")
       .then(({ data }) => {
-        if (ativo) setVendedorObrigatorio(Boolean(data.vendedor_obrigatorio_pdv));
+        if (ativo) {
+          setVendedorObrigatorio(Boolean(data.vendedor_obrigatorio_pdv));
+          setMostrarEnderecoCliente(Boolean(data.mostrar_endereco_cliente_pdv));
+        }
       })
       .catch(() => {
         if (ativo) toast.error("Não foi possível carregar a regra de vendedor do PDV.");
@@ -82,6 +87,7 @@ export default function PDV() {
     itens: [],
     subtotal: 0,
     desconto_valor: 0,
+    desconto_venda_valor: 0,
     desconto_percentual: 0,
     cupom_code: null,
     cupom_discount_applied: null,
@@ -333,6 +339,7 @@ export default function PDV() {
   });
   const { salvarVenda } = usePDVSalvarVenda({
     vendaAtual,
+    setVendaAtual,
     loading,
     setLoading,
     temCaixaAberto,
@@ -343,6 +350,7 @@ export default function PDV() {
     funcionarioComissao,
     limparVenda,
     carregarVendasRecentes: () => carregarVendasRecentes(),
+    recarregarContextoClienteAtual,
   });
   const {
     mostrarModalDescontoItem,
@@ -455,6 +463,23 @@ export default function PDV() {
     limparVenda,
   });
 
+  const handleDevolucaoSucesso = async (devolucao) => {
+    try {
+      await recarregarPDVAposDevolucao({
+        devolucao,
+        vendaAtual,
+        carregarVendaEspecifica,
+        buscarClientePorId,
+        setVendaAtual,
+        recarregarContextoClientePorId,
+        carregarVendasRecentes,
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar o PDV após a devolução:", error);
+      toast.error("Devolução registrada. Não foi possível atualizar os dados do PDV.");
+    }
+  };
+
   const { driveAlertProps, containerStyle, mainAreaProps, overlayProps } = usePDVPageComposition({
     navigate,
     destaqueAbrirCaixa,
@@ -475,6 +500,7 @@ export default function PDV() {
     abrirPainelOportunidades,
     alternarPainelAssistente,
     abrirDevolucaoSignal,
+    handleDevolucaoSucesso,
     caixaKey,
     setMostrarModalAbrirCaixa,
     modoVisualizacao,
@@ -500,6 +526,7 @@ export default function PDV() {
     clientesSugeridos,
     copiadoClienteCampo,
     setBuscarCliente,
+    mostrarEnderecoCliente,
     copiarCampoCliente,
     limparClienteSelecionado,
     selecionarCliente,

@@ -1,3 +1,5 @@
+import { podeRegistrarRecebimentoVenda } from "../utils/pdvReturnEligibility";
+
 function criarEntregaVazia() {
   return {
     endereco_completo: "",
@@ -35,8 +37,8 @@ export function usePDVVendaAcoes({
       return;
     }
 
-    if (vendaAtual.status === "finalizada" || vendaAtual.status === "pago_nf") {
-      alert('Esta venda esta finalizada. Clique em "Reabrir Venda" para modificar.');
+    if (!podeRegistrarRecebimentoVenda(vendaAtual)) {
+      alert("Esta venda não permite novos recebimentos no estado atual.");
       return;
     }
 
@@ -51,6 +53,7 @@ export function usePDVVendaAcoes({
       itens: [],
       subtotal: 0,
       desconto_valor: 0,
+      desconto_venda_valor: 0,
       desconto_percentual: 0,
       cupom_code: null,
       cupom_discount_applied: null,

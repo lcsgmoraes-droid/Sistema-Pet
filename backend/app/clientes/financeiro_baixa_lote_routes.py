@@ -11,6 +11,7 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.clientes.common import _validar_tenant_e_obter_usuario
 from app.db import get_session
 from app.financeiro_models import ContaReceber
+from app.utils.timezone import now_brasilia
 from app.services.venda_rentabilidade_snapshot_service import (
     get_or_build_venda_rentabilidade_snapshot,
 )
@@ -128,6 +129,7 @@ async def baixar_vendas_lote(
         valor_total = _money(dados.get("valor_total", 0))
         forma_pagamento = dados.get("forma_pagamento", "")
         numero_transacao = dados.get("numero_transacao")
+        instante_recebimento = now_brasilia()
 
         logger.info(f"Vendas IDs: {vendas_ids}")
         logger.info(f"Valor total: {valor_total}")
@@ -135,7 +137,7 @@ async def baixar_vendas_lote(
 
         # Validar se há caixa aberto
         caixa_aberto, _ = buscar_caixa_aberto(
-            db, tenant_id=tenant_id, usuario_id=current_user.id
+            db, tenant_id=tenant_id, usuario_id=current_user.id, bloquear_caixa=True
         )
 
         logger.info(f"Caixa aberto: {caixa_aberto}")
@@ -224,12 +226,13 @@ async def baixar_vendas_lote(
             # 🔒 ISOLAMENTO MULTI-TENANT: tenant_id obrigatório
             pagamento = VendaPagamento(
                 venda_id=venda.id,
+                caixa_id=caixa_aberto.id,
                 tenant_id=tenant_id,  # ✅ Garantir isolamento entre empresas
                 forma_pagamento=forma_pagamento,
                 valor=valor_aplicar,
                 numero_transacao=numero_transacao,
                 status="confirmado",
-                data_pagamento=dt.now(),
+                data_pagamento=instante_recebimento,
             )
             db.add(pagamento)
 
@@ -293,16 +296,8 @@ async def baixar_vendas_lote(
                 force_refresh=True,
             )
 
-            # Registrar movimentação no caixa (apenas para formas que movimentam caixa)
-            formas_que_movimentam_caixa = [
-                "dinheiro",
-                "Dinheiro",
-                "pix",
-                "PIX",
-                "cartao_debito",
-                "Cartão de Débito",
-            ]
-            if forma_pagamento in formas_que_movimentam_caixa:
+            # PIX/cartão são auditados pelo pagamento associado, sem espelho físico.
+            if str(forma_pagamento).strip().casefold() == "dinheiro":
                 # 🔒 ISOLAMENTO MULTI-TENANT: tenant_id obrigatório
                 movimentacao = MovimentacaoCaixa(
                     caixa_id=caixa_aberto.id,
@@ -316,7 +311,7 @@ async def baixar_vendas_lote(
                     usuario_nome=current_user.nome
                     or getattr(current_user, "username", None)
                     or current_user.email,
-                    data_movimento=dt.now(),
+                    data_movimento=instante_recebimento,
                     tenant_id=tenant_id,  # ✅ Garantir isolamento entre empresas
                 )
                 db.add(movimentacao)
@@ -341,7 +336,7 @@ async def baixar_vendas_lote(
                     current_user=current_user,
                     tenant_id=tenant_id,
                     valor_ja_recebido=item["valor_ja_pago"],
-                    data_referencia=dt.now(),
+                    data_referencia=instante_recebimento,
                 )
 
             if conta_receber:
@@ -349,7 +344,7 @@ async def baixar_vendas_lote(
                 novo_valor_recebido = valor_ja_recebido + valor_aplicar
 
                 conta_receber.valor_recebido = novo_valor_recebido
-                conta_receber.data_recebimento = dt.now()
+                conta_receber.data_recebimento = instante_recebimento
 
                 if _money(conta_receber.valor_final) <= novo_valor_recebido:
                     conta_receber.status = "pago"
@@ -360,7 +355,7 @@ async def baixar_vendas_lote(
                 recebimento = Recebimento(
                     conta_receber_id=conta_receber.id,
                     valor_recebido=valor_aplicar,
-                    data_recebimento=dt.now().date(),
+                    data_recebimento=instante_recebimento.date(),
                     observacoes=f"Baixa em lote - {forma_pagamento}",
                     user_id=current_user.id,
                     tenant_id=tenant_id,  # ✅ Garantir isolamento multi-tenant
@@ -374,7 +369,7 @@ async def baixar_vendas_lote(
                     categoria="Recebimento de Venda",
                     descricao=f"Baixa venda #{venda.numero_venda} - {venda.cliente.nome if venda.cliente else 'Cliente avulso'}",
                     valor=valor_aplicar,
-                    data_movimentacao=dt.now(),
+                    data_movimentacao=instante_recebimento,
                     data_prevista=None,
                     status="realizado",
                     origem_tipo="conta_receber",

@@ -9,6 +9,7 @@ import { normalizeClienteAlertasPdv } from "../utils/clienteAlertasPdv";
 import { canManageAppAccessProfiles } from "../utils/appAccessProfiles";
 import { normalizePessoaAppLogin } from "../utils/pessoaAppLogin";
 import { resolveCepMunicipio } from "../utils/cepMunicipio";
+import { normalizarAcertoEntregador, validarAcertoEntregador } from "../utils/entregadorAcerto";
 import {
   buildInitialAccessCredentials,
   resolveTenantLoginReference,
@@ -509,29 +510,10 @@ export function useClientesNovoCadastro({
         numerosVistos.add(digitos);
       }
 
-      if (formData.is_entregador) {
-        if (!formData.tipo_acerto_entrega) {
-          alert("Informe o tipo de acerto do entregador (semanal, quinzenal ou mensal)");
-          return;
-        }
-
-        if (formData.tipo_acerto_entrega === "semanal" && !formData.dia_semana_acerto) {
-          alert("Informe o dia da semana para o acerto semanal");
-          return;
-        }
-
-        if (formData.tipo_acerto_entrega === "mensal" && !formData.dia_mes_acerto) {
-          alert("Informe o dia do mes para o acerto mensal");
-          return;
-        }
-
-        if (formData.tipo_acerto_entrega === "mensal") {
-          const dia = parseInt(formData.dia_mes_acerto, 10);
-          if (dia < 1 || dia > 28) {
-            alert("O dia do mes deve estar entre 1 e 28");
-            return;
-          }
-        }
+      const erroAcerto = validarAcertoEntregador(formData);
+      if (erroAcerto) {
+        setError(erroAcerto);
+        return;
       }
 
       const enderecoPrincipalCompleto = [
@@ -583,6 +565,7 @@ export function useClientesNovoCadastro({
       }
 
       if (clienteData.is_entregador) {
+        Object.assign(clienteData, normalizarAcertoEntregador(clienteData));
         if (clienteData.tipo_cadastro === "funcionario") {
           clienteData.tipo_vinculo_entrega = "funcionario";
           clienteData.is_terceirizado = false;

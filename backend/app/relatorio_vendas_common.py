@@ -148,7 +148,13 @@ def _valores_operacionais_venda(venda: Venda) -> dict[str, float]:
     total_se_subtotal_liquido = subtotal + taxa_entrega
     total_se_subtotal_bruto = subtotal - desconto + taxa_entrega
 
-    if desconto > 0 and abs(total - total_se_subtotal_liquido) <= tolerancia:
+    if getattr(venda, "desconto_venda_valor", None) is not None:
+        valor_bruto = sum(
+            _as_float(getattr(item, "quantidade", 0))
+            * _as_float(getattr(item, "preco_unitario", 0))
+            for item in list(getattr(venda, "itens", []) or [])
+        )
+    elif desconto > 0 and abs(total - total_se_subtotal_liquido) <= tolerancia:
         valor_bruto = subtotal + desconto
     elif desconto > 0 and abs(total - total_se_subtotal_bruto) <= tolerancia:
         valor_bruto = subtotal

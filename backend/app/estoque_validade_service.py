@@ -51,6 +51,10 @@ class EstoqueValidadeService:
         agora: datetime | None = None,
         origem: str = "rotina",
     ) -> EstoqueValidadeBloqueio:
+        if getattr(lote, "apenas_identificacao", False):
+            raise ValueError(
+                "Lote de identificação não permite baixa automática por validade"
+            )
         agora = agora or _agora_utc()
         quantidade_lote = max(_to_float(getattr(lote, "quantidade_disponivel", 0)), 0)
         quantidade_vendavel = max(_to_float(getattr(produto, "estoque_atual", 0)), 0)
@@ -198,6 +202,7 @@ class EstoqueValidadeService:
             .filter(
                 ProdutoLote.tenant_id == tenant.id,
                 ProdutoLote.status == "ativo",
+                ProdutoLote.apenas_identificacao.is_(False),
                 ProdutoLote.quantidade_disponivel > 0,
                 ProdutoLote.data_validade.isnot(None),
                 ProdutoLote.data_validade <= limite,
@@ -208,6 +213,8 @@ class EstoqueValidadeService:
 
         bloqueios = []
         for lote in lotes:
+            if getattr(lote, "apenas_identificacao", False):
+                continue
             existente = (
                 db.query(EstoqueValidadeBloqueio)
                 .filter(

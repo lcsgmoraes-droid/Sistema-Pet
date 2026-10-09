@@ -70,8 +70,8 @@ def test_gerar_comissoes_pendentes_ignora_parcelas_ja_geradas(monkeypatch):
     assert chamadas[0]["parcela_numero"] == 2
 
 
-def test_atualizar_venda_aciona_comissoes_sem_bloquear_venda_finalizada():
+def test_atualizar_venda_deixa_comissoes_e_fechamento_para_finalizacao():
     source = inspect.getsource(vendas_routes.atualizar_venda)
 
-    assert "_gerar_comissoes_pendentes_venda(" in source
-    assert "venda.status != 'finalizada'" not in source
+    assert "_gerar_comissoes_pendentes_venda(" not in source
+    assert 'venda.status = "finalizada"' not in source

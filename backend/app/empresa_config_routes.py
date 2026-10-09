@@ -56,6 +56,7 @@ class EmpresaConfigGeralCreate(BaseModel):
     mensagem_venda_critica: str = "🚨 CRÍTICO: Margem muito baixa! Venda com prejuízo!"
     caixa_compartilhado: bool = False
     vendedor_obrigatorio_pdv: bool = False
+    mostrar_endereco_cliente_pdv: bool = False
     dias_tolerancia_atraso: int = 5
     crediario_encargos_automaticos: bool = False
     crediario_multa_percentual: float = Field(default=2.0, ge=0, le=2)
@@ -95,6 +96,7 @@ class EmpresaConfigGeralUpdate(BaseModel):
     mensagem_venda_critica: Optional[str] = None
     caixa_compartilhado: Optional[bool] = None
     vendedor_obrigatorio_pdv: Optional[bool] = None
+    mostrar_endereco_cliente_pdv: bool = False
     dias_tolerancia_atraso: Optional[int] = None
     crediario_encargos_automaticos: Optional[bool] = None
     crediario_multa_percentual: Optional[float] = Field(default=None, ge=0, le=2)
@@ -125,6 +127,7 @@ class EmpresaConfigGeralResponse(BaseModel):
     mensagem_venda_critica: str
     caixa_compartilhado: bool
     vendedor_obrigatorio_pdv: bool = False
+    mostrar_endereco_cliente_pdv: bool = False
     aliquota_imposto_padrao: float
     dias_tolerancia_atraso: Optional[int] = 5
     crediario_encargos_automaticos: bool
@@ -176,6 +179,9 @@ def _serializar_config(
         caixa_compartilhado=bool(getattr(config, "caixa_compartilhado", False)),
         vendedor_obrigatorio_pdv=bool(
             getattr(config, "vendedor_obrigatorio_pdv", False)
+        ),
+        mostrar_endereco_cliente_pdv=bool(
+            getattr(config, "mostrar_endereco_cliente_pdv", False)
         ),
         aliquota_imposto_padrao=float(config.aliquota_imposto_padrao or 7),
         dias_tolerancia_atraso=(
@@ -396,6 +402,7 @@ def get_config_empresa(
             mensagem_venda_critica="🚨 CRÍTICO: Margem muito baixa! Venda com prejuízo!",
             caixa_compartilhado=False,
             vendedor_obrigatorio_pdv=False,
+            mostrar_endereco_cliente_pdv=False,
             aliquota_imposto_padrao=7.0,
             dias_tolerancia_atraso=5,
             crediario_encargos_automaticos=False,
@@ -417,7 +424,7 @@ def get_config_pdv(
     user_and_tenant=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session),
 ):
-    """Expõe ao operador somente a preferência necessária para o PDV."""
+    """Expõe ao operador as preferências necessárias para o PDV."""
     _, tenant_id = user_and_tenant
     config = (
         db.query(EmpresaConfigGeral)
@@ -425,7 +432,10 @@ def get_config_pdv(
         .first()
     )
     return {
-        "vendedor_obrigatorio_pdv": bool(config and config.vendedor_obrigatorio_pdv)
+        "vendedor_obrigatorio_pdv": bool(config and config.vendedor_obrigatorio_pdv),
+        "mostrar_endereco_cliente_pdv": bool(
+            config and getattr(config, "mostrar_endereco_cliente_pdv", False)
+        ),
     }
 
 

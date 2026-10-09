@@ -29,6 +29,9 @@ class _FakeQuery:
     def with_for_update(self):
         return self
 
+    def populate_existing(self):
+        return self
+
     def order_by(self, *args):
         return self
 

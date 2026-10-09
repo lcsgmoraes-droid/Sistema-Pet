@@ -406,15 +406,14 @@ def finalizar_venda(
         # ============================================================
         # ETAPA 4: BAIXAR ESTOQUE (COM SUPORTE A KIT)
         # ============================================================
-        # 🎯 LÓGICA CRÍTICA: Só baixa estoque se venda NÃO veio de status 'aberta'
-        # - Se status_anterior = 'aberta': estoque JÁ foi baixado na criação
-        # - Se status_anterior != 'aberta': venda criada direto como finalizada, baixar agora
+        # Vendas abertas e com baixa parcial já tiveram saída na criação.
+        # Receber outra parcela ou concluir o pagamento não gera nova saída.
 
         estoque_baixado = []
-        deve_baixar_estoque = status_anterior != "aberta"
+        deve_baixar_estoque = status_anterior not in {"aberta", "baixa_parcial"}
 
         if deve_baixar_estoque:
-            logger.info("📦 Baixando estoque (venda não veio de status aberta)")
+            logger.info("📦 Baixando estoque de venda sem saída anterior")
         else:
             logger.info(
                 "ℹ️  Estoque NÃO será baixado (já foi baixado quando venda estava aberta)"

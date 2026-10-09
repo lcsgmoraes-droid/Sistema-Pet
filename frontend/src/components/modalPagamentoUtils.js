@@ -301,6 +301,12 @@ export function avaliarEstadoJustificativaMargem({
   };
 }
 
+export function obterTotalRecebidoExistente(resposta = {}) {
+  // total_pago e o valor quitado limitado ao total salvo. A edicao pode ter
+  // outro total, entao usa o recebido real sem confundir crediario com baixa.
+  return Number(resposta.total_recebido ?? resposta.total_pago ?? 0);
+}
+
 export function calcularResumoRecebimento({
   valorTotal = 0,
   pagamentos = [],

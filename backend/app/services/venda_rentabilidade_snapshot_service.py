@@ -11,10 +11,11 @@ from app.financeiro_models import FormaPagamento
 from app.models import Cliente
 from app.produtos_models import EstoqueMovimentacao
 from app.utils.timezone import now_brasilia
+from app.services.venda_descontos import ratear_descontos_venda, resumo_descontos_venda
 
 logger = logging.getLogger(__name__)
 
-SNAPSHOT_VERSION = 5
+SNAPSHOT_VERSION = 6
 FROZEN_STATUSES = {"finalizada", "baixa_parcial"}
 
 
@@ -528,8 +529,14 @@ def build_venda_rentabilidade_snapshot(
 
     desconto_bruto = _round_money(getattr(venda, "desconto_valor", 0))
     desconto_cupom_reclassificado = min(cupom_desconto, desconto_bruto)
+    contrato_descontos = getattr(venda, "desconto_venda_valor", None) is not None
     venda_bruta = _round_money(
-        _as_float(getattr(venda, "subtotal", 0)) + desconto_bruto
+        sum(
+            _as_float(item.quantidade) * _as_float(item.preco_unitario)
+            for item in list(getattr(venda, "itens", []) or [])
+        )
+        if contrato_descontos
+        else _as_float(getattr(venda, "subtotal", 0)) + desconto_bruto
     )
     desconto_total = _round_money(
         max(desconto_bruto - desconto_cupom_reclassificado, 0)
@@ -559,21 +566,25 @@ def build_venda_rentabilidade_snapshot(
         subtotal_itens += subtotal_item
         custo_total += custo_item
 
+    componentes_desconto = ratear_descontos_venda(venda, cupom_desconto=cupom_desconto)
     itens_snapshot = []
-    for item_base in itens_base:
+    for item_base, descontos_item in zip(itens_base, componentes_desconto):
         item = item_base["item"]
         subtotal_item = item_base["subtotal_item"]
         percentual_item = (
             (subtotal_item / subtotal_itens) if subtotal_itens > 0 else 0.0
         )
 
-        desconto_rateado = desconto_total * percentual_item
+        desconto_rateado = float(descontos_item["manual"])
         taxa_loja_rateada = taxa_entrega_receita * percentual_item
         taxa_entrega_rateada = taxa_entrega_repasse * percentual_item
         taxa_operacional_rateada = taxa_operacional_entrega * percentual_item
         taxa_cartao_rateada = taxa_cartao_total * percentual_item
         comissao_rateada = comissao_total * percentual_item
-        campanha_rateada = custo_campanha * percentual_item
+        campanha_rateada = (
+            float(descontos_item["cupom"])
+            + max(custo_campanha - cupom_desconto, 0) * percentual_item
+        )
         imposto_rateado = (subtotal_item + taxa_loja_rateada) * (
             impostos_percentual / 100.0
         )
@@ -615,6 +626,12 @@ def build_venda_rentabilidade_snapshot(
                 "venda_bruta": _round_money(subtotal_item),
                 "taxa_loja": _round_money(taxa_loja_rateada),
                 "desconto": _round_money(desconto_rateado),
+                "desconto_item": float(descontos_item["desconto_item"]),
+                "desconto_venda": float(descontos_item["desconto_venda"])
+                if descontos_item["desconto_venda"] is not None
+                else None,
+                "cupom_desconto": float(descontos_item["cupom"]),
+                "desconto_origem_legado": descontos_item["legado"],
                 "taxa_entrega": _round_money(taxa_entrega_rateada),
                 "taxa_operacional": _round_money(taxa_operacional_rateada),
                 "taxa_cartao": _round_money(taxa_cartao_rateada),
@@ -665,6 +682,7 @@ def build_venda_rentabilidade_snapshot(
         "venda_bruta": _round_money(venda_bruta),
         "taxa_loja": _round_money(taxa_entrega_receita),
         "desconto": _round_money(desconto_total),
+        **resumo_descontos_venda(venda),
         "taxa_entrega": _round_money(taxa_entrega_repasse),
         "taxa_operacional": _round_money(taxa_operacional_entrega),
         "taxa_cartao": _round_money(taxa_cartao_total),
@@ -709,7 +727,12 @@ def get_or_build_venda_rentabilidade_snapshot(
         existing = _load_existing_snapshot(
             getattr(venda, "rentabilidade_snapshot", None)
         )
-        if existing and int(existing.get("snapshot_version") or 0) == SNAPSHOT_VERSION:
+        # Fotografia antiga ja fechada permanece congelada; sua origem de
+        # desconto nao pode ser reclassificada retroativamente pelo novo campo.
+        versoes_aceitas = {SNAPSHOT_VERSION}
+        if getattr(venda, "desconto_venda_valor", None) is None:
+            versoes_aceitas.add(5)
+        if existing and int(existing.get("snapshot_version") or 0) in versoes_aceitas:
             return ajustar_snapshot_taxa_mista(venda, existing)
 
     snapshot = build_venda_rentabilidade_snapshot(

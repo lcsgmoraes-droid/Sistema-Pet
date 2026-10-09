@@ -22,6 +22,7 @@ from app.intnfe.client import IntNFeError
 from app.intnfe.fiscal_profile import local_profile
 from app.intnfe.models import IntNFeConnection, IntNFeEmissionSequence
 from app.produtos_estoque_models import EstoqueMovimentacao, ProdutoLote
+from app.services.venda_descontos import ratear_descontos_venda
 
 CENT = Decimal("0.01")
 AUTHORIZED_STATUS = 3
@@ -503,6 +504,14 @@ def build_payload(db, tenant, connection, venda, document_type):
     fiscal_pending = []
     product_total = Decimal("0")
     item_discount_total = Decimal("0")
+    descontos_fiscais = (
+        {
+            id(item): parte["total"]
+            for item, parte in zip(venda.itens or [], ratear_descontos_venda(venda))
+        }
+        if getattr(venda, "desconto_venda_valor", None) is not None
+        else {}
+    )
     for item_numero, item in enumerate(venda.itens or [], start=1):
         if _ascii(item.tipo) != "produto" or not item.produto:
             raise DirectEmissionError(
@@ -651,13 +660,14 @@ def build_payload(db, tenant, connection, venda, document_type):
             )
         quantity = Decimal(str(item.quantidade or 0))
         unit_price = Decimal(str(item.preco_unitario or 0))
-        discount = _money(item.desconto_item)
+        desconto_manual_item = _money(item.desconto_item)
+        discount = descontos_fiscais.get(id(item), desconto_manual_item)
         calculated_gross = (quantity * unit_price).quantize(
             CENT, rounding=ROUND_HALF_UP
         )
         stored_subtotal = getattr(item, "subtotal", None)
         gross = (
-            _money(stored_subtotal) + discount
+            _money(stored_subtotal) + desconto_manual_item
             if stored_subtotal is not None
             else calculated_gross
         )
@@ -854,13 +864,22 @@ def local_document_details(db, tenant, venda):
     items = []
     product_total = Decimal("0")
     item_discount_total = Decimal("0")
+    descontos_fiscais = (
+        {
+            id(item): parte["total"]
+            for item, parte in zip(venda.itens or [], ratear_descontos_venda(venda))
+        }
+        if getattr(venda, "desconto_venda_valor", None) is not None
+        else {}
+    )
     for sale_item in venda.itens or []:
         product = getattr(sale_item, "produto", None)
         quantity = Decimal(str(getattr(sale_item, "quantidade", 0) or 0))
         unit_price = Decimal(str(getattr(sale_item, "preco_unitario", 0) or 0))
-        discount = _money(getattr(sale_item, "desconto_item", 0))
+        desconto_manual_item = _money(getattr(sale_item, "desconto_item", 0))
+        discount = descontos_fiscais.get(id(sale_item), desconto_manual_item)
         subtotal = _money(getattr(sale_item, "subtotal", 0))
-        gross = subtotal + discount
+        gross = subtotal + desconto_manual_item
         if gross == 0 and quantity:
             gross = (quantity * unit_price).quantize(CENT, rounding=ROUND_HALF_UP)
 

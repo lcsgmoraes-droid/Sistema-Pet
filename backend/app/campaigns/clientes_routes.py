@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func as sqlfunc, or_ as sql_or_
+from sqlalchemy import String, cast, func as sqlfunc, or_ as sql_or_
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -17,11 +17,13 @@ from app.campaigns.cashback_wallet import (
 )
 from app.campaigns.models import (
     Campaign,
+    CampaignEventQueue,
     CashbackSourceTypeEnum,
     CashbackTransaction,
     Coupon,
     CouponStatusEnum,
     CustomerRankHistory,
+    EventStatusEnum,
     LoyaltyStamp,
 )
 from app.campaigns.routes_common import get_db
@@ -266,6 +268,22 @@ def saldo_cliente(
     """
     _, tenant_id = user_and_tenant
 
+    # Consultar a fila antes dos saldos evita retornar saldo antigo com sinal
+    # de concluido caso o worker termine entre as consultas desta resposta.
+    beneficios_pendentes = (
+        db.query(CampaignEventQueue.id)
+        .filter(
+            CampaignEventQueue.tenant_id == tenant_id,
+            CampaignEventQueue.event_type == "purchase_completed",
+            CampaignEventQueue.status.in_(
+                [EventStatusEnum.pending, EventStatusEnum.processing]
+            ),
+            cast(CampaignEventQueue.payload["customer_id"].astext, String)
+            == str(customer_id),
+        )
+        .count()
+    )
+
     saldo_cashback = float(
         get_cashback_wallet(db, tenant_id=tenant_id, customer_id=customer_id).available
     )
@@ -317,6 +335,8 @@ def saldo_cliente(
 
     return {
         "customer_id": customer_id,
+        "beneficios_em_processamento": beneficios_pendentes > 0,
+        "beneficios_pendentes": beneficios_pendentes,
         "saldo_cashback": saldo_cashback,
         "cashback_use_limit_percent": (
             float(cashback_limit_percent)

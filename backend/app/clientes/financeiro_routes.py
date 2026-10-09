@@ -19,6 +19,7 @@ from app.contas_receber_encargos import (
 )
 from app.financeiro_models import ContaReceber, FormaPagamento
 from app.models import Cliente
+from app.services.venda_descontos import resumo_descontos_venda
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -158,6 +159,10 @@ async def get_historico_compras(
                 ),
                 "desconto_valor": (
                     float(v.desconto_valor or 0) if hasattr(v, "desconto_valor") else 0
+                ),
+                **resumo_descontos_venda(v),
+                "cupom_discount_applied": float(
+                    getattr(v, "cupom_discount_applied", 0) or 0
                 ),
                 "taxa_entrega": (
                     float(v.taxa_entrega or 0) if hasattr(v, "taxa_entrega") else 0

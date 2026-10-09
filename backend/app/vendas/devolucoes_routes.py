@@ -24,7 +24,8 @@ from app.empresa_grupo_estoque_compartilhado_service import (
     resolver_tenant_estoque_item,
 )
 from app.estoque.service import EstoqueService
-from app.financeiro_models import ContaReceber
+from app.financeiro_models import ContaReceber, FormaPagamento
+from app.financeiro.recebiveis_operadora import TIPOS_RECEBIVEL_OPERADORA
 from app.produtos_models import EstoqueMovimentacao, Produto
 from app.utils.timezone import now_brasilia
 from app.vendas.devolucao_dre import custo_original_item_devolvido
@@ -37,7 +38,7 @@ from app.vendas.routes_common import (
     _obter_cliente_ou_404,
     _validar_tenant_e_obter_usuario,
 )
-from app.vendas_models import Venda, VendaItem
+from app.vendas_models import Venda, VendaItem, VendaPagamento
 from app.vendas_devolucoes_models import VendaDevolucao
 
 router = APIRouter()
@@ -108,13 +109,60 @@ def _validar_recebiveis_liquidados(db: Session, venda_id: int, tenant_id) -> Non
         )
         .all()
     )
-    if any(_recebivel_exige_conciliacao(conta) for conta in contas_receber):
+    abertas = [conta for conta in contas_receber if _recebivel_exige_conciliacao(conta)]
+    if not abertas:
+        return
+    mensagem = (
+        "A venda tem recebivel em aberto. Concilie o valor recebido "
+        "antes de registrar a devolucao."
+    )
+    if any(not getattr(conta, "forma_pagamento_id", None) for conta in abertas):
+        raise HTTPException(status_code=409, detail=mensagem)
+    formas = (
+        db.query(FormaPagamento)
+        .filter(
+            FormaPagamento.tenant_id == tenant_id,
+            FormaPagamento.id.in_([conta.forma_pagamento_id for conta in abertas]),
+        )
+        .all()
+    )
+    formas_operadora = {
+        forma.id for forma in formas if forma.tipo in TIPOS_RECEBIVEL_OPERADORA
+    }
+    pagamentos = (
+        db.query(VendaPagamento)
+        .filter(
+            VendaPagamento.tenant_id == tenant_id,
+            VendaPagamento.venda_id == venda_id,
+            VendaPagamento.forma_pagamento_id.in_(formas_operadora),
+            func.lower(func.coalesce(VendaPagamento.status, "pendente")).notin_(
+                ["recusado", "estornado", "cancelado", "cancelada"]
+            ),
+        )
+        .all()
+    )
+    pago_por_forma = defaultdict(Decimal)
+    for pagamento in pagamentos:
+        pago_por_forma[pagamento.forma_pagamento_id] += Decimal(
+            str(pagamento.valor or 0)
+        )
+    contas_por_forma = defaultdict(Decimal)
+    for conta in contas_receber:
+        if str(conta.status or "").lower() not in {"cancelado", "cancelada"}:
+            contas_por_forma[conta.forma_pagamento_id] += Decimal(
+                str(conta.valor_final or 0)
+            )
+    # Cartão registrado na venda permite devolução antes do repasse bancário.
+    # Contas sem forma conhecida e saldo de crediário continuam protegidos.
+    if any(
+        conta.forma_pagamento_id not in formas_operadora
+        or pago_por_forma[conta.forma_pagamento_id]
+        < contas_por_forma[conta.forma_pagamento_id]
+        for conta in abertas
+    ):
         raise HTTPException(
             status_code=409,
-            detail=(
-                "A venda tem recebivel em aberto. Concilie o valor recebido "
-                "antes de registrar a devolucao."
-            ),
+            detail=mensagem,
         )
 
 
@@ -399,6 +447,18 @@ def registrar_devolucao(
         logger.info("Usuario autenticado para devolucao")
         logger.info("Tenant validado para devolucao")
 
+        # Recebimentos e fechamento usam a ordem Caixa -> Venda.
+        # A validade do caixa é verificada depois da resposta idempotente.
+        caixa = None
+        if not dados.get("gerar_credito", False) and dados.get("caixa_id"):
+            caixa, _ = buscar_caixa_acessivel(
+                db,
+                caixa_id=dados["caixa_id"],
+                tenant_id=tenant_id,
+                usuario_id=current_user.id,
+                bloquear_caixa=True,
+            )
+
         # Buscar a venda
         venda = (
             db.query(Venda)
@@ -497,15 +557,7 @@ def registrar_devolucao(
             )
 
         # Verificar se o caixa existe e está aberto (apenas se for devolução em dinheiro)
-        caixa = None
         if not gerar_credito:
-            caixa, _ = buscar_caixa_acessivel(
-                db,
-                caixa_id=caixa_id,
-                tenant_id=tenant_id,
-                usuario_id=current_user.id,
-            )
-
             if not caixa or caixa.status != "aberto":
                 raise HTTPException(
                     status_code=400, detail="Caixa não encontrado ou não está aberto"
@@ -960,19 +1012,6 @@ def registrar_devolucao(
 
         # 💵 OPÇÃO 2: DEVOLUÇÃO EM DINHEIRO
         else:
-            # Verificar se o caixa existe e está aberto
-            caixa, _ = buscar_caixa_acessivel(
-                db,
-                caixa_id=caixa_id,
-                tenant_id=tenant_id,
-                usuario_id=current_user.id,
-            )
-
-            if not caixa or caixa.status != "aberto":
-                raise HTTPException(
-                    status_code=400, detail="Caixa não encontrado ou não está aberto"
-                )
-
             # Registrar devolução no caixa usando o service
             movimentacao = CaixaService.registrar_devolucao(
                 caixa_id=caixa_id,

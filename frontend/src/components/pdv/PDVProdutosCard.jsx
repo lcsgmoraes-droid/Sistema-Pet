@@ -470,7 +470,8 @@ export default function PDVProdutosCard({
                         )}
                         {item.desconto_valor > 0 && (
                           <span className="text-orange-600 ml-1">
-                            com {formatMoneyBRL(item.desconto_valor)} de desconto
+                            com {formatMoneyBRL(item.desconto_valor)} de desconto manual neste
+                            produto
                           </span>
                         )}
                       </div>

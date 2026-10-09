@@ -1,3 +1,5 @@
+import { resumirDescontosVenda } from "./pdvDescontosUtils.js";
+
 function normalizarNumero(valor) {
   const numero = Number(valor ?? 0);
   return Number.isFinite(numero) ? numero : 0;
@@ -28,6 +30,7 @@ export function montarItensVendaPayload(vendaAtual) {
 }
 
 export function montarPayloadVenda(vendaAtual, entregadorSelecionado = null) {
+  const descontos = resumirDescontosVenda(vendaAtual);
   const temEntrega = Boolean(vendaAtual.tem_entrega);
   const taxaEntregaTotal = temEntrega
     ? normalizarNumero(vendaAtual.entrega?.taxa_entrega_total)
@@ -47,7 +50,8 @@ export function montarPayloadVenda(vendaAtual, entregadorSelecionado = null) {
     funcionario_id: vendaAtual.funcionario_id || null,
     vendedor_funcionario_id: vendaAtual.vendedor_funcionario_id || null,
     itens: montarItensVendaPayload(vendaAtual),
-    desconto_valor: normalizarNumero(vendaAtual.desconto_valor),
+    desconto_valor: descontos.total,
+    desconto_venda_valor: vendaAtual.desconto_venda_valor == null ? null : descontos.global,
     desconto_percentual: normalizarNumero(vendaAtual.desconto_percentual),
     cupom_code: vendaAtual.cupom_code || null,
     cupom_discount_applied:

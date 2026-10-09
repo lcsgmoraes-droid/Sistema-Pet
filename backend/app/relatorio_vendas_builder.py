@@ -5,6 +5,8 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from app.services.venda_descontos import ratear_descontos_venda, resumo_descontos_venda
+
 from .relatorio_vendas_common import (
     _as_float,
     _enriquecer_itens_promocionais,
@@ -12,7 +14,6 @@ from .relatorio_vendas_common import (
     _precisa_reclassificar_campanha,
     _total_recebido_venda,
     _valor_cupom_venda,
-    _valores_operacionais_venda,
     _venda_tem_documento_fiscal,
 )
 from .relatorio_vendas_preloads import (
@@ -87,11 +88,10 @@ def montar_relatorio_vendas(
     )
 
     for venda in vendas:
-        valores_venda = valores_operacionais_por_venda.get(
-            venda.id
-        ) or _valores_operacionais_venda(venda)
-        bruto_venda = valores_venda["valor_bruto"]
-        desconto_venda = valores_venda["desconto"]
+        descontos_por_item = {
+            id(item): float(parte["total"])
+            for item, parte in zip(venda.itens, ratear_descontos_venda(venda))
+        }
         # OTIMIZAÇÃO: usar itens já carregados
         for item in venda.itens:
             # OTIMIZAÇÃO: usar relacionamento produto já carregado
@@ -117,9 +117,7 @@ def montar_relatorio_vendas(
             valor_item = _as_float(getattr(item, "quantidade", 0)) * _as_float(
                 getattr(item, "preco_unitario", 0)
             )
-            desconto_item = (
-                (valor_item * desconto_venda / bruto_venda) if bruto_venda > 0 else 0
-            )
+            desconto_item = descontos_por_item[id(item)]
 
             vendas_por_grupo[grupo]["valor_bruto"] += valor_item
             vendas_por_grupo[grupo]["desconto"] += desconto_item
@@ -144,11 +142,10 @@ def montar_relatorio_vendas(
     produtos_por_categoria = {}
 
     for venda in vendas:
-        valores_venda = valores_operacionais_por_venda.get(
-            venda.id
-        ) or _valores_operacionais_venda(venda)
-        bruto_venda = valores_venda["valor_bruto"]
-        desconto_venda = valores_venda["desconto"]
+        descontos_por_item = {
+            id(item): float(parte["total"])
+            for item, parte in zip(venda.itens, ratear_descontos_venda(venda))
+        }
         # OTIMIZAÇÃO: usar itens já carregados
         for item in venda.itens:
             produto_id = item.produto_id
@@ -224,11 +221,7 @@ def montar_relatorio_vendas(
                 valor_item = _as_float(getattr(item, "quantidade", 0)) * _as_float(
                     getattr(item, "preco_unitario", 0)
                 )
-                desconto_item = (
-                    (valor_item * desconto_venda / bruto_venda)
-                    if bruto_venda > 0
-                    else 0
-                )
+                desconto_item = descontos_por_item[id(item)]
 
                 # Atualizar produto
                 produtos_por_categoria[categoria_nome]["subcategorias"][
@@ -276,11 +269,7 @@ def montar_relatorio_vendas(
                 valor_item = _as_float(getattr(item, "quantidade", 0)) * _as_float(
                     getattr(item, "preco_unitario", 0)
                 )
-                desconto_item = (
-                    (valor_item * desconto_venda / bruto_venda)
-                    if bruto_venda > 0
-                    else 0
-                )
+                desconto_item = descontos_por_item[id(item)]
 
                 produtos_por_categoria[categoria_nome]["produtos"][produto_nome][
                     "quantidade"
@@ -299,9 +288,7 @@ def montar_relatorio_vendas(
             valor_item = _as_float(getattr(item, "quantidade", 0)) * _as_float(
                 getattr(item, "preco_unitario", 0)
             )
-            desconto_item = (
-                (valor_item * desconto_venda / bruto_venda) if bruto_venda > 0 else 0
-            )
+            desconto_item = descontos_por_item[id(item)]
             produtos_por_categoria[categoria_nome]["total_quantidade"] += (
                 item.quantidade
             )
@@ -469,6 +456,7 @@ def montar_relatorio_vendas(
                 "nfe_chave": venda.nfe_chave,
                 "nfe_bling_id": str(venda.nfe_bling_id) if venda.nfe_bling_id else None,
                 "cupom_code": snapshot.get("cupom_code") or venda.cupom_code,
+                **resumo_descontos_venda(venda),
                 "cupom_discount_applied": round(
                     float(snapshot.get("cupom_desconto", cupom_desconto) or 0),
                     2,

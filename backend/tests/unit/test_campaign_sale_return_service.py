@@ -63,7 +63,12 @@ def test_cashback_refund_reverses_only_unearned_unexpired_balance(
 def test_return_reverses_only_unspent_part_of_its_cashback_grant(monkeypatch):
     execution = SimpleNamespace(id=21, reward_meta={"venda_total_base": 100})
     grant = SimpleNamespace(id=12, amount=Decimal("10.00"))
-    queries = [_Query(rows=[execution]), _Query(rows=[grant]), _Query(rows=[])]
+    queries = [
+        _Query(rows=[execution]),
+        _Query(rows=[grant]),
+        _Query(rows=[]),
+        _Query(rows=[]),
+    ]
     added = []
     locked = []
     monkeypatch.setattr(

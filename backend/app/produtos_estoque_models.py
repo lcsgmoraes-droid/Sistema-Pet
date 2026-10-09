@@ -211,6 +211,10 @@ class ProdutoLote(BaseTenantModel):
     limite_dias = Column(Integer, default=30)
     codigo_agregacao = Column(String(50), nullable=True)
     status = Column(String(20), default="ativo")  # ativo, vencido, bloqueado, esgotado
+    # Identifica saldo já existente; não representa entrada nem autoriza baixa por validade.
+    apenas_identificacao = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     ordem_entrada = Column(Integer, nullable=False)  # Timestamp Unix para FIFO
     custo_unitario = Column(Float, nullable=True)
 

@@ -305,3 +305,67 @@ test("venda comum continua gerando apenas o recibo simples", () => {
   assert.match(recibo, /RECIBO DO PDV/);
   assert.doesNotMatch(recibo, /VIA DO ESTABELECIMENTO|ASSINATURA DO CLIENTE/);
 });
+
+test("recibo separa manuais de cupom sem duplicar desconto do produto", () => {
+  const recibo = montarCupomVenda({
+    ...vendaBase,
+    itens: [
+      {
+        produto_nome: "Produto A",
+        quantidade: 1,
+        preco_unitario: 100,
+        desconto_item: 20,
+        subtotal: 80,
+      },
+      {
+        produto_nome: "Produto B",
+        quantidade: 1,
+        preco_unitario: 100,
+        desconto_item: 0,
+        subtotal: 100,
+      },
+    ],
+    subtotal: 180,
+    desconto_venda_valor: 10,
+    desconto_valor: 35,
+    cupom_code: "FIXO5",
+    cupom_discount_applied: 5,
+    total: 165,
+  });
+  assert.match(recibo, /Total bruto:\s+R\$ 200,00/);
+  assert.match(recibo, /Desconto manual:\s+-R\$ 30,00/);
+  assert.match(recibo, /Campanha\/cupom:\s+-R\$ 5,00/);
+  assert.match(recibo, /TOTAL:\s+R\$ 165,00/);
+});
+
+test("recibo legado identifica cupom ja incluido sem afirmar origem manual", () => {
+  const recibo = montarCupomVenda({
+    ...vendaBase,
+    itens: [
+      {
+        produto_nome: "Produto A",
+        quantidade: 1,
+        preco_unitario: 100,
+        desconto_item: 15,
+        subtotal: 85,
+      },
+      {
+        produto_nome: "Produto B",
+        quantidade: 1,
+        preco_unitario: 100,
+        desconto_item: 5,
+        subtotal: 95,
+      },
+    ],
+    subtotal: 180,
+    desconto_venda_valor: null,
+    desconto_valor: 20,
+    cupom_code: "OLD",
+    cupom_discount_applied: 10,
+    total: 180,
+  });
+  assert.match(recibo, /Descontos anteriores:\s+-R\$ 20,00/);
+  assert.match(recibo, /Cupom \(ja incluido\):\s+-R\$ 10,00/);
+  assert.doesNotMatch(recibo, /Desconto manual:/);
+  assert.match(recibo, /TOTAL:\s+R\$ 180,00/);
+});

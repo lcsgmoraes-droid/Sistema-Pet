@@ -14,6 +14,7 @@ import PDVEnderecoModal from "./PDVEnderecoModal";
 import VendasEmAberto from "./VendasEmAberto";
 
 export default function PDVModalsLayer({
+  baseDescontoTotal,
   carregandoAnalise,
   dadosAnalise,
   enderecoAtual,
@@ -167,6 +168,7 @@ export default function PDVModalsLayer({
 
       {mostrarModalDescontoTotal && (
         <PDVDescontoTotalModal
+          baseDescontoTotal={baseDescontoTotal}
           itens={vendaAtual.itens}
           onAplicar={onAplicarDescontoTotal}
           onClose={onCloseModalDescontoTotal}

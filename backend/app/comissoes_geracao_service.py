@@ -11,6 +11,7 @@ from app.utils.logger import StructuredLogger
 from app.tenancy.context import set_tenant_context
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal
 from app.utils.tenant_safe_sql import execute_tenant_safe
+from app.services.venda_descontos import bruto_item, ratear_descontos_venda
 
 from app.comissoes_config_service import (
     _require_tenant_id,
@@ -63,7 +64,8 @@ def gerar_comissoes_venda(
         result = execute_tenant_safe(
             db,
             """
-            SELECT id, total, status, desconto_valor, taxa_entrega, tem_entrega, data_venda, tenant_id, entregador_id 
+            SELECT id, total, status, desconto_valor, taxa_entrega, tem_entrega, data_venda, tenant_id, entregador_id,
+                   desconto_venda_valor, cupom_discount_applied
             FROM vendas
             WHERE id = :venda_id
               AND {tenant_filter}
@@ -88,6 +90,8 @@ def gerar_comissoes_venda(
             "data_venda": venda_row[6],
             "tenant_id": venda_row[7] if venda_row[7] else tenant_id,
             "entregador_id": venda_row[8] if len(venda_row) > 8 else None,
+            "desconto_venda_valor": venda_row[9] if len(venda_row) > 9 else None,
+            "cupom_discount_applied": venda_row[10] if len(venda_row) > 10 else None,
         }
 
         # Validar status (apenas finalizada ou baixa_parcial podem gerar comissão)
@@ -157,7 +161,8 @@ def gerar_comissoes_venda(
                 vi.subtotal,
                 p.preco_custo,
                 p.nome as produto_nome,
-                v.valor_taxa_entregador
+                v.valor_taxa_entregador,
+                vi.desconto_item
             FROM venda_itens vi
             JOIN produtos p ON vi.produto_id = p.id AND p.tenant_id = vi.tenant_id
             JOIN vendas v ON v.id = vi.venda_id AND v.tenant_id = vi.tenant_id
@@ -186,6 +191,7 @@ def gerar_comissoes_venda(
                     "subtotal": row[4],
                     "preco_custo": row[5],
                     "produto_nome": row[6],
+                    "desconto_item": row[8] if len(row) > 8 else 0,
                 }
             )
             # Capturar valor pago ao entregador (mesmo valor para todos os itens da venda)
@@ -215,9 +221,7 @@ def gerar_comissoes_venda(
         itens_normalizados = []
 
         for item in itens:
-            valor_bruto_item = Decimal(str(item["preco_unitario"])) * Decimal(
-                str(item["quantidade"])
-            )
+            valor_bruto_item = bruto_item(item)
             soma_valores_brutos += valor_bruto_item
 
             itens_normalizados.append(
@@ -234,14 +238,11 @@ def gerar_comissoes_venda(
                 }
             )
 
-        # Ratear desconto proporcionalmente ao valor BRUTO
+        # Desconto da linha fica no item; apenas o geral e o cupom sao rateados.
+        componentes_desconto = ratear_descontos_venda({**venda, "itens": itens})
         soma_valores_liquidos = Decimal("0")
-        for item_norm in itens_normalizados:
-            if soma_valores_brutos > 0:
-                proporcao_desconto = item_norm["valor_bruto"] / soma_valores_brutos
-                item_norm["desconto_item"] = desconto_total_venda * proporcao_desconto
-            else:
-                item_norm["desconto_item"] = Decimal("0")
+        for item_norm, descontos_item in zip(itens_normalizados, componentes_desconto):
+            item_norm["desconto_item"] = descontos_item["total"]
 
             item_norm["valor_liquido"] = (
                 item_norm["valor_bruto"] - item_norm["desconto_item"]

@@ -53,6 +53,7 @@ export default function PDVOverlays(props) {
     mostrarModalCliente,
     mostrarModalDescontoItem,
     mostrarModalDescontoTotal,
+    baseDescontoTotal,
     mostrarModalEndereco,
     mostrarModalPagamento,
     mostrarPendenciasEstoque,
@@ -146,6 +147,7 @@ export default function PDVOverlays(props) {
       />
 
       <PDVModalsLayer
+        baseDescontoTotal={baseDescontoTotal}
         carregandoAnalise={carregandoAnalise}
         dadosAnalise={dadosAnalise}
         enderecoAtual={enderecoAtual}
