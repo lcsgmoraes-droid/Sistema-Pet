@@ -12,6 +12,10 @@ NFE_NAMESPACE = "http" + "://www.portalfiscal.inf.br/nfe"
 SKU_ROTULOS_EXPLICITOS = ("MSKU", "SKU", "CODIGO")
 QTD_ROTULOS_EXPLICITOS = ("QTD", "QUANTIDADE", "UNIDADES")
 UNIDADES_DANFE = {"UN", "UND", "UNID", "PC", "PCA", "PCT", "CX", "KG"}
+DANFE_CABECALHOS_ITENS = (
+    "DADOS DO PRODUTO / SERVI",
+    "DADOS DOS PRODUTOS / SERVI",
+)
 
 
 def _texto_busca_sem_acento(value: str) -> str:
@@ -162,6 +166,66 @@ def _extrair_sku_explicito(linha: str) -> Optional[str]:
     return _extrair_sku_por_rotulo(linha)
 
 
+def _tem_cabecalho_itens_danfe(texto_busca: str) -> bool:
+    return any(cabecalho in texto_busca for cabecalho in DANFE_CABECALHOS_ITENS)
+
+
+def _eh_sku_danfe(candidato: str) -> bool:
+    return (
+        len(candidato) >= 3
+        and any(char.isdigit() for char in candidato)
+        and all(_char_sku_valido(char) for char in candidato)
+    )
+
+
+def _eh_tabela_itens_danfe(tabela) -> bool:
+    cabecalho = " ".join(
+        str(celula or "").replace("\n", " ")
+        for linha in (tabela or [])[:3]
+        for celula in (linha or [])
+    )
+    cabecalho_busca = _texto_busca_sem_acento(cabecalho)
+    return (
+        "DESCRI" in cabecalho_busca
+        and "PRODUTO" in cabecalho_busca
+        and "UNID" in cabecalho_busca
+        and "QUANT" in cabecalho_busca
+    )
+
+
+def _extrair_itens_tabelas_danfe_pdf(tabelas_paginas) -> List[dict]:
+    itens_por_sku = defaultdict(float)
+
+    for tabelas_pagina in tabelas_paginas or []:
+        for tabela in tabelas_pagina or []:
+            if not _eh_tabela_itens_danfe(tabela):
+                continue
+
+            for linha in tabela or []:
+                celulas = [str(celula or "").strip() for celula in (linha or [])]
+                if not celulas:
+                    continue
+
+                sku = celulas[0].strip("|:;")
+                if not _eh_sku_danfe(sku):
+                    continue
+
+                for indice in range(1, len(celulas) - 1):
+                    unidade = _texto_busca_sem_acento(celulas[indice]).strip(
+                        ".:;|()[]"
+                    )
+                    if unidade not in UNIDADES_DANFE:
+                        continue
+
+                    candidato = celulas[indice + 1].strip(".:;|()[]")
+                    quantidade = _consumir_numero_quantidade(candidato)
+                    if quantidade == candidato:
+                        _adicionar_item(itens_por_sku, sku, quantidade)
+                        break
+
+    return _itens_dict(itens_por_sku)
+
+
 def _extrair_itens_mercado_livre_pdf(texto: str) -> List[dict]:
     linhas = [(linha or "").strip() for linha in texto.splitlines()]
     blocos = []
@@ -204,23 +268,20 @@ def _extrair_itens_danfe_pdf(texto: str) -> List[dict]:
     for raw_line in texto.splitlines():
         linha = (raw_line or "").strip()
         linha_busca = _texto_busca_sem_acento(linha)
-        if "DADOS DO PRODUTO / SERVI" in linha_busca:
+        if _tem_cabecalho_itens_danfe(linha_busca):
             dentro_dos_itens = True
             continue
         if dentro_dos_itens and (
             "LCULO DO ISSQN" in linha_busca or "DADOS ADICIONAIS" in linha_busca
         ):
-            break
+            dentro_dos_itens = False
+            continue
         if not dentro_dos_itens or not linha:
             continue
 
         partes = linha.split()
         sku = partes[0].strip("|:;") if partes else ""
-        if (
-            len(sku) < 3
-            or not any(char.isdigit() for char in sku)
-            or not all(_char_sku_valido(char) for char in sku)
-        ):
+        if not _eh_sku_danfe(sku):
             continue
 
         for indice in range(len(partes) - 2, 0, -1):
@@ -309,7 +370,7 @@ def _extrair_itens_full_pdf(texto: str) -> List[dict]:
         if itens:
             return itens
 
-    if "DANFE" in texto_busca and "DADOS DO PRODUTO / SERVI" in texto_busca:
+    if "DANFE" in texto_busca and _tem_cabecalho_itens_danfe(texto_busca):
         itens = _extrair_itens_danfe_pdf(texto)
         if itens:
             return itens
@@ -396,9 +457,13 @@ def _extrair_id_inbound_shopee(texto: str) -> Optional[str]:
     return None
 
 
-def _parse_saida_full_pdf(texto: str) -> dict:
+def _parse_saida_full_pdf(texto: str, tabelas_paginas=None) -> dict:
     texto_busca = _texto_busca_sem_acento(texto)
-    itens = _extrair_itens_full_pdf(texto)
+    itens = []
+    if "DANFE" in texto_busca and tabelas_paginas:
+        itens = _extrair_itens_tabelas_danfe_pdf(tabelas_paginas)
+    if not itens:
+        itens = _extrair_itens_full_pdf(texto)
     tipo_documento = "pdf"
     numero_documento = None
     plataforma_sugerida = None
@@ -408,7 +473,7 @@ def _parse_saida_full_pdf(texto: str) -> dict:
         numero_documento = f"ML-FRETE-{numero_frete}" if numero_frete else None
         tipo_documento = "mercado_livre_inbound"
         plataforma_sugerida = "mercado_livre"
-    elif "DANFE" in texto_busca and "DADOS DO PRODUTO / SERVI" in texto_busca:
+    elif "DANFE" in texto_busca and _tem_cabecalho_itens_danfe(texto_busca):
         numero_documento = _extrair_numero_danfe(texto)
         tipo_documento = "danfe"
         if "EBAZAR.COM.BR" in texto_busca or "MERCADO LIVRE" in texto_busca:
