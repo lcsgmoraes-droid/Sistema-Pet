@@ -130,15 +130,19 @@ def test_recebimento_em_outro_caixa_e_historico_auditavel(api: E2EApi):
         original_depois = _get(api, f"/caixas/{original['id']}/resumo")
         assert original_depois["total_recebido"] == resumo_original["total_recebido"]
         assert original_depois["total_vendido"] == resumo_original["total_vendido"]
-        assert (
-            original_depois["pagamentos_vendas_por_forma_pagamento"]["PIX"]["total"]
-            == 15
+        assert original_depois["pagamentos_vendas_por_forma_pagamento"]["PIX"][
+            "total"
+        ] == pytest.approx(
+            resumo_original["pagamentos_vendas_por_forma_pagamento"]["PIX"]["total"]
+            + 10
         )
-        assert (
-            original_depois["pagamentos_vendas_por_forma_pagamento"]["Dinheiro"][
-                "total"
-            ]
-            == 15
+        assert original_depois["pagamentos_vendas_por_forma_pagamento"]["Dinheiro"][
+            "total"
+        ] == pytest.approx(
+            resumo_original["pagamentos_vendas_por_forma_pagamento"]
+            .get("Dinheiro", {})
+            .get("total", 0)
+            + 15
         )
         detalhe = _get(api, f"/caixas/{atual['id']}/vendas?forma_pagamento=PIX")
         assert len(detalhe) == 1 and detalhe[0]["venda_id"] == venda_id
@@ -280,6 +284,7 @@ def test_auditoria_venda_mista_quatro_formas_mantem_caixa_aberto(api: E2EApi):
                     "quantidade": 1,
                     "preco_unitario": 100,
                     "desconto_item": 0,
+                    "subtotal": 100,
                 }
             ],
             "desconto_venda_valor": 0,
