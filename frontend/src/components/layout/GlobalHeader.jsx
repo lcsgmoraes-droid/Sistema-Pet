@@ -5,6 +5,7 @@ import {
   FiChevronUp,
   FiCreditCard,
   FiHelpCircle,
+  FiLock,
   FiLogOut,
   FiMoon,
   FiRepeat,
@@ -16,6 +17,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import useNovidadesNaoVistas from "../../hooks/useNovidadesNaoVistas";
 import { useTheme } from "../../theme/ThemeContext";
+import ChangePasswordModal from "./ChangePasswordModal";
 import { resolveLayoutSessionIdentity } from "./layoutSessionIdentity";
 
 const COREPET_LOGO = "/brand/corepet/corepet-horizontal.png";
@@ -56,6 +58,7 @@ function BotaoAlternarMenu({ aberto, onClick, title }) {
 // atuando", que agora é escolhida depois do login, não mais na tela dele.
 export default function GlobalHeader({ isMobile, sidebarOpen, onToggleSidebar, user, logout }) {
   const [menuUsuarioAberto, setMenuUsuarioAberto] = useState(false);
+  const [trocarSenhaAberto, setTrocarSenhaAberto] = useState(false);
   const [seletorLojaAberto, setSeletorLojaAberto] = useState(false);
   const [minhasLojas, setMinhasLojas] = useState([]);
   const [trocandoLojaId, setTrocandoLojaId] = useState(null);
@@ -66,10 +69,10 @@ export default function GlobalHeader({ isMobile, sidebarOpen, onToggleSidebar, u
   const { isDark, toggleTheme } = useTheme();
   const { fetchMyTenants, switchTenant } = useAuth();
 
-  const nomeUsuario = user?.nome || user?.username || user?.email;
+  const nomeUsuario = user?.name || user?.username || user?.email;
   const nivelAcesso = user?.role?.name || "";
   const inicialUsuario = (
-    user?.nome?.[0] ||
+    user?.name?.[0] ||
     user?.username?.[0] ||
     user?.email?.[0] ||
     ""
@@ -301,6 +304,18 @@ export default function GlobalHeader({ isMobile, sidebarOpen, onToggleSidebar, u
                 <FiHelpCircle className="flex-shrink-0 text-lg" />
                 <span className="v2-menu-item font-medium">Ajuda & Planos</span>
               </Link>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuUsuarioAberto(false);
+                  setTrocarSenhaAberto(true);
+                }}
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-gray-700 transition-all hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                <FiLock className="flex-shrink-0 text-lg" />
+                <span className="v2-menu-item font-medium">Trocar senha</span>
+              </button>
               <div className="my-1 border-t border-[#d8eee9] dark:border-slate-800" />
               <button
                 type="button"
@@ -318,6 +333,10 @@ export default function GlobalHeader({ isMobile, sidebarOpen, onToggleSidebar, u
           ) : null}
         </div>
       </div>
+
+      {trocarSenhaAberto ? (
+        <ChangePasswordModal onClose={() => setTrocarSenhaAberto(false)} />
+      ) : null}
     </header>
   );
 }

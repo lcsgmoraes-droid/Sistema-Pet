@@ -2,25 +2,42 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import api from "../../api";
 import { clearAuthTokens } from "../../auth/tokenStorage";
+import BotaoCancelar from "../v2/BotaoCancelar/BotaoCancelar";
+import BotaoSalva from "../v2/BotaoSalva/BotaoSalva";
+import InputSenha from "../v2/InputSenha/InputSenha";
 
+// Modal só sai por Cancelar ou Salvar: sem onClick no fundo escurecido e sem
+// botão de fechar (X) no cabeçalho, de propósito — evita perder o
+// preenchimento com um clique ou Esc sem querer.
 export default function ChangePasswordModal({ onClose }) {
   const [senhaAtual, setSenhaAtual] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmacao, setConfirmacao] = useState("");
-  const [erro, setErro] = useState("");
+  const [erros, setErros] = useState({});
+  const [erroGeral, setErroGeral] = useState("");
   const [salvando, setSalvando] = useState(false);
+
+  const validar = () => {
+    const proximosErros = {};
+    if (!senhaAtual) proximosErros.senhaAtual = "Informe a senha atual.";
+    if (!novaSenha) {
+      proximosErros.novaSenha = "Informe a nova senha.";
+    } else if (novaSenha.length < 8) {
+      proximosErros.novaSenha = "A nova senha deve ter pelo menos 8 caracteres.";
+    }
+    if (!confirmacao) {
+      proximosErros.confirmacao = "Confirme a nova senha.";
+    } else if (novaSenha && confirmacao !== novaSenha) {
+      proximosErros.confirmacao = "A confirmação não corresponde à nova senha.";
+    }
+    setErros(proximosErros);
+    return Object.keys(proximosErros).length === 0;
+  };
 
   const salvar = async (evento) => {
     evento.preventDefault();
-    setErro("");
-    if (novaSenha.length < 8) {
-      setErro("A nova senha deve ter pelo menos 8 caracteres.");
-      return;
-    }
-    if (novaSenha !== confirmacao) {
-      setErro("A confirmação não corresponde à nova senha.");
-      return;
-    }
+    setErroGeral("");
+    if (!validar()) return;
 
     setSalvando(true);
     try {
@@ -35,7 +52,7 @@ export default function ChangePasswordModal({ onClose }) {
       window.location.assign("/login?senha=alterada");
     } catch (error) {
       const detalhe = error.response?.data?.detail;
-      setErro(
+      setErroGeral(
         typeof detalhe === "string"
           ? detalhe
           : "Não foi possível alterar a senha. Tente novamente.",
@@ -56,63 +73,64 @@ export default function ChangePasswordModal({ onClose }) {
           id="change-password-title"
           className="text-xl font-semibold text-slate-900 dark:text-white"
         >
-          Alterar minha senha
+          Trocar senha
         </h2>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
           Informe sua senha atual e escolha uma nova senha. Depois, entre novamente em seus
           dispositivos.
         </p>
-        <form onSubmit={salvar} className="mt-5 space-y-4">
-          {[
-            ["senha-atual", "Senha atual", senhaAtual, setSenhaAtual, "current-password"],
-            ["nova-senha", "Nova senha", novaSenha, setNovaSenha, "new-password"],
-            [
-              "confirmar-senha",
-              "Confirmar nova senha",
-              confirmacao,
-              setConfirmacao,
-              "new-password",
-            ],
-          ].map(([id, label, value, onChange, autoComplete]) => (
-            <label
-              key={id}
-              htmlFor={id}
-              className="block text-sm font-medium text-slate-700 dark:text-slate-200"
-            >
-              {label}
-              <input
-                id={id}
-                type="password"
-                value={value}
-                onChange={(evento) => onChange(evento.target.value)}
-                autoComplete={autoComplete}
-                required
-                disabled={salvando}
-                className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#0f8b8d] focus:ring-2 focus:ring-[#0f8b8d]/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-              />
-            </label>
-          ))}
-          {erro && (
+        <form onSubmit={salvar} noValidate className="mt-5 space-y-4">
+          <InputSenha
+            id="trocar-senha-atual"
+            label="Senha atual"
+            value={senhaAtual}
+            onChange={(valor) => {
+              setSenhaAtual(valor);
+              if (erros.senhaAtual) setErros((atual) => ({ ...atual, senhaAtual: "" }));
+            }}
+            autoComplete="current-password"
+            autoFocus
+            required
+            disabled={salvando}
+            error={erros.senhaAtual}
+          />
+          <InputSenha
+            id="trocar-senha-nova"
+            label="Nova senha"
+            value={novaSenha}
+            onChange={(valor) => {
+              setNovaSenha(valor);
+              if (erros.novaSenha) setErros((atual) => ({ ...atual, novaSenha: "" }));
+            }}
+            autoComplete="new-password"
+            required
+            disabled={salvando}
+            error={erros.novaSenha}
+            help={erros.novaSenha ? "" : "Pelo menos 8 caracteres."}
+          />
+          <InputSenha
+            id="trocar-senha-confirmacao"
+            label="Confirmar nova senha"
+            value={confirmacao}
+            onChange={(valor) => {
+              setConfirmacao(valor);
+              if (erros.confirmacao) setErros((atual) => ({ ...atual, confirmacao: "" }));
+            }}
+            autoComplete="new-password"
+            required
+            disabled={salvando}
+            error={erros.confirmacao}
+          />
+          {erroGeral ? (
             <p role="alert" className="text-sm text-red-600 dark:text-red-300">
-              {erro}
+              {erroGeral}
             </p>
-          )}
+          ) : null}
           <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={salvando}
-              className="rounded-lg px-4 py-2 text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={salvando}
-              className="rounded-lg bg-[#0f5f63] px-4 py-2 font-medium text-white hover:bg-[#0d7375] disabled:opacity-50"
-            >
+            <BotaoCancelar onClick={onClose} disabled={salvando} />
+            <BotaoSalva loading={salvando}>
               {salvando ? "Salvando..." : "Salvar nova senha"}
-            </button>
+            </BotaoSalva>
           </div>
         </form>
       </div>
