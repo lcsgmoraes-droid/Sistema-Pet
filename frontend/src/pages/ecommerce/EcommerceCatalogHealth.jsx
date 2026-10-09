@@ -130,6 +130,12 @@ export default function EcommerceCatalogHealth() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link
+            to="/produtos/demanda-nao-atendida"
+            className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700"
+          >
+            <BellRing size={15} /> Ver demanda dos clientes
+          </Link>
           <select
             aria-label="Canal do catálogo"
             value={channel}
