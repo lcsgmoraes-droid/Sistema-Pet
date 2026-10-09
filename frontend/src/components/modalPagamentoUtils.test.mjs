@@ -43,6 +43,7 @@ import {
   obterParcelasDisponiveis,
   obterParcelasPermitidasParaForma,
   obterTaxaCartaoSelecionada,
+  obterTotalRecebidoExistente,
   podeEnviarPagamentoStonePos,
   persistirVendaAbertaParaPagamento,
   resolverFaixasParcelamentoDaForma,
@@ -616,6 +617,52 @@ test("calcula resumo do recebimento considerando pagamentos novos e existentes",
     podeConfirmarFinalizacao: true,
     troco: 10,
   });
+});
+
+test("reabertura preserva recebido real depois de reduzir e aumentar o total", () => {
+  const resposta = {
+    total_venda: 20,
+    total_pago: 20,
+    total_recebido: 60,
+    pagamentos: [{ valor: 40 }, { valor: 20 }],
+  };
+  const totalPagoExistente = obterTotalRecebidoExistente(resposta);
+
+  for (const valorTotal of [20, 60, 80]) {
+    const resumo = calcularResumoRecebimento({ valorTotal, totalPagoExistente });
+    assert.equal(resumo.valorPago, 60);
+    assert.equal(resumo.valorRestante, valorTotal === 80 ? 20 : 0);
+    assert.equal(resumo.podeConfirmarFinalizacao, valorTotal <= 60);
+    assert.equal(resumo.troco, 0, "reducao nao transforma recebido historico em troco novo");
+  }
+
+  const pagamentoComplementar = montarPagamentoRecebido({
+    formaPagamento: { id: 1, nome: "PIX", tipo: "pix" },
+    valor: 20,
+    valorRestante: 20,
+  });
+  assert.equal(pagamentoComplementar.valor, 20);
+  assert.equal(pagamentoComplementar.troco, null);
+});
+
+test("recebido real zero prevalece sobre plano ou total pago legado", () => {
+  const resposta = {
+    total_recebido: 0,
+    total_pago: 100,
+    pagamentos: [{ forma_pagamento: "Crediario", valor: 100 }],
+  };
+  const resumo = calcularResumoRecebimento({
+    valorTotal: 60,
+    totalPagoExistente: obterTotalRecebidoExistente(resposta),
+  });
+  assert.equal(resumo.valorPago, 0);
+  assert.equal(resumo.valorRestante, 60);
+  assert.equal(resumo.podeConfirmarFinalizacao, false);
+});
+
+test("aceita API antiga enquanto o campo de recebido real nao estiver disponivel", () => {
+  assert.equal(obterTotalRecebidoExistente({ total_pago: "40.50" }), 40.5);
+  assert.equal(obterTotalRecebidoExistente(), 0);
 });
 
 test("monta cupom salvo na venda quando nao ha cupom aplicado na tela", () => {

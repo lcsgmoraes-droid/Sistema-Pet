@@ -30,17 +30,17 @@ export default function ModalPagamentoResumoLateral({
         <div className="space-y-3">
           <div className="flex justify-between text-gray-600">
             <span>Total da Venda:</span>
-            <span className="font-medium">R$ {valorTotal.toFixed(2)}</span>
+            <span className="font-medium">{formatMoneyBRL(valorTotal)}</span>
           </div>
 
           <div className="flex justify-between text-green-600">
             <span>Valor Pago:</span>
-            <span className="font-medium">R$ {valorPago.toFixed(2)}</span>
+            <span className="font-medium">{formatMoneyBRL(valorPago)}</span>
           </div>
 
           <div className="flex justify-between text-blue-600 text-lg font-semibold border-t pt-3">
             <span>Restante:</span>
-            <span>R$ {valorRestante.toFixed(2)}</span>
+            <span>{formatMoneyBRL(valorRestante)}</span>
           </div>
         </div>
       </div>
@@ -182,8 +182,8 @@ export default function ModalPagamentoResumoLateral({
                     )}
                     {pag.numero_parcelas && pag.numero_parcelas > 1 && (
                       <div className="text-sm text-blue-600 mt-1 font-medium">
-                        🔢 Parcelado em {pag.numero_parcelas}x de R${" "}
-                        {(parseFloat(pag.valor) / pag.numero_parcelas).toFixed(2)}
+                        🔢 Parcelado em {pag.numero_parcelas}x de{" "}
+                        {formatMoneyBRL(parseFloat(pag.valor) / pag.numero_parcelas)}
                       </div>
                     )}
                     <div className="text-xs text-gray-400 mt-1">
@@ -193,11 +193,11 @@ export default function ModalPagamentoResumoLateral({
                   <div className="flex items-center space-x-3">
                     <div className="text-right">
                       <div className="font-semibold text-green-700 text-lg">
-                        R$ {parseFloat(pag.valor).toFixed(2)}
+                        {formatMoneyBRL(pag.valor)}
                       </div>
                       {pag.troco && parseFloat(pag.troco) > 0 && (
                         <div className="text-xs text-yellow-600">
-                          Troco: R$ {parseFloat(pag.troco).toFixed(2)}
+                          Troco: {formatMoneyBRL(pag.troco)}
                         </div>
                       )}
                     </div>
@@ -261,13 +261,13 @@ export default function ModalPagamentoResumoLateral({
                     )}
                     {pag.numero_parcelas > 1 && (
                       <div className="text-sm text-blue-600 mt-1 font-medium">
-                        🔢 {pag.numero_parcelas}x de R${" "}
-                        {(pag.valor / pag.numero_parcelas).toFixed(2)}
+                        🔢 {pag.numero_parcelas}x de{" "}
+                        {formatMoneyBRL(pag.valor / pag.numero_parcelas)}
                       </div>
                     )}
                     {pag.troco && pag.troco > 0 && (
                       <div className="text-sm text-yellow-600 mt-1">
-                        💵 Troco: R$ {pag.troco.toFixed(2)}
+                        💵 Troco: {formatMoneyBRL(pag.troco)}
                       </div>
                     )}
                   </div>
@@ -275,7 +275,7 @@ export default function ModalPagamentoResumoLateral({
                     <span
                       className={`font-semibold text-lg ${pag.is_cashback ? "text-green-700" : "text-blue-700"}`}
                     >
-                      R$ {pag.valor.toFixed(2)}
+                      {formatMoneyBRL(pag.valor)}
                     </span>
                     <button
                       onClick={() => removerPagamento(index)}

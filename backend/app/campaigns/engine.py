@@ -67,7 +67,13 @@ class CampaignEngine:
            b. execute() — concede recompensa se elegível
         4. Atualiza status do evento na fila
         """
-        set_current_tenant(UUID(str(event.tenant_id)))
+        # Um flush malsucedido expira os atributos ORM. Guardar identificadores
+        # antes permite registrar a falha e recuperar a fila após o rollback.
+        event_id = event.id
+        event_tenant_id = UUID(str(event.tenant_id))
+        previous_retry_count = int(getattr(event, "retry_count", 0) or 0)
+        max_retries = int(getattr(event, "max_retries", 3) or 3)
+        set_current_tenant(event_tenant_id)
         try:
             if event.event_type not in CAMPAIGN_TRIGGER_EVENTS:
                 logger.warning(
@@ -145,16 +151,40 @@ class CampaignEngine:
                 self.db.commit()
 
             except Exception as exc:
+                self.db.rollback()
                 logger.exception(
-                    "[CampaignEngine] Erro ao processar evento %d: %s", event.id, exc
+                    "[CampaignEngine] Erro ao processar evento %d: %s", event_id, exc
                 )
-                event.retry_count = (event.retry_count or 0) + 1
-                event.error_message = str(exc)
-                if event.retry_count >= event.max_retries:
-                    event.status = "failed"
+                failed_event = (
+                    self.db.query(CampaignEventQueue)
+                    .filter(
+                        CampaignEventQueue.id == event_id,
+                        CampaignEventQueue.tenant_id == event_tenant_id,
+                    )
+                    .populate_existing()
+                    .with_for_update()
+                    .one_or_none()
+                )
+                if failed_event is not None and failed_event.status in {
+                    "processing",
+                    "pending",
+                }:
+                    retry_count = failed_event.retry_count
+                    failed_event.retry_count = (
+                        retry_count if retry_count is not None else previous_retry_count
+                    ) + 1
+                    failed_event.error_message = str(exc)
+                    retry_limit = failed_event.max_retries or max_retries
+                    failed_event.status = (
+                        "failed"
+                        if failed_event.retry_count >= retry_limit
+                        else "pending"
+                    )
+                    self.db.commit()
                 else:
-                    event.status = "pending"  # Volta para fila
-                self.db.commit()
+                    # O commit pode ter sido confirmado antes de a conexão
+                    # falhar; não devolver um estado terminal para a fila.
+                    self.db.rollback()
                 raise
         finally:
             clear_current_tenant()
@@ -214,6 +244,9 @@ class CampaignEngine:
         """
         from app.campaigns.handlers import get_handler
 
+        campaign_id = campaign.id
+        campaign_tenant_id = campaign.tenant_id
+        event_type = event.event_type
         handler = get_handler(campaign.campaign_type)
         if handler is None:
             logger.debug(
@@ -235,15 +268,15 @@ class CampaignEngine:
         except Exception as exc:
             errors = 1
             logger.exception(
-                "[CampaignEngine] Handler erro campaign_id=%d: %s", campaign.id, exc
+                "[CampaignEngine] Handler erro campaign_id=%d: %s", campaign_id, exc
             )
             raise
         finally:
             duration_ms = int((datetime.now() - start).total_seconds() * 1000)
             run_log = CampaignRunLog(
-                tenant_id=campaign.tenant_id,
-                campaign_id=campaign.id,
-                event_type=event.event_type,
+                tenant_id=campaign_tenant_id,
+                campaign_id=campaign_id,
+                event_type=event_type,
                 evaluated=evaluated,
                 rewarded=rewarded,
                 errors=errors,

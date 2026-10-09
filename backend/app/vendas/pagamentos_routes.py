@@ -139,6 +139,7 @@ def listar_pagamentos_venda(
         "numero_venda": venda.numero_venda,
         "total_venda": float(venda.total),
         "total_pago": total_pago,
+        "total_recebido": float(resumo_pagamento["total_recebido"]),
         "valor_restante": valor_restante,
         "status": venda.status,
         "status_pagamento": resumo_pagamento["status_pagamento"],

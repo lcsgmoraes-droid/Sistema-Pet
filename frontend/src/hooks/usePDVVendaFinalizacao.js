@@ -12,13 +12,14 @@ import {
 } from "../utils/nfeFiscalAssistida";
 import { rejeicaoResponsavelTecnico } from "../utils/fiscalRejectionGuidance.mjs";
 import { confirmarCorePet, perguntarCorePet } from "../services/corepetDialog";
+import { obterTotalRecebidoExistente } from "../components/modalPagamentoUtils";
 
 async function carregarPagamentosDaVenda(vendaId) {
   try {
     const responsePagamentos = await api.get(`/vendas/${vendaId}/pagamentos`);
     return {
       pagamentos: responsePagamentos.data.pagamentos || [],
-      totalPago: responsePagamentos.data.total_pago || 0,
+      totalPago: obterTotalRecebidoExistente(responsePagamentos.data),
     };
   } catch (error) {
     console.error("Erro ao buscar pagamentos:", error);
@@ -62,7 +63,7 @@ function montarMensagemErroExclusao(errorData) {
   return "Erro ao excluir venda. Verifique se n\u00e3o h\u00e1 v\u00ednculos pendentes.";
 }
 
-function montarVendaReaberta(vendaAtualizada, clienteCompleto) {
+function montarVendaReaberta(vendaAtualizada, clienteCompleto, { pagamentos, totalPago }) {
   return {
     id: vendaAtualizada.id,
     numero_venda: vendaAtualizada.numero_venda,
@@ -79,6 +80,8 @@ function montarVendaReaberta(vendaAtualizada, clienteCompleto) {
     total: parseFloat(vendaAtualizada.total),
     observacoes: vendaAtualizada.observacoes || "",
     status: "aberta",
+    pagamentos,
+    total_pago: totalPago,
     tem_entrega: vendaAtualizada.tem_entrega || false,
     entrega: {
       endereco_completo: vendaAtualizada.endereco_entrega || "",
@@ -199,13 +202,14 @@ export function usePDVVendaFinalizacao({
       await api.post(`/vendas/${vendaAtual.id}/reabrir`);
 
       const vendaAtualizada = await buscarVenda(vendaAtual.id);
+      const pagamentosVenda = await carregarPagamentosDaVenda(vendaAtual.id);
 
       let clienteCompleto = null;
       if (vendaAtualizada.cliente_id) {
         clienteCompleto = await buscarClientePorId(vendaAtualizada.cliente_id);
       }
 
-      setVendaAtual(montarVendaReaberta(vendaAtualizada, clienteCompleto));
+      setVendaAtual(montarVendaReaberta(vendaAtualizada, clienteCompleto, pagamentosVenda));
       setModoVisualizacao(false);
       if (clienteCompleto?.id) {
         await recarregarContextoClienteAtual?.();

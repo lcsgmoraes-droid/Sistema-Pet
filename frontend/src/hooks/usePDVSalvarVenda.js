@@ -3,6 +3,7 @@ import { criarVenda } from "../api/vendas";
 import { toast } from "react-hot-toast";
 import { montarPayloadVenda } from "../utils/pdvVendaPayload";
 import { debugLog } from "../utils/debug";
+import { obterTotalRecebidoExistente } from "../components/modalPagamentoUtils";
 
 function calcularStatusPorPagamento(totalPago, totalVenda) {
   if (totalPago >= totalVenda - 0.01) {
@@ -19,7 +20,7 @@ function calcularStatusPorPagamento(totalPago, totalVenda) {
 async function buscarTotalPago(vendaId) {
   try {
     const responsePagamentos = await api.get(`/vendas/${vendaId}/pagamentos`);
-    return responsePagamentos.data.total_pago || 0;
+    return obterTotalRecebidoExistente(responsePagamentos.data);
   } catch (error) {
     console.error("Erro ao buscar pagamentos:", error);
     return 0;

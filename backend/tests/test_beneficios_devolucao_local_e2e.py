@@ -304,6 +304,121 @@ def test_reabrir_aumentar_reduzir_remover_e_refinalizar_sem_duplicar(
     )
 
 
+def test_reabrir_alterar_preco_e_desconto_ajusta_beneficios_sem_novo_recebimento(
+    api, regras_beneficios
+):
+    caixa = _local_com_caixa_aberto(api)
+    prefix = "E2E-PRECO-BENEFICIOS-" + uuid4().hex[:12]
+    cliente = _cliente(api, prefix)
+    produto = _produto(api, prefix, preco=20)
+    venda = _venda(api, cliente["id"], [_item(produto["id"], 2, 20)], prefix)
+    venda_id = venda["id"]
+    _finalizar(api, venda_id, [{"forma_pagamento": "PIX", "valor": 40}])
+    _saldo_esperado(api, cliente["id"], 4, 4)
+    coupons = _get(
+        api,
+        "/campanhas/cupons",
+        customer_id=cliente["id"],
+        campaign_id=regras_beneficios["id"],
+    )
+    assert len(coupons) == 1 and coupons[0]["status"] == "active"
+    original_coupon = coupons[0]
+    original_payments = _get(api, f"/vendas/{venda_id}/pagamentos")["pagamentos"]
+    expected_payments = original_payments
+    assert len(original_payments) == 1 and original_payments[0]["valor"] == 40
+
+    # Duas unidades em todas as etapas: primeiro varia o preço, depois o desconto.
+    for preco, desconto, total, cashback, carimbos, pagamento in (
+        (30, 0, 60, 6, 6, 20),
+        (10, 0, 20, 2, 2, 0),
+        (5, 0, 10, 1, 1, 0),
+        (5, 0, 10, 1, 1, 0),
+        (20, 25, 15, "1.50", 1, 0),
+        (20, 20, 20, 2, 2, 0),
+        (20, 0, 40, 4, 4, 0),
+    ):
+        api.expect(
+            "POST", f"/vendas/{venda_id}/reabrir", {200}, "preco.reabrir", json={}
+        )
+        _saldo_esperado(api, cliente["id"], 0, 0)
+        reopened_coupons = _get(
+            api,
+            "/campanhas/cupons",
+            customer_id=cliente["id"],
+            campaign_id=regras_beneficios["id"],
+        )
+        assert len(reopened_coupons) == 1
+        assert reopened_coupons[0]["id"] == original_coupon["id"]
+        assert reopened_coupons[0]["status"] == "voided"
+        atual = _get(api, f"/vendas/{venda_id}")
+        assert len(atual["itens"]) == 1
+        item = atual["itens"][0]
+        assert item["produto_id"] == produto["id"] and item["quantidade"] == 2
+        api.expect(
+            "PUT",
+            f"/vendas/{venda_id}",
+            {200},
+            "preco.editar_preco_ou_desconto",
+            json={
+                "cliente_id": cliente["id"],
+                "itens": [_item(produto["id"], 2, preco, item_id=item["id"])],
+                "desconto_valor": desconto,
+                "observacoes": prefix,
+            },
+        )
+        pagamentos = (
+            [{"forma_pagamento": "PIX", "valor": pagamento}] if pagamento else []
+        )
+        finalizada = _finalizar(api, venda_id, pagamentos)
+        assert finalizada["total"] == total
+        assert len(finalizada["itens"]) == 1
+        assert finalizada["itens"][0]["quantidade"] == 2
+        assert finalizada["itens"][0]["preco_unitario"] == preco
+        assert _get(api, f"/produtos/{produto['id']}")["estoque_atual"] == 18
+        _saldo_esperado(api, cliente["id"], cashback, carimbos)
+        receipts = _get(api, f"/vendas/{venda_id}/pagamentos")
+        if pagamento:
+            assert len(receipts["pagamentos"]) == 2
+            assert receipts["pagamentos"][0] == original_payments[0]
+            assert receipts["pagamentos"][1]["valor"] == 20
+            expected_payments = receipts["pagamentos"]
+        else:
+            assert receipts["pagamentos"] == expected_payments
+        assert sum(p["valor"] for p in receipts["pagamentos"]) == 60
+        assert all(p["caixa_id"] == caixa["id"] for p in receipts["pagamentos"])
+        assert receipts["valor_restante"] == 0
+        coupons = _get(
+            api,
+            "/campanhas/cupons",
+            customer_id=cliente["id"],
+            campaign_id=regras_beneficios["id"],
+        )
+        assert len(coupons) == 1
+        for key in ("id", "code", "valid_until", "discount_value"):
+            assert coupons[0][key] == original_coupon[key]
+        assert coupons[0]["status"] == ("active" if total >= 30 else "voided")
+
+    auditoria = _get(api, f"/caixas/{caixa['id']}/auditoria")
+    received = [p for p in auditoria["pagamentos"] if p["venda_id"] == venda_id]
+    assert len(received) == 2 and sum(p["valor"] for p in received) == 60
+    assert not [m for m in auditoria["movimentacoes"] if m["venda_id"] == venda_id]
+    stamps = _get(
+        api,
+        f"/campanhas/clientes/{cliente['id']}/carimbos",
+        incluir_estornados="true",
+    )
+    assert len(stamps) == 6
+    assert sum(stamp["voided_at"] is None for stamp in stamps) == 4
+    extrato = _get(api, f"/campanhas/clientes/{cliente['id']}/cashback/extrato")
+    assert sum(Decimal(str(t["amount"])) for t in extrato["transacoes"]) == 4
+    print(
+        f"PRECO_BENEFICIOS venda={venda_id} numero={finalizada['numero_venda']} "
+        f"cliente={cliente['id']} quantidade=2 estoque=18 "
+        "totais=40,60,20,10,10,15,20,40 cashback=4,6,2,1,1,1.5,2,4 "
+        "carimbos=4,6,2,1,1,1,2,4 recebimentos=40+20 sem_duplicacao"
+    )
+
+
 def preparar_venda_cartao_pendente(api, prefix=None):
     """Cria venda separada para a UI ou para a jornada HTTP de devolução."""
     caixa = _local_com_caixa_aberto(api)

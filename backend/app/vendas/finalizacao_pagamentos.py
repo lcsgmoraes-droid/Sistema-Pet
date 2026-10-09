@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.campaigns.cashback_wallet import get_cashback_wallet, lock_cashback_customer
 from app.utils.timezone import now_brasilia
+from app.vendas.status_pagamento import pagamento_valido_para_saldo
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,9 @@ def _calcular_pagamentos_finalizacao(
     pagamentos_novos: List[Dict[str, Any]],
 ) -> Dict[str, float]:
     total_venda_float = float(total_venda or 0)
-    total_ja_pago = sum(float(p.valor) for p in pagamentos_existentes)
+    total_ja_pago = sum(
+        float(p.valor) for p in pagamentos_existentes if pagamento_valido_para_saldo(p)
+    )
     total_novos_pagamentos = sum(float(p.get("valor") or 0) for p in pagamentos_novos)
     valor_restante_bruto = total_venda_float - total_ja_pago
 

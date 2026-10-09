@@ -363,7 +363,7 @@ def sync_loyalty_stamps_for_sale(
                     stamp_index=stamp_index,
                     stamp_value_snapshot=Decimal(str(stamp_value)),
                     is_manual=False,
-                    notes=reason,
+                    notes=_append_note(None, reason) if reason else None,
                 )
             )
             added += 1

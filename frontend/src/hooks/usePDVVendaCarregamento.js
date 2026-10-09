@@ -5,6 +5,7 @@ import { buscarVenda, listarVendas } from "../api/vendas";
 import { debugLog } from "../utils/debug";
 import { extrairCamposFiscaisVenda } from "../utils/pdvFiscalStatus";
 import { perguntarCorePet } from "../services/corepetDialog";
+import { obterTotalRecebidoExistente } from "../components/modalPagamentoUtils";
 
 function criarEntregaVazia() {
   return {
@@ -21,7 +22,7 @@ async function carregarPagamentosVenda(vendaId) {
     const responsePagamentos = await api.get(`/vendas/${vendaId}/pagamentos`);
     return {
       pagamentos: responsePagamentos.data.pagamentos || [],
-      totalPago: responsePagamentos.data.total_pago || 0,
+      totalPago: obterTotalRecebidoExistente(responsePagamentos.data),
     };
   } catch (error) {
     console.error("Erro ao buscar pagamentos:", error);

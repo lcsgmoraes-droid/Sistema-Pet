@@ -187,9 +187,159 @@ Verificações finais desta etapa:
   `lote-validade-local.png`, `entregador-sem-acerto-local.png` e
   `devolucao-atualizada-local.png` na pasta de visualizações desta conversa.
 
-Somando as jornadas anteriores e adicionais, **8 testes HTTP distintos passaram**.
+Somando as jornadas anteriores e adicionais, **9 testes HTTP distintos passaram**.
 Nenhuma alteração foi enviada ao GitHub ou aplicada em produção. O PostgreSQL
 descartável dos testes foi parado; o sistema de homologação local permanece disponível.
+
+## Confirmação complementar de preços e descontos
+
+Novo pedido de Lucas: confirmar recebimentos de saldos anteriores e ajuste dos
+benefícios de venda já paga ao alterar quantidades e valores.
+
+O aceite `test_reabrir_alterar_preco_e_desconto_ajusta_beneficios_sem_novo_recebimento`
+foi acrescentado em `tests/test_beneficios_devolucao_local_e2e.py` e passou
+em 80,50 segundos. Venda fictícia `202610090023`, ID 28, cliente 35, produto 85.
+Sempre 2 unidades e saldo de estoque 18 durante a jornada de preço/desconto.
+
+| Alteração | Total líquido | Cashback | Carimbos |
+| --- | ---: | ---: | ---: |
+| Preço unitário R$ 20 | R$ 40 | R$ 4 | 4 |
+| Preço unitário R$ 30 | R$ 60 | R$ 6 | 6 |
+| Preço unitário R$ 10 | R$ 20 | R$ 2 | 2 |
+| Preço unitário R$ 5 | R$ 10 | R$ 1 | 1 |
+| Repetir preço R$ 5 | R$ 10 | R$ 1 | 1 |
+| Preço R$ 20, desconto R$ 25 | R$ 15 | R$ 1,50 | 1 |
+| Preço R$ 20, desconto R$ 20 | R$ 20 | R$ 2 | 2 |
+| Retirar desconto | R$ 40 | R$ 4 | 4 |
+
+Cashback de 10% e valor de carimbo R$ 10 eram regras fictícias exclusivas desta
+jornada. Não são parâmetros definidos para produção. Regras locais foram
+restauradas e a campanha exclusiva foi arquivada ao final.
+
+Em todas as reaberturas, cashback/carimbos disponíveis ficaram zerados e o
+cupom suspenso. Ao refinalizar, foram recalculados pelos valores atuais e pela
+regra original. Cupom preservou identidade/validade e voltou a ativo quando o
+mínimo foi atendido. O histórico continuou com somente PIX R$ 40 + R$ 20;
+redução, desconto e repetição não criaram novas entradas.
+
+A confirmação de recebimentos anteriores usa a jornada de baixa em lote já
+descrita acima: vendas de 07/10 e 08/10, recebidas em 09/10 no caixa ID 7,
+total R$ 30, preservando caixa de origem e estoque.
+
+No reteste pela interface, a mesma venda já paga foi reduzida de 2 para 1 unidade
+(total R$ 20) e finalizada por “Confirmar Ajustes”, sem novo pagamento. O PDV
+mostrou cashback R$ 2 e 2 carimbos. Depois, aumentou de 1 para 3 unidades
+(total R$ 60), confirmou novamente sem pagamento e mostrou cashback R$ 6 e
+6 carimbos. Os dois PIX anteriores permaneceram registrados.
+
+O aumento após a redução revelou um bloqueio adicional de interface: o campo
+`total_pago` da consulta estava limitado ao total salvo anterior de R$ 20,
+embora existissem PIX R$ 40 + R$ 20. O modal mostrava R$ 40 a pagar e não
+permitia confirmar. A API agora também expõe `total_recebido` sem esse limite,
+preservando `total_pago` e o status para consumidores existentes. O PDV utiliza
+o recebido real para comparar com o total editado. Crediário considera apenas
+parcelas baixadas; pagamentos estornados/recusados/cancelados ficam excluídos.
+Dinheiro considera o valor alocado, sem somar troco.
+
+O reteste do modal atualizado exibiu total R$ 60, recebido R$ 60 e restante
+zero; “Confirmar Ajustes” concluiu a venda. A redução não gerou crédito ou troco
+automático sobre pagamentos históricos. Novos testes também verificam que
+aumento para R$ 80 exige somente a diferença de R$ 20.
+
+Verificações adicionais: **30 testes Python** focados em status financeiro,
+finalização e resumo do cliente; **46 testes Node** de pagamento/cashback;
+Ruff, ESLint, Prettier e build passaram. Imagens local de backend/frontend
+foram reconstruídas; migrations permaneceram na head única `zzzm20261009a1`.
+Evidências: `beneficios-venda-reduzida-local.png` e
+`beneficios-venda-aumentada-local.png`, na pasta de visualizações desta conversa.
+
+O resumo principal do PDV foi alinhado ao modal. Na repetição pela tela, a venda
+foi reduzida para R$ 20 mantendo recebido R$ 60 e restante zero. Ao aumentar para
+R$ 80, ambos mostraram somente R$ 20 a receber. Foi registrado um terceiro PIX
+de R$ 20: banco local confirmou venda finalizada em R$ 80, pagamentos R$ 40 +
+R$ 20 + R$ 20 no caixa ID 7 e estoque do produto 85 em 16 unidades.
+
+A revisão também alinhou a finalização e o resumo para excluir pagamentos
+estornados, recusados e cancelados do saldo. **46 testes Python focados passaram**,
+incluindo complemento após estorno, normalização dos status e compatibilidade
+da alocação de crediário; Ruff passou. O teste antigo de tamanho de arquivo
+continua falhando no baseline: `finalizacao.py` já tem 663 linhas não vazias no
+HEAD (664 em `origin/main`) e o contrato exige menos de 560. Esse arquivo não
+foi alterado nesta rodada.
+
+Limite fora do cenário de venda já paga: a refinalização de uma venda com
+parcelas de crediário ainda pendentes mantém a política anterior de considerar
+o plano como alocação, enquanto o resumo considera somente baixas efetivas.
+O recebimento dessas parcelas continua pelo fluxo de contas a receber, testado
+na jornada de caixa. A política de renegociação do plano não foi alterada aqui.
+
+### Reaberturas repetidas e recuperação dos benefícios
+
+O reteste sucessivo encontrou um segundo defeito: as observações de carimbos
+automáticos acumulavam motivos de estorno/reativação até exceder `VARCHAR(500)`.
+A falha abortava a transação das campanhas e impedia cashback e cupom de serem
+recalculados. O motor tentava acessar atributos ORM antes do rollback, deixando
+eventos presos em `processing`.
+
+O resumo de observações agora fica limitado a 500 caracteres e guarda as ações
+recentes; os motivos e as contagens integrais permanecem na auditoria de cada
+sincronização. O handler de fidelidade propaga erros, e o motor faz rollback
+antes de recarregar o evento por ID/tenant com trava e salvar o contador e estado
+de tentativa. Eventos já concluídos permanecem concluídos.
+
+**35 testes passaram, sem skips**, incluindo 11 novas instâncias de regressão:
+limites Unicode, 25 ciclos de reabertura com 51 registros de auditoria, mudança
+da regra atual preservando o snapshot original, falha SQL real com rollback de
+carimbos/auditoria/log, recuperação sem duplicação, limite de tentativas,
+isolamento entre tenants e commit confirmado com resposta perdida. Ruff e
+revisão independente passaram; PostgreSQL temporário da porta 15440 foi removido.
+
+Após reconstruir somente o backend local, os eventos fictícios 103 a 106 da
+venda 28 foram reprocessados com guardas de staging, banco/tenant, cliente,
+número da venda e marcador exclusivo. Todos ficaram `done`: cashback R$ 8,
+oito carimbos e observação máxima de 469 caracteres, sem duplicar concessões.
+Eventos de produção não foram consultados ou reprocessados nesta rodada.
+
+Novo aumento pela tela para cinco unidades, total R$ 100, exigiu somente PIX
+R$ 20. Banco confirmou quatro pagamentos R$ 40 + R$ 20 + R$ 20 + R$ 20 no
+caixa ID 7, estoque 15, cashback R$ 10, dez carimbos brutos e eventos 107/108
+concluídos sem retry. Pela configuração fictícia, os dez carimbos completam um
+ciclo e são convertidos em cupom, deixando zero carimbos disponíveis.
+
+### Saldo atualizado automaticamente no PDV
+
+Foi corrigida uma corrida na consulta da interface: após finalizar, o PDV
+buscava o saldo antes de as campanhas terminarem e mantinha o zero da reabertura.
+A API agora informa eventos de compra pendentes por tenant/cliente antes de
+calcular o saldo. O PDV mostra “Atualizando benefícios…” e acompanha a fila até
+exibir cashback, carimbos e cupons finais. Consultas são limitadas a 40 tentativas
+com intervalo de 1,5 s; troca de cliente/desmontagem cancela consulta e timer,
+respostas antigas são ignoradas e erros não substituem o saldo por zero.
+
+Aceite final pela tela, sem recarregar a página após os ajustes:
+
+- Redução de cinco para quatro unidades, total R$ 80, mantendo R$ 100 já
+  recebidos: “Confirmar Ajustes” não criou pagamento; apareceu cashback R$ 8,
+  oito carimbos e somente o cupom de recompra válido.
+- Aumento para seis unidades, total R$ 120: resumo e modal pediram apenas
+  R$ 20. Após o PIX, a tela exibiu automaticamente cashback R$ 12, dois carimbos
+  disponíveis e cupom de fidelidade R$ 20 pelos dez carimbos convertidos.
+- Banco confirmou cinco pagamentos R$ 40 + quatro de R$ 20 no caixa ID 7,
+  estoque 14, cashback R$ 12, doze carimbos brutos, observação máxima de 472
+  caracteres e eventos 111/112 concluídos com zero retries.
+
+Verificação conjunta final: **54 testes Python** de pagamentos/resumos/consulta
+da fila e **52 testes Node** de pagamento/cashback/atualização assíncrona passaram.
+Os novos casos cobrem fila por tenant/cliente, IDs JSON numéricos e textuais,
+conclusão com cashback/cupons atualizados, resposta antiga, cancelamento,
+limite de tentativas e erro sem saldo falso. ESLint, Prettier, Ruff, build e
+`git diff --check` passaram. Backend e frontend locais reconstruídos e saudáveis.
+Permanece somente a falha antiga de contrato de tamanho descrita acima.
+
+Evidências finais: `beneficios-reabertura-reducao-local.png` e
+`beneficios-reabertura-pagamento-local.png` na pasta de visualizações desta
+conversa. Tudo permanece na branch local; não houve push ou deploy. As 184
+alterações preexistentes no checkout original permaneceram intactas.
 
 ## Recuperação do Docker local
 

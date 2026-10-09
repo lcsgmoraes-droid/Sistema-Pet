@@ -19,6 +19,7 @@ import {
   montarObservacoesComJustificativaMargem,
   montarPagamentoRecebido,
   montarVendaParaPersistirComCupom,
+  obterTotalRecebidoExistente,
   persistirVendaAbertaParaPagamento,
   validarPagamentoParaAdicionar,
 } from "../modalPagamentoUtils";
@@ -170,7 +171,7 @@ export function useModalPagamentoActions({
 
       const response = await api.get(`/vendas/${venda.id}/pagamentos`);
       setPagamentosExistentes(response.data.pagamentos || []);
-      setTotalPagoExistente(response.data.total_pago || 0);
+      setTotalPagoExistente(obterTotalRecebidoExistente(response.data));
 
       if (response.data.pagamentos.length === 0 && onVendaAtualizada) {
         await onVendaAtualizada();
