@@ -24,6 +24,10 @@ from app.empresa_grupo_estoque_compartilhado_service import (
     resolver_tenant_estoque_item,
 )
 from app.estoque.service import EstoqueService
+from app.estoque.devolucao_lotes import (
+    preparar_devolucao_lotes,
+    recompor_lotes_devolucao,
+)
 from app.financeiro_models import ContaReceber, FormaPagamento
 from app.financeiro.recebiveis_operadora import TIPOS_RECEBIVEL_OPERADORA
 from app.produtos_models import EstoqueMovimentacao, Produto
@@ -196,28 +200,58 @@ def _item_controlava_estoque_na_venda(item) -> bool:
     )
 
 
-def _produto_estoque_original(db: Session, item, tenant_id):
+def _produto_estoque_original(db: Session, item, tenant_id, bloquear=False):
     """Busca o produto no tenant dono do estoque, inclusive quando compartilhado."""
     tenant_estoque, _ = resolver_tenant_estoque_item(item, tenant_id)
     with contexto_tenant_estoque(tenant_estoque, tenant_id) as tenant_estoque_uuid:
-        produto = (
-            db.query(Produto)
-            .filter(
-                Produto.id == item.produto_id,
-                Produto.tenant_id == tenant_estoque_uuid,
-            )
-            .first()
+        consulta = db.query(Produto).filter(
+            Produto.id == item.produto_id,
+            Produto.tenant_id == tenant_estoque_uuid,
         )
+        if bloquear:
+            consulta = consulta.with_for_update().populate_existing()
+        produto = consulta.first()
     return produto, tenant_estoque
 
 
+def _validar_produto_devolucao(produto):
+    if produto is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Produto original indisponivel. Concilie o estoque manualmente.",
+        )
+    if getattr(produto, "controlar_estoque", True) is False:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Produto nao controla estoque atualmente. "
+                "Concilie a devolucao e o estoque manualmente."
+            ),
+        )
+    if (
+        getattr(produto, "tipo_produto", None) == "KIT"
+        and (getattr(produto, "tipo_kit", None) or "VIRTUAL") != "FISICO"
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="KIT virtual exige devolucao e recomposicao manual dos componentes.",
+        )
+
+
 def _validar_estoque_devolucao_seguro(
-    db: Session, venda_id: int, tenant_id, itens_venda, itens_solicitados
-) -> None:
-    """Exige saida rastreavel e evita recompor KIT virtual ou FIFO sem lote."""
+    db: Session,
+    venda_id: int,
+    tenant_id,
+    itens_venda,
+    itens_solicitados,
+    bloquear=False,
+) -> dict:
+    """Exige saida rastreavel e prepara a reposicao nos lotes originais."""
     itens_por_id = {item.id: item for item in itens_venda}
     grupos_solicitados = set()
     quantidades_vendidas = defaultdict(Decimal)
+    quantidades_solicitadas = defaultdict(lambda: defaultdict(Decimal))
+    itens_por_produto = defaultdict(list)
     for item in itens_venda:
         if not _item_controlava_estoque_na_venda(item):
             continue
@@ -225,41 +259,30 @@ def _validar_estoque_devolucao_seguro(
         quantidades_vendidas[(item.produto_id, tenant_estoque)] += Decimal(
             str(item.quantidade or 0)
         )
+        itens_por_produto[(item.produto_id, tenant_estoque)].append(item)
 
     for solicitado in itens_solicitados:
         item = itens_por_id.get(solicitado.get("item_id"))
         if item is None or not _item_controlava_estoque_na_venda(item):
             continue
         produto, tenant_estoque = _produto_estoque_original(db, item, tenant_id)
-        if produto is None:
-            raise HTTPException(
-                status_code=409,
-                detail="Produto original indisponivel. Concilie o estoque manualmente.",
-            )
-        if getattr(produto, "controlar_estoque", True) is False:
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    "Produto nao controla estoque atualmente. "
-                    "Concilie a devolucao e o estoque manualmente."
-                ),
-            )
-        if getattr(item, "lote_id", None) is not None:
-            raise HTTPException(
-                status_code=409,
-                detail="Devolucao de item com lote exige recomposicao manual do estoque.",
-            )
-        if (
-            getattr(produto, "tipo_produto", None) == "KIT"
-            and (getattr(produto, "tipo_kit", None) or "VIRTUAL") != "FISICO"
-        ):
-            raise HTTPException(
-                status_code=409,
-                detail="KIT virtual exige devolucao e recomposicao manual dos componentes.",
-            )
+        _validar_produto_devolucao(produto)
         grupos_solicitados.add((item.produto_id, tenant_estoque))
+        quantidades_solicitadas[(item.produto_id, tenant_estoque)][item.id] += Decimal(
+            str(solicitado["quantidade"])
+        )
 
-    for produto_id, tenant_estoque in grupos_solicitados:
+    planos_lotes = {}
+    # As devolucoes de vendas diferentes compartilham produto/lote; a ordem
+    # fixa evita disputar os mesmos produtos em ordens opostas.
+    for produto_id, tenant_estoque in sorted(
+        grupos_solicitados, key=lambda grupo: (str(grupo[1]), grupo[0])
+    ):
+        if bloquear:
+            produto, _ = _produto_estoque_original(
+                db, itens_por_produto[(produto_id, tenant_estoque)][0], tenant_id, True
+            )
+            _validar_produto_devolucao(produto)
         with contexto_tenant_estoque(tenant_estoque, tenant_id) as tenant_estoque_uuid:
             saidas = (
                 db.query(EstoqueMovimentacao)
@@ -272,11 +295,6 @@ def _validar_estoque_devolucao_seguro(
                     EstoqueMovimentacao.status != "cancelado",
                 )
                 .all()
-            )
-        if any(saida.lotes_consumidos for saida in saidas):
-            raise HTTPException(
-                status_code=409,
-                detail="Devolucao de item com lote exige recomposicao manual do estoque.",
             )
         quantidade_saida = sum(
             (abs(Decimal(str(saida.quantidade or 0))) for saida in saidas),
@@ -292,6 +310,20 @@ def _validar_estoque_devolucao_seguro(
                     "Concilie o estoque manualmente."
                 ),
             )
+        with contexto_tenant_estoque(tenant_estoque, tenant_id) as tenant_estoque_uuid:
+            planos_lotes[(produto_id, tenant_estoque)] = preparar_devolucao_lotes(
+                db,
+                produto_id=produto_id,
+                tenant_id=tenant_estoque_uuid,
+                venda_id=venda_id,
+                saidas=saidas,
+                itens_venda=itens_por_produto[(produto_id, tenant_estoque)],
+                quantidades_por_item=quantidades_solicitadas[
+                    (produto_id, tenant_estoque)
+                ],
+                bloquear=bloquear,
+            )
+    return planos_lotes
 
 
 def _hash_requisicao_devolucao(venda_id: int, dados: dict, itens: list) -> str:
@@ -640,8 +672,11 @@ def registrar_devolucao(
                     detail="O valor da devolução mudou. Revise a prévia antes de confirmar.",
                 )
         _validar_recebiveis_liquidados(db, venda_id, tenant_id)
-        _validar_estoque_devolucao_seguro(
-            db, venda_id, tenant_id, todos_itens_venda, itens_devolucao
+        planos_lotes = (
+            _validar_estoque_devolucao_seguro(
+                db, venda_id, tenant_id, todos_itens_venda, itens_devolucao, True
+            )
+            or {}
         )
         devolvido_por_item = defaultdict(Decimal)
         for evento_anterior in eventos_anteriores:
@@ -846,6 +881,7 @@ def registrar_devolucao(
 
                 # Devolver ao estoque
                 produto_nome_estoque = None
+                lotes_recompostos = []
                 if _item_controlava_estoque_na_venda(item_venda):
                     try:
                         tenant_estoque, compartilhado = resolver_tenant_estoque_item(
@@ -884,6 +920,17 @@ def registrar_devolucao(
                                 ),
                                 **custo_estoque,
                             )
+                            plano_lotes = planos_lotes.get(
+                                (item_venda.produto_id, tenant_estoque)
+                            )
+                            if plano_lotes is not None:
+                                lotes_recompostos = recompor_lotes_devolucao(
+                                    db,
+                                    plano_lotes,
+                                    item_venda.id,
+                                    quantidade_decimal,
+                                    resultado_estoque["movimentacao_id"],
+                                )
                         if isinstance(resultado_estoque, dict):
                             produto_nome_estoque = resultado_estoque.get("produto_nome")
                         # Registrar auditoria
@@ -921,6 +968,7 @@ def registrar_devolucao(
                         "custo_estornado": str(custo_item),
                         "origem_custo": origem_custo,
                         "custo_pendente": custo_pendente,
+                        "lotes_recompostos": lotes_recompostos,
                     }
                 )
 

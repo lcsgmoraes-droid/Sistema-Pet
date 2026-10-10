@@ -6,7 +6,6 @@ eventos fora da fachada ``VendaService`` sem alterar o comportamento publico.
 """
 
 import logging
-from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any, Callable, Dict, List, Optional
 
@@ -27,6 +26,7 @@ from app.vendas.finalizacao_pagamentos import (
 )
 from app.vendas.finalizacao_pos_commit import processar_pos_commit_finalizacao
 from app.vendas.finalizacao_recebiveis import (
+    baixar_recebiveis_dos_novos_pagamentos,
     cancelar_previsoes_apos_desconto,
     criar_recebiveis_dos_novos_pagamentos,
 )
@@ -130,7 +130,6 @@ def finalizar_venda(
     from app.vendas_models import Venda, VendaPagamento
     from app.caixa.service import CaixaService
     from app.financeiro import ContasReceberService
-    from app.financeiro_models import LancamentoManual, CategoriaFinanceira
     from app.services.business_audit_service import (
         build_sale_coupon_redeemed_metadata,
         calculate_manual_discount_amount,
@@ -306,48 +305,8 @@ def finalizar_venda(
                 f"📊 Venda BAIXA PARCIAL - R$ {total_pagamentos:.2f} de R$ {total_venda:.2f}"
             )
 
-            # Criar lançamento previsto para saldo em aberto
-            saldo_em_aberto = total_venda - total_pagamentos
-            if saldo_em_aberto > 0.01:
-                categoria_receitas = (
-                    db.query(CategoriaFinanceira)
-                    .filter(
-                        CategoriaFinanceira.nome.ilike("%vendas%"),
-                        CategoriaFinanceira.tipo == "receita",
-                        CategoriaFinanceira.tenant_id == tenant_id,
-                    )
-                    .first()
-                )
-
-                if not categoria_receitas:
-                    categoria_receitas = CategoriaFinanceira(
-                        nome="Receitas de Vendas",
-                        tipo="receita",
-                        user_id=user_id,
-                        tenant_id=tenant_id,  # ✅ Garantir isolamento multi-tenant
-                    )
-                    db.add(categoria_receitas)
-                    db.flush()
-
-                data_prevista = date.today() + timedelta(days=30)
-                lancamento_saldo = LancamentoManual(
-                    tipo="entrada",
-                    valor=Decimal(str(saldo_em_aberto)),
-                    descricao=f"Venda {venda.numero_venda} - Saldo em aberto",
-                    data_lancamento=data_prevista,
-                    status="previsto",
-                    categoria_id=categoria_receitas.id,
-                    documento=f"VENDA-{venda.id}-SALDO",
-                    fornecedor_cliente=venda.cliente.nome
-                    if venda.cliente
-                    else "Cliente Avulso",
-                    user_id=user_id,
-                    tenant_id=tenant_id,  # ✅ Garantir isolamento multi-tenant
-                )
-                db.add(lancamento_saldo)
-                logger.info(
-                    f"📝 Lançamento previsto criado: R$ {saldo_em_aberto:.2f} em {data_prevista}"
-                )
+            # O service financeiro mantem uma unica previsao de saldo. Criar
+            # outra VENDA-ID-SALDO aqui duplicava o valor ainda a receber.
         else:
             venda.status = "aberta"
 
@@ -501,29 +460,28 @@ def finalizar_venda(
 
         contas_baixadas = []
         valor_ja_baixado = Decimal("0")
+        valores_baixados_por_pagamento = {}
         if total_novos_pagamentos > 0.01:
-            forma_pag_nome = (
-                pagamentos[0]["forma_pagamento"] if pagamentos else "Diversos"
+            contas_baixadas, valores_baixados_por_pagamento = (
+                baixar_recebiveis_dos_novos_pagamentos(
+                    db=db,
+                    venda=venda,
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    pagamentos_anteriores=pagamentos_existentes,
+                    data_recebimento=data_ocorrencia.date()
+                    if data_ocorrencia
+                    else None,
+                )
             )
-
-            resultado_baixa = ContasReceberService.baixar_contas_da_venda(
-                venda_id=venda.id,
-                venda_numero=venda.numero_venda,
-                valor_total_pagamento=total_novos_pagamentos,
-                forma_pagamento_nome=forma_pag_nome,
-                user_id=user_id,
-                tenant_id=tenant_id,
-                db=db,
-                data_recebimento=data_ocorrencia.date() if data_ocorrencia else None,
+            valor_ja_baixado = sum(
+                valores_baixados_por_pagamento.values(), Decimal("0")
             )
-
-            contas_baixadas = resultado_baixa["contas_baixadas"]
-            valor_ja_baixado = resultado_baixa["valor_distribuido"]
 
             if contas_baixadas:
                 logger.info(
                     f"💰 Contas baixadas: {len(contas_baixadas)} conta(s), "
-                    f"R$ {float(resultado_baixa['valor_distribuido']):.2f} distribuído"
+                    f"R$ {float(valor_ja_baixado):.2f} distribuído"
                 )
 
             # Atualizar lançamentos manuais
@@ -551,8 +509,9 @@ def finalizar_venda(
             user_id=user_id,
             pagamentos_anteriores=pagamentos_existentes,
             valor_ja_baixado=valor_ja_baixado,
+            valores_baixados_por_pagamento=valores_baixados_por_pagamento,
         )
-        if not pagamentos and total_pagamentos >= total_venda - 0.01:
+        if total_pagamentos >= total_venda - 0.01:
             cancelar_previsoes_apos_desconto(db=db, venda=venda, tenant_id=tenant_id)
 
         # ============================================================
