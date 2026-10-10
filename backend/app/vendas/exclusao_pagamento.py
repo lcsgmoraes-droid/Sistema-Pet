@@ -15,7 +15,12 @@ from fastapi import HTTPException
 from app.audit_log import log_action
 from app.caixa.service import CaixaService
 from app.caixa_models import Caixa, MovimentacaoCaixa
-from app.financeiro_models import ContaReceber, LancamentoManual, Recebimento
+from app.financeiro_models import (
+    ContaPagar,
+    ContaReceber,
+    LancamentoManual,
+    Recebimento,
+)
 from app.models import AuditLog, Cliente, CreditoLog
 from app.services.venda_rentabilidade_snapshot_service import (
     invalidate_venda_rentabilidade_snapshot,
@@ -69,6 +74,41 @@ def _exclusao_anterior(db, tenant_id, pagamento_id):
         if dados.get("pagamento_excluido") is True:
             return dados["resultado"]
     raise HTTPException(404, "Pagamento nao encontrado")
+
+
+def _conferir_taxas(db, venda, pagamento, tenant_id, forma):
+    from sqlalchemy import or_
+
+    taxa_prevista = _valor(pagamento.valor_taxa_prevista) > 0
+    taxa_historica = None
+    if (
+        not CaixaService.eh_forma_dinheiro(pagamento.forma_pagamento)
+        and forma != "credito_cliente"
+    ):
+        referencia = f"Taxa de pagamento ref. venda {venda.numero_venda}"
+        taxa_historica = (
+            db.query(ContaPagar.id)
+            .filter(
+                ContaPagar.tenant_id == tenant_id,
+                or_(
+                    ContaPagar.status.is_(None),
+                    ContaPagar.status.notin_(("cancelado", "cancelada")),
+                ),
+                or_(
+                    ContaPagar.observacoes == referencia,
+                    ContaPagar.observacoes.startswith(
+                        referencia + " - ", autoescape=True
+                    ),
+                ),
+            )
+            .first()
+        )
+    if taxa_prevista or taxa_historica:
+        _conferir(
+            pagamento,
+            venda,
+            "ha taxa de pagamento prevista ou registrada; confira e estorne a taxa no financeiro",
+        )
 
 
 def _movimento_do_pagamento(db, venda, pagamento, pagamentos, tenant_id):
@@ -395,6 +435,7 @@ def excluir_pagamento_atomico(*, db, pagamento_id, tenant_id, current_user):
             pagamento, venda, "o pagamento pertence a um caixa fechado ou indisponivel"
         )
     forma = _forma(pagamento.forma_pagamento)
+    _conferir_taxas(db, venda, pagamento, tenant_id, forma)
     if (
         forma == "cashback"
         or pagamento.gateway_payment_id

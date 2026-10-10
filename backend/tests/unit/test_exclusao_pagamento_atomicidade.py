@@ -12,6 +12,7 @@ from sqlalchemy.schema import CreateTable
 
 from app.caixa_models import Caixa, MovimentacaoCaixa
 from app.financeiro_models import (
+    ContaPagar,
     ContaReceber,
     FormaPagamento,
     LancamentoManual,
@@ -32,7 +33,13 @@ pytest_plugins = ["tests.unit.test_finalizacao_recebiveis_atomicidade"]
 @pytest.fixture
 def pagamentos(cenario):
     db = cenario.db
-    for model in (CreditoLog, MovimentacaoFinanceira, FluxoCaixa, VetPartnerLink):
+    for model in (
+        CreditoLog,
+        MovimentacaoFinanceira,
+        FluxoCaixa,
+        VetPartnerLink,
+        ContaPagar,
+    ):
         if db.bind.dialect.name == "postgresql":
             with db.bind.begin() as conn:
                 conn.execute(
@@ -420,3 +427,96 @@ def test_excluir_pix_preserva_dinheiro_anterior_em_caixa_fechado(pagamentos):
     c.excluir(pix.id)
     assert c.db.query(MovimentacaoCaixa).one().valor == 100
     assert c.db.query(Recebimento).one().valor_recebido == Decimal("100")
+
+
+def _taxa(cenario, *, tenant=None, observacoes=None, status="pendente"):
+    taxa = ContaPagar(
+        tenant_id=tenant or cenario.tenant,
+        user_id=1,
+        descricao="Taxa de pagamento",
+        observacoes=observacoes
+        or f"Taxa de pagamento ref. venda {cenario.venda.numero_venda} - 2% sobre R$ 35",
+        valor_original=Decimal("0.70"),
+        valor_final=Decimal("0.70"),
+        valor_pago=0,
+        data_emissao=date.today(),
+        data_vencimento=date.today(),
+        status=status,
+    )
+    cenario.db.add(taxa)
+    cenario.db.commit()
+    return taxa
+
+
+@pytest.mark.parametrize("forma,forma_id", [("PIX", 1), ("Dinheiro", 2)])
+def test_taxa_prevista_do_pagamento_bloqueia_sem_alterar_financeiro(
+    pagamentos, forma, forma_id
+):
+    c = pagamentos
+    c.receber((forma, forma_id, 135))
+    pagamento = c.db.query(VendaPagamento).one()
+    pagamento.valor_taxa_prevista = Decimal("2.70")
+    c.db.commit()
+    auditorias = c.db.query(AuditLog).count()
+    with pytest.raises(HTTPException) as exc:
+        c.excluir(pagamento.id)
+    assert exc.value.status_code == 409
+    assert "estorne a taxa no financeiro" in exc.value.detail
+    assert c.db.query(VendaPagamento).one().id == pagamento.id
+    assert c.db.query(Recebimento).one().valor_recebido == Decimal("135")
+    assert _entrada_financeira(c) == Decimal("135")
+    assert c.db.query(AuditLog).count() == auditorias
+
+
+def test_taxa_historica_bloqueia_pix_e_permite_excluir_dinheiro_preservando_pix(
+    pagamentos,
+):
+    c = pagamentos
+    c.receber(("Dinheiro", 2, 100), ("PIX", 1, 35))
+    taxa = _taxa(c)
+    pix = c.db.query(VendaPagamento).filter_by(forma_pagamento_id=1).one()
+    dinheiro = c.db.query(VendaPagamento).filter_by(forma_pagamento_id=2).one()
+    with pytest.raises(HTTPException) as exc:
+        c.excluir(pix.id)
+    assert exc.value.status_code == 409
+    assert c.db.query(Recebimento).count() == 2
+    assert c.db.query(MovimentacaoCaixa).one().valor == 100
+    assert c.db.get(ContaPagar, taxa.id).status == "pendente"
+    c.excluir(dinheiro.id)
+    assert c.db.query(VendaPagamento).one().id == pix.id
+    assert c.db.query(Recebimento).one().valor_recebido == Decimal("35")
+    assert c.db.get(ContaPagar, taxa.id).status == "pendente"
+    assert _entrada_financeira(c) == Decimal("35")
+
+
+def test_taxa_historica_nao_bloqueia_devolucao_de_credito_cliente(pagamentos):
+    c = pagamentos
+    cliente = _credito(c)
+    c.receber(("Crédito Cliente", 3, Decimal("4.90")), ("PIX", 1, Decimal("130.10")))
+    taxa = _taxa(c)
+    credito = c.db.query(VendaPagamento).filter_by(forma_pagamento_id=3).one()
+    c.excluir(credito.id)
+    assert cliente.credito == Decimal("4.90")
+    assert c.db.query(Recebimento).one().valor_recebido == Decimal("130.10")
+    assert c.db.get(ContaPagar, taxa.id).status == "pendente"
+    assert _entrada_financeira(c) == Decimal("130.10")
+
+
+def test_taxa_de_outro_tenant_ou_numero_semelhante_nao_bloqueia_pagamento(
+    pagamentos, tenant_context
+):
+    c = pagamentos
+    c.receber(("PIX", 1, 135))
+    outro_tenant = uuid4()
+    tenant_context(outro_tenant)
+    _taxa(c, tenant=outro_tenant)
+    tenant_context(c.tenant)
+    _taxa(
+        c,
+        observacoes=f"Taxa de pagamento ref. venda {c.venda.numero_venda}0 - Taxa fixa",
+    )
+    _taxa(c, status="cancelado")
+    c.excluir(c.db.query(VendaPagamento).one().id)
+    assert c.db.query(VendaPagamento).count() == 0
+    assert c.db.query(Recebimento).count() == 0
+    assert _entrada_financeira(c) == 0
