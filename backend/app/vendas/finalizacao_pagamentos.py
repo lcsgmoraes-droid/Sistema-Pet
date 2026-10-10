@@ -514,15 +514,31 @@ def processar_pagamentos_finalizacao(
             if not cliente:
                 raise HTTPException(status_code=404, detail="Cliente não encontrado")
 
-            credito_disponivel = float(cliente.credito or 0)
-            if pag_data["valor"] > credito_disponivel + 0.01:
+            credito_disponivel = Decimal(str(cliente.credito or 0))
+            valor_credito = Decimal(str(pag_data["valor"]))
+            if valor_credito > credito_disponivel + Decimal("0.01"):
                 raise HTTPException(
                     status_code=400,
                     detail=f"Crédito insuficiente. Disponível: R$ {credito_disponivel:.2f}",
                 )
 
-            cliente.credito = Decimal(str(credito_disponivel - pag_data["valor"]))
+            cliente.credito = credito_disponivel - valor_credito
             db.add(cliente)
+            from app.models import CreditoLog
+
+            db.add(
+                CreditoLog(
+                    tenant_id=tenant_id,
+                    cliente_id=cliente.id,
+                    tipo="uso_venda",
+                    valor=Decimal(str(pag_data["valor"])),
+                    saldo_anterior=Decimal(str(credito_disponivel)),
+                    saldo_atual=cliente.credito,
+                    referencia_id=venda.id,
+                    motivo=f"Pagamento #{pagamento.id} da venda {venda.numero_venda}",
+                    usuario_nome=user_nome,
+                )
+            )
             logger.info(
                 f"🎁 Crédito utilizado: R$ {pag_data['valor']:.2f} - "
                 f"Saldo restante: R$ {float(cliente.credito):.2f}"
@@ -643,6 +659,15 @@ def processar_pagamentos_finalizacao(
                 data_movimento=data_ocorrencia,
             )
             movimentacoes_caixa_ids.append(mov_info["movimentacao_id"])
+            from app.caixa_models import MovimentacaoCaixa
+            from app.utils.pagamento_vinculos import referencia_pagamento
+
+            movimento = (
+                db.query(MovimentacaoCaixa)
+                .filter_by(id=mov_info["movimentacao_id"], tenant_id=tenant_id)
+                .one()
+            )
+            movimento.documento = referencia_pagamento(pagamento.id)
             logger.info(f"💵 Caixa: Movimentação #{mov_info['movimentacao_id']} criada")
 
     return movimentacoes_caixa_ids
