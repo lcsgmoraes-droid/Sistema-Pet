@@ -1,6 +1,6 @@
 ---
 tipo: dominio
-atualizado: 2026-09-25
+atualizado: 2026-10-09
 ---
 
 # Entidade — Cliente
@@ -17,9 +17,17 @@ Ver [[Pet]], [[Funcionalidades]] (Pessoas/Clientes), [[Venda]], [[Tenant]], [[Em
 - **não** une nem afeta o licenciamento — as 7 lojas continuam pagando e contratando módulos cada uma por si.
 
 **Quem acessa as 7 lojas é a mesma pessoa, mas o sistema enxerga isso como 7 vínculos separados.** O dono é 1 único `User` (uma conta de login), com uma linha [[UserTenant]] por loja — 7 linhas, cada uma podendo ter um perfil (`Role`) diferente (ex.: Administrador nas 7, ou Administrador em 3 e Gerente nas outras 4). No login, ele escolhe em qual das 7 lojas quer trabalhar (`POST /auth/select-tenant`); a partir daí, tudo que ele vê nas telas normais do sistema (clientes, produtos, módulos liberados) é só da loja escolhida naquele momento.
-Exceção real e confirmada: se as 7 lojas estiverem no mesmo [[EmpresaGrupo]], existe um **dashboard de visão consolidada** (`GET /grupos-empresas/{grupo_id}/visao-consolidada` e endpoints de detalhamento) que soma vendas/estoque/financeiro das 7 de uma vez, calculado com segurança (entra no contexto de cada loja uma por vez, respeitando o isolamento de cada uma, e só soma o resultado depois) — ver [[EmpresaGrupo]] para os detalhes. Isso cobre venda, estoque e financeiro; **não cobre Cliente** (ver abaixo).
+Exceção real e confirmada: se as 7 lojas estiverem no mesmo [[EmpresaGrupo]], existe um **dashboard de visão consolidada** (`GET /grupos-empresas/{grupo_id}/visao-consolidada` e endpoints de detalhamento) que soma vendas/estoque/financeiro das 7 de uma vez, calculado com segurança (entra no contexto de cada loja uma por vez, respeitando o isolamento de cada uma, e só soma o resultado depois) — ver [[EmpresaGrupo]] para os detalhes. Isso cobre venda, estoque e financeiro; Cliente é coberto por um mecanismo diferente (ver abaixo), não por esse dashboard.
 
-**Cliente (o comprador/tutor) é 100% isolado por loja — não existe cliente compartilhado nem uma visão consolidada de clientes entre lojas do mesmo grupo.** Cada linha da tabela `clientes` pertence a exatamente um `tenant_id`. ⚠️ Se a mesma pessoa física compra na loja 1 e na loja 3 do mesmo grupo, ela vira **dois cadastros de Cliente completamente separados e sem nenhuma ligação** — mesmo no dashboard de visão consolidada do grupo (que existe para venda/estoque/financeiro, ver acima), o nome do cliente só aparece como rótulo de exibição em cada venda individual, sempre resolvido dentro do `tenant_id` daquela venda — não há nenhuma listagem, agregação ou deduplicação de clientes entre lojas do mesmo grupo (diferente do que existe para [[Produto]], que tem um vínculo manual de equivalência entre lojas — ver lá). O único merge de Cliente que existe (`merged_into_id`, campo desta tabela) é para duplicados **dentro do mesmo tenant**, nunca entre tenants diferentes.
+**Cliente (o comprador/tutor) é compartilhado por GRUPO comercial, não isolado por loja (desde 10/2026).** Pessoa deixou de ser um cadastro duplicado por loja: existe **um único registro de Cliente**, visível e editável por qualquer loja ativa do mesmo grupo comercial — a mesma pessoa física que compra na loja 1 e na loja 3 do mesmo grupo é **o mesmo cadastro**, não dois. Mecanismo (ver `Documentacao/Dominio/EmpresaGrupo.md`):
+
+- `origem_tenant_id` (campo desta tabela, **imutável** após criado) registra qual loja introduziu a pessoa no grupo — é só metadado de origem, não controla visibilidade nem edição.
+- A visibilidade/edição cross-loja roda em duas camadas, sempre em conjunto: o filtro automático do ORM (`app/tenancy/filters.py::pessoa_visivel_no_grupo`) e a política real de RLS no Postgres (`clientes_grupo_select`/`clientes_grupo_update`, migration `zzzv20261005a1_rls_grupo_pessoas_pets.py`) — ambas liberam acesso quando `origem_tenant_id` do cadastro está no mesmo grupo ativo da loja que está acessando.
+- Unicidade de CPF/CNPJ/CRMV passou a ser verificada no **grupo inteiro**, não mais por loja isolada (`_validar_campo_unico`/`listar_empresas_do_grupo`, `backend/app/clientes/crud_routes.py`) — tentar cadastrar um documento já existente em outra loja do mesmo grupo é bloqueado; fora do grupo continua permitido (lojas de grupos diferentes são negócios independentes).
+- Histórico de alterações (`ClienteHistoricoAlteracao`) grava quem editou e de qual loja, mesmo quando a edição vem de uma loja diferente da `origem_tenant_id`.
+- Vendas, contas, pets e comissões **continuam sempre por loja** — só o cadastro (dados pessoais/documento/contato) é compartilhado; um usuário só vê o histórico das lojas às quais tem acesso.
+- O antigo mecanismo de "pessoa-mestre" (vínculo manual opcional entre cópias de Cliente por loja) foi **eliminado** (modelo `PessoaMestre` removido, migration `zzzy20261009a1_drop_pessoa_mestre.py`) — não existe mais cópia por loja para vincular.
+- O único merge de Cliente que existe (`merged_into_id`, campo desta tabela) continua sendo para duplicados **dentro do mesmo tenant** via a tela de Pessoas (`pessoa_merge_service.py`/`pessoa_duplicate_service.py`) — fusão de duplicados **entre lojas de um mesmo grupo** (ex.: cadastros antigos de antes desta mudança) usa uma ferramenta interna separada, não esse serviço.
 
 ## Confirmado no código
 - Modelo: `backend/app/models_cadastros.py:55-272` (`Cliente`), tabela `clientes`.
@@ -39,8 +47,9 @@ Todos os campos da tabela `clientes` (além de `id`/`tenant_id`, herdados de `Ba
 |---|---|---|
 | `user_id` | Integer, FK `users.id`, **NOT NULL** | Criador/dono legado do registro — não usar para conceder acesso operacional |
 | `auth_user_id` | Integer, FK `users.id` (SET NULL), nullable | Conta que de fato loga como esta pessoa (app/e-commerce) |
-| `merged_into_id` | Integer, FK `clientes.id` (SET NULL), nullable | Preenchido quando este cadastro foi fundido em outro (merge de duplicados) |
+| `merged_into_id` | Integer, FK `clientes.id` (SET NULL), nullable | Preenchido quando este cadastro foi fundido em outro (merge de duplicados **dentro do mesmo tenant** — ver seção de grupo acima) |
 | `codigo` | String(20), nullable | Código único do cliente por tenant (ex.: `9923`) |
+| `origem_tenant_id` | UUID, nullable, **imutável** após gravado | Loja que introduziu a pessoa no grupo comercial — controla só metadado de origem, não visibilidade (ver seção de grupo acima) |
 
 ### Tipo de cadastro e pessoa
 | Campo | Tipo | Observação |

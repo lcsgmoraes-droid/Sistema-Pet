@@ -4,6 +4,7 @@ from datetime import datetime as dt
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -12,6 +13,8 @@ from app.db import get_session
 from app.models import Cliente, Pet
 from app.pet_clinical_utils import normalize_pet_clinical_payload
 from app.clientes.schemas import PetCreate, PetResponse, PetUpdate
+from app.grupo_comercial_contexto import listar_empresas_do_grupo
+from app.tenancy.filters import pessoa_visivel_no_grupo
 
 router = APIRouter()
 
@@ -24,7 +27,10 @@ def _validar_tenant_e_obter_usuario(user_and_tenant):
 def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
     cliente = (
         db.query(Cliente)
-        .filter(Cliente.id == cliente_id, Cliente.tenant_id == tenant_id)
+        .filter(
+            Cliente.id == cliente_id,
+            or_(Cliente.tenant_id == tenant_id, pessoa_visivel_no_grupo(Cliente, tenant_id)),
+        )
         .first()
     )
     if not cliente:
@@ -105,6 +111,7 @@ def create_pet(
         cliente_id=cliente_id,
         user_id=current_user.id,
         tenant_id=tenant_id,
+        origem_tenant_id=tenant_id,
         codigo=codigo_pet,
         **pet_payload,
     )
@@ -132,11 +139,14 @@ def listar_todos_pets(
 ):
     """Listar todos os pets do usuário (de todos os clientes)"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    empresas_grupo = listar_empresas_do_grupo(db, tenant_id)
 
     pets = (
         db.query(Pet)
         .join(Cliente)
-        .filter(Cliente.tenant_id == tenant_id)
+        .filter(
+            or_(Cliente.tenant_id == tenant_id, Pet.tenant_id.in_(empresas_grupo))
+        )
         .order_by(Pet.nome)
         .all()
     )
@@ -176,7 +186,10 @@ def get_pet(
     pet = (
         db.query(Pet)
         .join(Cliente)
-        .filter(Pet.id == pet_id, Cliente.tenant_id == tenant_id)
+        .filter(
+            Pet.id == pet_id,
+            or_(Cliente.tenant_id == tenant_id, pessoa_visivel_no_grupo(Pet, tenant_id)),
+        )
         .first()
     )
 
@@ -201,7 +214,10 @@ def update_pet(
     pet = (
         db.query(Pet)
         .join(Cliente)
-        .filter(Pet.id == pet_id, Cliente.tenant_id == tenant_id)
+        .filter(
+            Pet.id == pet_id,
+            or_(Cliente.tenant_id == tenant_id, pessoa_visivel_no_grupo(Pet, tenant_id)),
+        )
         .first()
     )
 
@@ -277,7 +293,10 @@ def delete_pet(
     pet = (
         db.query(Pet)
         .join(Cliente)
-        .filter(Pet.id == pet_id, Cliente.tenant_id == tenant_id)
+        .filter(
+            Pet.id == pet_id,
+            or_(Cliente.tenant_id == tenant_id, pessoa_visivel_no_grupo(Pet, tenant_id)),
+        )
         .first()
     )
 

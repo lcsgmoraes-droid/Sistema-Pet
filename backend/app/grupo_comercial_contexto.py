@@ -44,3 +44,25 @@ def obter_grupo_id_ativo(db: Session, empresa_id) -> int | None:
         .first()
     )
     return qualquer[0] if qualquer else None
+
+
+def listar_empresas_do_grupo(db: Session, empresa_id) -> list[str]:
+    """IDs de todas as empresas ativas no grupo comercial de `empresa_id`
+    (inclusive ela mesma). Sem grupo ativo, devolve só a própria empresa -
+    nunca uma lista vazia, pra quem usa isso como escopo de `tenant_id IN (...)`
+    não acabar filtrando tudo fora.
+    """
+    empresa_id = str(empresa_id)
+    grupo_id = obter_grupo_id_ativo(db, empresa_id)
+    if grupo_id is None:
+        return [empresa_id]
+
+    membros = (
+        db.query(GrupoComercialMembro.empresa_id)
+        .filter(
+            GrupoComercialMembro.grupo_id == grupo_id,
+            GrupoComercialMembro.status == "ativo",
+        )
+        .all()
+    )
+    return [str(membro[0]) for membro in membros]

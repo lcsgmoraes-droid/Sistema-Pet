@@ -18,8 +18,6 @@ from app.auth.auth_multitenant_support import grant_all_permissions_to_role
 from app.clientes.common import gerar_codigo_cliente
 from app.models import Cliente, Role, Tenant, User, UserTenant
 from app.evolucao_corepet import registrar_uso_funcionalidade
-from app.pessoa_mestre_models import PessoaMestre
-from app.pessoa_mestre_service import vincular_pessoa_mestre
 from app.services.business_audit_service import log_business_event
 from app.services.plan_catalog import resolve_signup_selection
 from app.services.tenant_provisioning_service import provision_tenant
@@ -122,15 +120,17 @@ class GrupoComercialService:
             commit=False,
         )
 
-    def _pessoa_mestre_do_titular(
+    def _titular_tem_cadastro_no_grupo(
         self, *, grupo_id: int, usuario_id: int
-    ) -> PessoaMestre | None:
-        """Acha a pessoa-mestre que o titular ja tem em qualquer loja membro
-        ativa deste grupo, olhando o Cliente dele em cada empresa, uma de
-        cada vez, no proprio tenant_context - mesmo padrao ja usado em
-        GrupoComercialProdutoVinculoService.buscar_produtos. GrupoComercialMembro
-        nao herda BaseTenantModel (atravessa tenants por natureza), entao
-        esta consulta nao precisa de nenhum contexto ativo.
+    ) -> bool:
+        """Pessoa e compartilhada pelo grupo inteiro (ver
+        app.tenancy.filters.pessoa_visivel_no_grupo): se o titular ja tem um
+        Cliente ativo em qualquer loja membro deste grupo, esse cadastro ja
+        fica visivel e editavel automaticamente pela loja nova, sem precisar
+        duplicar. Mesmo padrao de iteracao por tenant_context ja usado em
+        GrupoComercialProdutoVinculoService.buscar_produtos - GrupoComercialMembro
+        nao herda BaseTenantModel (atravessa tenants por natureza), entao esta
+        consulta nao precisa de nenhum contexto ativo.
         """
         membros_ativos = (
             self.db.query(GrupoComercialMembro)
@@ -140,27 +140,19 @@ class GrupoComercialService:
             )
             .all()
         )
-        mestre_id = None
         for membro in membros_ativos:
             with tenant_context(membro.empresa_id):
-                cliente = (
+                existe = (
                     self.db.query(Cliente)
                     .filter(
                         Cliente.auth_user_id == usuario_id,
-                        Cliente.pessoa_mestre_id.isnot(None),
+                        Cliente.ativo.is_not(False),
                     )
                     .first()
                 )
-            if cliente is not None:
-                mestre_id = cliente.pessoa_mestre_id
-                break
-        if mestre_id is None:
-            return None
-        return (
-            self.db.query(PessoaMestre)
-            .filter(PessoaMestre.id == mestre_id)
-            .first()
-        )
+            if existe is not None:
+                return True
+        return False
 
     def _criar_cliente_titular(
         self,
@@ -170,15 +162,15 @@ class GrupoComercialService:
         grupo_id: int,
         tipo_pessoa: str = "PF",
         telefone: str | None = None,
-        pessoa_mestre_id: int | None,
     ) -> Cliente:
-        """Cria a Pessoa (Cliente) do titular na loja recem-provisionada e
-        ja vincula automaticamente a pessoa-mestre do grupo - mesmo molde de
-        usuarios_routes._vincular_ou_criar_pessoa_para_usuario (branch de
-        criacao; a branch de vinculo a Cliente existente nao se aplica aqui,
-        toda loja nova e um tenant vazio). Ver Documentacao/Dominio/
-        EmpresaGrupo.md e Plano-Camada-Geral.md (Checkpoint 4, nota de
-        25/09/2026 sobre vinculo automatico nesta situacao).
+        """Cria a Pessoa (Cliente) do titular na loja recem-provisionada -
+        mesmo molde de usuarios_routes._vincular_ou_criar_pessoa_para_usuario
+        (branch de criacao; a branch de vinculo a Cliente existente nao se
+        aplica aqui, toda loja nova e um tenant vazio). So e chamado quando
+        o titular ainda nao tem nenhum cadastro em outra loja do grupo (ver
+        _titular_tem_cadastro_no_grupo) - pessoa e compartilhada pelo grupo
+        inteiro, entao nao ha mais necessidade de vincular a uma
+        pessoa-mestre separada (ver Documentacao/Dominio/EmpresaGrupo.md).
         """
         # Cliente.tenant_id e UUID(as_uuid=True) - callers passam empresa_id
         # como string as vezes (ex.: GrupoComercialService normaliza tudo
@@ -195,15 +187,6 @@ class GrupoComercialService:
             .first()
         )
         if cliente_existente is not None:
-            if cliente_existente.pessoa_mestre_id is None:
-                vincular_pessoa_mestre(
-                    self.db,
-                    cliente=cliente_existente,
-                    grupo_id=grupo_id,
-                    usuario_id=usuario.id,
-                    pessoa_mestre_id=pessoa_mestre_id,
-                    commit=False,
-                )
             return cliente_existente
 
         nome_pessoa = (
@@ -229,14 +212,6 @@ class GrupoComercialService:
         self.db.add(cliente)
         self.db.flush()
 
-        mestre = vincular_pessoa_mestre(
-            self.db,
-            cliente=cliente,
-            grupo_id=grupo_id,
-            usuario_id=usuario.id,
-            pessoa_mestre_id=pessoa_mestre_id,
-            commit=False,
-        )
         log_business_event(
             db=self.db,
             tenant_id=tenant_id,
@@ -246,7 +221,6 @@ class GrupoComercialService:
             entity_id=cliente.id,
             metadata={
                 "grupo_id": grupo_id,
-                "pessoa_mestre_id": mestre.id,
                 "tipo_pessoa": tipo_pessoa,
             },
             commit=False,
@@ -309,7 +283,6 @@ class GrupoComercialService:
                     grupo_id=grupo.id,
                     tipo_pessoa=titular_tipo_pessoa,
                     telefone=titular_telefone,
-                    pessoa_mestre_id=None,
                 )
         self._auditar(
             empresa_id=empresa_id,
@@ -545,21 +518,18 @@ class GrupoComercialService:
             self._garantir_acesso_master(
                 grupo_id=grupo.id, tenant_id=resultado.tenant_id
             )
-            mestre_existente = self._pessoa_mestre_do_titular(
+            # Pessoa e compartilhada pelo grupo inteiro: se o titular ja tem
+            # cadastro em alguma loja membro, ele ja fica visivel/editavel
+            # automaticamente na loja nova (RLS de grupo) - so cria um
+            # Cliente novo quando realmente nao existe nenhum ainda.
+            if not self._titular_tem_cadastro_no_grupo(
                 grupo_id=grupo.id, usuario_id=usuario.id
-            )
-            self._criar_cliente_titular(
-                tenant_id=resultado.tenant_id,
-                usuario=usuario,
-                grupo_id=grupo.id,
-                tipo_pessoa=mestre_existente.tipo_pessoa if mestre_existente else "PF",
-                telefone=(
-                    (mestre_existente.celular or mestre_existente.telefone)
-                    if mestre_existente
-                    else None
-                ),
-                pessoa_mestre_id=mestre_existente.id if mestre_existente else None,
-            )
+            ):
+                self._criar_cliente_titular(
+                    tenant_id=resultado.tenant_id,
+                    usuario=usuario,
+                    grupo_id=grupo.id,
+                )
             self._auditar(
                 empresa_id=str(resultado.tenant_id),
                 usuario_id=usuario.id,

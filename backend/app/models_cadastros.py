@@ -100,14 +100,6 @@ class Cliente(BaseTenantModel):
     codigo = Column(
         String(20), nullable=True, index=True
     )  # Código único do cliente por tenant (ex: 9923)
-    # Vínculo opcional com a pessoa-mestre do grupo comercial (ver
-    # app/pessoa_mestre_models.py). Sem vínculo, cadastro 100% local igual
-    # hoje. Histórico de compra, segmentação, DRE e consentimento continuam
-    # sempre locais, com ou sem vínculo — só identidade é compartilhada, e
-    # só por confirmação explícita (nunca fusão automática por CPF/CNPJ).
-    pessoa_mestre_id = Column(
-        Integer, ForeignKey("pessoa_mestre.id", ondelete="SET NULL"), nullable=True
-    )
 
     # Tipo de cadastro e pessoa
     # Sem default global: importacoes e registros antigos nao comprovam origem.

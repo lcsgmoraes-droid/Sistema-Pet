@@ -33,9 +33,6 @@ from app.produto_mestre_models import (  # noqa
     ProdutoMestre,
 )
 
-# Pessoa mestre (Checkpoint 4)
-from app.pessoa_mestre_models import PessoaMestre  # noqa
-
 # Importando produtos
 from app.produtos_models import Produto, Marca, Categoria  # noqa
 from app.produto_identity_models import ProdutoSkuAlias, ProdutoFusaoLog  # noqa

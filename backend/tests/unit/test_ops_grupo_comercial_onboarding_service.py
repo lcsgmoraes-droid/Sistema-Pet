@@ -24,7 +24,6 @@ from app.models import (
     UserTenant,
 )
 from app.models_cadastros import Cliente
-from app.pessoa_mestre_models import PessoaMestre
 from app.services.ops_grupo_comercial_onboarding_service import (
     OpsGrupoComercialOnboardingError,
     OpsLojaOnboarding,
@@ -76,7 +75,6 @@ def db(monkeypatch):
             GrupoComercial.__table__,
             GrupoComercialMembro.__table__,
             Cliente.__table__,
-            PessoaMestre.__table__,
         ],
     )
     session = Session(engine)
@@ -162,18 +160,23 @@ def test_onboard_grupo_comercial_cria_grupo_unico_com_titular_responsavel_nas_n_
     assert len(emails_enviados) == 1
     assert emails_enviados[0]["to"] == "titular@example.com"
 
-    # cada uma das 3 lojas ganhou a Cliente do titular, todas com os mesmos
-    # dados enviados no formulario, todas vinculadas a mesma pessoa-mestre.
-    mestres = set()
-    for tenant_id in tenant_ids:
+    # Pessoa e compartilhada pelo grupo inteiro: so a loja responsavel (a
+    # primeira, criada por criar_grupo) ganha o Cliente do titular - as
+    # outras duas (adicionadas via adicionar_loja) ja enxergam esse mesmo
+    # cadastro automaticamente (RLS de grupo), sem duplicar.
+    tenant_responsavel = next(m.empresa_id for m in membros if m.papel == "responsavel")
+    tenants_membro = [m.empresa_id for m in membros if m.papel == "membro"]
+
+    with tenant_context(tenant_responsavel):
+        cliente = db.query(Cliente).filter(Cliente.email == "titular@example.com").one()
+    assert cliente.tipo_pessoa == "PJ"
+    assert cliente.celular == "11988887777"
+    assert cliente.origem_cliente == "cadastro_grupo_comercial"
+
+    for tenant_id in tenants_membro:
         with tenant_context(tenant_id):
-            cliente = db.query(Cliente).filter(Cliente.email == "titular@example.com").one()
-        assert cliente.tipo_pessoa == "PJ"
-        assert cliente.celular == "11988887777"
-        assert cliente.origem_cliente == "cadastro_grupo_comercial"
-        assert cliente.pessoa_mestre_id is not None
-        mestres.add(cliente.pessoa_mestre_id)
-    assert len(mestres) == 1  # uma unica pessoa-mestre para as 3 lojas
+            clientes = db.query(Cliente).filter(Cliente.email == "titular@example.com").all()
+        assert clientes == []
 
 
 def test_onboard_grupo_comercial_recusa_email_ja_cadastrado_sem_provisionar_nada(

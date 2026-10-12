@@ -12,6 +12,7 @@ from app.clientes.crud_routes import _aplicar_filtro_ativo, _aplicar_filtro_busc
 from app.db import get_session
 from app.models import Cliente, Tenant
 from app.partner_utils import get_all_accessible_tenant_ids
+from app.grupo_comercial_contexto import listar_empresas_do_grupo
 from app.security.permissions_decorator import require_permission
 
 router = APIRouter()
@@ -95,7 +96,9 @@ def listar_pessoas_para_relatorio(
     """Lista somente os campos necessarios para montar relatorios de pessoas."""
     _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     tipos = _validar_tipos_relatorio(tipo)
-    access_ids = get_all_accessible_tenant_ids(db, tenant_id)
+    access_ids = set(get_all_accessible_tenant_ids(db, tenant_id)) | set(
+        listar_empresas_do_grupo(db, tenant_id)
+    )
     tenant_atual = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
 
     query = db.query(Cliente).filter(Cliente.tenant_id.in_(access_ids))

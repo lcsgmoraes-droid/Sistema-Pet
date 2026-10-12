@@ -47,11 +47,18 @@ export default function PetDetalhesPage() {
             carteirinha={controller.carteirinha}
             exames={controller.exames}
             loadingExames={controller.loadingExames}
+            loadingRegistrosClinicos={controller.loadingRegistrosClinicos}
             novoExame={controller.novoExame}
+            onAdicionarRegistroHistorico={controller.adicionarRegistroHistorico}
+            onAdicionarRegistroPeso={controller.adicionarRegistroPeso}
+            onExcluirRegistroClinico={controller.excluirRegistroClinico}
             onInterpretarExameIA={controller.interpretarExameIA}
             onSalvarNovoExame={controller.salvarNovoExame}
             pet={controller.pet}
+            registrosHistorico={controller.registrosHistorico}
+            registrosPeso={controller.registrosPeso}
             salvandoExame={controller.salvandoExame}
+            salvandoRegistroClinico={controller.salvandoRegistroClinico}
             setNovoExame={controller.setNovoExame}
           />
         )}

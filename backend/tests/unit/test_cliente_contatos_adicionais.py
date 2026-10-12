@@ -20,7 +20,6 @@ from app.db import Base
 from app.models import Cliente, ClienteContato, FornecedorGrupo, Pet
 import app.financeiro_models  # noqa: F401  # Registra os relacionamentos de Venda.
 import app.produtos_models  # noqa: F401
-import app.pessoa_mestre_models  # noqa: F401  # Registra o FK Cliente.pessoa_mestre_id.
 from app.tenancy.context import tenant_context
 
 

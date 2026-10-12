@@ -3,6 +3,7 @@
 from datetime import datetime as dt
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -10,6 +11,7 @@ from app.audit_log import log_update
 from app.db import get_session
 from app.models import Cliente
 from app.clientes.schemas import AjustarCreditoRequest
+from app.tenancy.filters import pessoa_visivel_no_grupo
 
 router = APIRouter()
 
@@ -23,7 +25,8 @@ def _obter_cliente_ou_404(
     db: Session, cliente_id: int, tenant_id: str, *, bloquear_credito: bool = False
 ):
     consulta = db.query(Cliente).filter(
-        Cliente.id == cliente_id, Cliente.tenant_id == tenant_id
+        Cliente.id == cliente_id,
+        or_(Cliente.tenant_id == tenant_id, pessoa_visivel_no_grupo(Cliente, tenant_id)),
     )
     if bloquear_credito:
         consulta = consulta.populate_existing().with_for_update()

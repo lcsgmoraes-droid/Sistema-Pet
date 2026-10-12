@@ -30,7 +30,6 @@ from app.evolucao_corepet import registrar_uso_funcionalidade
 from app.security.permissions_decorator import require_any_permission
 from app.especie_raca_mestre_models import EspecieMestre, RacaMestre
 from app.produto_mestre_models import ProdutoMestre
-from app.pessoa_mestre_models import PessoaMestre
 
 router = APIRouter(prefix="/grupos-comerciais", tags=["Grupos Comerciais"])
 PERMISSOES_CONFIG_EMPRESA = ("configuracoes.empresa", "configuracoes.editar")
@@ -78,7 +77,6 @@ def listar_mestres_grupo(
 
     return {
         "produtos": _linhas(ProdutoMestre),
-        "pessoas": _linhas(PessoaMestre),
         "especies": _linhas(EspecieMestre),
         "racas": _linhas(RacaMestre),
     }

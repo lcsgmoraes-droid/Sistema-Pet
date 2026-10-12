@@ -19,7 +19,6 @@ from app.grupo_comercial_models import (
 from app.grupo_comercial_service import GrupoComercialService
 from app.models import Permission, Role, RolePermission, Tenant, User, UserTenant
 from app.models_cadastros import Cliente
-from app.pessoa_mestre_models import PessoaMestre
 from app.tenancy.context import clear_tenant_context, set_tenant_context
 
 
@@ -45,7 +44,6 @@ def db(monkeypatch):
             GrupoComercialMembro.__table__,
             GrupoComercialEstoqueCompartilhado.__table__,
             Cliente.__table__,
-            PessoaMestre.__table__,
         ],
     )
     session = Session(engine)
@@ -125,9 +123,6 @@ def test_criar_grupo_marca_fundador_como_master(db):
     assert cliente_titular.celular == "11988887777"
     assert cliente_titular.is_funcionario is True
     assert cliente_titular.origem_cliente == "cadastro_grupo_comercial"
-    assert cliente_titular.pessoa_mestre_id is not None
-    mestre = db.query(PessoaMestre).filter(PessoaMestre.id == cliente_titular.pessoa_mestre_id).one()
-    assert mestre.grupo_id == grupo["id"]
 
 
 def test_usuario_sem_acesso_de_gestao_nao_ve_o_grupo_no_resumo(db):
@@ -213,16 +208,19 @@ def test_adicionar_loja_provisiona_tenant_e_anexa_como_membro(db, monkeypatch):
     )
     assert len(vinculos_master) == 1
 
+    # Pessoa e compartilhada pelo grupo inteiro: o titular ja tem Cliente na
+    # loja fundadora, entao a loja nova NAO cria uma copia - o cadastro da
+    # fundadora ja fica visivel/editavel automaticamente nela (RLS de grupo).
     set_tenant_context(UUID(EMPRESA_A))
     cliente_loja_fundadora = db.query(Cliente).filter(Cliente.auth_user_id == master.id).one()
     clear_tenant_context()
 
     set_tenant_context(UUID(nova_loja_id))
-    cliente_loja_nova = db.query(Cliente).filter(Cliente.auth_user_id == master.id).one()
+    clientes_loja_nova = db.query(Cliente).filter(Cliente.auth_user_id == master.id).all()
     clear_tenant_context()
 
-    assert cliente_loja_nova.pessoa_mestre_id is not None
-    assert cliente_loja_nova.pessoa_mestre_id == cliente_loja_fundadora.pessoa_mestre_id
+    assert cliente_loja_fundadora is not None
+    assert clientes_loja_nova == []
 
 
 def test_adicionar_loja_exige_acesso_de_gestao_mesmo_sendo_empresa_responsavel(db, monkeypatch):
@@ -295,11 +293,13 @@ def test_responsavel_remove_membro_sem_poder_remover_a_si_mesmo(db, monkeypatch)
     assert remover_responsavel.value.status_code == 400
 
 
-def test_duas_lojas_adicionadas_em_chamadas_separadas_compartilham_pessoa_mestre(db, monkeypatch):
-    """_pessoa_mestre_do_titular precisa achar a mestre de uma loja que ja
-    existe, nao so reaproveitar algo que ainda esta em memoria no mesmo
+def test_duas_lojas_adicionadas_em_chamadas_separadas_nao_duplicam_cliente_titular(db, monkeypatch):
+    """_titular_tem_cadastro_no_grupo precisa achar o Cliente de uma loja que
+    ja existe, nao so reaproveitar algo que ainda esta em memoria no mesmo
     laco (caso onboard_grupo_comercial) - aqui cada adicionar_loja e uma
-    chamada independente, simulando 'adicionar loja dias depois'."""
+    chamada independente, simulando 'adicionar loja dias depois'. Pessoa e
+    compartilhada pelo grupo inteiro: a segunda loja nao deve criar um
+    Cliente novo, o cadastro da primeira loja ja fica visivel nela."""
     from app import grupo_comercial_service as modulo
 
     loja_1_id = "77777777-7777-7777-7777-777777777771"
@@ -341,15 +341,21 @@ def test_duas_lojas_adicionadas_em_chamadas_separadas_compartilham_pessoa_mestre
     )
     clear_tenant_context()
 
+    # O titular ja tinha Cliente na loja fundadora (EMPRESA_A, criada por
+    # criar_grupo) - nenhuma das duas lojas novas deveria duplicar o cadastro.
+    set_tenant_context(UUID(EMPRESA_A))
+    clientes_fundadora = db.query(Cliente).filter(Cliente.auth_user_id == master.id).all()
+    clear_tenant_context()
     set_tenant_context(UUID(loja_1_id))
-    mestre_1 = db.query(Cliente).filter(Cliente.auth_user_id == master.id).one().pessoa_mestre_id
+    clientes_loja_1 = db.query(Cliente).filter(Cliente.auth_user_id == master.id).all()
     clear_tenant_context()
     set_tenant_context(UUID(loja_2_id))
-    mestre_2 = db.query(Cliente).filter(Cliente.auth_user_id == master.id).one().pessoa_mestre_id
+    clientes_loja_2 = db.query(Cliente).filter(Cliente.auth_user_id == master.id).all()
     clear_tenant_context()
 
-    assert mestre_1 is not None
-    assert mestre_1 == mestre_2
+    assert len(clientes_fundadora) == 1
+    assert len(clientes_loja_1) == 0
+    assert len(clientes_loja_2) == 0
 
 
 def test_criar_cliente_titular_nao_duplica_se_ja_existir(db):
@@ -367,7 +373,7 @@ def test_criar_cliente_titular_nao_duplica_se_ja_existir(db):
     set_tenant_context(UUID(EMPRESA_A))
     service._criar_cliente_titular(
         tenant_id=EMPRESA_A, usuario=master, grupo_id=grupo["id"],
-        tipo_pessoa="PF", telefone=None, pessoa_mestre_id=None,
+        tipo_pessoa="PF", telefone=None,
     )
     clear_tenant_context()
 

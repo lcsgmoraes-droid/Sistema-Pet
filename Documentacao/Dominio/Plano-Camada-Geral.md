@@ -69,7 +69,9 @@ Toda entidade "mestre" segue a mesma forma:
 
 **Critério de pronto:** tutor que leva o pet a duas lojas do mesmo grupo não precisa recadastrar alergia/doença crônica/microchip na segunda; consulta na loja 2 lê o perfil comportamental cadastrado na loja 1; teste cobrindo isso.
 
-## Checkpoint 4 — Pessoa mestre (Cliente / Fornecedor / Veterinário) ✅ Feito
+## Checkpoint 4 — Pessoa mestre (Cliente / Fornecedor / Veterinário) ⚠️ Eliminado em 10/2026
+
+**Superado**: o mecanismo de `pessoa_mestre` descrito abaixo (vínculo opcional entre cópias de Cliente por loja) foi **removido por inteiro** — modelo, service, rotas e tabela (migration `zzzy20261009a1_drop_pessoa_mestre.py`). Pessoa deixou de ser copiada por loja: agora existe um único `Cliente`, compartilhado automaticamente por todas as lojas ativas do grupo via RLS (`app/tenancy/filters.py::pessoa_visivel_no_grupo` + migrations `zzzq20261005a1`/`zzzv20261005a1`) — não precisa mais de vínculo manual nenhum. Ver [[Cliente]] (seção "Relação com Tenant, lojas e grupos de empresa") e [[EmpresaGrupo]] (seções "1. Criação do grupo"/"2. Adicionar loja") para o mecanismo atual. Resto desta seção fica só como histórico do desenho anterior.
 
 **Por quê por último:** é a mais sensível (dado pessoal, LGPD) e a mais complexa (a mesma tabela hoje cobre cliente, fornecedor e veterinário via `tipo_cadastro`). Só começar depois que o padrão já estiver validado nos três anteriores.
 

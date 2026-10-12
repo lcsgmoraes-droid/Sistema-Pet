@@ -189,9 +189,6 @@ from app.routes.ops_grupo_comercial_routes import (
 from app.produto_mestre_routes import (
     router as produto_mestre_router,
 )  # Camada geral do grupo comercial, Checkpoint 2
-from app.pessoa_mestre_routes import (
-    router as pessoa_mestre_router,
-)  # Camada geral do grupo comercial, Checkpoint 4
 from app.platform_auth import router as platform_auth_router
 from app.routes.evolucao_routes import router as evolucao_router
 from app.lgpd_routes import router as lgpd_router  # LGPD operacional
@@ -269,7 +266,6 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(ops_tenants_router)
     app.include_router(ops_grupo_comercial_router)
     app.include_router(produto_mestre_router)
-    app.include_router(pessoa_mestre_router)
     app.include_router(evolucao_router)
     app.include_router(product_images_public_router)
     app.include_router(ofertas_estudio_public_router)

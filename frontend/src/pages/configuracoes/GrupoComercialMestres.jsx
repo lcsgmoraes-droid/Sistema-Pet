@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
-import { FiBox, FiChevronLeft, FiGrid, FiHeart, FiUsers } from "react-icons/fi";
+import { FiBox, FiChevronLeft, FiGrid, FiHeart } from "react-icons/fi";
 
 import EmptyState from "../../components/ui/EmptyState";
 import LoadingState from "../../components/ui/LoadingState";
@@ -16,7 +16,6 @@ function mensagemErro(error, padrao) {
 const SECOES = [
   { chave: "produtos", titulo: "Produtos", icone: FiBox },
   { chave: "pets", titulo: "Pets", icone: FiHeart },
-  { chave: "pessoas", titulo: "Pessoas", icone: FiUsers },
   { chave: "especies", titulo: "Espécies", icone: FiGrid },
   { chave: "racas", titulo: "Raças", icone: FiGrid },
 ];

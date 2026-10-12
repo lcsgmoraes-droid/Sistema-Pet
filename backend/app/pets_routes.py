@@ -17,9 +17,11 @@ from .auth.dependencies import get_current_user_and_tenant
 from .models import Cliente, Pet, Tenant
 from .pet_clinical_utils import normalize_clinical_list, normalize_pet_clinical_payload
 from .services import pet_registros_clinicos_service as registros_service
+from .services.pet_historico_service import CAMPOS_RASTREADOS_PET, registrar_alteracoes_pet
 from .security.permissions_decorator import require_permission
 from sqlalchemy.orm import object_session
 from app.partner_utils import get_all_accessible_tenant_ids
+from app.grupo_comercial_contexto import listar_empresas_do_grupo
 
 from pydantic import BaseModel, Field
 
@@ -244,9 +246,19 @@ def listar_pets(
 
     # Incluir pets de tenants parceiros (ex.: pet shop parceiro da clínica)
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
+    # Pet e compartilhado por grupo comercial (ver app/tenancy/filters.py::
+    # pessoa_visivel_no_grupo) - soma as lojas do grupo ao escopo. Filtra pelo
+    # tenant_id do PROPRIO Pet (nao do Cliente/tutor): o tutor pode ser visto
+    # por todo o grupo, mas o pet em si tem sua propria origem_tenant_id.
+    empresas_grupo = listar_empresas_do_grupo(db, tenant_id)
 
     # Filtrar por tenant_id (multi-tenant)
-    query = db.query(Pet).join(Cliente).filter(Cliente.tenant_id.in_(access_ids))
+    query = db.query(Pet).join(Cliente).filter(
+        or_(
+            Cliente.tenant_id.in_(access_ids),
+            Pet.tenant_id.in_(empresas_grupo),
+        )
+    )
     query = query.options(joinedload(Pet.cliente))
 
     # Filtros
@@ -278,11 +290,18 @@ def listar_pets(
     pets = query.offset(skip).limit(limit).all()
 
     tenant_id_str = str(tenant_id)
+    # "Parceiro" so quando a loja do tutor e de fora do proprio grupo
+    # comercial (parceria pet shop<->clinica vet) - pet de uma loja irmã do
+    # mesmo grupo nao e "parceiro", e cadastro compartilhado normal.
+    empresas_grupo_str = {str(e) for e in empresas_grupo}
     return [
         enriquecer_pet_response(
             pet,
             de_parceiro=(
-                str(pet.cliente.tenant_id) != tenant_id_str if pet.cliente else False
+                str(pet.cliente.tenant_id) != tenant_id_str
+                and str(pet.cliente.tenant_id) not in empresas_grupo_str
+                if pet.cliente
+                else False
             ),
         )
         for pet in pets
@@ -406,6 +425,11 @@ def atualizar_pet(
                 detail="Novo cliente não encontrado",
             )
 
+    # Snapshot dos campos diretos rastreados, antes de qualquer alteracao -
+    # pessoa e Pet tem historico de alteracoes (data/usuario/loja/campo),
+    # mesmo padrao de Cliente.
+    dados_antes = {campo: getattr(pet, campo) for campo in CAMPOS_RASTREADOS_PET}
+
     # Atualizar campos fornecidos
     update_data = normalize_pet_clinical_payload(
         pet_data.model_dump(exclude_unset=True)
@@ -447,6 +471,15 @@ def atualizar_pet(
 
     pet.updated_at = dt.now()
 
+    registrar_alteracoes_pet(
+        db,
+        pet_id=pet.id,
+        tenant_id=tenant_id,
+        user_id=current_user.id,
+        antes=dados_antes,
+        depois=update_data,
+    )
+
     if registrar_peso:
         registros_service.registrar_se_mudou(
             db, pet_id=pet.id, tenant_id=tenant_id, user_id=current_user.id, tipo="peso", novo=peso_informado
@@ -481,12 +514,7 @@ def excluir_pet(
     """
     current_user, tenant_id = user_and_tenant
 
-    pet = (
-        db.query(Pet)
-        .join(Cliente)
-        .filter(Pet.id == pet_id, Cliente.tenant_id == tenant_id)
-        .first()
-    )
+    pet = registros_service.pet_visivel(db, pet_id, tenant_id)
 
     if not pet:
         raise HTTPException(
@@ -517,12 +545,7 @@ def ativar_pet(
     """
     current_user, tenant_id = user_and_tenant
 
-    pet = (
-        db.query(Pet)
-        .join(Cliente)
-        .filter(Pet.id == pet_id, Cliente.tenant_id == tenant_id)
-        .first()
-    )
+    pet = registros_service.pet_visivel(db, pet_id, tenant_id)
 
     if not pet:
         raise HTTPException(
@@ -553,12 +576,9 @@ def listar_pets_por_cliente(
     """
     current_user, tenant_id = user_and_tenant
 
-    # Validar cliente
-    cliente = (
-        db.query(Cliente)
-        .filter(Cliente.id == cliente_id, Cliente.tenant_id == tenant_id)
-        .first()
-    )
+    # Pessoa (tutor) e compartilhada pelo grupo - valida visibilidade via
+    # pessoa_visivel_no_grupo, nao so o proprio tenant.
+    cliente = registros_service.cliente_visivel(db, cliente_id, tenant_id)
 
     if not cliente:
         raise HTTPException(
@@ -568,8 +588,7 @@ def listar_pets_por_cliente(
     query = (
         db.query(Pet)
         .options(joinedload(Pet.cliente))
-        .join(Cliente)
-        .filter(Pet.cliente_id == cliente_id, Cliente.tenant_id == tenant_id)
+        .filter(Pet.cliente_id == cliente_id)
     )
 
     if not incluir_inativos:

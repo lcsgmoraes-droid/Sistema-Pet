@@ -1,7 +1,13 @@
 """Historico de alteracoes dos dados diretos de um pet.
 
-Campos de saude (alergias, doencas, medicamentos, historico clinico) nao entram
-aqui: pendencia de decisao, pois saude e por loja.
+Decisao de negocio (10/2026): dados do animal compartilhados pelo grupo sao
+so identidade/cadastro - nome, especie, raca, porte, microchip etc. Peso e
+historico clinico (texto) sao por loja (cada marcacao com sua propria
+data/loja) e vivem em `PetRegistroClinico`/`pet_registros_clinicos_service.py`,
+nao aqui. Alergias/doencas cronicas/medicamentos continuos/restricoes
+alimentares/tipo sanguineo tambem sao diretos no Pet (compartilhados), mas
+ainda nao entram neste rastreamento por serem campos JSON de lista, nao
+texto simples - ver `models_cadastros.py::Pet` se for estender.
 """
 
 from typing import Any
@@ -20,7 +26,6 @@ CAMPOS_RASTREADOS_PET = (
     "porte",
     "cor",
     "microchip",
-    "peso",
     "pedigree_registro",
     "ativo",
 )

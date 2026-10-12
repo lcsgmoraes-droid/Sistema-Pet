@@ -3,6 +3,7 @@
 from datetime import datetime as dt
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -11,6 +12,7 @@ from app.db import get_session
 from app.models import Cliente
 from app.clientes.common import tipos_cadastro_da_pessoa
 from app.clientes.schemas import ToggleParceiroRequest
+from app.tenancy.filters import pessoa_visivel_no_grupo
 
 router = APIRouter()
 
@@ -23,7 +25,10 @@ def _validar_tenant_e_obter_usuario(user_and_tenant):
 def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
     cliente = (
         db.query(Cliente)
-        .filter(Cliente.id == cliente_id, Cliente.tenant_id == tenant_id)
+        .filter(
+            Cliente.id == cliente_id,
+            or_(Cliente.tenant_id == tenant_id, pessoa_visivel_no_grupo(Cliente, tenant_id)),
+        )
         .first()
     )
     if not cliente:
@@ -247,7 +252,7 @@ def obter_custo_operacional_entregador(
         db.query(Cliente)
         .filter(
             Cliente.id == entregador_id,
-            Cliente.tenant_id == tenant_id,
+            or_(Cliente.tenant_id == tenant_id, pessoa_visivel_no_grupo(Cliente, tenant_id)),
             Cliente.is_entregador,
         )
         .first()

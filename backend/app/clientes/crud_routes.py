@@ -35,10 +35,11 @@ from app.clientes.schemas import (
     ClienteUpdate,
 )
 from app.db import get_session
-from app.models import AppAccessProfile, Cliente, ClienteContato, Role, User, UserTenant
+from app.models import AppAccessProfile, Cliente, ClienteContato, Role, Tenant, User, UserTenant
 from app.segmentacao_models import ClienteSegmento
 from app.vendas_models import Venda
 from app.partner_utils import get_all_accessible_tenant_ids
+from app.grupo_comercial_contexto import listar_empresas_do_grupo
 from app.security.permissions_decorator import require_permission
 from app.security.permissions_service import check_permission
 from app.security.crediario_override import definir_liberacao_crediario
@@ -823,14 +824,22 @@ def _validar_campo_unico(
             == valor_normalizado
         )
 
+    # Unicidade de documento e por GRUPO comercial, nao por loja isolada -
+    # pessoa e cadastro compartilhado do grupo (ver listar_empresas_do_grupo).
     query = db.query(Cliente).filter(
-        Cliente.tenant_id == tenant_id,
+        Cliente.tenant_id.in_(listar_empresas_do_grupo(db, tenant_id)),
         expressao,
         Cliente.ativo.is_not(False),
     )
     if cliente_id_excluir is not None:
         query = query.filter(Cliente.id != cliente_id_excluir)
-    if query.first():
+    existente = query.first()
+    if existente:
+        if str(existente.tenant_id) != str(tenant_id):
+            loja_existente = (
+                db.query(Tenant.name).filter(Tenant.id == str(existente.tenant_id)).scalar()
+            )
+            detail = f"{detail} (já cadastrado na loja {loja_existente or existente.tenant_id} do grupo)"
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
 
 
@@ -914,7 +923,13 @@ def _montar_query_listagem_clientes(
     is_funcionario=None,
     visao_dashboard=None,
 ):
-    access_ids = get_all_accessible_tenant_ids(db, tenant_id)
+    # Pessoa e compartilhada por grupo comercial (ver filtro automatico do ORM
+    # em app/tenancy/filters.py::pessoa_visivel_no_grupo); get_all_accessible_tenant_ids
+    # e so o mecanismo de parceria pet shop<->clinica veterinaria, sem relacao
+    # com grupo comercial, entao precisa somar os dois aqui.
+    access_ids = set(get_all_accessible_tenant_ids(db, tenant_id)) | set(
+        listar_empresas_do_grupo(db, tenant_id)
+    )
     query = db.query(Cliente).filter(Cliente.tenant_id.in_(access_ids))
     if is_entregador is not None:
         query = query.filter(Cliente.is_entregador == is_entregador)
@@ -932,7 +947,7 @@ def _montar_query_listagem_clientes(
         query = _aplicar_filtro_ativo(query, ativo)
     if visao_dashboard == "ativos":
         query = query.filter(
-            Cliente.tenant_id == tenant_id,
+            Cliente.tenant_id.in_(access_ids),
             Cliente.is_cliente.is_(True),
         )
     elif visao_dashboard == "vip_em_risco":
@@ -943,7 +958,7 @@ def _montar_query_listagem_clientes(
                 ClienteSegmento.tenant_id == Cliente.tenant_id,
             ),
         ).filter(
-            Cliente.tenant_id == tenant_id,
+            Cliente.tenant_id.in_(access_ids),
             Cliente.is_cliente.is_(True),
             ClienteSegmento.segmento == "VIP",
             cast(ClienteSegmento.metricas["ultima_compra_dias"].astext, Integer) > 20,
@@ -961,7 +976,7 @@ def _montar_query_listagem_clientes(
         query = query.outerjoin(
             ultima_venda, ultima_venda.c.cliente_id == Cliente.id
         ).filter(
-            Cliente.tenant_id == tenant_id,
+            Cliente.tenant_id.in_(access_ids),
             Cliente.is_cliente.is_(True),
             or_(
                 ultima_venda.c.ultima_venda.is_(None),
@@ -976,14 +991,14 @@ def _montar_query_listagem_clientes(
                 ClienteSegmento.tenant_id == Cliente.tenant_id,
             ),
         ).filter(
-            Cliente.tenant_id == tenant_id,
+            Cliente.tenant_id.in_(access_ids),
             Cliente.is_cliente.is_(True),
             ClienteSegmento.segmento == "Novo",
             cast(ClienteSegmento.metricas["ticket_medio"].astext, Float) > 200,
         )
     elif visao_dashboard == "sem_whatsapp":
         query = query.filter(
-            Cliente.tenant_id == tenant_id,
+            Cliente.tenant_id.in_(access_ids),
             Cliente.is_cliente.is_(True),
             or_(Cliente.celular.is_(None), func.trim(Cliente.celular) == ""),
         )
