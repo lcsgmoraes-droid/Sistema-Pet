@@ -10,6 +10,7 @@ const ClientesNovoActionsBar = ({
   setShowModalImportacao,
   openModal,
   tipoFiltro,
+  modoFusaoAtivo = false,
   pessoasSelecionadasFusao = [],
   onAbrirFusao,
   onAbrirRelatorio,
@@ -50,8 +51,13 @@ const ClientesNovoActionsBar = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-          {pessoasSelecionadasFusao.length > 0 && (
+          {modoFusaoAtivo && (
             <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1">
+              <span className="px-1 text-xs font-medium text-amber-800">
+                {pessoasSelecionadasFusao.length === 2
+                  ? "2 pessoas selecionadas"
+                  : "Selecione mais 1 pessoa para fundir"}
+              </span>
               <ActionButton
                 disabled={pessoasSelecionadasFusao.length !== 2}
                 icon={GitMerge}
@@ -67,12 +73,12 @@ const ClientesNovoActionsBar = ({
                 Fundir ({pessoasSelecionadasFusao.length})
               </ActionButton>
               <IconActionButton
-                aria-label="Limpar selecao"
+                aria-label="Cancelar fusao"
                 icon={X}
                 intent="warning"
                 onClick={onLimparSelecaoFusao}
                 size="md"
-                title="Limpar selecao"
+                title="Cancelar fusao"
                 tone="ghost"
               />
             </div>

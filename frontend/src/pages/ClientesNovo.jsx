@@ -54,6 +54,7 @@ const Pessoas = () => {
   const [tipoParaCriar, setTipoParaCriar] = useState(null);
   const [showModalImportacao, setShowModalImportacao] = useState(false);
   const [pessoasSelecionadasFusao, setPessoasSelecionadasFusao] = useState([]);
+  const [modoFusaoAtivo, setModoFusaoAtivo] = useState(false);
   const [pessoasSugestaoFusao, setPessoasSugestaoFusao] = useState(null);
   const [modalFusaoAberto, setModalFusaoAberto] = useState(false);
   const [modalRelatorioAberto, setModalRelatorioAberto] = useState(false);
@@ -211,7 +212,7 @@ const Pessoas = () => {
       }
 
       if (prev.length >= 2) {
-        toast("Selecione no maximo 2 pessoas para fundir.");
+        toast("Selecione no maximo 2 pessoas para fundir.", { id: "fusao-limite-selecao" });
         return prev;
       }
 
@@ -219,9 +220,16 @@ const Pessoas = () => {
     });
   };
 
+  const iniciarFusaoDePessoa = (clienteId) => {
+    setPessoasSugestaoFusao(null);
+    setPessoasSelecionadasFusao([clienteId]);
+    setModoFusaoAtivo(true);
+  };
+
   const limparSelecaoFusao = () => {
     setPessoasSelecionadasFusao([]);
     setPessoasSugestaoFusao(null);
+    setModoFusaoAtivo(false);
   };
 
   const abrirModalFusao = () => {
@@ -431,6 +439,7 @@ const Pessoas = () => {
 
   const concluirFusaoPessoa = async () => {
     setPessoasSelecionadasFusao([]);
+    setModoFusaoAtivo(false);
     await loadClientes();
     await carregarSugestoesDuplicidade();
 
@@ -513,6 +522,7 @@ const Pessoas = () => {
         setShowModalImportacao={setShowModalImportacao}
         openModal={abrirModalCriacao}
         tipoFiltro={tipoFiltro}
+        modoFusaoAtivo={modoFusaoAtivo}
         pessoasSelecionadasFusao={pessoasSelecionadasFusao}
         onAbrirFusao={abrirModalFusao}
         onAbrirRelatorio={() => setModalRelatorioAberto(true)}
@@ -556,6 +566,8 @@ const Pessoas = () => {
         setHighlightedPetId={setHighlightedPetId}
         handleDelete={handleDelete}
         handleDeletePet={handleDeletePet}
+        modoFusaoAtivo={modoFusaoAtivo}
+        onIniciarFusao={iniciarFusaoDePessoa}
         pessoasSelecionadasFusao={pessoasSelecionadasFusao}
         togglePessoaFusao={togglePessoaFusao}
       />
