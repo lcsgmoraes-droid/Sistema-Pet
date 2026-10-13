@@ -131,7 +131,8 @@ def test_pagamento_com_beneficio_exige_conciliacao_da_forma_original(operacao, f
         )
 
     assert erro.value.status_code == 409
-    assert "forma original" in erro.value.detail
+    assert erro.value.detail["codigo"] == "DEVOLUCAO_PAGAMENTO_BENEFICIO"
+    assert erro.value.detail["acao"] == "devolver_na_origem"
     db.add.assert_not_called()
     db.commit.assert_not_called()
 

@@ -49,20 +49,16 @@ export default function MenuCaixa({
       return;
     }
 
-    if (!caixaAberto) {
-      return;
-    }
-
     ultimoSignalDevolucaoRef.current = abrirDevolucaoSignal;
     setModalAtivo("devolucao");
     setMenuAberto(false);
-  }, [abrirDevolucaoSignal, caixaAberto]);
+  }, [abrirDevolucaoSignal]);
 
   useEffect(() => {
     setResumo(null);
     setStatusResumo("carregando");
     setMenuAberto(false);
-    setModalAtivo(null);
+    setModalAtivo((ativo) => (ativo === "devolucao" ? ativo : null));
   }, [caixaAberto?.id]);
 
   useEffect(() => {
@@ -108,7 +104,7 @@ export default function MenuCaixa({
 
   const handleOperacaoSucesso = () => {
     setModalAtivo(null);
-    publicarEventoCaixa("movimentacao", { contextoCaixa, caixaId: caixaAberto.id });
+    publicarEventoCaixa("movimentacao", { contextoCaixa, caixaId: caixaAberto?.id });
     setResumoKey((valor) => valor + 1);
     void atualizarCaixa();
   };
@@ -122,37 +118,57 @@ export default function MenuCaixa({
     await onAbrirCaixa();
   };
 
+  // A troca do estado do caixa não deve desmontar uma devolução em andamento.
+  const modalDevolucao = modalAtivo === "devolucao" && (
+    <ModalDevolucao
+      key="devolucao"
+      caixaId={caixaAberto?.id}
+      vendaInicial={vendaAtualPodeAbrirDevolucao ? vendaParaDevolucao : null}
+      onClose={() => setModalAtivo(null)}
+      onSucesso={handleDevolucaoSucesso}
+    />
+  );
+
   if (statusConsultaCaixa === "carregando") {
     return (
-      <div className="flex h-10 w-full min-w-[138px] items-center rounded-lg bg-slate-100 px-3 shadow-sm sm:w-auto">
-        <div className="h-5 w-full animate-pulse rounded-lg bg-slate-200"></div>
-      </div>
+      <>
+        <div className="flex h-10 w-full min-w-[138px] items-center rounded-lg bg-slate-100 px-3 shadow-sm sm:w-auto">
+          <div className="h-5 w-full animate-pulse rounded-lg bg-slate-200"></div>
+        </div>
+        {modalDevolucao}
+      </>
     );
   }
 
   if (!caixaAberto && statusConsultaCaixa === "erro") {
     return (
-      <button
-        type="button"
-        disabled={atualizandoCaixa}
-        onClick={() => atualizarCaixa()}
-        className="inline-flex h-10 items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 text-sm font-semibold text-amber-900 disabled:opacity-50"
-      >
-        <RotateCcw className={`h-4 w-4 ${atualizandoCaixa ? "animate-spin" : ""}`} />
-        Verificar caixa
-      </button>
+      <>
+        <button
+          type="button"
+          disabled={atualizandoCaixa}
+          onClick={() => atualizarCaixa()}
+          className="inline-flex h-10 items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 text-sm font-semibold text-amber-900 disabled:opacity-50"
+        >
+          <RotateCcw className={`h-4 w-4 ${atualizandoCaixa ? "animate-spin" : ""}`} />
+          Verificar caixa
+        </button>
+        {modalDevolucao}
+      </>
     );
   }
 
   if (!caixaAberto) {
     return (
-      <button
-        onClick={handleCaixaAberto}
-        className="inline-flex h-10 w-full min-w-[138px] items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 sm:w-auto"
-      >
-        <DollarSign className="h-4 w-4" />
-        <span>Abrir Caixa</span>
-      </button>
+      <>
+        <button
+          onClick={handleCaixaAberto}
+          className="inline-flex h-10 w-full min-w-[138px] items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 sm:w-auto"
+        >
+          <DollarSign className="h-4 w-4" />
+          <span>Abrir Caixa</span>
+        </button>
+        {modalDevolucao}
+      </>
     );
   }
 
@@ -269,7 +285,7 @@ export default function MenuCaixa({
                       <div
                         className={`font-semibold ${mostrarValores ? "text-gray-900" : "text-gray-300"}`}
                       >
-                        {mostrarValores ? `R$ ${caixaAberto.valor_abertura.toFixed(2)}` : "••••••"}
+                        {mostrarValores ? formatMoneyBRL(caixaAberto.valor_abertura) : "••••••"}
                       </div>
                     </div>
                     <div>
@@ -277,7 +293,7 @@ export default function MenuCaixa({
                       <div
                         className={`font-semibold ${mostrarValores ? "text-green-600" : "text-green-300"}`}
                       >
-                        {mostrarValores ? `+ R$ ${resumo.totais.vendas.toFixed(2)}` : "••••••"}
+                        {mostrarValores ? `+ ${formatMoneyBRL(resumo.totais.vendas)}` : "••••••"}
                       </div>
                     </div>
                     <div>
@@ -285,7 +301,9 @@ export default function MenuCaixa({
                       <div
                         className={`font-semibold ${mostrarValores ? "text-green-600" : "text-green-300"}`}
                       >
-                        {mostrarValores ? `+ R$ ${resumo.totais.suprimentos.toFixed(2)}` : "••••••"}
+                        {mostrarValores
+                          ? `+ ${formatMoneyBRL(resumo.totais.suprimentos)}`
+                          : "••••••"}
                       </div>
                     </div>
                     <div>
@@ -293,7 +311,7 @@ export default function MenuCaixa({
                       <div
                         className={`font-semibold ${mostrarValores ? "text-orange-600" : "text-orange-300"}`}
                       >
-                        {mostrarValores ? `- R$ ${resumo.totais.sangrias.toFixed(2)}` : "••••••"}
+                        {mostrarValores ? `- ${formatMoneyBRL(resumo.totais.sangrias)}` : "••••••"}
                       </div>
                     </div>
                     <div>
@@ -301,7 +319,7 @@ export default function MenuCaixa({
                       <div
                         className={`font-semibold ${mostrarValores ? "text-red-600" : "text-red-300"}`}
                       >
-                        {mostrarValores ? `- R$ ${resumo.totais.despesas.toFixed(2)}` : "••••••"}
+                        {mostrarValores ? `- ${formatMoneyBRL(resumo.totais.despesas)}` : "••••••"}
                       </div>
                     </div>
                   </div>
@@ -454,14 +472,7 @@ export default function MenuCaixa({
         />
       )}
 
-      {modalAtivo === "devolucao" && caixaAberto && (
-        <ModalDevolucao
-          caixaId={caixaAberto.id}
-          vendaInicial={vendaAtualPodeAbrirDevolucao ? vendaParaDevolucao : null}
-          onClose={() => setModalAtivo(null)}
-          onSucesso={handleDevolucaoSucesso}
-        />
-      )}
+      {modalDevolucao}
 
       {modalAtivo === "movimentacoes" && caixaAberto && (
         <ModalMovimentacoesCaixa caixaId={caixaAberto.id} onClose={() => setModalAtivo(null)} />
