@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import ts from "typescript";
+import {
+  createControllerHarness,
+  elements,
+} from "../../scripts/helpers/reactControllerHarness.mjs";
 
 const controllerPath = fileURLToPath(new URL("./ModalDevolucao.jsx", import.meta.url));
 
@@ -27,54 +28,12 @@ function createHarness({
   const calls = [];
   const confirmations = [];
   const successes = [];
-  const slots = [];
-  let index = 0;
-  let dirty = false;
-  let effects = [];
-  let tree;
   let saldoAtual = saldo;
   let caixaAtual = null;
   let previewCount = 0;
   let registrationCount = 0;
   const Sections = () => null;
   const AbrirCaixa = () => null;
-  const sameDependencies = (previous, next) =>
-    previous &&
-    next &&
-    previous.length === next.length &&
-    previous.every((value, i) => Object.is(value, next[i]));
-  const hooks = {
-    useState(initial) {
-      const slot = index++;
-      if (!slots[slot])
-        slots[slot] = { value: typeof initial === "function" ? initial() : initial };
-      return [
-        slots[slot].value,
-        (update) => {
-          const value = typeof update === "function" ? update(slots[slot].value) : update;
-          if (!Object.is(value, slots[slot].value)) {
-            slots[slot].value = value;
-            dirty = true;
-          }
-        },
-      ];
-    },
-    useRef(initial) {
-      const slot = index++;
-      if (!slots[slot]) slots[slot] = { current: initial };
-      return slots[slot];
-    },
-    useEffect(effect, dependencies) {
-      const slot = index++;
-      if (!sameDependencies(slots[slot]?.dependencies, dependencies)) {
-        slots[slot]?.cleanup?.();
-        slots[slot] = { dependencies };
-        effects.push(() => {
-          slots[slot].cleanup = effect();
-        });
-      }
-    },
-  };
   const api = {
     async get(url) {
       calls.push({ method: "get", url });
@@ -120,10 +79,7 @@ function createHarness({
       throw new Error(`Unexpected POST ${url}`);
     },
   };
-  const jsx = (type, props) => ({ type, props });
   const mocks = new Map([
-    ["react", hooks],
-    ["react/jsx-runtime", { jsx, jsxs: jsx, Fragment: "fragment" }],
     ["lucide-react", { X: "icon", RotateCcw: "icon" }],
     ["../api", { __esModule: true, default: api }],
     [
@@ -147,80 +103,26 @@ function createHarness({
     ["./ModalAbrirCaixa", { __esModule: true, default: AbrirCaixa }],
     ["./devolucao/ModalDevolucaoSections", { __esModule: true, default: Sections }],
   ]);
-  const cache = new Map();
-  function loadModule(path) {
-    if (cache.has(path)) return cache.get(path);
-    const source = readFileSync(path, "utf8");
-    const { outputText, diagnostics } = ts.transpileModule(source, {
-      fileName: path,
-      reportDiagnostics: true,
-      compilerOptions: {
-        target: ts.ScriptTarget.ES2022,
-        module: ts.ModuleKind.CommonJS,
-        jsx: ts.JsxEmit.ReactJSX,
-        esModuleInterop: true,
-      },
-    });
-    assert.equal(
-      diagnostics?.filter((item) => item.category === ts.DiagnosticCategory.Error).length,
-      0,
-    );
-    const module = { exports: {} };
-    cache.set(path, module.exports);
-    const requireMock = (specifier) => {
-      if (mocks.has(specifier)) return mocks.get(specifier);
-      if (specifier.startsWith(".")) {
-        const target = resolve(dirname(path), specifier);
-        return loadModule(/\.[cm]?[jt]sx?$/.test(target) ? target : `${target}.js`);
-      }
-      throw new Error(`Unexpected module ${specifier}`);
-    };
-    new Function("require", "module", "exports", "alert", "console", outputText)(
-      requireMock,
-      module,
-      module.exports,
-      () => {},
-      { error() {} },
-    );
-    return module.exports;
-  }
-  const Controller = loadModule(controllerPath).default;
-  function render() {
-    index = 0;
-    dirty = false;
-    effects = [];
-    tree = Controller({
+  const controller = createControllerHarness(controllerPath, {
+    mocks,
+    globals: { alert() {}, console: { error() {} } },
+    props: {
       caixaId,
       vendaInicial: venda,
       onClose() {},
       onSucesso: (result) => successes.push(result),
-    });
-    effects.forEach((effect) => effect());
-  }
-  function findElement(node, type) {
-    if (!node || typeof node !== "object") return null;
-    if (node.type === type) return node;
-    const children = Array.isArray(node.props?.children)
-      ? node.props.children
-      : [node.props?.children];
-    return children.map((child) => findElement(child, type)).find(Boolean) || null;
-  }
-  async function settle() {
-    for (let pass = 0; pass < 20; pass += 1) {
-      await Promise.resolve();
-      if (dirty) render();
-    }
-  }
-  render();
+    },
+  });
+  const findElement = (type) => elements(controller.tree).find((element) => element.type === type);
   return {
     calls,
     confirmations,
     successes,
     get sections() {
-      return findElement(tree, Sections).props;
+      return findElement(Sections).props;
     },
     get abrirCaixa() {
-      return findElement(tree, AbrirCaixa)?.props;
+      return findElement(AbrirCaixa)?.props;
     },
     setCaixa(value) {
       caixaAtual = value;
@@ -228,13 +130,8 @@ function createHarness({
     setSaldo(value) {
       saldoAtual = value;
     },
-    settle,
-    async act(callback) {
-      const result = callback();
-      await settle();
-      await result;
-      await settle();
-    },
+    settle: controller.settle,
+    act: controller.act,
   };
 }
 
@@ -243,6 +140,27 @@ async function selectItem(harness) {
   await harness.act(() => harness.sections.toggleItem(1));
   await harness.act(() => harness.sections.handleQuantidadeChange(1, "1"));
   await harness.act(() => harness.sections.setMotivo("Troca solicitada pelo cliente"));
+}
+
+async function prepareUncertainReturn() {
+  const harness = createHarness({
+    beneficio: false,
+    postRegistro: (_payload, count) => {
+      if (count === 1) throw new Error("Network Error");
+      return { data: { success: true } };
+    },
+  });
+  await selectItem(harness);
+  await harness.act(() => harness.sections.handleConfirmar());
+  return harness;
+}
+
+function assertRetriedPendingOperation(harness) {
+  const records = harness.calls.filter((call) => call.url === "/vendas/100/devolucao");
+  assert.equal(records.length, 2);
+  assert.deepEqual(records[0].payload, records[1].payload);
+  assert.equal(harness.calls.filter((call) => call.url?.endsWith("/previa")).length, 1);
+  assert.equal(harness.successes.length, 1);
 }
 
 test("cashback recovery keeps the selection and sends restitution to its original balance", async () => {
@@ -276,59 +194,27 @@ test("cashback recovery keeps the selection and sends restitution to its origina
 });
 
 test("retry after an uncertain response reuses the operation key without another preview", async () => {
-  const harness = createHarness({
-    beneficio: false,
-    postRegistro: (_payload, count) => {
-      if (count === 1) throw new Error("Network Error");
-      return { data: { success: true } };
-    },
-  });
-  await selectItem(harness);
-  await harness.act(() => harness.sections.handleConfirmar());
+  const harness = await prepareUncertainReturn();
   assert.equal(harness.successes.length, 0);
   assert.equal(
     harness.sections.recuperacao.acoes.some((action) => action.id === "atualizar_saldos"),
     false,
   );
   await harness.act(() => harness.sections.onRecuperar("tentar_novamente"));
-  const records = harness.calls.filter((call) => call.url === "/vendas/100/devolucao");
-  assert.equal(records.length, 2);
-  assert.deepEqual(records[0].payload, records[1].payload);
-  assert.equal(harness.calls.filter((call) => call.url?.endsWith("/previa")).length, 1);
+  assertRetriedPendingOperation(harness);
   assert.equal(harness.confirmations.length, 1);
-  assert.equal(harness.successes.length, 1);
 });
 
 test("editing the draft after an uncertain response cannot replace the pending operation during retry", async () => {
-  const harness = createHarness({
-    beneficio: false,
-    postRegistro: (_payload, count) => {
-      if (count === 1) throw new Error("Network Error");
-      return { data: { success: true } };
-    },
-  });
-  await selectItem(harness);
-  await harness.act(() => harness.sections.handleConfirmar());
+  const harness = await prepareUncertainReturn();
   await harness.act(() => harness.sections.setMotivo("Motivo corrigido depois do envio"));
   await harness.act(() => harness.sections.onRecuperar("tentar_novamente"));
-  const records = harness.calls.filter((call) => call.url === "/vendas/100/devolucao");
-  assert.equal(records.length, 2);
-  assert.deepEqual(records[0].payload, records[1].payload);
-  assert.equal(harness.calls.filter((call) => call.url?.endsWith("/previa")).length, 1);
+  assertRetriedPendingOperation(harness);
   assert.equal(harness.confirmations.length, 1);
-  assert.equal(harness.successes.length, 1);
 });
 
 test("returning to the sale list cannot discard an uncertain operation and provides a way to check it", async () => {
-  const harness = createHarness({
-    beneficio: false,
-    postRegistro: (_payload, count) => {
-      if (count === 1) throw new Error("Network Error");
-      return { data: { success: true } };
-    },
-  });
-  await selectItem(harness);
-  await harness.act(() => harness.sections.handleConfirmar());
+  const harness = await prepareUncertainReturn();
   await harness.act(() => {
     // This is the return modal's Back button handler.
     harness.sections.setPasso(1);
@@ -341,11 +227,7 @@ test("returning to the sale list cannot discard an uncertain operation and provi
   await harness.act(() => harness.sections.selecionarVenda({ id: 100 }));
   assert.ok(harness.sections.recuperacao.acoes.some((action) => action.id === "tentar_novamente"));
   await harness.act(() => harness.sections.onRecuperar("tentar_novamente"));
-  const records = harness.calls.filter((call) => call.url === "/vendas/100/devolucao");
-  assert.equal(records.length, 2);
-  assert.deepEqual(records[0].payload, records[1].payload);
-  assert.equal(harness.calls.filter((call) => call.url?.endsWith("/previa")).length, 1);
-  assert.equal(harness.successes.length, 1);
+  assertRetriedPendingOperation(harness);
 });
 
 test("opening a cash register preserves the return draft and uses the newly opened register", async () => {
