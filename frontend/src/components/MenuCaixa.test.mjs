@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import ts from "typescript";
+import {
+  createControllerHarness,
+  elements,
+  elementText,
+} from "../../scripts/helpers/reactControllerHarness.mjs";
 
 const menuPath = fileURLToPath(new URL("./MenuCaixa.jsx", import.meta.url));
 const caixa = {
@@ -17,15 +19,10 @@ const venda = { id: 100, status: "finalizada", numero_venda: "V100" };
 // Run the component's real state transitions and inspect React element identity.
 // The same parent, element type and key preserve a modal's draft during reconciliation.
 function createHarness(overrides = {}) {
-  const slots = [];
   const calls = [];
   const ModalDevolucao = () => null;
   const ModalSangria = () => null;
-  let index = 0;
-  let dirty = false;
-  let effects = [];
-  let tree;
-  let props = {
+  const props = {
     caixaAberto: caixa,
     contextoCaixa: "usuario:empresa",
     statusConsultaCaixa: "pronto",
@@ -42,46 +39,7 @@ function createHarness(overrides = {}) {
     },
     ...overrides,
   };
-  const hooks = {
-    useState(initial) {
-      const slot = index++;
-      if (!slots[slot])
-        slots[slot] = { value: typeof initial === "function" ? initial() : initial };
-      return [
-        slots[slot].value,
-        (update) => {
-          const value = typeof update === "function" ? update(slots[slot].value) : update;
-          if (!Object.is(value, slots[slot].value)) {
-            slots[slot].value = value;
-            dirty = true;
-          }
-        },
-      ];
-    },
-    useRef(initial) {
-      const slot = index++;
-      if (!slots[slot]) slots[slot] = { current: initial };
-      return slots[slot];
-    },
-    useEffect(effect, dependencies) {
-      const slot = index++;
-      const previous = slots[slot];
-      if (
-        !previous?.dependencies ||
-        dependencies.some((value, i) => !Object.is(value, previous.dependencies[i]))
-      ) {
-        previous?.cleanup?.();
-        slots[slot] = { dependencies };
-        effects.push(() => {
-          slots[slot].cleanup = effect();
-        });
-      }
-    },
-  };
-  const jsx = (type, elementProps, key) => ({ type, props: elementProps, key });
   const mocks = new Map([
-    ["react", hooks],
-    ["react/jsx-runtime", { jsx, jsxs: jsx, Fragment: "fragment" }],
     ["lucide-react", new Proxy({}, { get: (_target, name) => name })],
     ["../api/caixa", { obterResumoCaixa: async () => ({ totais: {} }) }],
     ["./ModalDevolucao", { __esModule: true, default: ModalDevolucao }],
@@ -89,89 +47,30 @@ function createHarness(overrides = {}) {
     ["./ModalFecharCaixa", { __esModule: true, default: () => null }],
     ["./ModalMovimentacoesCaixa", { __esModule: true, default: () => null }],
   ]);
-  const cache = new Map();
-  function loadModule(path) {
-    if (cache.has(path)) return cache.get(path);
-    const { outputText, diagnostics } = ts.transpileModule(readFileSync(path, "utf8"), {
-      fileName: path,
-      reportDiagnostics: true,
-      compilerOptions: {
-        target: ts.ScriptTarget.ES2022,
-        module: ts.ModuleKind.CommonJS,
-        jsx: ts.JsxEmit.ReactJSX,
-        esModuleInterop: true,
-      },
-    });
-    assert.equal(
-      diagnostics.filter((item) => item.category === ts.DiagnosticCategory.Error).length,
-      0,
-    );
-    const module = { exports: {} };
-    cache.set(path, module.exports);
-    const requireMock = (specifier) => {
-      if (mocks.has(specifier)) return mocks.get(specifier);
-      if (specifier.startsWith(".")) {
-        const target = resolve(dirname(path), specifier);
-        return loadModule(/\.[cm]?[jt]sx?$/.test(target) ? target : `${target}.js`);
-      }
-      throw new Error(`Unexpected module ${specifier}`);
-    };
-    new Function("require", "module", "exports", outputText)(requireMock, module, module.exports);
-    return module.exports;
-  }
-  const MenuCaixa = loadModule(menuPath).default;
-  function render() {
-    index = 0;
-    dirty = false;
-    effects = [];
-    tree = MenuCaixa(props);
-    effects.forEach((effect) => effect());
-  }
-  function elements(node) {
-    if (!node || typeof node !== "object") return [];
-    if (Array.isArray(node)) return node.flatMap(elements);
-    return [node, ...elements(node.props?.children)];
-  }
-  function text(node) {
-    if (typeof node === "string") return node;
-    if (!node || typeof node !== "object") return "";
-    if (Array.isArray(node)) return node.map(text).join(" ");
-    return text(node.props?.children);
-  }
-  async function settle() {
-    for (let pass = 0; pass < 20; pass++) {
-      await Promise.resolve();
-      if (dirty) render();
-    }
-  }
-  render();
+  const controller = createControllerHarness(menuPath, { mocks, props });
   return {
     calls,
     get tree() {
-      return tree;
+      return controller.tree;
     },
     get modal() {
-      return elements(tree).find((element) => element.type === ModalDevolucao);
+      return elements(controller.tree).find((element) => element.type === ModalDevolucao);
     },
     get sangria() {
-      return elements(tree).find((element) => element.type === ModalSangria);
+      return elements(controller.tree).find((element) => element.type === ModalSangria);
     },
     get buttons() {
-      return elements(tree).filter((element) => element.type === "button");
+      return elements(controller.tree).filter((element) => element.type === "button");
     },
-    settle,
-    async update(update) {
-      props = { ...props, ...update };
-      render();
-      await settle();
-    },
+    settle: controller.settle,
+    update: controller.update,
     async click(label) {
-      const button = elements(tree).find(
-        (element) => element.type === "button" && text(element).includes(label),
+      const button = elements(controller.tree).find(
+        (element) => element.type === "button" && elementText(element).includes(label),
       );
       assert.ok(button, `Button ${label} not found`);
       await button.props.onClick();
-      await settle();
+      await controller.settle();
     },
   };
 }
