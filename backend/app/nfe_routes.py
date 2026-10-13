@@ -39,12 +39,17 @@ from app.intnfe.emission import (
 from app.intnfe.sharing import extrair_link_publico_nfce
 from app.intnfe.repository import get_connection, get_tenant
 from app.intnfe.numbering import NumberingError
+from app.intnfe.rejection_diagnostics import (
+    enrich_validation_items,
+    rejection_diagnostics,
+)
 from app.intnfe.recovery import (
     discard_rejected_attempt as discard_rejected_attempt_intnfe,
     repair_and_retry as repair_and_retry_intnfe,
 )
 from app.bling_integration_fiscal import prevalidar_produtos_fiscais_venda
 from app.nfe.danfe_nfce import gerar_danfe_nfce
+from app.nfe.correcao_routes import router as correcao_router
 from app.nfe.operacional_routes import (
     CancelarNFeRequest as CancelarNFeRequest,
     CartaCorrecaoRequest as CartaCorrecaoRequest,
@@ -237,9 +242,9 @@ async def prevalidar_nfe(
 
     try:
         rejeitada_intnfe = (
-            venda.nfe_correlation_id
-            and venda.nfe_provider == "intnfe"
-            and str(venda.nfe_status or "").strip().casefold() == "rejeitada"
+            getattr(venda, "nfe_provider", None) == "intnfe"
+            and str(getattr(venda, "nfe_status", None) or "").strip().casefold()
+            == "rejeitada"
         )
         if (venda.nfe_bling_id or venda.nfe_correlation_id) and not rejeitada_intnfe:
             raise DirectEmissionError(
@@ -278,6 +283,11 @@ async def prevalidar_nfe(
                 "motivo": venda.nfe_motivo_rejeicao,
             }
         validacao["provedor"] = "intnfe"
+    enrich_validation_items(venda, validacao)
+    if rejeitada_intnfe:
+        validacao["diagnostico_rejeicao"] = rejection_diagnostics(
+            venda, db=db, validation=validacao
+        )
     validacao["tipo_nota"] = tipo_nota
     validacao["venda_id"] = venda.id
     validacao["tenant_id"] = str(tenant_id)
@@ -812,3 +822,4 @@ async def reconciliar_pendentes_nfe(
 
 router.include_router(listagem_rapida_router)
 router.include_router(operacional_router)
+router.include_router(correcao_router)

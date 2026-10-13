@@ -634,6 +634,9 @@ def test_local_document_details_keeps_sale_items_visible_after_rejection():
     assert details["cliente"]["nome"] == "Cliente Teste"
     assert details["itens"] == [
         {
+            "item_id": None,
+            "item_numero": 1,
+            "lote_id": None,
             "produto_id": 9,
             "codigo": "PET-9",
             "descricao": "Ração Teste",
@@ -644,12 +647,14 @@ def test_local_document_details_keeps_sale_items_visible_after_rejection():
             "desconto": 2.0,
             "ncm": "23091000",
             "cest": None,
+            "origem_mercadoria": "0",
             "cfop": "5102",
             "icms": "102",
             "pis": "49",
             "cofins": "49",
         }
     ]
+    assert details["diagnostico_rejeicao"]["correcoes"][0]["campo"] == "cst_icms"
     assert details["totais"] == {
         "valor_produtos": 20.0,
         "valor_frete": 5.0,
