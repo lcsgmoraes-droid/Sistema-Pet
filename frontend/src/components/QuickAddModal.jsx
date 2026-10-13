@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { FiAlertCircle, FiSave, FiX } from "react-icons/fi";
 import api from "../api";
-import "./QuickAddModal.css";
+import BotaoCancelar from "./v2/BotaoCancelar/BotaoCancelar";
+import BotaoSalva from "./v2/BotaoSalva/BotaoSalva";
+import InputTexto from "./v2/InputTexto/InputTexto";
+import ModalPadrao from "./v2/ModalPadrao/ModalPadrao";
 
 /**
  * Modal rapido para adicionar especie ou raca sem sair do formulario de Pet.
@@ -76,74 +78,57 @@ const QuickAddModal = ({ tipo, especieId, especieNome, onSuccess, onClose }) => 
   };
 
   return (
-    <div className="quick-modal-overlay" onClick={onClose}>
-      <div className="quick-modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="quick-modal-header">
-          <h3>
-            {tipo === "especie" ? "Nova especie" : "Nova raca"}
-            {isRaca && especieNome && <span className="quick-subtitle"> - {especieNome}</span>}
-          </h3>
-          <button className="quick-btn-close" type="button" onClick={onClose}>
-            <FiX />
-          </button>
-        </div>
+    <ModalPadrao
+      titulo={`${tipo === "especie" ? "Nova espécie" : "Nova raça"}${
+        isRaca && especieNome ? ` — ${especieNome}` : ""
+      }`}
+      onFechar={onClose}
+      tamanho="pequena"
+      rodape={
+        <>
+          <BotaoCancelar disabled={saving} onClick={onClose} />
+          <BotaoSalva
+            disabled={isRaca && !especieValida}
+            loading={saving}
+            onClick={handleSubmit}
+          >
+            Salvar
+          </BotaoSalva>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} noValidate>
+        {error && (
+          <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </p>
+        )}
 
-        <form onSubmit={handleSubmit}>
-          <div className="quick-modal-body">
-            {error && (
-              <div className="quick-alert quick-alert-danger">
-                <FiAlertCircle /> {error}
-              </div>
-            )}
+        <InputTexto
+          id={fieldId}
+          label={`Nome ${tipo === "especie" ? "da espécie" : "da raça"}`}
+          value={nome}
+          onChange={setNome}
+          placeholder={
+            tipo === "especie" ? "Ex: Cão, Gato, Ave..." : "Ex: Labrador, SRD, Siamês..."
+          }
+          required
+          autoFocus
+          disabled={saving}
+        />
 
-            <div className="quick-form-group">
-              <label htmlFor={fieldId}>
-                Nome {tipo === "especie" ? "da especie" : "da raca"} *
-              </label>
-              <input
-                id={fieldId}
-                name={fieldId}
-                type="text"
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                placeholder={
-                  tipo === "especie" ? "Ex: Cao, Gato, Ave..." : "Ex: Labrador, SRD, Siames..."
-                }
-                required
-                autoFocus
-                disabled={saving}
-              />
-            </div>
-
-            <div className="quick-info">
-              <p>
-                {tipo === "especie"
-                  ? "Esta especie ficara disponivel para todos os pets."
-                  : `Esta raca sera adicionada a especie "${especieNome || "selecionada"}".`}
-              </p>
-            </div>
-          </div>
-
-          <div className="quick-modal-footer">
-            <button
-              type="button"
-              className="quick-btn quick-btn-secondary"
-              onClick={onClose}
-              disabled={saving}
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="quick-btn quick-btn-primary"
-              disabled={saving || (isRaca && !especieValida)}
-            >
-              <FiSave /> {saving ? "Salvando..." : "Salvar"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <p className="mt-3 text-xs text-slate-500">
+          {tipo === "especie"
+            ? "Esta espécie ficará disponível para todos os pets."
+            : `Esta raça será adicionada à espécie "${especieNome || "selecionada"}".`}
+        </p>
+        {isRaca && !especieValida && (
+          <p className="mt-2 text-xs font-medium text-amber-800">
+            Selecione uma espécie no formulário antes de salvar a raça.
+          </p>
+        )}
+      </form>
+    </ModalPadrao>
   );
 };
 

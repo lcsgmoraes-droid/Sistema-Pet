@@ -3,7 +3,6 @@ import { useParams, useNavigate, useLocation, useSearchParams } from "react-rout
 import api from "../api";
 import PetFormView from "./petForm/PetFormView";
 import { buildReturnWithNovoPet } from "../utils/petReturnFlow";
-import "./EspeciesRacas.css"; // Para estilos do botão de adicionar rápido
 
 const listToTextarea = (items = [], fallback = "") => {
   if (Array.isArray(items) && items.length > 0) {
@@ -195,20 +194,12 @@ const PetForm = () => {
     }
   };
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    if (name === "especie") {
-      setFormData((prev) => ({
-        ...prev,
-        especie: value,
-        raca: "",
-      }));
-      return;
-    }
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+  const setField = (name) => (value) => {
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleEspecieChange = (value) => {
+    setFormData((prev) => ({ ...prev, especie: value, raca: "" }));
   };
 
   // Funções para Quick Add
@@ -286,7 +277,7 @@ const PetForm = () => {
         ...formData,
         especie: especieSelecionada?.nome || formData.especie,
         cliente_id: parseInt(formData.cliente_id),
-        peso: formData.peso ? parseFloat(formData.peso) : null,
+        peso: formData.peso ? parseFloat(String(formData.peso).replace(",", ".")) : null,
         idade_aproximada: formData.idade_aproximada ? parseInt(formData.idade_aproximada) : null,
         data_nascimento: formData.data_nascimento || null,
         alergias_lista: textareaToList(formData.alergias),
@@ -343,7 +334,8 @@ const PetForm = () => {
       clienteIdPreSelecionado={clienteIdPreSelecionado}
       handleSubmit={handleSubmit}
       formData={formData}
-      handleChange={handleChange}
+      setField={setField}
+      handleEspecieChange={handleEspecieChange}
       clientes={clientes}
       abrirQuickAdd={abrirQuickAdd}
       especies={especies}

@@ -1,8 +1,39 @@
-import { FiArrowLeft, FiSave, FiAlertCircle, FiCheckCircle, FiPlus } from "react-icons/fi";
-import { PawPrint } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, PawPrint, Plus } from "lucide-react";
 
 import CampoIdadeInteligente from "../../components/CampoIdadeInteligente";
 import QuickAddModal from "../../components/QuickAddModal";
+import BotaoCancelar from "../../components/v2/BotaoCancelar/BotaoCancelar";
+import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
+import BotaoLink from "../../components/v2/BotaoLink/BotaoLink";
+import BotaoSalva from "../../components/v2/BotaoSalva/BotaoSalva";
+import InputCheckTexto from "../../components/v2/InputCheckTexto/InputCheckTexto";
+import InputCombobox from "../../components/v2/InputCombobox/InputCombobox";
+import InputData from "../../components/v2/InputData/InputData";
+import InputRadio from "../../components/v2/InputRadio/InputRadio";
+import InputTexto from "../../components/v2/InputTexto/InputTexto";
+import InputTextoLongo from "../../components/v2/InputTextoLongo/InputTextoLongo";
+import PetAvatar from "../../components/ui/PetAvatar";
+
+const OPCOES_SEXO = [
+  { value: "Macho", label: "Macho" },
+  { value: "Fêmea", label: "Fêmea" },
+];
+
+const OPCOES_PORTE = [
+  { value: "Mini", label: "Mini" },
+  { value: "Pequeno", label: "Pequeno" },
+  { value: "Médio", label: "Médio" },
+  { value: "Grande", label: "Grande" },
+  { value: "Gigante", label: "Gigante" },
+];
+
+// Aceita digitos com virgula ou ponto, igual ao InputQuantidade — mas sem forcar um minimo:
+// peso do pet e uma caracteristica opcional, pode ficar em branco indefinidamente.
+function aoDigitarPeso(bruto, setFormData) {
+  if (bruto === "" || /^[0-9]*[.,]?[0-9]*$/.test(bruto)) {
+    setFormData((prev) => ({ ...prev, peso: bruto }));
+  }
+}
 
 export default function PetFormView({
   loading,
@@ -15,7 +46,8 @@ export default function PetFormView({
   clienteIdPreSelecionado,
   handleSubmit,
   formData,
-  handleChange,
+  setField,
+  handleEspecieChange,
   clientes,
   abrirQuickAdd,
   especies,
@@ -30,35 +62,49 @@ export default function PetFormView({
 }) {
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
+      <div className="flex h-96 items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div
+            className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600 motion-reduce:animate-none"
+            aria-hidden="true"
+          />
           <p className="mt-4 text-gray-600">Carregando...</p>
         </div>
       </div>
     );
   }
 
+  const opcoesClientes = clientes.map((cliente) => ({
+    value: String(cliente.id),
+    label: `${cliente.nome}${cliente.cpf ? ` - CPF: ${cliente.cpf}` : ""}`,
+  }));
+  const opcoesEspecies = especies.map((especie) => ({
+    value: String(especie.id),
+    label: especie.nome,
+  }));
+  const opcoesRacas = racas.map((raca) => ({ value: raca.nome, label: raca.nome }));
+
+  const voltar = () => {
+    if (!isEditing && returnTo) {
+      navigate(returnTo);
+      return;
+    }
+    navigate(isEditing ? `/pets/${petId}` : "/pets");
+  };
+
   return (
     <div className="p-6">
       {/* Header */}
       <div className="mb-6">
-        <button
-          onClick={() => {
-            if (!isEditing && returnTo) {
-              navigate(returnTo);
-              return;
-            }
-            navigate(isEditing ? `/pets/${petId}` : "/pets");
-          }}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
-        >
-          <FiArrowLeft />
-          {isEditing ? "Voltar para detalhes do pet" : "Voltar para lista de pets"}
-        </button>
+        <BotaoLink onClick={voltar}>
+          <span className="inline-flex items-center gap-2">
+            <ArrowLeft size={14} aria-hidden="true" />
+            {isEditing ? "Voltar para detalhes do pet" : "Voltar para lista de pets"}
+          </span>
+        </BotaoLink>
 
-        <div className="flex items-center gap-3 mb-2">
-          <PawPrint className="text-blue-600" size={36} />
+        <div className="mb-2 mt-4 flex items-center gap-3">
+          <PawPrint className="text-blue-600" size={36} aria-hidden="true" />
           <h1 className="text-3xl font-bold text-gray-900">
             {isEditing ? "Editar Pet" : "Cadastrar Novo Pet"}
           </h1>
@@ -72,175 +118,139 @@ export default function PetFormView({
 
       {/* Mensagens */}
       {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
-          <FiAlertCircle />
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+          <AlertCircle size={18} aria-hidden="true" />
           {error}
         </div>
       )}
 
       {success && (
-        <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2">
-          <FiCheckCircle />
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-green-700">
+          <CheckCircle2 size={18} aria-hidden="true" />
           {success}
         </div>
       )}
 
       {/* Aviso de tutor pré-selecionado */}
       {clienteIdPreSelecionado && (
-        <div className="mb-6 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg flex items-center gap-2">
-          <FiCheckCircle />
-          <span>✅ Tutor pré-selecionado automaticamente! Você pode alterar se necessário.</span>
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-blue-700">
+          <CheckCircle2 size={18} aria-hidden="true" />
+          <span>Tutor pré-selecionado automaticamente! Você pode alterar se necessário.</span>
         </div>
       )}
 
       {/* Formulário */}
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} noValidate className="space-y-6">
         {/* Dados Básicos */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Dados Básicos</h2>
+        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 text-xl font-bold text-gray-900">Dados Básicos</h2>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Cliente (Tutor) *
-              </label>
-              <select
-                name="cliente_id"
-                value={formData.cliente_id}
-                onChange={handleChange}
+              <InputCombobox
+                id="pet-cliente"
+                label="Cliente (Tutor)"
+                opcoes={opcoesClientes}
+                value={formData.cliente_id ? String(formData.cliente_id) : ""}
+                onChange={setField("cliente_id")}
+                placeholder="Selecione o tutor..."
                 required
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
-                  clienteIdPreSelecionado ? "border-blue-400 bg-blue-50" : "border-gray-300"
-                }`}
-              >
-                <option value="">Selecione o tutor...</option>
-                {clientes.map((cliente) => (
-                  <option key={cliente.id} value={cliente.id}>
-                    {cliente.nome} {cliente.cpf && `- CPF: ${cliente.cpf}`}
-                  </option>
-                ))}
-              </select>
+              />
               {clienteIdPreSelecionado && (
-                <p className="text-xs text-blue-600 mt-1">🎯 Tutor selecionado automaticamente</p>
+                <p className="mt-1 text-xs text-blue-600">Tutor selecionado automaticamente</p>
               )}
             </div>
 
             <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Pet *</label>
-              <input
-                type="text"
-                name="nome"
+              <InputTexto
+                id="pet-nome"
+                label="Nome do Pet"
                 value={formData.nome}
-                onChange={handleChange}
+                onChange={setField("nome")}
                 required
                 placeholder="Ex: Rex, Miau, Totó"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Espécie *</label>
-              <div className="field-with-action">
-                <select
-                  name="especie"
-                  value={formData.especie}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                >
-                  <option value="">Selecione...</option>
-                  {especies.map((especie) => (
-                    <option key={especie.id} value={especie.id}>
-                      {especie.nome}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="btn-add-quick"
-                  onClick={() => abrirQuickAdd("especie")}
-                  title="Adicionar nova espécie"
-                >
-                  <FiPlus /> Nova
-                </button>
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <InputCombobox
+                    id="pet-especie"
+                    label="Espécie"
+                    opcoes={opcoesEspecies}
+                    value={formData.especie}
+                    onChange={handleEspecieChange}
+                    placeholder="Selecione..."
+                    required
+                  />
+                </div>
+                <BotaoInteracao icon={Plus} onClick={() => abrirQuickAdd("especie")} tamanho="normal">
+                  Nova
+                </BotaoInteracao>
               </div>
               {especies.length === 0 && (
-                <p className="text-xs text-amber-600 mt-1">
+                <p className="mt-1 text-xs text-amber-800">
                   Nenhuma espécie cadastrada. Cadastre em Cadastros → Espécies e Raças.
                 </p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Raça</label>
-              <div className="field-with-action">
-                <select
-                  name="raca"
-                  value={formData.raca}
-                  onChange={handleChange}
-                  disabled={!formData.especie}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">
-                    {!formData.especie ? "Selecione uma espécie primeiro" : "Selecione uma raça..."}
-                  </option>
-                  {racas.map((raca) => (
-                    <option key={raca.id} value={raca.nome}>
-                      {raca.nome}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="btn-add-quick"
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <InputCombobox
+                    id="pet-raca"
+                    label="Raça"
+                    opcoes={opcoesRacas}
+                    value={formData.raca}
+                    onChange={setField("raca")}
+                    placeholder={
+                      !formData.especie ? "Selecione uma espécie primeiro" : "Selecione uma raça..."
+                    }
+                    disabled={!formData.especie}
+                  />
+                </div>
+                <BotaoInteracao
+                  icon={Plus}
                   onClick={() => abrirQuickAdd("raca")}
-                  title="Adicionar nova raça"
+                  tamanho="normal"
                   disabled={!formData.especie}
                 >
-                  <FiPlus /> Nova
-                </button>
+                  Nova
+                </BotaoInteracao>
               </div>
               {formData.especie && racas.length === 0 && (
-                <p className="text-xs text-amber-600 mt-1">
+                <p className="mt-1 text-xs text-amber-800">
                   Nenhuma raça cadastrada para{" "}
                   {especieSelecionadaAtual?.nome || "a espécie selecionada"}.
                 </p>
               )}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
-              <select
-                name="sexo"
-                value={formData.sexo}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              >
-                <option value="">Selecione...</option>
-                <option value="Macho">Macho</option>
-                <option value="Fêmea">Fêmea</option>
-              </select>
-            </div>
+            <InputRadio
+              name="sexo"
+              label="Sexo"
+              opcoes={OPCOES_SEXO}
+              value={formData.sexo}
+              onChange={setField("sexo")}
+            />
 
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                name="castrado"
-                id="castrado"
+            <div className="flex items-end">
+              <InputCheckTexto
+                id="pet-castrado"
                 checked={formData.castrado}
-                onChange={handleChange}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-              />
-              <label htmlFor="castrado" className="text-sm font-medium text-gray-700">
+                onChange={setField("castrado")}
+              >
                 Pet castrado
-              </label>
+              </InputCheckTexto>
             </div>
           </div>
         </div>
 
         {/* Características Físicas */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Características Físicas</h2>
+        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 text-xl font-bold text-gray-900">Características Físicas</h2>
 
           <div className="grid grid-cols-2 gap-4">
             <CampoIdadeInteligente
@@ -254,263 +264,165 @@ export default function PetFormView({
               className="col-span-2"
             />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Peso (kg)</label>
-              <input
-                type="number"
-                name="peso"
-                value={formData.peso}
-                onChange={handleChange}
-                step="0.1"
-                min="0"
-                placeholder="Ex: 5.5"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              />
-            </div>
+            <InputTexto
+              id="pet-peso"
+              label="Peso (kg)"
+              value={formData.peso}
+              onChange={(bruto) => aoDigitarPeso(bruto, setFormData)}
+              inputMode="decimal"
+              placeholder="Ex: 5.5"
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Porte</label>
-              <select
-                name="porte"
-                value={formData.porte}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              >
-                <option value="">Selecione...</option>
-                <option value="Mini">Mini</option>
-                <option value="Pequeno">Pequeno</option>
-                <option value="Médio">Médio</option>
-                <option value="Grande">Grande</option>
-                <option value="Gigante">Gigante</option>
-              </select>
-            </div>
+            <InputCombobox
+              id="pet-porte"
+              label="Porte"
+              opcoes={OPCOES_PORTE}
+              value={formData.porte}
+              onChange={setField("porte")}
+              placeholder="Selecione..."
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Cor/Pelagem</label>
-              <input
-                type="text"
-                name="cor"
-                value={formData.cor}
-                onChange={handleChange}
-                placeholder="Ex: Preto, Branco, Caramelo"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              />
-            </div>
+            <InputTexto
+              id="pet-cor"
+              label="Cor/Pelagem"
+              value={formData.cor}
+              onChange={setField("cor")}
+              placeholder="Ex: Preto, Branco, Caramelo"
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Microchip</label>
-              <input
-                type="text"
-                name="microchip"
-                value={formData.microchip}
-                onChange={handleChange}
-                placeholder="Número do microchip"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-mono text-sm"
-              />
-            </div>
+            <InputTexto
+              id="pet-microchip"
+              label="Microchip"
+              value={formData.microchip}
+              onChange={setField("microchip")}
+              placeholder="Número do microchip"
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo sanguíneo</label>
-              <input
-                type="text"
-                name="tipo_sanguineo"
-                value={formData.tipo_sanguineo}
-                onChange={handleChange}
-                placeholder="Ex: DEA 1.1, A, B"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              />
-            </div>
+            <InputTexto
+              id="pet-tipo-sanguineo"
+              label="Tipo sanguíneo"
+              value={formData.tipo_sanguineo}
+              onChange={setField("tipo_sanguineo")}
+              placeholder="Ex: DEA 1.1, A, B"
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Registro de pedigree
-              </label>
-              <input
-                type="text"
-                name="pedigree_registro"
-                value={formData.pedigree_registro}
-                onChange={handleChange}
-                placeholder="Código do registro, se houver"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              />
-            </div>
+            <InputTexto
+              id="pet-pedigree"
+              label="Registro de pedigree"
+              value={formData.pedigree_registro}
+              onChange={setField("pedigree_registro")}
+              placeholder="Código do registro, se houver"
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Data da castração
-              </label>
-              <input
-                type="date"
-                name="castrado_data"
-                value={formData.castrado_data}
-                onChange={handleChange}
-                disabled={!formData.castrado}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-100"
-              />
-            </div>
+            <InputData
+              id="pet-castrado-data"
+              label="Data da castração"
+              value={formData.castrado_data}
+              onChange={setField("castrado_data")}
+              disabled={!formData.castrado}
+            />
 
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">URL da Foto</label>
-              <input
-                type="url"
-                name="foto_url"
-                value={formData.foto_url}
-                onChange={handleChange}
-                placeholder="https://exemplo.com/foto-do-pet.jpg"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              />
+            <div className="col-span-2 flex items-end gap-3">
+              <div className="flex-1">
+                <InputTexto
+                  id="pet-foto-url"
+                  label="URL da Foto"
+                  type="url"
+                  value={formData.foto_url}
+                  onChange={setField("foto_url")}
+                  placeholder="https://exemplo.com/foto-do-pet.jpg"
+                />
+              </div>
+              <PetAvatar name={formData.nome} url={formData.foto_url} size="lg" />
             </div>
           </div>
         </div>
 
         {/* Informações de Saúde */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Informações de Saúde</h2>
+        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 text-xl font-bold text-gray-900">Informações de Saúde</h2>
 
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Alergias</label>
-              <p className="text-xs text-gray-500 mb-2">Uma linha por item.</p>
-              <textarea
-                name="alergias"
-                value={formData.alergias}
-                onChange={handleChange}
-                rows="3"
-                placeholder="Descreva alergias conhecidas (alimentares, medicamentos, etc)"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              />
-            </div>
+            <InputTextoLongo
+              id="pet-alergias"
+              label="Alergias"
+              help="Uma linha por item."
+              value={formData.alergias}
+              onChange={setField("alergias")}
+              linhas={3}
+              placeholder="Descreva alergias conhecidas (alimentares, medicamentos, etc)"
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Doenças Crônicas
-              </label>
-              <p className="text-xs text-gray-500 mb-2">Uma linha por condição registrada.</p>
-              <textarea
-                name="doencas_cronicas"
-                value={formData.doencas_cronicas}
-                onChange={handleChange}
-                rows="3"
-                placeholder="Descreva doenças crônicas diagnosticadas"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              />
-            </div>
+            <InputTextoLongo
+              id="pet-doencas-cronicas"
+              label="Doenças Crônicas"
+              help="Uma linha por condição registrada."
+              value={formData.doencas_cronicas}
+              onChange={setField("doencas_cronicas")}
+              linhas={3}
+              placeholder="Descreva doenças crônicas diagnosticadas"
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Medicamentos Contínuos
-              </label>
-              <p className="text-xs text-gray-500 mb-2">
-                Uma linha por medicamento, de preferência com dose.
-              </p>
-              <textarea
-                name="medicamentos_continuos"
-                value={formData.medicamentos_continuos}
-                onChange={handleChange}
-                rows="3"
-                placeholder="Liste medicamentos de uso contínuo com dosagem"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              />
-            </div>
+            <InputTextoLongo
+              id="pet-medicamentos"
+              label="Medicamentos Contínuos"
+              help="Uma linha por medicamento, de preferência com dose."
+              value={formData.medicamentos_continuos}
+              onChange={setField("medicamentos_continuos")}
+              linhas={3}
+              placeholder="Liste medicamentos de uso contínuo com dosagem"
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Restrições alimentares
-              </label>
-              <p className="text-xs text-gray-500 mb-2">
-                Uma linha por restrição, intolerância ou dieta especial.
-              </p>
-              <textarea
-                name="restricoes_alimentares"
-                value={formData.restricoes_alimentares}
-                onChange={handleChange}
-                rows="3"
-                placeholder="Ex: sem frango, dieta renal, alimento úmido controlado"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              />
-            </div>
+            <InputTextoLongo
+              id="pet-restricoes"
+              label="Restrições alimentares"
+              help="Uma linha por restrição, intolerância ou dieta especial."
+              value={formData.restricoes_alimentares}
+              onChange={setField("restricoes_alimentares")}
+              linhas={3}
+              placeholder="Ex: sem frango, dieta renal, alimento úmido controlado"
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Histórico Clínico
-              </label>
-              <textarea
-                name="historico_clinico"
-                value={formData.historico_clinico}
-                onChange={handleChange}
-                rows="4"
-                placeholder="Descreva o histórico clínico do pet (cirurgias, tratamentos anteriores, etc)"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              />
-            </div>
+            <InputTextoLongo
+              id="pet-historico-clinico"
+              label="Histórico Clínico"
+              value={formData.historico_clinico}
+              onChange={setField("historico_clinico")}
+              linhas={4}
+              placeholder="Descreva o histórico clínico do pet (cirurgias, tratamentos anteriores, etc)"
+            />
           </div>
         </div>
 
         {/* Observações */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Observações Adicionais</h2>
+        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 text-xl font-bold text-gray-900">Observações Adicionais</h2>
 
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Observações Gerais
-              </label>
-              <textarea
-                name="observacoes"
-                value={formData.observacoes}
-                onChange={handleChange}
-                rows="4"
-                placeholder="Informações adicionais, comportamento, preferências, etc"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              />
-            </div>
+            <InputTextoLongo
+              id="pet-observacoes"
+              label="Observações Gerais"
+              value={formData.observacoes}
+              onChange={setField("observacoes")}
+              linhas={4}
+              placeholder="Informações adicionais, comportamento, preferências, etc"
+            />
 
             {isEditing && (
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="ativo"
-                  id="ativo"
-                  checked={formData.ativo}
-                  onChange={handleChange}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                />
-                <label htmlFor="ativo" className="text-sm font-medium text-gray-700">
-                  Pet ativo no sistema
-                </label>
-              </div>
+              <InputCheckTexto id="pet-ativo" checked={formData.ativo} onChange={setField("ativo")}>
+                Pet ativo no sistema
+              </InputCheckTexto>
             )}
           </div>
         </div>
 
         {/* Botões */}
         <div className="flex items-center gap-4">
-          <button
-            type="submit"
-            disabled={saving}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saving ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Salvando...
-              </>
-            ) : (
-              <>
-                <FiSave />
-                {isEditing ? "Salvar Alterações" : "Cadastrar Pet"}
-              </>
-            )}
-          </button>
+          <BotaoSalva loading={saving} tamanho="grande">
+            {isEditing ? "Salvar Alterações" : "Cadastrar Pet"}
+          </BotaoSalva>
 
-          <button
-            type="button"
-            onClick={() => navigate(isEditing ? `/pets/${petId}` : "/pets")}
-            disabled={saving}
-            className="px-6 py-3 border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors font-medium disabled:opacity-50"
-          >
-            Cancelar
-          </button>
+          <BotaoCancelar disabled={saving} onClick={voltar} tamanho="grande" />
         </div>
       </form>
 
