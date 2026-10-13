@@ -64,6 +64,7 @@ from typing import Dict, Any, List, Optional
 from decimal import Decimal
 from datetime import date, timedelta
 from sqlalchemy.orm import Session
+from app.utils.pagamento_vinculos import marcar_pagamento
 
 # Logger
 logger = logging.getLogger(__name__)
@@ -172,7 +173,9 @@ class ContasReceberService:
                 if isinstance(pag, dict)
                 else getattr(pag, "forma_pagamento_id", None)
             )
-            forma_query = db.query(FormaPagamento)
+            forma_query = db.query(FormaPagamento).filter(
+                FormaPagamento.tenant_id == venda.tenant_id
+            )
             if forma_pag_id:
                 forma_pag = forma_query.filter(
                     FormaPagamento.id == forma_pag_id
@@ -328,6 +331,8 @@ class ContasReceberService:
                 data_recebimento=None,
                 venda_id=venda.id,
                 documento=f"VENDA-{venda.id}",
+                observacoes=marcar_pagamento(None, campo("id")),
+                eh_parcelado=True,
                 numero_parcela=i,
                 total_parcelas=numero_parcelas,
                 status="pendente",
@@ -455,6 +460,12 @@ class ContasReceberService:
             data_recebimento=data_recebimento,
             status=status_conta,
             venda_id=venda.id,
+            observacoes=marcar_pagamento(
+                None,
+                pagamento.get("id")
+                if isinstance(pagamento, dict)
+                else getattr(pagamento, "id", None),
+            ),
             user_id=user_id,
             tenant_id=getattr(venda, "tenant_id", None),  # Propagar tenant_id da venda
         )
@@ -476,7 +487,12 @@ class ContasReceberService:
                 valor_recebido=valor,
                 data_recebimento=data_base,
                 forma_pagamento_id=forma_pag.id if forma_pag else None,
-                observacoes=f"Recebimento automático - Venda à vista #{venda.numero_venda}",
+                observacoes=marcar_pagamento(
+                    f"Recebimento automático - Venda à vista #{venda.numero_venda}",
+                    pagamento.get("id")
+                    if isinstance(pagamento, dict)
+                    else getattr(pagamento, "id", None),
+                ),
                 user_id=user_id,
                 tenant_id=getattr(venda, "tenant_id", None),
             )
@@ -503,6 +519,8 @@ class ContasReceberService:
         tenant_id: str,
         db: Session,
         data_recebimento: Optional[date] = None,
+        pagamento_id: Optional[int] = None,
+        forma_pagamento_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Baixa contas a receber pendentes de uma venda (parcial ou total).
@@ -545,6 +563,8 @@ class ContasReceberService:
             >>> logger.info(f"Baixadas {len(resultado['contas_baixadas'])} contas")
         """
         from app.financeiro_models import ContaReceber, Recebimento, FormaPagamento
+        from app.financeiro.recebiveis_operadora import TIPOS_RECEBIVEL_OPERADORA
+        from sqlalchemy import and_, or_
 
         logger.debug(
             f"💰 Baixando contas da venda #{venda_numero} - "
@@ -554,10 +574,21 @@ class ContasReceberService:
         # Buscar contas pendentes/parciais da venda
         contas_originais = (
             db.query(ContaReceber)
+            .outerjoin(
+                FormaPagamento,
+                and_(
+                    FormaPagamento.id == ContaReceber.forma_pagamento_id,
+                    FormaPagamento.tenant_id == ContaReceber.tenant_id,
+                ),
+            )
             .filter(
                 ContaReceber.venda_id == venda_id,
                 ContaReceber.tenant_id == tenant_id,
                 ContaReceber.status.in_(["pendente", "parcial", "vencido"]),
+                or_(
+                    FormaPagamento.tipo.is_(None),
+                    FormaPagamento.tipo.notin_(TIPOS_RECEBIVEL_OPERADORA),
+                ),
             )
             .order_by(ContaReceber.data_vencimento)
             .all()
@@ -575,15 +606,16 @@ class ContasReceberService:
             }
 
         # Buscar forma de pagamento
-        forma_pag = (
-            db.query(FormaPagamento)
-            .filter(
-                FormaPagamento.nome.ilike(f"%{forma_pagamento_nome}%"),
-                FormaPagamento.tenant_id == tenant_id,
-                FormaPagamento.ativo.is_(True),
-            )
-            .first()
+        forma_query = db.query(FormaPagamento).filter(
+            FormaPagamento.tenant_id == tenant_id, FormaPagamento.ativo.is_(True)
         )
+        if forma_pagamento_id:
+            forma_query = forma_query.filter(FormaPagamento.id == forma_pagamento_id)
+        else:
+            forma_query = forma_query.filter(
+                FormaPagamento.nome.ilike(f"%{forma_pagamento_nome}%")
+            )
+        forma_pag = forma_query.first()
         forma_pag_id = forma_pag.id if forma_pag else None
 
         valor_disponivel = valor_total_pagamento
@@ -614,7 +646,9 @@ class ContasReceberService:
                     valor_recebido=Decimal(str(valor_a_baixar)),
                     data_recebimento=data_recebimento or date.today(),
                     forma_pagamento_id=forma_pag_id,
-                    observacoes=f"Recebimento venda #{venda_numero}",
+                    observacoes=marcar_pagamento(
+                        f"Recebimento venda #{venda_numero}", pagamento_id
+                    ),
                     user_id=user_id,
                     tenant_id=tenant_id,  # ✅ Garantir isolamento entre empresas
                 )
@@ -723,6 +757,71 @@ class ContasReceberService:
             )
             .all()
         )
+
+        saldos_legados = (
+            db.query(LancamentoManual)
+            .filter(
+                LancamentoManual.tenant_id == tenant_id,
+                LancamentoManual.documento == f"VENDA-{venda_id}-SALDO",
+                LancamentoManual.tipo == "entrada",
+                LancamentoManual.status == "previsto",
+            )
+            .all()
+        )
+        if not lancamentos_previstos:
+            realizados = (
+                db.query(LancamentoManual)
+                .filter(
+                    LancamentoManual.tenant_id == tenant_id,
+                    LancamentoManual.documento.in_(
+                        [f"VENDA-{venda_id}", f"VENDA-{venda_id}-REALIZADO"]
+                    ),
+                    LancamentoManual.tipo == "entrada",
+                    LancamentoManual.status == "realizado",
+                )
+                .all()
+            )
+            espelhado = sum(
+                (
+                    Decimal(str(lancamento.valor))
+                    for lancamento in realizados
+                    if lancamento.documento == f"VENDA-{venda_id}"
+                ),
+                Decimal("0"),
+            ) + max(
+                (
+                    Decimal(str(lancamento.valor))
+                    for lancamento in realizados
+                    if lancamento.documento == f"VENDA-{venda_id}-REALIZADO"
+                ),
+                default=Decimal("0"),
+            )
+            saldo = max(Decimal(str(total_venda)) - espelhado, Decimal("0"))
+            if saldo > Decimal("0.01"):
+                modelo = next(iter(saldos_legados or realizados), None)
+                lancamento = LancamentoManual(
+                    tipo="entrada",
+                    valor=saldo,
+                    descricao=f"Venda {venda_numero} - A receber",
+                    data_lancamento=(
+                        modelo.data_lancamento
+                        if modelo
+                        else (data_recebimento or date.today())
+                    ),
+                    status="previsto",
+                    documento=f"VENDA-{venda_id}",
+                    categoria_id=modelo.categoria_id if modelo else None,
+                    fornecedor_cliente=modelo.fornecedor_cliente if modelo else None,
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                )
+                db.add(lancamento)
+                db.flush()
+                lancamentos_previstos.append(lancamento)
+        # A previsao principal ja representa todo o saldo. O sufixo SALDO era
+        # outro espelho desse mesmo valor, nunca um segundo recebimento.
+        for saldo_legado in saldos_legados:
+            saldo_legado.status = "cancelado"
 
         if not lancamentos_previstos:
             logger.debug("ℹ️ Nenhum lançamento previsto encontrado")

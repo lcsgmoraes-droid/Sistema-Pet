@@ -215,11 +215,12 @@ export default function PDVVendasRecentesSidebar({
               />
             </div>
 
-            <div className="flex space-x-1 mb-3">
-              {["24h", "7d", "30d"].map((periodo) => (
+            <div className="grid grid-cols-2 gap-1 mb-3">
+              {["hoje", "24h", "7d", "30d"].map((periodo) => (
                 <button
                   key={periodo}
                   onClick={() => setFiltroVendas(periodo)}
+                  aria-pressed={filtroVendas === periodo}
                   className={`flex h-9 flex-1 items-center justify-center rounded-lg px-2 text-center text-xs font-medium leading-tight transition-colors ${
                     filtroVendas === periodo
                       ? "bg-blue-600 text-white"
@@ -227,6 +228,7 @@ export default function PDVVendasRecentesSidebar({
                   }`}
                   type="button"
                 >
+                  {periodo === "hoje" && "Hoje"}
                   {periodo === "24h" && "Ultimas 24h"}
                   {periodo === "7d" && "7 dias"}
                   {periodo === "30d" && "30 dias"}

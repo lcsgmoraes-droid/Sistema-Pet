@@ -33,6 +33,7 @@ import {
   obterParcelasDisponiveis,
   obterParcelasPermitidasParaForma,
   obterTaxaCartaoSelecionada,
+  obterTotalRecebidoExistente,
   resolverFaixasParcelamentoDaForma,
 } from "../modalPagamentoUtils";
 
@@ -235,7 +236,7 @@ export default function useModalPagamentoController({
       try {
         const response = await api.get(`/vendas/${venda.id}/pagamentos`);
         setPagamentosExistentes(response.data.pagamentos || []);
-        setTotalPagoExistente(response.data.total_pago || 0);
+        setTotalPagoExistente(obterTotalRecebidoExistente(response.data));
       } catch (error) {
         console.error("Erro ao buscar pagamentos:", error);
         // Não mostrar erro se a venda ainda não existe

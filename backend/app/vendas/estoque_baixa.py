@@ -222,7 +222,7 @@ def processar_baixa_estoque_item(
                     db.query(Produto)
                     .filter(
                         Produto.id == componente.produto_componente_id,
-                        Produto.user_id == user_id,
+                        Produto.tenant_id == tenant_id,
                     )
                     .first()
                 )

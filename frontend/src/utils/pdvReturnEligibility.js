@@ -48,6 +48,14 @@ export function podeAbrirDevolucaoVenda(venda) {
   return Boolean(venda?.id && STATUS_DEVOLUCAO_DIRETA.has(normalizarStatusVenda(venda.status)));
 }
 
+export function podeRegistrarRecebimentoVenda(venda) {
+  const status = normalizarStatusVenda(venda?.status);
+  return (
+    !["finalizada", "pago_nf", "cancelada", "cancelado", "trocada"].includes(status) &&
+    getTipoDevolucaoVenda(venda) !== "total"
+  );
+}
+
 export function getStatusBuscaDevolucao() {
   return [...STATUS_BUSCA_DEVOLUCAO];
 }

@@ -65,6 +65,21 @@ def _make_venda_nfce():
     )
 
 
+def test_payload_novo_contrato_usa_di_g_c_no_total_fiscal():
+    venda = _make_venda_nfce()
+    venda.itens[0].desconto_item = 2
+    venda.desconto_venda_valor = 3
+    venda.cupom_discount_applied = 4
+    venda.desconto_valor = 9
+    venda.total = 91
+
+    payload = _make_api()._montar_payload(venda, "nfce")
+
+    assert payload["desconto"] == 9
+    assert payload["totais"]["valorTotal"] == 91
+    assert venda.itens[0].desconto_item == 2
+
+
 def test_configuracao_jwt_nao_pode_ser_desativada_por_variavel(monkeypatch):
     monkeypatch.setattr(bling_core, "ENV_PATHS", [])
     monkeypatch.setenv("BLING_ENABLE_JWT", "0")

@@ -2,11 +2,11 @@
 Rotas para o Sistema de Controle de Caixa
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Annotated, Optional
 from datetime import datetime, date, timezone
 from pydantic import BaseModel, Field
 
@@ -14,6 +14,14 @@ from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.idempotency import idempotent  # ← IDEMPOTÊNCIA
 from app.caixa_models import Caixa, MovimentacaoCaixa
+from app.caixa.recebimentos import (
+    carregar_pagamentos_vendas,
+    filtro_recebimentos_caixa,
+    resumir_pagamentos_vendas_caixa,
+)
+from app.caixa.auditoria import registrar_evento_caixa, snapshot_caixa
+from app.caixa.auditoria_routes import router as auditoria_router
+from app.utils.timezone import now_brasilia
 from app.caixa.conferencia import (
     instante_fechamento_sql,
     indicadores_vendas_recebimentos,
@@ -33,6 +41,7 @@ from app.domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
 from app.pdf_caixa import gerar_pdf_fechamento_caixa
 
 router = APIRouter(prefix="/caixas", tags=["caixas"])
+router.include_router(auditoria_router)
 
 
 # Schemas
@@ -51,6 +60,10 @@ class AbrirCaixaSchema(BaseModel):
 class FecharCaixaSchema(BaseModel):
     valor_informado: float = Field(ge=0, allow_inf_nan=False)
     observacoes_fechamento: Optional[str] = None
+
+
+class ReabrirCaixaSchema(BaseModel):
+    motivo: str = Field(min_length=10, max_length=1000)
 
 
 class MovimentacaoSchema(BaseModel):
@@ -113,8 +126,10 @@ def _validar_referencia_abertura(dados: AbrirCaixaSchema, caixa_anterior) -> Non
         )
 
 
-def _serializar_caixa(caixa: Caixa, *, compartilhado: bool) -> dict:
-    dados = caixa.to_dict()
+def _serializar_caixa(
+    caixa: Caixa, *, compartilhado: bool, compact: bool = False
+) -> dict:
+    dados = caixa.to_dict(incluir_movimentacoes=False) if compact else caixa.to_dict()
     dados["compartilhado"] = compartilhado
     return dados
 
@@ -202,6 +217,7 @@ async def abrir_caixa(
             valor_abertura=dados.valor_abertura,
         ),
         status="aberto",
+        data_abertura=now_brasilia(),
         tenant_id=tenant_id,
     )
 
@@ -216,6 +232,7 @@ async def abrir_caixa(
 def obter_caixa_aberto(
     db: Session = Depends(get_session),
     current_user_and_tenant=Depends(get_current_user_and_tenant),
+    compact: bool = False,
 ):
     """Obter o caixa aberto acessivel ao usuario atual."""
     current_user, tenant_id = current_user_and_tenant
@@ -227,7 +244,7 @@ def obter_caixa_aberto(
     if not caixa:
         return None
 
-    return _serializar_caixa(caixa, compartilhado=compartilhado)
+    return _serializar_caixa(caixa, compartilhado=compartilhado, compact=compact)
 
 
 @router.get("/conferencia-abertura")
@@ -256,6 +273,9 @@ def listar_caixas(
     status_filter: Optional[str] = None,
     db: Session = Depends(get_session),
     current_user_and_tenant=Depends(get_current_user_and_tenant),
+    compact: bool = False,
+    limit: Annotated[Optional[int], Query(ge=1, le=100)] = None,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ):
     """Listar caixas acessiveis ao usuario conforme a configuracao da empresa."""
     current_user, tenant_id = current_user_and_tenant
@@ -277,9 +297,15 @@ def listar_caixas(
     if status_filter:
         query = query.filter(Caixa.status == status_filter)
 
-    caixas = query.order_by(Caixa.data_abertura.desc()).all()
+    query = query.order_by(Caixa.data_abertura.desc(), Caixa.id.desc()).offset(offset)
+    if limit is not None:
+        query = query.limit(limit)
+    caixas = query.all()
 
-    return [_serializar_caixa(caixa, compartilhado=compartilhado) for caixa in caixas]
+    return [
+        _serializar_caixa(caixa, compartilhado=compartilhado, compact=compact)
+        for caixa in caixas
+    ]
 
 
 @router.get("/{caixa_id}")
@@ -314,7 +340,11 @@ async def criar_movimentacao(
     current_user, tenant_id = current_user_and_tenant
 
     caixa, _ = buscar_caixa_acessivel(
-        db, caixa_id=caixa_id, tenant_id=tenant_id, usuario_id=current_user.id
+        db,
+        caixa_id=caixa_id,
+        tenant_id=tenant_id,
+        usuario_id=current_user.id,
+        bloquear_caixa=True,
     )
 
     if not caixa:
@@ -350,6 +380,7 @@ async def criar_movimentacao(
         usuario_id=current_user.id,
         usuario_nome=usuario_nome,
         tenant_id=tenant_id,
+        data_movimento=now_brasilia(),
     )
 
     db.add(movimentacao)
@@ -429,7 +460,11 @@ async def fechar_caixa(
     current_user, tenant_id = current_user_and_tenant
 
     caixa, compartilhado = buscar_caixa_acessivel(
-        db, caixa_id=caixa_id, tenant_id=tenant_id, usuario_id=current_user.id
+        db,
+        caixa_id=caixa_id,
+        tenant_id=tenant_id,
+        usuario_id=current_user.id,
+        bloquear_caixa=True,
     )
 
     if not caixa:
@@ -456,7 +491,7 @@ async def fechar_caixa(
     diferenca = float(moeda(dados.valor_informado) - moeda(valor_esperado))
 
     # Atualizar caixa
-    caixa.data_fechamento = datetime.now()
+    caixa.data_fechamento = now_brasilia()
     caixa.fechamento_em = datetime.now(timezone.utc)
     caixa.valor_esperado = valor_esperado
     caixa.valor_informado = dados.valor_informado
@@ -470,6 +505,16 @@ async def fechar_caixa(
     )
     caixa.status = "fechado"
 
+    registrar_evento_caixa(
+        db,
+        caixa_id=caixa.id,
+        usuario=current_user,
+        tenant_id=tenant_id,
+        acao="caixa_fechado",
+        novo=snapshot_caixa(db, caixa.id, current_user_and_tenant),
+        motivo=dados.observacoes_fechamento,
+    )
+
     db.commit()
     db.refresh(caixa)
 
@@ -479,11 +524,16 @@ async def fechar_caixa(
 @router.post("/{caixa_id}/reabrir")
 def reabrir_caixa(
     caixa_id: int,
+    dados: ReabrirCaixaSchema,
     db: Session = Depends(get_session),
     current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Reabrir um caixa fechado"""
     current_user, tenant_id = current_user_and_tenant
+    if len(dados.motivo.strip()) < 10:
+        raise HTTPException(
+            400, "Descreva o motivo da reabertura com pelo menos 10 caracteres."
+        )
 
     caixa_aberto, compartilhado = buscar_caixa_aberto(
         db,
@@ -503,7 +553,11 @@ def reabrir_caixa(
         )
 
     caixa, _ = buscar_caixa_acessivel(
-        db, caixa_id=caixa_id, tenant_id=tenant_id, usuario_id=current_user.id
+        db,
+        caixa_id=caixa_id,
+        tenant_id=tenant_id,
+        usuario_id=current_user.id,
+        bloquear_caixa=True,
     )
 
     if not caixa:
@@ -515,7 +569,17 @@ def reabrir_caixa(
             detail="Apenas caixas fechados podem ser reabertos",
         )
 
-    # Reabrir caixa
+    registrar_evento_caixa(
+        db,
+        caixa_id=caixa.id,
+        usuario=current_user,
+        tenant_id=tenant_id,
+        acao="caixa_reaberto",
+        motivo=dados.motivo.strip(),
+        anterior=snapshot_caixa(db, caixa.id, current_user_and_tenant),
+        novo={"status": "aberto"},
+    )
+    # O fechamento completo foi preservado antes de iniciar outro ciclo.
     caixa.status = "aberto"
     caixa.data_fechamento = None
     caixa.fechamento_em = None
@@ -537,6 +601,7 @@ def obter_resumo_caixa(
     caixa_id: int,
     db: Session = Depends(get_session),
     current_user_and_tenant=Depends(get_current_user_and_tenant),
+    compact: bool = False,
 ):
     """Obter resumo do caixa com totais"""
     current_user, tenant_id = current_user_and_tenant
@@ -582,18 +647,13 @@ def obter_resumo_caixa(
         )
         .join(Venda, VendaPagamento.venda_id == Venda.id)
         .filter(
-            Venda.caixa_id == caixa_id,
+            filtro_recebimentos_caixa(caixa),
             Venda.tenant_id == tenant_id,
             VendaPagamento.tenant_id == tenant_id,
-            Venda.status.in_(["finalizada", "baixa_parcial", "pago_nf"]),
+            VendaPagamento.valor > 0,
             func.lower(func.trim(VendaPagamento.forma_pagamento)) != "dinheiro",
-            VendaPagamento.data_pagamento >= caixa.data_abertura,
         )
     )
-    if caixa.data_fechamento:
-        pagamentos_query = pagamentos_query.filter(
-            VendaPagamento.data_pagamento <= caixa.data_fechamento
-        )
     pagamentos_por_data = pagamentos_query.group_by(
         data_da_venda, VendaPagamento.forma_pagamento
     ).all()
@@ -645,10 +705,11 @@ def obter_resumo_caixa(
     indicadores = indicadores_vendas_recebimentos(total_vendido, vendas_por_forma)
 
     return {
-        "caixa": _serializar_caixa(caixa, compartilhado=compartilhado),
+        "caixa": _serializar_caixa(caixa, compartilhado=compartilhado, compact=compact),
         "totais": totais,
         "vendas_por_forma_pagamento": vendas_por_forma,
         "recebimentos_por_data_venda": recebimentos_por_data_venda,
+        **resumir_pagamentos_vendas_caixa(db, caixa_id=caixa_id, tenant_id=tenant_id),
         **indicadores,
     }
 
@@ -763,6 +824,8 @@ def listar_vendas_caixa(
         return [
             {
                 "id": mov.id,
+                "venda_id": mov.venda_id,
+                "movimentacao_id": mov.id,
                 "numero_venda": mov.venda.numero_venda if mov.venda else None,
                 "cliente_nome": mov.venda.cliente.nome
                 if mov.venda and mov.venda.cliente
@@ -775,24 +838,117 @@ def listar_vendas_caixa(
                 "data_venda": mov.venda.data_venda.date().isoformat()
                 if mov.venda and mov.venda.data_venda
                 else None,
+                "data_recebimento": mov.data_movimento.isoformat(),
             }
             for mov in movimentos
         ]
 
-    query = db.query(Venda).filter(
-        Venda.caixa_id == caixa_id,
-        Venda.tenant_id == tenant_id,
-        Venda.status.in_(["finalizada", "baixa_parcial", "pago_nf"]),
-    )
     if not forma_pagamento:
-        vendas = query.order_by(Venda.data_venda.desc()).all()
+        from sqlalchemy import or_
+        from sqlalchemy.orm import lazyload, selectinload, with_loader_criteria
+        from app.models import Cliente
+        from app.produtos_models import Produto
+        from app.vendas_models import VendaItem
+
+        pagamentos_caixa = (
+            db.query(VendaPagamento)
+            .join(Venda, VendaPagamento.venda_id == Venda.id)
+            .filter(
+                filtro_recebimentos_caixa(caixa),
+                Venda.tenant_id == tenant_id,
+                VendaPagamento.tenant_id == tenant_id,
+                func.lower(func.trim(VendaPagamento.forma_pagamento)) != "dinheiro",
+            )
+            .all()
+        )
+        dinheiro_caixa = (
+            db.query(MovimentacaoCaixa)
+            .filter(
+                MovimentacaoCaixa.caixa_id == caixa_id,
+                MovimentacaoCaixa.tenant_id == tenant_id,
+                MovimentacaoCaixa.tipo == "venda",
+                func.lower(func.trim(MovimentacaoCaixa.forma_pagamento)) == "dinheiro",
+            )
+            .all()
+        )
+        recebimentos = {}
+        for pagamento in pagamentos_caixa:
+            recebimentos.setdefault(pagamento.venda_id, []).append(
+                {
+                    "id": pagamento.id,
+                    "tipo": "pagamento",
+                    "forma_pagamento": pagamento.forma_pagamento,
+                    "valor": float(moeda(pagamento.valor)),
+                    "data_recebimento": pagamento.data_pagamento.isoformat()
+                    if pagamento.data_pagamento
+                    else None,
+                }
+            )
+        for movimento in dinheiro_caixa:
+            if movimento.venda_id:
+                recebimentos.setdefault(movimento.venda_id, []).append(
+                    {
+                        "id": movimento.id,
+                        "tipo": "movimentacao",
+                        "forma_pagamento": "Dinheiro",
+                        "valor": float(moeda(movimento.valor)),
+                        "data_recebimento": movimento.data_movimento.isoformat(),
+                    }
+                )
+        vendas = (
+            db.query(Venda)
+            .options(
+                selectinload(Venda.cliente),
+                selectinload(Venda.itens).selectinload(VendaItem.produto),
+                lazyload(Venda.contas_receber),
+                with_loader_criteria(Cliente, Cliente.tenant_id == tenant_id),
+                with_loader_criteria(VendaItem, VendaItem.tenant_id == tenant_id),
+                with_loader_criteria(Produto, Produto.tenant_id == tenant_id),
+            )
+            .filter(
+                Venda.tenant_id == tenant_id,
+                or_(Venda.caixa_id == caixa_id, Venda.id.in_(list(recebimentos))),
+            )
+            .order_by(Venda.data_venda.desc())
+            .all()
+        )
+        pagamentos_vendas = carregar_pagamentos_vendas(
+            db, venda_ids=[venda.id for venda in vendas], tenant_id=tenant_id
+        )
         return [
             {
                 "id": venda.id,
+                "venda_id": venda.id,
                 "numero_venda": venda.numero_venda,
                 "cliente_nome": venda.cliente.nome if venda.cliente else "Consumidor",
                 "total": float(venda.total),
-                "valor_nesta_forma": float(venda.total),
+                "valor_nesta_forma": float(
+                    sum(
+                        (
+                            moeda(item["valor"])
+                            for item in recebimentos.get(venda.id, [])
+                        ),
+                        moeda(0),
+                    )
+                ),
+                "data_venda": venda.data_venda.date().isoformat()
+                if venda.data_venda
+                else None,
+                "status": venda.status,
+                "caixa_origem_id": venda.caixa_id,
+                "recebimentos": recebimentos.get(venda.id, []),
+                "pagamentos": pagamentos_vendas.get(venda.id, []),
+                "itens": [
+                    {
+                        "id": item.id,
+                        "produto_nome": item.produto.nome
+                        if item.produto
+                        else item.servico_descricao,
+                        "quantidade": float(item.quantidade),
+                        "subtotal": float(item.subtotal),
+                    }
+                    for item in venda.itens
+                ],
                 "hora_venda": venda.data_venda.strftime("%H:%M")
                 if venda.data_venda
                 else None,
@@ -806,10 +962,10 @@ def listar_vendas_caixa(
         db.query(VendaPagamento)
         .join(Venda, VendaPagamento.venda_id == Venda.id)
         .filter(
-            Venda.caixa_id == caixa_id,
+            filtro_recebimentos_caixa(caixa),
             Venda.tenant_id == tenant_id,
             VendaPagamento.tenant_id == tenant_id,
-            Venda.status.in_(["finalizada", "baixa_parcial", "pago_nf"]),
+            VendaPagamento.valor > 0,
             VendaPagamento.forma_pagamento == forma_pagamento,
         )
         .order_by(VendaPagamento.data_pagamento.desc())
@@ -818,6 +974,8 @@ def listar_vendas_caixa(
     return [
         {
             "id": pagamento.id,
+            "venda_id": pagamento.venda_id,
+            "pagamento_id": pagamento.id,
             "numero_venda": pagamento.venda.numero_venda,
             "cliente_nome": pagamento.venda.cliente.nome
             if pagamento.venda.cliente
@@ -829,6 +987,9 @@ def listar_vendas_caixa(
             else None,
             "data_venda": pagamento.venda.data_venda.date().isoformat()
             if pagamento.venda.data_venda
+            else None,
+            "data_recebimento": pagamento.data_pagamento.isoformat()
+            if pagamento.data_pagamento
             else None,
         }
         for pagamento in pagamentos

@@ -43,16 +43,34 @@ def atualizar_itens_venda_aberta(
     resolucoes_produtos: dict,
     saidas_ajuste: dict,
     db,
-) -> None:
+) -> dict[int, int]:
     """Mantém ID e comprovante da linha quando o estoque físico não mudou.
 
     Uma quantidade alterada não herda o comprovante anterior. Novas baixas só
     vinculam custo quando o movimento de edição corresponde à linha inteira.
+    Retorna a identidade comprovada item_id solicitado → ID persistido, sem
+    inferir associações para linhas enviadas sem ID.
     """
     disponiveis = sorted(itens_antigos, key=lambda item: item.id)
     novos_criados = []
     antigos_por_id = {item.id: item for item in disponiveis}
-    ids_reservados = {item.item_id for item in itens_novos if item.item_id is not None}
+    ids_informados = [item.item_id for item in itens_novos if item.item_id is not None]
+    ids_reservados = set(ids_informados)
+    if len(ids_informados) != len(ids_reservados):
+        raise HTTPException(
+            409, "O mesmo item foi informado mais de uma vez. Recarregue a venda."
+        )
+    for item_id in ids_informados:
+        original = antigos_por_id.get(item_id)
+        if (
+            original is None
+            or original.venda_id != venda_id
+            or str(original.tenant_id) != str(tenant_id)
+        ):
+            raise HTTPException(
+                409, "Item da venda mudou. Recarregue a venda antes de salvar."
+            )
+    itens_por_id_anterior = {}
     antigos_sem_id_por_grupo = Counter(
         _grupo_item(item, resolver_tenant_estoque_item(item, tenant_id)[0])
         for item in disponiveis
@@ -155,6 +173,8 @@ def atualizar_itens_venda_aberta(
         item.racao_prazo_estimado_dias = previsao.prazo_dias
         if antigo is None:
             item.quantidade = item_data.quantidade
+        if item_data.item_id is not None:
+            itens_por_id_anterior[item_data.item_id] = item
 
     for antigo in disponiveis:
         db.delete(antigo)
@@ -164,3 +184,5 @@ def atualizar_itens_venda_aberta(
         for item, origem in novos_criados:
             resultados = saidas_ajuste.get((item.produto_id, origem), [])
             registrar_custo_original_saida(item, resultados, origem)
+
+    return {item_id: item.id for item_id, item in itens_por_id_anterior.items()}

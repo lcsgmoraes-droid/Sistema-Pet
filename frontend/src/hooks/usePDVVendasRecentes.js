@@ -5,11 +5,31 @@ import { debugLog } from "../utils/debug";
 import { getTipoDevolucaoVenda } from "../utils/pdvReturnEligibility";
 import { useModulos } from "../contexts/ModulosContext";
 
+const formatarDataLocal = (data) =>
+  [
+    data.getFullYear(),
+    String(data.getMonth() + 1).padStart(2, "0"),
+    String(data.getDate()).padStart(2, "0"),
+  ].join("-");
+
+const FILTRO_VENDAS_STORAGE_KEY = "pdv_vendas_recentes_periodo";
+const PERIODOS_VALIDOS = new Set(["hoje", "24h", "7d", "30d"]);
+
+const carregarFiltroVendasSalvo = () => {
+  if (typeof window === "undefined") return "24h";
+  try {
+    const salvo = window.localStorage.getItem(FILTRO_VENDAS_STORAGE_KEY);
+    return PERIODOS_VALIDOS.has(salvo) ? salvo : "24h";
+  } catch {
+    return "24h";
+  }
+};
+
 export function usePDVVendasRecentes() {
   const { moduloAtivo } = useModulos();
   const moduloEcommerceAtivo = moduloAtivo("ecommerce");
   const [vendasRecentes, setVendasRecentes] = useState([]);
-  const [filtroVendas, setFiltroVendas] = useState("24h");
+  const [filtroVendas, setFiltroVendas] = useState(carregarFiltroVendasSalvo);
   const [filtroStatus, setFiltroStatus] = useState("todas");
   const [confirmandoRetirada, setConfirmandoRetirada] = useState({
     vendaId: null,
@@ -22,6 +42,14 @@ export function usePDVVendasRecentes() {
   const vendasPollingRef = useRef(false);
   const drivePollingRef = useRef(false);
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(FILTRO_VENDAS_STORAGE_KEY, filtroVendas);
+    } catch {
+      // O filtro continua funcionando quando o navegador bloqueia o armazenamento.
+    }
+  }, [filtroVendas]);
+
   const carregarVendasRecentes = async ({ force = false } = {}) => {
     if (vendasPollingRef.current) return;
     if (!force && document.visibilityState === "hidden") return;
@@ -31,7 +59,9 @@ export function usePDVVendasRecentes() {
       const hoje = new Date();
       let dataInicio;
 
-      if (filtroVendas === "24h") {
+      if (filtroVendas === "hoje") {
+        dataInicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+      } else if (filtroVendas === "24h") {
         dataInicio = new Date(hoje.getTime() - 24 * 60 * 60 * 1000);
       } else if (filtroVendas === "7d") {
         dataInicio = new Date(hoje.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -40,8 +70,8 @@ export function usePDVVendasRecentes() {
       }
 
       const params = {
-        data_inicio: dataInicio.toISOString().split("T")[0],
-        data_fim: hoje.toISOString().split("T")[0],
+        data_inicio: formatarDataLocal(dataInicio),
+        data_fim: formatarDataLocal(hoje),
         per_page: 50,
       };
 

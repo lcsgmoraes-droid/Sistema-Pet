@@ -6,6 +6,7 @@ deixar ``finalizacao.py`` focado na transacao principal da venda.
 """
 
 import logging
+import math
 import re
 from datetime import date as _date
 from decimal import Decimal
@@ -16,6 +17,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.campaigns.cashback_wallet import get_cashback_wallet, lock_cashback_customer
+from app.utils.timezone import now_brasilia
+from app.vendas.status_pagamento import pagamento_valido_para_saldo
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +69,16 @@ def _calcular_pagamentos_finalizacao(
     pagamentos_novos: List[Dict[str, Any]],
 ) -> Dict[str, float]:
     total_venda_float = float(total_venda or 0)
-    total_ja_pago = sum(float(p.valor) for p in pagamentos_existentes)
+    total_ja_pago = sum(
+        float(p.valor) for p in pagamentos_existentes if pagamento_valido_para_saldo(p)
+    )
+    for pagamento in pagamentos_novos:
+        valor = float(pagamento.get("valor") or 0)
+        if not math.isfinite(valor) or valor < 0.01:
+            raise HTTPException(
+                status_code=400,
+                detail="O valor de cada pagamento deve ser maior que zero",
+            )
     total_novos_pagamentos = sum(float(p.get("valor") or 0) for p in pagamentos_novos)
     valor_restante_bruto = total_venda_float - total_ja_pago
 
@@ -78,7 +90,9 @@ def _calcular_pagamentos_finalizacao(
     if valor_restante_bruto <= 0.01 and total_novos_pagamentos > 0.01:
         raise HTTPException(status_code=400, detail="Venda já está totalmente paga")
 
-    if total_novos_pagamentos > valor_restante_bruto + 0.01:
+    # A edição pode reduzir o total abaixo do valor recebido anteriormente.
+    # Sem pagamento novo, a refinalização preserva esse histórico financeiro.
+    if total_novos_pagamentos > max(0, valor_restante_bruto) + 0.01:
         raise HTTPException(
             status_code=400,
             detail=(
@@ -138,6 +152,19 @@ def consumir_cupom_finalizacao(
         )
 
     venda_total_para_cupom = float(venda.total or 0)
+    if getattr(venda, "desconto_venda_valor", None) is not None:
+        if (
+            abs(
+                float(cupom_discount_resolvido or 0)
+                - float(venda.cupom_discount_applied or 0)
+            )
+            > 0.01
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Salve o cupom aplicado antes de finalizar a venda.",
+            )
+        venda_total_para_cupom -= float(venda.taxa_entrega or 0)
     if cupom_discount_resolvido:
         venda_total_para_cupom += float(cupom_discount_resolvido or 0)
 
@@ -449,6 +476,7 @@ def processar_pagamentos_finalizacao(
                 )
 
         pagamento = VendaPagamento(
+            caixa_id=caixa_aberto_id,
             **_montar_campos_venda_pagamento(
                 venda_id=venda.id,
                 tenant_id=tenant_id,
@@ -458,10 +486,9 @@ def processar_pagamentos_finalizacao(
                 bandeira=bandeira,
                 operadora_id=operadora_id,
                 taxa_aplicada=taxa_aplicada,
-            )
+            ),
         )
-        if data_ocorrencia is not None:
-            pagamento.data_pagamento = data_ocorrencia
+        pagamento.data_pagamento = data_ocorrencia or now_brasilia()
         db.add(pagamento)
         db.flush()
 
@@ -487,15 +514,31 @@ def processar_pagamentos_finalizacao(
             if not cliente:
                 raise HTTPException(status_code=404, detail="Cliente não encontrado")
 
-            credito_disponivel = float(cliente.credito or 0)
-            if pag_data["valor"] > credito_disponivel + 0.01:
+            credito_disponivel = Decimal(str(cliente.credito or 0))
+            valor_credito = Decimal(str(pag_data["valor"]))
+            if valor_credito > credito_disponivel + Decimal("0.01"):
                 raise HTTPException(
                     status_code=400,
                     detail=f"Crédito insuficiente. Disponível: R$ {credito_disponivel:.2f}",
                 )
 
-            cliente.credito = Decimal(str(credito_disponivel - pag_data["valor"]))
+            cliente.credito = credito_disponivel - valor_credito
             db.add(cliente)
+            from app.models import CreditoLog
+
+            db.add(
+                CreditoLog(
+                    tenant_id=tenant_id,
+                    cliente_id=cliente.id,
+                    tipo="uso_venda",
+                    valor=Decimal(str(pag_data["valor"])),
+                    saldo_anterior=Decimal(str(credito_disponivel)),
+                    saldo_atual=cliente.credito,
+                    referencia_id=venda.id,
+                    motivo=f"Pagamento #{pagamento.id} da venda {venda.numero_venda}",
+                    usuario_nome=user_nome,
+                )
+            )
             logger.info(
                 f"🎁 Crédito utilizado: R$ {pag_data['valor']:.2f} - "
                 f"Saldo restante: R$ {float(cliente.credito):.2f}"
@@ -616,6 +659,15 @@ def processar_pagamentos_finalizacao(
                 data_movimento=data_ocorrencia,
             )
             movimentacoes_caixa_ids.append(mov_info["movimentacao_id"])
+            from app.caixa_models import MovimentacaoCaixa
+            from app.utils.pagamento_vinculos import referencia_pagamento
+
+            movimento = (
+                db.query(MovimentacaoCaixa)
+                .filter_by(id=mov_info["movimentacao_id"], tenant_id=tenant_id)
+                .one()
+            )
+            movimento.documento = referencia_pagamento(pagamento.id)
             logger.info(f"💵 Caixa: Movimentação #{mov_info['movimentacao_id']} criada")
 
     return movimentacoes_caixa_ids

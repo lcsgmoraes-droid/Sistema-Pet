@@ -88,7 +88,7 @@ class LoyaltyHandler:
             )
         except Exception as exc:
             logger.warning("[LoyaltyHandler] Erro customer=%d: %s", customer_id, exc)
-            return {"evaluated": 1, "rewarded": 0, "errors": 1}
+            raise
 
         return {"evaluated": 1, "rewarded": rewarded, "errors": 0}
 

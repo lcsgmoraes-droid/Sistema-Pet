@@ -55,6 +55,7 @@ function ClienteLookup({
   buscarCliente,
   buscarClientePorCodigoExato,
   clientesSugeridos,
+  mostrarEnderecoCliente,
   modoVisualizacao,
   onAbrirCadastroCliente,
   onBuscarClienteChange,
@@ -67,6 +68,7 @@ function ClienteLookup({
           className="w-full sm:flex-1"
           disabled={modoVisualizacao}
           minChars={0}
+          mostrarEndereco={mostrarEnderecoCliente}
           onChange={onBuscarClienteChange}
           onKeyDown={(e) => {
             if (e.key !== "Enter") return;
@@ -247,6 +249,7 @@ function ClienteAlertasPdv({ cliente }) {
 }
 
 function ClienteResumoSelecionado({
+  beneficiosMensagem,
   cashback,
   cliente,
   codigoCliente,
@@ -289,15 +292,21 @@ function ClienteResumoSelecionado({
       </div>
 
       <div className="min-w-0 border-b border-blue-200 px-3 py-3 md:border-b-0 md:border-r">
-        <ClienteFidelidadeResumo
-          cashback={cashback}
-          copiadoClienteCampo={copiadoClienteCampo}
-          cuponsAtivos={cuponsAtivos}
-          debitoFidelidade={debitoFidelidade}
-          nivelFidelidade={nivelFidelidade}
-          onCopiarCampoCliente={onCopiarCampoCliente}
-          saldoCarimbos={saldoCarimbos}
-        />
+        {beneficiosMensagem ? (
+          <p role="status" className="text-xs text-blue-700">
+            {beneficiosMensagem}
+          </p>
+        ) : (
+          <ClienteFidelidadeResumo
+            cashback={cashback}
+            copiadoClienteCampo={copiadoClienteCampo}
+            cuponsAtivos={cuponsAtivos}
+            debitoFidelidade={debitoFidelidade}
+            nivelFidelidade={nivelFidelidade}
+            onCopiarCampoCliente={onCopiarCampoCliente}
+            saldoCarimbos={saldoCarimbos}
+          />
+        )}
       </div>
 
       <div className="flex min-w-0 flex-col gap-2 bg-blue-50 px-3 py-3">
@@ -443,6 +452,7 @@ export default function PDVClienteCard({
   clientesSugeridos,
   copiadoClienteCampo,
   destaqueVenda,
+  mostrarEnderecoCliente = false,
   modoVisualizacao,
   onAbrirCadastroCliente,
   onAbrirHistoricoCliente,
@@ -472,6 +482,13 @@ export default function PDVClienteCard({
   const codigoCliente = cliente?.codigo || cliente?.id || "";
   const nivelFidelidade = saldoCampanhas?.rank_level || "bronze";
   const cashback = Number(saldoCampanhas?.saldo_cashback || 0);
+  const beneficiosMensagem = saldoCampanhas?.beneficios_erro_atualizacao
+    ? "Não foi possível atualizar os benefícios. Consulte novamente."
+    : saldoCampanhas?.beneficios_consulta_limite
+      ? "Benefícios ainda em processamento. Consulte novamente."
+      : saldoCampanhas?.beneficios_atualizando || saldoCampanhas?.beneficios_em_processamento
+        ? "Atualizando benefícios…"
+        : "";
 
   return (
     <Panel
@@ -496,6 +513,7 @@ export default function PDVClienteCard({
           buscarCliente={buscarCliente}
           buscarClientePorCodigoExato={buscarClientePorCodigoExato}
           clientesSugeridos={clientesSugeridos}
+          mostrarEnderecoCliente={mostrarEnderecoCliente}
           modoVisualizacao={modoVisualizacao}
           onAbrirCadastroCliente={onAbrirCadastroCliente}
           onBuscarClienteChange={onBuscarClienteChange}
@@ -504,6 +522,7 @@ export default function PDVClienteCard({
       ) : (
         <div className="space-y-2">
           <ClienteResumoSelecionado
+            beneficiosMensagem={beneficiosMensagem}
             cashback={cashback}
             cliente={cliente}
             codigoCliente={codigoCliente}

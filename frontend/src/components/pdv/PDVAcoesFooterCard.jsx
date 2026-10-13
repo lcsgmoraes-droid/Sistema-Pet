@@ -1,6 +1,7 @@
 import { AlertCircle, CreditCard, Save, X } from "lucide-react";
 import ActionButton from "../ui/ActionButton";
 import Panel from "../ui/Panel";
+import { podeRegistrarRecebimentoVenda } from "../../utils/pdvReturnEligibility";
 
 export default function PDVAcoesFooterCard({
   itensCount,
@@ -65,7 +66,7 @@ export default function PDVAcoesFooterCard({
         <ActionButton
           onClick={onAbrirModalPagamento}
           disabled={
-            loading || statusVenda === "finalizada" || statusVenda === "pago_nf" || !temCaixaAberto
+            loading || !podeRegistrarRecebimentoVenda({ status: statusVenda }) || !temCaixaAberto
           }
           icon={CreditCard}
           intent="create"

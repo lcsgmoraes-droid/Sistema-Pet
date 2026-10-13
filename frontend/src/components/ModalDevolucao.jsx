@@ -393,7 +393,10 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
 
       operacaoDevolucaoRef.current = null;
       alert("Devolução registrada com sucesso!");
-      onSucesso();
+      onSucesso?.({
+        venda_id: vendaSelecionada.id,
+        cliente_id: vendaSelecionada.cliente_id,
+      });
     } catch (error) {
       if (registroEnviado && error.response?.status >= 400 && error.response.status < 500) {
         operacaoDevolucaoRef.current = null;

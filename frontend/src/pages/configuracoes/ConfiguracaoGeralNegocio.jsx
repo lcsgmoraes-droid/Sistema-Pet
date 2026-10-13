@@ -21,6 +21,7 @@ const DEFAULT_FORM = {
   aliquota_imposto_padrao: 7,
   caixa_compartilhado: false,
   vendedor_obrigatorio_pdv: false,
+  mostrar_endereco_cliente_pdv: false,
   dias_tolerancia_atraso: 5,
   crediario_encargos_automaticos: false,
   crediario_multa_percentual: 2,
@@ -69,6 +70,7 @@ export default function ConfiguracaoGeralNegocio() {
           aliquota_imposto_padrao: Number(data.aliquota_imposto_padrao ?? 7),
           caixa_compartilhado: Boolean(data.caixa_compartilhado),
           vendedor_obrigatorio_pdv: Boolean(data.vendedor_obrigatorio_pdv),
+          mostrar_endereco_cliente_pdv: Boolean(data.mostrar_endereco_cliente_pdv),
           dias_tolerancia_atraso: Number(data.dias_tolerancia_atraso ?? 5),
           crediario_encargos_automaticos: Boolean(data.crediario_encargos_automaticos),
           crediario_multa_percentual: Number(data.crediario_multa_percentual ?? 2),
@@ -160,6 +162,7 @@ export default function ConfiguracaoGeralNegocio() {
         aliquota_imposto_padrao: Number(form.aliquota_imposto_padrao),
         caixa_compartilhado: Boolean(form.caixa_compartilhado),
         vendedor_obrigatorio_pdv: Boolean(form.vendedor_obrigatorio_pdv),
+        mostrar_endereco_cliente_pdv: Boolean(form.mostrar_endereco_cliente_pdv),
         dias_tolerancia_atraso: Number(form.dias_tolerancia_atraso),
         crediario_encargos_automaticos: Boolean(form.crediario_encargos_automaticos),
         crediario_multa_percentual: Number(form.crediario_multa_percentual),
@@ -275,6 +278,24 @@ export default function ConfiguracaoGeralNegocio() {
           opcional e é configurada separadamente na venda.
         </p>
       </div>
+
+      <fieldset className="rounded-lg bg-white p-6 shadow-md">
+        <legend className="sr-only">Busca de clientes no PDV</legend>
+        <h2 className="text-xl font-semibold text-gray-800">Busca de clientes no PDV</h2>
+        <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-800">
+          <input
+            type="checkbox"
+            checked={form.mostrar_endereco_cliente_pdv}
+            onChange={(event) => onChange("mostrar_endereco_cliente_pdv", event.target.checked)}
+            className="h-4 w-4"
+          />
+          Mostrar endereço nas sugestões de clientes
+        </label>
+        <p className="mt-2 text-sm text-gray-600">
+          Exibe o endereço principal do cadastro abaixo do telefone na busca de clientes. Clientes
+          sem endereço cadastrado continuam aparecendo normalmente.
+        </p>
+      </fieldset>
 
       <fieldset className="rounded-lg bg-white p-6 shadow-md">
         <legend className="sr-only">Visão padrão dos indicadores comerciais</legend>

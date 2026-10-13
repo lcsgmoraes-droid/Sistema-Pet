@@ -314,7 +314,7 @@ export default function useProdutosNovoCarregamento({
         if (!requestAindaAtiva()) return;
         const lotesCarregados = lotesRes.data || [];
         setLotes(lotesCarregados);
-        if (lotesCarregados.length > 0 && !produto.controle_lote) {
+        if (lotesCarregados.some((lote) => !lote.apenas_identificacao) && !produto.controle_lote) {
           setFormData((prev) => ({ ...prev, controle_lote: true }));
         }
       };

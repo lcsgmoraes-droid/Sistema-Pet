@@ -52,7 +52,7 @@ export default function useProdutosNovoSubmit({
     if (falhas.length > 0) throw new Error(falhas.join("; "));
   };
 
-  const salvarEdicao = async (dados, produtosCompostosIds) => {
+  const salvarEdicao = async (dados, produtosCompostosIds, abrirEstoque = false) => {
     await salvarFiscal({ id, tipo_produto: formData.tipo_produto });
     const payload =
       produtosCompostosIds === undefined
@@ -71,7 +71,7 @@ export default function useProdutosNovoSubmit({
       return;
     }
     alert("Produto atualizado com sucesso!");
-    navigate("/produtos");
+    navigate(abrirEstoque ? `/produtos/${id}/movimentacoes?aba=lotes` : "/produtos");
   };
 
   const fecharPreviewPrecosCompostos = () => {
@@ -86,7 +86,11 @@ export default function useProdutosNovoSubmit({
 
     try {
       setSalvando(true);
-      await salvarEdicao(dadosPendentes, precosCompostosSelecionados);
+      await salvarEdicao(
+        dadosPendentes.dados,
+        precosCompostosSelecionados,
+        dadosPendentes.abrirEstoque,
+      );
       fecharPreviewPrecosCompostos();
     } catch (error) {
       console.error("Erro ao salvar produto:", error);
@@ -98,6 +102,7 @@ export default function useProdutosNovoSubmit({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const abrirEstoque = e.nativeEvent?.submitter?.value === "estoque";
 
     if (!formData.nome) {
       alert("Preencha o campo Nome");
@@ -242,13 +247,13 @@ export default function useProdutosNovoSubmit({
         const sugestoes = Array.isArray(preview.sugestoes) ? preview.sugestoes : [];
 
         if (sugestoes.length > 0) {
-          setDadosPendentes(dados);
+          setDadosPendentes({ dados, abrirEstoque });
           setPreviewPrecosCompostos(preview);
           setPrecosCompostosSelecionados(sugestoes.map((item) => item.produto_id));
           return;
         }
 
-        await salvarEdicao(dados);
+        await salvarEdicao(dados, undefined, abrirEstoque);
         return;
       }
 
@@ -271,7 +276,7 @@ export default function useProdutosNovoSubmit({
       }
 
       alert(isClone ? "Produto clonado com sucesso!" : "Produto cadastrado com sucesso!");
-      navigate("/produtos");
+      navigate(abrirEstoque ? `/produtos/${produtoId}/movimentacoes?aba=lotes` : "/produtos");
     } catch (error) {
       console.error("Erro ao salvar produto:", error);
       alert(error.response?.data?.detail || "Erro ao salvar produto");

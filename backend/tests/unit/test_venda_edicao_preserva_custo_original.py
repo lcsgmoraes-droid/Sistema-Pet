@@ -6,6 +6,10 @@ from fastapi import HTTPException
 
 from app.vendas.edicao_itens import atualizar_itens_venda_aberta
 from app.vendas.schemas import VendaItemSchema
+from app.vendas_models import VendaItem
+from tests.unit import test_finalizacao_recebiveis_atomicidade as recebiveis
+
+cenario = recebiveis.cenario
 
 
 TENANT = "8f556b9e-3eb2-4e72-89db-10c512d53093"
@@ -33,6 +37,7 @@ def _antigo(item_id=7, quantidade="2", preco="100", comprovante=None):
     return SimpleNamespace(
         id=item_id,
         venda_id=123,
+        tenant_id=TENANT,
         tipo="produto",
         produto_id=11,
         estoque_origem_tenant_id=None,
@@ -72,7 +77,7 @@ def _resolucoes(*produto_ids):
 
 def _editar(antigos, novos, saidas=None):
     db = SessaoFake()
-    atualizar_itens_venda_aberta(
+    db.ids_atualizados = atualizar_itens_venda_aberta(
         venda_id=123,
         cliente_id=None,
         tenant_id=TENANT,
@@ -188,3 +193,101 @@ def test_quantidade_alterada_nao_herda_comprovante_da_linha_antiga():
     assert db.excluidos == [antigo]
     assert len(db.adicionados) == 1
     assert db.adicionados[0].custo_original_saida is None
+
+
+def test_mapeia_id_solicitado_para_id_novo_apos_quantidade_alterada():
+    antigo = _antigo(item_id=7, quantidade="1")
+    db = _editar([antigo], [_novo(item_id=7, quantidade=2)])
+    assert db.excluidos == [antigo]
+    assert db.flushes == 1
+    assert db.ids_atualizados == {7: db.adicionados[0].id}
+    assert db.adicionados[0].id == 800
+    assert db.adicionados[0].quantidade == 2
+
+
+def test_mapeia_linhas_do_mesmo_sku_sem_usar_ordem_ou_quantidade_antiga():
+    primeiro = _antigo(item_id=7, quantidade="1")
+    segundo = _antigo(item_id=8, quantidade="1")
+    db = _editar(
+        [primeiro, segundo],
+        [_novo(item_id=8, quantidade=3), _novo(item_id=7, quantidade=2)],
+    )
+    assert db.ids_atualizados == {8: 800, 7: 801}
+    assert [item.quantidade for item in db.adicionados] == [3, 2]
+    assert db.excluidos == [primeiro, segundo]
+
+
+def test_id_preservado_tem_mapeamento_exato_e_linha_sem_id_nao_tem():
+    primeiro = _antigo(item_id=7, quantidade="1")
+    segundo = _antigo(item_id=8, quantidade="2")
+    db = _editar(
+        [primeiro, segundo],
+        [_novo(item_id=7, quantidade=1), _novo(quantidade=2)],
+    )
+    assert db.ids_atualizados == {7: 7}
+    assert not db.adicionados and not db.excluidos
+    assert db.flushes == 0
+
+
+def test_duas_linhas_com_mesmo_id_e_quantidades_novas_nao_sao_associadas():
+    with pytest.raises(HTTPException) as erro:
+        _editar(
+            [_antigo()],
+            [_novo(item_id=7, quantidade=3), _novo(item_id=7, quantidade=4)],
+        )
+    assert erro.value.status_code == 409
+
+
+@pytest.mark.parametrize(
+    "campo,valor", [("tenant_id", "outro-tenant"), ("venda_id", 999)]
+)
+def test_id_de_outra_venda_ou_empresa_nao_entra_no_mapeamento(campo, valor):
+    antigo = _antigo()
+    setattr(antigo, campo, valor)
+    with pytest.raises(HTTPException) as erro:
+        _editar([antigo], [_novo(item_id=7, quantidade=3)])
+    assert erro.value.status_code == 409
+
+
+def test_mapeamento_usa_ids_gerados_no_flush_real_para_sku_repetido(cenario):
+    antigos = [
+        VendaItem(
+            venda_id=1,
+            tenant_id=cenario.tenant,
+            tipo="produto",
+            produto_id=11,
+            quantidade=1,
+            preco_unitario=100,
+            desconto_item=10,
+            subtotal=90,
+        )
+        for _ in range(2)
+    ]
+    cenario.db.add_all(antigos)
+    cenario.db.flush()
+    primeiro, segundo = [item.id for item in antigos]
+    ids = atualizar_itens_venda_aberta(
+        venda_id=1,
+        cliente_id=None,
+        tenant_id=cenario.tenant,
+        itens_antigos=antigos,
+        itens_novos=[
+            _novo(item_id=segundo, quantidade=3),
+            _novo(item_id=primeiro, quantidade=2),
+        ],
+        resolucoes_produtos={},
+        saidas_ajuste={},
+        db=cenario.db,
+    )
+    persistidos = (
+        cenario.db.query(VendaItem)
+        .filter_by(venda_id=1, tenant_id=cenario.tenant)
+        .all()
+    )
+    assert len(persistidos) == 2
+    assert set(ids) == {primeiro, segundo}
+    assert not set(ids.values()).intersection({primeiro, segundo})
+    quantidades = {item.id: item.quantidade for item in persistidos}
+    assert quantidades[ids[primeiro]] == 2
+    assert quantidades[ids[segundo]] == 3
+    assert all(item.custo_original_saida is None for item in persistidos)

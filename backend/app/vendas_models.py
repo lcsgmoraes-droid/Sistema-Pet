@@ -58,6 +58,8 @@ class Venda(BaseTenantModel):
     # Valores
     subtotal = Column(DECIMAL(10, 2), nullable=False)
     desconto_valor = Column(DECIMAL(10, 2), default=0)
+    # NULL identifica o contrato legado, que podia ratear cupons nos itens.
+    desconto_venda_valor = Column(DECIMAL(10, 2), nullable=True)
     desconto_percentual = Column(DECIMAL(5, 2), default=0)
     cupom_code = Column(String(100), nullable=True, index=True)
     cupom_discount_applied = Column(DECIMAL(10, 2), nullable=True)
@@ -286,6 +288,11 @@ class Venda(BaseTenantModel):
             else None,
             "subtotal": safe_decimal_to_float(self.subtotal),
             "desconto_valor": safe_decimal_to_float(self.desconto_valor) or 0,
+            "desconto_venda_valor": safe_decimal_to_float(self.desconto_venda_valor),
+            "desconto_itens_valor": round(
+                sum(float(item.desconto_item or 0) for item in self.itens), 2
+            ),
+            "desconto_origem_legado": self.desconto_venda_valor is None,
             "desconto_percentual": safe_decimal_to_float(self.desconto_percentual) or 0,
             "cupom_code": self.cupom_code,
             "cupom_discount_applied": safe_decimal_to_float(
@@ -645,6 +652,8 @@ class VendaPagamento(BaseTenantModel):
     venda_id = Column(
         Integer, ForeignKey("vendas.id", ondelete="CASCADE"), nullable=False
     )
+    # O recebimento pertence ao caixa que recebeu, mesmo em vendas de dias anteriores.
+    caixa_id = Column(Integer, ForeignKey("caixas.id"), nullable=True, index=True)
 
     # Forma de Pagamento
     forma_pagamento = Column(
@@ -707,6 +716,7 @@ class VendaPagamento(BaseTenantModel):
     def to_dict(self):
         return {
             "id": self.id,
+            "caixa_id": self.caixa_id,
             "forma_pagamento": self.forma_pagamento,
             "forma_pagamento_id": self.forma_pagamento_id,
             "valor": safe_decimal_to_float(self.valor),

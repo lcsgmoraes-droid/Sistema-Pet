@@ -32,6 +32,12 @@ DEPLOY_LOCK_FILE="${DEPLOY_LOCK_FILE:-/tmp/petshop-deploy-in-progress}"
 DEPLOY_MUTEX_FILE="${DEPLOY_MUTEX_FILE:-/tmp/petshop-deploy.lock}"
 DEPLOY_LOCK_HELD="${DEPLOY_LOCK_HELD:-0}"
 DEPLOY_OWNS_LOCK="${DEPLOY_OWNS_LOCK:-0}"
+CAIXA_BACKFILL_LOCK_MARKER="writers_paused=zzzk20261009a1"
+DEPLOY_WRITERS_PAUSED=0
+if [[ -f "$DEPLOY_LOCK_FILE" ]] && [[ "$(<"$DEPLOY_LOCK_FILE")" == "$CAIXA_BACKFILL_LOCK_MARKER" ]]; then
+  # Uma tentativa anterior pode ter falhado depois de parar os escritores.
+  DEPLOY_WRITERS_PAUSED=1
+fi
 
 log() {
   printf '\n[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
@@ -187,7 +193,13 @@ trap 'on_error $LINENO' ERR
 
 cleanup_deploy_lock() {
   [[ "$DEPLOY_OWNS_LOCK" == "1" ]] || return 0
-  rm -f "$DEPLOY_LOCK_FILE" 2>/dev/null || true
+  if [[ "$DEPLOY_WRITERS_PAUSED" == "1" ]]; then
+    local recovery_message="Escritores pausados para zzzk20261009a1; marcador $DEPLOY_LOCK_FILE preservado. Nao inicie codigo antigo. Corrija a falha, conclua migrations/RLS com a imagem desta release e retome backend/workers pelo passo subir_servicos. Remova o marcador somente apos confirmar os servicos novos saudaveis."
+    printf '\n%s\n' "$recovery_message" >&2
+    write_deploy_event "failed" "$CURRENT_STEP" "$recovery_message" || true
+  else
+    rm -f "$DEPLOY_LOCK_FILE" 2>/dev/null || true
+  fi
   flock -u 9 2>/dev/null || true
   exec 9>&- 2>/dev/null || true
   DEPLOY_LOCK_HELD=0
@@ -265,6 +277,17 @@ requires_runtime_deploy() {
     esac
   done <<<"$changed_files"
 
+  return 1
+}
+
+requires_caixa_backfill_pause() {
+  local changed_files="$1"
+  local file
+  while IFS= read -r file; do
+    if [[ "$file" == "backend/alembic/versions/zzzk20261009a1_caixa_recebimentos.py" ]]; then
+      return 0
+    fi
+  done <<<"$changed_files"
   return 1
 }
 
@@ -406,7 +429,7 @@ if [[ "$tracked_dist_count" != "0" ]]; then
   fail "Artefatos gerados voltaram a aparecer no Git."
 fi
 
-if ! requires_runtime_deploy "$changed_files" && [[ "$runtime_release_mismatch" == "0" ]]; then
+if ! requires_runtime_deploy "$changed_files" && [[ "$runtime_release_mismatch" == "0" ]] && [[ "$DEPLOY_WRITERS_PAUSED" != "1" ]]; then
   mark_step "sem_mudanca_runtime"
   if [[ "$HEAD_BEFORE" == "$HEAD_AFTER" ]]; then
     audit_step "Repositorio ja estava atualizado; rebuild nao necessario"
@@ -569,6 +592,15 @@ wait_for \
   24 \
   5
 
+if [[ "$DEPLOY_WRITERS_PAUSED" == "1" ]] || requires_caixa_backfill_pause "$changed_files"; then
+  mark_step "pausar_escritores_backfill_caixa"
+  audit_step "Pausando escritores antes do backup e backfill de caixa"
+  # Registrar antes do stop: uma parada parcial tambem exige recuperacao manual.
+  DEPLOY_WRITERS_PAUSED=1
+  printf '%s\n' "$CAIXA_BACKFILL_LOCK_MARKER" >"$DEPLOY_LOCK_FILE"
+  docker compose -f "$COMPOSE_FILE" stop backend worker-bling worker-catalogo
+fi
+
 mark_step "backup_banco"
 audit_step "Gerando backup do banco (pg_dump) antes das migrations"
 log "Gerando backup do banco (pg_dump) antes das migrations"
@@ -605,6 +637,7 @@ mark_step "subir_servicos"
 audit_step "Subindo backend e worker"
 log "Subindo backend e workers"
 docker compose -f "$COMPOSE_FILE" up -d backend worker-bling worker-catalogo
+DEPLOY_WRITERS_PAUSED=0
 
 mark_step "publicar_frontend"
 audit_step "Publicando frontend gerado"

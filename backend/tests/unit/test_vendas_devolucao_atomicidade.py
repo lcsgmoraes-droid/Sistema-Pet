@@ -795,11 +795,10 @@ def test_previa_e_registro_bloqueiam_reembolso_com_recebivel_aberto(
     "tipo_produto,tipo_kit,lote_id,controlar_estoque,erro_esperado",
     [
         ("KIT", "VIRTUAL", None, True, "KIT virtual"),
-        ("SIMPLES", None, 12, True, "item com lote"),
         ("SIMPLES", None, None, False, "nao controla estoque"),
     ],
 )
-def test_estoque_nao_recompoe_kit_virtual_ou_lote_sem_conciliacao(
+def test_estoque_nao_recompoe_kit_virtual_ou_produto_sem_estoque(
     monkeypatch, tipo_produto, tipo_kit, lote_id, controlar_estoque, erro_esperado
 ):
     item = SimpleNamespace(
@@ -836,13 +835,13 @@ def test_estoque_nao_recompoe_kit_virtual_ou_lote_sem_conciliacao(
 @pytest.mark.parametrize(
     "lotes_consumidos,quantidade_saida,tipo_produto,erro_esperado",
     [
-        ('[{"lote_id": 12, "quantidade": 1}]', 1, "SIMPLES", "item com lote"),
+        ('[{"lote_id": 12, "quantidade": 0.5}]', 1, "SIMPLES", "lotes originais"),
         (None, 0.5, "SIMPLES", "Saida original"),
         (None, 1, "SIMPLES", None),
         (None, 1, "KIT", None),
     ],
 )
-def test_estoque_exige_saida_original_sem_fifo_de_lote(
+def test_estoque_exige_saida_original_com_lotes_rastreaveis(
     monkeypatch, lotes_consumidos, quantidade_saida, tipo_produto, erro_esperado
 ):
     item = SimpleNamespace(
@@ -967,6 +966,8 @@ def test_previa_e_registro_aceitam_produto_de_estoque_compartilhado(monkeypatch)
 
     consulta_produto = MagicMock()
     consulta_produto.filter.return_value = consulta_produto
+    consulta_produto.with_for_update.return_value = consulta_produto
+    consulta_produto.populate_existing.return_value = consulta_produto
     consulta_produto.first.side_effect = lambda: (
         produto if tenant_ativo["valor"] == str(tenant_estoque) else None
     )
@@ -1030,7 +1031,7 @@ def test_previa_e_registro_aceitam_produto_de_estoque_compartilhado(monkeypatch)
     assert entradas[0]["user_id"] == 0
     assert entradas[0]["valor_total_override"] == 15.0
     assert item.produto is None
-    assert len(consulta_produto.filter.call_args_list) == 2
+    assert len(consulta_produto.filter.call_args_list) == 3
     for chamada in consulta_produto.filter.call_args_list:
         assert chamada.args[0].right.value == produto.id
         assert str(chamada.args[1].right.value) == str(tenant_estoque)
@@ -1040,7 +1041,7 @@ def test_previa_e_registro_aceitam_produto_de_estoque_compartilhado(monkeypatch)
 @pytest.mark.parametrize("operacao", [prever_devolucao, registrar_devolucao])
 @pytest.mark.parametrize(
     "tipo_produto,tipo_kit,lote_id",
-    [("KIT", "VIRTUAL", None), ("SIMPLES", None, 12)],
+    [("KIT", "VIRTUAL", None)],
 )
 def test_previa_e_registro_bloqueiam_estoque_que_nao_pode_ser_recomposto(
     monkeypatch, operacao, tipo_produto, tipo_kit, lote_id, preflight_beneficios_mock

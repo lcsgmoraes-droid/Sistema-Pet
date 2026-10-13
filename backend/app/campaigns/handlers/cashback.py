@@ -46,6 +46,7 @@ from app.campaigns.app_push import enqueue_campaign_push
 from app.campaigns.notification_service import enqueue_email
 from app.campaigns.channel_scope import normalize_benefit_channel
 from app.campaigns.cashback_wallet import get_cashback_wallet, lock_cashback_customer
+from app.campaigns.audit import log_campaign_event
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +67,12 @@ def _retained_cashback_after_reopening(
     campaign: Campaign,
     customer_id: int,
     execution: CampaignExecution,
-) -> Decimal:
-    """Return the prior award that remained with the customer after reopening."""
+) -> tuple[Decimal, Decimal]:
+    """Return the prior award not revoked, including its already expired part.
+
+    Expiration consumes the original entitlement just like redemption. Editing
+    a sale must not create a fresh replacement for a benefit that already expired.
+    """
     prior_credits = (
         db.query(CashbackTransaction)
         .filter(
@@ -99,6 +104,7 @@ def _retained_cashback_after_reopening(
         (Decimal(str(credit.amount)) for credit in prior_credits),
         Decimal("0.00"),
     )
+    expired = Decimal("0.00")
     for prior in [*prior_credits, *refunded_credits]:
         revoked = sum(
             (
@@ -116,8 +122,8 @@ def _retained_cashback_after_reopening(
             Decimal("0.00"),
         )
         retained -= revoked
-        retained -= wallet.expected_expiration_by_credit.get(prior.id, Decimal("0.00"))
-    return max(Decimal("0.00"), retained)
+        expired += wallet.expected_expiration_by_credit.get(prior.id, Decimal("0.00"))
+    return max(Decimal("0.00"), retained), expired
 
 
 def _notify_cashback_award(
@@ -132,7 +138,11 @@ def _notify_cashback_award(
 ) -> None:
     from app.models import Cliente
 
-    cliente = db.query(Cliente).filter(Cliente.id == customer_id).first()
+    cliente = (
+        db.query(Cliente)
+        .filter(Cliente.id == customer_id, Cliente.tenant_id == campaign.tenant_id)
+        .first()
+    )
     if cliente:
         amount_label = f"{amount:.2f}".replace(".", ",")
         push_body = (
@@ -257,12 +267,20 @@ class CashbackHandler:
             "finalizada",
             "baixa_parcial",
             "pago_nf",
+            "finalizada_devolucao",
+            "finalizada_devolucao_parcial",
         }:
+            return 0
+        if getattr(venda, "nao_gerar_beneficios", False):
             return 0
         lock_cashback_customer(
             db, tenant_id=campaign.tenant_id, customer_id=customer_id
         )
-        venda_total = Decimal(str(venda.total or 0))
+        from app.campaigns.sale_return_service import remaining_sale_amount
+
+        venda_total = remaining_sale_amount(
+            db, tenant_id=campaign.tenant_id, venda=venda
+        )
         ref_period = str(venda_id)  # Idempotência por venda
 
         # Já processou esta venda?
@@ -295,22 +313,66 @@ class CashbackHandler:
         params = campaign.params or {}
         pct_key = _RANK_PARAM_KEY.get(rank, "bronze_percent")
         pct = Decimal(str(params.get(pct_key, 0) or 0))
+        # An edited sale keeps the rule that earned its original benefit.
+        # Changing campaign settings or rank later must not reprice old sales.
+        old_meta = dict(existing.reward_meta or {}) if existing else {}
+        if existing and old_meta.get("percent") is not None:
+            pct = Decimal(str(old_meta["percent"]))
+            rank = RankLevelEnum(old_meta.get("rank") or rank.value)
 
-        if pct <= 0:
-            return 0  # sem cashback configurado para este nível
-
-        amount = (venda_total * pct / Decimal("100")).quantize(Decimal("0.01"))
+        entitlement = (
+            max(venda_total, Decimal("0.00")) * max(pct, Decimal("0")) / Decimal("100")
+        ).quantize(Decimal("0.01"))
+        retained = Decimal("0.00")
+        amount = entitlement
         if existing:
             # Part of a prior award may already have been redeemed before the
             # sale was reopened. It cannot be clawed back or granted again.
-            retained = _retained_cashback_after_reopening(
+            retained, expired = _retained_cashback_after_reopening(
                 db, campaign, customer_id, existing
             )
-            amount = max(Decimal("0.00"), amount - retained)
+            consumed = max(retained - expired, Decimal("0.00"))
+            retained_excess = max(retained - entitlement, Decimal("0.00"))
+            consumed_excess = max(consumed - entitlement, Decimal("0.00"))
+            amount = max(Decimal("0.00"), entitlement - retained)
+            existing.reward_value = retained + amount
             existing.reward_meta = {
-                **(existing.reward_meta or {}),
+                **old_meta,
                 "cashback_sale_revoked": False,
+                "percent": float(pct),
+                "rank": rank.value,
+                "canal": canal,
+                "venda_total_base": float(venda_total),
+                "cashback_entitlement": float(entitlement),
+                "cashback_retained_on_reopening": float(retained),
+                "cashback_expired_before_recalculation": float(expired),
+                "cashback_consumed_before_recalculation": float(consumed),
+                "cashback_retained_excess": float(retained_excess),
+                "cashback_consumed_excess": float(consumed_excess),
             }
+            existing.source_event_id = source_event_id
+            log_campaign_event(
+                db=db,
+                tenant_id=campaign.tenant_id,
+                event="campaign.cashback.sale_recalculated",
+                entity_type="campaign_executions",
+                entity_id=existing.id,
+                metadata={
+                    "venda_id": venda_id,
+                    "customer_id": customer_id,
+                    "previous_sale_total": old_meta.get("venda_total_base"),
+                    "sale_total": float(venda_total),
+                    "entitlement": float(entitlement),
+                    "retained": float(retained),
+                    "expired": float(expired),
+                    "consumed": float(consumed),
+                    "retained_excess": float(retained_excess),
+                    "consumed_excess": float(consumed_excess),
+                    "credited": float(amount),
+                    "source_event_id": source_event_id,
+                },
+                details=f"Cashback recalculado apos edicao da venda #{venda_id}",
+            )
         if amount <= 0:
             return 0
 
@@ -350,6 +412,7 @@ class CashbackHandler:
                     "rank": rank.value,
                     "venda_id": venda_id,
                     "venda_total_base": float(venda_total),
+                    "cashback_entitlement": float(entitlement),
                     "canal": canal,
                 },
                 source_event_id=source_event_id,

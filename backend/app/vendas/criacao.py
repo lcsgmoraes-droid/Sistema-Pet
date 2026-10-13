@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.utils.timezone import now_brasilia
 from app.vendas.custo_original import registrar_custo_original_saida
+from app.services.venda_descontos import normalizar_item_venda
+from app.vendas.regras import calcular_totais_venda
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +112,22 @@ def criar_venda(
         tem_entrega = bool(payload.get("tem_entrega", False))
         taxa_entrega = (payload.get("taxa_entrega", 0) or 0) if tem_entrega else 0
         total = subtotal_itens + taxa_entrega
+        if payload.get("desconto_venda_valor") is not None:
+            try:
+                itens = [{**item, **normalizar_item_venda(item)} for item in itens]
+                totais = calcular_totais_venda(
+                    itens,
+                    desconto_valor,
+                    payload.get("desconto_percentual", 0) or 0,
+                    taxa_entrega,
+                    desconto_venda_valor=payload["desconto_venda_valor"],
+                    cupom_discount_applied=payload.get("cupom_discount_applied"),
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            subtotal_itens = totais["subtotal"]
+            desconto_valor = totais["desconto_valor"]
+            total = totais["total"]
         validar_valor_para_troco(payload.get("pagamento_entrega_previsto"), saldo=total)
 
         # 🚚 Calcular distribuição da taxa de entrega
@@ -165,6 +183,7 @@ def criar_venda(
             or payload.get("funcionario_id"),
             subtotal=float(subtotal_itens),
             desconto_valor=float(desconto_valor),  # Desconto aplicado na venda
+            desconto_venda_valor=payload.get("desconto_venda_valor"),
             desconto_percentual=payload.get("desconto_percentual", 0) or 0,
             cupom_code=(
                 str(payload.get("cupom_code")).strip().upper()

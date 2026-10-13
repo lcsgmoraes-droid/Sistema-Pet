@@ -103,6 +103,7 @@ def _cashback_reversal_amount(
     expired_amount: Decimal,
     base_sale_total: Decimal,
     retained_sale_total: Decimal,
+    granted_total: Decimal | None = None,
 ) -> Decimal:
     """How much of a grant is still unearned and has not already expired."""
     if grant <= 0 or base_sale_total <= 0:
@@ -110,7 +111,10 @@ def _cashback_reversal_amount(
     target = (
         grant * min(retained_sale_total / base_sale_total, Decimal("1"))
     ).quantize(_CENT)
-    effective_now = max(grant - reversed_amount - expired_amount, Decimal("0"))
+    # Re-finalization can append replacement grants under the same execution.
+    # Their raw total differs from the entitlement of the current sale revision.
+    awarded = grant if granted_total is None else granted_total
+    effective_now = max(awarded - reversed_amount - expired_amount, Decimal("0"))
     effective_target = max(target - expired_amount, Decimal("0"))
     return max(effective_now - effective_target, Decimal("0")).quantize(_CENT)
 
@@ -130,11 +134,8 @@ def _reconcile_cashback(
 
     # Keep a return, redemption and expiration on the same customer lock.
     lock_cashback_customer(db, tenant_id=tenant_id, customer_id=venda.cliente_id)
-    remaining_by_credit = dict(
-        get_cashback_wallet(
-            db, tenant_id=tenant_id, customer_id=venda.cliente_id
-        ).remaining_by_credit
-    )
+    wallet = get_cashback_wallet(db, tenant_id=tenant_id, customer_id=venda.cliente_id)
+    remaining_by_credit = dict(wallet.remaining_by_credit)
     executions = (
         db.query(CampaignExecution)
         .filter(
@@ -154,6 +155,7 @@ def _reconcile_cashback(
                 CashbackTransaction.customer_id == venda.cliente_id,
                 CashbackTransaction.source_type == CashbackSourceTypeEnum.campaign,
                 CashbackTransaction.source_id == execution.id,
+                CashbackTransaction.amount > 0,
             )
             .with_for_update()
             .all()
@@ -165,7 +167,23 @@ def _reconcile_cashback(
                 or 0
             )
         )
-        for grant_tx in grants:
+        grant_ids = [grant.id for grant in grants]
+        restored_credits = (
+            db.query(CashbackTransaction)
+            .filter(
+                CashbackTransaction.tenant_id == tenant_id,
+                CashbackTransaction.customer_id == venda.cliente_id,
+                CashbackTransaction.origin_credit_id.in_(grant_ids),
+                CashbackTransaction.amount > 0,
+            )
+            .with_for_update()
+            .all()
+            if grant_ids
+            else []
+        )
+        credits = [*grants, *restored_credits]
+        reversed_total = Decimal("0.00")
+        for grant_tx in credits:
             adjustments = (
                 db.query(CashbackTransaction)
                 .filter(
@@ -189,27 +207,44 @@ def _reconcile_cashback(
                 ),
                 Decimal("0"),
             )
-            expired_amount = sum(
-                (
-                    -Decimal(str(tx.amount or 0))
-                    for tx in adjustments
-                    if tx.source_type == CashbackSourceTypeEnum.expiration
-                ),
-                Decimal("0"),
-            )
-            delta = _cashback_reversal_amount(
-                grant=Decimal(str(grant_tx.amount or 0)),
-                reversed_amount=reversed_amount,
-                expired_amount=expired_amount,
-                base_sale_total=base,
-                retained_sale_total=retained,
-            )
+            reversed_total += reversed_amount
+
+        # A reopened sale may have several grants under the same execution.
+        # Reconcile their combined effective award, rather than prorating each
+        # old grant against a sale total from an earlier revision.
+        granted = sum(
+            (Decimal(str(grant.amount or 0)) for grant in grants), Decimal("0.00")
+        )
+        expired = sum(
+            (
+                getattr(wallet, "expected_expiration_by_credit", {}).get(
+                    credit.id, Decimal("0.00")
+                )
+                for credit in credits
+            ),
+            Decimal("0.00"),
+        )
+        entitlement = Decimal(
+            str((execution.reward_meta or {}).get("cashback_entitlement", granted))
+        )
+        to_reverse = _cashback_reversal_amount(
+            grant=entitlement,
+            granted_total=granted,
+            reversed_amount=reversed_total,
+            expired_amount=expired,
+            base_sale_total=base,
+            retained_sale_total=retained,
+        )
+        for grant_tx in credits:
             # A used or expired part of this grant belongs to the customer;
             # a return may revoke only the amount still in this same lot.
-            delta = min(delta, remaining_by_credit.get(grant_tx.id, Decimal("0.00")))
+            delta = min(
+                to_reverse, remaining_by_credit.get(grant_tx.id, Decimal("0.00"))
+            )
             if delta <= 0:
                 continue
             remaining_by_credit[grant_tx.id] -= delta
+            to_reverse -= delta
             db.add(
                 CashbackTransaction(
                     tenant_id=tenant_id,

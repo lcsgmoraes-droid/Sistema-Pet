@@ -54,7 +54,7 @@ def test_backend_ci_keeps_postgres_migration_smoke():
     source = _workflow_source()
 
     assert "migration-smoke:" in source
-    assert "image: postgres:16" in source
+    assert "image: public.ecr.aws/docker/library/postgres:16" in source
     assert "Run Alembic migration smoke" in source
     assert "python scripts/ci_migration_smoke.py" in source
 

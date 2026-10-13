@@ -1,5 +1,6 @@
 import { formatMoneyBRL } from "./formatters.js";
 import { valorPorExtenso } from "./pdvPromissory.js";
+import { resumirDescontosVenda } from "./pdvDescontosUtils.js";
 
 export const RECEIPT_WIDTH = 42;
 
@@ -338,8 +339,14 @@ function gerarParcelasCrediario(pagamento = {}) {
 
 function montarResumoVenda(venda = {}) {
   const subtotal = Number(venda.subtotal || 0);
-  const descontoTotal = Number(venda.desconto_valor || 0);
-  const totalBruto = subtotal + descontoTotal;
+  const descontos = resumirDescontosVenda(venda);
+  const totalBruto =
+    (venda.itens || []).length > 0
+      ? venda.itens.reduce(
+          (sum, item) => sum + Number(item.preco_unitario || 0) * Number(item.quantidade || 0),
+          0,
+        )
+      : subtotal + descontos.itens;
   const taxaEntrega = Number(venda?.entrega?.taxa_entrega_total || venda.taxa_entrega || 0);
   const linhas = [
     "-".repeat(RECEIPT_WIDTH),
@@ -350,8 +357,18 @@ function montarResumoVenda(venda = {}) {
     linePair("Total bruto:", formatMoneyBRL(totalBruto)),
   ];
 
-  if (descontoTotal > 0) {
-    linhas.push(linePair("Desconto:", `-${formatMoneyBRL(descontoTotal)}`));
+  if (venda.desconto_venda_valor == null && descontos.total > 0) {
+    linhas.push(linePair("Descontos anteriores:", `-${formatMoneyBRL(descontos.total)}`));
+  } else if (descontos.manual > 0) {
+    linhas.push(linePair("Desconto manual:", `-${formatMoneyBRL(descontos.manual)}`));
+  }
+  if (descontos.cupom > 0) {
+    linhas.push(
+      linePair(
+        venda.desconto_venda_valor == null ? "Cupom (ja incluido):" : "Campanha/cupom:",
+        `-${formatMoneyBRL(descontos.cupom)}`,
+      ),
+    );
   }
   if (venda.tem_entrega) {
     linhas.push(linePair("Taxa entrega:", formatMoneyBRL(taxaEntrega)));

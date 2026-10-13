@@ -135,6 +135,7 @@ def _snapshot_pronto(venda: Venda) -> Optional[Dict[str, Any]]:
     return (
         ajustar_snapshot_taxa_mista(venda, snapshot)
         if version >= SNAPSHOT_VERSION
+        or (version == 5 and getattr(venda, "desconto_venda_valor", None) is None)
         else None
     )
 
