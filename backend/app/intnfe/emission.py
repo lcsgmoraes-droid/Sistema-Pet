@@ -21,6 +21,11 @@ from app.financeiro.crediario_parcelamento import montar_plano_crediario
 from app.intnfe.client import IntNFeError
 from app.intnfe.fiscal_profile import local_profile
 from app.intnfe.models import IntNFeConnection, IntNFeEmissionSequence
+from app.intnfe.rejection_diagnostics import (
+    enrich_validation_items,
+    message_corrections,
+    rejection_diagnostics,
+)
 from app.produtos_estoque_models import EstoqueMovimentacao, ProdutoLote
 from app.services.venda_descontos import ratear_descontos_venda
 
@@ -859,7 +864,12 @@ def local_document_details(db, tenant, venda):
         if cliente
         else emitter_uf
     )
-    interstate = bool(emitter_uf and destination_uf and emitter_uf != destination_uf)
+    interstate = venda.nfe_tipo == "nfe" and bool(
+        emitter_uf and destination_uf and emitter_uf != destination_uf
+    )
+    recipient_non_taxpayer = cliente is not None and not _text(
+        getattr(cliente, "inscricao_estadual", None)
+    )
 
     items = []
     product_total = Decimal("0")
@@ -872,7 +882,7 @@ def local_document_details(db, tenant, venda):
         if getattr(venda, "desconto_venda_valor", None) is not None
         else {}
     )
-    for sale_item in venda.itens or []:
+    for item_numero, sale_item in enumerate(venda.itens or [], start=1):
         product = getattr(sale_item, "produto", None)
         quantity = Decimal(str(getattr(sale_item, "quantidade", 0) or 0))
         unit_price = Decimal(str(getattr(sale_item, "preco_unitario", 0) or 0))
@@ -884,21 +894,32 @@ def local_document_details(db, tenant, venda):
             gross = (quantity * unit_price).quantize(CENT, rounding=ROUND_HALF_UP)
 
         fiscal = {}
+        lot = getattr(sale_item, "lote", None)
         if product and _ascii(getattr(sale_item, "tipo", None)) == "produto":
             try:
-                fiscal = _resolver_fiscal_item_nfe(db, venda, sale_item) or {}
+                inferred_lot = _lot_from_recorded_fifo(db, venda, sale_item)
+                if inferred_lot is not None:
+                    lot = inferred_lot
+                fiscal_item = SimpleNamespace(produto=product, lote=lot)
+                fiscal = _resolver_fiscal_item_nfe(db, venda, fiscal_item) or {}
             except Exception:
                 # O item precisa continuar visível mesmo se seu cadastro fiscal
                 # tiver sido alterado ou estiver incompleto depois da emissão.
                 fiscal = {}
 
-        cfop = (
-            fiscal.get("cfop_interestadual")
-            if interstate
-            else fiscal.get("cfop_interno")
-        )
+        if interstate and recipient_non_taxpayer:
+            cfop = fiscal.get("cfop_interestadual_nao_contribuinte")
+        else:
+            cfop = (
+                fiscal.get("cfop_interestadual")
+                if interstate
+                else fiscal.get("cfop_interno")
+            )
         items.append(
             {
+                "item_id": getattr(sale_item, "id", None),
+                "item_numero": item_numero,
+                "lote_id": getattr(lot, "id", None),
                 "produto_id": getattr(sale_item, "produto_id", None),
                 "codigo": (
                     _text(getattr(product, "codigo", None))
@@ -916,6 +937,7 @@ def local_document_details(db, tenant, venda):
                 "desconto": float(discount),
                 "ncm": _digits(fiscal.get("ncm")) or None,
                 "cest": _digits(fiscal.get("cest")) or None,
+                "origem_mercadoria": _text(fiscal.get("origem_mercadoria")),
                 "cfop": _text(cfop),
                 "icms": _text(fiscal.get("cst_icms")),
                 "pis": _text(fiscal.get("pis_cst")),
@@ -973,7 +995,7 @@ def local_document_details(db, tenant, venda):
             }
         )
 
-    return {
+    details = {
         "id": venda.id,
         "numero": venda.nfe_numero,
         "serie": venda.nfe_serie,
@@ -1016,6 +1038,8 @@ def local_document_details(db, tenant, venda):
                 "endereco": getattr(cliente, "endereco", None),
                 "numero": getattr(cliente, "numero", None),
                 "complemento": getattr(cliente, "complemento", None),
+                "codigo_municipio": getattr(cliente, "codigo_municipio", None),
+                "inscricao_estadual": getattr(cliente, "inscricao_estadual", None),
             }
             if cliente
             else (
@@ -1070,6 +1094,8 @@ def local_document_details(db, tenant, venda):
         },
         "pessoas_autorizadas_xml": [],
     }
+    details["diagnostico_rejeicao"] = rejection_diagnostics(venda, db=db, items=items)
+    return details
 
 
 def _access_token(api, connection, environment=None):
@@ -1089,56 +1115,20 @@ def _provider_validation(venda, messages):
     if not messages:
         return None
 
-    products = [
-        item.produto
-        for item in (venda.itens or [])
-        if _ascii(getattr(item, "tipo", None)) == "produto"
-        and getattr(item, "produto", None)
-    ]
-    single_product = products[0] if len(products) == 1 else None
-    field_patterns = (
-        ("ncm", ("ncm",)),
-        ("cfop", ("cfop",)),
-        ("origem_mercadoria", ("origem", "mercadoria")),
-        ("cst_icms", ("csosn",)),
-        ("cst_icms", ("cst", "icms")),
-        ("pis_cst", ("pis",)),
-        ("cofins_cst", ("cofins",)),
-    )
     blocks = []
     for message in messages:
-        normalized = _ascii(message)
-        field = next(
-            (
-                candidate
-                for candidate, terms in field_patterns
-                if all(term in normalized for term in terms)
-            ),
-            None,
-        )
-        block = {
-            "campo": field or "intnfe",
-            "mensagem": message,
-        }
-        if field and single_product:
-            block.update(
-                {
-                    "produto_id": single_product.id,
-                    "produto_nome": single_product.nome,
-                    "produto_tipo": getattr(single_product, "tipo_produto", None),
-                    "sku": _text(getattr(single_product, "codigo", None))
-                    or _text(getattr(single_product, "codigo_barras", None))
-                    or str(single_product.id),
-                }
-            )
-        blocks.append(block)
-    return {
-        "success": True,
-        "pode_emitir": False,
-        "requer_autorizacao": False,
-        "correcoes": [],
-        "bloqueios": blocks,
-    }
+        for block in message_corrections(venda, message):
+            blocks.append({**block, "origem": "intnfe", "historico": False})
+    return enrich_validation_items(
+        venda,
+        {
+            "success": True,
+            "pode_emitir": False,
+            "requer_autorizacao": False,
+            "correcoes": [],
+            "bloqueios": blocks,
+        },
+    )
 
 
 def issue(db, tenant, venda, document_type, api):

@@ -6,6 +6,12 @@ import {
   resolverCorrecaoFiscal,
 } from "../../services/fiscalCorrectionDialog";
 import FiscalReferenceSearch from "./FiscalReferenceSearch";
+import FiscalCorrectionNoteContext from "./FiscalCorrectionNoteContext";
+import FiscalCorrectionField from "./FiscalCorrectionField";
+import {
+  agruparPendenciasFiscais,
+  camposFiscaisAlterados,
+} from "../../utils/fiscalCorrectionFields.mjs";
 import {
   MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO,
   rejeicaoResponsavelTecnico,
@@ -14,6 +20,7 @@ import {
 
 const CAMPOS = {
   ncm: { rotulo: "NCM", tipo: "texto", placeholder: "8 dígitos", tamanho: 8 },
+  cest: { rotulo: "CEST", tipo: "texto", placeholder: "7 dígitos, quando aplicável", tamanho: 7 },
   origem_mercadoria: {
     rotulo: "Origem da mercadoria",
     tipo: "select",
@@ -75,66 +82,6 @@ const OPCOES_PIS_COFINS = [
   ["99", "99 - Outras operações"],
 ];
 
-const CONFIANCA = {
-  alta: {
-    rotulo: "Alta confiança",
-    classe: "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200",
-  },
-  media: {
-    rotulo: "Média confiança",
-    classe: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200",
-  },
-  baixa: {
-    rotulo: "Baixa confiança",
-    classe: "bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-200",
-  },
-};
-
-const FONTES_SUGESTAO = {
-  catalogo_fiscal: "catálogo fiscal do CorePet",
-  configuracao_fiscal_da_empresa: "configuração fiscal da empresa",
-  xml_ou_cadastro_do_produto_e_regime_da_empresa: "XML/cadastro do produto e regime da empresa",
-  regime_da_empresa_sem_historico_do_produto: "regime da empresa; sem histórico deste produto",
-  regime_da_empresa_sem_padrao_configurado: "regime da empresa; sem padrão fiscal configurado",
-  historico_de_produtos_semelhantes: "produtos semelhantes já cadastrados",
-  palavras_da_descricao: "descrição do produto",
-  correcao_de_codigo_incompleto: "correção de código fiscal incompleto",
-  padrao_operacional_sem_origem_informada: "padrão operacional; origem não comprovada",
-};
-
-function fonteLegivel(fonte) {
-  return FONTES_SUGESTAO[fonte] || String(fonte || "fonte não identificada").replaceAll("_", " ");
-}
-
-function agruparPendencias(validacao) {
-  const itens = [...(validacao?.bloqueios || []), ...(validacao?.correcoes || [])];
-  const produtos = new Map();
-  const gerais = [];
-
-  itens.forEach((item) => {
-    if (!item?.produto_id || !CAMPOS[item.campo]) {
-      gerais.push(item);
-      return;
-    }
-    const chave = String(item.produto_id);
-    const atual = produtos.get(chave) || {
-      id: item.produto_id,
-      nome: item.produto_nome || `Produto ${item.produto_id}`,
-      sku: item.sku,
-      codigo_barras: item.codigo_barras,
-      tipo: item.produto_tipo,
-      itemNumero: item.item_numero,
-      pendencias: [],
-    };
-    if (!atual.pendencias.some((pendencia) => pendencia.campo === item.campo)) {
-      atual.pendencias.push(item);
-    }
-    produtos.set(chave, atual);
-  });
-
-  return { produtos: [...produtos.values()], gerais };
-}
-
 function normalizarFiscal(data = {}) {
   return {
     ...data,
@@ -142,8 +89,8 @@ function normalizarFiscal(data = {}) {
     origem_mercadoria: data.origem_mercadoria ?? "",
     ncm: data.ncm ?? "",
     cst_icms: data.cst_icms ?? "",
-    pis_cst: data.pis_cst ?? "",
-    cofins_cst: data.cofins_cst ?? "",
+    pis_cst: data.pis_cst ?? data.cst_pis ?? "",
+    cofins_cst: data.cofins_cst ?? data.cst_cofins ?? "",
   };
 }
 
@@ -238,6 +185,8 @@ function FiscalSupportDialog({ fechar }) {
 export default function FiscalCorrectionDialogHost() {
   const [dialogo, setDialogo] = useState(null);
   const [formularios, setFormularios] = useState({});
+  const [originais, setOriginais] = useState({});
+  const [camposAplicados, setCamposAplicados] = useState({});
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
@@ -245,7 +194,12 @@ export default function FiscalCorrectionDialogHost() {
 
   useEffect(() => assinarCorrecaoFiscal(setDialogo), []);
 
-  const agrupado = useMemo(() => agruparPendencias(dialogo?.validacao), [dialogo]);
+  const agrupado = useMemo(() => agruparPendenciasFiscais(dialogo?.validacao, CAMPOS), [dialogo]);
+  const correcaoDaNota = Boolean(
+    dialogo?.nota?.provedor === "intnfe" &&
+    dialogo?.nota?.status?.toLowerCase() === "rejeitada" &&
+    dialogo?.vendaId,
+  );
   const temSugestoes = agrupado.produtos.some((produto) =>
     produto.pendencias.some((item) => item.valor_sugerido),
   );
@@ -289,18 +243,37 @@ export default function FiscalCorrectionDialogHost() {
     let ativo = true;
     setCarregando(true);
     setErro("");
+    setFormularios({});
+    setOriginais({});
+    setCamposAplicados({});
     Promise.all(
       agrupado.produtos.map(async (produto) => {
-        const endpoint =
-          produto.tipo === "KIT"
+        if (correcaoDaNota && !produto.itemId) {
+          throw new Error(
+            "Não foi possível identificar o item desta nota para corrigir. Atualize a lista e abra a nota novamente.",
+          );
+        }
+        const endpoint = correcaoDaNota
+          ? `/nfe/vendas/${dialogo.vendaId}/itens/${produto.itemId}/fiscal`
+          : produto.tipo === "KIT"
             ? `/produtos/${produto.id}/kit/fiscal`
             : `/produtos/${produto.id}/fiscal`;
         const { data } = await api.get(endpoint);
-        return [String(produto.id), normalizarFiscal(data)];
+        return [
+          produto.chave,
+          {
+            ...normalizarFiscal(correcaoDaNota ? data.fiscal : data),
+            fontesFiscais: data.fontes_fiscais,
+          },
+        ];
       }),
     )
       .then((entradas) => {
-        if (ativo) setFormularios(Object.fromEntries(entradas));
+        if (ativo) {
+          const carregados = Object.fromEntries(entradas);
+          setFormularios(carregados);
+          setOriginais(carregados);
+        }
       })
       .catch((error) => {
         if (ativo) setErro(mensagemErroApi(error));
@@ -311,11 +284,13 @@ export default function FiscalCorrectionDialogHost() {
     return () => {
       ativo = false;
     };
-  }, [dialogo, agrupado.produtos, erroResponsavelTecnico]);
+  }, [dialogo, agrupado.produtos, erroResponsavelTecnico, correcaoDaNota]);
 
   if (!dialogo) return null;
 
-  const fechar = () => resolverCorrecaoFiscal(false);
+  const fechar = () => {
+    if (!salvando) resolverCorrecaoFiscal(false);
+  };
   if (erroResponsavelTecnico) return <FiscalSupportDialog fechar={fechar} />;
   const atualizarCampo = (produtoId, campo, valor) => {
     setFormularios((atuais) => ({
@@ -324,12 +299,32 @@ export default function FiscalCorrectionDialogHost() {
     }));
     setErro("");
   };
+  const aplicarReferencia = (produto, campo, valor) => {
+    if (!CAMPOS[campo] || salvando) return;
+    atualizarCampo(produto.chave, campo, valor);
+    setCamposAplicados((atuais) => ({
+      ...atuais,
+      [produto.chave]: [...new Set([...(atuais[produto.chave] || []), campo])],
+    }));
+  };
+  const pendenciasDoEditor = (produto) => [
+    ...produto.pendencias,
+    ...(camposAplicados[produto.chave] || [])
+      .filter((campo) => !produto.pendencias.some((item) => item.campo === campo))
+      .map((campo) => ({
+        campo,
+        aplicado_na_consulta: true,
+        valor_atual: originais[produto.chave]?.[campo],
+        mensagem:
+          "Valor aplicado pela consulta fiscal. Revise este campo antes de salvar; ele também será atualizado.",
+      })),
+  ];
 
   const preencherSugestoes = () => {
     setFormularios((atuais) => {
       const proximos = { ...atuais };
       agrupado.produtos.forEach((produto) => {
-        const chave = String(produto.id);
+        const chave = produto.chave;
         const fiscal = { ...(proximos[chave] || {}) };
         produto.pendencias.forEach((item) => {
           if (item.valor_sugerido && item.preenchimento_automatico === true) {
@@ -345,15 +340,19 @@ export default function FiscalCorrectionDialogHost() {
   const salvarETentarNovamente = async () => {
     const faltantes = [];
     agrupado.produtos.forEach((produto) => {
-      const fiscal = formularios[String(produto.id)] || {};
-      produto.pendencias.forEach((item) => {
+      const fiscal = formularios[produto.chave] || {};
+      pendenciasDoEditor(produto).forEach((item) => {
         const valor = String(fiscal[item.campo] ?? "").trim();
-        if (!valor) faltantes.push(`${produto.nome}: ${CAMPOS[item.campo].rotulo}`);
+        if (!valor && item.campo !== "cest")
+          faltantes.push(`${produto.nome}: ${CAMPOS[item.campo].rotulo}`);
         if (item.campo === "ncm" && valor && (!/^\d{8}$/.test(valor) || valor === "00000000")) {
           faltantes.push(`${produto.nome}: informe um NCM válido com 8 dígitos`);
         }
         if (item.campo === "cfop" && valor && !/^\d{4}$/.test(valor)) {
           faltantes.push(`${produto.nome}: o CFOP precisa ter 4 dígitos`);
+        }
+        if (item.campo === "cest" && valor && !/^\d{7}$/.test(valor)) {
+          faltantes.push(`${produto.nome}: o CEST precisa ter 7 dígitos`);
         }
         if (item.valor_invalido && valor === String(item.valor_atual || "")) {
           faltantes.push(`${produto.nome}: altere ${CAMPOS[item.campo].rotulo}`);
@@ -368,15 +367,25 @@ export default function FiscalCorrectionDialogHost() {
     setSalvando(true);
     setErro("");
     try {
-      await Promise.all(
-        agrupado.produtos.map((produto) => {
+      for (const produto of agrupado.produtos) {
+        const fiscal = formularios[produto.chave];
+        if (correcaoDaNota) {
+          const alterados = camposFiscaisAlterados(produto, fiscal, originais[produto.chave]);
+          if (Object.keys(alterados).length) {
+            await api.put(
+              `/nfe/vendas/${dialogo.vendaId}/itens/${produto.itemId}/fiscal`,
+              alterados,
+            );
+          }
+        } else {
           const endpoint =
             produto.tipo === "KIT"
               ? `/produtos/${produto.id}/kit/fiscal`
               : `/produtos/${produto.id}/fiscal`;
-          return api.put(endpoint, formularios[String(produto.id)]);
-        }),
-      );
+          const { fontesFiscais: _fontesFiscais, ...cadastroFiscal } = fiscal;
+          await api.put(endpoint, cadastroFiscal);
+        }
+      }
       resolverCorrecaoFiscal(true);
     } catch (error) {
       setErro(mensagemErroApi(error));
@@ -402,9 +411,11 @@ export default function FiscalCorrectionDialogHost() {
               id="fiscal-correction-title"
               className="text-lg font-semibold text-slate-900 dark:text-slate-100"
             >
-              {temCamposDeProduto
-                ? "Complete os dados fiscais para emitir"
-                : "Revise a pendência fiscal para emitir"}
+              {correcaoDaNota
+                ? "Corrigir nota fiscal rejeitada"
+                : temCamposDeProduto
+                  ? "Complete os dados fiscais para emitir"
+                  : "Revise a pendência fiscal para emitir"}
             </h2>
             <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
               {temCamposDeProduto
@@ -415,6 +426,7 @@ export default function FiscalCorrectionDialogHost() {
           <button
             type="button"
             onClick={fechar}
+            disabled={salvando}
             className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
             aria-label="Fechar"
           >
@@ -423,6 +435,11 @@ export default function FiscalCorrectionDialogHost() {
         </header>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
+          <FiscalCorrectionNoteContext
+            nota={dialogo.nota}
+            detalheNota={dialogo.detalheNota}
+            produtos={agrupado.produtos}
+          />
           {(rejeicao?.motivo || rejeicao?.codigo) && (
             <div
               className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900"
@@ -478,10 +495,10 @@ export default function FiscalCorrectionDialogHost() {
 
           {!carregando &&
             agrupado.produtos.map((produto) => {
-              const fiscal = formularios[String(produto.id)] || {};
+              const fiscal = formularios[produto.chave] || {};
               return (
                 <article
-                  key={produto.id}
+                  key={produto.chave}
                   className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700"
                 >
                   <div className="mb-4">
@@ -496,132 +513,24 @@ export default function FiscalCorrectionDialogHost() {
                   <FiscalReferenceSearch
                     produto={produto}
                     contextoFiscal={contextoFiscal}
-                    onAplicar={(campo, valor) => atualizarCampo(String(produto.id), campo, valor)}
+                    onAplicar={(campo, valor) => aplicarReferencia(produto, campo, valor)}
                     valoresAtuais={fiscal}
                   />
                   <div className="grid gap-4 md:grid-cols-2">
-                    {produto.pendencias.map((item) => {
-                      const campo = CAMPOS[item.campo];
-                      const opcoesBase =
-                        campo.tipo === "pis-cofins" ? OPCOES_PIS_COFINS : campo.opcoes;
-                      const opcoes =
-                        item.campo === "cst_icms" &&
-                        contextoFiscal.regime_tributario &&
-                        typeof contextoFiscal.simples_nacional === "boolean"
-                          ? opcoesBase.filter(([valor]) =>
-                              contextoFiscal.simples_nacional
-                                ? valor.length === 3
-                                : valor.length === 2,
-                            )
-                          : opcoesBase;
-                      const confianca = CONFIANCA[item.confianca];
-                      const campoId = `fiscal-${produto.id}-${item.campo}`;
-                      const valorAtual = String(fiscal[item.campo] || "");
-                      const valorForaDaLista =
-                        valorAtual &&
-                        Array.isArray(opcoes) &&
-                        !opcoes.some(([valor]) => valor === valorAtual);
-                      return (
-                        <div key={item.campo} className="block">
-                          <label
-                            htmlFor={campoId}
-                            className="mb-1.5 flex flex-wrap items-center gap-2 text-sm font-semibold text-red-800 dark:text-red-300"
-                          >
-                            {campo.rotulo}
-                            {confianca && (
-                              <span
-                                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${confianca.classe}`}
-                              >
-                                {confianca.rotulo}
-                                {item.confianca_percentual
-                                  ? ` · ${item.confianca_percentual}%`
-                                  : ""}
-                              </span>
-                            )}
-                          </label>
-                          {campo.tipo === "select" || campo.tipo === "pis-cofins" ? (
-                            <select
-                              id={campoId}
-                              value={fiscal[item.campo] || ""}
-                              onChange={(event) =>
-                                atualizarCampo(String(produto.id), item.campo, event.target.value)
-                              }
-                              aria-invalid="true"
-                              aria-describedby={`${campoId}-erro`}
-                              className="w-full rounded-xl border-2 border-red-400 bg-red-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 dark:bg-slate-950 dark:text-slate-100"
-                            >
-                              <option value="">Selecione...</option>
-                              {valorForaDaLista && (
-                                <option value={valorAtual}>
-                                  {valorAtual} — valor atual inválido
-                                </option>
-                              )}
-                              {opcoes.map(([valor, rotulo]) => (
-                                <option key={valor} value={valor}>
-                                  {rotulo}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <input
-                              id={campoId}
-                              value={fiscal[item.campo] || ""}
-                              inputMode="numeric"
-                              maxLength={campo.tamanho}
-                              placeholder={campo.placeholder}
-                              onChange={(event) =>
-                                atualizarCampo(
-                                  String(produto.id),
-                                  item.campo,
-                                  event.target.value.replace(/\D/g, ""),
-                                )
-                              }
-                              aria-invalid="true"
-                              aria-describedby={`${campoId}-erro`}
-                              className="w-full rounded-xl border-2 border-red-400 bg-red-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 dark:bg-slate-950 dark:text-slate-100"
-                            />
-                          )}
-                          <p
-                            id={`${campoId}-erro`}
-                            className="mt-1.5 text-xs font-medium leading-5 text-red-700"
-                          >
-                            {item.mensagem || item.motivo || "Confira este campo antes de emitir."}
-                          </p>
-                          {item.valor_atual && valorAtual !== String(item.valor_atual) && (
-                            <p className="mt-1.5 text-xs font-semibold text-amber-800">
-                              Valor que seria usado na nota: {item.valor_atual}. O cadastro, lote ou
-                              regra de ICMS-ST pode prevalecer sobre o valor mostrado no campo.
-                            </p>
-                          )}
-                          {item.valor_sugerido ? (
-                            <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs leading-5 text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <p>
-                                  Sugestão: <strong>{item.valor_sugerido}</strong>
-                                </p>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    atualizarCampo(
-                                      String(produto.id),
-                                      item.campo,
-                                      item.valor_sugerido,
-                                    )
-                                  }
-                                  className="rounded-lg border border-cyan-300 bg-white px-2.5 py-1 font-semibold text-cyan-800 hover:bg-cyan-50 dark:border-cyan-700 dark:bg-slate-900 dark:text-cyan-200"
-                                >
-                                  Usar esta sugestão
-                                </button>
-                              </div>
-                              <p className="mt-1">{item.motivo}</p>
-                              <p className="mt-1 font-medium text-slate-500 dark:text-slate-400">
-                                Fonte: {fonteLegivel(item.fonte_sugestao)}.
-                              </p>
-                            </div>
-                          ) : null}
-                        </div>
-                      );
-                    })}
+                    {pendenciasDoEditor(produto).map((item) => (
+                      <FiscalCorrectionField
+                        key={item.campo}
+                        produto={produto}
+                        item={item}
+                        fiscal={fiscal}
+                        contextoFiscal={contextoFiscal}
+                        campo={CAMPOS[item.campo]}
+                        opcoesPisCofins={OPCOES_PIS_COFINS}
+                        correcaoDaNota={correcaoDaNota}
+                        salvando={salvando}
+                        onChange={(valor) => atualizarCampo(produto.chave, item.campo, valor)}
+                      />
+                    ))}
                   </div>
                 </article>
               );
@@ -666,9 +575,11 @@ export default function FiscalCorrectionDialogHost() {
         <footer className="flex flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-700 dark:bg-slate-950/40">
           <p className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            {temCamposDeProduto
-              ? "Os dados ficam salvos no cadastro do produto para as próximas vendas."
-              : "Esta tela não transmite uma nova nota."}
+            {correcaoDaNota && temCamposDeProduto
+              ? "A correção atualiza o cadastro fiscal usado pela nota. O reenvio exige sua confirmação."
+              : temCamposDeProduto
+                ? "Os dados ficam salvos no cadastro do produto para as próximas vendas."
+                : "Esta tela não transmite uma nova nota."}
           </p>
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
             <button
@@ -683,7 +594,11 @@ export default function FiscalCorrectionDialogHost() {
               <button
                 type="button"
                 onClick={salvarETentarNovamente}
-                disabled={carregando || salvando}
+                disabled={
+                  carregando ||
+                  salvando ||
+                  agrupado.produtos.some((produto) => !formularios[produto.chave])
+                }
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {salvando && <Loader2 className="h-4 w-4 animate-spin" />}

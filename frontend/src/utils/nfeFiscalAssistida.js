@@ -1,4 +1,5 @@
 import api from "../api";
+import { formatMoneyBRL } from "./formatters";
 import { confirmarCorePet } from "../services/corepetDialog";
 import { solicitarCorrecaoFiscal } from "../services/fiscalCorrectionDialog";
 import {
@@ -109,9 +110,7 @@ function validacaoFiscalDoErro(error) {
 function resumoIntNFe(resumo) {
   const linhas = [
     `${resumo.modelo === 55 ? "NF-e" : "NFC-e"} em ${resumo.ambiente}, série ${resumo.serie}`,
-    `Total: R$ ${Number(resumo.total || 0)
-      .toFixed(2)
-      .replace(".", ",")}`,
+    `Total: ${formatMoneyBRL(resumo.total || 0)}`,
     `Itens: ${resumo.itens?.length || 0}`,
   ];
   const destinatario = resumo.destinatario?.razaoSocial || resumo.destinatario?.nome;
