@@ -1,7 +1,18 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { compileFunction } from "node:vm";
 import ts from "typescript";
+
+const sourceRoot = fileURLToPath(new URL("../../src/", import.meta.url));
+
+function validateSourcePath(path) {
+  const localPath = relative(sourceRoot, path);
+  if (isAbsolute(localPath) || localPath.startsWith("..") || !/\.[cm]?[jt]sx?$/.test(path)) {
+    throw new Error("Controller tests can only load local frontend source modules");
+  }
+}
 
 // Execute actual component handlers with isolated hooks and mocked imports, without a DOM.
 export function createControllerHarness(componentPath, { mocks, props, globals = {} }) {
@@ -56,6 +67,7 @@ export function createControllerHarness(componentPath, { mocks, props, globals =
     ["react/jsx-runtime", { jsx, jsxs: jsx, Fragment: "fragment" }],
   ]);
   function loadModule(path) {
+    validateSourcePath(path);
     if (cache.has(path)) return cache.get(path);
     const { outputText, diagnostics } = ts.transpileModule(readFileSync(path, "utf8"), {
       fileName: path,
@@ -81,12 +93,10 @@ export function createControllerHarness(componentPath, { mocks, props, globals =
       }
       throw new Error(`Unexpected module ${specifier}`);
     };
-    new Function("require", "module", "exports", ...Object.keys(globals), outputText)(
-      requireMock,
-      module,
-      module.exports,
-      ...Object.values(globals),
-    );
+    // Compile only repository source validated above, with the explicit test mocks.
+    compileFunction(outputText, ["require", "module", "exports", ...Object.keys(globals)], {
+      filename: path,
+    })(requireMock, module, module.exports, ...Object.values(globals));
     return module.exports;
   }
   const Controller = loadModule(componentPath).default;
