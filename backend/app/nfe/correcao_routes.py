@@ -42,9 +42,13 @@ CAMPO_LOTE = {
     "origem_mercadoria": "fiscal_origem_mercadoria",
 }
 CAMPO_LEGADO = {
-    "ncm": "ncm", "cest": "cest", "origem_mercadoria": "origem",
-    "cfop": "cfop", "aliquota_icms": "aliquota_icms",
-    "aliquota_pis": "aliquota_pis", "aliquota_cofins": "aliquota_cofins",
+    "ncm": "ncm",
+    "cest": "cest",
+    "origem_mercadoria": "origem",
+    "cfop": "cfop",
+    "aliquota_icms": "aliquota_icms",
+    "aliquota_pis": "aliquota_pis",
+    "aliquota_cofins": "aliquota_cofins",
 }
 IDENTIFICACAO_LEGADA = {"ncm", "cest", "origem_mercadoria", "cfop"}
 
@@ -64,8 +68,14 @@ class CorrecaoFiscalItemRequest(BaseModel):
     aliquota_cofins: Decimal | None = None
 
     @field_validator(
-        "ncm", "cest", "origem_mercadoria", "cfop", "cst_icms",
-        "cst_pis", "cst_cofins", mode="before",
+        "ncm",
+        "cest",
+        "origem_mercadoria",
+        "cfop",
+        "cst_icms",
+        "cst_pis",
+        "cst_cofins",
+        mode="before",
     )
     @classmethod
     def validar_codigo(cls, value, info):
@@ -74,11 +84,18 @@ class CorrecaoFiscalItemRequest(BaseModel):
         if campo == "cest" and not text:
             return None
         tamanhos = {
-            "ncm": {8}, "cest": {7}, "origem_mercadoria": {1},
-            "cfop": {4}, "cst_icms": {2, 3}, "cst_pis": {2}, "cst_cofins": {2},
+            "ncm": {8},
+            "cest": {7},
+            "origem_mercadoria": {1},
+            "cfop": {4},
+            "cst_icms": {2, 3},
+            "cst_pis": {2},
+            "cst_cofins": {2},
         }
         if not text.isascii() or not text.isdigit() or len(text) not in tamanhos[campo]:
-            raise ValueError("Informe um código fiscal válido, com a quantidade correta de dígitos.")
+            raise ValueError(
+                "Informe um código fiscal válido, com a quantidade correta de dígitos."
+            )
         if campo == "ncm" and text == "00000000":
             raise ValueError("Informe um NCM válido com 8 dígitos.")
         if campo == "origem_mercadoria" and text not in "012345678":
@@ -91,10 +108,14 @@ class CorrecaoFiscalItemRequest(BaseModel):
     @classmethod
     def validar_aliquota(cls, value):
         if value is not None and (
-            not value.is_finite() or value < 0 or value > 100
+            not value.is_finite()
+            or value < 0
+            or value > 100
             or value != value.quantize(Decimal("0.01"))
         ):
-            raise ValueError("A alíquota deve estar entre 0 e 100, com até duas casas decimais.")
+            raise ValueError(
+                "A alíquota deve estar entre 0 e 100, com até duas casas decimais."
+            )
         return value
 
 
@@ -121,23 +142,39 @@ def _exigir_rejeitada(venda):
 
 def _carregar_contexto(db, tenant_id, venda_id, item_id, *, travar=False):
     venda = _consulta(
-        db, Venda, Venda.id == venda_id, Venda.tenant_id == tenant_id, travar=travar,
+        db,
+        Venda,
+        Venda.id == venda_id,
+        Venda.tenant_id == tenant_id,
+        travar=travar,
     )
     if venda is None:
         raise HTTPException(status_code=404, detail="Venda não encontrada.")
     _exigir_rejeitada(venda)
     item = _consulta(
-        db, VendaItem, VendaItem.id == item_id, VendaItem.venda_id == venda_id,
-        VendaItem.tenant_id == tenant_id, travar=travar,
+        db,
+        VendaItem,
+        VendaItem.id == item_id,
+        VendaItem.venda_id == venda_id,
+        VendaItem.tenant_id == tenant_id,
+        travar=travar,
     )
     if item is None or item.tipo != "produto" or not item.produto_id:
-        raise HTTPException(status_code=404, detail="Item de produto não encontrado nesta venda.")
+        raise HTTPException(
+            status_code=404, detail="Item de produto não encontrado nesta venda."
+        )
     produto = _consulta(
-        db, Produto, Produto.id == item.produto_id, Produto.tenant_id == tenant_id,
+        db,
+        Produto,
+        Produto.id == item.produto_id,
+        Produto.tenant_id == tenant_id,
         travar=travar,
     )
     if produto is None or getattr(item, "estoque_origem_tenant_id", None):
-        raise HTTPException(status_code=409, detail="O produto deve pertencer à empresa desta venda para corrigir seus dados fiscais.")
+        raise HTTPException(
+            status_code=409,
+            detail="O produto deve pertencer à empresa desta venda para corrigir seus dados fiscais.",
+        )
     lote_id = item.lote_id
     if not lote_id:
         try:
@@ -148,26 +185,45 @@ def _carregar_contexto(db, tenant_id, venda_id, item_id, *, travar=False):
     lote = None
     if lote_id:
         lote = _consulta(
-            db, ProdutoLote, ProdutoLote.id == lote_id,
-            ProdutoLote.produto_id == produto.id, ProdutoLote.tenant_id == tenant_id,
+            db,
+            ProdutoLote,
+            ProdutoLote.id == lote_id,
+            ProdutoLote.produto_id == produto.id,
+            ProdutoLote.tenant_id == tenant_id,
             travar=travar,
         )
         if lote is None:
-            raise HTTPException(status_code=409, detail="O lote deste item não pertence ao produto e à empresa da venda.")
+            raise HTTPException(
+                status_code=409,
+                detail="O lote deste item não pertence ao produto e à empresa da venda.",
+            )
     fiscal_produto = _consulta(
-        db, ProdutoConfigFiscal, ProdutoConfigFiscal.produto_id == produto.id,
-        ProdutoConfigFiscal.tenant_id == tenant_id, travar=travar,
+        db,
+        ProdutoConfigFiscal,
+        ProdutoConfigFiscal.produto_id == produto.id,
+        ProdutoConfigFiscal.tenant_id == tenant_id,
+        travar=travar,
     )
     fiscal_kit = None
     if produto.tipo_produto == "KIT":
         fiscal_kit = _consulta(
-            db, KitConfigFiscal, KitConfigFiscal.produto_kit_id == produto.id,
-            KitConfigFiscal.tenant_id == tenant_id, travar=travar,
+            db,
+            KitConfigFiscal,
+            KitConfigFiscal.produto_kit_id == produto.id,
+            KitConfigFiscal.tenant_id == tenant_id,
+            travar=travar,
         )
-    empresa = _consulta(db, EmpresaConfigFiscal, EmpresaConfigFiscal.tenant_id == tenant_id)
+    empresa = _consulta(
+        db, EmpresaConfigFiscal, EmpresaConfigFiscal.tenant_id == tenant_id
+    )
     return SimpleNamespace(
-        venda=venda, item=item, produto=produto, lote=lote,
-        fiscal_produto=fiscal_produto, fiscal_kit=fiscal_kit, empresa=empresa,
+        venda=venda,
+        item=item,
+        produto=produto,
+        lote=lote,
+        fiscal_produto=fiscal_produto,
+        fiscal_kit=fiscal_kit,
+        empresa=empresa,
     )
 
 
@@ -177,7 +233,8 @@ def _valor_json(value):
 
 def _fiscal_efetivo(db, contexto):
     resolved = _resolver_fiscal_item_nfe(
-        db, contexto.venda,
+        db,
+        contexto.venda,
         SimpleNamespace(produto=contexto.produto, lote=contexto.lote),
     )
     tenant = get_tenant(db, contexto.venda.tenant_id)
@@ -188,7 +245,11 @@ def _fiscal_efetivo(db, contexto):
         str(getattr(contexto.venda, "nfe_tipo", None) or "nfce").lower() == "nfe"
         and uf_destino != uf_emissor
     )
-    if interestadual and cliente is not None and not str(getattr(cliente, "inscricao_estadual", None) or "").strip():
+    if (
+        interestadual
+        and cliente is not None
+        and not str(getattr(cliente, "inscricao_estadual", None) or "").strip()
+    ):
         cfop = resolved.get("cfop_interestadual_nao_contribuinte")
     else:
         cfop = resolved.get("cfop_interestadual" if interestadual else "cfop_interno")
@@ -205,45 +266,80 @@ def _fontes_fiscais(contexto, fiscal):
     for campo, atributo in CAMPO_CONFIG.items():
         if getattr(contexto.fiscal_kit, atributo, None) not in (None, ""):
             fontes[campo] = {"tipo": "kit", "id": contexto.produto.id}
-        elif campo in CAMPO_LOTE and getattr(contexto.lote, CAMPO_LOTE[campo], None) not in (None, ""):
+        elif campo in CAMPO_LOTE and getattr(
+            contexto.lote, CAMPO_LOTE[campo], None
+        ) not in (None, ""):
             fontes[campo] = {"tipo": "lote", "id": contexto.lote.id}
         elif getattr(contexto.fiscal_produto, atributo, None) not in (None, "") or (
-            contexto.fiscal_produto is None and campo in IDENTIFICACAO_LEGADA
+            contexto.fiscal_produto is None
+            and campo in IDENTIFICACAO_LEGADA
             and getattr(contexto.produto, CAMPO_LEGADO[campo], None) not in (None, "")
         ):
             fontes[campo] = {"tipo": "produto", "id": contexto.produto.id}
         else:
-            fontes[campo] = {"tipo": "empresa", "id": getattr(contexto.empresa, "id", None)}
+            fontes[campo] = {
+                "tipo": "empresa",
+                "id": getattr(contexto.empresa, "id", None),
+            }
     lote_st = getattr(contexto.lote, "fiscal_icms_st", None)
-    icms_st = lote_st if lote_st is not None else getattr(contexto.fiscal_produto, "icms_st", False)
+    icms_st = (
+        lote_st
+        if lote_st is not None
+        else getattr(contexto.fiscal_produto, "icms_st", False)
+    )
     regime = str(getattr(contexto.empresa, "regime_tributario", None) or "").casefold()
-    simples = bool(getattr(contexto.empresa, "simples_ativo", False) or "simples" in regime)
+    simples = bool(
+        getattr(contexto.empresa, "simples_ativo", False) or "simples" in regime
+    )
     if icms_st and simples:
         for campo in ("cfop", "aliquota_icms"):
-            fontes[campo] = {"tipo": "regra_icms_st", "id": getattr(contexto.lote, "id", contexto.produto.id)}
+            fontes[campo] = {
+                "tipo": "regra_icms_st",
+                "id": getattr(contexto.lote, "id", contexto.produto.id),
+            }
         if not getattr(contexto.fiscal_kit, "cst_icms", None):
-            fontes["cst_icms"] = {"tipo": "regra_icms_st", "id": getattr(contexto.lote, "id", contexto.produto.id)}
+            fontes["cst_icms"] = {
+                "tipo": "regra_icms_st",
+                "id": getattr(contexto.lote, "id", contexto.produto.id),
+            }
     elif fontes["cfop"]["tipo"] != "empresa":
-        config = contexto.fiscal_kit if fontes["cfop"]["tipo"] == "kit" else contexto.fiscal_produto
-        especifico = getattr(config, "cfop_venda", None) if config is not None else contexto.produto.cfop
+        config = (
+            contexto.fiscal_kit
+            if fontes["cfop"]["tipo"] == "kit"
+            else contexto.fiscal_produto
+        )
+        especifico = (
+            getattr(config, "cfop_venda", None)
+            if config is not None
+            else contexto.produto.cfop
+        )
         if especifico != fiscal["cfop"]:
-            fontes["cfop"] = {"tipo": "empresa", "id": getattr(contexto.empresa, "id", None)}
+            fontes["cfop"] = {
+                "tipo": "empresa",
+                "id": getattr(contexto.empresa, "id", None),
+            }
     return fontes
 
 
 @router.get("/vendas/{venda_id}/itens/{item_id}/fiscal")
 def obter_fiscal_item_rejeitado(
-    venda_id: int, item_id: int, db: Session = Depends(get_session),
+    venda_id: int,
+    item_id: int,
+    db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _user, tenant_id = user_and_tenant
     contexto = _carregar_contexto(db, tenant_id, venda_id, item_id)
     fiscal = _fiscal_efetivo(db, contexto)
     return {
-        "venda_id": venda_id, "item_id": item_id, "produto_id": contexto.produto.id,
-        "lote_id": getattr(contexto.lote, "id", None), "nome": contexto.produto.nome,
+        "venda_id": venda_id,
+        "item_id": item_id,
+        "produto_id": contexto.produto.id,
+        "lote_id": getattr(contexto.lote, "id", None),
+        "nome": contexto.produto.nome,
         "fiscal": fiscal,
-        "fontes_fiscais": _fontes_fiscais(contexto, fiscal), "editavel": True,
+        "fontes_fiscais": _fontes_fiscais(contexto, fiscal),
+        "editavel": True,
     }
 
 
@@ -253,19 +349,31 @@ def _aplicar_patch(db, contexto, patch):
     if config is None:
         if is_kit:
             config = KitConfigFiscal(
-                tenant_id=contexto.venda.tenant_id, produto_kit_id=contexto.produto.id,
+                tenant_id=contexto.venda.tenant_id,
+                produto_kit_id=contexto.produto.id,
                 herdado_da_empresa=False,
             )
         else:
             config = ProdutoConfigFiscal(
-                tenant_id=contexto.venda.tenant_id, produto_id=contexto.produto.id,
+                tenant_id=contexto.venda.tenant_id,
+                produto_id=contexto.produto.id,
                 herdado_da_empresa=False,
             )
             # A presença do V2 torna seus campos autoritativos; preservar o legado.
             for campo in IDENTIFICACAO_LEGADA:
-                setattr(config, CAMPO_CONFIG[campo], getattr(contexto.produto, CAMPO_LEGADO[campo], None))
+                setattr(
+                    config,
+                    CAMPO_CONFIG[campo],
+                    getattr(contexto.produto, CAMPO_LEGADO[campo], None),
+                )
         db.add(config)
-    fontes = [{"tipo": "kit" if is_kit else "produto", "id": contexto.produto.id, "campos": list(patch)}]
+    fontes = [
+        {
+            "tipo": "kit" if is_kit else "produto",
+            "id": contexto.produto.id,
+            "campos": list(patch),
+        }
+    ]
     for campo, valor in patch.items():
         setattr(config, CAMPO_CONFIG[campo], valor)
     config.herdado_da_empresa = False
@@ -273,7 +381,10 @@ def _aplicar_patch(db, contexto, patch):
     campos_lote = []
     if contexto.lote is not None and not is_kit:
         for campo, atributo in CAMPO_LOTE.items():
-            if campo in patch and getattr(contexto.lote, atributo, None) not in (None, ""):
+            if campo in patch and getattr(contexto.lote, atributo, None) not in (
+                None,
+                "",
+            ):
                 setattr(contexto.lote, atributo, patch[campo])
                 campos_lote.append(campo)
     if campos_lote:
@@ -287,13 +398,18 @@ def _aplicar_patch(db, contexto, patch):
 
 @router.put("/vendas/{venda_id}/itens/{item_id}/fiscal")
 def salvar_fiscal_item_rejeitado(
-    venda_id: int, item_id: int, request: CorrecaoFiscalItemRequest,
-    db: Session = Depends(get_session), user_and_tenant=Depends(get_current_user_and_tenant),
+    venda_id: int,
+    item_id: int,
+    request: CorrecaoFiscalItemRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = user_and_tenant
     patch = request.model_dump(exclude_unset=True)
     if not patch:
-        raise HTTPException(status_code=422, detail="Informe ao menos um campo fiscal para corrigir.")
+        raise HTTPException(
+            status_code=422, detail="Informe ao menos um campo fiscal para corrigir."
+        )
     try:
         contexto = _carregar_contexto(db, tenant_id, venda_id, item_id, travar=True)
         antes = _fiscal_efetivo(db, contexto)
@@ -307,10 +423,19 @@ def salvar_fiscal_item_rejeitado(
                     detail=f"A regra fiscal da empresa ou do lote prevalece sobre o campo {campo}. Revise essa regra antes de reenviar a nota.",
                 )
         log_action(
-            db, user.id, "corrigir_item_nfe_rejeitada", entity_type="venda",
-            entity_id=venda_id, old_value={campo: antes[campo] for campo in patch},
-            new_value={"item_id": item_id, "campos": {campo: depois[campo] for campo in patch}, "fontes_atualizadas": fontes},
-            tenant_id=tenant_id, commit=False,
+            db,
+            user.id,
+            "corrigir_item_nfe_rejeitada",
+            entity_type="venda",
+            entity_id=venda_id,
+            old_value={campo: antes[campo] for campo in patch},
+            new_value={
+                "item_id": item_id,
+                "campos": {campo: depois[campo] for campo in patch},
+                "fontes_atualizadas": fontes,
+            },
+            tenant_id=tenant_id,
+            commit=False,
         )
         db.commit()
     except Exception:
@@ -318,6 +443,8 @@ def salvar_fiscal_item_rejeitado(
         raise
     return {
         "message": "Correção fiscal salva. Revalide os dados antes de reenviar a nota.",
-        "venda_id": venda_id, "item_id": item_id, "campos_alterados": list(patch),
+        "venda_id": venda_id,
+        "item_id": item_id,
+        "campos_alterados": list(patch),
         "fontes_atualizadas": fontes,
     }
