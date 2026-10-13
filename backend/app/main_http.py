@@ -12,7 +12,11 @@ from slowapi.util import get_remote_address
 
 from app.config import ALLOWED_ORIGINS
 from app.middlewares.rate_limit import RateLimitMiddleware
-from app.middlewares.request_context import RequestContextMiddleware, get_request_id
+from app.middlewares.request_context import (
+    ObservedErrorResponse,
+    RequestContextMiddleware,
+    get_request_id,
+)
 from app.middlewares.request_logging import RequestLoggingMiddleware
 from app.middlewares.security_audit import SecurityAuditMiddleware
 from app.middlewares.security_headers import SecurityHeadersMiddleware
@@ -46,7 +50,6 @@ def register_proxy_headers_middleware(app: FastAPI) -> None:
 
 def configure_middlewares(app: FastAPI, limiter) -> None:
     """Register global middlewares in the established execution order."""
-    app.add_middleware(RequestContextMiddleware)
     app.add_middleware(SecurityAuditMiddleware)
     app.add_middleware(RequestLoggingMiddleware)
     app.add_middleware(RateLimitMiddleware)
@@ -79,10 +82,13 @@ def configure_middlewares(app: FastAPI, limiter) -> None:
         allow_headers=["*"],
         expose_headers=["X-Require-2FA"],
     )
+    # Observe responses after inner middleware has handled disconnects/204s.
+    app.add_middleware(RequestContextMiddleware)
 
 
 def register_exception_handlers(app: FastAPI) -> None:
     """Register API exception handlers."""
+    app.state.ops_observed_error_handler = True
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(
@@ -138,7 +144,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         from app.utils.logger import logger as structured_logger
 
         strict_runtime = is_strict_runtime_environment()
-        request_id = get_request_id()
+        request_id = get_request_id() or getattr(request.state, "request_id", None)
         structured_message = (
             "Erro interno nao tratado" if strict_runtime else f"Erro 500: {str(exc)}"
         )
@@ -162,12 +168,12 @@ def register_exception_handlers(app: FastAPI) -> None:
             logger.error("[ERROR] Erro 500: %s", str(exc), exc_info=True)
 
         if strict_runtime:
-            return JSONResponse(
+            return ObservedErrorResponse(
                 status_code=500,
                 content=internal_error_payload(request_id),
             )
 
-        return JSONResponse(
+        return ObservedErrorResponse(
             status_code=500,
             content={
                 "error": "internal_server_error",

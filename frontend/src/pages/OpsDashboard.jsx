@@ -15,6 +15,7 @@ import {
 
 import api from "../platformApi";
 import JourneySloPanel from "./opsDashboard/JourneySloPanel";
+import UnknownFailuresNotice from "./opsDashboard/UnknownFailuresNotice";
 
 const RANGE_HOURS = 24;
 
@@ -72,6 +73,8 @@ function statusLabel(status) {
     unavailable: "sem leitura",
     unhealthy: "indisponivel",
     warning: "atencao",
+    running: "em andamento",
+    success: "sucesso",
     ok: "ok",
   };
   return labels[status] || status || "-";
@@ -339,6 +342,7 @@ function DeployPanel({ deploys, release }) {
         ) : (
           items.map((item) => {
             const success = item.status === "success";
+            const failed = item.status === "failed";
             return (
               <div
                 key={`${item.created_at}-${item.head_after}`}
@@ -346,9 +350,9 @@ function DeployPanel({ deploys, release }) {
               >
                 <div className="flex items-center justify-between gap-3">
                   <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${success ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}
+                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${success ? "bg-emerald-100 text-emerald-700" : failed ? "bg-rose-100 text-rose-700" : "bg-blue-100 text-blue-700"}`}
                   >
-                    {success ? "sucesso" : "falha"}
+                    {statusLabel(item.status)}
                   </span>
                   <span className="text-xs text-slate-500">{formatDate(item.created_at)}</span>
                 </div>
@@ -465,6 +469,16 @@ function TenantIncidentsPanel({ items }) {
                 <span>
                   5xx: <b>{item.errors_5xx}</b>
                 </span>
+                {Number(item.unknown_status_failures || 0) > 0 ? (
+                  <span>
+                    Sem status: <b>{item.unknown_status_failures}</b>
+                  </span>
+                ) : null}
+                {Number(item.response_failures || 0) > 0 ? (
+                  <span>
+                    Interrompidas: <b>{item.response_failures}</b>
+                  </span>
+                ) : null}
                 <span>
                   Lentas: <b>{item.slow_requests}</b>
                 </span>
@@ -512,6 +526,16 @@ function RouteIncidentsPanel({ items }) {
                 <span>
                   5xx: <b>{item.errors_5xx}</b>
                 </span>
+                {Number(item.unknown_status_failures || 0) > 0 ? (
+                  <span>
+                    Sem status: <b>{item.unknown_status_failures}</b>
+                  </span>
+                ) : null}
+                {Number(item.response_failures || 0) > 0 ? (
+                  <span>
+                    Interrompidas: <b>{item.response_failures}</b>
+                  </span>
+                ) : null}
                 <span>
                   Lentas: <b>{item.slow_requests}</b>
                 </span>
@@ -679,6 +703,7 @@ export default function OpsDashboard() {
         ) : null}
 
         <CurrentStatusPanel currentStatus={currentStatus} watchdog={watchdog} />
+        <UnknownFailuresNotice summary={errors} />
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5 2xl:grid-cols-10">
           <MetricCard

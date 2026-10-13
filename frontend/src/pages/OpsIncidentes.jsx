@@ -45,6 +45,8 @@ export default function OpsIncidentes() {
         event.user_id,
         event.exception_type,
         event.exception_message,
+        event.diagnostic_code,
+        ...(event.exception_origin || []),
       ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(needle)),

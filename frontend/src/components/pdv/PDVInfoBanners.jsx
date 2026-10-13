@@ -1,7 +1,8 @@
-import { AlertCircle, ExternalLink, FileText } from "lucide-react";
+import { AlertCircle, ExternalLink, FileText, RefreshCw } from "lucide-react";
 import SaleReference from "../ui/SaleReference";
 import { obterSituacaoFiscalVenda, rotaNotaFiscalVenda } from "../../utils/pdvFiscalStatus";
 import { buildValidadePdvMessage } from "./pdvValidadeAlertUtils";
+import { mensagemCaixaIndisponivel } from "../../utils/caixaAbertoMonitor";
 
 const ESTILOS_FISCAIS = {
   success: "border-emerald-200 bg-emerald-50 text-emerald-800",
@@ -27,6 +28,9 @@ function formatarDataVenda(dataVenda) {
 
 export default function PDVInfoBanners({
   temCaixaAberto,
+  statusConsultaCaixa,
+  atualizandoCaixa,
+  onAtualizarCaixa,
   modoVisualizacao,
   vendaAtual,
   validadeAlertas = [],
@@ -37,7 +41,29 @@ export default function PDVInfoBanners({
 
   return (
     <>
-      {!temCaixaAberto && !modoVisualizacao && (
+      {statusConsultaCaixa !== "pronto" && !modoVisualizacao && (
+        <div role="status" className="border-b border-amber-200 bg-amber-50 px-6 py-3">
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-3 text-amber-900">
+            <span className="text-sm">
+              {temCaixaAberto
+                ? "Não foi possível atualizar a consulta. O último caixa confirmado continua aberto."
+                : mensagemCaixaIndisponivel(statusConsultaCaixa)}
+            </span>
+            {statusConsultaCaixa === "erro" && (
+              <button
+                type="button"
+                disabled={atualizandoCaixa}
+                onClick={() => onAtualizarCaixa()}
+                className="inline-flex items-center gap-1 rounded border border-amber-300 px-2 py-1 text-sm font-semibold disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 ${atualizandoCaixa ? "animate-spin" : ""}`} />
+                Tentar novamente
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {!temCaixaAberto && statusConsultaCaixa === "pronto" && !modoVisualizacao && (
         <div className="border-b border-red-200 bg-red-50 px-6 py-3">
           <div className="mx-auto flex max-w-5xl items-center justify-center">
             <div className="flex items-center space-x-2 text-red-800">

@@ -144,7 +144,7 @@ def buscar_produto_granel_funcionario_barcode(
         .filter(
             Produto.tenant_id == tenant_id,
             or_(Produto.ativo.is_(True), Produto.ativo.is_(None)),
-            _barcode_filters_for_produto(barcode),
+            or_(*_barcode_filters_for_produto(barcode)),
         )
         .first()
     )

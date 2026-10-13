@@ -6,6 +6,7 @@ export function usePDVProdutos({
   setVendaAtual,
   modoVisualizacao,
   temCaixaAberto,
+  statusConsultaCaixa,
   recalcularTotais,
 }) {
   const {
@@ -23,6 +24,7 @@ export function usePDVProdutos({
     vendaAtual,
     setVendaAtual,
     temCaixaAberto,
+    statusConsultaCaixa,
     recalcularTotais,
   });
 

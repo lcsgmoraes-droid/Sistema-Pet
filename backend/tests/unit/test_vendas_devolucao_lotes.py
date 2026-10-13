@@ -16,7 +16,7 @@ from app import caixa_models, ecommerceai_integration_models, ofertas_estudio_mo
 from app.estoque import service as estoque_service
 from app.grupo_comercial_estoque_compartilhado_service import contexto_tenant_estoque
 from app.financeiro_models import ContaReceber
-from app.models import Cliente
+from app.models import Cliente, CreditoLog
 from app.produtos_models import EstoqueMovimentacao, Produto, ProdutoLote
 from app.vendas.devolucoes_routes import prever_devolucao, registrar_devolucao
 from app.vendas_devolucoes_models import VendaDevolucao
@@ -66,6 +66,7 @@ def dados(tenant_context, monkeypatch):
         ProdutoLote,
         EstoqueMovimentacao,
         Cliente,
+        CreditoLog,
         Venda,
         VendaItem,
         VendaPagamento,

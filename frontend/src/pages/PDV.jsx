@@ -242,6 +242,11 @@ export default function PDV() {
     setMostrarModalAbrirCaixa,
     caixaKey,
     temCaixaAberto,
+    caixaAberto,
+    contextoCaixa,
+    statusConsultaCaixa,
+    atualizandoCaixa,
+    atualizarCaixa,
     mostrarCalculadoraRacao,
     racaoIdFechada,
     fecharCalculadoraRacao,
@@ -249,6 +254,7 @@ export default function PDV() {
   } = usePDVCaixaRacao({
     vendaAtual,
     destaqueAbrirCaixa,
+    contextoCaixa: `${user?.id}:${user?.tenant?.id}`,
   });
 
   const {
@@ -343,6 +349,7 @@ export default function PDV() {
     loading,
     setLoading,
     temCaixaAberto,
+    statusConsultaCaixa,
     entregadorSelecionado,
     vendaComissionada,
     vendedorObrigatorio,
@@ -410,6 +417,7 @@ export default function PDV() {
     setVendaAtual,
     modoVisualizacao,
     temCaixaAberto,
+    statusConsultaCaixa,
     recalcularTotais,
   });
   const {
@@ -506,6 +514,11 @@ export default function PDV() {
     modoVisualizacao,
     loading,
     temCaixaAberto,
+    caixaAberto,
+    contextoCaixa,
+    statusConsultaCaixa,
+    atualizandoCaixa,
+    atualizarCaixa,
     cancelarEdicao,
     excluirVenda,
     salvarVenda,
