@@ -147,7 +147,15 @@ export function ModalSuprimento({ caixaId, numeroCaixa, onClose, onSucesso }) {
 /**
  * Modal de Sangria - Retirada de valores do caixa
  */
-export function ModalSangria({ caixaId, numeroCaixa, saldoAtual, onClose, onSucesso }) {
+export function ModalSangria({
+  caixaId,
+  numeroCaixa,
+  saldoAtual,
+  statusResumo,
+  onRecarregarResumo,
+  onClose,
+  onSucesso,
+}) {
   const [valor, setValor] = useState("");
   const [contaDestino, setContaDestino] = useState("");
   const [descricao, setDescricao] = useState("");
@@ -201,7 +209,17 @@ export function ModalSangria({ caixaId, numeroCaixa, saldoAtual, onClose, onSuce
           <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
               <div className="text-sm text-blue-800">
-                <strong>Em caixa:</strong> {formatMoneyBRL(saldoAtual)}
+                <strong>Em caixa:</strong>{" "}
+                {saldoAtual != null
+                  ? formatMoneyBRL(saldoAtual)
+                  : statusResumo === "erro"
+                    ? "Saldo indisponível"
+                    : "Consultando saldo..."}
+                {statusResumo === "erro" && (
+                  <button type="button" onClick={onRecarregarResumo} className="ml-2 underline">
+                    Tentar novamente
+                  </button>
+                )}
               </div>
             </div>
 

@@ -1,47 +1,66 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { obterCaixaAberto } from "../api/caixa";
 import { contarRacoes, ehRacao } from "../helpers/deteccaoRacao";
 import { debugLog } from "../utils/debug";
+import {
+  criarEstadoCaixaAberto,
+  criarMonitorCaixaAberto,
+  publicarEventoCaixa,
+} from "../utils/caixaAbertoMonitor";
 
-export function usePDVCaixaRacao({ vendaAtual, destaqueAbrirCaixa }) {
+export function usePDVCaixaRacao({ vendaAtual, destaqueAbrirCaixa, contextoCaixa }) {
   const [mostrarModalAbrirCaixa, setMostrarModalAbrirCaixa] = useState(false);
   const [caixaKey, setCaixaKey] = useState(0);
-  const [temCaixaAberto, setTemCaixaAberto] = useState(false);
+  const [consultaCaixa, setConsultaCaixa] = useState(criarEstadoCaixaAberto);
   const [mostrarCalculadoraRacao, setMostrarCalculadoraRacao] = useState(false);
   const [racaoIdFechada, setRacaoIdFechada] = useState(null);
-  const verificandoCaixaRef = useRef(false);
+  const monitorCaixaRef = useRef(null);
+  const estadoCaixa =
+    consultaCaixa.contexto === contextoCaixa ? consultaCaixa : criarEstadoCaixaAberto();
+  const temCaixaAberto = Boolean(estadoCaixa.caixa);
+  const atualizarCaixa = useCallback(
+    (opcoes = {}) => monitorCaixaRef.current?.atualizar(opcoes),
+    [],
+  );
 
   useEffect(() => {
-    void verificarCaixaAberto({ force: true });
-
-    const intervalId = setInterval(() => {
-      void verificarCaixaAberto();
-    }, 60000);
-
-    return () => clearInterval(intervalId);
-  }, [caixaKey]);
+    const monitor = criarMonitorCaixaAberto({
+      consultar: obterCaixaAberto,
+      onEstado: (estado) => setConsultaCaixa({ ...estado, contexto: contextoCaixa }),
+    });
+    monitorCaixaRef.current = monitor;
+    void monitor.atualizar();
+    const consultarSeVisivel = () => {
+      if (document.visibilityState !== "hidden") void monitor.atualizar();
+    };
+    const sincronizarCaixa = (event) => {
+      if (event.key === "petshop_caixa_sync_event")
+        void monitor.sincronizar(event.newValue, contextoCaixa);
+    };
+    const intervalId = setInterval(consultarSeVisivel, 60000);
+    document.addEventListener("visibilitychange", consultarSeVisivel);
+    window.addEventListener("online", consultarSeVisivel);
+    window.addEventListener("storage", sincronizarCaixa);
+    return () => {
+      monitor.cancelar();
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", consultarSeVisivel);
+      window.removeEventListener("online", consultarSeVisivel);
+      window.removeEventListener("storage", sincronizarCaixa);
+    };
+  }, [contextoCaixa]);
 
   useEffect(() => {
-    if (destaqueAbrirCaixa && !temCaixaAberto && !mostrarModalAbrirCaixa) {
+    if (
+      destaqueAbrirCaixa &&
+      estadoCaixa.status === "pronto" &&
+      !temCaixaAberto &&
+      !mostrarModalAbrirCaixa
+    ) {
       setMostrarModalAbrirCaixa(true);
     }
-  }, [destaqueAbrirCaixa, temCaixaAberto, mostrarModalAbrirCaixa]);
-
-  const verificarCaixaAberto = async ({ force = false } = {}) => {
-    if (verificandoCaixaRef.current) return;
-    if (!force && document.visibilityState === "hidden") return;
-
-    verificandoCaixaRef.current = true;
-    try {
-      const caixa = await obterCaixaAberto();
-      setTemCaixaAberto(!!caixa);
-    } catch {
-      setTemCaixaAberto(false);
-    } finally {
-      verificandoCaixaRef.current = false;
-    }
-  };
+  }, [destaqueAbrirCaixa, estadoCaixa.status, temCaixaAberto, mostrarModalAbrirCaixa]);
 
   const abrirCalculadoraRacao = () => {
     debugLog("🔍 Debug - Itens no carrinho:", vendaAtual.itens);
@@ -84,7 +103,8 @@ export function usePDVCaixaRacao({ vendaAtual, destaqueAbrirCaixa }) {
   const handleAbrirCaixaSucesso = () => {
     setMostrarModalAbrirCaixa(false);
     setCaixaKey((prev) => prev + 1);
-    setTemCaixaAberto(true);
+    publicarEventoCaixa("abertura", { contextoCaixa });
+    void atualizarCaixa({ invalidar: true });
   };
 
   return {
@@ -92,6 +112,11 @@ export function usePDVCaixaRacao({ vendaAtual, destaqueAbrirCaixa }) {
     setMostrarModalAbrirCaixa,
     caixaKey,
     temCaixaAberto,
+    contextoCaixa,
+    caixaAberto: estadoCaixa.caixa,
+    statusConsultaCaixa: estadoCaixa.status,
+    atualizandoCaixa: estadoCaixa.atualizando,
+    atualizarCaixa,
     mostrarCalculadoraRacao,
     racaoIdFechada,
     abrirCalculadoraRacao,

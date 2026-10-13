@@ -20,12 +20,22 @@ import re
 import time
 import uuid
 from typing import Optional
-from starlette.middleware.base import BaseHTTPMiddleware
+import asyncio
+import anyio
+
+from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import MutableHeaders
+from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from fastapi import Request
 from contextvars import ContextVar
 import logging
 
 from app.services.error_event_reporter import record_request_event
+from app.services.request_failure_diagnostics import (
+    CANCELLATION_CODES,
+    exception_diagnostics,
+)
 from app.services.journey_event_reporter import record_http_journey_event
 from app.security.error_sanitization import is_strict_runtime_environment
 from app.utils.logger import clear_context as clear_log_context
@@ -138,198 +148,181 @@ def clear_request_context() -> None:
 # ============================================================================
 
 
-class RequestContextMiddleware(BaseHTTPMiddleware):
-    """
-    Middleware para injetar request_id e contexto observável em cada request.
+class _RequestTelemetry:
+    def __init__(self, request: Request, request_id: str):
+        self.request = request
+        self.request_id = request_id
+        self.started_at = time.perf_counter()
+        self.status_code = None
+        self.response_complete = False
+        self.disconnected = False
+        self.replayed = False
+        self.emitted = False
+        self.exception = None
 
-    Funcionalidades:
-    ----------------
-    1. Gera ou aceita request_id via header X-Request-ID
-    2. Propaga request_id via contextvars (disponível em toda a stack)
-    3. Adiciona request_id aos logs automaticamente
-    4. Captura metadata essencial: método, path, status, duração
-    5. NÃO loga body ou dados sensíveis (segurança)
-    6. Adiciona request_id no header de resposta (rastreabilidade)
+    async def emit(self) -> None:
+        if self.emitted:
+            return
+        self.emitted = True
+        duration_ms = round((time.perf_counter() - self.started_at) * 1000, 2)
+        exception = self.exception
+        diagnostics = exception_diagnostics(exception) if exception else {}
+        if self.disconnected:
+            diagnostics["diagnostic_code"] = "client_disconnected"
+        strict_runtime = is_strict_runtime_environment()
+        event = {
+            "request": self.request,
+            "request_id": self.request_id,
+            "method": self.request.method,
+            "path": self.request.url.path,
+            "status_code": self.status_code,
+            "status_source": "asgi_response_start" if self.status_code else "not_sent",
+            "duration_ms": duration_ms,
+            "exception_type": type(exception).__name__ if exception else None,
+            "exception_message": (
+                str(exception)[:200] if exception and not strict_runtime else None
+            ),
+            **diagnostics,
+        }
+        cancellation = diagnostics.get("diagnostic_code") in CANCELLATION_CODES
+        event["response_incomplete"] = (
+            self.status_code is not None and not self.response_complete
+        )
+        if exception and event["response_incomplete"] and not cancellation:
+            event["diagnostic_code"] = "response_stream_failure"
+        log_level = (
+            logging.WARNING
+            if cancellation
+            else (
+                logging.ERROR
+                if exception or (self.status_code or 0) >= 500
+                else logging.WARNING
+                if (self.status_code or 0) >= 400 or duration_ms >= SLOW_REQUEST_LOG_MS
+                else logging.DEBUG
+            )
+        )
+        logger.log(
+            log_level,
+            "Request cancelled" if cancellation else "Request finished",
+            extra={key: value for key, value in event.items() if key != "request"},
+        )
 
-    Headers:
-    --------
-    Request:
-    - X-Request-ID: (opcional) ID do cliente para correlação
+        def persist():
+            try:
+                record_request_event(**event)
+            except Exception:
+                logger.debug("Request telemetry failed", exc_info=False)
+            if not cancellation:
+                journey = dict(
+                    request=self.request,
+                    request_id=self.request_id,
+                    method=self.request.method,
+                    path=self.request.url.path,
+                    status_code=self.status_code,
+                    duration_ms=duration_ms,
+                    replayed=self.replayed,
+                )
+                if exception is not None:
+                    journey["exception"] = True
+                _record_http_journey_event_safely(**journey)
 
-    Response:
-    - X-Request-ID: ID usado nesta request (para cliente correlacionar)
+        # Each reporter opens its own session in this thread; no request session
+        # crosses threads or blocks the API event loop while telemetry is saved.
+        # A cancelled client request must not cancel the diagnostic write itself.
+        with anyio.CancelScope(shield=True):
+            await run_in_threadpool(persist)
 
-    Logs:
-    -----
-    Todos os logs dentro desta request terão automaticamente:
-    - request_id
-    - method
-    - path
 
-    Exemplo de log:
-    {
-        "timestamp": "2026-02-05T10:30:15.123Z",
-        "level": "INFO",
-        "message": "Request completed",
-        "request_id": "a1b2c3d4-e5f6-...",
-        "method": "GET",
-        "path": "/api/clientes/123",
-        "status_code": 200,
-        "duration_ms": 45.2
-    }
-    """
+class ObservedErrorResponse(JSONResponse):
+    """Observe the 500 sent outside user middleware by ServerErrorMiddleware."""
 
-    async def dispatch(self, request: Request, call_next):
-        """
-        Processa request e injeta contexto observável.
-        """
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        telemetry = scope.get("_ops_request_telemetry")
 
-        # ============================================================
-        # 0️⃣ BYPASS PARA WEBSOCKET
-        # BaseHTTPMiddleware não suporta WebSocket - deixa passar direto
-        # ============================================================
-        if request.scope.get("type") == "websocket":
-            return await call_next(request)
-
-        # ============================================================
-        # 1️⃣ GERAR OU OBTER REQUEST_ID
-        # ============================================================
-
-        # Tentar obter request_id seguro de header (cliente pode enviar)
-        request_id = normalize_request_id(request.headers.get("X-Request-ID"))
-
-        # Propagar via contextvars
-        set_request_id(request_id)
-        set_trace_id(request_id)
-
-        # ============================================================
-        # 2️⃣ CAPTURAR METADATA DA REQUEST
-        # ============================================================
-
-        method = request.method
-        path = request.url.path
-
-        # Propagar metadata via contextvars
-        set_request_metadata(method, path)
-        set_endpoint(path)
-
-        # Timestamp de início (para calcular duração)
-        start_time = time.time()
-
-        # ============================================================
-        # 3️⃣ PROCESSAR REQUEST
-        # ============================================================
+        async def observed_send(message: Message):
+            if message["type"] == "http.response.start" and telemetry is not None:
+                MutableHeaders(scope=message)["X-Request-ID"] = telemetry.request_id
+            await send(message)
+            if message["type"] == "http.response.start" and telemetry is not None:
+                telemetry.status_code = message["status"]
+            elif (
+                message["type"] == "http.response.body"
+                and not message.get("more_body", False)
+                and telemetry is not None
+            ):
+                telemetry.response_complete = True
 
         try:
-            response = await call_next(request)
-
-            # Calcular duração (em milissegundos)
-            duration_ms = round((time.time() - start_time) * 1000, 2)
-
-            # ============================================================
-            # 4️⃣ LOGGING ESTRUTURADO (sem dados sensíveis)
-            # ============================================================
-
-            # Determinar nivel de log baseado no status e lentidao.
-            if response.status_code >= 500:
-                log_level = logging.ERROR
-            elif response.status_code >= 400:
-                log_level = logging.WARNING
-            elif duration_ms >= SLOW_REQUEST_LOG_MS:
-                log_level = logging.WARNING
-            else:
-                log_level = logging.DEBUG
-
-            # Log estruturado com contexto completo
-            logger.log(
-                log_level,
-                "Request completed",
-                extra={
-                    "request_id": request_id,
-                    "method": method,
-                    "path": path,
-                    "status_code": response.status_code,
-                    "duration_ms": duration_ms,
-                    "client_ip": request.client.host if request.client else None,
-                    "user_agent": request.headers.get("user-agent", "unknown")[
-                        :100
-                    ],  # Truncado
-                },
-            )
-
-            record_request_event(
-                request=request,
-                request_id=request_id,
-                method=method,
-                path=path,
-                status_code=response.status_code,
-                duration_ms=duration_ms,
-            )
-            _record_http_journey_event_safely(
-                request=request,
-                request_id=request_id,
-                method=method,
-                path=path,
-                status_code=response.status_code,
-                duration_ms=duration_ms,
-                replayed=(
-                    response.headers.get("X-Idempotency-Replayed", "").lower() == "true"
-                ),
-            )
-
-            # ============================================================
-            # 5️⃣ ADICIONAR REQUEST_ID NO HEADER DA RESPOSTA
-            # ============================================================
-
-            response.headers["X-Request-ID"] = request_id
-
-            return response
-
-        except Exception as e:
-            # Em caso de exceção, ainda logar com contexto
-            duration_ms = round((time.time() - start_time) * 1000, 2)
-
-            strict_runtime = is_strict_runtime_environment()
-            exception_message = None if strict_runtime else str(e)[:200]
-
-            logger.error(
-                f"Request failed with exception: {type(e).__name__}",
-                extra={
-                    "request_id": request_id,
-                    "method": method,
-                    "path": path,
-                    "duration_ms": duration_ms,
-                    "exception_type": type(e).__name__,
-                    "exception_message": exception_message,
-                },
-                exc_info=not strict_runtime,
-            )
-
-            record_request_event(
-                request=request,
-                request_id=request_id,
-                method=method,
-                path=path,
-                duration_ms=duration_ms,
-                exception_type=type(e).__name__,
-                exception_message=exception_message,
-            )
-            _record_http_journey_event_safely(
-                request=request,
-                request_id=request_id,
-                method=method,
-                path=path,
-                duration_ms=duration_ms,
-                exception=True,
-            )
-
-            raise  # Re-raise para FastAPI lidar
-
+            await super().__call__(scope, receive, observed_send)
         finally:
-            # ============================================================
-            # 6️⃣ LIMPAR CONTEXTO APÓS REQUEST
-            # ============================================================
+            if telemetry is not None:
+                await telemetry.emit()
 
+
+class RequestContextMiddleware:
+    """Observe HTTP directly, without BaseHTTPMiddleware tasks/response streams."""
+
+    def __init__(self, app: ASGIApp):
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        request = Request(scope)
+        request_id = normalize_request_id(request.headers.get("X-Request-ID"))
+        telemetry = _RequestTelemetry(request, request_id)
+        scope["_ops_request_telemetry"] = telemetry
+        request.state.request_id = request_id
+        set_request_id(request_id)
+        set_trace_id(request_id)
+        set_request_metadata(request.method, request.url.path)
+        set_endpoint(request.url.path)
+
+        async def observed_receive() -> Message:
+            message = await receive()
+            if message["type"] == "http.disconnect" and not telemetry.response_complete:
+                telemetry.disconnected = True
+            return message
+
+        async def observed_send(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                headers["X-Request-ID"] = request_id
+                telemetry.replayed = (
+                    headers.get("X-Idempotency-Replayed", "").lower() == "true"
+                )
+            await send(message)
+            if message["type"] == "http.response.start":
+                telemetry.status_code = message["status"]
+            elif message["type"] == "http.response.pathsend" or (
+                message["type"] == "http.response.body"
+                and not message.get("more_body", False)
+            ):
+                telemetry.response_complete = True
+
+        try:
+            await self.app(scope, observed_receive, observed_send)
+            await telemetry.emit()
+        except asyncio.CancelledError as exc:
+            telemetry.exception = exc
+            await telemetry.emit()
+            raise
+        except Exception as exc:
+            telemetry.exception = exc
+            app = scope.get("app")
+            has_observed_handler = bool(
+                getattr(
+                    getattr(app, "state", None), "ops_observed_error_handler", False
+                )
+            )
+            # The outer server-error handler sends the 500 after this middleware
+            # unwinds. Keep pending telemetry until its response really starts.
+            if telemetry.status_code is not None or not has_observed_handler:
+                await telemetry.emit()
+            raise
+        finally:
             clear_request_context()
             clear_log_context()
 

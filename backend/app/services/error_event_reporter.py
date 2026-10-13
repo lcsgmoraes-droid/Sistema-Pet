@@ -9,6 +9,11 @@ from uuid import UUID
 
 from fastapi import Request
 
+from app.services.request_failure_diagnostics import (
+    CANCELLATION_CODES,
+    event_diagnostic_code,
+)
+
 
 _lock = threading.Lock()
 
@@ -151,6 +156,23 @@ def should_record_event(status_code: int | None, duration_ms: float) -> bool:
     return (status_code or 0) >= 500 or duration_ms >= SLOW_REQUEST_EVENT_MS
 
 
+def is_unknown_status_failure(event: dict[str, Any]) -> bool:
+    return (
+        event.get("status_code") is None
+        and bool(event.get("exception_type"))
+        and event_diagnostic_code(event) not in CANCELLATION_CODES
+    )
+
+
+def is_incomplete_response_failure(event: dict[str, Any]) -> bool:
+    return (
+        bool(event.get("response_incomplete"))
+        and bool(event.get("exception_type"))
+        and event.get("status_code") is not None
+        and event_diagnostic_code(event) not in CANCELLATION_CODES
+    )
+
+
 def record_request_event(
     *,
     request: Request,
@@ -161,8 +183,16 @@ def record_request_event(
     status_code: int | None = None,
     exception_type: str | None = None,
     exception_message: str | None = None,
+    diagnostic_code: str | None = None,
+    exception_origin: list[str] | None = None,
+    status_source: str | None = None,
+    response_incomplete: bool = False,
 ) -> None:
-    if exception_type is None and not should_record_event(status_code, duration_ms):
+    if (
+        exception_type is None
+        and diagnostic_code not in CANCELLATION_CODES
+        and not should_record_event(status_code, duration_ms)
+    ):
         return
 
     identity = _extract_identity(request)
@@ -179,6 +209,11 @@ def record_request_event(
         "duration_ms": duration_ms,
         "exception_type": exception_type,
         "exception_message": (exception_message or "")[:300] or None,
+        "diagnostic_code": diagnostic_code,
+        "exception_origin": (exception_origin or [])[-8:],
+        "pid": os.getpid(),
+        "status_source": status_source,
+        "response_incomplete": response_incomplete,
         "client_ip": request.client.host if request.client else None,
         "user_agent": (request.headers.get("user-agent") or "")[:160] or None,
     }
@@ -354,6 +389,18 @@ def summarize_error_events(
         str(event.get("status_code") or "sem_status") for event in events
     )
     errors_5xx = sum(1 for event in events if int(event.get("status_code") or 0) >= 500)
+    unknown_status_failures = sum(is_unknown_status_failure(event) for event in events)
+    cancellations = sum(
+        event_diagnostic_code(event) in CANCELLATION_CODES for event in events
+    )
+    by_diagnostic_code = Counter(event_diagnostic_code(event) for event in events)
+    response_failures = sum(is_incomplete_response_failure(event) for event in events)
+    failed_requests = sum(
+        int(event.get("status_code") or 0) >= 500
+        or is_unknown_status_failure(event)
+        or is_incomplete_response_failure(event)
+        for event in events
+    )
     slow_requests = sum(
         1
         for event in events
@@ -365,6 +412,11 @@ def summarize_error_events(
     return {
         "total": len(events),
         "errors_5xx": errors_5xx,
+        "unknown_status_failures": unknown_status_failures,
+        "cancellations": cancellations,
+        "response_failures": response_failures,
+        "failed_requests": failed_requests,
+        "by_diagnostic_code": by_diagnostic_code.most_common(),
         "slow_requests": slow_requests,
         "by_tenant": by_tenant.most_common(20),
         "by_path": by_path.most_common(20),

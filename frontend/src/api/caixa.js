@@ -4,13 +4,14 @@
 
 import api from "../api";
 import { criarConsultaCaixaAberto } from "../utils/caixaAbertoRequest";
+import { validarRespostaCaixaAberto } from "../utils/caixaAbertoMonitor";
 
 const consultarCaixaAberto = criarConsultaCaixaAberto(async ({ compact, signal }) => {
   const response = await api.get("/caixas/aberto", {
     ...(compact ? { params: { compact: true } } : {}),
     ...(signal ? { signal } : {}),
   });
-  return response.data;
+  return validarRespostaCaixaAberto(response);
 });
 
 /**
@@ -107,8 +108,10 @@ export const conferirItemCaixa = async (caixaId, dados) => {
 /**
  * Obter resumo do caixa
  */
-export const obterResumoCaixa = async (caixaId) => {
-  const response = await api.get(`/caixas/${caixaId}/resumo`);
+export const obterResumoCaixa = async (caixaId, opcoes = {}) => {
+  const response = await api.get(`/caixas/${caixaId}/resumo`, {
+    ...(opcoes.signal ? { signal: opcoes.signal } : {}),
+  });
   return response.data;
 };
 
