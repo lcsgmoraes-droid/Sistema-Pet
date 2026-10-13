@@ -17,6 +17,7 @@ from app.caixa_models import Caixa, MovimentacaoCaixa
 from app.caixa.service import CaixaService
 from app.empresa_config_geral_models import EmpresaConfigGeral
 from app.financeiro import ContasReceberService
+from app.financeiro.models_contas import ContaPagar
 from app.financeiro_models import (
     CategoriaFinanceira,
     ContaReceber,
@@ -50,6 +51,7 @@ def cenario(monkeypatch, tenant_context):
         CategoriaFinanceira,
         FormaPagamento,
         ContaReceber,
+        ContaPagar,
         Recebimento,
         LancamentoManual,
         AuditLog,

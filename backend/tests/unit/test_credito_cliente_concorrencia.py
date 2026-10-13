@@ -61,7 +61,7 @@ def test_pagamento_com_credito_bloqueia_cliente_do_mesmo_tenant():
     consulta = _consulta_cliente(cliente)
     db = MagicMock()
     db.query.side_effect = lambda modelo: consulta if modelo is Cliente else None
-    venda = SimpleNamespace(id=8, cliente_id=cliente.id)
+    venda = SimpleNamespace(id=8, cliente_id=cliente.id, numero_venda=8)
 
     movimentacoes = processar_pagamentos_finalizacao(
         venda=venda,

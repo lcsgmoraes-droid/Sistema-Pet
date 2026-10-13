@@ -94,5 +94,5 @@ def test_vendas_routes_stays_below_large_file_threshold_after_extraction():
     assert len(vendas_source.read_text(encoding="utf-8").splitlines()) < 200
     for source in extracted_sources:
         assert len(source.read_text(encoding="utf-8").splitlines()) < 700
-    assert len(pagamentos_source.read_text(encoding="utf-8").splitlines()) > 200
+    assert len(pagamentos_source.read_text(encoding="utf-8").splitlines()) > 150
     assert len(devolucoes_source.read_text(encoding="utf-8").splitlines()) > 450

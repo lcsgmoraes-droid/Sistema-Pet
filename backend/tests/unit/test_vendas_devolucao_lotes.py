@@ -14,7 +14,7 @@ from sqlalchemy.sql.sqltypes import Uuid
 
 from app import caixa_models, ecommerceai_integration_models, ofertas_estudio_models  # noqa: F401
 from app.estoque import service as estoque_service
-from app.empresa_grupo_estoque_compartilhado_service import contexto_tenant_estoque
+from app.grupo_comercial_estoque_compartilhado_service import contexto_tenant_estoque
 from app.financeiro_models import ContaReceber
 from app.models import Cliente
 from app.produtos_models import EstoqueMovimentacao, Produto, ProdutoLote
