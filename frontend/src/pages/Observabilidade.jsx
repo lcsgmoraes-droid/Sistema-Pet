@@ -12,6 +12,7 @@ import {
 } from "react-icons/fi";
 
 import api from "../platformApi";
+import UnknownFailuresNotice from "./opsDashboard/UnknownFailuresNotice";
 
 const PAGE_SIZE = 50;
 
@@ -327,6 +328,15 @@ export default function Observabilidade() {
           </div>
         ) : null}
 
+        <UnknownFailuresNotice
+          summary={summary}
+          onShowEvents={() => {
+            setStatusMin("");
+            setSlowOnly(false);
+            setPage(1);
+          }}
+        />
+
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <MetricCard
             icon={FiActivity}
@@ -457,7 +467,7 @@ export default function Observabilidade() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <Badge className={statusTone(event.status_code)}>
-                          {event.status_code || "erro"}
+                          {event.status_code || "sem status"}
                         </Badge>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-700">

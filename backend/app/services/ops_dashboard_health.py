@@ -82,13 +82,15 @@ def _current_health_status(
 ) -> dict[str, Any]:
     watchdog_status = str(watchdog.get("status") or "unknown")
     errors_5xx = int(error_summary.get("errors_5xx") or 0)
+    unknown_status_failures = int(error_summary.get("unknown_status_failures") or 0)
+    response_failures = int(error_summary.get("response_failures") or 0)
     slow_requests = int(error_summary.get("slow_requests") or 0)
     window_minutes = max(1, round((until - since).total_seconds() / 60))
     latency_ms = watchdog.get("latency_ms")
 
     status = "healthy"
     title = "Servidor saudavel agora"
-    detail = f"Sem 5xx ou lentidao nos ultimos {window_minutes} min."
+    detail = f"Sem falhas registradas ou lentidao nos ultimos {window_minutes} min."
     action = "Manter monitoramento."
 
     if watchdog_status == "unhealthy":
@@ -106,6 +108,19 @@ def _current_health_status(
         title = "Instabilidade recente"
         detail = f"{errors_5xx} erro(s) 5xx nos ultimos {window_minutes} min."
         action = "Abrir incidentes recentes e corrigir a rota com falha."
+    elif response_failures:
+        status = "degraded"
+        title = "Respostas interrompidas recentemente"
+        detail = f"{response_failures} resposta(s) interrompida(s) nos ultimos {window_minutes} min."
+        action = "Verificar a origem da falha nos eventos recentes."
+    elif unknown_status_failures:
+        status = "degraded"
+        title = "Ocorrencias recentes em investigacao"
+        detail = (
+            f"{unknown_status_failures} excecao(oes) sem status HTTP confirmado "
+            f"nos ultimos {window_minutes} min."
+        )
+        action = "Abrir os eventos e verificar a origem da excecao."
     elif slow_requests:
         status = "degraded"
         title = "Lentidao recente"
@@ -121,6 +136,8 @@ def _current_health_status(
         "until": _iso(until),
         "window_minutes": window_minutes,
         "errors_5xx": errors_5xx,
+        "unknown_status_failures": unknown_status_failures,
+        "response_failures": response_failures,
         "slow_requests": slow_requests,
         "watchdog_status": watchdog_status,
         "database": watchdog.get("database"),

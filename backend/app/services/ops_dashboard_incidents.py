@@ -5,7 +5,11 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.services.error_event_reporter import SLOW_REQUEST_EVENT_MS
+from app.services.error_event_reporter import (
+    SLOW_REQUEST_EVENT_MS,
+    is_incomplete_response_failure,
+    is_unknown_status_failure,
+)
 from app.services.ops_dashboard_utils import (
     _duration,
     _event_dt,
@@ -44,11 +48,23 @@ def _build_tenant_incidents(
 
     for tenant_id, tenant_events in grouped.items():
         errors_5xx = sum(1 for event in tenant_events if _status_code(event) >= 500)
+        unknown_status_failures = sum(
+            1 for event in tenant_events if is_unknown_status_failure(event)
+        )
+        response_failures = sum(
+            1 for event in tenant_events if is_incomplete_response_failure(event)
+        )
         slow_requests = sum(
             1 for event in tenant_events if _duration(event) >= SLOW_REQUEST_EVENT_MS
         )
         latest_at = max((_event_dt(event) for event in tenant_events), default=None)
-        severity = "critical" if errors_5xx else "warning" if slow_requests else "info"
+        severity = (
+            "critical"
+            if errors_5xx
+            else "warning"
+            if slow_requests or unknown_status_failures or response_failures
+            else "info"
+        )
         incidents.append(
             {
                 "tenant_id": None if tenant_id == "sem_tenant" else tenant_id,
@@ -61,6 +77,8 @@ def _build_tenant_incidents(
                 "severity": severity,
                 "total": len(tenant_events),
                 "errors_5xx": errors_5xx,
+                "unknown_status_failures": unknown_status_failures,
+                "response_failures": response_failures,
                 "slow_requests": slow_requests,
                 "latest_at": _iso(latest_at),
                 "top_paths": _top_paths(tenant_events),
@@ -69,7 +87,13 @@ def _build_tenant_incidents(
 
     return sorted(
         incidents,
-        key=lambda item: (item["errors_5xx"], item["slow_requests"], item["total"]),
+        key=lambda item: (
+            item["errors_5xx"],
+            item["unknown_status_failures"],
+            item["response_failures"],
+            item["slow_requests"],
+            item["total"],
+        ),
         reverse=True,
     )[:20]
 
@@ -83,6 +107,12 @@ def _build_route_incidents(events: list[dict[str, Any]]) -> list[dict[str, Any]]
     for path, route_events in grouped.items():
         durations = [_duration(event) for event in route_events]
         errors_5xx = sum(1 for event in route_events if _status_code(event) >= 500)
+        unknown_status_failures = sum(
+            1 for event in route_events if is_unknown_status_failure(event)
+        )
+        response_failures = sum(
+            1 for event in route_events if is_incomplete_response_failure(event)
+        )
         slow_requests = sum(
             1 for event in route_events if _duration(event) >= SLOW_REQUEST_EVENT_MS
         )
@@ -90,13 +120,21 @@ def _build_route_incidents(events: list[dict[str, Any]]) -> list[dict[str, Any]]
             {str(event.get("tenant_id") or "sem_tenant") for event in route_events}
         )
         latest_at = max((_event_dt(event) for event in route_events), default=None)
-        severity = "critical" if errors_5xx else "warning" if slow_requests else "info"
+        severity = (
+            "critical"
+            if errors_5xx
+            else "warning"
+            if slow_requests or unknown_status_failures or response_failures
+            else "info"
+        )
         incidents.append(
             {
                 "path": path,
                 "severity": severity,
                 "total": len(route_events),
                 "errors_5xx": errors_5xx,
+                "unknown_status_failures": unknown_status_failures,
+                "response_failures": response_failures,
                 "slow_requests": slow_requests,
                 "avg_duration_ms": round(sum(durations) / max(len(durations), 1), 2),
                 "max_duration_ms": round(max(durations) if durations else 0, 2),
@@ -109,6 +147,8 @@ def _build_route_incidents(events: list[dict[str, Any]]) -> list[dict[str, Any]]
         incidents,
         key=lambda item: (
             item["errors_5xx"],
+            item["unknown_status_failures"],
+            item["response_failures"],
             item["slow_requests"],
             item["max_duration_ms"],
         ),

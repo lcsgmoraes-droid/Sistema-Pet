@@ -10,11 +10,13 @@ import {
 import ImprimirDocumentoFiscalButton from "./ImprimirDocumentoFiscalButton";
 import ModalSelecaoDocumentoFiscal from "./ModalSelecaoDocumentoFiscal";
 import ModalDadosVendaFinalizada from "./ModalDadosVendaFinalizada";
+import { mensagemCaixaIndisponivel } from "../../utils/caixaAbertoMonitor";
 
 export default function PDVModoVisualizacaoBanner({
   ativo,
   vendaAtual,
   temCaixaAberto,
+  statusConsultaCaixa,
   onAbrirDevolucao,
   onVoltar,
   emitirNotaVendaFinalizada,
@@ -79,7 +81,7 @@ export default function PDVModoVisualizacaoBanner({
                 title={
                   temCaixaAberto
                     ? "Abrir devolucao desta venda"
-                    : "Abra o caixa para registrar devolucao"
+                    : mensagemCaixaIndisponivel(statusConsultaCaixa)
                 }
               >
                 Devolucao

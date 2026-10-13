@@ -20,6 +20,7 @@ import {
   shortText,
   statusTone,
 } from "./OpsIncidentesCards";
+import UnknownFailuresNotice from "../opsDashboard/UnknownFailuresNotice";
 
 export default function OpsIncidentesView({
   loadData,
@@ -83,6 +84,15 @@ export default function OpsIncidentesView({
             {error}
           </div>
         ) : null}
+
+        <UnknownFailuresNotice
+          summary={summary?.errors}
+          onShowEvents={() => {
+            setStatusMin("");
+            setSlowOnly(false);
+            setPage(1);
+          }}
+        />
 
         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <div className="grid gap-3 lg:grid-cols-[180px_160px_150px_minmax(220px,0.8fr)_1fr_auto]">

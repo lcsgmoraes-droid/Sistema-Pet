@@ -4,6 +4,7 @@ import { toast } from "react-hot-toast";
 import { montarPayloadVenda } from "../utils/pdvVendaPayload";
 import { debugLog } from "../utils/debug";
 import { montarVendaPersistidaParaEdicao, salvarEdicaoVenda } from "../utils/pdvSalvarEdicaoVenda";
+import { mensagemCaixaIndisponivel } from "../utils/caixaAbertoMonitor";
 
 export function usePDVSalvarVenda({
   vendaAtual,
@@ -11,6 +12,7 @@ export function usePDVSalvarVenda({
   loading,
   setLoading,
   temCaixaAberto,
+  statusConsultaCaixa,
   entregadorSelecionado,
   vendaComissionada,
   vendedorObrigatorio,
@@ -27,7 +29,7 @@ export function usePDVSalvarVenda({
     }
 
     if (!temCaixaAberto) {
-      toast.error("Não é possível salvar uma venda sem caixa aberto. Abra um caixa primeiro.");
+      toast.error(mensagemCaixaIndisponivel(statusConsultaCaixa));
       return;
     }
 

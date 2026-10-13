@@ -39,6 +39,11 @@ export default function PDVMainArea(props) {
     modoVisualizacao,
     loading,
     temCaixaAberto,
+    caixaAberto,
+    contextoCaixa,
+    statusConsultaCaixa,
+    atualizandoCaixa,
+    atualizarCaixa,
     onCancelarEdicao,
     onExcluirVenda,
     onSalvarVenda,
@@ -191,6 +196,11 @@ export default function PDVMainArea(props) {
         modoVisualizacao={modoVisualizacao}
         loading={loading}
         temCaixaAberto={temCaixaAberto}
+        caixaAberto={caixaAberto}
+        contextoCaixa={contextoCaixa}
+        statusConsultaCaixa={statusConsultaCaixa}
+        atualizandoCaixa={atualizandoCaixa}
+        atualizarCaixa={atualizarCaixa}
         onCancelarEdicao={onCancelarEdicao}
         onExcluirVenda={onExcluirVenda}
         onSalvarVenda={onSalvarVenda}
@@ -199,6 +209,9 @@ export default function PDVMainArea(props) {
 
       <PDVInfoBanners
         temCaixaAberto={temCaixaAberto}
+        statusConsultaCaixa={statusConsultaCaixa}
+        atualizandoCaixa={atualizandoCaixa}
+        onAtualizarCaixa={atualizarCaixa}
         modoVisualizacao={modoVisualizacao}
         vendaAtual={vendaAtual}
         validadeAlertas={validadeAlertas}
@@ -213,6 +226,7 @@ export default function PDVMainArea(props) {
         habilitarEdicao={habilitarEdicao}
         onRecarregarVenda={onRecarregarVenda}
         temCaixaAberto={temCaixaAberto}
+        statusConsultaCaixa={statusConsultaCaixa}
         onAbrirDevolucao={onAbrirDevolucaoVendaAtual}
       />
 
@@ -336,6 +350,7 @@ export default function PDVMainArea(props) {
           onSalvarVenda={onSalvarVenda}
           statusVenda={vendaAtual.status}
           temCaixaAberto={temCaixaAberto}
+          statusConsultaCaixa={statusConsultaCaixa}
           vendaId={vendaAtual.id}
         />
       </div>

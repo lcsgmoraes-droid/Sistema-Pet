@@ -6,11 +6,13 @@ import {
   recalcularSubtotalItem,
 } from "../utils/pdvCarrinhoItensUtils";
 import { sugerirProtocoloRecorrencia } from "../utils/pdvProtocolosRecorrencia";
+import { mensagemCaixaIndisponivel } from "../utils/caixaAbertoMonitor";
 
 export function usePDVCarrinhoItens({
   vendaAtual,
   setVendaAtual,
   temCaixaAberto,
+  statusConsultaCaixa,
   recalcularTotais,
 }) {
   const [copiadoCodigoItem, setCopiadoCodigoItem] = useState("");
@@ -18,9 +20,7 @@ export function usePDVCarrinhoItens({
 
   const adicionarProdutoAoCarrinho = (produto, etiquetaBalanca = null) => {
     if (!temCaixaAberto) {
-      alert(
-        "\u274c N\u00e3o \u00e9 poss\u00edvel adicionar produtos sem caixa aberto. Abra um caixa primeiro.",
-      );
+      alert(mensagemCaixaIndisponivel(statusConsultaCaixa));
       return false;
     }
 

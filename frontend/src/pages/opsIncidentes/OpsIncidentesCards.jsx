@@ -102,6 +102,11 @@ export function TenantCard({ item, selected, onSelect }) {
         <span>
           5xx: <b>{item.errors_5xx}</b>
         </span>
+        {Number(item.unknown_status_failures || 0) > 0 ? (
+          <span>
+            Sem status: <b>{item.unknown_status_failures}</b>
+          </span>
+        ) : null}
         <span>
           Lentas: <b>{item.slow_requests}</b>
         </span>
@@ -136,6 +141,11 @@ export function RouteCard({ item, selected, onSelect }) {
         <span>
           5xx: <b>{item.errors_5xx}</b>
         </span>
+        {Number(item.unknown_status_failures || 0) > 0 ? (
+          <span>
+            Sem status: <b>{item.unknown_status_failures}</b>
+          </span>
+        ) : null}
         <span>
           Lentas: <b>{item.slow_requests}</b>
         </span>
@@ -283,6 +293,20 @@ export function EventDetail({ event, auditTrail = [], auditLoading = false }) {
           <div className="font-bold">{event.exception_type || "Erro"}</div>
           <div className="mt-1 whitespace-pre-wrap text-xs">
             {event.exception_message || "Sem mensagem detalhada."}
+          </div>
+        </div>
+      ) : null}
+
+      {event.diagnostic_code || event.exception_origin?.length ? (
+        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800">
+          <div className="font-bold">
+            Diagnóstico: {event.diagnostic_code || "sem classificação"}
+          </div>
+          {event.pid ? <div className="mt-1 text-xs">Processo: {event.pid}</div> : null}
+          <div className="mt-2 space-y-1 break-words font-mono text-xs">
+            {(event.exception_origin || []).map((origin, index) => (
+              <div key={`${index}-${origin}`}>{origin}</div>
+            ))}
           </div>
         </div>
       ) : null}
