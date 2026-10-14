@@ -14,8 +14,25 @@ import EcommerceAIIntegracaoCard from "./EcommerceAIIntegracaoCard";
 import IfoodIntegracaoCard from "./IfoodIntegracaoCard";
 import OpenAIIntegracaoCard from "./OpenAIIntegracaoCard";
 import IntNFeIntegracao from "./IntNFeIntegracao";
+import SefazIntegracaoCard from "./SefazIntegracaoCard";
 
 const INTEGRACOES = [
+  {
+    id: "sefaz",
+    nome: "SEFAZ - NF-e de entrada",
+    categoria: "Notas fiscais",
+    descricao: "Configure o certificado digital e a consulta de notas recebidas pelo CNPJ.",
+    recursos: [
+      "Certificado digital A1",
+      "Consulta pela chave de acesso",
+      "Importação automática de documentos recebidos",
+    ],
+    icon: FiFileText,
+    cardClass:
+      "border-indigo-200 bg-indigo-50/70 hover:border-indigo-300 hover:bg-indigo-50 dark:border-indigo-800 dark:bg-indigo-950/20",
+    iconClass: "bg-indigo-600 text-white",
+    linkClass: "text-indigo-700 dark:text-indigo-300",
+  },
   {
     id: "intnfe",
     nome: "IntNFe",
@@ -99,6 +116,7 @@ const INTEGRACOES = [
 ];
 
 const PAINEIS = {
+  sefaz: SefazIntegracaoCard,
   intnfe: IntNFeIntegracao,
   bling: BlingIntegracao,
   ifood: IfoodIntegracaoCard,
@@ -108,6 +126,7 @@ const PAINEIS = {
 
 function integracaoInicial() {
   const params = new URLSearchParams(globalThis.location.search);
+  if (params.get("integracao") === "sefaz") return "sefaz";
   return params.has("ecommerceai_request") ? "ecommerceai" : null;
 }
 
@@ -126,7 +145,7 @@ export default function Integracoes() {
           <FiArrowLeft aria-hidden="true" />
           Voltar às integrações
         </button>
-        <PainelSelecionado />
+        {selecionada === "sefaz" ? <PainelSelecionado modoModal /> : <PainelSelecionado />}
       </div>
     );
   }

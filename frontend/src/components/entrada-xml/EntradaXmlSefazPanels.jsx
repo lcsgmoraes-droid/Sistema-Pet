@@ -8,6 +8,76 @@ function formatarChaveAcesso(valor) {
   return String(valor).replaceAll(/\D/g, "").slice(0, 44);
 }
 
+const STATUS_SINCRONIZACAO = {
+  nunca: "Nunca sincronizado",
+  ok: "Concluída",
+  erro: "Erro",
+  erro_656: "Pausada pela SEFAZ (cStat 656)",
+};
+
+function ProgressoSefaz({ cfgSefaz }) {
+  const dataSincronizacao = cfgSefaz.ultimo_sync_at
+    ? new Date(cfgSefaz.ultimo_sync_at).toLocaleString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+      })
+    : "Ainda não ocorreu";
+  const maxNsuInformado =
+    String(cfgSefaz.ultimo_sync_cstat) !== "656" &&
+    cfgSefaz.ultimo_sync_max_nsu_retorno &&
+    !/^0+$/.test(cfgSefaz.ultimo_sync_max_nsu_retorno);
+  const maxNsuConfirmado =
+    cfgSefaz.ultimo_max_nsu_confirmado && !/^0+$/.test(cfgSefaz.ultimo_max_nsu_confirmado)
+      ? cfgSefaz.ultimo_max_nsu_confirmado
+      : null;
+
+  return (
+    <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div>
+          Última sincronização: <strong>{dataSincronizacao}</strong>
+        </div>
+        <div>
+          Status:{" "}
+          <strong>
+            {STATUS_SINCRONIZACAO[cfgSefaz.ultimo_sync_status] || cfgSefaz.ultimo_sync_status}
+          </strong>
+        </div>
+        <div>
+          Último NSU salvo: <strong className="font-mono">{cfgSefaz.ultimo_nsu}</strong>
+        </div>
+        <div>
+          maxNSU da última resposta:{" "}
+          <strong className="font-mono">
+            {maxNsuInformado ? cfgSefaz.ultimo_sync_max_nsu_retorno : "Não informado pela SEFAZ"}
+          </strong>
+        </div>
+        {maxNsuConfirmado && maxNsuConfirmado !== cfgSefaz.ultimo_sync_max_nsu_retorno && (
+          <div>
+            Último maxNSU confirmado anteriormente:{" "}
+            <strong className="font-mono">{maxNsuConfirmado}</strong>
+          </div>
+        )}
+      </div>
+      <p className="mt-2 text-slate-600">
+        O NSU é a sequência de distribuição para este CNPJ, não o número da NF-e. O maxNSU é o
+        último valor conhecido na sincronização anterior; esta tela não consulta esse número em
+        tempo real.
+      </p>
+    </div>
+  );
+}
+
+ProgressoSefaz.propTypes = {
+  cfgSefaz: PropTypes.shape({
+    ultimo_nsu: PropTypes.string,
+    ultimo_max_nsu_confirmado: PropTypes.string,
+    ultimo_sync_at: PropTypes.string,
+    ultimo_sync_cstat: PropTypes.string,
+    ultimo_sync_max_nsu_retorno: PropTypes.string,
+    ultimo_sync_status: PropTypes.string,
+  }).isRequired,
+};
+
 export default function EntradaXmlSefazPanels({
   avisoConectorSefaz,
   chaveSefaz,
@@ -67,7 +137,7 @@ export default function EntradaXmlSefazPanels({
                   </ul>
                 )}
                 <Link
-                  to="/configuracoes/integracoes"
+                  to="/configuracoes/integracoes?integracao=sefaz"
                   className="mt-3 inline-flex font-semibold text-amber-900 underline"
                 >
                   Configurar certificado e integração SEFAZ
@@ -75,6 +145,8 @@ export default function EntradaXmlSefazPanels({
               </div>
             )
           )}
+
+          {!configSefazLoading && <ProgressoSefaz cfgSefaz={cfgSefaz} />}
 
           <form onSubmit={consultarSefaz} className="mb-2 flex gap-3">
             <input
@@ -212,7 +284,10 @@ export default function EntradaXmlSefazPanels({
           subtitle={
             <>
               Certificado digital e parametros ficam em{" "}
-              <Link to="/configuracoes/integracoes" className="font-semibold text-indigo-600">
+              <Link
+                to="/configuracoes/integracoes?integracao=sefaz"
+                className="font-semibold text-indigo-600"
+              >
                 Configuracoes &gt; Integracoes
               </Link>
               . Aqui configure apenas a rotina automatica.
@@ -244,22 +319,15 @@ export default function EntradaXmlSefazPanels({
                   />
                   <span>Ativar importacao automatica</span>
                 </label>
+                <p className="mt-2 text-xs text-amber-800">
+                  Se a contabilidade também consulta notas deste CNPJ, combine com ela a sequência
+                  de consultas antes de ativar. Consultas fora de ordem podem causar bloqueio 656.
+                </p>
               </div>
 
+              <ProgressoSefaz cfgSefaz={cfgSefaz} />
+
               <div className="mb-4 grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 sm:grid-cols-2">
-                <div>
-                  Ultima sincronizacao:{" "}
-                  <strong>
-                    {cfgSefaz.ultimo_sync_at
-                      ? new Date(cfgSefaz.ultimo_sync_at).toLocaleString("pt-BR", {
-                          timeZone: "America/Sao_Paulo",
-                        })
-                      : "-"}
-                  </strong>
-                </div>
-                <div>
-                  Status: <strong>{cfgSefaz.ultimo_sync_status}</strong>
-                </div>
                 <div>
                   Documentos trazidos: <strong>{cfgSefaz.ultimo_sync_documentos}</strong>
                 </div>
@@ -308,8 +376,12 @@ EntradaXmlSefazPanels.propTypes = {
     mensagem: PropTypes.string,
     modo: PropTypes.string,
     pendencias: PropTypes.arrayOf(PropTypes.string),
+    ultimo_nsu: PropTypes.string,
+    ultimo_max_nsu_confirmado: PropTypes.string,
     ultimo_sync_at: PropTypes.string,
+    ultimo_sync_cstat: PropTypes.string,
     ultimo_sync_documentos: PropTypes.number,
+    ultimo_sync_max_nsu_retorno: PropTypes.string,
     ultimo_sync_mensagem: PropTypes.string,
     ultimo_sync_status: PropTypes.string,
   }).isRequired,

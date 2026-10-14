@@ -262,15 +262,8 @@ def _loop_renovacao_token_bling():
 def _loop_sefaz_sync():
     """
     Job em background para sincronizar NF-e automaticamente via SEFAZ.
-    *** DESATIVADO TEMPORARIAMENTE — sincronização apenas via chamada manual. ***
-    Para reativar: remover o return logo abaixo.
+    Apenas tenants com importacao_automatica habilitada sao consultados.
     """
-    logger.info(
-        "[SEFAZ] Sincronização automática DESATIVADA — usando apenas modo manual."
-    )
-    return
-
-    # --- CÓDIGO ABAIXO PRESERVADO PARA REATIVAÇÃO FUTURA ---
     import os as _os
     from datetime import datetime as _dt, timezone as _tz
     from pathlib import Path as _Path
@@ -287,7 +280,10 @@ def _loop_sefaz_sync():
             from app.services.sefaz_tenant_config_service import (
                 SefazTenantConfigService,
             )
-            from app.services.sefaz_sync_coordinator import sefaz_coordinator
+            from app.services.sefaz_sync_coordinator import (
+                proximo_sync_permitido,
+                sefaz_coordinator,
+            )
 
             base_dir = SefazTenantConfigService.BASE_DIR
             if base_dir.exists():
@@ -307,41 +303,23 @@ def _loop_sefaz_sync():
                             continue
                         if cfg.get("modo") != "real":
                             continue
+
+                        tenant_id_str = tenant_dir.name
+                        agora = _dt.now(_tz.utc)
+                        proximo = proximo_sync_permitido(cfg)
+                        if proximo is not None and proximo > agora:
+                            sefaz_coordinator.try_reprocess_local(
+                                tenant_id_str, config_path
+                            )
+                            continue
                         if (
                             not cfg.get("cert_path")
                             or not _Path(cfg["cert_path"]).exists()
                         ):
+                            sefaz_coordinator.try_reprocess_local(
+                                tenant_id_str, config_path
+                            )
                             continue
-
-                        # Verificação de timing:
-                        # _proximo_sync_permitido_at controla tanto penalidade 656
-                        # quanto o intervalo de backoff — setado pelo coordinator
-                        # após cada sync (bem-sucedida ou não).
-                        agora = _dt.now(_tz.utc)
-                        proximo_str = cfg.get("_proximo_sync_permitido_at")
-                        if proximo_str:
-                            proximo_dt = _dt.fromisoformat(proximo_str)
-                            if proximo_dt.tzinfo is None:
-                                proximo_dt = proximo_dt.replace(tzinfo=_tz.utc)
-                            if proximo_dt > agora:
-                                continue  # em penalidade 656 ou backoff ainda ativo
-
-                        # Fallback para configs antigas (só existia ultimo_sync_at)
-                        else:
-                            ultimo_str = cfg.get("ultimo_sync_at")
-                            if ultimo_str:
-                                ultimo_dt = _dt.fromisoformat(ultimo_str)
-                                if ultimo_dt.tzinfo is None:
-                                    ultimo_dt = ultimo_dt.replace(tzinfo=_tz.utc)
-                                intervalo_min = int(
-                                    cfg.get("importacao_intervalo_min", 60)
-                                )
-                                if (
-                                    agora - ultimo_dt
-                                ).total_seconds() / 60 < intervalo_min:
-                                    continue
-
-                        tenant_id_str = tenant_dir.name
                         result = sefaz_coordinator.try_sync(
                             tenant_id_str=tenant_id_str,
                             config_path=config_path,
@@ -358,7 +336,7 @@ def _loop_sefaz_sync():
                             logger.debug(
                                 f"[SEFAZ] Scheduler: sync já em andamento para {tenant_id_str}."
                             )
-                        elif r_status not in ("ok", "erro_656"):
+                        elif r_status not in ("ok", "erro_656", "cooldown", "disabled"):
                             logger.warning(
                                 f"[SEFAZ] Scheduler: resultado inesperado para "
                                 f"{tenant_id_str}: {result}"

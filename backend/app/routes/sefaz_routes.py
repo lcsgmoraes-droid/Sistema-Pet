@@ -2,21 +2,31 @@
 Rotas SEFAZ — Consulta de NF-e por chave de acesso.
 """
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from typing import Optional, List
+from pathlib import Path
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 import logging
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session as get_db
 from app.models import Tenant
-from app.produtos_models import NotaEntrada
-from app.services.sefaz_service import SefazService
+from app.produtos_compras_models import SefazDocumentoDistribuido
+from app.security.permissions_decorator import require_permission_dependency
+from app.services.sefaz_service import SefazConsumoIndevidoError, SefazService
 from app.services.sefaz_tenant_config_service import SefazTenantConfigService
+from app.services.sefaz_sync_coordinator import (
+    SefazLockBusy,
+    bloqueio_656_ate,
+    proximo_sync_permitido,
+    sefaz_coordinator,
+)
 
 router = APIRouter(prefix="/sefaz", tags=["sefaz"])
 logger = logging.getLogger(__name__)
+can_configure_sefaz = require_permission_dependency("configuracoes.editar")
 
 
 class ConsultaNFeRequest(BaseModel):
@@ -80,9 +90,61 @@ async def consultar_nfe(
 
     _, tenant_id = auth
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
-    cfg = SefazTenantConfigService.merged_config(tenant_id, tenant)
+    try:
+        with sefaz_coordinator.config_guard():
+            cfg = SefazTenantConfigService.merged_config(tenant_id, tenant)
+            agora = datetime.now(timezone.utc)
+            bloqueio = bloqueio_656_ate(cfg)
+            if bloqueio is not None and bloqueio > agora:
+                espera = int((bloqueio - agora).total_seconds()) + 1
+                raise HTTPException(
+                    status_code=429,
+                    detail="SEFAZ bloqueou as consultas (cStat 656). Aguarde o horário indicado.",
+                    headers={"Retry-After": str(espera)},
+                )
 
-    data = SefazService.consultar_nfe_por_chave(chave, cfg)
+            SefazService.garantir_pronto_para_consulta_real(cfg)
+            janela = []
+            for valor in cfg.get("consultas_chave_timestamps", []):
+                try:
+                    momento = datetime.fromisoformat(valor)
+                    if momento.tzinfo is None:
+                        momento = momento.replace(tzinfo=timezone.utc)
+                    if momento > agora - timedelta(hours=1):
+                        janela.append(momento)
+                except (TypeError, ValueError):
+                    continue
+            # Reserva margem para outras modalidades no limite combinado de 20/h.
+            if len(janela) >= 18:
+                espera = (
+                    int((janela[0] + timedelta(hours=1) - agora).total_seconds()) + 1
+                )
+                raise HTTPException(
+                    status_code=429,
+                    detail="Limite de consultas por chave atingido. Aguarde uma hora.",
+                    headers={"Retry-After": str(max(1, espera))},
+                )
+
+            cfg["consultas_chave_timestamps"] = [
+                momento.isoformat() for momento in (*janela, agora)
+            ]
+            SefazTenantConfigService.save_config(tenant_id, cfg)
+            try:
+                data = SefazService.consultar_nfe_por_chave(chave, cfg)
+            except SefazConsumoIndevidoError as exc:
+                bloqueio = datetime.now(timezone.utc) + timedelta(minutes=65)
+                cfg["dfe_656_bloqueado_ate"] = bloqueio.isoformat()
+                SefazTenantConfigService.save_config(tenant_id, cfg)
+                raise HTTPException(
+                    status_code=429,
+                    detail="SEFAZ bloqueou as consultas (cStat 656). Tente novamente após a espera indicada.",
+                    headers={"Retry-After": str(65 * 60)},
+                ) from exc
+    except SefazLockBusy as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Outra consulta SEFAZ está em andamento. Aguarde alguns instantes.",
+        ) from exc
     return ConsultaNFeResponse(**data)
 
 
@@ -104,6 +166,13 @@ def get_config(
         "uf": cfg.get("uf", "SP"),
         "cnpj": cfg.get("cnpj", ""),
         "importacao_automatica": cfg.get("importacao_automatica", False),
+        "importacao_automatica_status": (
+            "desativada"
+            if not cfg.get("importacao_automatica")
+            else "configuracao_pendente"
+            if not status.enabled or cfg.get("modo") != "real" or not status.cert_ok
+            else "configurada"
+        ),
         "importacao_intervalo_min": cfg.get("importacao_intervalo_min", 15),
         "ultimo_nsu": cfg.get("ultimo_nsu", "000000000000000"),
         "ultimo_sync_at": cfg.get("ultimo_sync_at"),
@@ -116,7 +185,12 @@ def get_config(
         "ultimo_sync_xmotivo": cfg.get("ultimo_sync_xmotivo"),
         "ultimo_sync_ult_nsu_retorno": cfg.get("ultimo_sync_ult_nsu_retorno"),
         "ultimo_sync_max_nsu_retorno": cfg.get("ultimo_sync_max_nsu_retorno"),
-        "proximo_sync_permitido_at": cfg.get("_proximo_sync_permitido_at"),
+        "ultimo_max_nsu_confirmado": cfg.get("ultimo_max_nsu_confirmado"),
+        "proximo_sync_permitido_at": (
+            proximo_sync_permitido(cfg).isoformat()
+            if proximo_sync_permitido(cfg)
+            else None
+        ),
         "cnpj_configurado": status.cnpj_configurado,
         "cert_path_configurado": status.cert_path_configurado,
         "cert_existe": status.cert_existe,
@@ -148,27 +222,48 @@ def update_config(
     payload: SefazConfigUpdateRequest,
     auth=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_db),
+    _permission=Depends(can_configure_sefaz),
 ):
     """Salva configuracao SEFAZ por tenant (sem upload de certificado)."""
     _, tenant_id = auth
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
 
-    atual = SefazTenantConfigService.merged_config(tenant_id, tenant)
-    novo = {
-        **atual,
-        "enabled": payload.enabled,
-        "modo": payload.modo.strip().lower(),
-        "ambiente": payload.ambiente.strip().lower(),
-        "uf": payload.uf.strip().upper(),
-        "cnpj": SefazTenantConfigService.sanitize_cnpj(payload.cnpj),
-        "importacao_automatica": payload.importacao_automatica,
-        "importacao_intervalo_min": payload.importacao_intervalo_min,
-    }
-
-    if payload.cert_password is not None:
-        novo["cert_password"] = payload.cert_password
-
-    SefazTenantConfigService.save_config(tenant_id, novo)
+    try:
+        with sefaz_coordinator.config_guard():
+            atual = SefazTenantConfigService.merged_config(tenant_id, tenant)
+            novo_cnpj = SefazTenantConfigService.sanitize_cnpj(payload.cnpj)
+            novo_ambiente = payload.ambiente.strip().lower()
+            houve_sync = (
+                bool(atual.get("ultimo_sync_at"))
+                or str(atual.get("ultimo_nsu", "000000000000000")) != "000000000000000"
+            )
+            if houve_sync and (
+                novo_cnpj != atual.get("cnpj") or novo_ambiente != atual.get("ambiente")
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "CNPJ e ambiente nao podem ser alterados apos iniciar a "
+                        "distribuicao. Solicite migracao auditada do checkpoint NSU."
+                    ),
+                )
+            novo = {
+                **atual,
+                "enabled": payload.enabled,
+                "modo": payload.modo.strip().lower(),
+                "ambiente": novo_ambiente,
+                "uf": payload.uf.strip().upper(),
+                "cnpj": novo_cnpj,
+                "importacao_automatica": payload.importacao_automatica,
+                "importacao_intervalo_min": payload.importacao_intervalo_min,
+            }
+            if payload.cert_password is not None:
+                novo["cert_password"] = payload.cert_password
+            SefazTenantConfigService.save_config(tenant_id, novo)
+    except SefazLockBusy as exc:
+        raise HTTPException(
+            status_code=409, detail="Sincronizacao SEFAZ em andamento. Tente novamente."
+        ) from exc
     status = SefazService.status_configuracao(novo)
     return {
         "ok": True,
@@ -188,22 +283,29 @@ async def upload_certificado(
     cert_password: str = Form(...),
     auth=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_db),
+    _permission=Depends(can_configure_sefaz),
 ):
     """Recebe e valida certificado A1 (.pfx) por tenant."""
     _, tenant_id = auth
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
 
     cert_path = await SefazTenantConfigService.save_certificate(tenant_id, file)
-    cfg = SefazTenantConfigService.merged_config(tenant_id, tenant)
-    cfg["cert_path"] = cert_path
-    cfg["cert_password"] = cert_password
-    SefazTenantConfigService.save_config(tenant_id, cfg)
-
-    # Valida o arquivo/senha do certificado de forma isolada.
-    # Nao bloqueia upload quando o tenant ainda estiver em modo mock.
     cert_ok, cert_msg = SefazService._validar_certificado(cert_path, cert_password)
     if not cert_ok:
+        Path(cert_path).unlink(missing_ok=True)
         raise HTTPException(status_code=422, detail=cert_msg)
+
+    try:
+        with sefaz_coordinator.config_guard():
+            cfg = SefazTenantConfigService.merged_config(tenant_id, tenant)
+            cfg["cert_path"] = cert_path
+            cfg["cert_password"] = cert_password
+            SefazTenantConfigService.save_config(tenant_id, cfg)
+    except SefazLockBusy as exc:
+        Path(cert_path).unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=409, detail="Sincronizacao SEFAZ em andamento. Tente novamente."
+        ) from exc
 
     status = SefazService.status_configuracao(cfg)
 
@@ -246,6 +348,7 @@ def get_sync_status(
 def sync_now(
     auth=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_db),
+    _permission=Depends(can_configure_sefaz),
 ):
     """
     Dispara sincronizacao manual.
@@ -260,54 +363,18 @@ def sync_now(
 
     now_dt = datetime.now(timezone.utc)
 
-    # ── Verificar penalidade 656 (bloqueia sync manual) ──────────────────────
-    proximo_str = cfg.get("_proximo_sync_permitido_at")
-    if proximo_str and cfg.get("_sync_bloqueado_656"):
-        try:
-            from datetime import timezone as _tz_check
-
-            proximo_dt = datetime.fromisoformat(proximo_str)
-            if proximo_dt.tzinfo is None:
-                proximo_dt = proximo_dt.replace(tzinfo=_tz_check.utc)
-            if now_dt < proximo_dt:
-                faltam = int((proximo_dt - now_dt).total_seconds() / 60) + 1
-                raise HTTPException(
-                    status_code=429,
-                    detail=(
-                        f"SEFAZ em cooldown por bloqueio anterior (cStat 656). "
-                        f"Proxima tentativa permitida em ~{faltam} minuto(s). "
-                        f"Aguarde antes de sincronizar novamente."
-                    ),
-                )
-        except HTTPException:
-            raise
-        except Exception:
-            pass
-
-    # ── Anti-spam: mínimo 20 minutos entre sincronizações manuais ────────────
-    ultimo_sync_str = cfg.get("ultimo_sync_at")
-    if ultimo_sync_str:
-        try:
-            from datetime import timezone as _tz_spam
-
-            ultimo_dt = datetime.fromisoformat(ultimo_sync_str)
-            if ultimo_dt.tzinfo is None:
-                ultimo_dt = ultimo_dt.replace(tzinfo=_tz_spam.utc)
-            segundos = (now_dt - ultimo_dt).total_seconds()
-            min_segundos = 20 * 60
-            if segundos < min_segundos:
-                faltam_min = int((min_segundos - segundos) / 60) + 1
-                raise HTTPException(
-                    status_code=429,
-                    detail=(
-                        f"Uma sincronizacao foi executada ha {int(segundos)} segundos. "
-                        f"Aguarde cerca de {faltam_min} minuto(s) antes de tentar novamente."
-                    ),
-                )
-        except HTTPException:
-            raise
-        except Exception:
-            pass
+    # Respeita a proxima janela tambem no fluxo manual. Repetir o mesmo
+    # ultNSU antes da hora pode provocar cStat 656.
+    proximo_dt = proximo_sync_permitido(cfg)
+    if proximo_dt is not None and now_dt < proximo_dt:
+        faltam = int((proximo_dt - now_dt).total_seconds() / 60) + 1
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"Proxima consulta SEFAZ permitida em ~{faltam} minuto(s). "
+                "Aguarde antes de sincronizar novamente."
+            ),
+        )
 
     # ── Verificar configuração ────────────────────────────────────────────────
     status = SefazService.status_configuracao(cfg)
@@ -337,8 +404,6 @@ def sync_now(
 
     # ── Executar via coordinator ──────────────────────────────────────────────
     # Garante exclusividade: scheduler e sync-now nunca chamam SEFAZ ao mesmo tempo.
-    from app.services.sefaz_sync_coordinator import sefaz_coordinator
-
     config_path = SefazTenantConfigService._config_path(tenant_id)
     result = sefaz_coordinator.try_sync(
         tenant_id_str=str(tenant_id),
@@ -359,6 +424,15 @@ def sync_now(
             status_code=409,
             detail="Sincronizacao SEFAZ ja esta em execucao. Aguarde alguns instantes.",
         )
+
+    if r_status == "cooldown":
+        raise HTTPException(
+            status_code=429,
+            detail="Aguarde o proximo horario de consulta SEFAZ antes de sincronizar.",
+        )
+
+    if r_status == "disabled":
+        raise HTTPException(status_code=422, detail=result.get("mensagem"))
 
     if r_status == "erro_656":
         raise HTTPException(
@@ -385,7 +459,7 @@ def sync_now(
         "proximo_permitido_at": result.get(
             "proximo_permitido_at", cfg.get("_proximo_sync_permitido_at")
         ),
-        "max_nsu": result.get("ultimo_nsu", ""),
+        "max_nsu": result.get("max_nsu", ""),
         "c_stat": None,
         "x_motivo": None,
     }
@@ -397,111 +471,141 @@ def get_nsu_status(
     db: Session = Depends(get_db),
 ):
     """
-    Retorna o ultimo_nsu armazenado e o maxNSU atual da SEFAZ,
-    permitindo ver quantos documentos ainda faltam ser alcançados.
+    Retorna o checkpoint e o ultimo maxNSU observado em uma sincronizacao.
+    Nao faz chamada extra a SEFAZ; a distancia entre NSUs nao e contagem de NFs.
     """
     _, tenant_id = auth
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
     cfg = SefazTenantConfigService.merged_config(tenant_id, tenant)
 
     ultimo_nsu = cfg.get("ultimo_nsu", "000000000000000")
+    max_nsu_observado = cfg.get("ultimo_max_nsu_confirmado")
+    if not max_nsu_observado and cfg.get("ultimo_sync_status") == "ok":
+        max_nsu_observado = cfg.get("ultimo_sync_max_nsu_retorno")
+    if max_nsu_observado == "000000000000000":
+        max_nsu_observado = None
 
     return {
         "ultimo_nsu": ultimo_nsu,
-        "max_nsu_sefaz": None,
+        "max_nsu_sefaz": max_nsu_observado,
         "gap_documentos": None,
         "documentos_por_lote": 50,
-        "lotes_restantes": 0,
-        "atualizado": False,
+        "lotes_restantes": None,
+        "atualizado": bool(max_nsu_observado),
+        "ultimo_sync_at": cfg.get("ultimo_sync_at"),
+        "ultimo_sync_status": cfg.get("ultimo_sync_status", "nunca"),
+        "ultimo_sync_cstat": cfg.get("ultimo_sync_cstat"),
+        "proximo_sync_permitido_at": (
+            proximo_sync_permitido(cfg).isoformat()
+            if proximo_sync_permitido(cfg)
+            else None
+        ),
         "erro": None,
     }
 
 
-class ResetNsuRequest(BaseModel):
-    nsu: str = "000000000000000"
+@router.get("/documentos")
+def listar_documentos_distribuidos(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(30, ge=1, le=100),
+    status: Optional[str] = None,
+    tipos: Optional[str] = None,
+    auth=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_db),
+):
+    """Lista metadados dos documentos recebidos, sem expor o XML armazenado."""
+    _, tenant_id = auth
+    consulta = db.query(SefazDocumentoDistribuido).filter(
+        SefazDocumentoDistribuido.tenant_id == str(tenant_id)
+    )
+    if status:
+        consulta = consulta.filter(SefazDocumentoDistribuido.status == status)
+    if tipos:
+        tipos_solicitados = [item.strip() for item in tipos.split(",") if item.strip()]
+        tipos_permitidos = {"resNFe", "procNFe", "evento", "outro"}
+        if not tipos_solicitados or any(
+            item not in tipos_permitidos for item in tipos_solicitados
+        ):
+            raise HTTPException(status_code=422, detail="Tipo de documento inválido.")
+        consulta = consulta.filter(
+            SefazDocumentoDistribuido.tipo.in_(tipos_solicitados)
+        )
+
+    total = consulta.count()
+    documentos = (
+        consulta.order_by(
+            SefazDocumentoDistribuido.nsu.desc(),
+            SefazDocumentoDistribuido.id.desc(),
+        )
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    campos = (
+        "id",
+        "nsu",
+        "schema",
+        "tipo",
+        "chave_acesso",
+        "emitente_cnpj",
+        "emitente_nome",
+        "numero_nota",
+        "data_emissao",
+        "valor_total",
+        "status",
+        "nota_entrada_id",
+        "processado_em",
+        "created_at",
+        "updated_at",
+    )
+    return {
+        "items": [
+            {
+                **{campo: getattr(doc, campo) for campo in campos},
+                "erro_mensagem": (
+                    "Falha ao processar o XML salvo; nova tentativa será feita automaticamente."
+                    if doc.status == "erro_processamento"
+                    else None
+                ),
+            }
+            for doc in documentos
+        ],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
 
 
 @router.post("/reset-nsu")
 def reset_nsu(
-    payload: ResetNsuRequest,
     auth=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_db),
+    _permission=Depends(can_configure_sefaz),
 ):
-    """
-    Redefine o ultimo_nsu para o valor informado.
-    Use '000000000000000' para reiniciar do zero (busca todas as NFs disponíveis).
-    Use um valor específico para começar de um ponto determinado.
-    ATENÇÃO: notas já importadas não serão duplicadas pois há verificação por chave de acesso.
-    """
-    nsu = payload.nsu.strip().zfill(15)
-    if not nsu.isdigit() or len(nsu) != 15:
-        raise HTTPException(
-            status_code=422, detail="NSU deve ter 15 dígitos numéricos."
-        )
-
-    _, tenant_id = auth
-    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
-    cfg = SefazTenantConfigService.merged_config(tenant_id, tenant)
-
-    nsu_anterior = cfg.get("ultimo_nsu", "000000000000000")
-    cfg["ultimo_nsu"] = nsu
-    cfg["ultimo_sync_status"] = "nunca"
-    cfg["ultimo_sync_mensagem"] = (
-        f"NSU redefinido de {nsu_anterior} para {nsu}. Próxima sincronização buscará a partir deste ponto."
+    """Alterações manuais do cursor exigem procedimento auditado fora da API."""
+    raise HTTPException(
+        status_code=409,
+        detail=(
+            "A redefinição manual do NSU foi desativada para evitar perda de NF-e "
+            "ou bloqueio por consumo indevido."
+        ),
     )
-    SefazTenantConfigService.save_config(tenant_id, cfg)
-
-    return {
-        "ok": True,
-        "nsu_anterior": nsu_anterior,
-        "novo_nsu": nsu,
-        "mensagem": f"NSU redefinido. O próximo ciclo de sincronização buscará documentos a partir do NSU {nsu}.",
-    }
 
 
 @router.post("/pular-para-hoje")
 def pular_para_hoje(
     auth=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_db),
+    _permission=Depends(can_configure_sefaz),
 ):
-    """
-    Marca a configuração para pular documentos antigos na próxima sincronização.
-    Na próxima janela disponível (após o cooldown atual), o sistema avança o NSU
-    para o ponto atual da SEFAZ sem importar nenhum documento antigo.
-    Útil quando o CNPJ ficou muito atrás no NSU e há risco de cStat 656.
-    """
-    _, tenant_id = auth
-    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
-    cfg = SefazTenantConfigService.merged_config(tenant_id, tenant)
-
-    cfg["comecar_do_hoje"] = True
-    SefazTenantConfigService.save_config(tenant_id, cfg)
-
-    proximo_str = cfg.get("_proximo_sync_permitido_at")
-    aviso_cooldown = ""
-    if proximo_str and cfg.get("_sync_bloqueado_656"):
-        try:
-            from datetime import timezone as _tz
-
-            proximo_dt = __import__("datetime").datetime.fromisoformat(proximo_str)
-            if proximo_dt.tzinfo is None:
-                proximo_dt = proximo_dt.replace(tzinfo=_tz.utc)
-            from datetime import datetime as _dt
-
-            faltam = int((_dt.now(_tz.utc) - proximo_dt).total_seconds() / -60) + 1
-            if faltam > 0:
-                aviso_cooldown = f" O sistema está em cooldown por ~{faltam} minuto(s) — o pulo será executado automaticamente após esse período."
-        except Exception:
-            pass
-
-    return {
-        "ok": True,
-        "mensagem": (
-            "Configurado com sucesso. Na próxima sincronização disponível, "
-            "documentos antigos serão ignorados e o sistema começará do ponto atual da SEFAZ."
-            + aviso_cooldown
+    """Bloqueia avanço artificial do NSU, que poderia ocultar notas ainda não salvas."""
+    raise HTTPException(
+        status_code=409,
+        detail=(
+            "Não é seguro pular para o NSU atual: isso pode deixar NF-e fora do sistema. "
+            "Use a sincronização sequencial para importar os documentos disponíveis."
         ),
-    }
+    )
 
 
 @router.post("/sync-diagnostico")
@@ -509,235 +613,16 @@ def sync_diagnostico(
     max_lotes: int = 5,
     auth=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_db),
+    _permission=Depends(can_configure_sefaz),
 ):
     """
-    Busca documentos da SEFAZ em lote (até max_lotes chamadas de 50 docs cada)
-    e retorna diagnóstico detalhado: tipo de cada documento, o que foi importado,
-    pulado (duplicado), descartado (NF de saída) ou ignorado (só resumo resNFe).
-
-    Útil para entender por que poucos documentos foram importados numa sincronização.
-    NÃO avança o ultimo_nsu globalmente — apenas lê e relata.
+    Endpoint legado desativado. Ele fazia novas consultas e modificava o NSU,
+    apesar de se apresentar como diagnostico somente de leitura.
     """
-    from datetime import datetime, timezone
-    import time as _time
-
-    _, tenant_id = auth
-    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
-    cfg = SefazTenantConfigService.merged_config(tenant_id, tenant)
-    status_cfg = SefazService.status_configuracao(cfg)
-
-    # Bloquear se em penalidade 656
-    now_dt = datetime.now(timezone.utc)
-    proximo_str = cfg.get("_proximo_sync_permitido_at")
-    if proximo_str and cfg.get("_sync_bloqueado_656"):
-        try:
-            proximo_dt = datetime.fromisoformat(proximo_str)
-            if proximo_dt.tzinfo is None:
-                proximo_dt = proximo_dt.replace(tzinfo=timezone.utc)
-            if now_dt < proximo_dt:
-                faltam = int((proximo_dt - now_dt).total_seconds() / 60) + 1
-                raise HTTPException(
-                    status_code=429,
-                    detail=(
-                        f"SEFAZ em cooldown por bloqueio (cStat 656). "
-                        f"Aguarde ~{faltam} minuto(s) antes de executar o diagnóstico."
-                    ),
-                )
-        except HTTPException:
-            raise
-        except Exception:
-            pass
-
-    if not status_cfg.enabled or cfg.get("modo") != "real":
-        raise HTTPException(
-            status_code=422,
-            detail="SEFAZ precisa estar habilitado e em modo real para executar o diagnóstico.",
-        )
-    if not status_cfg.cert_ok:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Certificado não está válido: {status_cfg.mensagem}",
-        )
-
-    from app.notas_entrada_routes import importar_docs_sefaz
-
-    tenant_cnpj = "".join(c for c in str(cfg.get("cnpj", "")) if c.isdigit())
-
-    nsu_atual = cfg.get("ultimo_nsu", "000000000000000")
-    lotes_executados = 0
-    relatorio_docs: list[dict] = []
-    total_importadas = 0
-    total_duplicadas = 0
-    total_saidas = 0
-    total_resumos = 0
-    total_erros = 0
-    novo_ultimo_nsu = nsu_atual
-    max_nsu_global = nsu_atual
-
-    for _ in range(max(1, min(max_lotes, 20))):  # Limite de segurança: máx 20 lotes
-        try:
-            resultado = SefazService.sincronizar_nsu(config=cfg, ultimo_nsu=nsu_atual)
-        except HTTPException as exc:
-            relatorio_docs.append(
-                {
-                    "lote": lotes_executados + 1,
-                    "erro": str(exc.detail),
-                    "nsu_inicio": nsu_atual,
-                }
-            )
-            total_erros += 1
-            break
-
-        lotes_executados += 1
-        docs = resultado.get("docs_list", [])
-        novo_ultimo_nsu = resultado.get("ultimo_nsu", nsu_atual)
-        max_nsu_global = resultado.get("max_nsu", novo_ultimo_nsu)
-
-        for doc in docs:
-            nsu = doc.get("nsu", "?")
-            schema = doc.get("schema", "")
-            xml_str = doc.get("xml", "")
-
-            entry: dict = {
-                "nsu": nsu,
-                "schema": schema,
-                "tipo": "",
-                "resultado": "",
-                "chave": None,
-                "fornecedor": None,
-                "numero_nf": None,
-                "valor_total": None,
-            }
-
-            # Resumo apenas (sem XML completo)
-            if "procNFe" not in schema and "nfeProc" not in xml_str[:200]:
-                entry["tipo"] = "resNFe (resumo)"
-                entry["resultado"] = (
-                    "ignorado — sem XML completo, não é possível importar itens"
-                )
-
-                # Tentar extrair info básica do resNFe para ajudar no diagnóstico
-                try:
-                    import xml.etree.ElementTree as _ET
-
-                    _root = _ET.fromstring(xml_str)
-
-                    def _txt(tag):
-                        for el in _root.iter():
-                            if el.tag.split("}")[-1] == tag:
-                                return el.text
-                        return None
-
-                    entry["chave"] = _txt("chNFe")
-                    entry["fornecedor"] = _txt("xNome")
-                    entry["numero_nf"] = _txt("nNF")
-                    v = _txt("vNF")
-                    entry["valor_total"] = float(v) if v else None
-                except Exception:
-                    pass
-
-                total_resumos += 1
-                relatorio_docs.append(entry)
-                continue
-
-            # NF-e completa — tentar parsear
-            try:
-                from app.notas_entrada_routes import parse_nfe_xml
-
-                dados = parse_nfe_xml(xml_str)
-            except Exception as exc_parse:
-                entry["tipo"] = "procNFe"
-                entry["resultado"] = f"erro_parse — {exc_parse}"
-                total_erros += 1
-                relatorio_docs.append(entry)
-                continue
-
-            entry["tipo"] = "procNFe (completa)"
-            entry["chave"] = dados.get("chave_acesso")
-            entry["fornecedor"] = dados.get("fornecedor_nome")
-            entry["numero_nf"] = dados.get("numero_nota")
-            entry["valor_total"] = dados.get("valor_total")
-
-            # Verificar NF de saída
-            cnpj_emit = "".join(
-                c for c in str(dados.get("fornecedor_cnpj", "")) if c.isdigit()
-            )
-            if tenant_cnpj and cnpj_emit == tenant_cnpj:
-                entry["resultado"] = (
-                    "descartada — NF de saída (emitida pela própria empresa)"
-                )
-                total_saidas += 1
-                relatorio_docs.append(entry)
-                continue
-
-            # Verificar duplicata
-            chave = dados.get("chave_acesso", "")
-            if chave:
-                existente = (
-                    db.query(NotaEntrada)
-                    .filter(NotaEntrada.chave_acesso == chave)
-                    .first()
-                )
-                if existente:
-                    entry["resultado"] = (
-                        f"duplicada — já existe no sistema (id={existente.id}, status={existente.status})"
-                    )
-                    total_duplicadas += 1
-                    relatorio_docs.append(entry)
-                    continue
-
-            entry["resultado"] = "importada com sucesso"
-            total_importadas += 1
-            relatorio_docs.append(entry)
-
-        # Importar de verdade os documentos deste lote
-        if docs:
-            try:
-                importar_docs_sefaz(docs, str(tenant_id), db)
-            except Exception as exc_import:
-                relatorio_docs.append({"erro_importacao_lote": str(exc_import)})
-
-        # Avança NSU para próximo lote
-        nsu_atual = novo_ultimo_nsu
-
-        # Se não há mais documentos novos, para
-        if novo_ultimo_nsu >= max_nsu_global or not docs:
-            break
-
-        # Pausa entre lotes para evitar bloqueio 656 da SEFAZ
-        _time.sleep(15)
-
-    # Atualiza o ultimo_nsu na config se avançou
-    if novo_ultimo_nsu != cfg.get("ultimo_nsu"):
-        cfg["ultimo_nsu"] = novo_ultimo_nsu
-        cfg["ultimo_sync_at"] = datetime.now(timezone.utc).isoformat()
-        cfg["ultimo_sync_status"] = "ok"
-        cfg["ultimo_sync_mensagem"] = (
-            f"Diagnóstico em lote: {total_importadas} importada(s), "
-            f"{total_duplicadas} duplicada(s), {total_resumos} resumo(s) ignorado(s), "
-            f"{total_saidas} NF(s) de saída descartada(s)."
-        )
-        SefazTenantConfigService.save_config(tenant_id, cfg)
-
-    return {
-        "ok": True,
-        "lotes_executados": lotes_executados,
-        "nsu_inicio": cfg.get("ultimo_nsu", "000000000000000"),
-        "novo_ultimo_nsu": novo_ultimo_nsu,
-        "max_nsu_sefaz": max_nsu_global,
-        "ha_mais_documentos": novo_ultimo_nsu < max_nsu_global,
-        "resumo": {
-            "total_documentos_analisados": len(relatorio_docs),
-            "importadas": total_importadas,
-            "duplicadas": total_duplicadas,
-            "resumos_sem_xml": total_resumos,
-            "nfs_de_saida_descartadas": total_saidas,
-            "erros": total_erros,
-        },
-        "explicacao": (
-            "resNFe = resumo enviado pela SEFAZ sem XML completo. "
-            "O XML completo (procNFe) chega depois, quando o emitente transmite a NF. "
-            "Execute o diagnóstico novamente para buscar os XMLs completos que ainda não chegaram."
+    raise HTTPException(
+        status_code=409,
+        detail=(
+            "O diagnóstico em lote foi desativado para proteger o NSU. "
+            "Consulte /sefaz/config ou /sefaz/nsu-status para ver o último estado salvo."
         ),
-        "documentos": relatorio_docs,
-    }
+    )

@@ -195,6 +195,30 @@ def test_sincronizar_nsu_cstat_656_retorna_excecao_com_nsu(
     assert exc.value.max_nsu == "000000000001240"
 
 
+def test_consulta_por_chave_classifica_cstat_656(monkeypatch):
+    monkeypatch.setattr(
+        SefazService,
+        "_post_soap_dist_dfe",
+        classmethod(lambda cls, cfg, xml: "<xml />"),
+    )
+    monkeypatch.setattr(
+        SefazService,
+        "_parse_retorno_dist_dfe",
+        classmethod(
+            lambda cls, soap: {
+                "c_stat": "656",
+                "x_motivo": "Consumo indevido",
+                "ult_nsu": "000000000000000",
+                "max_nsu": "000000000000000",
+                "docs": [],
+            }
+        ),
+    )
+
+    with pytest.raises(SefazConsumoIndevidoError):
+        SefazService._consultar_por_chave_real("1" * 44, _config_real_base())
+
+
 def test_falha_cloudflare_na_sefaz_retorna_mensagem_operacional() -> None:
     raw_msg = (
         "The origin web server returned an invalid or incomplete response to Cloudflare. "
@@ -227,3 +251,20 @@ def test_parse_nfe_documento_rejeita_xml_com_entidade_interna() -> None:
     """
 
     assert SefazService._parse_nfe_documento(xml) is None
+
+
+def test_doczip_corrompido_falha_lote_sem_expor_conteudo() -> None:
+    resposta = (
+        "<retDistDFeInt><cStat>138</cStat>"
+        "<ultNSU>000000000000010</ultNSU><maxNSU>000000000000010</maxNSU>"
+        '<docZip NSU="000000000000010" schema="procNFe_v4.00.xsd">'
+        "conteudo-invalido"
+        "</docZip></retDistDFeInt>"
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        SefazService._parse_retorno_dist_dfe(resposta)
+
+    assert exc.value.status_code == 502
+    assert "documento inválido" in exc.value.detail
+    assert "conteudo-invalido" not in exc.value.detail

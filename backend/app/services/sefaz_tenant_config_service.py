@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import secrets
+import tempfile
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -21,6 +23,9 @@ class SefazTenantConfigService:
     def _tenant_dir(cls, tenant_id: UUID) -> Path:
         tenant_dir = cls.BASE_DIR / str(tenant_id)
         tenant_dir.mkdir(parents=True, exist_ok=True)
+        if os.name != "nt":
+            cls.BASE_DIR.chmod(0o700)
+            tenant_dir.chmod(0o700)
         return tenant_dir
 
     @classmethod
@@ -43,10 +48,31 @@ class SefazTenantConfigService:
     @classmethod
     def save_config(cls, tenant_id: UUID, config: dict[str, Any]) -> dict[str, Any]:
         path = cls._config_path(tenant_id)
-        path.write_text(
-            json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8"
+        cls._secure_write(
+            path, json.dumps(config, ensure_ascii=False, indent=2).encode("utf-8")
         )
         return config
+
+    @staticmethod
+    def _secure_write(path: Path, content: bytes) -> None:
+        """Substitui configuração atomicamente, restrita ao usuário do processo."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if os.name != "nt":
+            path.parent.chmod(0o700)
+        fd, temp_name = tempfile.mkstemp(prefix=".sefaz-", dir=path.parent)
+        try:
+            if os.name != "nt":
+                os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "wb") as arquivo:
+                arquivo.write(content)
+                arquivo.flush()
+                os.fsync(arquivo.fileno())
+            os.replace(temp_name, path)
+            if os.name != "nt":
+                path.chmod(0o600)
+        finally:
+            if os.path.exists(temp_name):
+                os.unlink(temp_name)
 
     @staticmethod
     def sanitize_cnpj(cnpj: str | None) -> str:
@@ -75,7 +101,11 @@ class SefazTenantConfigService:
 
         cert_name = f"cert_{secrets.token_hex(8)}.pfx"
         cert_path = cls._tenant_dir(tenant_id) / cert_name
-        cert_path.write_bytes(content)
+        fd = os.open(cert_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as arquivo:
+            arquivo.write(content)
+        if os.name != "nt":
+            cert_path.chmod(0o600)
         return str(cert_path)
 
     @classmethod
