@@ -2,7 +2,10 @@ import {
   Award,
   Cake,
   CalendarCheck,
+  CalendarPlus,
   CheckCircle2,
+  Circle,
+  Clock,
   Dna,
   Droplet,
   Hash,
@@ -14,7 +17,6 @@ import {
   ScanLine,
   Tag,
   UserRound,
-  XCircle,
 } from "lucide-react";
 import { formatarIdadeMeses } from "../../helpers/idadeHelper";
 import PetDetalhesInfoField from "./PetDetalhesInfoField";
@@ -36,11 +38,13 @@ function ResumoClinicoCard({ children, title, tone }) {
 
 function SecaoCampos({ children, titulo }) {
   return (
-    <div>
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+    <div className="p-5">
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
         {titulo}
       </h3>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{children}</div>
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-4">
+        {children}
+      </dl>
     </div>
   );
 }
@@ -56,7 +60,19 @@ export default function PetDetalhesGeralTab({ pet, ultimaAlta, ultimaVacina }) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-900 mb-4">Informações Gerais</h2>
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1">
+        <h2 className="text-xl font-bold text-gray-900">Informações Gerais</h2>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+          <span className="inline-flex items-center gap-1.5">
+            <CalendarPlus className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" />
+            Cadastrado em {formatarData(pet.created_at)}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" />
+            Atualizado em {formatarData(pet.updated_at)}
+          </span>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <ResumoClinicoCard title="Última vacina" tone="blue">
@@ -97,7 +113,7 @@ export default function PetDetalhesGeralTab({ pet, ultimaAlta, ultimaVacina }) {
         </ResumoClinicoCard>
       </div>
 
-      <div className="space-y-5">
+      <div className="divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white">
         <SecaoCampos titulo="Identificação">
           <PetDetalhesInfoField icon={PawPrint} label="Nome" value={pet.nome} />
           <PetDetalhesInfoField icon={Hash} label="Código" mono value={pet.codigo} />
@@ -113,15 +129,17 @@ export default function PetDetalhesGeralTab({ pet, ultimaAlta, ultimaVacina }) {
           <PetDetalhesInfoField icon={Ruler} label="Porte" value={pet.porte} />
           <PetDetalhesInfoField icon={Palette} label="Cor/Pelagem" value={pet.cor} />
           <PetDetalhesInfoField
-            icon={pet.castrado ? CheckCircle2 : XCircle}
+            icon={pet.castrado ? CheckCircle2 : Circle}
             label="Castrado"
             value={pet.castrado ? "Sim" : "Não"}
           />
-          <PetDetalhesInfoField
-            icon={CalendarCheck}
-            label="Data da castração"
-            value={formatarData(pet.castrado_data)}
-          />
+          {pet.castrado && (
+            <PetDetalhesInfoField
+              icon={CalendarCheck}
+              label="Data da castração"
+              value={formatarData(pet.castrado_data)}
+            />
+          )}
         </SecaoCampos>
 
         <SecaoCampos titulo="Outras informações">
@@ -129,18 +147,15 @@ export default function PetDetalhesGeralTab({ pet, ultimaAlta, ultimaVacina }) {
           <PetDetalhesInfoField icon={Droplet} label="Tipo sanguíneo" value={pet.tipo_sanguineo} />
           <PetDetalhesInfoField icon={Award} label="Pedigree" value={pet.pedigree_registro} />
         </SecaoCampos>
-      </div>
 
-      {pet.observacoes && (
-        <div>
-          <p className="text-sm font-medium text-gray-700 mb-1">Observações</p>
-          <p className="text-gray-900 bg-gray-50 p-3 rounded-lg">{pet.observacoes}</p>
-        </div>
-      )}
-
-      <div className="pt-4 border-t border-gray-200 text-sm text-gray-500">
-        <p>Cadastrado em: {formatarData(pet.created_at)}</p>
-        <p>Última atualização: {formatarData(pet.updated_at)}</p>
+        {pet.observacoes && (
+          <div className="p-5">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Observações
+            </h3>
+            <p className="text-sm text-gray-900">{pet.observacoes}</p>
+          </div>
+        )}
       </div>
     </div>
   );
