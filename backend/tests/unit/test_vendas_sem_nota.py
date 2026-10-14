@@ -11,9 +11,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.caixa_models import Caixa  # noqa: F401 - registra a FK de Venda
-from app.financeiro_models import (
-    ContaReceber,
-)  # noqa: F401 - registra a relação de Venda
+from app.financeiro_models import ContaReceber  # noqa: F401
 from app.models import Cliente
 from app.produtos_models import Produto  # noqa: F401 - registra a relação de VendaItem
 from app.nfe.vendas_sem_nota_routes import listar_vendas_sem_nota
