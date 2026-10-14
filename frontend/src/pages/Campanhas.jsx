@@ -64,7 +64,8 @@ export default function Campanhas() {
     }
   }, [location.pathname, location.search, setAba]);
 
-  const campanhasGestor = useCampanhasGestor();
+  const clienteCodigoInicial = new URLSearchParams(location.search).get("cliente_codigo");
+  const campanhasGestor = useCampanhasGestor({ clienteCodigoInicial });
   const campanhasGestao = useCampanhasGestao({
     setCampanhas,
     carregarCampanhas,

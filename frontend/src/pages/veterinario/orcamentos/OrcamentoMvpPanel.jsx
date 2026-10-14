@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Calculator, Plus, Save, Trash2 } from "lucide-react";
+import { Calculator, FileDown, FileSpreadsheet, Plus, Save, Trash2 } from "lucide-react";
 
 import ProdutoEstoqueAutocomplete from "../../../components/veterinario/ProdutoEstoqueAutocomplete";
 import { formatMoneyBRL, formatPercent } from "../../../utils/formatters";
 import { vetApi } from "../vetApi";
+import { downloadBlob } from "../extratos/extratoUtils";
+import { baixarOrcamentoExcel } from "./orcamentoExcel";
 import {
   calcularTotaisOrcamento,
   criarItemCatalogoOrcamento,
@@ -24,6 +26,7 @@ export default function OrcamentoMvpPanel({
   titulo = "Orçamento",
 }) {
   const [orcamentoId, setOrcamentoId] = useState(null);
+  const [orcamentoSalvo, setOrcamentoSalvo] = useState(null);
   const [itens, setItens] = useState([]);
   const [catalogoId, setCatalogoId] = useState("");
   const [quantidadeCatalogo, setQuantidadeCatalogo] = useState("1");
@@ -34,6 +37,8 @@ export default function OrcamentoMvpPanel({
   const [diariaPreco, setDiariaPreco] = useState("");
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [gerandoExcel, setGerandoExcel] = useState(false);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
   const chaveContexto = `${contexto?.consultaId || ""}:${contexto?.internacaoId || ""}:${contexto?.petId || ""}`;
@@ -41,6 +46,7 @@ export default function OrcamentoMvpPanel({
   useEffect(() => {
     if (!contexto?.consultaId && !contexto?.internacaoId) {
       setOrcamentoId(null);
+      setOrcamentoSalvo(null);
       setItens([]);
       return;
     }
@@ -50,14 +56,20 @@ export default function OrcamentoMvpPanel({
       setCarregando(true);
       setFeedback(null);
       try {
-        const params = contexto?.consultaId
-          ? { consulta_id: contexto.consultaId }
-          : { internacao_id: contexto.internacaoId };
+        const params = contexto?.internacaoId
+          ? { internacao_id: contexto.internacaoId }
+          : { consulta_id: contexto.consultaId };
         const response = await vetApi.listarOrcamentos(params);
         const lista = Array.isArray(response.data) ? response.data : [];
-        const atual = lista.find((item) => item.status === "rascunho") || lista[0];
+        const orcamentosDoContexto = contexto?.internacaoId
+          ? lista.filter((item) => String(item.internacao_id) === String(contexto.internacaoId))
+          : lista.filter((item) => !item.internacao_id);
+        const atual =
+          orcamentosDoContexto.find((item) => item.status === "rascunho") ||
+          orcamentosDoContexto[0];
         if (!ativo) return;
         setOrcamentoId(atual?.id ?? null);
+        setOrcamentoSalvo(atual ?? null);
         setItens(Array.isArray(atual?.itens) ? atual.itens : []);
         if (atual?.previsao_dias_internacao) {
           setDiasInternacao(String(atual.previsao_dias_internacao));
@@ -76,6 +88,11 @@ export default function OrcamentoMvpPanel({
   }, [chaveContexto, contexto?.consultaId, contexto?.internacaoId]);
 
   const totais = useMemo(() => calcularTotaisOrcamento(itens), [itens]);
+  const alteracoesPendentes =
+    orcamentoSalvo && JSON.stringify(itens) !== JSON.stringify(orcamentoSalvo.itens || []);
+  const podeExportar = Boolean(
+    orcamentoSalvo?.id && orcamentoSalvo.itens?.length && !alteracoesPendentes,
+  );
   const catalogoSelecionado = procedimentosCatalogo.find(
     (item) => String(item.id) === String(catalogoId),
   );
@@ -146,9 +163,19 @@ export default function OrcamentoMvpPanel({
       const response = orcamentoId
         ? await vetApi.atualizarOrcamento(orcamentoId, payload)
         : await vetApi.criarOrcamento(payload);
-      setOrcamentoId(response.data?.id ?? orcamentoId);
-      setItens(Array.isArray(response.data?.itens) ? response.data.itens : itens);
-      setFeedback({ tipo: "sucesso", texto: "Orçamento salvo." });
+      const salvo = {
+        ...payload,
+        ...response.data,
+        id: response.data?.id ?? orcamentoId,
+        itens: Array.isArray(response.data?.itens) ? response.data.itens : itens,
+      };
+      setOrcamentoId(salvo.id);
+      setOrcamentoSalvo(salvo);
+      setItens(salvo.itens);
+      setFeedback({
+        tipo: "sucesso",
+        texto: `Orçamento #${salvo.id} salvo nesta ${contexto?.internacaoId ? "internação" : "consulta"}.`,
+      });
     } catch (error) {
       setFeedback({
         tipo: "erro",
@@ -156,6 +183,33 @@ export default function OrcamentoMvpPanel({
       });
     } finally {
       setSalvando(false);
+    }
+  };
+
+  const exportarExcel = async () => {
+    if (!podeExportar) return;
+    setGerandoExcel(true);
+    setFeedback(null);
+    try {
+      await baixarOrcamentoExcel(orcamentoSalvo);
+    } catch {
+      setFeedback({ tipo: "erro", texto: "Não foi possível gerar o Excel do orçamento." });
+    } finally {
+      setGerandoExcel(false);
+    }
+  };
+
+  const exportarPdf = async () => {
+    if (!podeExportar) return;
+    setGerandoPdf(true);
+    setFeedback(null);
+    try {
+      const response = await vetApi.baixarOrcamentoPdf(orcamentoSalvo.id);
+      downloadBlob(response.data, `orcamento_veterinario_${orcamentoSalvo.id}.pdf`);
+    } catch {
+      setFeedback({ tipo: "erro", texto: "Não foi possível gerar o PDF do orçamento." });
+    } finally {
+      setGerandoPdf(false);
     }
   };
 
@@ -173,16 +227,52 @@ export default function OrcamentoMvpPanel({
             {formatPercent(totais.margem_percentual)})
           </p>
         </div>
-        <button
-          type="button"
-          onClick={salvarOrcamento}
-          disabled={!podeSalvar || salvando || carregando}
-          className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-        >
-          <Save size={15} />
-          {salvando ? "Salvando..." : "Salvar"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={salvarOrcamento}
+            disabled={!podeSalvar || salvando || carregando}
+            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+          >
+            <Save size={15} />
+            {salvando ? "Salvando..." : "Salvar orçamento"}
+          </button>
+          <button
+            type="button"
+            onClick={exportarPdf}
+            disabled={!podeExportar || salvando || gerandoPdf || carregando}
+            title={
+              alteracoesPendentes
+                ? "Salve as alterações antes de baixar o PDF"
+                : "PDF com valores para compartilhar com o tutor"
+            }
+            className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <FileDown size={15} />
+            {gerandoPdf ? "Gerando..." : "PDF para o tutor"}
+          </button>
+          <button
+            type="button"
+            onClick={exportarExcel}
+            disabled={!podeExportar || salvando || gerandoExcel || carregando}
+            title={alteracoesPendentes ? "Salve as alterações antes de baixar o Excel" : ""}
+            className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <FileSpreadsheet size={15} />
+            {gerandoExcel ? "Gerando..." : "Excel interno"}
+          </button>
+        </div>
       </div>
+
+      <p className="mt-2 text-xs text-gray-500">
+        {orcamentoSalvo?.id
+          ? `Orçamento #${orcamentoSalvo.id} salvo nesta ${contexto?.internacaoId ? `internação #${contexto.internacaoId}` : `consulta #${contexto?.consultaId}`}. Ao reabrir, ele aparece aqui.`
+          : "Ainda não há orçamento salvo. Adicione os itens e clique em Salvar orçamento."}
+        {alteracoesPendentes && " Salve as alterações para atualizar os arquivos."}
+        {orcamentoSalvo?.id &&
+          !orcamentoSalvo.itens?.length &&
+          " Adicione itens para gerar PDF e Excel."}
+      </p>
 
       {feedback && (
         <p

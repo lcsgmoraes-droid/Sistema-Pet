@@ -19,10 +19,11 @@ import {
   montarObservacoesComJustificativaMargem,
   montarPagamentoRecebido,
   montarVendaParaPersistirComCupom,
+  obterTotalRecebidoExistente,
   persistirVendaAbertaParaPagamento,
   validarPagamentoParaAdicionar,
 } from "../modalPagamentoUtils";
-import { confirmarCorePet } from "../../services/corepetDialog";
+import { confirmarCorePet, perguntarCorePet } from "../../services/corepetDialog";
 
 export function useModalPagamentoActions({
   bandeira,
@@ -33,6 +34,9 @@ export function useModalPagamentoActions({
   justificativaTexto,
   margemCriticaAtual,
   moduloFiscalAtivo,
+  emissaoAutomatica,
+  naoGerarBeneficios,
+  justificativaBeneficios,
   nsuCartao,
   numeroParcelas,
   onConfirmar,
@@ -53,6 +57,7 @@ export function useModalPagamentoActions({
   setLoading,
   setMostrarModalCreditoExcedente,
   setMostrarPerguntaNFe,
+  setAutoEmitirTipo,
   setNsuCartao,
   setNumeroParcelas,
   setOperadoraSelecionada,
@@ -168,7 +173,7 @@ export function useModalPagamentoActions({
 
       const response = await api.get(`/vendas/${venda.id}/pagamentos`);
       setPagamentosExistentes(response.data.pagamentos || []);
-      setTotalPagoExistente(response.data.total_pago || 0);
+      setTotalPagoExistente(obterTotalRecebidoExistente(response.data));
 
       if (response.data.pagamentos.length === 0 && onVendaAtualizada) {
         await onVendaAtualizada();
@@ -244,10 +249,38 @@ export function useModalPagamentoActions({
       }
 
       const vendaId = await salvarVendaAbertaParaPagamento();
-      const resultado = await finalizarVenda(vendaId, pagamentos, {
+      const opcoesFinalizacao = {
         cupom_code: cupomParaFinalizar?.code || null,
         cupom_discount_applied: cupomParaFinalizar?.discount_applied ?? null,
-      });
+        nao_gerar_beneficios: naoGerarBeneficios,
+        justificativa_nao_gerar_beneficios: naoGerarBeneficios
+          ? justificativaBeneficios.trim()
+          : null,
+      };
+      let resultado;
+      try {
+        resultado = await finalizarVenda(vendaId, pagamentos, opcoesFinalizacao);
+      } catch (erroBloqueio) {
+        const detalhe = erroBloqueio.response?.data?.detail;
+        if (
+          erroBloqueio.response?.status !== 409 ||
+          typeof detalhe !== "string" ||
+          !detalhe.startsWith("Venda bloqueada:")
+        ) {
+          throw erroBloqueio;
+        }
+        const motivo = await perguntarCorePet({
+          titulo: "Liberar venda bloqueada",
+          mensagem: `${detalhe}\n\nUm administrador ou usuário autorizado em Administração > Usuários pode liberar esta venda. Informe o motivo:`,
+          placeholder: "Motivo da liberação (mínimo de 10 caracteres)",
+          confirmarTexto: "Liberar esta venda",
+        });
+        if (motivo === null) throw erroBloqueio;
+        resultado = await finalizarVenda(vendaId, pagamentos, {
+          ...opcoesFinalizacao,
+          motivo_liberacao_crediario: motivo.trim(),
+        });
+      }
 
       const tiposPorFormaId = new Map(
         pagamentos
@@ -274,6 +307,11 @@ export function useModalPagamentoActions({
       });
 
       if (!moduloFiscalAtivo || devePerguntarNotaFiscal(resultado)) {
+        setAutoEmitirTipo(
+          moduloFiscalAtivo && emissaoAutomatica?.ativa && devePerguntarNotaFiscal(resultado)
+            ? emissaoAutomatica.tipo
+            : null,
+        );
         setMostrarPerguntaNFe(true);
       } else {
         onConfirmar();
@@ -286,7 +324,7 @@ export function useModalPagamentoActions({
     }
   };
 
-  const emitirNFe = async (tipoNota) => {
+  const emitirNFe = async (tipoNota, { automatico = false } = {}) => {
     setLoading(true);
     setErro("");
 
@@ -294,22 +332,27 @@ export function useModalPagamentoActions({
       const resultado = await emitirNotaFiscalAssistida({
         vendaId: vendaFinalizadaId,
         tipoNota,
+        semInteracao: automatico,
       });
 
       if (resultado?.cancelado) return;
 
       const transmissao = resultado?.data?.transmissao;
       if (resultado?.data?.processando) {
-        globalThis.alert(
-          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} recebida pelo emissor e ainda em processamento. Consulte novamente em Notas Fiscais.`,
-        );
-        onConfirmar();
+        if (!automatico) {
+          globalThis.alert(
+            `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} recebida pelo emissor e ainda em processamento. Consulte novamente em Notas Fiscais.`,
+          );
+          onConfirmar();
+        }
         return { autorizada: false, processando: true, data: resultado.data };
       } else if (transmissao?.success === false) {
-        globalThis.alert(
-          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} criada, mas a transmissão não foi concluída automaticamente.\n\n${transmissao.erro || ""}`.trim(),
-        );
-        onConfirmar();
+        if (!automatico) {
+          globalThis.alert(
+            `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} criada, mas a transmissão não foi concluída automaticamente.\n\n${transmissao.erro || ""}`.trim(),
+          );
+          onConfirmar();
+        }
         return { autorizada: false, processando: true, data: resultado.data };
       }
       return {
@@ -321,6 +364,10 @@ export function useModalPagamentoActions({
     } catch (error) {
       console.error("Erro ao emitir nota:", error);
       const mensagem = extrairMensagemNFe(error);
+      if (automatico) {
+        setErro(`A emissão automática não foi concluída: ${mensagem}`);
+        return;
+      }
       const recuperacao = error?.recuperacaoNFe;
       if (recuperacao) {
         setErro(mensagem);

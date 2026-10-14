@@ -99,25 +99,39 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
     elements.append(Paragraph("RESUMO FINANCEIRO", style_heading))
 
     saldo_inicial = float(caixa_data.get("saldo_inicial", 0))
-    total_entradas = float(caixa_data.get("total_entradas", 0))
-    total_saidas = float(caixa_data.get("total_saidas", 0))
-    saldo_final = float(caixa_data.get("saldo_final", 0))
+    totais = caixa_data.get("totais", {})
+    saldo_final = float(totais.get("saldo_atual", 0))
     saldo_declarado = (
         float(caixa_data.get("saldo_fechamento", 0))
-        if caixa_data.get("saldo_fechamento")
+        if caixa_data.get("saldo_fechamento") is not None
         else None
     )
     diferenca = (
-        float(caixa_data.get("diferenca", 0)) if caixa_data.get("diferenca") else None
+        float(caixa_data.get("diferenca", 0))
+        if caixa_data.get("diferenca") is not None
+        else None
     )
 
     resumo_data = [
         ["DESCRIÇÃO", "VALOR"],
-        ["Saldo Inicial", formatar_moeda(saldo_inicial)],
-        ["Total de Entradas", formatar_moeda(total_entradas)],
-        ["Total de Saídas", formatar_moeda(total_saidas)],
-        ["Saldo Final (Calculado)", formatar_moeda(saldo_final)],
+        ["Abertura do caixa", formatar_moeda(saldo_inicial)],
+        ["Total vendido no caixa", formatar_moeda(caixa_data.get("total_vendido"))],
+        ["Total recebido no caixa", formatar_moeda(caixa_data.get("total_recebido"))],
+        ["Vendas recebidas em dinheiro", formatar_moeda(totais.get("vendas"))],
+        ["Suprimentos (entradas avulsas)", formatar_moeda(totais.get("suprimentos"))],
+        [
+            "Total de entradas em dinheiro",
+            formatar_moeda(
+                float(totais.get("vendas", 0)) + float(totais.get("suprimentos", 0))
+            ),
+        ],
+        ["Sangrias", formatar_moeda(totais.get("sangrias"))],
+        ["Despesas", formatar_moeda(totais.get("despesas"))],
+        ["Devoluções", formatar_moeda(totais.get("devolucoes"))],
+        ["Transferências", formatar_moeda(totais.get("transferencias"))],
+        ["Saldo esperado em dinheiro", formatar_moeda(saldo_final)],
     ]
+    saldo_row = len(resumo_data) - 1
 
     if saldo_declarado is not None:
         resumo_data.append(
@@ -150,9 +164,11 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
         ),
     ]
 
-    # Destacar saldo final
-    table_style.append(("BACKGROUND", (0, 4), (-1, 4), colors.HexColor("#dbeafe")))
-    table_style.append(("FONTNAME", (0, 4), (-1, 4), "Helvetica-Bold"))
+    # Destacar saldo esperado
+    table_style.append(
+        ("BACKGROUND", (0, saldo_row), (-1, saldo_row), colors.HexColor("#dbeafe"))
+    )
+    table_style.append(("FONTNAME", (0, saldo_row), (-1, saldo_row), "Helvetica-Bold"))
 
     # Destacar diferença se houver
     if diferenca is not None:
@@ -191,6 +207,43 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
     elements.append(resumo_table)
     elements.append(Spacer(1, 1 * cm))
 
+    elements.append(Paragraph("PAGAMENTOS POR FORMA", style_heading))
+    formas_data = [["FORMA", "VALOR"]]
+    for forma, dados in sorted(
+        caixa_data.get("vendas_por_forma_pagamento", {}).items()
+    ):
+        prazo = forma.strip().casefold() in {"crediario", "crediário", "boleto"}
+        formas_data.append(
+            [
+                f"{forma} (a prazo)" if prazo else forma,
+                formatar_moeda(dados.get("total")),
+            ]
+        )
+    if len(formas_data) == 1:
+        formas_data.append(["Nenhum recebimento", formatar_moeda(0)])
+    formas_table = Table(formas_data, colWidths=[12 * cm, 5 * cm])
+    formas_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e40af")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ]
+        )
+    )
+    elements.append(formas_table)
+    elements.append(Spacer(1, 0.5 * cm))
+    elements.append(
+        Paragraph(
+            "Vendido e recebido são indicadores separados. Formas a prazo não entram no recebido. Suprimentos e abertura não são vendas.",
+            style_normal,
+        )
+    )
+
     # ===== MOVIMENTAÇÕES DETALHADAS =====
     if movimentacoes and len(movimentacoes) > 0:
         elements.append(Paragraph("MOVIMENTAÇÕES DETALHADAS", style_heading))
@@ -201,9 +254,16 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
         # Adicionar movimentações
         for mov in movimentacoes:
             data_hora = formatar_datetime(mov.get("created_at"))
-            tipo = "ENTRADA" if mov.get("tipo") == "entrada" else "SAÍDA"
-            descricao = mov.get("descricao", "")[:40]  # Limitar tamanho
-            forma_pgto = mov.get("forma_pagamento_nome", "-")
+            tipo = {
+                "venda": "VENDA",
+                "suprimento": "SUPRIMENTO",
+                "sangria": "SANGRIA",
+                "despesa": "DESPESA",
+                "transferencia": "TRANSFERÊNCIA",
+                "devolucao": "DEVOLUÇÃO",
+            }.get(mov.get("tipo"), str(mov.get("tipo") or "OUTRO").upper())
+            descricao = str(mov.get("descricao") or "")[:40]
+            forma_pgto = mov.get("forma_pagamento_nome") or "-"
             valor = mov.get("valor", 0)
 
             # Cores por tipo
@@ -240,7 +300,7 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
 
         # Colorir tipos de movimentação
         for i, mov in enumerate(movimentacoes, start=1):
-            if mov.get("tipo") == "entrada":
+            if mov.get("tipo") in {"venda", "suprimento", "entrada"}:
                 mov_style.append(
                     ("TEXTCOLOR", (1, i), (1, i), colors.HexColor("#166534"))
                 )

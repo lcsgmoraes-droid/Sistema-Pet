@@ -27,6 +27,15 @@ def _texto_normalizado(valor: Any) -> str:
     )
 
 
+def pagamento_valido_para_saldo(pagamento: Any) -> bool:
+    return _texto_normalizado(_campo(pagamento, "status")) not in {
+        "estornado",
+        "recusado",
+        "cancelado",
+        "cancelada",
+    }
+
+
 def _eh_pagamento_crediario(pagamento: Any) -> bool:
     forma = _texto_normalizado(_campo(pagamento, "forma_pagamento"))
     return forma == "crediario" or bool(_campo(pagamento, "intervalo_crediario"))
@@ -83,14 +92,19 @@ def calcular_resumo_pagamento_venda(
 
     total_venda = max(_dinheiro(total), Decimal("0.00"))
     contas = list(contas_receber or [])
-    pagamentos_lista = list(pagamentos or [])
+    pagamentos_registrados = list(pagamentos or [])
+    pagamentos_lista = [
+        pagamento
+        for pagamento in pagamentos_registrados
+        if pagamento_valido_para_saldo(pagamento)
+    ]
     pagamentos_crediario = [
         pagamento
         for pagamento in pagamentos_lista
         if _eh_pagamento_crediario(pagamento)
     ]
 
-    if pagamentos_lista:
+    if pagamentos_registrados:
         valor_pagamentos_imediatos = sum(
             (
                 max(_dinheiro(_campo(pagamento, "valor", 0)), Decimal("0.00"))
@@ -116,16 +130,17 @@ def calcular_resumo_pagamento_venda(
                 _valor_recebido_contas(contas_crediario), total_crediario
             )
 
-        valor_pago = min(
-            valor_pagamentos_imediatos + valor_crediario_recebido,
-            total_venda,
-        )
+        total_recebido = valor_pagamentos_imediatos + valor_crediario_recebido
     elif contas:
         # Compatibilidade com vendas antigas que possuem contas, mas nao tem o
         # registro da forma escolhida no PDV.
-        valor_pago = min(_valor_recebido_contas(contas), total_venda)
+        total_recebido = _valor_recebido_contas(contas)
     else:
-        valor_pago = Decimal("0.00")
+        total_recebido = Decimal("0.00")
+
+    # O status continua limitado ao total da venda. Na reabertura, o PDV precisa
+    # do recebido real para comparar com o novo total, antes de salvar a edicao.
+    valor_pago = min(total_recebido, total_venda)
 
     if valor_pago >= total_venda - CENTAVOS:
         status = "pago"
@@ -136,6 +151,7 @@ def calcular_resumo_pagamento_venda(
 
     return {
         "valor_pago": valor_pago,
+        "total_recebido": total_recebido,
         "valor_restante": max(total_venda - valor_pago, Decimal("0.00")),
         "status_pagamento": status,
     }

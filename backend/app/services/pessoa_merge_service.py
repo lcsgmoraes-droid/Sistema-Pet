@@ -172,6 +172,7 @@ def _obter_pessoas(
             Cliente.tenant_id == tenant_id,
             Cliente.id.in_([principal_id, duplicado_id]),
         )
+        .populate_existing()
         .with_for_update()
         .all()
     )

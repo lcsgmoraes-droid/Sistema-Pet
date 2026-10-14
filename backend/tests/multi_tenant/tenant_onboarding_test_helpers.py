@@ -4,6 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import app.db  # noqa: F401 - registra hooks multitenant
+import app.produtos_models  # noqa: F401 - completa o registro ORM para teste isolado
 
 
 TENANT_A = "11111111-1111-1111-1111-111111111111"
@@ -14,9 +15,9 @@ BASE_EXPECTED_COUNTS = {
     "pet_species": 2,
     "pet_breeds": 2,
     "dre_categories": 12,
-    "dre_subcategories": 38,
+    "dre_subcategories": 37,
     "financial_categories": 27,
-    "expense_types": 19,
+    "expense_types": 17,
     "product_departments": 1,
     "product_categories": 2,
     "ration_lines": 4,

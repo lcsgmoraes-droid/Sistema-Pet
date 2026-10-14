@@ -45,9 +45,7 @@ export default function useProdutosNovoPageComposition({
   } = kitState;
   const {
     entradaData,
-    handleEditarLote,
     handleEntradaEstoque,
-    handleExcluirLote,
     handleSalvarEdicaoLote,
     loteEmEdicao,
     lotes,
@@ -85,6 +83,9 @@ export default function useProdutosNovoPageComposition({
     sucessorInfo,
   } = predecessorState;
   const {
+    produtosOrigemGranel,
+    setProdutosOrigemGranel,
+    granelVinculos,
     handleApresentacaoPesoChange,
     handleClassificacaoRacaoChange,
     handleCriarOpcaoRacao,
@@ -188,11 +189,9 @@ export default function useProdutosNovoPageComposition({
     formatarData,
     formatarMoeda,
     handleChange,
-    handleEditarLote,
-    handleExcluirLote,
     isEdicao,
     lotes,
-    setModalEntrada,
+    salvando,
   };
 
   const fornecedoresTabProps = {
@@ -222,6 +221,9 @@ export default function useProdutosNovoPageComposition({
 
   const racaoTabProps = {
     formData,
+    produtosOrigemGranel,
+    setProdutosOrigemGranel,
+    granelVinculos,
     handleChange,
     handleApresentacaoPesoChange,
     handleClassificacaoRacaoChange,

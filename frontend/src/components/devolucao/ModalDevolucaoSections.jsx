@@ -3,6 +3,9 @@ import CustomerIdentity from "../ui/CustomerIdentity";
 import ProductIdentity from "../ui/ProductIdentity";
 import SaleReference from "../ui/SaleReference";
 import { formatMoneyBRL } from "../../utils/formatters";
+import { quantidadeDisponivelDevolucao } from "../../utils/pdvReturnBalance";
+import { criarRecuperacaoDevolucao } from "../../utils/pdvReturnRecovery";
+import DevolucaoRecoveryAlert from "./DevolucaoRecoveryAlert";
 
 function getVendaStatusDevolucaoInfo(status) {
   if (status === "finalizada") {
@@ -21,8 +24,9 @@ function getVendaStatusDevolucaoInfo(status) {
 }
 
 export default function ModalDevolucaoSections({
-  calcularTotalDevolucao,
+  calcularValorBrutoSelecionado,
   componentesSelecionados,
+  devolverNaOrigem,
   erro,
   filtros,
   formatarDataVenda,
@@ -37,11 +41,17 @@ export default function ModalDevolucaoSections({
   modoDevolucaoKit,
   motivo,
   onClose,
+  onRecuperar,
   passo,
+  possuiPagamentoBeneficio,
+  previaRestituicao,
   quantidades,
+  saldosItens,
   quantidadesComponentes,
+  recuperacao,
   selecionarVenda,
   setErro,
+  setDevolverNaOrigem,
   setFiltros,
   setGerarCredito,
   setItensSelecionados,
@@ -54,6 +64,9 @@ export default function ModalDevolucaoSections({
   vendaSelecionada,
   vendas,
 }) {
+  const orientacaoErro =
+    recuperacao || criarRecuperacaoDevolucao(erro, { venda: vendaSelecionada, passo });
+
   return (
     <>
       {/* Content */}
@@ -143,7 +156,7 @@ export default function ModalDevolucaoSections({
                         </div>
                         <div className="text-right">
                           <div className="text-lg font-bold text-green-600">
-                            R$ {venda.total.toFixed(2)}
+                            {formatMoneyBRL(venda.total)}
                           </div>
                           <div className={`text-xs mt-1 px-2 py-1 rounded ${statusInfo.className}`}>
                             {statusInfo.label}
@@ -156,12 +169,11 @@ export default function ModalDevolucaoSections({
               </div>
             )}
 
-            {erro && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
-                <AlertCircle className="w-5 h-5" />
-                <span>{erro}</span>
-              </div>
-            )}
+            <DevolucaoRecoveryAlert
+              recuperacao={orientacaoErro}
+              loading={loading}
+              onRecuperar={onRecuperar}
+            />
           </div>
         )}
 
@@ -194,19 +206,23 @@ export default function ModalDevolucaoSections({
                 <div>
                   <span className="text-gray-600">Total:</span>
                   <span className="ml-2 font-medium text-green-600">
-                    R$ {vendaSelecionada.total.toFixed(2)}
+                    {formatMoneyBRL(vendaSelecionada.total)}
                   </span>
                 </div>
               </div>
             </div>
 
             {/* Lista de Itens */}
-            <div>
+            <div id="devolucao-itens" tabIndex={-1}>
               <h3 className="font-semibold text-gray-900 mb-3">Itens da Venda</h3>
               <div className="space-y-2">
                 {vendaSelecionada.itens.map((item) => {
                   const isKit = isItemKit(item);
+                  const isKitVirtual =
+                    item.tipo_produto === "KIT" && (item.tipo_kit || "VIRTUAL") !== "FISICO";
                   const modoKit = modoDevolucaoKit[item.id];
+                  const quantidadeDisponivel = quantidadeDisponivelDevolucao(saldosItens, item.id);
+                  const quantidadeDevolvida = saldosItens[item.id]?.quantidade_devolvida || 0;
 
                   return (
                     <div
@@ -222,6 +238,7 @@ export default function ModalDevolucaoSections({
                           type="checkbox"
                           checked={itensSelecionados[item.id] || false}
                           onChange={() => toggleItem(item.id)}
+                          disabled={isKitVirtual || quantidadeDisponivel <= 0}
                           className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                         />
 
@@ -240,9 +257,26 @@ export default function ModalDevolucaoSections({
                             )}
                           </ProductIdentity>
                           <div className="text-sm text-gray-600">
-                            Preço unitário: R$ {item.preco_unitario.toFixed(2)} | Qtd vendida:{" "}
-                            {item.quantidade}
+                            Preço unitário: {formatMoneyBRL(item.preco_unitario)} | Qtd vendida:{" "}
+                            {item.quantidade} | Já devolvida: {quantidadeDevolvida} | Disponível:{" "}
+                            {quantidadeDisponivel}
                           </div>
+                          {isKitVirtual && (
+                            <div className="mt-2 text-sm text-amber-700">
+                              <p>
+                                KIT virtual: a devolução exige conciliação manual dos componentes e
+                                do estoque.
+                              </p>
+                              <a
+                                href="/produtos"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-2 inline-flex rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold hover:bg-amber-50"
+                              >
+                                Abrir estoque e componentes
+                              </a>
+                            </div>
+                          )}
 
                           {/* 🆕 ESCOLHA: KIT INTEIRO OU COMPONENTES */}
                           {itensSelecionados[item.id] && isKit && (
@@ -271,20 +305,21 @@ export default function ModalDevolucaoSections({
                                   </div>
                                 </label>
 
-                                <label className="flex items-start gap-3 cursor-pointer group">
+                                <label className="flex items-start gap-3 opacity-60">
                                   <input
                                     type="radio"
                                     name={`modo-kit-${item.id}`}
                                     checked={modoKit === "componentes"}
-                                    onChange={() => handleEscolhaModoKit(item.id, "componentes")}
+                                    disabled
                                     className="mt-1 w-4 h-4 text-purple-600 focus:ring-2 focus:ring-purple-500"
                                   />
                                   <div className="flex-1">
-                                    <div className="font-medium text-gray-800 group-hover:text-purple-700 transition-colors">
-                                      🧩 Selecionar Componentes
+                                    <div className="font-medium text-gray-800">
+                                      🧩 Selecionar Componentes (indisponível)
                                     </div>
                                     <p className="text-xs text-gray-600 mt-1">
-                                      Escolha quais componentes do KIT devolver
+                                      A venda não registra o preço original de cada componente.
+                                      Devolva o KIT inteiro.
                                     </p>
                                   </div>
                                 </label>
@@ -302,14 +337,14 @@ export default function ModalDevolucaoSections({
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                max={item.quantidade}
+                                max={quantidadeDisponivel}
                                 value={quantidades[item.id]}
                                 onChange={(e) => handleQuantidadeChange(item.id, e.target.value)}
                                 className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                               />
                               <span className="text-sm text-gray-600">
-                                Subtotal: R${" "}
-                                {(item.preco_unitario * (quantidades[item.id] || 0)).toFixed(2)}
+                                Subtotal:{" "}
+                                {formatMoneyBRL(item.preco_unitario * (quantidades[item.id] || 0))}
                               </span>
                             </div>
                           )}
@@ -324,14 +359,14 @@ export default function ModalDevolucaoSections({
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                max={item.quantidade}
+                                max={quantidadeDisponivel}
                                 value={quantidades[item.id]}
                                 onChange={(e) => handleQuantidadeChange(item.id, e.target.value)}
                                 className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                               />
                               <span className="text-sm text-gray-600">
-                                Subtotal: R${" "}
-                                {(item.preco_unitario * (quantidades[item.id] || 0)).toFixed(2)}
+                                Subtotal:{" "}
+                                {formatMoneyBRL(item.preco_unitario * (quantidades[item.id] || 0))}
                               </span>
                             </div>
                           )}
@@ -420,10 +455,14 @@ export default function ModalDevolucaoSections({
 
             {/* Motivo */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="devolucao-motivo"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Motivo da Devolução *
               </label>
               <textarea
+                id="devolucao-motivo"
                 value={motivo}
                 onChange={(e) => setMotivo(e.target.value)}
                 placeholder="Descreva o motivo da devolução..."
@@ -432,10 +471,54 @@ export default function ModalDevolucaoSections({
               />
             </div>
 
+            {possuiPagamentoBeneficio && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-blue-900">
+                <p className="text-sm font-semibold">
+                  Esta venda usou cashback ou crédito do cliente.
+                </p>
+                <p className="mt-1 text-sm">
+                  O cashback deve voltar ao saldo de cashback e o crédito ao saldo de crédito.
+                  Apenas o restante pode ser devolvido em dinheiro ou novo crédito.
+                </p>
+                <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(devolverNaOrigem)}
+                    disabled={loading}
+                    onChange={(event) => {
+                      setDevolverNaOrigem(event.target.checked);
+                      setErro("");
+                    }}
+                    className="mt-0.5 h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
+                  />
+                  Devolver aos saldos originais
+                </label>
+                {devolverNaOrigem && previaRestituicao && (
+                  <div className="mt-3 space-y-1 text-sm">
+                    <p>
+                      Cashback: {formatMoneyBRL(previaRestituicao.cashback)} · Crédito original:{" "}
+                      {formatMoneyBRL(previaRestituicao.credito_cliente)}
+                    </p>
+                    <p>
+                      Restante em {gerarCredito ? "crédito" : "dinheiro"}:{" "}
+                      {formatMoneyBRL(previaRestituicao.valor_restante)}
+                    </p>
+                    {Number(previaRestituicao.cashback_expirado) > 0 && (
+                      <p>
+                        Do cashback restituído,{" "}
+                        {formatMoneyBRL(previaRestituicao.cashback_expirado)} já expirou e não fica
+                        disponível para novas compras.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Opção de Crédito ou Dinheiro */}
             <div className="bg-gradient-to-br from-purple-50 to-blue-50 border-2 border-purple-200 rounded-lg p-5">
               <label className="block text-sm font-bold text-gray-800 mb-3">
-                💳 Tipo de Devolução
+                💳 {devolverNaOrigem ? "Destino do valor restante" : "Tipo de Devolução"}
               </label>
               <div className="space-y-3">
                 <label className="flex items-start gap-3 cursor-pointer group">
@@ -447,10 +530,14 @@ export default function ModalDevolucaoSections({
                   />
                   <div className="flex-1">
                     <div className="font-semibold text-gray-800 group-hover:text-green-700 transition-colors">
-                      💵 Devolver em Dinheiro
+                      💵{" "}
+                      {devolverNaOrigem
+                        ? "Devolver o restante em Dinheiro"
+                        : "Devolver em Dinheiro"}
                     </div>
                     <p className="text-xs text-gray-600 mt-1">
-                      O valor será devolvido em dinheiro e registrado como saída de caixa
+                      {devolverNaOrigem ? "O valor restante" : "O valor"} será devolvido em dinheiro
+                      e registrado como saída de caixa
                     </p>
                   </div>
                 </label>
@@ -464,17 +551,20 @@ export default function ModalDevolucaoSections({
                   />
                   <div className="flex-1">
                     <div className="font-semibold text-gray-800 group-hover:text-purple-700 transition-colors">
-                      🎁 Gerar Crédito para o Cliente
+                      🎁{" "}
+                      {devolverNaOrigem
+                        ? "Gerar Crédito do restante para o Cliente"
+                        : "Gerar Crédito para o Cliente"}
                     </div>
                     <p className="text-xs text-gray-600 mt-1">
-                      O valor será convertido em crédito para uso em futuras compras (sem
-                      movimentação de caixa)
+                      {devolverNaOrigem ? "O valor restante" : "O valor"} será convertido em crédito
+                      para uso em futuras compras (sem movimentação de caixa)
                     </p>
                   </div>
                 </label>
               </div>
 
-              {gerarCredito && !vendaSelecionada?.cliente_id && (
+              {gerarCredito && !vendaSelecionada?.cliente_id && !vendaSelecionada?.cliente?.id && (
                 <div className="mt-3 p-3 bg-yellow-50 border border-yellow-300 rounded-lg">
                   <p className="text-xs text-yellow-800 flex items-center gap-2">
                     <AlertCircle className="w-4 h-4" />
@@ -483,19 +573,33 @@ export default function ModalDevolucaoSections({
                       crédito, é necessário ter um cliente cadastrado.
                     </span>
                   </p>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => {
+                      setGerarCredito(false);
+                      setErro("");
+                    }}
+                    className="mt-3 rounded-lg border border-yellow-300 bg-white px-3 py-2 text-sm font-semibold text-yellow-900 hover:bg-yellow-100 disabled:opacity-50"
+                  >
+                    Devolver em dinheiro
+                  </button>
                 </div>
               )}
             </div>
 
-            {/* Total */}
+            {/* O valor líquido exato será mostrado antes da confirmação. */}
             <div
               className={`border-2 rounded-lg p-4 ${gerarCredito ? "bg-purple-50 border-purple-300" : "bg-orange-50 border-orange-200"}`}
             >
               <div className="flex justify-between items-center">
                 <div>
                   <span className="text-lg font-semibold text-gray-900">
-                    {gerarCredito ? "Crédito a Gerar:" : "Total da Devolução:"}
+                    Valor bruto selecionado:
                   </span>
+                  <p className="text-xs text-gray-600 mt-1">
+                    A prévia líquida com os descontos será exibida antes de confirmar.
+                  </p>
                   {gerarCredito && vendaSelecionada?.cliente && (
                     <p className="text-xs text-gray-600 mt-1">
                       <CustomerIdentity
@@ -510,17 +614,16 @@ export default function ModalDevolucaoSections({
                 <span
                   className={`text-2xl font-bold ${gerarCredito ? "text-purple-600" : "text-orange-600"}`}
                 >
-                  {formatMoneyBRL(calcularTotalDevolucao())}
+                  {formatMoneyBRL(calcularValorBrutoSelecionado())}
                 </span>
               </div>
             </div>
 
-            {erro && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
-                <AlertCircle className="w-5 h-5" />
-                <span>{erro}</span>
-              </div>
-            )}
+            <DevolucaoRecoveryAlert
+              recuperacao={orientacaoErro}
+              loading={loading}
+              onRecuperar={onRecuperar}
+            />
           </div>
         )}
       </div>

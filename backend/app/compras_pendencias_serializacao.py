@@ -1,5 +1,6 @@
 """Persistencia auxiliar e serializacao das pendencias de compras."""
 
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
@@ -11,6 +12,13 @@ from .compras_pendencias_models import (
     CompraPendenciaFornecedorItem,
 )
 from .compras_pendencias_utils import _normalizar_texto, _round_quantity
+
+
+def _iso_utc(valor: Optional[datetime]) -> Optional[str]:
+    if valor is None:
+        return None
+    # Os campos de auditoria sao gravados em UTC sem tzinfo no banco.
+    return (valor if valor.tzinfo else valor.replace(tzinfo=timezone.utc)).isoformat()
 
 
 def _adicionar_historico(
@@ -76,7 +84,7 @@ def _serializar_historico(item: CompraPendenciaFornecedorHistorico) -> Dict[str,
         "observacao": item.observacao,
         "status_anterior": item.status_anterior,
         "status_novo": item.status_novo,
-        "created_at": item.created_at.isoformat() if item.created_at else None,
+        "created_at": _iso_utc(item.created_at),
         "usuario": getattr(usuario, "nome", None) or getattr(usuario, "email", None),
     }
 
@@ -142,22 +150,12 @@ def _serializar_pendencia(
         "email_destinatario": pendencia.email_destinatario,
         "email_assunto": pendencia.email_assunto,
         "email_mensagem": pendencia.email_mensagem,
-        "email_enviado_em": pendencia.email_enviado_em.isoformat()
-        if pendencia.email_enviado_em
-        else None,
-        "pdf_gerado_em": pendencia.pdf_gerado_em.isoformat()
-        if pendencia.pdf_gerado_em
-        else None,
-        "resolvida_em": pendencia.resolvida_em.isoformat()
-        if pendencia.resolvida_em
-        else None,
+        "email_enviado_em": _iso_utc(pendencia.email_enviado_em),
+        "pdf_gerado_em": _iso_utc(pendencia.pdf_gerado_em),
+        "resolvida_em": _iso_utc(pendencia.resolvida_em),
         "resolucao_observacao": pendencia.resolucao_observacao,
-        "created_at": pendencia.created_at.isoformat()
-        if pendencia.created_at
-        else None,
-        "updated_at": pendencia.updated_at.isoformat()
-        if pendencia.updated_at
-        else None,
+        "created_at": _iso_utc(pendencia.created_at),
+        "updated_at": _iso_utc(pendencia.updated_at),
     }
     if incluir_itens:
         dados["itens"] = [_serializar_item(item) for item in itens]

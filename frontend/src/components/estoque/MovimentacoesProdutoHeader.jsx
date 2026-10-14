@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   Boxes,
+  CalendarDays,
   ExternalLink,
   Info,
   PackageOpen,
@@ -133,6 +134,7 @@ export default function MovimentacoesProdutoHeader({
   onFracionarClinica,
   onForcarSyncProduto,
   onIncluirLancamento,
+  onLotesValidade,
   onLancarGranel,
   onVoltarProdutos,
   podeFracionarClinica,
@@ -232,6 +234,20 @@ export default function MovimentacoesProdutoHeader({
                       onClick={onIncluirLancamento}
                     >
                       Incluir lancamento
+                    </ActionButton>
+
+                    <ActionButton
+                      disabled={
+                        produto?.tipo_produto === "PAI" ||
+                        produto?.controlar_estoque === false ||
+                        (produto?.tipo_produto === "KIT" && produto?.tipo_kit === "VIRTUAL")
+                      }
+                      icon={CalendarDays}
+                      intent="info"
+                      tone="soft"
+                      onClick={onLotesValidade}
+                    >
+                      Lotes e validade
                     </ActionButton>
 
                     {podeLancarGranel ? (

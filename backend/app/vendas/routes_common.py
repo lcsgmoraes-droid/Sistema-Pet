@@ -28,9 +28,14 @@ def _obter_venda_ou_404(db: Session, venda_id: int, tenant_id: str):
     return venda
 
 
-def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
+def _obter_cliente_ou_404(
+    db: Session, cliente_id: int, tenant_id: str, *, bloquear_credito: bool = False
+):
     """Busca cliente com validação de tenant e retorna 404 se não encontrado."""
-    cliente = db.query(Cliente).filter_by(id=cliente_id, tenant_id=tenant_id).first()
+    consulta = db.query(Cliente).filter_by(id=cliente_id, tenant_id=tenant_id)
+    if bloquear_credito:
+        consulta = consulta.populate_existing().with_for_update()
+    cliente = consulta.first()
 
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente não encontrado")

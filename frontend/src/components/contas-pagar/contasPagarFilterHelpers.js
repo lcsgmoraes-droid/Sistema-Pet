@@ -217,3 +217,9 @@ export function calcularValorFinalPagamentoContasPagar(dados = {}) {
     (Number(dados.valor_desconto) || 0)
   );
 }
+
+export function calcularSaldoRestanteContasPagar(conta = {}) {
+  const totalCentavos = Math.round(Number(conta.valor_final || 0) * 100);
+  const pagoCentavos = Math.round(Number(conta.valor_pago || 0) * 100);
+  return (totalCentavos - pagoCentavos) / 100;
+}

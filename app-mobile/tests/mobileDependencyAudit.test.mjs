@@ -84,3 +84,24 @@ test("só aceita o alerta de node-forge quando o backport foi verificado", () =>
     [],
   );
 });
+
+test("aceita braces somente na cadeia de build do Metro sem importacao pelo app", () => {
+  const report = {
+    vulnerabilities: {
+      braces: {
+        severity: "high",
+        via: [{ url: "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm" }],
+      },
+      micromatch: { severity: "high", via: ["braces"] },
+      "metro-file-map": { severity: "high", via: ["micromatch"] },
+    },
+  };
+  const safe = { metroOnlyBracesChain: true, sourceImportsBuildGlobs: false };
+
+  assert.deepEqual(evaluateAudit(report).ignored, []);
+  assert.deepEqual(evaluateAudit(report, safe).blocked, []);
+  assert.deepEqual(
+    evaluateAudit(report, { ...safe, sourceImportsBuildGlobs: true }).ignored,
+    [],
+  );
+});

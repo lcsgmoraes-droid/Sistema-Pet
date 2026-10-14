@@ -130,6 +130,26 @@ def _produto_search_exact_conditions(termo_busca: Optional[str]):
     return or_(*conditions)
 
 
+def _scale_code_variants(codigo_balanca: str) -> tuple[str, ...]:
+    """Representacoes de um codigo da balanca com zeros a esquerda opcionais."""
+    if len(codigo_balanca) != 6 or not codigo_balanca.isdigit():
+        raise ValueError("O codigo da balanca deve ter seis digitos")
+    zeros_iniciais = min(6 - len(codigo_balanca.lstrip("0")), 5)
+    return tuple(codigo_balanca[indice:] for indice in range(zeros_iniciais + 1))
+
+
+def _produto_search_scale_code_conditions(codigo_balanca: str):
+    """Busca somente codigos iguais aos seis digitos da etiqueta, com zeros opcionais."""
+    variantes = _scale_code_variants(codigo_balanca)
+    conditions = [column.in_(variantes) for column in PRODUTO_CODIGO_EXATO_COLUMNS]
+    if PRODUTO_EAN_ALTERNATIVO_COLUMN is not None:
+        conditions.extend(
+            PRODUTO_EAN_ALTERNATIVO_COLUMN.ilike(f'%"{variante}"%')
+            for variante in variantes
+        )
+    return or_(*conditions)
+
+
 def _valores_codigo_produto(produto) -> list[str]:
     valores = [
         getattr(produto, "codigo", None),

@@ -2,7 +2,6 @@
 
 import logging
 from datetime import datetime
-from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -17,8 +16,7 @@ from app.services.venda_rentabilidade_snapshot_service import (
 from app.utils.logger import logger as struct_logger
 from app.vendas.comissoes import (
     _contar_comissoes_venda,
-    _listar_pagamentos_venda_para_comissao,
-    _parcelas_com_comissao_funcionario,
+    _gerar_comissoes_pendentes_venda,
     _remover_comissoes_venda,
 )
 from app.vendas.routes_common import (
@@ -134,7 +132,15 @@ def reabrir_venda(
     invalidate_venda_rentabilidade_snapshot(venda)
 
     from app.campaigns.coupon_service import reverse_coupon_redemptions_for_sale
+    from app.campaigns.cashback_sale_reversal import reverse_cashback_for_sale
     from app.campaigns.loyalty_service import void_loyalty_stamps_for_sale
+    from app.campaigns.sale_reopening_service import (
+        void_quick_repurchase_coupons_for_sale,
+    )
+    from app.vendas.cashback_financeiro import (
+        cancelar_despesas_cashback_venda,
+        remover_pagamentos_cashback_venda,
+    )
     from app.services.business_audit_service import (
         build_sale_reopened_metadata,
         log_business_event,
@@ -152,6 +158,18 @@ def reabrir_venda(
         tenant_id=tenant_id,
         venda_id=venda.id,
         reason="Venda reaberta para edicao",
+    )
+    void_quick_repurchase_coupons_for_sale(db, tenant_id=tenant_id, venda_id=venda.id)
+    remover_pagamentos_cashback_venda(db, tenant_id=tenant_id, venda_id=venda.id)
+    if venda.cliente_id:
+        reverse_cashback_for_sale(
+            db,
+            tenant_id=tenant_id,
+            sale_id=venda.id,
+            customer_id=venda.cliente_id,
+        )
+    cancelar_despesas_cashback_venda(
+        db, tenant_id=tenant_id, numero_venda=venda.numero_venda
     )
 
     log_business_event(
@@ -188,18 +206,30 @@ def reabrir_venda(
     return venda.to_dict()
 
 
-@router.patch("/{venda_id}/status")
+@router.patch(
+    "/{venda_id}/status",
+    responses={
+        400: {"description": "Status inválido ou reativação de venda cancelada"},
+        404: {"description": "Venda não encontrada"},
+    },
+)
 def atualizar_status_venda(
     venda_id: int,
     status_data: dict,
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Atualiza apenas o status da venda"""
+    """Atualiza status; o fechamento executa a finalização completa."""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     # Buscar a venda
-    venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
+    venda = (
+        db.query(Venda)
+        .filter_by(id=venda_id, tenant_id=tenant_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
 
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
@@ -210,6 +240,63 @@ def atualizar_status_venda(
         raise HTTPException(status_code=400, detail="Status não informado")
 
     status_anterior = venda.status
+    status_cashback_ativos = {"finalizada", "baixa_parcial", "pago_nf"}
+    if status_anterior == "cancelada" and novo_status in status_cashback_ativos:
+        raise HTTPException(
+            status_code=400,
+            detail="Venda cancelada não pode ser reativada como paga.",
+        )
+
+    if novo_status == "finalizada":
+        # Compatibilidade com clientes que restauram uma venda reaberta via
+        # PATCH: fechar precisa reaplicar cupons e benefícios, sem novo pagamento.
+        if status_anterior == "finalizada":
+            return {"success": True, "status": "finalizada"}
+        if venda.tem_entrega and not venda.entregador_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Entregador é obrigatório quando a venda tem entrega. Atribua um entregador antes de finalizar.",
+            )
+
+        from app.vendas import VendaService
+
+        resultado = VendaService.finalizar_venda(
+            venda_id=venda_id,
+            pagamentos=[],
+            user_id=current_user.id,
+            user_nome=getattr(current_user, "nome", None)
+            or getattr(current_user, "username", None)
+            or getattr(current_user, "email", None)
+            or "Usuário",
+            tenant_id=tenant_id,
+            cupom_code=venda.cupom_code,
+            cupom_discount_applied=venda.cupom_discount_applied,
+            nao_gerar_beneficios=bool(venda.nao_gerar_beneficios),
+            justificativa_nao_gerar_beneficios=venda.justificativa_nao_gerar_beneficios,
+            db=db,
+        )
+        venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
+        if venda.funcionario_id:
+            try:
+                _gerar_comissoes_pendentes_venda(
+                    db=db,
+                    venda=venda,
+                    tenant_id=tenant_id,
+                    trigger="status_change",
+                )
+            except Exception:
+                logger.exception("Erro ao gerar comissões da venda %s", venda_id)
+        db.commit()
+        log_action(
+            db=db,
+            user_id=current_user.id,
+            action="update",
+            entity_type="vendas",
+            entity_id=venda_id,
+            details=f"Status da venda #{venda_id} alterado: {status_anterior} → finalizada",
+        )
+        return {"success": True, "status": resultado["venda"]["status"]}
+
     venda.status = novo_status
     venda.updated_at = datetime.now()
 
@@ -221,15 +308,15 @@ def atualizar_status_venda(
             persist_if_missing=True,
             force_refresh=True,
         )
-    elif novo_status == "aberta":
-        invalidate_venda_rentabilidade_snapshot(venda)
-
-    if status_anterior in ["finalizada", "baixa_parcial"] and novo_status not in [
-        "finalizada",
-        "baixa_parcial",
-    ]:
+    if (
+        status_anterior in status_cashback_ativos
+        and novo_status not in status_cashback_ativos
+    ):
         from app.campaigns.coupon_service import reverse_coupon_redemptions_for_sale
         from app.campaigns.loyalty_service import void_loyalty_stamps_for_sale
+        from app.campaigns.sale_reopening_service import (
+            void_quick_repurchase_coupons_for_sale,
+        )
 
         reverse_coupon_redemptions_for_sale(
             db,
@@ -243,118 +330,29 @@ def atualizar_status_venda(
             venda_id=venda.id,
             reason=f"Status alterado para {novo_status}",
         )
-    # 🆕 GERAR COMISSÕES se estiver finalizando a venda (apenas se funcionário/veterinário foi selecionado)
-    if (
-        novo_status == "finalizada"
-        and status_anterior != "finalizada"
-        and venda.funcionario_id
-    ):
-        try:
-            from app.comissoes_service import gerar_comissoes_venda
-
-            struct_logger.info(
-                event="COMMISSION_START",
-                message=f"Gerando comissões via PATCH /status (status: {status_anterior} → {novo_status})",
-                venda_id=venda.id,
-                funcionario_id=venda.funcionario_id,
-                trigger="status_change",
+        if novo_status == "aberta":
+            void_quick_repurchase_coupons_for_sale(
+                db, tenant_id=tenant_id, venda_id=venda.id
             )
+    if novo_status not in status_cashback_ativos:
+        from app.campaigns.cashback_sale_reversal import reverse_cashback_for_sale
+        from app.vendas.cashback_financeiro import (
+            cancelar_despesas_cashback_venda,
+            remover_pagamentos_cashback_venda,
+        )
 
-            # 🔍 BUSCAR TODOS OS PAGAMENTOS DA VENDA
-            # Precisamos gerar comissões para TODOS os pagamentos que ainda não têm comissão
-            todos_pagamentos = _listar_pagamentos_venda_para_comissao(
-                db, venda.id, tenant_id
+        remover_pagamentos_cashback_venda(db, tenant_id=tenant_id, venda_id=venda.id)
+        if venda.cliente_id:
+            reverse_cashback_for_sale(
+                db,
+                tenant_id=tenant_id,
+                sale_id=venda.id,
+                customer_id=venda.cliente_id,
             )
-
-            if not todos_pagamentos:
-                logger.info("ℹ️  Nenhum pagamento encontrado na venda")
-            else:
-                # 🔢 Verificar quais pagamentos já têm comissão
-                parcelas_com_comissao = _parcelas_com_comissao_funcionario(
-                    db,
-                    venda.id,
-                    venda.funcionario_id,
-                    tenant_id,
-                )
-                logger.info(
-                    f"📊 Pagamentos: {len(todos_pagamentos)} total, {len(parcelas_com_comissao)} já com comissão"
-                )
-
-                # 🔄 GERAR UMA COMISSÃO PARA CADA PAGAMENTO SEM COMISSÃO
-                comissoes_geradas = 0
-                total_comissoes = Decimal("0")
-
-                for idx, pagamento_row in enumerate(todos_pagamentos, start=1):
-                    parcela_numero = idx
-
-                    # Pular se já tem comissão
-                    if parcela_numero in parcelas_com_comissao:
-                        logger.info(
-                            f"⏭️  Parcela {parcela_numero} já tem comissão - pulando"
-                        )
-                        continue
-
-                    valor_pagamento = Decimal(str(pagamento_row[2]))
-                    forma_pagamento = pagamento_row[1]
-
-                    struct_logger.info(
-                        event="COMMISSION_START",
-                        message="Gerando comissão para pagamento",
-                        venda_id=venda.id,
-                        funcionario_id=venda.funcionario_id,
-                        valor_pago=float(valor_pagamento),
-                        forma_pagamento=forma_pagamento,
-                        parcela_numero=parcela_numero,
-                    )
-
-                    resultado = gerar_comissoes_venda(
-                        venda_id=venda.id,
-                        funcionario_id=venda.funcionario_id,
-                        valor_pago=valor_pagamento,
-                        forma_pagamento=forma_pagamento,
-                        parcela_numero=parcela_numero,
-                        db=db,
-                    )
-
-                    if resultado and resultado.get("success"):
-                        if not resultado.get("duplicated"):
-                            comissoes_geradas += 1
-                            total_comissoes += Decimal(
-                                str(resultado.get("total_comissao", 0))
-                            )
-                            struct_logger.info(
-                                event="COMMISSION_GENERATED",
-                                message="Comissão gerada com sucesso",
-                                venda_id=venda.id,
-                                parcela_numero=parcela_numero,
-                                total_comissao=float(
-                                    resultado.get("total_comissao", 0)
-                                ),
-                            )
-
-                if comissoes_geradas > 0:
-                    logger.info(
-                        f"✅ {comissoes_geradas} comissões geradas - Total: R$ {total_comissoes:.2f}"
-                    )
-                else:
-                    logger.info(
-                        "ℹ️  Nenhuma comissão nova gerada (todas já existiam ou sem configuração)"
-                    )
-
-        except Exception as e:
-            logger.error(
-                f"❌ Erro ao gerar comissões para venda {venda.id}: {str(e)}",
-                exc_info=True,
-            )
-            struct_logger.error(
-                event="COMMISSION_ERROR",
-                message=f"Erro ao gerar comissões: {str(e)}",
-                venda_id=venda.id,
-                error=str(e),
-                trigger="status_change",
-            )
-            # Não abortar a atualização por erro nas comissões
-
+        cancelar_despesas_cashback_venda(
+            db, tenant_id=tenant_id, numero_venda=venda.numero_venda
+        )
+        invalidate_venda_rentabilidade_snapshot(venda)
     db.commit()
     db.refresh(venda)
 
@@ -368,5 +366,3 @@ def atualizar_status_venda(
     )
 
     return {"success": True, "status": novo_status}
-
-    return {"message": "Status atualizado com sucesso", "status": venda.status}

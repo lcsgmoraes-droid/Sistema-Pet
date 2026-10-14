@@ -131,6 +131,20 @@ def test_payload_preserves_totals_and_hides_real_recipient_in_homologation():
     assert payload["pagamentos"] == [{"formaPagamento": "17", "valor": 23.0}]
 
 
+def test_novo_contrato_rateia_so_global_e_cupom_preservando_desconto_item():
+    tenant, connection, sale = _objects()
+    sale.desconto_venda_valor = 3
+    sale.cupom_discount_applied = 4
+    sale.desconto_valor = 9
+    sale.total = "16.00"
+    sale.pagamentos[0].valor = "16.00"
+    payload = emission.build_payload(None, tenant, connection, sale, "nfe")
+    assert payload["produtos"][0]["valorTotal"] == 20
+    assert payload["produtos"][0]["desconto"] == 9
+    assert sale.itens[0].desconto_item == "2.00"
+    assert sale.itens[0].subtotal == "18.00"
+
+
 def test_crediario_uses_credito_loja_instead_of_outros():
     tenant, connection, sale = _objects()
     sale.pagamentos[0].forma_pagamento = "Crediário"
@@ -620,6 +634,9 @@ def test_local_document_details_keeps_sale_items_visible_after_rejection():
     assert details["cliente"]["nome"] == "Cliente Teste"
     assert details["itens"] == [
         {
+            "item_id": None,
+            "item_numero": 1,
+            "lote_id": None,
             "produto_id": 9,
             "codigo": "PET-9",
             "descricao": "Ração Teste",
@@ -630,12 +647,14 @@ def test_local_document_details_keeps_sale_items_visible_after_rejection():
             "desconto": 2.0,
             "ncm": "23091000",
             "cest": None,
+            "origem_mercadoria": "0",
             "cfop": "5102",
             "icms": "102",
             "pis": "49",
             "cofins": "49",
         }
     ]
+    assert details["diagnostico_rejeicao"]["correcoes"][0]["campo"] == "cst_icms"
     assert details["totais"] == {
         "valor_produtos": 20.0,
         "valor_frete": 5.0,

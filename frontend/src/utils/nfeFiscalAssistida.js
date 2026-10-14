@@ -1,4 +1,5 @@
 import api from "../api";
+import { formatMoneyBRL } from "./formatters";
 import { confirmarCorePet } from "../services/corepetDialog";
 import { solicitarCorrecaoFiscal } from "../services/fiscalCorrectionDialog";
 import {
@@ -109,9 +110,7 @@ function validacaoFiscalDoErro(error) {
 function resumoIntNFe(resumo) {
   const linhas = [
     `${resumo.modelo === 55 ? "NF-e" : "NFC-e"} em ${resumo.ambiente}, série ${resumo.serie}`,
-    `Total: R$ ${Number(resumo.total || 0)
-      .toFixed(2)
-      .replace(".", ",")}`,
+    `Total: ${formatMoneyBRL(resumo.total || 0)}`,
     `Itens: ${resumo.itens?.length || 0}`,
   ];
   const destinatario = resumo.destinatario?.razaoSocial || resumo.destinatario?.nome;
@@ -189,11 +188,14 @@ export async function emitirNotaFiscalAssistida({
   vendaId,
   tipoNota = "nfce",
   confirmar = confirmarCorePet,
+  semInteracao = false,
 } = {}) {
   let validacao;
   for (let tentativa = 0; tentativa < 5; tentativa += 1) {
     validacao = await prevalidarNotaFiscal({ vendaId, tipoNota });
     if (!temPendenciasFiscais(validacao)) break;
+
+    if (semInteracao) throw erroComValidacaoFiscal(validacao);
 
     const corrigido = await solicitarCorrecaoFiscal({ validacao, vendaId, tipoNota });
     if (!corrigido) return { cancelado: true, validacao };
@@ -203,7 +205,11 @@ export async function emitirNotaFiscalAssistida({
     throw erroComValidacaoFiscal(validacao);
   }
 
-  if (validacao?.provedor === "intnfe" && validacao?.resumo_emissao) {
+  if (semInteracao && validacao?.pode_emitir !== true) {
+    throw new Error("A venda não está pronta para emissão fiscal. Confira os dados da nota.");
+  }
+
+  if (!semInteracao && validacao?.provedor === "intnfe" && validacao?.resumo_emissao) {
     const confirmed = await confirmar(resumoIntNFe(validacao.resumo_emissao));
     if (!confirmed) return { cancelado: true, validacao };
   }
@@ -226,7 +232,7 @@ export async function emitirNotaFiscalAssistida({
       return { data, validacao, correcoesAutorizadas: false };
     } catch (error) {
       const validacaoProvedor = validacaoFiscalDoErro(error);
-      if (!validacaoProvedor) throw error;
+      if (!validacaoProvedor || semInteracao) throw error;
 
       const corrigido = await solicitarCorrecaoFiscal({
         validacao: validacaoProvedor,

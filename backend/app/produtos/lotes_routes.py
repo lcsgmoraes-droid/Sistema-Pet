@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.produtos.lotes import _consumir_lotes_fifo_produto
+from app.produtos.lotes_validade_routes import router as lotes_validade_router
 from app.produtos.schemas import (
     EntradaEstoqueRequest,
     LoteBase,
@@ -28,6 +29,7 @@ from app.produtos_models import EstoqueMovimentacao, Produto, ProdutoLote
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+router.include_router(lotes_validade_router)
 
 
 def _validar_controle_estoque(produto: Produto) -> None:

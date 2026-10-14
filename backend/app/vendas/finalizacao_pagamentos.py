@@ -6,6 +6,7 @@ deixar ``finalizacao.py`` focado na transacao principal da venda.
 """
 
 import logging
+import math
 import re
 from datetime import date as _date
 from decimal import Decimal
@@ -14,6 +15,10 @@ from typing import Any, Dict, List, Optional
 from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+
+from app.campaigns.cashback_wallet import get_cashback_wallet, lock_cashback_customer
+from app.utils.timezone import now_brasilia
+from app.vendas.status_pagamento import pagamento_valido_para_saldo
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +69,16 @@ def _calcular_pagamentos_finalizacao(
     pagamentos_novos: List[Dict[str, Any]],
 ) -> Dict[str, float]:
     total_venda_float = float(total_venda or 0)
-    total_ja_pago = sum(float(p.valor) for p in pagamentos_existentes)
+    total_ja_pago = sum(
+        float(p.valor) for p in pagamentos_existentes if pagamento_valido_para_saldo(p)
+    )
+    for pagamento in pagamentos_novos:
+        valor = float(pagamento.get("valor") or 0)
+        if not math.isfinite(valor) or valor < 0.01:
+            raise HTTPException(
+                status_code=400,
+                detail="O valor de cada pagamento deve ser maior que zero",
+            )
     total_novos_pagamentos = sum(float(p.get("valor") or 0) for p in pagamentos_novos)
     valor_restante_bruto = total_venda_float - total_ja_pago
 
@@ -76,7 +90,9 @@ def _calcular_pagamentos_finalizacao(
     if valor_restante_bruto <= 0.01 and total_novos_pagamentos > 0.01:
         raise HTTPException(status_code=400, detail="Venda já está totalmente paga")
 
-    if total_novos_pagamentos > valor_restante_bruto + 0.01:
+    # A edição pode reduzir o total abaixo do valor recebido anteriormente.
+    # Sem pagamento novo, a refinalização preserva esse histórico financeiro.
+    if total_novos_pagamentos > max(0, valor_restante_bruto) + 0.01:
         raise HTTPException(
             status_code=400,
             detail=(
@@ -136,6 +152,19 @@ def consumir_cupom_finalizacao(
         )
 
     venda_total_para_cupom = float(venda.total or 0)
+    if getattr(venda, "desconto_venda_valor", None) is not None:
+        if (
+            abs(
+                float(cupom_discount_resolvido or 0)
+                - float(venda.cupom_discount_applied or 0)
+            )
+            > 0.01
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Salve o cupom aplicado antes de finalizar a venda.",
+            )
+        venda_total_para_cupom -= float(venda.taxa_entrega or 0)
     if cupom_discount_resolvido:
         venda_total_para_cupom += float(cupom_discount_resolvido or 0)
 
@@ -194,6 +223,11 @@ def processar_pagamentos_finalizacao(
         CashbackSourceTypeEnum,
         CashbackTransaction,
     )
+    from app.campaigns.cashback_limit import (
+        cashback_amount_brl,
+        cashback_available_in_sale,
+        cashback_use_limit_percent,
+    )
     from app.financeiro_models import (
         CategoriaFinanceira,
         FormaPagamento,
@@ -211,6 +245,27 @@ def processar_pagamentos_finalizacao(
     from app.vendas_models import Venda, VendaPagamento
 
     movimentacoes_caixa_ids: List[int] = []
+    tem_cashback = any(
+        str(pagamento.get("forma_pagamento") or "").strip().lower() == "cashback"
+        for pagamento in pagamentos
+    )
+    cashback_percent = (
+        cashback_use_limit_percent(db, tenant_id) if tem_cashback else None
+    )
+    cashback_ja_usado = Decimal("0")
+    if cashback_percent is not None:
+        cashback_ja_usado = Decimal(
+            str(
+                db.query(func.coalesce(func.sum(VendaPagamento.valor), 0))
+                .filter(
+                    VendaPagamento.tenant_id == tenant_id,
+                    VendaPagamento.venda_id == venda.id,
+                    func.lower(VendaPagamento.forma_pagamento) == "cashback",
+                )
+                .scalar()
+            )
+        )
+    cashback_novos = Decimal("0")
 
     for pag_data in pagamentos:
         operadora_id = pag_data.get("operadora_id")
@@ -421,6 +476,7 @@ def processar_pagamentos_finalizacao(
                 )
 
         pagamento = VendaPagamento(
+            caixa_id=caixa_aberto_id,
             **_montar_campos_venda_pagamento(
                 venda_id=venda.id,
                 tenant_id=tenant_id,
@@ -430,10 +486,9 @@ def processar_pagamentos_finalizacao(
                 bandeira=bandeira,
                 operadora_id=operadora_id,
                 taxa_aplicada=taxa_aplicada,
-            )
+            ),
         )
-        if data_ocorrencia is not None:
-            pagamento.data_pagamento = data_ocorrencia
+        pagamento.data_pagamento = data_ocorrencia or now_brasilia()
         db.add(pagamento)
         db.flush()
 
@@ -449,19 +504,41 @@ def processar_pagamentos_finalizacao(
                     detail="Crédito só pode ser usado em vendas com cliente vinculado",
                 )
 
-            cliente = db.query(Cliente).filter_by(id=venda.cliente_id).first()
+            cliente = (
+                db.query(Cliente)
+                .filter_by(id=venda.cliente_id, tenant_id=tenant_id)
+                .populate_existing()
+                .with_for_update()
+                .first()
+            )
             if not cliente:
                 raise HTTPException(status_code=404, detail="Cliente não encontrado")
 
-            credito_disponivel = float(cliente.credito or 0)
-            if pag_data["valor"] > credito_disponivel + 0.01:
+            credito_disponivel = Decimal(str(cliente.credito or 0))
+            valor_credito = Decimal(str(pag_data["valor"]))
+            if valor_credito > credito_disponivel + Decimal("0.01"):
                 raise HTTPException(
                     status_code=400,
                     detail=f"Crédito insuficiente. Disponível: R$ {credito_disponivel:.2f}",
                 )
 
-            cliente.credito = Decimal(str(credito_disponivel - pag_data["valor"]))
+            cliente.credito = credito_disponivel - valor_credito
             db.add(cliente)
+            from app.models import CreditoLog
+
+            db.add(
+                CreditoLog(
+                    tenant_id=tenant_id,
+                    cliente_id=cliente.id,
+                    tipo="uso_venda",
+                    valor=Decimal(str(pag_data["valor"])),
+                    saldo_anterior=Decimal(str(credito_disponivel)),
+                    saldo_atual=cliente.credito,
+                    referencia_id=venda.id,
+                    motivo=f"Pagamento #{pagamento.id} da venda {venda.numero_venda}",
+                    usuario_nome=user_nome,
+                )
+            )
             logger.info(
                 f"🎁 Crédito utilizado: R$ {pag_data['valor']:.2f} - "
                 f"Saldo restante: R$ {float(cliente.credito):.2f}"
@@ -480,17 +557,33 @@ def processar_pagamentos_finalizacao(
                     detail="Cashback só pode ser usado em vendas com cliente vinculado",
                 )
 
-            saldo_raw = (
-                db.query(func.sum(CashbackTransaction.amount))
-                .filter(
-                    CashbackTransaction.tenant_id == tenant_id,
-                    CashbackTransaction.customer_id == venda.cliente_id,
+            if cashback_percent is not None:
+                disponivel_na_venda = cashback_available_in_sale(
+                    venda.total, cashback_percent, cashback_ja_usado + cashback_novos
                 )
-                .scalar()
-            )
-            saldo_disponivel = float(saldo_raw or 0)
+                if Decimal(str(pag_data["valor"])) > disponivel_na_venda:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"Cashback limitado a {str(cashback_percent).replace('.', ',')}% da venda. "
+                            f"Disponível nesta compra: {cashback_amount_brl(disponivel_na_venda)}"
+                        ),
+                    )
 
-            if pag_data["valor"] > saldo_disponivel + 0.01:
+            try:
+                lock_cashback_customer(
+                    db, tenant_id=tenant_id, customer_id=venda.cliente_id
+                )
+            except LookupError as exc:
+                raise HTTPException(
+                    status_code=404, detail="Cliente não encontrado"
+                ) from exc
+            saldo_disponivel = get_cashback_wallet(
+                db, tenant_id=tenant_id, customer_id=venda.cliente_id
+            ).available
+
+            valor_cashback = Decimal(str(pag_data["valor"])).quantize(Decimal("0.01"))
+            if valor_cashback <= 0 or valor_cashback > saldo_disponivel:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Cashback insuficiente. Disponível: R$ {saldo_disponivel:.2f}",
@@ -499,13 +592,15 @@ def processar_pagamentos_finalizacao(
             debit = CashbackTransaction(
                 tenant_id=tenant_id,
                 customer_id=venda.cliente_id,
-                amount=-Decimal(str(pag_data["valor"])),
+                amount=-valor_cashback,
                 source_type=CashbackSourceTypeEnum.redemption,
                 source_id=venda.id,
                 description=f"Resgate em venda {venda.numero_venda}",
                 tx_type="debit",
             )
             db.add(debit)
+            db.flush()
+            cashback_novos += Decimal(str(pag_data["valor"]))
 
             cat_campanha = (
                 db.query(CategoriaFinanceira)
@@ -564,6 +659,15 @@ def processar_pagamentos_finalizacao(
                 data_movimento=data_ocorrencia,
             )
             movimentacoes_caixa_ids.append(mov_info["movimentacao_id"])
+            from app.caixa_models import MovimentacaoCaixa
+            from app.utils.pagamento_vinculos import referencia_pagamento
+
+            movimento = (
+                db.query(MovimentacaoCaixa)
+                .filter_by(id=mov_info["movimentacao_id"], tenant_id=tenant_id)
+                .one()
+            )
+            movimento.documento = referencia_pagamento(pagamento.id)
             logger.info(f"💵 Caixa: Movimentação #{mov_info['movimentacao_id']} criada")
 
     return movimentacoes_caixa_ids

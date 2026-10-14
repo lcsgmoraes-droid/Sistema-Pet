@@ -9,6 +9,7 @@ export default function ProdutoSelector({
   containerRef,
   disabled = false,
   id,
+  inputId,
   inputClassName = "",
   inputRef,
   minChars = 2,
@@ -37,6 +38,7 @@ export default function ProdutoSelector({
     <div id={id} ref={containerRef} className={`relative ${className}`.trim()}>
       <div className="flex items-center">
         <input
+          id={inputId}
           ref={inputRef}
           type="text"
           value={value}

@@ -96,6 +96,7 @@ def ajustar_estoque_edicao_venda(
     current_user,
     tenant_id,
     db: Session,
+    saidas_ajuste: dict | None = None,
 ) -> dict[int, ProdutoVendaResolvido]:
     tenant_venda = str(tenant_id)
     antigos_por_produto = {
@@ -209,7 +210,7 @@ def ajustar_estoque_edicao_venda(
                         produto_id,
                         diferenca,
                     )
-                    processar_baixa_estoque_item(
+                    resultados = processar_baixa_estoque_item(
                         produto=produto,
                         quantidade_vendida=diferenca,
                         venda_id=venda.id,
@@ -223,6 +224,8 @@ def ajustar_estoque_edicao_venda(
                             else None
                         ),
                     )
+                    if saidas_ajuste is not None:
+                        saidas_ajuste[(produto_id, tenant_estoque)] = resultados
                     detalhe = f"Baixa (-{diferenca}) - Quantidade adicionada na venda #{venda.id}"
 
             log_action(

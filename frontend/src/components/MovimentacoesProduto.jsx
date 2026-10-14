@@ -3,13 +3,14 @@
  * Modelo inspirado no Bling
  */
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api";
 import toast from "react-hot-toast";
 import { formatBRL, formatMoneyBRL } from "../utils/formatters";
 import MovimentacoesLancamentosTable from "./estoque/MovimentacoesLancamentosTable";
 import MovimentacoesProdutoHeader from "./estoque/MovimentacoesProdutoHeader";
 import MovimentacoesProdutoModals from "./estoque/MovimentacoesProdutoModals";
+import LotesValidadeModal from "./estoque/LotesValidadeModal";
 import {
   ESTILOS_CANAIS,
   LABELS_CANAIS,
@@ -38,6 +39,8 @@ const movimentacaoPodeSerSelecionada = (item) => !movimentacaoEstoqueProtegida(i
 export default function MovimentacoesProduto() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [showLotesValidade, setShowLotesValidade] = useState(searchParams.get("aba") === "lotes");
   const { moduloAtivo } = useModulos();
   const moduloBlingAtivo = moduloAtivo("bling");
 
@@ -416,18 +419,18 @@ export default function MovimentacoesProduto() {
           let mensagem = "Lançamento registrado!";
 
           if (variacao_preco === "aumento") {
-            mensagem += ` ⬆️ Custo aumentou de R$ ${custo_anterior?.toFixed(2)} para R$ ${custo_unitario?.toFixed(2)}`;
+            mensagem += ` ⬆️ Custo aumentou de ${formatMoneyBRL(custo_anterior)} para ${formatMoneyBRL(custo_unitario)}`;
             toast.error(mensagem, { duration: 5000 });
           } else if (variacao_preco === "reducao") {
-            mensagem += ` ⬇️ Custo reduziu de R$ ${custo_anterior?.toFixed(2)} para R$ ${custo_unitario?.toFixed(2)}`;
+            mensagem += ` ⬇️ Custo reduziu de ${formatMoneyBRL(custo_anterior)} para ${formatMoneyBRL(custo_unitario)}`;
             toast.success(mensagem, { duration: 5000 });
           } else if (variacao_preco === "estavel") {
-            mensagem += ` Custo mantido em R$ ${custo_unitario?.toFixed(2)}`;
+            mensagem += ` Custo mantido em ${formatMoneyBRL(custo_unitario)}`;
             toast(mensagem, { icon: "➖", duration: 3000 });
           }
         } else if (custo_unitario) {
           // Primeira entrada
-          toast.success(`Lançamento registrado! Custo: R$ ${custo_unitario?.toFixed(2)}`, {
+          toast.success(`Lançamento registrado! Custo: ${formatMoneyBRL(custo_unitario)}`, {
             duration: 3000,
           });
         } else {
@@ -548,6 +551,7 @@ export default function MovimentacoesProduto() {
         onFracionarClinica={fracionamentoClinico.onAbrir}
         onForcarSyncProduto={handleAcaoPrincipalBling}
         onIncluirLancamento={handleIncluirLancamento}
+        onLotesValidade={() => setShowLotesValidade(true)}
         onLancarGranel={abrirModalGranel}
         onVoltarProdutos={() => navigate("/produtos")}
         podeFracionarClinica={fracionamentoClinico.podeFracionarClinica}
@@ -595,6 +599,15 @@ export default function MovimentacoesProduto() {
         totalMovimentacoes={totalMovimentacoes}
         movimentacoesPorPagina={movimentacoesPorPagina}
       />
+
+      {showLotesValidade && (
+        <LotesValidadeModal
+          produto={produto}
+          estoqueAtual={estoqueAtual}
+          onClose={() => setShowLotesValidade(false)}
+          onSaved={carregarDados}
+        />
+      )}
 
       <MovimentacoesProdutoModals
         abrirPedidoReservado={abrirPedidoReservado}

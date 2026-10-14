@@ -42,10 +42,12 @@ export interface GestorDREResumo {
   criterio: "periodo_selecionado" | "competencia_do_mes";
   receita_bruta: number;
   descontos: number;
+  devolucoes?: number;
   impostos: number;
   deducoes_total: number;
   receita_liquida: number;
   cmv: number;
+  custo_servicos?: number;
   despesas_variaveis: number;
   despesas_operacionais: number;
   despesas_fixas_operacionais: number;

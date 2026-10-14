@@ -32,12 +32,18 @@ export default function PDVMainArea(props) {
     onAbrirOportunidades,
     onToggleAssistente,
     abrirDevolucaoSignal,
+    onDevolucaoSucesso,
     caixaKey,
     onAbrirCaixa,
     onNavigateMeusCaixas,
     modoVisualizacao,
     loading,
     temCaixaAberto,
+    caixaAberto,
+    contextoCaixa,
+    statusConsultaCaixa,
+    atualizandoCaixa,
+    atualizarCaixa,
     onCancelarEdicao,
     onExcluirVenda,
     onSalvarVenda,
@@ -55,6 +61,7 @@ export default function PDVMainArea(props) {
     buscarCliente,
     buscarClientePorCodigoExato,
     clientesSugeridos,
+    mostrarEnderecoCliente,
     copiadoClienteCampo,
     onBuscarClienteChange,
     onCopiarCampoCliente,
@@ -93,6 +100,7 @@ export default function PDVMainArea(props) {
     onObservacoesEntregaChange,
     onSelecionarEndereco,
     onSelecionarEntregador,
+    onPagamentoEntregaPrevistoChange,
     onTaxaEntregaTotalChange,
     onTaxaEntregadorChange,
     onTaxaLojaChange,
@@ -118,6 +126,9 @@ export default function PDVMainArea(props) {
     onSelecionarFuncionario,
     onToggleVendaComissionada,
     vendaComissionada,
+    vendedorObrigatorio,
+    gerarComissao,
+    onGerarComissaoChange,
     onNovaVenda,
   } = props;
 
@@ -178,12 +189,18 @@ export default function PDVMainArea(props) {
         onAbrirOportunidades={onAbrirOportunidades}
         onToggleAssistente={onToggleAssistente}
         abrirDevolucaoSignal={abrirDevolucaoSignal}
+        onDevolucaoSucesso={onDevolucaoSucesso}
         menuCaixaKey={caixaKey}
         onAbrirCaixa={onAbrirCaixa}
         onNavigateMeusCaixas={onNavigateMeusCaixas}
         modoVisualizacao={modoVisualizacao}
         loading={loading}
         temCaixaAberto={temCaixaAberto}
+        caixaAberto={caixaAberto}
+        contextoCaixa={contextoCaixa}
+        statusConsultaCaixa={statusConsultaCaixa}
+        atualizandoCaixa={atualizandoCaixa}
+        atualizarCaixa={atualizarCaixa}
         onCancelarEdicao={onCancelarEdicao}
         onExcluirVenda={onExcluirVenda}
         onSalvarVenda={onSalvarVenda}
@@ -192,6 +209,9 @@ export default function PDVMainArea(props) {
 
       <PDVInfoBanners
         temCaixaAberto={temCaixaAberto}
+        statusConsultaCaixa={statusConsultaCaixa}
+        atualizandoCaixa={atualizandoCaixa}
+        onAtualizarCaixa={atualizarCaixa}
         modoVisualizacao={modoVisualizacao}
         vendaAtual={vendaAtual}
         validadeAlertas={validadeAlertas}
@@ -206,6 +226,7 @@ export default function PDVMainArea(props) {
         habilitarEdicao={habilitarEdicao}
         onRecarregarVenda={onRecarregarVenda}
         temCaixaAberto={temCaixaAberto}
+        statusConsultaCaixa={statusConsultaCaixa}
         onAbrirDevolucao={onAbrirDevolucaoVendaAtual}
       />
 
@@ -215,6 +236,7 @@ export default function PDVMainArea(props) {
             buscarCliente={buscarCliente}
             buscarClientePorCodigoExato={buscarClientePorCodigoExato}
             clientesSugeridos={clientesSugeridos}
+            mostrarEnderecoCliente={mostrarEnderecoCliente}
             copiadoClienteCampo={copiadoClienteCampo}
             destaqueVenda={destaqueVenda}
             modoVisualizacao={modoVisualizacao}
@@ -277,6 +299,7 @@ export default function PDVMainArea(props) {
             onObservacoesEntregaChange={onObservacoesEntregaChange}
             onSelecionarEndereco={onSelecionarEndereco}
             onSelecionarEntregador={onSelecionarEntregador}
+            onPagamentoEntregaPrevistoChange={onPagamentoEntregaPrevistoChange}
             onTaxaEntregaTotalChange={onTaxaEntregaTotalChange}
             onTaxaEntregadorChange={onTaxaEntregadorChange}
             onTaxaLojaChange={onTaxaLojaChange}
@@ -312,6 +335,9 @@ export default function PDVMainArea(props) {
             onSelecionarFuncionario={onSelecionarFuncionario}
             onToggleVendaComissionada={onToggleVendaComissionada}
             vendaComissionada={vendaComissionada}
+            vendedorObrigatorio={vendedorObrigatorio}
+            gerarComissao={gerarComissao}
+            onGerarComissaoChange={onGerarComissaoChange}
           />
         </div>
 
@@ -324,6 +350,7 @@ export default function PDVMainArea(props) {
           onSalvarVenda={onSalvarVenda}
           statusVenda={vendaAtual.status}
           temCaixaAberto={temCaixaAberto}
+          statusConsultaCaixa={statusConsultaCaixa}
           vendaId={vendaAtual.id}
         />
       </div>

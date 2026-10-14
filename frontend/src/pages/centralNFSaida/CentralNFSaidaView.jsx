@@ -5,6 +5,7 @@ import NFSaidaFilters from "./NFSaidaFilters";
 import NFSaidaList from "./NFSaidaList";
 import SefazConsultasSessao from "./SefazConsultasSessao";
 import SefazToolsPanel from "./SefazToolsPanel";
+import VendasSemNotaPanel from "./VendasSemNotaPanel";
 
 export default function CentralNFSaidaView({
   painelSefazAberto,
@@ -100,6 +101,8 @@ export default function CentralNFSaidaView({
         consultaExpandidaId={consultaExpandidaId}
         setConsultaExpandidaId={setConsultaExpandidaId}
       />
+
+      <VendasSemNotaPanel onEmissaoConcluida={() => carregarNotas(true)} />
 
       <NFSaidaFilters
         filtroCanal={filtroCanal}

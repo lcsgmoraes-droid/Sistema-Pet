@@ -9,11 +9,6 @@ from sqlalchemy.orm import Session
 from app.audit_log import log_action
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
-from app.financeiro_models import ContaReceber
-from app.services.venda_rentabilidade_snapshot_service import (
-    get_or_build_venda_rentabilidade_snapshot,
-    invalidate_venda_rentabilidade_snapshot,
-)
 from app.vendas.routes_common import _validar_tenant_e_obter_usuario
 from app.vendas.status_pagamento import calcular_resumo_pagamento_venda
 from app.vendas_models import Venda, VendaPagamento
@@ -139,6 +134,7 @@ def listar_pagamentos_venda(
         "numero_venda": venda.numero_venda,
         "total_venda": float(venda.total),
         "total_pago": total_pago,
+        "total_recebido": float(resumo_pagamento["total_recebido"]),
         "valor_restante": valor_restante,
         "status": venda.status,
         "status_pagamento": resumo_pagamento["status_pagamento"],
@@ -152,111 +148,25 @@ def excluir_pagamento(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Excluir um pagamento de uma venda"""
+    """Excluir o pagamento junto com caixa, credito, baixas e auditoria."""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    from app.vendas.exclusao_pagamento import excluir_pagamento_atomico
 
-    # 🔒 SEGURANÇA: Buscar o pagamento validando que a venda pertence ao usuário
-    # Primeiro buscamos o pagamento, depois validamos a venda
-    pagamento = db.query(VendaPagamento).filter_by(id=pagamento_id).first()
-
-    if not pagamento:
-        raise HTTPException(status_code=404, detail="Pagamento não encontrado")
-
-    # 🔒 SEGURANÇA: Validar que a venda do pagamento pertence ao tenant
-    venda = (
-        db.query(Venda).filter_by(id=pagamento.venda_id, tenant_id=tenant_id).first()
-    )
-
-    if not venda:
-        raise HTTPException(status_code=404, detail="Venda não encontrada")
-
-    # Impedir exclusão de pagamento em vendas com NF emitida
-    if venda.status == "pago_nf":
-        raise HTTPException(
-            status_code=400,
-            detail="Não é possível excluir pagamentos de uma venda com NF-e emitida. Cancele a nota fiscal primeiro.",
-        )
-
-    # ⚠️ IMPORTANTE: Se venda está finalizada/baixa_parcial, não pode excluir pagamento
-    # Usuário deve REABRIR a venda primeiro!
-    if venda.status in ["finalizada", "baixa_parcial"]:
-        raise HTTPException(
-            status_code=400,
-            detail='Não é possível excluir pagamentos de uma venda finalizada. Reabra a venda primeiro através do botão "Reabrir Venda".',
-        )
-
-    # Registrar auditoria
     try:
-        log_action(
+        resultado = excluir_pagamento_atomico(
             db=db,
-            user_id=current_user.id,
-            action="delete",
-            entity_type="venda_pagamentos",
-            entity_id=pagamento.id,
-            details=f"Excluído pagamento de R$ {pagamento.valor} ({pagamento.forma_pagamento}) da venda #{venda.id}",
+            pagamento_id=pagamento_id,
+            tenant_id=tenant_id,
+            current_user=current_user,
         )
-    except Exception as e:
-        logger.info(f"⚠️ Erro ao registrar auditoria: {e}")
-
-    # Sincronizar exclusão com contas a receber e lançamentos manuais
-    try:
-        contas = db.query(ContaReceber).filter(ContaReceber.venda_id == venda.id).all()
-
-        for conta in contas:
-            # Deletar conta a receber
-            try:
-                db.delete(conta)
-                logger.info(f"🗑️ Conta a receber {conta.id} excluída")
-            except Exception as e:
-                logger.info(f"⚠️ Erro ao deletar conta: {e}")
-    except Exception as e:
-        logger.info(f"⚠️ Erro ao buscar contas a receber: {e}")
-
-    # Excluir o pagamento
-    db.delete(pagamento)
-    db.flush()  # Garantir que o delete seja processado antes da query
-
-    # Recalcular total pago
-    pagamentos_restantes = db.query(VendaPagamento).filter_by(venda_id=venda.id).all()
-    total_pago = sum(float(p.valor) for p in pagamentos_restantes)
-    total_venda = float(venda.total)
-
-    logger.info(
-        f"DEBUG excluir_pagamento: total_pago={total_pago}, total_venda={total_venda}"
-    )
-
-    # Atualizar status da venda
-    if total_pago == 0:
-        venda.status = "aberta"
-        logger.info("DEBUG: Mudou status para ABERTA (total_pago = 0)")
-        invalidate_venda_rentabilidade_snapshot(venda)
-    elif total_pago >= total_venda:
-        venda.status = "finalizada"
-        logger.info("DEBUG: Mudou status para FINALIZADA (total_pago >= total_venda)")
-        get_or_build_venda_rentabilidade_snapshot(
-            venda,
-            db,
-            tenant_id,
-            persist_if_missing=True,
-            force_refresh=True,
+        db.commit()
+        return resultado
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        logger.exception("Erro ao excluir pagamento %s", pagamento_id)
+        raise HTTPException(
+            500, "Nao foi possivel excluir o pagamento. Nenhum valor foi alterado."
         )
-    else:
-        venda.status = "baixa_parcial"
-        logger.info("DEBUG: Mudou status para BAIXA_PARCIAL")
-        get_or_build_venda_rentabilidade_snapshot(
-            venda,
-            db,
-            tenant_id,
-            persist_if_missing=True,
-            force_refresh=True,
-        )
-
-    db.commit()
-
-    return {
-        "message": "Pagamento excluído com sucesso",
-        "venda_id": venda.id,
-        "novo_status": venda.status,
-        "total_pago": total_pago,
-        "valor_restante": max(0, total_venda - total_pago),
-    }

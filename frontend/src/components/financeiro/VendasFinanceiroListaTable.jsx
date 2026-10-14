@@ -234,14 +234,14 @@ function ItensVendaDetalhes({ colSpan, formatarMoeda, venda }) {
                   <th className="px-1 py-1 text-right">Preço Unit.</th>
                   <th className="px-1 py-1 text-right">Venda Bruta</th>
                   <th className="px-1 py-1 text-right">Tx Loja</th>
-                  <th className="px-1 py-1 text-right">Desconto</th>
+                  <th className="px-1 py-1 text-right">Desconto manual</th>
                   <th className="px-1 py-1 text-right">Tx. Entr.</th>
                   <th className="px-1 py-1 text-right">Tx. Oper.</th>
                   <th className="px-1 py-1 text-right">Tx. Cartão</th>
                   <th className="px-1 py-1 text-right">Comissão</th>
                   <th className="px-1 py-1 text-right">Imposto</th>
                   <th className="px-1 py-1 text-right" title="Cashback/cupom rateado neste item">
-                    Campanha
+                    Campanha/cupom
                   </th>
                   <th className="px-1 py-1 text-right">Líquido</th>
                   <th className="px-1 py-1 text-right">Custo Unit.</th>
@@ -479,7 +479,7 @@ export default function VendasFinanceiroListaTable({
     },
     {
       key: "desconto",
-      header: "Desconto",
+      header: "Desconto manual",
       align: "right",
       className: "text-red-600 whitespace-nowrap",
       render: (venda) => <MoneyCell value={venda.desconto} sign="-" zeroAsDash />,
@@ -529,7 +529,7 @@ export default function VendasFinanceiroListaTable({
     },
     {
       key: "custo_campanha",
-      header: "Custo Camp.",
+      header: "Campanha/cupom",
       align: "right",
       headerClassName: "whitespace-nowrap",
       title: "Cashback / cupons resgatados nesta venda",

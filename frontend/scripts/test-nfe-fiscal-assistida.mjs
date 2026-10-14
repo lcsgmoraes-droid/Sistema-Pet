@@ -104,10 +104,9 @@ assert.match(
   "assistente fiscal deve retentar com limite depois da correcao no caixa",
 );
 
-const correctionDialog = readFileSync(
-  resolve(__dirname, "../src/components/ui/FiscalCorrectionDialogHost.jsx"),
-  "utf8",
-);
+const correctionDialog = ["FiscalCorrectionDialogHost.jsx", "FiscalCorrectionField.jsx"]
+  .map((file) => readFileSync(resolve(__dirname, "../src/components/ui", file), "utf8"))
+  .join("\n");
 const fiscalReferenceSearch = readFileSync(
   resolve(__dirname, "../src/components/ui/FiscalReferenceSearch.jsx"),
   "utf8",

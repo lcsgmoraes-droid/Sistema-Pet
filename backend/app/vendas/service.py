@@ -74,6 +74,9 @@ class VendaService:
         permitir_caixa_tenant: bool = False,
         data_ocorrencia=None,
         motivo_revisao: Optional[str] = None,
+        motivo_liberacao_crediario: Optional[str] = None,
+        nao_gerar_beneficios: bool = False,
+        justificativa_nao_gerar_beneficios: Optional[str] = None,
     ) -> Dict[str, Any]:
         return finalizar_venda_impl(
             venda_id=venda_id,
@@ -88,5 +91,8 @@ class VendaService:
             permitir_caixa_tenant=permitir_caixa_tenant,
             data_ocorrencia=data_ocorrencia,
             motivo_revisao=motivo_revisao,
+            motivo_liberacao_crediario=motivo_liberacao_crediario,
+            nao_gerar_beneficios=nao_gerar_beneficios,
+            justificativa_nao_gerar_beneficios=justificativa_nao_gerar_beneficios,
             processar_baixa_estoque_item=VendaService._processar_baixa_estoque_item,
         )

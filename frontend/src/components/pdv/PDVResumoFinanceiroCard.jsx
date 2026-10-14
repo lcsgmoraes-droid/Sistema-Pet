@@ -2,6 +2,7 @@ import { CreditCard, Percent, Tag, X } from "lucide-react";
 import { formatMoneyBRL } from "../../utils/formatters";
 import { descricaoFormaPagamento } from "../../utils/pdvPaymentDisplay";
 import Panel from "../ui/Panel";
+import { resumirDescontosVenda } from "../../utils/pdvDescontosUtils";
 
 export default function PDVResumoFinanceiroCard({
   alertasCarrinho,
@@ -19,7 +20,8 @@ export default function PDVResumoFinanceiroCard({
   totalImpostos,
   vendaAtual,
 }) {
-  const totalBruto = vendaAtual.subtotal + vendaAtual.desconto_valor;
+  const descontos = resumirDescontosVenda(vendaAtual);
+  const totalBruto = vendaAtual.subtotal + descontos.itens;
   const saldoRestante = Math.max(0, vendaAtual.total - (vendaAtual.total_pago || 0));
   const pagamentosExibicao = Array.isArray(vendaAtual.pagamentos)
     ? vendaAtual.pagamentos.filter((pagamento) => pagamento && Number(pagamento.valor || 0) > 0)
@@ -29,7 +31,7 @@ export default function PDVResumoFinanceiroCard({
     (vendaAtual.cupom_code
       ? {
           code: vendaAtual.cupom_code,
-          discount_applied: vendaAtual.cupom_discount_applied ?? vendaAtual.desconto_valor ?? 0,
+          discount_applied: descontos.cupom,
         }
       : null);
   const cuponsExibicao = cupomExibicao
@@ -39,14 +41,6 @@ export default function PDVResumoFinanceiroCard({
         .filter(Boolean)
         .map((code) => ({ code, discount_applied: null }))
     : [];
-  const descontoPercentualTexto = cupomExibicao
-    ? `Cupom ${String(cupomExibicao.code || "").toUpperCase()} aplicado:`
-    : vendaAtual.desconto_valor > 0 && totalBruto > 0
-      ? `${((vendaAtual.desconto_valor / totalBruto) * 100).toLocaleString("pt-BR", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}% de desconto:`
-      : "Desconto:";
 
   if (vendaAtual.itens.length === 0) {
     return null;
@@ -86,7 +80,9 @@ export default function PDVResumoFinanceiroCard({
             <div className="border rounded-lg p-3 bg-purple-50 border-purple-200">
               <div className="flex items-center gap-1 mb-2">
                 <Tag className="w-3.5 h-3.5 text-purple-600" />
-                <span className="text-xs font-medium text-purple-700">Cupons de desconto</span>
+                <span className="text-xs font-medium text-purple-700">
+                  Desconto por campanha/cupom
+                </span>
               </div>
               {cupomExibicao ? (
                 <div className="space-y-2">
@@ -114,9 +110,12 @@ export default function PDVResumoFinanceiroCard({
                       )}
                     </div>
                   ))}
-                  {cuponsExibicao.length > 1 ? (
+                  {cuponsExibicao.length > 1 || vendaAtual.desconto_venda_valor == null ? (
                     <p className="text-xs font-semibold text-green-700">
                       Desconto total dos cupons: {formatMoneyBRL(cupomExibicao.discount_applied)}
+                      {vendaAtual.desconto_venda_valor == null
+                        ? " (incluído nos descontos anteriores)"
+                        : ""}
                     </p>
                   ) : null}
                 </div>
@@ -145,21 +144,39 @@ export default function PDVResumoFinanceiroCard({
             </div>
           )}
 
+          {descontos.itens > 0 && (
+            <div className="flex justify-between text-orange-600 text-sm">
+              <span>
+                {vendaAtual.desconto_venda_valor == null
+                  ? "Descontos anteriores nos produtos:"
+                  : "Desconto nos produtos:"}
+              </span>
+              <span>- {formatMoneyBRL(descontos.itens)}</span>
+            </div>
+          )}
+          {vendaAtual.desconto_venda_valor == null && (
+            <p className="text-xs text-gray-500">
+              Descontos anteriores em modo de compatibilidade; a origem por produto foi preservada.
+              {vendaAtual.cupom_code
+                ? " O cupom mantém o valor anterior. Revise antes de fechar."
+                : ""}
+            </p>
+          )}
           <div className="flex justify-between items-center">
             <span
-              className={
-                vendaAtual.desconto_valor > 0 ? "text-orange-600 text-sm" : "text-gray-500 text-sm"
-              }
+              className={descontos.global > 0 ? "text-orange-600 text-sm" : "text-gray-500 text-sm"}
             >
-              {descontoPercentualTexto}
+              {vendaAtual.desconto_venda_valor == null
+                ? "Descontos anteriores na venda:"
+                : "Desconto na venda:"}
             </span>
             <div className="flex items-center gap-2">
-              {vendaAtual.desconto_valor > 0 && (
+              {descontos.global > 0 && (
                 <span className="font-medium text-orange-600 text-sm">
-                  - {formatMoneyBRL(vendaAtual.desconto_valor)}
+                  - {formatMoneyBRL(descontos.global)}
                 </span>
               )}
-              {!cupomExibicao && (
+              {
                 <button
                   onClick={onAbrirModalDescontoTotal}
                   disabled={modoVisualizacao}
@@ -167,15 +184,15 @@ export default function PDVResumoFinanceiroCard({
                   title="Aplicar desconto no total da venda"
                 >
                   <Percent className="w-3 h-3" />
-                  <span>{vendaAtual.desconto_valor > 0 ? "Editar" : "Adicionar"}</span>
+                  <span>{descontos.global > 0 ? "Editar" : "Adicionar"}</span>
                 </button>
-              )}
-              {vendaAtual.desconto_valor > 0 && !cupomExibicao && (
+              }
+              {descontos.global > 0 && (
                 <button
                   onClick={onRemoverDescontoTotal}
                   disabled={modoVisualizacao}
                   className="p-1 text-red-400 hover:bg-red-50 rounded disabled:opacity-50 transition-colors"
-                  title="Remover desconto"
+                  title="Remover desconto da venda"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -184,7 +201,7 @@ export default function PDVResumoFinanceiroCard({
           </div>
 
           <div className="flex justify-between text-gray-600">
-            <span>Total:</span>
+            <span>Subtotal dos produtos:</span>
             <span className="font-medium">{formatMoneyBRL(vendaAtual.subtotal)}</span>
           </div>
 

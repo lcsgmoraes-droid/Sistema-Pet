@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, model_validator
-from typing import Optional
+from typing import Literal, Optional
 
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
@@ -55,10 +55,16 @@ class EmpresaConfigGeralCreate(BaseModel):
     mensagem_venda_alerta: str = "⚠️ ATENÇÃO: Margem reduzida! Revisar preço."
     mensagem_venda_critica: str = "🚨 CRÍTICO: Margem muito baixa! Venda com prejuízo!"
     caixa_compartilhado: bool = False
+    vendedor_obrigatorio_pdv: bool = False
+    mostrar_endereco_cliente_pdv: bool = False
+    emitir_nota_automatica_pdv: bool = False
+    tipo_nota_automatica_pdv: Literal["nfce", "nfe"] = "nfce"
     dias_tolerancia_atraso: int = 5
     crediario_encargos_automaticos: bool = False
     crediario_multa_percentual: float = Field(default=2.0, ge=0, le=2)
     crediario_juros_mensal_percentual: float = Field(default=1.0, ge=0, le=100)
+    bloquear_venda_crediario_atrasado: bool = False
+    dias_atraso_bloqueio_venda: int = Field(default=30, ge=1, le=3650)
     meta_faturamento_mensal: float = 0
     alerta_estoque_percentual: int = 20
     dias_produto_parado: int = 90
@@ -91,12 +97,18 @@ class EmpresaConfigGeralUpdate(BaseModel):
     mensagem_venda_alerta: Optional[str] = None
     mensagem_venda_critica: Optional[str] = None
     caixa_compartilhado: Optional[bool] = None
+    vendedor_obrigatorio_pdv: Optional[bool] = None
+    mostrar_endereco_cliente_pdv: bool = False
+    emitir_nota_automatica_pdv: bool = False
+    tipo_nota_automatica_pdv: Literal["nfce", "nfe"] = "nfce"
     dias_tolerancia_atraso: Optional[int] = None
     crediario_encargos_automaticos: Optional[bool] = None
     crediario_multa_percentual: Optional[float] = Field(default=None, ge=0, le=2)
     crediario_juros_mensal_percentual: Optional[float] = Field(
         default=None, ge=0, le=100
     )
+    bloquear_venda_crediario_atrasado: Optional[bool] = None
+    dias_atraso_bloqueio_venda: Optional[int] = Field(default=None, ge=1, le=3650)
     meta_faturamento_mensal: Optional[float] = None
     alerta_estoque_percentual: Optional[int] = None
     dias_produto_parado: Optional[int] = None
@@ -118,11 +130,17 @@ class EmpresaConfigGeralResponse(BaseModel):
     mensagem_venda_alerta: str
     mensagem_venda_critica: str
     caixa_compartilhado: bool
+    vendedor_obrigatorio_pdv: bool = False
+    mostrar_endereco_cliente_pdv: bool = False
+    emitir_nota_automatica_pdv: bool = False
+    tipo_nota_automatica_pdv: Literal["nfce", "nfe"] = "nfce"
     aliquota_imposto_padrao: float
     dias_tolerancia_atraso: Optional[int] = 5
     crediario_encargos_automaticos: bool
     crediario_multa_percentual: float
     crediario_juros_mensal_percentual: float
+    bloquear_venda_crediario_atrasado: bool = False
+    dias_atraso_bloqueio_venda: int = 30
     meta_faturamento_mensal: Optional[float] = 0
     alerta_estoque_percentual: Optional[int] = 20
     dias_produto_parado: Optional[int] = 90
@@ -165,6 +183,17 @@ def _serializar_config(
             or "🚨 CRÍTICO: Margem muito baixa! Venda com prejuízo!"
         ),
         caixa_compartilhado=bool(getattr(config, "caixa_compartilhado", False)),
+        vendedor_obrigatorio_pdv=bool(
+            getattr(config, "vendedor_obrigatorio_pdv", False)
+        ),
+        mostrar_endereco_cliente_pdv=bool(
+            getattr(config, "mostrar_endereco_cliente_pdv", False)
+        ),
+        emitir_nota_automatica_pdv=bool(
+            getattr(config, "emitir_nota_automatica_pdv", False)
+        ),
+        tipo_nota_automatica_pdv=getattr(config, "tipo_nota_automatica_pdv", None)
+        or "nfce",
         aliquota_imposto_padrao=float(config.aliquota_imposto_padrao or 7),
         dias_tolerancia_atraso=(
             config.dias_tolerancia_atraso
@@ -175,6 +204,12 @@ def _serializar_config(
         crediario_multa_percentual=float(config.crediario_multa_percentual or 0),
         crediario_juros_mensal_percentual=float(
             config.crediario_juros_mensal_percentual or 0
+        ),
+        bloquear_venda_crediario_atrasado=bool(
+            getattr(config, "bloquear_venda_crediario_atrasado", False)
+        ),
+        dias_atraso_bloqueio_venda=(
+            getattr(config, "dias_atraso_bloqueio_venda", None) or 30
         ),
         meta_faturamento_mensal=float(config.meta_faturamento_mensal or 0),
         alerta_estoque_percentual=(
@@ -377,17 +412,50 @@ def get_config_empresa(
             mensagem_venda_alerta="⚠️ ATENÇÃO: Margem reduzida! Revisar preço.",
             mensagem_venda_critica="🚨 CRÍTICO: Margem muito baixa! Venda com prejuízo!",
             caixa_compartilhado=False,
+            vendedor_obrigatorio_pdv=False,
+            mostrar_endereco_cliente_pdv=False,
+            emitir_nota_automatica_pdv=False,
+            tipo_nota_automatica_pdv="nfce",
             aliquota_imposto_padrao=7.0,
             dias_tolerancia_atraso=5,
             crediario_encargos_automaticos=False,
             crediario_multa_percentual=2.0,
             crediario_juros_mensal_percentual=1.0,
+            bloquear_venda_crediario_atrasado=False,
+            dias_atraso_bloqueio_venda=30,
             meta_faturamento_mensal=0,
             alerta_estoque_percentual=20,
             dias_produto_parado=90,
         )
 
     return _serializar_config(config, nome_acesso=nome_acesso)
+
+
+@router.get("/pdv")
+@require_permission("vendas.criar")
+def get_config_pdv(
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    """Expõe ao operador as preferências necessárias para o PDV."""
+    _, tenant_id = user_and_tenant
+    config = (
+        db.query(EmpresaConfigGeral)
+        .filter(EmpresaConfigGeral.tenant_id == tenant_id)
+        .first()
+    )
+    return {
+        "vendedor_obrigatorio_pdv": bool(config and config.vendedor_obrigatorio_pdv),
+        "mostrar_endereco_cliente_pdv": bool(
+            config and getattr(config, "mostrar_endereco_cliente_pdv", False)
+        ),
+        "emitir_nota_automatica_pdv": bool(
+            config and config.emitir_nota_automatica_pdv
+        ),
+        "tipo_nota_automatica_pdv": (
+            config.tipo_nota_automatica_pdv if config else "nfce"
+        ),
+    }
 
 
 @router.post("/", response_model=EmpresaConfigGeralResponse)

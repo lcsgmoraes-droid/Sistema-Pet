@@ -200,8 +200,8 @@ export default function DashEntregasFinanceiro() {
           </div>
 
           {/* Skeleton dos KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...Array(6)].map((_, i) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            {[...Array(7)].map((_, i) => (
               <KpiSkeleton key={i} />
             ))}
           </div>
@@ -251,7 +251,7 @@ export default function DashEntregasFinanceiro() {
           )}
 
           {/* Cards de KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-6">
             <Card
               titulo="Total de Entregas"
               valor={dados.total_entregas}
@@ -450,13 +450,17 @@ export default function DashEntregasFinanceiro() {
 
 function Card({ titulo, valor, icon, colorClasse, subtitulo }) {
   return (
-    <div className={`p-5 rounded-lg border shadow-sm ${colorClasse || "border-gray-200 bg-white"}`}>
-      <div className="flex items-start justify-between mb-3">
-        <div className="text-2xl">{icon}</div>
+    <div className={`p-3 rounded-lg border shadow-sm ${colorClasse || "border-gray-200 bg-white"}`}>
+      <div className="flex items-center gap-3">
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/70 text-lg">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <h4 className="text-xs font-semibold text-gray-600">{titulo}</h4>
+          <div className="text-xl font-bold leading-tight text-gray-800">{valor}</div>
+          {subtitulo && <p className="text-[11px] leading-tight text-gray-500">{subtitulo}</p>}
+        </div>
       </div>
-      <h4 className="text-sm font-medium text-gray-600 mb-1">{titulo}</h4>
-      {subtitulo && <p className="text-xs text-gray-500 mb-2">{subtitulo}</p>}
-      <div className="text-2xl font-bold text-gray-800">{valor}</div>
     </div>
   );
 }
@@ -466,7 +470,7 @@ function KpiSkeleton() {
   return (
     <div
       style={{
-        height: 110,
+        height: 76,
         borderRadius: 8,
         background: "linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%)",
         backgroundSize: "200% 100%",

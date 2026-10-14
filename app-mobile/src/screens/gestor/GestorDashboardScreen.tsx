@@ -429,6 +429,11 @@ function DashboardCards({ summary }: { summary: GestorResumo }) {
               />
               <DreCalculationRow
                 operator="−"
+                label="Devoluções de vendas"
+                value={dre.devolucoes ?? 0}
+              />
+              <DreCalculationRow
+                operator="−"
                 label="Impostos"
                 value={dre.impostos}
               />
@@ -439,6 +444,11 @@ function DashboardCards({ summary }: { summary: GestorResumo }) {
                 tone="subtotal"
               />
               <DreCalculationRow operator="−" label="CMV" value={dre.cmv} />
+              <DreCalculationRow
+                operator="−"
+                label="Custo dos serviços prestados"
+                value={dre.custo_servicos ?? 0}
+              />
               <DreCalculationRow
                 operator="="
                 label="Lucro bruto"

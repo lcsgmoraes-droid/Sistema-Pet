@@ -8,7 +8,14 @@ from app.vendas_models import VendaPagamento
 
 
 def criar_recebiveis_dos_novos_pagamentos(
-    *, db, venda, tenant_id, user_id, pagamentos_anteriores, valor_ja_baixado=0
+    *,
+    db,
+    venda,
+    tenant_id,
+    user_id,
+    pagamentos_anteriores,
+    valor_ja_baixado=0,
+    valores_baixados_por_pagamento=None,
 ):
     """Nunca reapresenta pagamentos antigos, inclusive apos reabertura/desconto.
 
@@ -30,8 +37,13 @@ def criar_recebiveis_dos_novos_pagamentos(
     pagamentos = []
     for pagamento in novos:
         valor = Decimal(str(pagamento.valor))
-        destinado = min(absorvido, valor)
-        absorvido -= destinado
+        if valores_baixados_por_pagamento is None:
+            destinado = min(absorvido, valor)
+            absorvido -= destinado
+        else:
+            destinado = Decimal(
+                str(valores_baixados_por_pagamento.get(pagamento.id, 0))
+            )
         if valor <= destinado:
             continue
         dados = {
@@ -46,6 +58,40 @@ def criar_recebiveis_dos_novos_pagamentos(
         venda=venda, pagamentos=pagamentos, user_id=user_id, db=db
     )
     return resultado["contas_criadas"]
+
+
+def baixar_recebiveis_dos_novos_pagamentos(
+    *, db, venda, tenant_id, user_id, pagamentos_anteriores, data_recebimento=None
+):
+    """Mantem cada baixa ligada ao pagamento que efetivamente a financiou."""
+    anteriores = [p.id for p in pagamentos_anteriores]
+    novos = (
+        db.query(VendaPagamento)
+        .filter(
+            VendaPagamento.tenant_id == tenant_id,
+            VendaPagamento.venda_id == venda.id,
+            VendaPagamento.id.notin_(anteriores),
+        )
+        .order_by(VendaPagamento.id)
+        .all()
+    )
+    baixadas, valores = [], {}
+    for pagamento in novos:
+        resultado = ContasReceberService.baixar_contas_da_venda(
+            venda_id=venda.id,
+            venda_numero=venda.numero_venda,
+            valor_total_pagamento=float(pagamento.valor),
+            forma_pagamento_nome=pagamento.forma_pagamento,
+            forma_pagamento_id=pagamento.forma_pagamento_id,
+            pagamento_id=pagamento.id,
+            user_id=user_id,
+            tenant_id=tenant_id,
+            db=db,
+            data_recebimento=data_recebimento,
+        )
+        baixadas.extend(resultado["contas_baixadas"])
+        valores[pagamento.id] = resultado["valor_distribuido"]
+    return baixadas, valores
 
 
 def cancelar_previsoes_apos_desconto(*, db, venda, tenant_id):

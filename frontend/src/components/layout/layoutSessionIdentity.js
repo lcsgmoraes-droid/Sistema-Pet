@@ -20,10 +20,12 @@ export function resolveLayoutSessionIdentity(user) {
     cleanText(user?.nome) ||
     "Usuário";
 
-  const avatarSource = cleanText(user?.name) || cleanText(user?.nome) || userLabel || tenantLabel;
+  const displayName = cleanText(user?.name) || cleanText(user?.nome) || userLabel;
+  const avatarSource = displayName || tenantLabel;
 
   return {
     tenantLabel,
+    displayName,
     userLabel,
     avatarInitial: avatarSource.charAt(0).toUpperCase() || "U",
   };

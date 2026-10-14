@@ -40,8 +40,8 @@ class Caixa(BaseTenantModel):
         "MovimentacaoCaixa", back_populates="caixa", cascade="all, delete-orphan"
     )
 
-    def to_dict(self):
-        return {
+    def to_dict(self, incluir_movimentacoes: bool = True):
+        dados = {
             "id": self.id,
             "numero_caixa": self.numero_caixa,
             "usuario_id": self.usuario_id,
@@ -62,10 +62,10 @@ class Caixa(BaseTenantModel):
             "conferencia_abertura": self.conferencia_abertura,
             "created_at": safe_datetime_to_iso(self.created_at),
             "updated_at": safe_datetime_to_iso(self.updated_at),
-            "movimentacoes": [m.to_dict() for m in self.movimentacoes]
-            if hasattr(self, "movimentacoes")
-            else [],
         }
+        if incluir_movimentacoes:
+            dados["movimentacoes"] = [m.to_dict() for m in self.movimentacoes]
+        return dados
 
 
 class MovimentacaoCaixa(BaseTenantModel):

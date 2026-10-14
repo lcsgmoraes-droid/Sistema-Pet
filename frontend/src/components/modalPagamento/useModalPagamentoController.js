@@ -11,6 +11,7 @@ import {
   calcularCustoTotalItensVenda,
   calcularResumoRecebimento,
   calcularSaldoBeneficioDisponivel,
+  calcularCashbackDisponivelNaVenda,
   descreverCupomMargem,
   ehFormaPagamentoCartao,
   ehFormaPagamentoPix,
@@ -32,6 +33,7 @@ import {
   obterParcelasDisponiveis,
   obterParcelasPermitidasParaForma,
   obterTaxaCartaoSelecionada,
+  obterTotalRecebidoExistente,
   resolverFaixasParcelamentoDaForma,
 } from "../modalPagamentoUtils";
 
@@ -47,6 +49,10 @@ export default function useModalPagamentoController({
   const moduloFiscalAtivo = moduloAtivo("fiscal");
   const [pagamentos, setPagamentos] = useState([]);
   const [pagamentosExistentes, setPagamentosExistentes] = useState([]);
+  const [naoGerarBeneficios, setNaoGerarBeneficios] = useState(Boolean(venda.nao_gerar_beneficios));
+  const [justificativaBeneficios, setJustificativaBeneficios] = useState(
+    venda.justificativa_nao_gerar_beneficios || "",
+  );
   const [formasPagamento, setFormasPagamento] = useState([]);
   const [operadoras, setOperadoras] = useState([]); // 🆕 Operadoras de cartão
   const [operadoraSelecionada, setOperadoraSelecionada] = useState(null); // 🆕 Operadora selecionada
@@ -61,6 +67,8 @@ export default function useModalPagamentoController({
   const [erro, setErro] = useState("");
   const [totalPagoExistente, setTotalPagoExistente] = useState(0);
   const [mostrarPerguntaNFe, setMostrarPerguntaNFe] = useState(false);
+  const [emissaoAutomatica, setEmissaoAutomatica] = useState(null);
+  const [autoEmitirTipo, setAutoEmitirTipo] = useState(null);
   const [vendaFinalizadaId, setVendaFinalizadaId] = useState(null);
   const [vendaFinalizadaParaCupom, setVendaFinalizadaParaCupom] = useState(null);
 
@@ -87,11 +95,32 @@ export default function useModalPagamentoController({
 
   // 💰 Cashback de campanhas
   const [saldoCashback, setSaldoCashback] = useState(0);
+  const [cashbackLimitPercent, setCashbackLimitPercent] = useState(null);
   const [campanhasCompra, setCampanhasCompra] = useState([]);
   const [rankCliente, setRankCliente] = useState("bronze");
   const [loadingBeneficiosCampanha, setLoadingBeneficiosCampanha] = useState(false);
 
   const modalPagamentoContentRef = useRef(null);
+
+  useEffect(() => {
+    if (!moduloFiscalAtivo) return;
+    let ativo = true;
+    api
+      .get("/empresa/config/pdv")
+      .then(({ data }) => {
+        if (ativo)
+          setEmissaoAutomatica({
+            ativa: Boolean(data?.emitir_nota_automatica_pdv),
+            tipo: data?.tipo_nota_automatica_pdv === "nfe" ? "nfe" : "nfce",
+          });
+      })
+      .catch(() => {
+        if (ativo) setEmissaoAutomatica(null);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [moduloFiscalAtivo]);
 
   // Ref para o container das opções de parcelamento
   const opcoesParcelamentoRef = useRef(null);
@@ -116,13 +145,21 @@ export default function useModalPagamentoController({
   useEffect(() => {
     if (!moduloCampanhasAtivo) {
       setSaldoCashback(0);
+      setCashbackLimitPercent(null);
       return;
     }
-    if (!venda.cliente?.id) return;
+    if (!venda.cliente?.id) {
+      setSaldoCashback(0);
+      setCashbackLimitPercent(null);
+      return;
+    }
     const clienteId = venda.cliente.id;
     api
       .get(`/campanhas/clientes/${clienteId}/saldo`)
-      .then((res) => setSaldoCashback(parseFloat(res.data.saldo_cashback || 0)))
+      .then((res) => {
+        setSaldoCashback(parseFloat(res.data.saldo_cashback || 0));
+        setCashbackLimitPercent(res.data.cashback_use_limit_percent ?? null);
+      })
       .catch(() => {}); // campanhas são opcionais
   }, [moduloCampanhasAtivo, venda.cliente?.id]);
 
@@ -221,7 +258,7 @@ export default function useModalPagamentoController({
       try {
         const response = await api.get(`/vendas/${venda.id}/pagamentos`);
         setPagamentosExistentes(response.data.pagamentos || []);
-        setTotalPagoExistente(response.data.total_pago || 0);
+        setTotalPagoExistente(obterTotalRecebidoExistente(response.data));
       } catch (error) {
         console.error("Erro ao buscar pagamentos:", error);
         // Não mostrar erro se a venda ainda não existe
@@ -251,15 +288,22 @@ export default function useModalPagamentoController({
   const valorTotal = venda.total;
   const modalidadeCartao = obterModalidadeCartao(formaPagamentoSelecionada);
   const bandeirasDisponiveis = useMemo(
-    () => obterBandeirasDisponiveis({ taxas: taxasOperadora, modalidade: modalidadeCartao }),
-    [modalidadeCartao, taxasOperadora],
+    () =>
+      obterBandeirasDisponiveis({
+        taxas: taxasOperadora,
+        modalidade: modalidadeCartao,
+        bandeiraLegada: formaPagamentoSelecionada?.bandeira,
+      }),
+    [formaPagamentoSelecionada?.bandeira, modalidadeCartao, taxasOperadora],
   );
   const parcelasDisponiveis = useMemo(() => {
     if (!ehFormaPagamentoCartao(formaPagamentoSelecionada)) {
       return obterParcelasPermitidasParaForma(formaPagamentoSelecionada);
     }
-    const maxParcelas =
-      operadoraSelecionada?.max_parcelas || formaPagamentoSelecionada?.parcelas_maximas || 12;
+    const maxParcelas = Math.min(
+      Number(operadoraSelecionada?.max_parcelas || 12),
+      Number(formaPagamentoSelecionada?.parcelas_maximas || 12),
+    );
     return obterParcelasDisponiveis({
       taxas: taxasOperadora,
       modalidade: modalidadeCartao,
@@ -314,10 +358,12 @@ export default function useModalPagamentoController({
     pagamentos,
     tipo: "credito_cliente",
   });
-  const saldoCashbackDisponivel = calcularSaldoBeneficioDisponivel({
+  const saldoCashbackDisponivel = calcularCashbackDisponivelNaVenda({
     saldo: saldoCashback,
+    valorTotal,
+    limitePercentual: cashbackLimitPercent,
     pagamentos,
-    tipo: "cashback",
+    pagamentosExistentes,
   });
   const cupomParaFinalizar = montarCupomParaFinalizar({ cupomAplicado, venda });
   const descricaoCupomMargem = descreverCupomMargem(cupomParaFinalizar, formatMoneyBRL);
@@ -654,6 +700,9 @@ export default function useModalPagamentoController({
     justificativaTexto,
     margemCriticaAtual,
     moduloFiscalAtivo,
+    emissaoAutomatica,
+    naoGerarBeneficios,
+    justificativaBeneficios,
     nsuCartao,
     numeroParcelas,
     onConfirmar,
@@ -674,6 +723,7 @@ export default function useModalPagamentoController({
     setLoading,
     setMostrarModalCreditoExcedente,
     setMostrarPerguntaNFe,
+    setAutoEmitirTipo,
     setNsuCartao,
     setNumeroParcelas,
     setOperadoraSelecionada,
@@ -695,6 +745,7 @@ export default function useModalPagamentoController({
   return {
     mostrarPerguntaNFe,
     modalPerguntaNFeProps: {
+      autoEmitirTipo,
       cliente: venda.cliente,
       erro,
       loading,
@@ -721,6 +772,8 @@ export default function useModalPagamentoController({
       setValorRecebido,
       valorRestante,
       saldoCashback: saldoCashbackDisponivel,
+      saldoCashbackTotal: saldoCashback,
+      cashbackLimitPercent,
       saldoCreditoDisponivel,
       formasPagamento,
       valorRecebido,
@@ -740,6 +793,10 @@ export default function useModalPagamentoController({
       valorTotal,
       valorPago,
       moduloCampanhasAtivo,
+      naoGerarBeneficios,
+      setNaoGerarBeneficios,
+      justificativaBeneficios,
+      setJustificativaBeneficios,
       moduloFiscalAtivo,
       loadingBeneficiosCampanha,
       carimbosPrevistos,

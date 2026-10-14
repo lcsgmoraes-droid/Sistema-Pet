@@ -44,7 +44,16 @@ export function useCategoriasFinanceirasController() {
   const [formSubData, setFormSubData] = useState(createSubcategoriaForm);
 
   async function carregarDados() {
-    await Promise.all([carregarCategorias(), carregarSubcategoriasDRE(), carregarCategoriasDRE()]);
+    setLoading(true);
+    try {
+      await Promise.all([
+        carregarCategorias(),
+        carregarSubcategoriasDRE(),
+        carregarCategoriasDRE(),
+      ]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function carregarCategoriasDRE() {
@@ -59,14 +68,11 @@ export function useCategoriasFinanceirasController() {
 
   async function carregarCategorias() {
     try {
-      setLoading(true);
       const response = await api.get("/categorias-financeiras");
       setCategorias(response.data);
     } catch (error) {
       console.error("Erro ao carregar categorias:", error);
       toast.error(error.response?.data?.detail || "Erro ao carregar categorias financeiras");
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -108,7 +114,10 @@ export function useCategoriasFinanceirasController() {
   }
 
   function handleEdit(categoria) {
-    const subsExistentes = buildSubcategoriasExistentes(getSubcategoriasDREDaCategoria(categoria));
+    const subsExistentes = buildSubcategoriasExistentes(
+      getSubcategoriasDREDaCategoria(categoria),
+      categoria.id,
+    );
     setFormData({
       nome: normalizeDisplayText(categoria.nome),
       tipo: categoria.tipo,
@@ -129,21 +138,26 @@ export function useCategoriasFinanceirasController() {
   }
 
   function adicionarSubcategoriaNova(nome = "") {
-    setFormData({
-      ...formData,
-      novasSubcategorias: [...formData.novasSubcategorias, { nome, descricao: "", ativo: true }],
-    });
+    setFormData((atual) => ({
+      ...atual,
+      novasSubcategorias: [...atual.novasSubcategorias, { nome, descricao: "", ativo: true }],
+    }));
   }
 
   function atualizarSubcategoriaNova(index, field, value) {
-    const novasSubs = [...formData.novasSubcategorias];
-    novasSubs[index][field] = value;
-    setFormData({ ...formData, novasSubcategorias: novasSubs });
+    setFormData((atual) => ({
+      ...atual,
+      novasSubcategorias: atual.novasSubcategorias.map((subcategoria, subIndex) =>
+        subIndex === index ? { ...subcategoria, [field]: value } : subcategoria,
+      ),
+    }));
   }
 
   function removerSubcategoriaNova(index) {
-    const novasSubs = formData.novasSubcategorias.filter((_, subIndex) => subIndex !== index);
-    setFormData({ ...formData, novasSubcategorias: novasSubs });
+    setFormData((atual) => ({
+      ...atual,
+      novasSubcategorias: atual.novasSubcategorias.filter((_, subIndex) => subIndex !== index),
+    }));
   }
 
   function handleKeyDownSubcategoria(e, index) {

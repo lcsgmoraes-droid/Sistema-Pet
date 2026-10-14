@@ -52,6 +52,21 @@ export default function ModalDadosVendaFinalizada({ venda, onClose, onUpdated })
         <p className="mt-1 text-sm text-gray-600">
           Venda {venda.numero_venda}. A nota fiscal já emitida não será alterada.
         </p>
+        {venda.nao_gerar_beneficios && (
+          <div className="mt-4 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">
+            <strong>Benefícios de campanhas não gerados nesta venda.</strong>
+            {venda.justificativa_nao_gerar_beneficios && (
+              <p className="mt-1">Justificativa: {venda.justificativa_nao_gerar_beneficios}</p>
+            )}
+            {venda.beneficios_bloqueados_em && (
+              <p className="mt-1 text-xs">
+                Registrado em {new Date(venda.beneficios_bloqueados_em).toLocaleString("pt-BR")}
+                {venda.beneficios_bloqueados_por_id &&
+                  ` pelo usuário #${venda.beneficios_bloqueados_por_id}`}
+              </p>
+            )}
+          </div>
+        )}
         {pagamentosCartao.map((pagamento, index) => (
           <label key={pagamento.id} className="mt-4 block text-sm font-medium text-gray-800">
             NSU do cartão {pagamentosCartao.length > 1 ? index + 1 : ""}

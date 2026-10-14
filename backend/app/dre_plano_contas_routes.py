@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 from app.db import get_session
+from app.categorias_integridade import normalizar_nome_categoria
 from app.auth import get_current_user_and_tenant
 from app.dre_plano_contas_models import (
     DRECategoria,
@@ -18,6 +19,7 @@ from app.dre_plano_contas_models import (
     BaseRateio,
     EscopoRateio,
 )
+from app.financeiro_models import CategoriaFinanceira
 from pydantic import BaseModel, Field, validator
 from datetime import datetime
 
@@ -112,6 +114,70 @@ class DRESubcategoriaResponse(BaseModel):
 # ============================================================
 
 
+def _nome_categoria_dre_duplicado(
+    db: Session,
+    tenant_id,
+    natureza: NaturezaDRE,
+    nome: str,
+    ignorar_id: int | None = None,
+) -> bool:
+    existentes = (
+        db.query(DRECategoria)
+        .filter(
+            DRECategoria.tenant_id == tenant_id,
+            DRECategoria.natureza == natureza,
+            DRECategoria.ativo.is_(True),
+        )
+        .all()
+    )
+    nome_normalizado = normalizar_nome_categoria(nome)
+    return any(
+        categoria.id != ignorar_id
+        and normalizar_nome_categoria(categoria.nome) == nome_normalizado
+        for categoria in existentes
+    )
+
+
+def _nome_subcategoria_dre_duplicado(
+    db: Session, tenant_id, categoria_id: int, nome: str, ignorar_id: int | None = None
+) -> bool:
+    existentes = (
+        db.query(DRESubcategoria)
+        .filter(
+            DRESubcategoria.tenant_id == tenant_id,
+            DRESubcategoria.categoria_id == categoria_id,
+            DRESubcategoria.ativo.is_(True),
+        )
+        .all()
+    )
+    nome_normalizado = normalizar_nome_categoria(nome)
+    return any(
+        subcategoria.id != ignorar_id
+        and normalizar_nome_categoria(subcategoria.nome) == nome_normalizado
+        for subcategoria in existentes
+    )
+
+
+def _validar_proprietario_categoria_financeira_vinculada(
+    db: Session, categoria_financeira_id: int | None, tenant_id, usuario_id: int
+) -> None:
+    if categoria_financeira_id is None:
+        return
+    categoria = (
+        db.query(CategoriaFinanceira)
+        .filter(
+            CategoriaFinanceira.id == categoria_financeira_id,
+            CategoriaFinanceira.tenant_id == tenant_id,
+            CategoriaFinanceira.user_id == usuario_id,
+        )
+        .first()
+    )
+    if not categoria:
+        raise HTTPException(
+            status_code=404, detail="Categoria financeira vinculada não encontrada"
+        )
+
+
 @router.get("/categorias", response_model=List[DRECategoriaResponse])
 def listar_categorias(
     db: Session = Depends(get_session),
@@ -142,10 +208,15 @@ def criar_categoria(
 ):
     """Cria uma nova categoria DRE (apenas estrutural, NÃO cria DRE)"""
     current_user, tenant_id = user_and_tenant
+    nome = categoria.nome.strip()
+    if not normalizar_nome_categoria(nome):
+        raise HTTPException(status_code=400, detail="Informe o nome da categoria DRE")
+    if _nome_categoria_dre_duplicado(db, tenant_id, categoria.natureza, nome):
+        raise HTTPException(status_code=409, detail="Categoria DRE já existe")
 
     nova_categoria = DRECategoria(
         tenant_id=tenant_id,
-        nome=categoria.nome,
+        nome=nome,
         ordem=categoria.ordem,
         natureza=categoria.natureza,
         ativo=True,
@@ -177,8 +248,27 @@ def atualizar_categoria(
     if not db_categoria:
         raise HTTPException(status_code=404, detail="Categoria não encontrada")
 
+    nome_novo = (
+        categoria.nome.strip() if categoria.nome is not None else db_categoria.nome
+    )
+    ativo_novo = categoria.ativo if categoria.ativo is not None else db_categoria.ativo
+    if not normalizar_nome_categoria(nome_novo):
+        raise HTTPException(status_code=400, detail="Informe o nome da categoria DRE")
+    if (
+        ativo_novo
+        and (
+            normalizar_nome_categoria(nome_novo)
+            != normalizar_nome_categoria(db_categoria.nome)
+            or not db_categoria.ativo
+        )
+        and _nome_categoria_dre_duplicado(
+            db, tenant_id, db_categoria.natureza, nome_novo, ignorar_id=categoria_id
+        )
+    ):
+        raise HTTPException(status_code=409, detail="Categoria DRE já existe")
+
     if categoria.nome is not None:
-        db_categoria.nome = categoria.nome
+        db_categoria.nome = nome_novo
     if categoria.ordem is not None:
         db_categoria.ordem = categoria.ordem
     if categoria.ativo is not None:
@@ -283,10 +373,22 @@ def criar_subcategoria(
             status_code=400, detail="Categoria inválida ou não pertence a este tenant"
         )
 
+    _validar_proprietario_categoria_financeira_vinculada(
+        db, subcategoria.categoria_financeira_id, tenant_id, current_user.id
+    )
+
+    nome = subcategoria.nome.strip()
+    if not normalizar_nome_categoria(nome):
+        raise HTTPException(
+            status_code=400, detail="Informe o nome da subcategoria DRE"
+        )
+    if _nome_subcategoria_dre_duplicado(db, tenant_id, subcategoria.categoria_id, nome):
+        raise HTTPException(status_code=409, detail="Subcategoria DRE já existe")
+
     nova_subcategoria = DRESubcategoria(
         tenant_id=tenant_id,
         categoria_id=subcategoria.categoria_id,
-        nome=subcategoria.nome,
+        nome=nome,
         tipo_custo=subcategoria.tipo_custo,
         base_rateio=subcategoria.base_rateio,
         escopo_rateio=subcategoria.escopo_rateio,
@@ -323,8 +425,41 @@ def atualizar_subcategoria(
     if not db_subcategoria:
         raise HTTPException(status_code=404, detail="Subcategoria não encontrada")
 
+    _validar_proprietario_categoria_financeira_vinculada(
+        db, db_subcategoria.categoria_financeira_id, tenant_id, current_user.id
+    )
+
+    nome_novo = (
+        subcategoria.nome.strip()
+        if subcategoria.nome is not None
+        else db_subcategoria.nome
+    )
+    ativo_novo = (
+        subcategoria.ativo if subcategoria.ativo is not None else db_subcategoria.ativo
+    )
+    if not normalizar_nome_categoria(nome_novo):
+        raise HTTPException(
+            status_code=400, detail="Informe o nome da subcategoria DRE"
+        )
+    if (
+        ativo_novo
+        and (
+            normalizar_nome_categoria(nome_novo)
+            != normalizar_nome_categoria(db_subcategoria.nome)
+            or not db_subcategoria.ativo
+        )
+        and _nome_subcategoria_dre_duplicado(
+            db,
+            tenant_id,
+            db_subcategoria.categoria_id,
+            nome_novo,
+            ignorar_id=subcategoria_id,
+        )
+    ):
+        raise HTTPException(status_code=409, detail="Subcategoria DRE já existe")
+
     if subcategoria.nome is not None:
-        db_subcategoria.nome = subcategoria.nome
+        db_subcategoria.nome = nome_novo
     if subcategoria.tipo_custo is not None:
         db_subcategoria.tipo_custo = subcategoria.tipo_custo
     if subcategoria.base_rateio is not None:
@@ -380,6 +515,25 @@ def deletar_subcategoria(
     if not db_subcategoria:
         raise HTTPException(status_code=404, detail="Subcategoria não encontrada")
 
+    _validar_proprietario_categoria_financeira_vinculada(
+        db, db_subcategoria.categoria_financeira_id, tenant_id, current_user.id
+    )
+
+    categoria_em_uso = (
+        db.query(CategoriaFinanceira)
+        .filter(
+            CategoriaFinanceira.dre_subcategoria_id == subcategoria_id,
+            CategoriaFinanceira.tenant_id == tenant_id,
+            CategoriaFinanceira.ativo.is_(True),
+        )
+        .first()
+    )
+    if categoria_em_uso:
+        raise HTTPException(
+            status_code=409,
+            detail="Desvincule a subcategoria DRE das categorias financeiras ativas antes de excluir",
+        )
+
     # Verificar se há lançamentos (contas_pagar ou contas_receber)
     from app.financeiro_models import ContaPagar, ContaReceber
 
@@ -413,9 +567,7 @@ def deletar_subcategoria(
         )
 
     # Sem lançamentos: pode deletar fisicamente
-    # Antes, limpar referências em categorias_financeiras para não violar FK
-    from app.financeiro_models import CategoriaFinanceira
-
+    # Apenas vínculos de categorias inativas podem restar neste ponto.
     db.query(CategoriaFinanceira).filter(
         CategoriaFinanceira.dre_subcategoria_id == subcategoria_id,
         CategoriaFinanceira.tenant_id == tenant_id,

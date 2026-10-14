@@ -45,12 +45,16 @@ def test_backend_large_files_700_batch_6_dre_routes_is_facade():
 
 
 def test_backend_large_files_700_batch_6_preserves_public_dre_paths():
+    from fastapi import FastAPI
+
     from app.dre_routes import router
 
+    app = FastAPI()
+    app.include_router(router)
     route_methods = {
-        (route.path, method)
-        for route in router.routes
-        for method in getattr(route, "methods", set())
+        (path, method.upper())
+        for path, methods in app.openapi()["paths"].items()
+        for method in methods
     }
 
     expected_methods = {

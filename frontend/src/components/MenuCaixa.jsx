@@ -13,84 +13,75 @@ import {
   EyeOff,
   Users,
 } from "lucide-react";
-import { obterCaixaAberto, obterResumoCaixa } from "../api/caixa";
+import { obterResumoCaixa } from "../api/caixa";
 import { ModalSuprimento, ModalSangria, ModalDespesa } from "./ModaisCaixa";
 import ModalFecharCaixa from "./ModalFecharCaixa";
 import ModalDevolucao from "./ModalDevolucao";
 import ModalMovimentacoesCaixa from "./ModalMovimentacoesCaixa";
 import { getNumeroVendaParaExibicao, podeAbrirDevolucaoVenda } from "../utils/pdvReturnEligibility";
-
-const CAIXA_SYNC_EVENT_KEY = "petshop_caixa_sync_event";
-
-const publicarEventoCaixa = (tipo) => {
-  try {
-    localStorage.setItem(CAIXA_SYNC_EVENT_KEY, JSON.stringify({ tipo, timestamp: Date.now() }));
-  } catch {
-    // Se storage falhar, mantém comportamento normal do menu.
-  }
-};
+import { precisaConsultarResumoCaixa, publicarEventoCaixa } from "../utils/caixaAbertoMonitor";
+import { formatMoneyBRL } from "../utils/formatters";
 
 export default function MenuCaixa({
   abrirDevolucaoSignal = 0,
   onAbrirCaixa,
+  onDevolucaoSucesso,
   vendaParaDevolucao = null,
+  caixaAberto,
+  contextoCaixa,
+  statusConsultaCaixa,
+  atualizandoCaixa,
+  atualizarCaixa,
 }) {
-  const [caixaAberto, setCaixaAberto] = useState(null);
   const [resumo, setResumo] = useState(null);
   const [menuAberto, setMenuAberto] = useState(false);
   const [modalAtivo, setModalAtivo] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [mostrarSaldoTopo, setMostrarSaldoTopo] = useState(false); // Press-to-reveal (topo)
   const [mostrarValores, setMostrarValores] = useState(false); // Toggle normal (resumo)
-  const carregandoCaixaRef = useRef(false);
+  const [resumoKey, setResumoKey] = useState(0);
+  const [statusResumo, setStatusResumo] = useState("carregando");
   const ultimoSignalDevolucaoRef = useRef(0);
   const vendaAtualPodeAbrirDevolucao = podeAbrirDevolucaoVenda(vendaParaDevolucao);
+  const precisaResumo = precisaConsultarResumoCaixa({ menuAberto, mostrarSaldoTopo, modalAtivo });
 
   useEffect(() => {
     if (!abrirDevolucaoSignal || ultimoSignalDevolucaoRef.current === abrirDevolucaoSignal) {
       return;
     }
 
-    if (!caixaAberto) {
-      return;
-    }
-
     ultimoSignalDevolucaoRef.current = abrirDevolucaoSignal;
     setModalAtivo("devolucao");
     setMenuAberto(false);
-  }, [abrirDevolucaoSignal, caixaAberto]);
+  }, [abrirDevolucaoSignal]);
 
   useEffect(() => {
-    carregarCaixa({ force: true });
-
-    // Atualizar em segundo plano sem sobrepor chamadas.
-    const interval = setInterval(carregarCaixa, 60000);
-    return () => clearInterval(interval);
-  }, []);
+    setResumo(null);
+    setStatusResumo("carregando");
+    setMenuAberto(false);
+    setModalAtivo((ativo) => (ativo === "devolucao" ? ativo : null));
+  }, [caixaAberto?.id]);
 
   useEffect(() => {
-    const handleStorage = (event) => {
-      if (event.key !== CAIXA_SYNC_EVENT_KEY || !event.newValue) {
-        return;
-      }
-
-      carregarCaixa({ force: true });
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        carregarCaixa({ force: true });
-      }
-    };
-
-    window.addEventListener("storage", handleStorage);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
+    if (!caixaAberto?.id || !precisaResumo) return;
+    const controller = new AbortController();
+    setStatusResumo("carregando");
+    void obterResumoCaixa(caixaAberto.id, { signal: controller.signal })
+      .then((dados) => {
+        if (!controller.signal.aborted) {
+          setResumo(dados);
+          setStatusResumo("pronto");
+        }
+      })
+      .catch((erro) => {
+        if (!controller.signal.aborted) {
+          setStatusResumo("erro");
+          console.error("Erro ao carregar resumo do caixa:", erro);
+        }
+      });
     return () => {
-      window.removeEventListener("storage", handleStorage);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      controller.abort();
     };
-  }, []);
+  }, [caixaAberto, precisaResumo, resumoKey]);
 
   // Fechar olho do topo ao soltar o mouse
   useEffect(() => {
@@ -111,57 +102,73 @@ export default function MenuCaixa({
     setMostrarSaldoTopo(false);
   };
 
-  const carregarCaixa = async ({ force = false } = {}) => {
-    if (carregandoCaixaRef.current) return;
-    if (!force && document.visibilityState === "hidden") return;
-
-    carregandoCaixaRef.current = true;
-    try {
-      const caixa = await obterCaixaAberto();
-      setCaixaAberto(caixa);
-
-      if (caixa) {
-        const res = await obterResumoCaixa(caixa.id);
-        setResumo(res);
-      }
-    } catch (error) {
-      console.error("Erro ao carregar caixa:", error);
-    } finally {
-      setLoading(false);
-      carregandoCaixaRef.current = false;
-    }
-  };
-
   const handleOperacaoSucesso = () => {
     setModalAtivo(null);
-    publicarEventoCaixa("movimentacao");
-    carregarCaixa({ force: true });
+    publicarEventoCaixa("movimentacao", { contextoCaixa, caixaId: caixaAberto?.id });
+    setResumoKey((valor) => valor + 1);
+    void atualizarCaixa();
+  };
+
+  const handleDevolucaoSucesso = (devolucao) => {
+    handleOperacaoSucesso();
+    void onDevolucaoSucesso?.(devolucao);
   };
 
   const handleCaixaAberto = async () => {
     await onAbrirCaixa();
-    publicarEventoCaixa("abertura");
-    // Aguardar um pouco e recarregar
-    setTimeout(() => carregarCaixa({ force: true }), 500);
   };
 
-  if (loading) {
+  // A troca do estado do caixa não deve desmontar uma devolução em andamento.
+  const modalDevolucao = modalAtivo === "devolucao" && (
+    <ModalDevolucao
+      key="devolucao"
+      caixaId={caixaAberto?.id}
+      vendaInicial={vendaAtualPodeAbrirDevolucao ? vendaParaDevolucao : null}
+      onClose={() => setModalAtivo(null)}
+      onSucesso={handleDevolucaoSucesso}
+    />
+  );
+
+  if (statusConsultaCaixa === "carregando") {
     return (
-      <div className="flex h-10 w-full min-w-[138px] items-center rounded-lg bg-slate-100 px-3 shadow-sm sm:w-auto">
-        <div className="h-5 w-full animate-pulse rounded-lg bg-slate-200"></div>
-      </div>
+      <>
+        <div className="flex h-10 w-full min-w-[138px] items-center rounded-lg bg-slate-100 px-3 shadow-sm sm:w-auto">
+          <div className="h-5 w-full animate-pulse rounded-lg bg-slate-200"></div>
+        </div>
+        {modalDevolucao}
+      </>
+    );
+  }
+
+  if (!caixaAberto && statusConsultaCaixa === "erro") {
+    return (
+      <>
+        <button
+          type="button"
+          disabled={atualizandoCaixa}
+          onClick={() => atualizarCaixa()}
+          className="inline-flex h-10 items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 text-sm font-semibold text-amber-900 disabled:opacity-50"
+        >
+          <RotateCcw className={`h-4 w-4 ${atualizandoCaixa ? "animate-spin" : ""}`} />
+          Verificar caixa
+        </button>
+        {modalDevolucao}
+      </>
     );
   }
 
   if (!caixaAberto) {
     return (
-      <button
-        onClick={handleCaixaAberto}
-        className="inline-flex h-10 w-full min-w-[138px] items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 sm:w-auto"
-      >
-        <DollarSign className="h-4 w-4" />
-        <span>Abrir Caixa</span>
-      </button>
+      <>
+        <button
+          onClick={handleCaixaAberto}
+          className="inline-flex h-10 w-full min-w-[138px] items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 sm:w-auto"
+        >
+          <DollarSign className="h-4 w-4" />
+          <span>Abrir Caixa</span>
+        </button>
+        {modalDevolucao}
+      </>
     );
   }
 
@@ -234,7 +241,11 @@ export default function MenuCaixa({
                         className={`text-sm font-bold ${mostrarSaldoTopo ? "text-green-600" : "text-gray-400"}`}
                       >
                         {mostrarSaldoTopo
-                          ? `R$ ${resumo?.totais?.saldo_atual?.toFixed(2) || "0,00"}`
+                          ? resumo?.totais?.saldo_atual != null
+                            ? formatMoneyBRL(resumo.totais.saldo_atual)
+                            : statusResumo === "erro"
+                              ? "Saldo indisponível"
+                              : "Consultando..."
                           : "••••••"}
                       </div>
                     </div>
@@ -274,7 +285,7 @@ export default function MenuCaixa({
                       <div
                         className={`font-semibold ${mostrarValores ? "text-gray-900" : "text-gray-300"}`}
                       >
-                        {mostrarValores ? `R$ ${caixaAberto.valor_abertura.toFixed(2)}` : "••••••"}
+                        {mostrarValores ? formatMoneyBRL(caixaAberto.valor_abertura) : "••••••"}
                       </div>
                     </div>
                     <div>
@@ -282,7 +293,7 @@ export default function MenuCaixa({
                       <div
                         className={`font-semibold ${mostrarValores ? "text-green-600" : "text-green-300"}`}
                       >
-                        {mostrarValores ? `+ R$ ${resumo.totais.vendas.toFixed(2)}` : "••••••"}
+                        {mostrarValores ? `+ ${formatMoneyBRL(resumo.totais.vendas)}` : "••••••"}
                       </div>
                     </div>
                     <div>
@@ -290,7 +301,9 @@ export default function MenuCaixa({
                       <div
                         className={`font-semibold ${mostrarValores ? "text-green-600" : "text-green-300"}`}
                       >
-                        {mostrarValores ? `+ R$ ${resumo.totais.suprimentos.toFixed(2)}` : "••••••"}
+                        {mostrarValores
+                          ? `+ ${formatMoneyBRL(resumo.totais.suprimentos)}`
+                          : "••••••"}
                       </div>
                     </div>
                     <div>
@@ -298,7 +311,7 @@ export default function MenuCaixa({
                       <div
                         className={`font-semibold ${mostrarValores ? "text-orange-600" : "text-orange-300"}`}
                       >
-                        {mostrarValores ? `- R$ ${resumo.totais.sangrias.toFixed(2)}` : "••••••"}
+                        {mostrarValores ? `- ${formatMoneyBRL(resumo.totais.sangrias)}` : "••••••"}
                       </div>
                     </div>
                     <div>
@@ -306,7 +319,7 @@ export default function MenuCaixa({
                       <div
                         className={`font-semibold ${mostrarValores ? "text-red-600" : "text-red-300"}`}
                       >
-                        {mostrarValores ? `- R$ ${resumo.totais.despesas.toFixed(2)}` : "••••••"}
+                        {mostrarValores ? `- ${formatMoneyBRL(resumo.totais.despesas)}` : "••••••"}
                       </div>
                     </div>
                   </div>
@@ -421,6 +434,7 @@ export default function MenuCaixa({
       {modalAtivo === "suprimento" && (
         <ModalSuprimento
           caixaId={caixaAberto.id}
+          numeroCaixa={caixaAberto.numero_caixa}
           onClose={() => setModalAtivo(null)}
           onSucesso={handleOperacaoSucesso}
         />
@@ -429,7 +443,10 @@ export default function MenuCaixa({
       {modalAtivo === "sangria" && (
         <ModalSangria
           caixaId={caixaAberto.id}
-          saldoAtual={resumo?.totais?.saldo_atual || 0}
+          numeroCaixa={caixaAberto.numero_caixa}
+          saldoAtual={resumo?.totais?.saldo_atual ?? null}
+          statusResumo={statusResumo}
+          onRecarregarResumo={() => setResumoKey((valor) => valor + 1)}
           onClose={() => setModalAtivo(null)}
           onSucesso={handleOperacaoSucesso}
         />
@@ -449,20 +466,13 @@ export default function MenuCaixa({
           onClose={() => setModalAtivo(null)}
           onSuccess={() => {
             setModalAtivo(null);
-            publicarEventoCaixa("fechamento");
-            carregarCaixa(); // Recarrega para mostrar que não há mais caixa aberto
+            publicarEventoCaixa("fechamento", { contextoCaixa, caixaId: caixaAberto.id });
+            void atualizarCaixa({ invalidar: true });
           }}
         />
       )}
 
-      {modalAtivo === "devolucao" && caixaAberto && (
-        <ModalDevolucao
-          caixaId={caixaAberto.id}
-          vendaInicial={vendaAtualPodeAbrirDevolucao ? vendaParaDevolucao : null}
-          onClose={() => setModalAtivo(null)}
-          onSucesso={handleOperacaoSucesso}
-        />
-      )}
+      {modalDevolucao}
 
       {modalAtivo === "movimentacoes" && caixaAberto && (
         <ModalMovimentacoesCaixa caixaId={caixaAberto.id} onClose={() => setModalAtivo(null)} />

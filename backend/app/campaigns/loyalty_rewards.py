@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.campaigns.coupon_service import create_coupon
+from app.campaigns.cashback_wallet import get_cashback_wallet, lock_cashback_customer
 from app.campaigns.models import (
     Campaign,
     CampaignExecution,
@@ -83,6 +84,9 @@ def _give_loyalty_reward(
         reward_meta.update({"coupon_id": coupon.id, "coupon_code": code})
         reward_type = "coupon:fixed"
     elif reward_tp == "credit":
+        lock_cashback_customer(
+            db, tenant_id=campaign.tenant_id, customer_id=customer_id
+        )
         tx = CashbackTransaction(
             tenant_id=campaign.tenant_id,
             customer_id=customer_id,
@@ -255,6 +259,11 @@ def _revoke_loyalty_reward(
         )
 
         if cashback_tx is not None:
+            lock_cashback_customer(
+                db,
+                tenant_id=campaign.tenant_id,
+                customer_id=execution.customer_id,
+            )
             reversal_exists = (
                 db.query(CashbackTransaction.id)
                 .filter(
@@ -265,20 +274,26 @@ def _revoke_loyalty_reward(
                 .first()
             )
             if not reversal_exists:
-                db.add(
-                    CashbackTransaction(
-                        tenant_id=campaign.tenant_id,
-                        customer_id=execution.customer_id,
-                        amount=-(cashback_tx.amount or 0),
-                        source_type=CashbackSourceTypeEnum.reversal,
-                        source_id=cashback_tx.id,
-                        description=(
-                            f"Estorno recompensa de fidelidade {campaign.name} "
-                            f"({execution.reference_period})"
-                        ),
-                        tx_type="debit",
+                restante = get_cashback_wallet(
+                    db,
+                    tenant_id=campaign.tenant_id,
+                    customer_id=execution.customer_id,
+                ).remaining_by_credit.get(cashback_tx.id, Decimal("0.00"))
+                if restante > 0:
+                    db.add(
+                        CashbackTransaction(
+                            tenant_id=campaign.tenant_id,
+                            customer_id=execution.customer_id,
+                            amount=-restante,
+                            source_type=CashbackSourceTypeEnum.reversal,
+                            source_id=cashback_tx.id,
+                            description=(
+                                f"Estorno recompensa de fidelidade {campaign.name} "
+                                f"({execution.reference_period})"
+                            ),
+                            tx_type="debit",
+                        )
                     )
-                )
 
         db.delete(execution)
         return 1
@@ -288,12 +303,14 @@ def _revoke_loyalty_reward(
 
 
 def _append_note(existing: str | None, message: str) -> str:
-    base = (existing or "").strip()
-    if not base:
-        return message
-    if message in base:
-        return base
-    return f"{base} | {message}"
+    # notes é um resumo limitado pelo VARCHAR(500). O histórico integral de
+    # cada ajuste permanece nos eventos campaign.loyalty.stamps_synced.
+    parts = [part for part in (existing or "").strip().split(" | ") if part]
+    if message and message not in parts:
+        parts.append(message)
+    while len(parts) > 1 and len(" | ".join(parts)) > 500:
+        parts.pop(0)
+    return " | ".join(parts)[:500]
 
 
 def _load_loyalty_executions(

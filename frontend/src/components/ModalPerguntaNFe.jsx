@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle, FileText, HelpCircle } from "lucide-react";
 import { useDadosCupomEmpresa } from "../hooks/useDadosCupomEmpresa";
 import { useFiscalDocumentAvailability } from "../hooks/useFiscalDocumentAvailability";
@@ -16,6 +16,7 @@ const IMPRESSAO_CUPOM_STORAGE_KEY = "pdv_imprimir_cupom_ao_finalizar";
 const IMPRESSAO_CREDIARIO_STORAGE_KEY = "pdv_imprimir_crediario_ao_finalizar";
 
 export default function ModalPerguntaNFe({
+  autoEmitirTipo = null,
   cliente,
   erro = "",
   loading = false,
@@ -38,6 +39,8 @@ export default function ModalPerguntaNFe({
   );
   const [savedCustomerDocument, setSavedCustomerDocument] = useState("");
   const [documentoEmitido, setDocumentoEmitido] = useState(null);
+  const [documentoProcessando, setDocumentoProcessando] = useState(false);
+  const autoEmissaoIniciadaRef = useRef(false);
   const [headerHelpOpen, setHeaderHelpOpen] = useState(false);
   const { carregandoEmpresa, dadosEmpresa } = useDadosCupomEmpresa();
   const {
@@ -62,8 +65,8 @@ export default function ModalPerguntaNFe({
     });
   };
 
-  const handleEmitir = async (modelo = tipoNota) => {
-    const resultado = await onEmitir(modelo);
+  const handleEmitir = async (modelo = tipoNota, automatico = false) => {
+    const resultado = await onEmitir(modelo, { automatico });
     if (resultado?.autorizada) {
       setDocumentoEmitido({
         ...venda,
@@ -75,9 +78,18 @@ export default function ModalPerguntaNFe({
         nfe_provider: resultado.data?.provedor || "intnfe",
         nfe_correlation_id: resultado.data?.correlation_id || null,
       });
+    } else if (resultado?.processando) {
+      setDocumentoProcessando(true);
     }
     return resultado;
   };
+
+  useEffect(() => {
+    if (!autoEmitirTipo || !vendaId || autoEmissaoIniciadaRef.current) return;
+    autoEmissaoIniciadaRef.current = true;
+    setTipoNota(autoEmitirTipo);
+    void handleEmitir(autoEmitirTipo, true);
+  }, [autoEmitirTipo, vendaId]);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -118,7 +130,7 @@ export default function ModalPerguntaNFe({
           )}
 
           <div className="space-y-3">
-            {moduloFiscalAtivo && !documentoEmitido && (
+            {moduloFiscalAtivo && !documentoEmitido && !documentoProcessando && (
               <>
                 <SeletorModeloDocumentoFiscal
                   clienteIdentificado={clienteIdentificado}
@@ -185,6 +197,13 @@ export default function ModalPerguntaNFe({
                   size="md"
                 />
               </div>
+            )}
+
+            {documentoProcessando && (
+              <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                Nota enviada e ainda em processamento. Confira o resultado em NF de Saída antes de
+                tentar emitir novamente.
+              </p>
             )}
 
             <button

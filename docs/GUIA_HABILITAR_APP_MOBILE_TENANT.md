@@ -33,8 +33,12 @@ o usuario para o perfil correto dentro daquele tenant.
 1. Abre o app.
 2. Digita ou escaneia o codigo publico da loja.
 3. Confirma a loja encontrada.
-4. Faz login com email e senha.
+4. Faz login com o mesmo celular e senha cadastrados em Usuarios no ERP. Contas antigas tambem podem usar e-mail ou nome de usuario.
 5. O app identifica o perfil operacional dentro do tenant selecionado.
+
+O funcionario criado em Usuarios ja tem uma pessoa operacional vinculada. Ele
+nao precisa usar Cadastre-se no aplicativo. Para aparecer como funcionario no
+app, a pessoa deve estar ativa e ter o perfil de funcionario liberado.
 
 Se o mesmo email existir em mais de um tenant, a loja selecionada no app define
 qual tenant sera usado. Isso evita que um veterinario, entregador ou cliente

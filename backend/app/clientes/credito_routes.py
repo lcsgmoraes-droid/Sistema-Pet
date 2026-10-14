@@ -19,12 +19,15 @@ def _validar_tenant_e_obter_usuario(user_and_tenant):
     return current_user, tenant_id
 
 
-def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
-    cliente = (
-        db.query(Cliente)
-        .filter(Cliente.id == cliente_id, Cliente.tenant_id == tenant_id)
-        .first()
+def _obter_cliente_ou_404(
+    db: Session, cliente_id: int, tenant_id: str, *, bloquear_credito: bool = False
+):
+    consulta = db.query(Cliente).filter(
+        Cliente.id == cliente_id, Cliente.tenant_id == tenant_id
     )
+    if bloquear_credito:
+        consulta = consulta.populate_existing().with_for_update()
+    cliente = consulta.first()
     if not cliente:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado"
@@ -117,7 +120,7 @@ def adicionar_credito(
     from decimal import Decimal
 
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
-    cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
+    cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id, bloquear_credito=True)
 
     if not cliente.ativo:
         raise HTTPException(
@@ -186,7 +189,7 @@ def remover_credito(
     from decimal import Decimal
 
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
-    cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
+    cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id, bloquear_credito=True)
 
     if not cliente.ativo:
         raise HTTPException(

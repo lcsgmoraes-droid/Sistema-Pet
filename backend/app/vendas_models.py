@@ -51,14 +51,27 @@ class Venda(BaseTenantModel):
     funcionario_id = Column(
         Integer, ForeignKey("clientes.id"), nullable=True
     )  # Funcionário comissionado
+    vendedor_funcionario_id = Column(
+        Integer, ForeignKey("clientes.id"), nullable=True, index=True
+    )
 
     # Valores
     subtotal = Column(DECIMAL(10, 2), nullable=False)
     desconto_valor = Column(DECIMAL(10, 2), default=0)
+    # NULL identifica o contrato legado, que podia ratear cupons nos itens.
+    desconto_venda_valor = Column(DECIMAL(10, 2), nullable=True)
     desconto_percentual = Column(DECIMAL(5, 2), default=0)
     cupom_code = Column(String(100), nullable=True, index=True)
     cupom_discount_applied = Column(DECIMAL(10, 2), nullable=True)
     total = Column(DECIMAL(10, 2), nullable=False)
+    nao_gerar_beneficios = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    justificativa_nao_gerar_beneficios = Column(Text, nullable=True)
+    beneficios_bloqueados_em = Column(DateTime, nullable=True)
+    beneficios_bloqueados_por_id = Column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
 
     # Entrega
     tem_entrega = Column(Boolean, default=False)
@@ -83,6 +96,7 @@ class Venda(BaseTenantModel):
     endereco_entrega = Column(Text, nullable=True)
     distancia_km = Column(DECIMAL(10, 2), nullable=True)
     valor_por_km = Column(DECIMAL(10, 2), nullable=True)
+    pagamento_entrega_previsto = Column(JSON, nullable=True)
     observacoes_entrega = Column(Text, nullable=True)
     status_entrega = Column(
         String(20), nullable=True
@@ -187,6 +201,9 @@ class Venda(BaseTenantModel):
     vendedor = relationship(
         "User", foreign_keys=[vendedor_id], backref="vendas_realizadas"
     )
+    vendedor_funcionario = relationship(
+        "Cliente", foreign_keys=[vendedor_funcionario_id]
+    )
     entregador = relationship(
         "Cliente", foreign_keys=[entregador_id], backref="entregas_realizadas"
     )
@@ -264,20 +281,37 @@ class Venda(BaseTenantModel):
             "cliente": cliente_dict,
             "vendedor_id": self.vendedor_id,
             "funcionario_id": self.funcionario_id,
+            "vendedor_funcionario_id": self.vendedor_funcionario_id
+            or self.funcionario_id,
+            "vendedor_funcionario_nome": self.vendedor_funcionario.nome
+            if self.vendedor_funcionario
+            else None,
             "subtotal": safe_decimal_to_float(self.subtotal),
             "desconto_valor": safe_decimal_to_float(self.desconto_valor) or 0,
+            "desconto_venda_valor": safe_decimal_to_float(self.desconto_venda_valor),
+            "desconto_itens_valor": round(
+                sum(float(item.desconto_item or 0) for item in self.itens), 2
+            ),
+            "desconto_origem_legado": self.desconto_venda_valor is None,
             "desconto_percentual": safe_decimal_to_float(self.desconto_percentual) or 0,
             "cupom_code": self.cupom_code,
             "cupom_discount_applied": safe_decimal_to_float(
                 self.cupom_discount_applied
             ),
             "total": safe_decimal_to_float(self.total),
+            "nao_gerar_beneficios": bool(self.nao_gerar_beneficios),
+            "justificativa_nao_gerar_beneficios": self.justificativa_nao_gerar_beneficios,
+            "beneficios_bloqueados_em": safe_datetime_to_iso(
+                self.beneficios_bloqueados_em
+            ),
+            "beneficios_bloqueados_por_id": self.beneficios_bloqueados_por_id,
             "valor_total": safe_decimal_to_float(
                 self.total
             ),  # Alias para compatibilidade
             "valor_pago": valor_pago,
             "valor_restante": valor_restante,
             "tem_entrega": self.tem_entrega,
+            "pagamento_entrega_previsto": self.pagamento_entrega_previsto,
             "taxa_entrega": safe_decimal_to_float(self.taxa_entrega) or 0,
             "entrega": {
                 "endereco_completo": self.endereco_entrega,
@@ -408,6 +442,11 @@ class VendaItem(BaseTenantModel):
     desconto_item = Column(DECIMAL(10, 2), default=0)
     subtotal = Column(DECIMAL(10, 2), nullable=False)
 
+    # Comprovante prospectivo da baixa de estoque, gravado uma unica vez na
+    # transacao da venda. Snapshots de rentabilidade e movimentos podem ser
+    # reprocessados; este registro nao acompanha essas atualizacoes.
+    custo_original_saida = Column(JSON, nullable=True)
+
     # Referência ao lote (FIFO)
     lote_id = Column(Integer, ForeignKey("produto_lotes.id"), nullable=True)
 
@@ -444,6 +483,7 @@ class VendaItem(BaseTenantModel):
 
         result = {
             "id": self.id,
+            "venda_id": self.venda_id,
             "tipo": self.tipo,
             "produto_id": self.produto_id,
             "estoque_compartilhado": bool(self.estoque_origem_tenant_id),
@@ -612,6 +652,8 @@ class VendaPagamento(BaseTenantModel):
     venda_id = Column(
         Integer, ForeignKey("vendas.id", ondelete="CASCADE"), nullable=False
     )
+    # O recebimento pertence ao caixa que recebeu, mesmo em vendas de dias anteriores.
+    caixa_id = Column(Integer, ForeignKey("caixas.id"), nullable=True, index=True)
 
     # Forma de Pagamento
     forma_pagamento = Column(
@@ -674,6 +716,7 @@ class VendaPagamento(BaseTenantModel):
     def to_dict(self):
         return {
             "id": self.id,
+            "caixa_id": self.caixa_id,
             "forma_pagamento": self.forma_pagamento,
             "forma_pagamento_id": self.forma_pagamento_id,
             "valor": safe_decimal_to_float(self.valor),

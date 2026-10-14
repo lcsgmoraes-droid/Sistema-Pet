@@ -1,4 +1,5 @@
 import { useState } from "react";
+import api from "../api";
 import { createProduto, previewPrecosVendaProdutosCompostos, updateProduto } from "../api/produtos";
 import { normalizarCodigosBarrasAlternativosPayload } from "../pages/produtosFormUtils";
 import { debugLog } from "../utils/debug";
@@ -17,12 +18,41 @@ export default function useProdutosNovoSubmit({
   salvarFiscal,
   salvando,
   setSalvando,
+  produtosOrigemGranel,
+  setProdutosOrigemGranel,
+  granelVinculos,
+  setGranelVinculos,
 }) {
   const [dadosPendentes, setDadosPendentes] = useState(null);
   const [previewPrecosCompostos, setPreviewPrecosCompostos] = useState(null);
   const [precosCompostosSelecionados, setPrecosCompostosSelecionados] = useState([]);
 
-  const salvarEdicao = async (dados, produtosCompostosIds) => {
+  const salvarVinculosGranel = async (produtoId) => {
+    if (!formData.e_granel) return;
+    const falhas = [];
+    for (const origem of produtosOrigemGranel) {
+      if (granelVinculos.some((vinculo) => vinculo.produto_origem_id === origem.id)) {
+        setProdutosOrigemGranel((atuais) => atuais.filter((produto) => produto.id !== origem.id));
+        continue;
+      }
+      try {
+        const { data } = await api.post("/estoque/granel/vinculos", {
+          produto_origem_id: origem.id,
+          produto_granel_id: Number(produtoId),
+        });
+        setGranelVinculos((atuais) =>
+          atuais.some((vinculo) => vinculo.id === data.id) ? atuais : [...atuais, data],
+        );
+        setProdutosOrigemGranel((atuais) => atuais.filter((produto) => produto.id !== origem.id));
+      } catch (error) {
+        const detalhe = error.response?.data?.detail || "tente novamente";
+        falhas.push(`${origem.nome}: ${detalhe}`);
+      }
+    }
+    if (falhas.length > 0) throw new Error(falhas.join("; "));
+  };
+
+  const salvarEdicao = async (dados, produtosCompostosIds, abrirEstoque = false) => {
     await salvarFiscal({ id, tipo_produto: formData.tipo_produto });
     const payload =
       produtosCompostosIds === undefined
@@ -32,8 +62,16 @@ export default function useProdutosNovoSubmit({
             produtos_compostos_preco_venda_ids: produtosCompostosIds,
           };
     await updateProduto(id, payload);
+    try {
+      await salvarVinculosGranel(id);
+    } catch (error) {
+      alert(
+        `Produto atualizado. Alguns vínculos não foram salvos: ${error.message}. Os demais foram mantidos.`,
+      );
+      return;
+    }
     alert("Produto atualizado com sucesso!");
-    navigate("/produtos");
+    navigate(abrirEstoque ? `/produtos/${id}/movimentacoes?aba=lotes` : "/produtos");
   };
 
   const fecharPreviewPrecosCompostos = () => {
@@ -48,7 +86,11 @@ export default function useProdutosNovoSubmit({
 
     try {
       setSalvando(true);
-      await salvarEdicao(dadosPendentes, precosCompostosSelecionados);
+      await salvarEdicao(
+        dadosPendentes.dados,
+        precosCompostosSelecionados,
+        dadosPendentes.abrirEstoque,
+      );
       fecharPreviewPrecosCompostos();
     } catch (error) {
       console.error("Erro ao salvar produto:", error);
@@ -60,6 +102,7 @@ export default function useProdutosNovoSubmit({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const abrirEstoque = e.nativeEvent?.submitter?.value === "estoque";
 
     if (!formData.nome) {
       alert("Preencha o campo Nome");
@@ -204,18 +247,27 @@ export default function useProdutosNovoSubmit({
         const sugestoes = Array.isArray(preview.sugestoes) ? preview.sugestoes : [];
 
         if (sugestoes.length > 0) {
-          setDadosPendentes(dados);
+          setDadosPendentes({ dados, abrirEstoque });
           setPreviewPrecosCompostos(preview);
           setPrecosCompostosSelecionados(sugestoes.map((item) => item.produto_id));
           return;
         }
 
-        await salvarEdicao(dados);
+        await salvarEdicao(dados, undefined, abrirEstoque);
         return;
       }
 
       const response = await createProduto(dados);
       const produtoId = response.data.id;
+      try {
+        await salvarVinculosGranel(produtoId);
+      } catch (error) {
+        alert(
+          `Produto cadastrado. Alguns vínculos não foram salvos: ${error.message}. Confira os vínculos na edição.`,
+        );
+        navigate(`/produtos/${produtoId}/editar?aba=7`);
+        return;
+      }
 
       if (formData.tipo_produto === "PAI") {
         alert("Produto PAI criado com sucesso! Agora cadastre as variações.");
@@ -224,7 +276,7 @@ export default function useProdutosNovoSubmit({
       }
 
       alert(isClone ? "Produto clonado com sucesso!" : "Produto cadastrado com sucesso!");
-      navigate("/produtos");
+      navigate(abrirEstoque ? `/produtos/${produtoId}/movimentacoes?aba=lotes` : "/produtos");
     } catch (error) {
       console.error("Erro ao salvar produto:", error);
       alert(error.response?.data?.detail || "Erro ao salvar produto");

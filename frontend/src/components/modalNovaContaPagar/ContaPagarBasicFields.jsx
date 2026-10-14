@@ -6,6 +6,7 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
   const {
     categorias,
     dados,
+    ehPrincipalParcelado,
     fornecedorSelecionado,
     fornecedores,
     handleCategoriaChange,
@@ -67,6 +68,35 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
         />
       </div>
 
+      <div className="md:col-span-2">
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <input
+            type="checkbox"
+            checked={dados.afeta_dre}
+            onChange={(event) =>
+              setDados((atual) => ({
+                ...atual,
+                afeta_dre: event.target.checked,
+                ...(event.target.checked
+                  ? { dre_subcategoria_id: categoriaSelecionada?.dre_subcategoria_id || null }
+                  : { dre_subcategoria_id: null, tipo_despesa_id: null }),
+              }))
+            }
+          />
+          Afeta a DRE
+        </label>
+        <p className="mt-1 text-xs text-gray-500">
+          Desmarque para o principal de empréstimos ou pagamento de fatura de cartão. Lance juros e
+          taxas separadamente como despesa na DRE.
+        </p>
+        {ehPrincipalParcelado && (
+          <p className="mt-1 text-xs text-amber-700">
+            Alterações na classificação serão aplicadas a todas as parcelas, inclusive as pagas. Os
+            valores e vencimentos das parcelas não serão alterados.
+          </p>
+        )}
+      </div>
+
       <div className="min-w-0">
         <label className="block text-sm font-medium text-gray-700 mb-1">
           <Tag size={16} className="inline mr-1" />
@@ -94,7 +124,7 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
             <Plus size={16} /> Adicionar
           </button>
         </div>
-        {categoriaSelecionada?.tipo_custo && (
+        {dados.afeta_dre && categoriaSelecionada?.tipo_custo && (
           <p
             className={`text-xs font-semibold mt-1 ${
               categoriaSelecionada.tipo_custo === "fixo"
@@ -111,7 +141,7 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
                 : "↕ Custo Misto (Fixo + Variável)"}
           </p>
         )}
-        {categoriaSelecionada && !categoriaSelecionada.dre_subcategoria_id && (
+        {dados.afeta_dre && categoriaSelecionada && !categoriaSelecionada.dre_subcategoria_id && (
           <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex items-center justify-between gap-3">
             <span>Esta categoria ainda não está vinculada ao DRE.</span>
             <button
@@ -125,12 +155,13 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
         )}
       </div>
 
-      <div>
+      <div hidden={!dados.afeta_dre}>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           🏷️ Subcategoria DRE (Demonstrativo de Resultado)
         </label>
         <select
           value={dados.dre_subcategoria_id || ""}
+          disabled={!dados.afeta_dre}
           onChange={(event) =>
             setDados({
               ...dados,
@@ -149,10 +180,11 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
         <p className="text-xs text-gray-500 mt-1">Classifique para melhor análise gerencial</p>
       </div>
 
-      <div>
+      <div hidden={!dados.afeta_dre}>
         <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de despesa</label>
         <select
           value={dados.tipo_despesa_id || ""}
+          disabled={!dados.afeta_dre}
           onChange={(event) =>
             setDados({
               ...dados,
@@ -198,6 +230,25 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
           placeholder="0.00"
           required
         />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          <Calendar size={16} className="inline mr-1" />
+          {dados.afeta_dre ? "Data de emissão / competência da DRE *" : "Data de emissão *"}
+        </label>
+        <input
+          type="date"
+          value={dados.data_emissao}
+          onChange={(event) => setDados({ ...dados, data_emissao: event.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+          required
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          {dados.afeta_dre
+            ? "Define o mês da despesa na DRE. O vencimento informa quando ela será paga."
+            : "Registra a origem da obrigação. O vencimento informa quando ela será paga."}
+        </p>
       </div>
 
       <div>

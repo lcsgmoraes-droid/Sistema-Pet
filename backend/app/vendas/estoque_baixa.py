@@ -117,6 +117,8 @@ def processar_baixa_estoque_item(
                 "quantidade": quantidade_vendida,
                 "estoque_anterior": resultado_estoque["estoque_anterior"],
                 "estoque_novo": resultado_estoque["estoque_novo"],
+                "movimentacao_id": resultado_estoque.get("movimentacao_id"),
+                "valor_total": resultado_estoque.get("valor_total"),
             }
         )
 
@@ -173,6 +175,8 @@ def processar_baixa_estoque_item(
                     "quantidade": quantidade_vendida,
                     "estoque_anterior": resultado_estoque["estoque_anterior"],
                     "estoque_novo": resultado_estoque["estoque_novo"],
+                    "movimentacao_id": resultado_estoque.get("movimentacao_id"),
+                    "valor_total": resultado_estoque.get("valor_total"),
                 }
             )
 
@@ -218,7 +222,7 @@ def processar_baixa_estoque_item(
                     db.query(Produto)
                     .filter(
                         Produto.id == componente.produto_componente_id,
-                        Produto.user_id == user_id,
+                        Produto.tenant_id == tenant_id,
                     )
                     .first()
                 )

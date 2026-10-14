@@ -5,8 +5,11 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.services.venda_descontos import moeda, normalizar_item_venda
+
 
 class VendaItemSchema(BaseModel):
+    item_id: Optional[int] = Field(default=None, gt=0)
     tipo: str
     produto_id: Optional[int] = None
     servico_descricao: Optional[str] = None
@@ -60,8 +63,10 @@ class CriarVendaRequest(BaseModel):
     cliente_id: Optional[int] = None
     vendedor_id: Optional[int] = None
     funcionario_id: Optional[int] = None
+    vendedor_funcionario_id: Optional[int] = None
     itens: List[VendaItemSchema]
     desconto_valor: Optional[float] = 0
+    desconto_venda_valor: Optional[float] = Field(default=None, ge=0)
     desconto_percentual: Optional[float] = 0
     cupom_code: Optional[str] = None
     cupom_discount_applied: Optional[float] = None
@@ -76,6 +81,18 @@ class CriarVendaRequest(BaseModel):
     distancia_km: Optional[float] = None
     valor_por_km: Optional[float] = None
     observacoes_entrega: Optional[str] = None
+    pagamento_entrega_previsto: Optional[dict] = None
+
+    @model_validator(mode="after")
+    def normalizar_precisao_descontos_separados(self):
+        if self.desconto_venda_valor is not None:
+            self.desconto_venda_valor = float(moeda(self.desconto_venda_valor))
+            if self.cupom_discount_applied is not None:
+                self.cupom_discount_applied = float(moeda(self.cupom_discount_applied))
+            for item in self.itens:
+                for campo, valor in normalizar_item_venda(item).items():
+                    setattr(item, campo, valor)
+        return self
 
 
 class FinalizarVendaRequest(BaseModel):
@@ -85,6 +102,11 @@ class FinalizarVendaRequest(BaseModel):
     pagamentos: List[VendaPagamentoSchema]
     cupom_code: Optional[str] = None
     cupom_discount_applied: Optional[float] = None
+    motivo_liberacao_crediario: Optional[str] = Field(default=None, max_length=500)
+    nao_gerar_beneficios: bool = False
+    justificativa_nao_gerar_beneficios: Optional[str] = Field(
+        default=None, max_length=500
+    )
 
 
 class CancelarVendaRequest(BaseModel):

@@ -29,6 +29,14 @@ export interface Parada {
   forma_pagamento?: string;
   valor_venda?: number | null;
   pagamentos?: PagamentoEntrega[];
+  status_pagamento?: string;
+  valor_pago?: number | null;
+  pagamento_entrega_previsto?: PagamentoEntregaPrevisto | null;
+}
+
+export interface PagamentoEntregaPrevisto {
+  forma: "dinheiro" | "cartao_debito" | "cartao_credito" | "pix";
+  valor_para_troco?: number | null;
 }
 
 export interface Rota {
@@ -53,6 +61,8 @@ export interface VendaDetalhes {
   total?: number;
   valor_total?: number;
   pagamentos?: PagamentoEntrega[];
+  valor_pago?: number | null;
+  pagamento_entrega_previsto?: PagamentoEntregaPrevisto | null;
   itens?: Array<{
     produto_nome?: string;
     servico_descricao?: string;
@@ -70,6 +80,10 @@ type FontePagamentoEntrega = {
   valor_total?: number | null;
   total?: number | null;
   pagamentos?: PagamentoEntrega[];
+  status_pagamento?: string;
+  valor_pago?: number | null;
+  valor_restante?: number | null;
+  pagamento_entrega_previsto?: PagamentoEntregaPrevisto | null;
 };
 
 export interface InstrucaoPagamentoEntrega {
@@ -119,6 +133,33 @@ export function montarInstrucoesPagamentoEntrega(
   fonte: FontePagamentoEntrega = {},
 ): InstrucaoPagamentoEntrega[] {
   const totalVenda = Number(fonte.valor_venda ?? fonte.valor_total ?? fonte.total ?? 0);
+  const valorPago = Number(fonte.valor_pago ?? 0);
+  const saldo = Math.max(0, Number(fonte.valor_restante ?? totalVenda - valorPago));
+  if (fonte.status_pagamento === "pago" || (totalVenda > 0 && saldo <= 0.005)) {
+    return [{ chave: "pago", resumo: `✅ PAGO — ${formatarMoeda(totalVenda)}` }];
+  }
+  const previsto = fonte.pagamento_entrega_previsto;
+  if (previsto?.forma) {
+    const nomes = {
+      dinheiro: "DINHEIRO NA ENTREGA",
+      cartao_debito: "CARTÃO DE DÉBITO NA ENTREGA",
+      cartao_credito: "CARTÃO DE CRÉDITO NA ENTREGA",
+      pix: "PIX A FAZER",
+    };
+    const instrucao: InstrucaoPagamentoEntrega = {
+      chave: "previsto",
+      resumo: `${nomes[previsto.forma]} — ${formatarMoeda(saldo)}`,
+      alerta: previsto.forma.startsWith("cartao") ? "LEVAR MÁQUINA DE CARTÃO" : undefined,
+    };
+    if (previsto.forma === "dinheiro" && Number(previsto.valor_para_troco) > 0) {
+      const valor = Number(previsto.valor_para_troco);
+      instrucao.complemento = `Cliente paga com ${formatarMoeda(valor)}`;
+      if (valor >= saldo) instrucao.alerta = `LEVAR TROCO: ${formatarMoeda(valor - saldo)}`;
+    }
+    return valorPago > 0
+      ? [{ chave: "parcial", resumo: `PAGO PARCIALMENTE: ${formatarMoeda(valorPago)}` }, instrucao]
+      : [instrucao];
+  }
   const pagamentos = fonte.pagamentos?.length
     ? fonte.pagamentos
     : fonte.forma_pagamento

@@ -17,6 +17,8 @@ import MenuCaixa from "../MenuCaixa";
 import ActionButton from "../ui/ActionButton";
 import IconActionButton from "../ui/IconActionButton";
 import PageHeader from "../ui/PageHeader";
+import { podeRegistrarRecebimentoVenda } from "../../utils/pdvReturnEligibility";
+import { mensagemCaixaIndisponivel } from "../../utils/caixaAbertoMonitor";
 
 export default function PDVHeaderBar({
   destaqueAbrirCaixa,
@@ -36,12 +38,18 @@ export default function PDVHeaderBar({
   onAbrirOportunidades,
   onToggleAssistente,
   abrirDevolucaoSignal,
+  onDevolucaoSucesso,
   menuCaixaKey,
   onAbrirCaixa,
   onNavigateMeusCaixas,
   modoVisualizacao,
   loading,
   temCaixaAberto,
+  caixaAberto,
+  contextoCaixa,
+  statusConsultaCaixa,
+  atualizandoCaixa,
+  atualizarCaixa,
   onCancelarEdicao,
   onExcluirVenda,
   onSalvarVenda,
@@ -157,8 +165,14 @@ export default function PDVHeaderBar({
             <MenuCaixa
               key={menuCaixaKey}
               abrirDevolucaoSignal={abrirDevolucaoSignal}
+              onDevolucaoSucesso={onDevolucaoSucesso}
               onAbrirCaixa={onAbrirCaixa}
               vendaParaDevolucao={vendaAtual}
+              caixaAberto={caixaAberto}
+              contextoCaixa={contextoCaixa}
+              statusConsultaCaixa={statusConsultaCaixa}
+              atualizandoCaixa={atualizandoCaixa}
+              atualizarCaixa={atualizarCaixa}
             />
           </div>
 
@@ -211,7 +225,7 @@ export default function PDVHeaderBar({
             className="w-full sm:w-auto sm:min-w-[96px]"
             title={
               !temCaixaAberto
-                ? "Caixa fechado - Abra o caixa para salvar vendas"
+                ? mensagemCaixaIndisponivel(statusConsultaCaixa)
                 : "Salvar venda atual"
             }
           >
@@ -221,19 +235,14 @@ export default function PDVHeaderBar({
 
           <ActionButton
             onClick={onAbrirModalPagamento}
-            disabled={
-              loading ||
-              vendaAtual.status === "finalizada" ||
-              vendaAtual.status === "pago_nf" ||
-              !temCaixaAberto
-            }
+            disabled={loading || !podeRegistrarRecebimentoVenda(vendaAtual) || !temCaixaAberto}
             icon={CreditCard}
             intent="create"
             size="lg"
             className="w-full sm:w-auto sm:min-w-[190px]"
             title={
               !temCaixaAberto
-                ? "Caixa fechado - Abra o caixa para registrar recebimentos"
+                ? mensagemCaixaIndisponivel(statusConsultaCaixa)
                 : "Registrar pagamento da venda"
             }
           >

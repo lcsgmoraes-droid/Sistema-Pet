@@ -1,6 +1,8 @@
 import { Plus, Trash2, X } from "lucide-react";
 import ActionButton from "../ui/ActionButton";
+import CurrencyInput from "../CurrencyInput";
 import { safeArray } from "../../utils/safeArray";
+import { calcularSaldoRestanteContasPagar } from "./contasPagarHelpers";
 
 export default function ContasPagarModals({
   mostrarModalPagamento,
@@ -61,21 +63,19 @@ export default function ContasPagarModals({
                 <strong>Já Pago:</strong> {formatarMoeda(contaSelecionada.valor_pago)}
                 <br />
                 <strong>Saldo Restante:</strong>{" "}
-                {formatarMoeda(contaSelecionada.valor_final - contaSelecionada.valor_pago)}
+                {formatarMoeda(calcularSaldoRestanteContasPagar(contaSelecionada))}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Valor a Pagar *</label>
-                  <input
-                    type="number"
+                  <CurrencyInput
                     className="w-full border border-gray-300 rounded px-3 py-2"
-                    step="0.01"
                     value={dadosPagamento.valor_pago}
-                    onChange={(e) =>
+                    onChange={(valor) =>
                       setDadosPagamento({
                         ...dadosPagamento,
-                        valor_pago: parseFloat(e.target.value),
+                        valor_pago: valor,
                       })
                     }
                   />
@@ -153,15 +153,13 @@ export default function ContasPagarModals({
 
                 <div>
                   <label className="block text-sm font-medium mb-1">Juros</label>
-                  <input
-                    type="number"
+                  <CurrencyInput
                     className="w-full border border-gray-300 rounded px-3 py-2"
-                    step="0.01"
                     value={dadosPagamento.valor_juros}
-                    onChange={(e) =>
+                    onChange={(valor) =>
                       setDadosPagamento({
                         ...dadosPagamento,
-                        valor_juros: parseFloat(e.target.value) || 0,
+                        valor_juros: valor,
                       })
                     }
                   />
@@ -169,15 +167,13 @@ export default function ContasPagarModals({
 
                 <div>
                   <label className="block text-sm font-medium mb-1">Multa</label>
-                  <input
-                    type="number"
+                  <CurrencyInput
                     className="w-full border border-gray-300 rounded px-3 py-2"
-                    step="0.01"
                     value={dadosPagamento.valor_multa}
-                    onChange={(e) =>
+                    onChange={(valor) =>
                       setDadosPagamento({
                         ...dadosPagamento,
-                        valor_multa: parseFloat(e.target.value) || 0,
+                        valor_multa: valor,
                       })
                     }
                   />
@@ -185,15 +181,13 @@ export default function ContasPagarModals({
 
                 <div>
                   <label className="block text-sm font-medium mb-1">Desconto</label>
-                  <input
-                    type="number"
+                  <CurrencyInput
                     className="w-full border border-gray-300 rounded px-3 py-2"
-                    step="0.01"
                     value={dadosPagamento.valor_desconto}
-                    onChange={(e) =>
+                    onChange={(valor) =>
                       setDadosPagamento({
                         ...dadosPagamento,
-                        valor_desconto: parseFloat(e.target.value) || 0,
+                        valor_desconto: valor,
                       })
                     }
                   />

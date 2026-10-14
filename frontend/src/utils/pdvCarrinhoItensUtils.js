@@ -32,14 +32,14 @@ export function colocarItemProdutoNoTopo(itens, itemAtualizado) {
 export function recalcularSubtotalItem(item, novaQuantidade) {
   const quantidade = normalizarQuantidadePDV(novaQuantidade);
   const precoUnitario = Number(item.preco_unitario ?? item.preco_venda ?? 0) || 0;
-  const subtotalSemDesconto = precoUnitario * quantidade;
-  let novoDescontoValor = Number(item.desconto_valor || 0) || 0;
+  const subtotalSemDesconto = arredondarDinheiro(precoUnitario * quantidade);
+  let novoDescontoValor = Number(item.desconto_valor ?? item.desconto_item ?? 0) || 0;
 
   if (item.tipo_desconto_aplicado === "percentual" && Number(item.desconto_percentual) > 0) {
     novoDescontoValor = (subtotalSemDesconto * Number(item.desconto_percentual)) / 100;
   }
 
-  novoDescontoValor = Math.min(novoDescontoValor, subtotalSemDesconto);
+  novoDescontoValor = arredondarDinheiro(Math.min(novoDescontoValor, subtotalSemDesconto));
 
   return {
     ...item,

@@ -1,3 +1,5 @@
+import { resumirDescontosVenda } from "./pdvDescontosUtils.js";
+
 function normalizarNumero(valor) {
   const numero = Number(valor ?? 0);
   return Number.isFinite(numero) ? numero : 0;
@@ -5,6 +7,12 @@ function normalizarNumero(valor) {
 
 export function montarItensVendaPayload(vendaAtual) {
   return (vendaAtual.itens || []).map((item) => ({
+    item_id:
+      item.venda_id != null &&
+      vendaAtual.id != null &&
+      Number(item.venda_id) === Number(vendaAtual.id)
+        ? item.id
+        : null,
     tipo: item.tipo,
     produto_id: item.produto_id,
     servico_descricao: item.servico_descricao,
@@ -22,6 +30,7 @@ export function montarItensVendaPayload(vendaAtual) {
 }
 
 export function montarPayloadVenda(vendaAtual, entregadorSelecionado = null) {
+  const descontos = resumirDescontosVenda(vendaAtual);
   const temEntrega = Boolean(vendaAtual.tem_entrega);
   const taxaEntregaTotal = temEntrega
     ? normalizarNumero(vendaAtual.entrega?.taxa_entrega_total)
@@ -39,8 +48,10 @@ export function montarPayloadVenda(vendaAtual, entregadorSelecionado = null) {
   return {
     cliente_id: vendaAtual.cliente?.id || null,
     funcionario_id: vendaAtual.funcionario_id || null,
+    vendedor_funcionario_id: vendaAtual.vendedor_funcionario_id || null,
     itens: montarItensVendaPayload(vendaAtual),
-    desconto_valor: normalizarNumero(vendaAtual.desconto_valor),
+    desconto_valor: descontos.total,
+    desconto_venda_valor: vendaAtual.desconto_venda_valor == null ? null : descontos.global,
     desconto_percentual: normalizarNumero(vendaAtual.desconto_percentual),
     cupom_code: vendaAtual.cupom_code || null,
     cupom_discount_applied:
@@ -58,5 +69,6 @@ export function montarPayloadVenda(vendaAtual, entregadorSelecionado = null) {
     valor_por_km: temEntrega ? normalizarNumero(vendaAtual.entrega?.valor_por_km) : null,
     loja_origem: temEntrega ? vendaAtual.entrega?.loja_origem || null : null,
     entregador_id: entregadorId,
+    pagamento_entrega_previsto: temEntrega ? vendaAtual.pagamento_entrega_previsto || null : null,
   };
 }

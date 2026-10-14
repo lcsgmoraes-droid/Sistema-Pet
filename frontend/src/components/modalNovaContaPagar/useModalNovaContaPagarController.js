@@ -2,6 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 import api from "../../api";
 import { safeArray } from "../../utils/safeArray";
+import { garantirCategoriaDRE } from "../../utils/dreCategoriaFinanceira";
+import {
+  dadosAoSelecionarCategoria,
+  ehCategoriaCompraRevendaPadrao,
+} from "./categoriaCompraRevenda";
 import {
   criarDadosPadraoContaPagar,
   criarFormCategoriaPadrao,
@@ -115,16 +120,13 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
 
   const handleCategoriaChange = (categoriaIdValue) => {
     const categoriaId = categoriaIdValue ? parseInt(categoriaIdValue, 10) : null;
-    const categoria = safeArray(categorias).find((item) => item.id === categoriaId) || null;
-    const dreSubcategoriaId = categoria?.dre_subcategoria_id || null;
+    const categoria =
+      safeArray(categorias).find((item) => String(item.id) === String(categoriaId)) || null;
+    const compraRevenda = ehCategoriaCompraRevendaPadrao(categoria);
 
-    setDados((dadosAtuais) => ({
-      ...dadosAtuais,
-      categoria_id: categoriaId,
-      dre_subcategoria_id: dreSubcategoriaId,
-    }));
+    setDados((dadosAtuais) => dadosAoSelecionarCategoria(dadosAtuais, categoria, categoriaId));
 
-    if (categoria && !dreSubcategoriaId) {
+    if (dados.afeta_dre && categoria && !compraRevenda && !categoria.dre_subcategoria_id) {
       abrirModalVinculoDRE(categoria.id);
     }
   };
@@ -232,6 +234,7 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
       return;
     }
 
+    let categoriaId;
     try {
       const response = await api.post("/categorias-financeiras", {
         nome: formCategoria.nome,
@@ -242,46 +245,60 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
         ativo: formCategoria.ativo,
       });
 
-      const categoriaId = response.data.id;
-      toast.success("Categoria criada com sucesso!");
+      categoriaId = response.data.id;
 
       const subsValidas = formCategoria.novasSubcategorias.filter((sub) => sub.nome.trim());
+      const categoriaDREId = subsValidas.length
+        ? await garantirCategoriaDRE(api, { nome: formCategoria.nome, tipo: formCategoria.tipo })
+        : null;
+      let primeiraSubDREId = null;
       for (const sub of subsValidas) {
-        try {
-          await api.post("/dre/subcategorias", {
-            categoria_id: categoriaId,
-            nome: sub.nome,
-            tipo_custo: "direto",
-            escopo_rateio: "ambos",
-          });
-        } catch (subError) {
-          console.error("Erro ao criar subcategoria:", subError);
-        }
+        const subResp = await api.post("/dre/subcategorias", {
+          categoria_id: categoriaDREId,
+          categoria_financeira_id: categoriaId,
+          nome: sub.nome.trim(),
+          tipo_custo: "direto",
+          escopo_rateio: "ambos",
+        });
+        primeiraSubDREId ||= subResp.data.id;
       }
 
-      if (subsValidas.length > 0) {
-        toast.success(`${subsValidas.length} subcategoria(s) criada(s)!`);
+      if (primeiraSubDREId) {
+        await api.put(`/categorias-financeiras/${categoriaId}`, {
+          dre_subcategoria_id: primeiraSubDREId,
+        });
       }
 
       await carregarDados();
       setDados((dadosAtuais) => ({ ...dadosAtuais, categoria_id: categoriaId }));
       setShowModalCategoria(false);
       setFormCategoria(criarFormCategoriaPadrao());
+      toast.success("Categoria e subcategorias salvas com sucesso!");
     } catch (error) {
       console.error("Erro ao salvar categoria:", error);
-      toast.error(error.response?.data?.detail || "Erro ao salvar categoria");
+      toast.error(
+        categoriaId
+          ? "Categoria criada, mas houve erro nas subcategorias. Reabra a categoria para concluir."
+          : error.response?.data?.detail || "Erro ao salvar categoria",
+      );
+      if (categoriaId) await carregarDados();
     }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!dados.descricao || !dados.valor_original || !dados.data_vencimento) {
+    if (
+      !dados.descricao ||
+      !dados.valor_original ||
+      !dados.data_emissao ||
+      !dados.data_vencimento
+    ) {
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
 
-    if (categoriaSelecionada && !categoriaSelecionada.dre_subcategoria_id) {
+    if (dados.afeta_dre && categoriaSelecionada && !categoriaSelecionada.dre_subcategoria_id) {
       abrirModalVinculoDRE(categoriaSelecionada.id);
       return;
     }
@@ -331,6 +348,7 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
     categorias,
     categoriaSelecionada,
     dados,
+    ehPrincipalParcelado: isEditando && contaEdicao?.status === "parcelado",
     fecharComReset,
     formCategoria,
     fornecedorSelecionado,

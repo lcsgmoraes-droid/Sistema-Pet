@@ -10,6 +10,7 @@ from app.models import (
     AppAccessProfile,
     AppNotification,
     Cliente,
+    Role,
     User,
     UserPushDevice,
     UserSession,
@@ -52,6 +53,7 @@ def _anonymize_ecommerce_user(user: User, *, now: datetime) -> None:
         f"conta-excluida-{user.id}-{secrets.token_hex(8)}@deleted.corepet.invalid"
     )
     user.username = None
+    user.login_phone = None
     user.hashed_password = hash_password(secrets.token_urlsafe(48))
     user.is_active = False
     user.is_admin = False
@@ -452,7 +454,20 @@ def excluir_conta(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Senha incorreta",
         )
-
+    system_role = (
+        db.query(Role)
+        .join(UserTenant, UserTenant.role_id == Role.id)
+        .filter(
+            UserTenant.tenant_id == current_user.tenant_id,
+            UserTenant.user_id == current_user.id,
+        )
+        .first()
+    )
+    if system_role and (system_role.name or "").strip().casefold() != "cliente":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso de funcionario e administrado pelo ERP. Procure o responsavel da loja.",
+        )
     clientes = (
         db.query(Cliente)
         .filter(
@@ -462,6 +477,15 @@ def excluir_conta(
         .order_by(Cliente.id.asc())
         .all()
     )
+    if any(
+        getattr(cliente, "tipo_cadastro", None) in {"funcionario", "veterinario"}
+        or bool(getattr(cliente, "is_entregador", False))
+        for cliente in clientes
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso de funcionario e administrado pelo ERP. Procure o responsavel da loja.",
+        )
     cliente_ids = [cliente.id for cliente in clientes]
     client = getattr(request, "client", None)
     ip_address = getattr(client, "host", None)

@@ -3,10 +3,8 @@ import { X, DollarSign, CheckCircle, AlertCircle, Loader } from "lucide-react";
 import { toast } from "react-hot-toast";
 import api from "../../api";
 import { formatBRL, formatMoneyBRL } from "../../utils/formatters";
-import {
-  campaignAllowsSaleChannel,
-  getCashbackBonusParamKey,
-} from "../../utils/campaignChannelScope";
+import CurrencyInput from "../CurrencyInput";
+import { campaignAllowsSaleChannel } from "../../utils/campaignChannelScope";
 import { useModulos } from "../../contexts/ModulosContext";
 import CustomerIdentity from "../ui/CustomerIdentity";
 import SaleReference from "../ui/SaleReference";
@@ -19,7 +17,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
   const [vendasSelecionadas, setVendasSelecionadas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processando, setProcessando] = useState(false);
-  const [valorPagamento, setValorPagamento] = useState("");
+  const [valorPagamento, setValorPagamento] = useState(0);
   const [formaPagamento, setFormaPagamento] = useState("dinheiro");
   const [numeroTransacao, setNumeroTransacao] = useState("");
   const [observacoes, setObservacoes] = useState("");
@@ -124,28 +122,28 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
     setSelectedIds: setVendasSelecionadas,
   });
 
-  const totalSelecionado = vendas
+  const totalSelecionadoCentavos = vendas
     .filter((v) => vendasSelecionadas.includes(v.id))
-    .reduce((sum, v) => sum + parseFloat(v.saldo_devedor), 0);
+    .reduce((sum, v) => sum + Math.round(Number(v.saldo_devedor || 0) * 100), 0);
+  const totalSelecionado = totalSelecionadoCentavos / 100;
 
   const vendasSelecionadasOrdenadas = vendas
     .filter((venda) => vendasSelecionadas.includes(venda.id))
     .sort((a, b) => new Date(a.data_venda) - new Date(b.data_venda));
 
-  const valorPagamentoNumerico = parseFloat(valorPagamento || 0);
-  const valorBasePrevisao = valorPagamentoNumerico > 0 ? valorPagamentoNumerico : totalSelecionado;
-
-  let valorRestantePrevisao = valorBasePrevisao;
+  const valorPagamentoCentavos = Math.round(Number(valorPagamento || 0) * 100);
+  let valorRestantePrevisao =
+    valorPagamentoCentavos > 0 ? valorPagamentoCentavos : totalSelecionadoCentavos;
   const vendasPrevistasQuitadas = [];
 
   for (const venda of vendasSelecionadasOrdenadas) {
     if (valorRestantePrevisao <= 0) break;
 
-    const saldoVenda = parseFloat(venda.saldo_devedor || 0);
+    const saldoVenda = Math.round(Number(venda.saldo_devedor || 0) * 100);
     const valorAplicado = Math.min(valorRestantePrevisao, saldoVenda);
     const saldoAposPagamento = saldoVenda - valorAplicado;
 
-    if (saldoAposPagamento <= 0.01) {
+    if (saldoAposPagamento <= 0) {
       vendasPrevistasQuitadas.push(venda);
     }
 
@@ -177,20 +175,16 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
 
       const chaveRank = `${rankCliente}_percent`;
       const percentualBase = Number(params[chaveRank] ?? params.bronze_percent ?? 0);
-      const percentuais = new Set();
       const valorCashback = vendasElegiveis.reduce((acc, venda) => {
-        const bonusKey = getCashbackBonusParamKey(venda.canal || "loja_fisica");
-        const percentualTotal = percentualBase + Number(params[bonusKey] ?? 0);
-        percentuais.add(percentualTotal);
         const totalVenda = parseFloat(venda.total || 0);
-        return acc + (totalVenda * percentualTotal) / 100;
+        return acc + (totalVenda * percentualBase) / 100;
       }, 0);
 
       if (valorCashback <= 0) return null;
 
       return {
         campanha: campanha.name,
-        percentual: percentuais.size === 1 ? [...percentuais][0] : null,
+        percentual: percentualBase,
         valor: valorCashback,
       };
     })
@@ -247,12 +241,12 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
       return;
     }
 
-    if (!valorPagamento || parseFloat(valorPagamento) <= 0) {
+    if (valorPagamentoCentavos <= 0) {
       toast.error("Informe um valor válido");
       return;
     }
 
-    if (parseFloat(valorPagamento) > totalSelecionado) {
+    if (valorPagamentoCentavos > totalSelecionadoCentavos) {
       toast.error("Valor do pagamento não pode ser maior que o total selecionado");
       return;
     }
@@ -261,7 +255,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
       setProcessando(true);
       console.log("Enviando requisição:", {
         vendas_ids: vendasSelecionadas,
-        valor_total: parseFloat(valorPagamento),
+        valor_total: valorPagamentoCentavos / 100,
         forma_pagamento: formaPagamento,
         numero_transacao: numeroTransacao || null,
         observacoes: observacoes || null,
@@ -269,7 +263,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
 
       const response = await api.post(`/clientes/${clienteId}/baixar-vendas-lote`, {
         vendas_ids: vendasSelecionadas,
-        valor_total: parseFloat(valorPagamento),
+        valor_total: valorPagamentoCentavos / 100,
         forma_pagamento: formaPagamento,
         numero_transacao: numeroTransacao || null,
         observacoes: observacoes || null,
@@ -285,12 +279,12 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
       const { vendas_quitadas, vendas_parciais, valor_total_baixado } = response.data;
 
       // Mensagem de sucesso detalhada
-      let mensagem = `💰 Total baixado: R$ ${valor_total_baixado.toFixed(2)}\n`;
+      let mensagem = `💰 Total baixado: ${formatMoneyBRL(valor_total_baixado)}\n`;
 
       if (vendas_quitadas.length > 0) {
         mensagem += `\n✅ ${vendas_quitadas.length} venda(s) quitada(s):`;
         vendas_quitadas.forEach((v) => {
-          mensagem += `\n  • ${v.numero_venda}: R$ ${v.valor_baixado.toFixed(2)}`;
+          mensagem += `\n  • ${v.numero_venda}: ${formatMoneyBRL(v.valor_baixado)}`;
         });
       }
 
@@ -298,8 +292,8 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
         mensagem += `\n\n⚠️ ${vendas_parciais.length} venda(s) parcial:`;
         vendas_parciais.forEach((v) => {
           mensagem += `\n  • ${v.numero_venda}:`;
-          mensagem += `\n    Baixado: R$ ${v.valor_baixado.toFixed(2)}`;
-          mensagem += `\n    Falta: R$ ${v.saldo_restante.toFixed(2)}`;
+          mensagem += `\n    Baixado: ${formatMoneyBRL(v.valor_baixado)}`;
+          mensagem += `\n    Falta: ${formatMoneyBRL(v.saldo_restante)}`;
         });
       }
 
@@ -465,13 +459,13 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
                             {new Date(venda.data_venda).toLocaleDateString("pt-BR")}
                           </td>
                           <td className="px-4 py-3 text-right text-gray-900">
-                            R$ {parseFloat(venda.total).toFixed(2)}
+                            {formatMoneyBRL(venda.total)}
                           </td>
                           <td className="px-4 py-3 text-right text-green-600">
-                            R$ {parseFloat(venda.total_pago).toFixed(2)}
+                            {formatMoneyBRL(venda.total_pago)}
                           </td>
                           <td className="px-4 py-3 text-right font-bold text-red-600">
-                            R$ {parseFloat(venda.saldo_devedor).toFixed(2)}
+                            {formatMoneyBRL(venda.saldo_devedor)}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <span
@@ -504,7 +498,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
                         Valor Total Selecionado
                       </label>
                       <div className="text-2xl font-bold text-blue-600">
-                        R$ {totalSelecionado.toFixed(2)}
+                        {formatMoneyBRL(totalSelecionado)}
                       </div>
                     </div>
 
@@ -512,12 +506,9 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Valor do Pagamento *
                       </label>
-                      <input
-                        type="number"
-                        step="0.01"
+                      <CurrencyInput
                         value={valorPagamento}
-                        onChange={(e) => setValorPagamento(e.target.value)}
-                        placeholder="0.00"
+                        onChange={setValorPagamento}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
@@ -643,7 +634,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
 
                   <button
                     onClick={handleBaixarVendas}
-                    disabled={processando || !valorPagamento || parseFloat(valorPagamento) <= 0}
+                    disabled={processando || !valorPagamento || Number(valorPagamento) <= 0}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {processando ? (

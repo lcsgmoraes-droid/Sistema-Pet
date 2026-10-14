@@ -3,8 +3,16 @@
  */
 
 import api from "../api";
+import { criarConsultaCaixaAberto } from "../utils/caixaAbertoRequest";
+import { validarRespostaCaixaAberto } from "../utils/caixaAbertoMonitor";
 
-let caixaAbertoEmAndamento = null;
+const consultarCaixaAberto = criarConsultaCaixaAberto(async ({ compact, signal }) => {
+  const response = await api.get("/caixas/aberto", {
+    ...(compact ? { params: { compact: true } } : {}),
+    ...(signal ? { signal } : {}),
+  });
+  return validarRespostaCaixaAberto(response);
+});
 
 /**
  * Abrir novo caixa
@@ -17,18 +25,7 @@ export const abrirCaixa = async (dados) => {
 /**
  * Obter caixa aberto do usuário atual
  */
-export const obterCaixaAberto = () => {
-  if (!caixaAbertoEmAndamento) {
-    caixaAbertoEmAndamento = api
-      .get("/caixas/aberto")
-      .then((response) => response.data)
-      .finally(() => {
-        caixaAbertoEmAndamento = null;
-      });
-  }
-
-  return caixaAbertoEmAndamento;
-};
+export const obterCaixaAberto = (opcoes = {}) => consultarCaixaAberto(opcoes);
 
 /**
  * Obter o ultimo fechamento do usuario para conferir o valor da proxima abertura.
@@ -58,8 +55,11 @@ export const validarCaixaAtual = async (caixaIdEsperado) => {
 /**
  * Listar caixas
  */
-export const listarCaixas = async (params = {}) => {
-  const response = await api.get("/caixas", { params });
+export const listarCaixas = async (params = {}, opcoes = {}) => {
+  const response = await api.get("/caixas", {
+    params,
+    ...(opcoes.signal ? { signal: opcoes.signal } : {}),
+  });
   return response.data;
 };
 
@@ -90,16 +90,28 @@ export const fecharCaixa = async (caixaId, dados) => {
 /**
  * Reabrir caixa
  */
-export const reabrirCaixa = async (caixaId) => {
-  const response = await api.post(`/caixas/${caixaId}/reabrir`);
+export const reabrirCaixa = async (caixaId, motivo) => {
+  const response = await api.post(`/caixas/${caixaId}/reabrir`, { motivo });
+  return response.data;
+};
+
+export const obterAuditoriaCaixa = async (caixaId) => {
+  const response = await api.get(`/caixas/${caixaId}/auditoria`);
+  return response.data;
+};
+
+export const conferirItemCaixa = async (caixaId, dados) => {
+  const response = await api.post(`/caixas/${caixaId}/auditoria/conferencia`, dados);
   return response.data;
 };
 
 /**
  * Obter resumo do caixa
  */
-export const obterResumoCaixa = async (caixaId) => {
-  const response = await api.get(`/caixas/${caixaId}/resumo`);
+export const obterResumoCaixa = async (caixaId, opcoes = {}) => {
+  const response = await api.get(`/caixas/${caixaId}/resumo`, {
+    ...(opcoes.signal ? { signal: opcoes.signal } : {}),
+  });
   return response.data;
 };
 
@@ -110,4 +122,16 @@ export const obterVendasCaixa = async (caixaId, formaPagamento = null) => {
   const params = formaPagamento ? { forma_pagamento: formaPagamento } : {};
   const response = await api.get(`/caixas/${caixaId}/vendas`, { params });
   return response.data;
+};
+
+export const baixarPdfCaixa = async (caixaId, numeroCaixa) => {
+  const response = await api.get(`/caixas/${caixaId}/pdf`, { responseType: "blob" });
+  const url = URL.createObjectURL(response.data);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `Caixa_${numeroCaixa}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 };

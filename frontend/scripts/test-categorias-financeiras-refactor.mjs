@@ -70,7 +70,7 @@ for (const literal of [
   "Subcategorias DRE",
   "Classificação de Custo",
   "Nova Subcategoria DRE",
-  "Categoria DRE",
+  "garantirCategoriaDRE",
 ]) {
   assert(
     featureSource.includes(literal),

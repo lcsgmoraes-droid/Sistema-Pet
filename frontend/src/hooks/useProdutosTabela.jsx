@@ -8,6 +8,7 @@ import {
   normalizeExpandId,
   obterEstoqueVisualProduto,
   obterLotesValidadeDisponiveis,
+  obterValidadeMaisProximaProduto,
 } from "../components/produtos/produtosUtils";
 
 const PRODUTOS_COLUNAS_STORAGE_KEY = "produtos_colunas_visiveis";
@@ -85,12 +86,7 @@ export default function useProdutosTabela({
 
   const getValidadeMaisProxima = (produto) => {
     const lotes = obterLotesValidadeDisponiveis(produto);
-    const primeiroLoteComValidade = lotes.find((lote) => lote.data_validade);
-
-    const proximaValidade =
-      primeiroLoteComValidade?.data_validade ||
-      produto.validade_proxima_listagem ||
-      produto.validade_proxima;
+    const proximaValidade = obterValidadeMaisProximaProduto(produto);
     const tooltip = montarTooltipLotesValidade(lotes, formatarData);
 
     if (!proximaValidade) {

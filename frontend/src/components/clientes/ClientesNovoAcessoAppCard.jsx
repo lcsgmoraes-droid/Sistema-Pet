@@ -74,6 +74,7 @@ export default function ClientesNovoAcessoAppCard({
       setFormData((prev) => ({
         ...prev,
         auth_user_id: null,
+        pode_liberar_venda_crediario_atrasado: false,
         app_login: {
           username: sugerirUsername(),
           email: prev.email || "",
@@ -87,6 +88,12 @@ export default function ClientesNovoAcessoAppCard({
       ...prev,
       auth_user_id: value ? Number(value) : null,
       app_login: null,
+      pode_liberar_venda_crediario_atrasado: value
+        ? Boolean(
+            usuarios.find((usuario) => usuario.user_id === Number(value))
+              ?.pode_liberar_venda_crediario_atrasado,
+          )
+        : false,
     }));
   };
 
@@ -138,6 +145,31 @@ export default function ClientesNovoAcessoAppCard({
           </option>
         ))}
       </select>
+
+      {(formData.auth_user_id || formData.app_login) && (
+        <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <input
+            type="checkbox"
+            checked={Boolean(formData.pode_liberar_venda_crediario_atrasado)}
+            onChange={(event) =>
+              setFormData((prev) => ({
+                ...prev,
+                pode_liberar_venda_crediario_atrasado: event.target.checked,
+              }))
+            }
+            className="mt-0.5 h-4 w-4 rounded border-amber-400 text-amber-700 focus:ring-amber-500"
+          />
+          <span>
+            <span className="block text-sm font-semibold text-slate-900">
+              Autorizar este usuário a liberar venda bloqueada por crediário em atraso
+            </span>
+            <span className="mt-1 block text-xs text-slate-600">
+              A liberação exige um motivo registrado na venda. Esta autorização vale somente para a
+              conta selecionada nesta loja.
+            </span>
+          </span>
+        </label>
+      )}
 
       {formData.app_login && (
         <div className="mt-3 grid gap-3 rounded-lg border border-indigo-200 bg-white p-3 sm:grid-cols-2">

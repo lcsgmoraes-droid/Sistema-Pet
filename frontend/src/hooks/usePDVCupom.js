@@ -1,47 +1,23 @@
 import { useEffect, useState } from "react";
 import api from "../api";
+import { calcularCuponsVenda, obterCuponsVenda } from "../utils/pdvDescontosUtils";
 
-export function usePDVCupom({ vendaAtual, aplicarDescontoTotal, removerDescontoTotal }) {
+export function usePDVCupom({ vendaAtual, recalcularTotais, prepararDescontos }) {
   const [codigoCupom, setCodigoCupom] = useState("");
-  const [cuponsAplicados, setCuponsAplicados] = useState([]);
   const [loadingCupom, setLoadingCupom] = useState(false);
   const [erroCupom, setErroCupom] = useState("");
+  const cuponsAplicados = obterCuponsVenda(vendaAtual);
 
   useEffect(() => {
-    if (!vendaAtual.id && vendaAtual.itens.length === 0) {
-      setCuponsAplicados([]);
-      setCodigoCupom("");
-      setErroCupom("");
-    }
-  }, [vendaAtual.id, vendaAtual.itens.length]);
-
-  useEffect(() => {
-    const codigosPersistidos = String(vendaAtual.cupom_code || "")
-      .split(",")
-      .map((codigo) => codigo.trim().toUpperCase())
-      .filter(Boolean);
-    if (codigosPersistidos.length === 0) return;
-
-    setCuponsAplicados((atuais) => {
-      if (atuais.map((cupom) => cupom.code).join(",") === codigosPersistidos.join(",")) {
-        return atuais;
-      }
-      return codigosPersistidos.map((code, index) => ({
-        code,
-        discount_applied: index === 0 ? Number(vendaAtual.cupom_discount_applied || 0) : 0,
-        persistido_sem_detalhe: true,
-      }));
-    });
-  }, [vendaAtual.cupom_code, vendaAtual.cupom_discount_applied]);
+    setCodigoCupom("");
+    setErroCupom("");
+  }, [vendaAtual.id]);
 
   const cupomAplicado =
     cuponsAplicados.length > 0
       ? {
           code: cuponsAplicados.map((cupom) => cupom.code).join(","),
-          discount_applied: cuponsAplicados.reduce(
-            (total, cupom) => total + Number(cupom.discount_applied || 0),
-            0,
-          ),
+          discount_applied: Number(vendaAtual.cupom_discount_applied || 0),
           items: cuponsAplicados,
         }
       : null;
@@ -61,59 +37,52 @@ export function usePDVCupom({ vendaAtual, aplicarDescontoTotal, removerDescontoT
       setErroCupom("Use no maximo 5 cupons na mesma venda.");
       return;
     }
+    const preparada = await prepararDescontos();
+    if (!preparada) return;
     setLoadingCupom(true);
     setErroCupom("");
     try {
-      const res = await api.post(`/campanhas/cupons/${code}/resgatar`, {
-        venda_total: vendaAtual.total,
-        customer_id: vendaAtual.cliente?.id || null,
-      });
-      const dados = res.data;
-      const proximosCupons = [...cuponsAplicados, dados];
-      const descontoTotal = proximosCupons.reduce(
-        (total, cupom) => total + Number(cupom.discount_applied || 0),
+      const base = Math.max(
         0,
+        Number(preparada.subtotal || 0) - Number(preparada.desconto_venda_valor || 0),
       );
-      const codigos = proximosCupons.map((cupom) => cupom.code).join(",");
-      setCuponsAplicados(proximosCupons);
+      const anteriores = calcularCuponsVenda(base, obterCuponsVenda(preparada));
+      const res = await api.post(`/campanhas/cupons/${code}/resgatar`, {
+        venda_total: anteriores.restante,
+        customer_id: preparada.cliente?.id || null,
+      });
+      const proximosCupons = [...anteriores.detalhes, res.data];
       setCodigoCupom("");
-      aplicarDescontoTotal("valor", descontoTotal, {
-        cupom_code: codigos,
-        cupom_discount_applied: descontoTotal,
+      recalcularTotais(preparada.itens, {
+        ...preparada,
+        cupom_code: proximosCupons.map((cupom) => cupom.code).join(","),
+        cupons_detalhes: proximosCupons,
       });
     } catch (err) {
-      const msg = err?.response?.data?.detail || "Erro ao validar cupom";
-      setErroCupom(msg);
+      setErroCupom(err?.response?.data?.detail || "Erro ao validar cupom");
     } finally {
       setLoadingCupom(false);
     }
   };
 
-  const removerCupom = (codigo) => {
-    const cupomSelecionado = cuponsAplicados.find((cupom) => cupom.code === codigo);
+  const removerCupom = async (codigo) => {
+    const preparada = await prepararDescontos();
+    if (!preparada) return;
+    const preparados = obterCuponsVenda(preparada);
+    const cupomSelecionado = preparados.find((cupom) => cupom.code === codigo);
     const removerTodos = !codigo || cupomSelecionado?.persistido_sem_detalhe;
-    const restantes = removerTodos ? [] : cuponsAplicados.filter((cupom) => cupom.code !== codigo);
-    setCuponsAplicados(restantes);
+    const restantes = removerTodos ? [] : preparados.filter((cupom) => cupom.code !== codigo);
     setCodigoCupom("");
     setErroCupom(
       removerTodos && cuponsAplicados.length > 1
         ? "Os cupons salvos anteriormente foram removidos juntos. Aplique novamente os que desejar."
         : "",
     );
-    if (restantes.length === 0) {
-      removerDescontoTotal({
-        cupom_code: null,
-        cupom_discount_applied: null,
-      });
-      return;
-    }
-    const descontoTotal = restantes.reduce(
-      (total, cupom) => total + Number(cupom.discount_applied || 0),
-      0,
-    );
-    aplicarDescontoTotal("valor", descontoTotal, {
-      cupom_code: restantes.map((cupom) => cupom.code).join(","),
-      cupom_discount_applied: descontoTotal,
+    recalcularTotais(preparada.itens, {
+      ...preparada,
+      cupom_code: restantes.map((cupom) => cupom.code).join(",") || null,
+      cupom_discount_applied: null,
+      cupons_detalhes: restantes,
     });
   };
 
@@ -123,9 +92,7 @@ export function usePDVCupom({ vendaAtual, aplicarDescontoTotal, removerDescontoT
   };
 
   const handleCodigoCupomKeyDown = (e) => {
-    if (e.key === "Enter") {
-      void aplicarCupom();
-    }
+    if (e.key === "Enter") void aplicarCupom();
   };
 
   return {

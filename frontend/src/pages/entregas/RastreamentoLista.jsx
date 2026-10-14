@@ -66,10 +66,51 @@ export default function RastreamentoLista({ rotas, rotaSelecionadaId, onSelecion
                 </div>
                 <div className="mt-2 flex items-start gap-2">
                   <MapPin size={14} className="mt-0.5 shrink-0 text-slate-400" />
-                  <span>Próxima entrega: {proximaParada?.endereco || "Não informada"}</span>
+                  <span>
+                    Próxima entrega:{" "}
+                    {proximaParada?.cliente_nome || proximaParada?.numero_venda || "Não informada"}
+                    {proximaParada?.endereco ? ` · ${proximaParada.endereco}` : ""}
+                  </span>
                 </div>
               </div>
             </button>
+
+            {selecionada && (
+              <div className="mx-4 mb-4 border-t border-slate-200 pt-3">
+                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">
+                  Entregas desta rota
+                </p>
+                <ol className="space-y-2">
+                  {[...(rota.paradas || [])]
+                    .sort((a, b) => a.ordem - b.ordem)
+                    .map((parada) => (
+                      <li
+                        key={parada.id || parada.ordem}
+                        className="rounded-lg bg-slate-50 p-3 text-xs text-slate-700"
+                      >
+                        <div className="font-bold text-slate-900">
+                          {parada.ordem}. {parada.cliente_nome || "Cliente não informado"}
+                        </div>
+                        {parada.numero_venda && <div>Venda {parada.numero_venda}</div>}
+                        <div>{parada.endereco || "Endereço não informado"}</div>
+                        <div
+                          className={
+                            parada.status === "entregue"
+                              ? "font-semibold text-green-700"
+                              : "font-semibold text-amber-700"
+                          }
+                        >
+                          {parada.status === "entregue"
+                            ? "Entregue"
+                            : parada.status === "tentativa"
+                              ? "Tentativa de entrega"
+                              : "A caminho"}
+                        </div>
+                      </li>
+                    ))}
+                </ol>
+              </div>
+            )}
 
             {urlPublica ? (
               <a
@@ -78,7 +119,7 @@ export default function RastreamentoLista({ rotas, rotaSelecionadaId, onSelecion
                 rel="noreferrer"
                 className="mx-4 mb-4 inline-flex items-center gap-1.5 text-xs font-bold text-teal-700 underline"
               >
-                <ExternalLink size={14} /> Abrir visão do cliente
+                <ExternalLink size={14} /> Abrir link público
               </a>
             ) : null}
           </article>

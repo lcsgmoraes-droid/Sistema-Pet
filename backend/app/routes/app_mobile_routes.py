@@ -47,7 +47,6 @@ from app.routes.app_mobile_funcionario_pdv_routes import (
     _buscar_cliente_pdv_funcionario as _buscar_cliente_pdv_funcionario,
     _calcular_beneficios_funcionario_pdv as _calcular_beneficios_funcionario_pdv,
     _calcular_beneficios_gerados_funcionario_pdv as _calcular_beneficios_gerados_funcionario_pdv,
-    _cashback_bonus_param_key_funcionario_pdv as _cashback_bonus_param_key_funcionario_pdv,
     _forma_pagamento_key_funcionario_pdv as _forma_pagamento_key_funcionario_pdv,
     _get_funcionario_operacional_or_403 as _get_funcionario_operacional_or_403,
     _listar_cupons_disponiveis_funcionario_pdv as _listar_cupons_disponiveis_funcionario_pdv,

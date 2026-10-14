@@ -109,7 +109,11 @@ def processar_pos_commit_finalizacao(
         db.rollback()  # Rollback apenas das contas (venda já commitada)
 
     # 📢 Enfileirar evento de campanha (purchase_completed)
-    if venda.status == "finalizada" and venda.cliente_id:
+    if (
+        venda.status == "finalizada"
+        and venda.cliente_id
+        and not venda.nao_gerar_beneficios
+    ):
         try:
             from app.campaigns.models import CampaignEventQueue, EventOriginEnum
             import uuid as _uuid

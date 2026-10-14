@@ -6,8 +6,13 @@ const criarEntregaVazia = () => ({
   observacoes_entrega: "",
 });
 
-const recalcularTotalComEntrega = (subtotal, taxaEntrega) =>
-  parseFloat((Number(subtotal || 0) + Number(taxaEntrega || 0)).toFixed(2));
+const recalcularTotalComEntrega = (venda, taxaEntrega) => {
+  const taxaAnterior = venda.tem_entrega ? Number(venda.entrega?.taxa_entrega_total || 0) : 0;
+  return Math.max(
+    0,
+    Number((Number(venda.total || 0) - taxaAnterior + Number(taxaEntrega || 0)).toFixed(2)),
+  );
+};
 
 export function usePDVEntregaForm(
   vendaAtual,
@@ -21,7 +26,7 @@ export function usePDVEntregaForm(
       return {
         ...prev,
         tem_entrega: temEntrega,
-        total: recalcularTotalComEntrega(prev.subtotal, taxaEntrega),
+        total: recalcularTotalComEntrega(prev, taxaEntrega),
         entrega: temEntrega ? prev.entrega : criarEntregaVazia(),
       };
     });
@@ -63,7 +68,7 @@ export function usePDVEntregaForm(
 
       return {
         ...prev,
-        total: recalcularTotalComEntrega(prev.subtotal, prev.tem_entrega ? totalArredondado : 0),
+        total: recalcularTotalComEntrega(prev, prev.tem_entrega ? totalArredondado : 0),
         entrega: {
           ...prev.entrega,
           taxa_entrega_total: totalArredondado,

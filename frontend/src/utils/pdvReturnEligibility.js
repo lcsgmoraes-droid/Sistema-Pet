@@ -27,8 +27,33 @@ export function getTipoDevolucaoVenda(venda) {
   return null;
 }
 
+export function getTextoDevolucaoVendaPDV(venda) {
+  const tipo = getTipoDevolucaoVenda(venda);
+  if (tipo === "parcial") {
+    return {
+      situacao: "com Devolução",
+      orientacao: "Consulte o saldo disponível em Devolução.",
+    };
+  }
+  if (tipo === "total") {
+    return {
+      situacao: "com Todos os Itens Devolvidos",
+      orientacao: "O reembolso dos itens não inclui o frete.",
+    };
+  }
+  return null;
+}
+
 export function podeAbrirDevolucaoVenda(venda) {
   return Boolean(venda?.id && STATUS_DEVOLUCAO_DIRETA.has(normalizarStatusVenda(venda.status)));
+}
+
+export function podeRegistrarRecebimentoVenda(venda) {
+  const status = normalizarStatusVenda(venda?.status);
+  return (
+    !["finalizada", "pago_nf", "cancelada", "cancelado", "trocada"].includes(status) &&
+    getTipoDevolucaoVenda(venda) !== "total"
+  );
 }
 
 export function getStatusBuscaDevolucao() {

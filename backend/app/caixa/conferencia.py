@@ -5,6 +5,8 @@ from sqlalchemy import func
 
 from app.caixa_models import Caixa
 
+FORMAS_PAGAMENTO_A_PRAZO = {"crediario", "crediário", "boleto"}
+
 
 def instante_fechamento_sql():
     # updated_at tem fuso e, nos caixas legados, registra a gravação do fechamento.
@@ -59,6 +61,22 @@ def totais_dinheiro(valor_abertura, movimentacoes) -> dict:
         - totais["devolucoes"]
     )
     return {campo: float(valor) for campo, valor in totais.items()}
+
+
+def indicadores_vendas_recebimentos(total_vendido, pagamentos_por_forma: dict) -> dict:
+    """Separa venda registrada de pagamento imediato, sem contar crédito a prazo."""
+    recebimentos = {
+        forma: dados
+        for forma, dados in pagamentos_por_forma.items()
+        if forma.strip().casefold() not in FORMAS_PAGAMENTO_A_PRAZO
+    }
+    return {
+        "total_vendido": float(moeda(total_vendido)),
+        "total_recebido": float(
+            sum((moeda(item["total"]) for item in recebimentos.values()), moeda(0))
+        ),
+        "recebimentos_por_forma_pagamento": recebimentos,
+    }
 
 
 def referencia_fechamento(caixa) -> dict | None:

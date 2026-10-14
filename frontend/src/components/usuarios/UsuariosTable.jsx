@@ -1,4 +1,4 @@
-import { KeyRound, LogOut, UserCheck, UserX } from "lucide-react";
+import { KeyRound, LogOut, Trash2, UserCheck, UserX } from "lucide-react";
 import DataTable from "../ui/DataTable";
 import IconActionButton from "../ui/IconActionButton";
 import Panel from "../ui/Panel";
@@ -16,6 +16,9 @@ export default function UsuariosTable({
   onForcarLogout,
   onManageCredentials,
   onToggleStatus,
+  onDelete,
+  onToggleCrediario,
+  savingLiberacaoId,
   usuarios,
 }) {
   const columns = [
@@ -69,6 +72,24 @@ export default function UsuariosTable({
       ),
     },
     {
+      key: "liberacao_crediario",
+      header: "Pode liberar venda bloqueada",
+      align: "center",
+      render: (usuario) => (
+        <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-slate-700">
+          <input
+            type="checkbox"
+            aria-label={`Autorizar ${usuario.nome || usuario.email || usuario.user_id} a liberar venda com crediário atrasado`}
+            checked={Boolean(usuario.pode_liberar_venda_crediario_atrasado)}
+            disabled={savingLiberacaoId === usuario.user_id}
+            onChange={(event) => onToggleCrediario(usuario, event.target.checked)}
+            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+          />
+          {usuario.pode_liberar_venda_crediario_atrasado ? "Concedida" : "Não concedida"}
+        </label>
+      ),
+    },
+    {
       key: "status",
       header: "Status",
       align: "center",
@@ -103,6 +124,12 @@ export default function UsuariosTable({
             onClick={() => onToggleStatus(usuario.user_id, usuario.is_active)}
             title={usuario.is_active ? "Desativar acesso" : "Ativar acesso"}
           />
+          <IconActionButton
+            icon={Trash2}
+            intent="danger"
+            onClick={() => onDelete(usuario)}
+            title="Excluir acesso definitivamente"
+          />
         </div>
       ),
     },
@@ -117,7 +144,7 @@ export default function UsuariosTable({
         getRowKey={(usuario) => usuario.user_id}
         loading={loading}
         loadingMessage="Carregando usuarios..."
-        tableClassName="min-w-[860px]"
+        tableClassName="min-w-[1060px]"
       />
     </Panel>
   );

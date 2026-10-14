@@ -97,6 +97,7 @@ export default function useUsuariosPage() {
   const [credenciaisError, setCredenciaisError] = useState("");
   const [generatedPassword, setGeneratedPassword] = useState("");
   const [savingCredentials, setSavingCredentials] = useState(false);
+  const [savingLiberacaoId, setSavingLiberacaoId] = useState(null);
   const [initialAccessCredentials, setInitialAccessCredentials] = useState(null);
   const tenantLoginReference = resolveTenantLoginReference(
     user,
@@ -126,6 +127,27 @@ export default function useUsuariosPage() {
     }
   }
 
+  async function alterarLiberacaoCrediario(usuario, autorizado) {
+    setSavingLiberacaoId(usuario.user_id);
+    try {
+      await api.patch(`/usuarios/${usuario.user_id}/liberacao-crediario`, { autorizado });
+      setUsuarios((atuais) =>
+        atuais.map((item) =>
+          item.user_id === usuario.user_id
+            ? { ...item, pode_liberar_venda_crediario_atrasado: autorizado }
+            : item,
+        ),
+      );
+      toast.success(
+        autorizado ? "Usuário autorizado a liberar vendas bloqueadas." : "Autorização removida.",
+      );
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Não foi possível alterar a autorização.");
+    } finally {
+      setSavingLiberacaoId(null);
+    }
+  }
+
   async function toggleStatus(userId, isActive) {
     const acao = isActive ? "desativar acesso" : "ativar acesso";
     if (!(await confirmarCorePet(`Confirma ${acao} deste usuario?`))) return;
@@ -139,6 +161,26 @@ export default function useUsuariosPage() {
     } catch (error) {
       console.error("Erro ao alterar status:", error);
       toast.error(error.response?.data?.detail || "Nao foi possivel alterar o status do usuario.");
+    }
+  }
+
+  async function excluirUsuario(usuario) {
+    const nome = usuario.nome || usuario.login_phone || usuario.email || `ID ${usuario.user_id}`;
+    if (
+      !(await confirmarCorePet(
+        `Excluir definitivamente o acesso de ${nome}? A conta sai da lista e o celular/e-mail ficam livres. O historico de operacoes sera preservado.`,
+      ))
+    )
+      return;
+
+    try {
+      await api.delete(`/usuarios/${usuario.user_id}`, {
+        data: { confirmacao: "EXCLUIR" },
+      });
+      toast.success("Acesso excluido. Celular e e-mail liberados.");
+      await carregarUsuarios();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Nao foi possivel excluir o acesso.");
     }
   }
 
@@ -329,9 +371,12 @@ export default function useUsuariosPage() {
     showPassword,
     salvarCredenciais,
     savingCredentials,
+    savingLiberacaoId,
     setInitialAccessCredentials,
     tenantLoginReference,
     toggleStatus,
+    alterarLiberacaoCrediario,
+    excluirUsuario,
     usuarioFormError,
     usuarioCredenciais,
     usuarios,

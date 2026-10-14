@@ -396,12 +396,19 @@ const ClientesNovoCadastroStep = ({
                       }
                       className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
                     >
-                      <option value="">Selecione</option>
+                      <option value="">Sem acerto</option>
                       <option value="semanal">Semanal</option>
                       <option value="quinzenal">Quinzenal (dias 1 e 15)</option>
                       <option value="mensal">Mensal</option>
                     </select>
                   </div>
+
+                  {!formData.tipo_acerto_entrega && (
+                    <p className="text-[10px] text-gray-600">
+                      As entregas podem ser lançadas normalmente, sem definir uma periodicidade de
+                      acerto.
+                    </p>
+                  )}
 
                   {formData.tipo_acerto_entrega === "semanal" && (
                     <div>

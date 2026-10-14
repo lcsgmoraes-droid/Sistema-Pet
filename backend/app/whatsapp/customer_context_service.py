@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from typing import Any, Optional
 
-from sqlalchemy import func, or_
+from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 
 from app.models import Cliente, Tenant
@@ -196,25 +196,16 @@ def load_customer_benefits(db, *, tenant_id: str, customer: Cliente) -> dict:
         summarize_loyalty_balances_for_customer,
     )
     from app.campaigns.models import (
-        CashbackTransaction,
         Coupon,
         CouponStatusEnum,
     )
 
     now = datetime.now(timezone.utc)
-    cashback_raw = (
-        db.query(func.sum(CashbackTransaction.amount))
-        .filter(
-            CashbackTransaction.tenant_id == tenant_id,
-            CashbackTransaction.customer_id == customer.id,
-            or_(
-                CashbackTransaction.expires_at.is_(None),
-                CashbackTransaction.expires_at > now,
-                CashbackTransaction.tx_type != "credit",
-            ),
-        )
-        .scalar()
-    )
+    from app.campaigns.cashback_wallet import get_cashback_wallet
+
+    cashback_available = get_cashback_wallet(
+        db, tenant_id=tenant_id, customer_id=customer.id, as_of=now
+    ).available
     loyalty = summarize_loyalty_balances_for_customer(
         db,
         tenant_id=tenant_id,
@@ -235,7 +226,7 @@ def load_customer_benefits(db, *, tenant_id: str, customer: Cliente) -> dict:
 
     return {
         "store_credit": float(customer.credito or 0),
-        "cashback": max(0.0, float(cashback_raw or 0)),
+        "cashback": float(cashback_available),
         "loyalty_stamps": max(0, int(loyalty.get("total_carimbos") or 0)),
         "coupons": [
             {

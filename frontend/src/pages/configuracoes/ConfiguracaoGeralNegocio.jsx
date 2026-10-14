@@ -20,10 +20,16 @@ const DEFAULT_FORM = {
   mensagem_venda_critica: "🚨 CRITICO: Margem muito baixa! Venda com prejuizo!",
   aliquota_imposto_padrao: 7,
   caixa_compartilhado: false,
+  vendedor_obrigatorio_pdv: false,
+  mostrar_endereco_cliente_pdv: false,
+  emitir_nota_automatica_pdv: false,
+  tipo_nota_automatica_pdv: "nfce",
   dias_tolerancia_atraso: 5,
   crediario_encargos_automaticos: false,
   crediario_multa_percentual: 2,
   crediario_juros_mensal_percentual: 1,
+  bloquear_venda_crediario_atrasado: false,
+  dias_atraso_bloqueio_venda: 30,
   meta_faturamento_mensal: 0,
   alerta_estoque_percentual: 20,
   dias_produto_parado: 90,
@@ -65,10 +71,16 @@ export default function ConfiguracaoGeralNegocio() {
           margem_alerta_minima: Number(data.margem_alerta_minima ?? 15),
           aliquota_imposto_padrao: Number(data.aliquota_imposto_padrao ?? 7),
           caixa_compartilhado: Boolean(data.caixa_compartilhado),
+          vendedor_obrigatorio_pdv: Boolean(data.vendedor_obrigatorio_pdv),
+          mostrar_endereco_cliente_pdv: Boolean(data.mostrar_endereco_cliente_pdv),
+          emitir_nota_automatica_pdv: Boolean(data.emitir_nota_automatica_pdv),
+          tipo_nota_automatica_pdv: data.tipo_nota_automatica_pdv === "nfe" ? "nfe" : "nfce",
           dias_tolerancia_atraso: Number(data.dias_tolerancia_atraso ?? 5),
           crediario_encargos_automaticos: Boolean(data.crediario_encargos_automaticos),
           crediario_multa_percentual: Number(data.crediario_multa_percentual ?? 2),
           crediario_juros_mensal_percentual: Number(data.crediario_juros_mensal_percentual ?? 1),
+          bloquear_venda_crediario_atrasado: Boolean(data.bloquear_venda_crediario_atrasado),
+          dias_atraso_bloqueio_venda: Number(data.dias_atraso_bloqueio_venda ?? 30),
           meta_faturamento_mensal: Number(data.meta_faturamento_mensal ?? 0),
           alerta_estoque_percentual: Number(data.alerta_estoque_percentual ?? 20),
           dias_produto_parado: Number(data.dias_produto_parado ?? 90),
@@ -132,6 +144,15 @@ export default function ConfiguracaoGeralNegocio() {
       return;
     }
 
+    if (
+      !Number.isInteger(form.dias_atraso_bloqueio_venda) ||
+      form.dias_atraso_bloqueio_venda < 1 ||
+      form.dias_atraso_bloqueio_venda > 3650
+    ) {
+      toast.error("Informe de 1 a 3650 dias para bloquear a venda");
+      return;
+    }
+
     setSalvando(true);
     try {
       const response = await api.put("/empresa/config/", {
@@ -144,10 +165,16 @@ export default function ConfiguracaoGeralNegocio() {
         mensagem_venda_critica: form.mensagem_venda_critica,
         aliquota_imposto_padrao: Number(form.aliquota_imposto_padrao),
         caixa_compartilhado: Boolean(form.caixa_compartilhado),
+        vendedor_obrigatorio_pdv: Boolean(form.vendedor_obrigatorio_pdv),
+        mostrar_endereco_cliente_pdv: Boolean(form.mostrar_endereco_cliente_pdv),
+        emitir_nota_automatica_pdv: Boolean(form.emitir_nota_automatica_pdv),
+        tipo_nota_automatica_pdv: form.tipo_nota_automatica_pdv,
         dias_tolerancia_atraso: Number(form.dias_tolerancia_atraso),
         crediario_encargos_automaticos: Boolean(form.crediario_encargos_automaticos),
         crediario_multa_percentual: Number(form.crediario_multa_percentual),
         crediario_juros_mensal_percentual: Number(form.crediario_juros_mensal_percentual),
+        bloquear_venda_crediario_atrasado: Boolean(form.bloquear_venda_crediario_atrasado),
+        dias_atraso_bloqueio_venda: Number(form.dias_atraso_bloqueio_venda),
         meta_faturamento_mensal: Number(form.meta_faturamento_mensal),
         alerta_estoque_percentual: Number(form.alerta_estoque_percentual),
         dias_produto_parado: Number(form.dias_produto_parado),
@@ -199,7 +226,7 @@ export default function ConfiguracaoGeralNegocio() {
         </Link>
         <h1 className="text-3xl font-bold text-gray-900">Configuracoes Gerais do Negocio</h1>
         <p className="text-gray-600 mt-2">
-          Defina margens do PDV, mensagens de alerta e metas operacionais.
+          Defina as regras do PDV, mensagens de alerta e metas operacionais.
         </p>
       </div>
 
@@ -239,6 +266,77 @@ export default function ConfiguracaoGeralNegocio() {
             acesso de quem ainda usa as credenciais antigas.
           </p>
         </div>
+      </div>
+
+      <div className="rounded-lg bg-white p-6 shadow-md">
+        <h2 className="text-xl font-semibold text-gray-800">Vendedor no PDV</h2>
+        <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-800">
+          <input
+            type="checkbox"
+            checked={form.vendedor_obrigatorio_pdv}
+            onChange={(event) => onChange("vendedor_obrigatorio_pdv", event.target.checked)}
+            className="h-4 w-4"
+          />
+          Exigir indicação do vendedor em cada venda
+        </label>
+        <p className="mt-2 text-sm text-gray-600">
+          Quando ativado, a venda só pode ser salva após selecionar um vendedor. A comissão continua
+          opcional e é configurada separadamente na venda.
+        </p>
+      </div>
+
+      <fieldset className="rounded-lg bg-white p-6 shadow-md">
+        <legend className="sr-only">Busca de clientes no PDV</legend>
+        <h2 className="text-xl font-semibold text-gray-800">Busca de clientes no PDV</h2>
+        <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-800">
+          <input
+            type="checkbox"
+            checked={form.mostrar_endereco_cliente_pdv}
+            onChange={(event) => onChange("mostrar_endereco_cliente_pdv", event.target.checked)}
+            className="h-4 w-4"
+          />
+          Mostrar endereço nas sugestões de clientes
+        </label>
+        <p className="mt-2 text-sm text-gray-600">
+          Exibe o endereço principal do cadastro abaixo do telefone na busca de clientes. Clientes
+          sem endereço cadastrado continuam aparecendo normalmente.
+        </p>
+      </fieldset>
+
+      <div className="rounded-lg bg-white p-6 shadow-md">
+        <h2 className="text-xl font-semibold text-gray-800">Nota fiscal no caixa</h2>
+        <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-800">
+          <input
+            type="checkbox"
+            checked={form.emitir_nota_automatica_pdv}
+            onChange={(event) => onChange("emitir_nota_automatica_pdv", event.target.checked)}
+            className="h-4 w-4"
+          />
+          Emitir nota automaticamente ao finalizar a venda no PDV
+        </label>
+        {form.emitir_nota_automatica_pdv && (
+          <div className="mt-4 max-w-xs">
+            <label
+              htmlFor="tipo-nota-automatica"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Tipo de nota
+            </label>
+            <select
+              id="tipo-nota-automatica"
+              value={form.tipo_nota_automatica_pdv}
+              onChange={(event) => onChange("tipo_nota_automatica_pdv", event.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2"
+            >
+              <option value="nfce">NFC-e (consumidor)</option>
+              <option value="nfe">NF-e (cliente identificado)</option>
+            </select>
+          </div>
+        )}
+        <p className="mt-2 text-sm text-gray-600">
+          A opção autoriza a transmissão da nota após cada venda finalizada. Se faltar algum dado
+          fiscal, a venda continua finalizada e o caixa mostra o erro para correção manual.
+        </p>
       </div>
 
       <fieldset className="rounded-lg bg-white p-6 shadow-md">
@@ -416,6 +514,40 @@ export default function ConfiguracaoGeralNegocio() {
           Informe estas condicoes ao cliente na venda a prazo. A multa de mora fica limitada a 2% no
           sistema.
         </p>
+        <div className="mt-5 border-t border-gray-200 pt-5">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-gray-800">
+            <input
+              type="checkbox"
+              checked={form.bloquear_venda_crediario_atrasado}
+              onChange={(e) => onChange("bloquear_venda_crediario_atrasado", e.target.checked)}
+              className="h-4 w-4"
+            />
+            Bloquear vendas para clientes com crediário em atraso
+          </label>
+          <div className="mt-3 max-w-xs">
+            <label
+              htmlFor="dias-atraso-bloqueio-venda"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Bloquear a partir de quantos dias de atraso?
+            </label>
+            <input
+              id="dias-atraso-bloqueio-venda"
+              type="number"
+              min="1"
+              max="3650"
+              step="1"
+              value={form.dias_atraso_bloqueio_venda}
+              onChange={(e) => onChange("dias_atraso_bloqueio_venda", e.target.value, true)}
+              className={campoClass("dias_atraso_bloqueio_venda")}
+            />
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-gray-500">
+            Considera parcelas de crediário ainda não quitadas. O bloqueio vale para qualquer forma
+            de pagamento e é removido após a quitação. Um responsável com acesso às configurações
+            pode liberar uma venda com motivo registrado.
+          </p>
+        </div>
       </div>
 
       <div className={blocoClass(["margem_saudavel_minima", "margem_alerta_minima"])}>

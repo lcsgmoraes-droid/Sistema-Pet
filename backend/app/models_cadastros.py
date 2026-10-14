@@ -271,6 +271,35 @@ class Cliente(BaseTenantModel):
         return self.fornecedor_grupo.nome if self.fornecedor_grupo else None
 
     pets = relationship("Pet", back_populates="cliente", cascade="all, delete-orphan")
+    contatos_adicionais = relationship(
+        "ClienteContato",
+        back_populates="cliente",
+        cascade="all, delete-orphan",
+        order_by="ClienteContato.id",
+    )
+
+
+class ClienteContato(BaseTenantModel):
+    """Celular de familiar ou outro contato vinculado ao cadastro principal."""
+
+    __tablename__ = "cliente_contatos"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "numero_digitos", name="uq_cliente_contatos_tenant_numero"
+        ),
+    )
+
+    cliente_id = Column(
+        Integer,
+        ForeignKey("clientes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    numero = Column(String(50), nullable=False)
+    numero_digitos = Column(String(20), nullable=False, index=True)
+    vinculo = Column(String(60), nullable=False)
+
+    cliente = relationship("Cliente", back_populates="contatos_adicionais")
 
 
 class Especie(BaseTenantModel):

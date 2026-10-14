@@ -104,13 +104,18 @@ def montar_linhas_dre_competencia(
     receita_produtos_total = _somar(dados_canais, "receita_produtos")
     receita_servicos_total = _somar(dados_canais, "receita_servicos")
     receita_frete_total = _somar(dados_canais, "receita_frete")
+    receita_outras_total = _somar(dados_canais, "receita_outras")
     receita_bruta_total = (
-        receita_produtos_total + receita_servicos_total + receita_frete_total
+        receita_produtos_total
+        + receita_servicos_total
+        + receita_frete_total
+        + receita_outras_total
     )
 
     descontos_total = _somar(dados_canais, "descontos")
+    devolucoes_total = _somar(dados_canais, "devolucoes")
     impostos_total = _somar(dados_canais, "impostos")
-    deducoes_total = descontos_total + impostos_total
+    deducoes_total = descontos_total + devolucoes_total + impostos_total
     receita_liquida_total = receita_bruta_total - deducoes_total
 
     cmv_total = (
@@ -118,7 +123,9 @@ def montar_linhas_dre_competencia(
         + _somar(dados_canais, "cmv_estimado")
         + _somar(dados_canais, "fretes_compras")
     )
-    lucro_bruto_total = receita_liquida_total - cmv_total
+    custo_servicos_total = _somar(dados_canais, "custo_servicos")
+    custos_diretos_total = cmv_total + custo_servicos_total
+    lucro_bruto_total = receita_liquida_total - custos_diretos_total
 
     despesas_variaveis_total = (
         _somar(dados_canais, "taxas_cartao")
@@ -176,6 +183,14 @@ def montar_linhas_dre_competencia(
         "Receita de Frete",
         "receita",
     )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "receita_outras",
+        "Outras Receitas (Contas a Receber)",
+        "receita",
+    )
 
     linhas.append(
         _linha_total(
@@ -194,6 +209,14 @@ def montar_linhas_dre_competencia(
         receita_bruta_total,
         "descontos",
         "Descontos Concedidos",
+        "deducao",
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "devolucoes",
+        "Devolucoes de Vendas",
         "deducao",
     )
     _adicionar_linhas_campo(
@@ -219,17 +242,17 @@ def montar_linhas_dre_competencia(
 
     linhas.append(
         _linha_total(
-            "(-) CUSTO DAS MERCADORIAS VENDIDAS (CMV)",
-            cmv_total,
+            "(-) CUSTOS DIRETOS DAS VENDAS",
+            custos_diretos_total,
             receita_bruta_total,
             "custo",
             "#dc2626",
             "#fef2f2",
-            ORIGENS_DRE["cmv_total"],
+            ORIGENS_DRE["custos_diretos_total"],
         )
     )
     _adicionar_linhas_campo(
-        linhas, dados_canais, receita_bruta_total, "cmv", "CMV", "custo"
+        linhas, dados_canais, receita_bruta_total, "cmv", "CMV - Produtos", "custo"
     )
     _adicionar_linhas_campo(
         linhas,
@@ -237,6 +260,14 @@ def montar_linhas_dre_competencia(
         receita_bruta_total,
         "cmv_estimado",
         "CMV Provisório (Produtos sem Custo)",
+        "custo",
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "custo_servicos",
+        "Custo dos Serviços Prestados",
         "custo",
     )
     _adicionar_linhas_campo(
@@ -400,11 +431,15 @@ def montar_linhas_dre_competencia(
         "vendas_produtos": float(receita_produtos_total),
         "vendas_servicos": float(receita_servicos_total),
         "receita_frete": float(receita_frete_total),
+        "outras_receitas": float(receita_outras_total),
         "descontos": float(descontos_total),
+        "devolucoes": float(devolucoes_total),
         "impostos": float(impostos_total),
         "deducoes_total": float(deducoes_total),
         "receita_liquida": float(receita_liquida_total),
         "cmv": float(cmv_total),
+        "custo_servicos": float(custo_servicos_total),
+        "custos_diretos": float(custos_diretos_total),
         "lucro_bruto": float(lucro_bruto_total),
         "despesas_variaveis": float(despesas_variaveis_total),
         "despesas_operacionais": float(despesas_operacionais_total),

@@ -2,6 +2,10 @@ import { toast } from "react-hot-toast";
 import api from "../../api.js";
 import { buildCategoriaPayload, buildSubcategoriaDREPayload } from "./categoriasFinanceirasUtils";
 import { confirmarCorePet } from "../../services/corepetDialog";
+import {
+  garantirCategoriaDRE,
+  prevalidarSubcategoriasDRE,
+} from "../../utils/dreCategoriaFinanceira";
 
 export function createCategoriasFinanceirasPersistence({
   carregarDados,
@@ -24,22 +28,49 @@ export function createCategoriasFinanceirasPersistence({
       toast.error("Preencha nome e tipo");
       return;
     }
+    const categoriaOriginal = categorias.find((categoria) => categoria.id === editando);
+    if (categoriaOriginal && formData.tipo !== categoriaOriginal.tipo) {
+      toast.error("O tipo da categoria não pode ser alterado após a criação.");
+      return;
+    }
 
+    let categoriaId;
     try {
-      let categoriaId;
+      await prevalidarSubcategoriasDRE(api, {
+        nomeCategoria: formData.nome,
+        tipoCategoria: formData.tipo,
+        categoriaFinanceiraId: editando,
+        categoriaDREId: editando ? resolverCategoriaDREId(editando) : null,
+        subcategorias: formData.novasSubcategorias,
+      });
+
       if (editando) {
         categoriaId = await atualizarCategoria();
       } else {
         categoriaId = await criarCategoria();
+        const primeiraSubDREId = await criarSubcategoriasNovaCategoria(categoriaId);
+        if (primeiraSubDREId) {
+          await api.put(`/categorias-financeiras/${categoriaId}`, {
+            dre_subcategoria_id: primeiraSubDREId,
+          });
+        }
       }
 
+      toast.success(
+        editando ? "Categoria atualizada com sucesso!" : "Categoria criada com sucesso!",
+      );
       setShowModal(false);
       resetForm();
       carregarDados();
       return categoriaId;
     } catch (error) {
       console.error("Erro ao salvar:", error);
-      toast.error(error.response?.data?.detail || "Erro ao salvar categoria");
+      toast.error(
+        categoriaId && !editando
+          ? "Categoria criada, mas houve erro nas subcategorias. Reabra a categoria para concluir."
+          : error.response?.data?.detail || error.message || "Erro ao salvar categoria",
+      );
+      if (categoriaId) carregarDados();
       return null;
     }
   }
@@ -47,27 +78,52 @@ export function createCategoriasFinanceirasPersistence({
   async function atualizarCategoria() {
     await api.put(`/categorias-financeiras/${editando}`, buildCategoriaPayload(formData));
     const categoriaId = editando;
-    await excluirSubcategoriasRemovidas(categoriaId);
-    await criarNovasSubcategoriasEditadas(categoriaId);
-    toast.success("Categoria atualizada com sucesso!");
+    const primeiraNovaSubId = await criarNovasSubcategoriasEditadas(categoriaId);
+    await atualizarSubcategoriasExistentes(categoriaId);
+    await excluirSubcategoriasRemovidas(categoriaId, primeiraNovaSubId);
     return categoriaId;
   }
 
-  async function excluirSubcategoriasRemovidas(categoriaId) {
+  async function atualizarSubcategoriasExistentes(categoriaId) {
+    const originais = getSubcategoriasDREDaCategoria(
+      categorias.find((categoria) => categoria.id === categoriaId),
+    );
+    for (const subcategoria of formData.novasSubcategorias) {
+      if (!subcategoria.id) continue;
+      const original = originais.find((item) => item.id === subcategoria.id);
+      if (
+        original?.categoria_financeira_id === categoriaId &&
+        subcategoria.nome?.trim() &&
+        subcategoria.nome.trim() !== original.nome
+      ) {
+        await api.put(`/dre/subcategorias/${subcategoria.id}`, {
+          nome: subcategoria.nome.trim(),
+        });
+      }
+    }
+  }
+
+  async function excluirSubcategoriasRemovidas(categoriaId, primeiraNovaSubId = null) {
     const idsAtuais = new Set(
       formData.novasSubcategorias.filter((subcategoria) => subcategoria.id).map((sub) => sub.id),
     );
     const categoriaAtualParaDelete = categorias.find((categoria) => categoria.id === categoriaId);
     const subsOriginais = getSubcategoriasDREDaCategoria(categoriaAtualParaDelete);
-    const subsRemovidas = subsOriginais.filter((subcategoria) => !idsAtuais.has(subcategoria.id));
+    if (
+      categoriaAtualParaDelete?.dre_subcategoria_id &&
+      !idsAtuais.has(categoriaAtualParaDelete.dre_subcategoria_id)
+    ) {
+      await api.put(`/categorias-financeiras/${categoriaId}`, {
+        dre_subcategoria_id: [...idsAtuais][0] || primeiraNovaSubId || null,
+      });
+    }
+    const subsRemovidas = subsOriginais.filter(
+      (subcategoria) =>
+        subcategoria.categoria_financeira_id === categoriaId && !idsAtuais.has(subcategoria.id),
+    );
 
     for (const subcategoria of subsRemovidas) {
-      try {
-        await api.delete(`/dre/subcategorias/${subcategoria.id}`);
-      } catch (delError) {
-        console.error("Erro ao excluir subcategoria:", delError);
-        toast.error(`Erro ao excluir subcategoria: ${subcategoria.nome}`);
-      }
+      await api.delete(`/dre/subcategorias/${subcategoria.id}`);
     }
   }
 
@@ -75,13 +131,15 @@ export function createCategoriasFinanceirasPersistence({
     const novasSubs = formData.novasSubcategorias.filter((subcategoria) => {
       return !subcategoria.id && subcategoria.nome?.trim();
     });
-    if (novasSubs.length === 0) return;
+    if (novasSubs.length === 0) return null;
 
-    const categoriaDREId = resolverCategoriaDREId(categoriaId);
-    if (!categoriaDREId) {
-      toast.error("Categoria DRE não encontrada para vincular subcategoria");
-      return;
-    }
+    const categoriaAtual = categorias.find((categoria) => categoria.id === categoriaId);
+    const categoriaDREId =
+      resolverCategoriaDREId(categoriaId) ||
+      (await garantirCategoriaDRE(api, {
+        nome: formData.nome,
+        tipo: formData.tipo,
+      }));
 
     let primeiraSubDREIdEdit = null;
     for (const subcategoria of novasSubs) {
@@ -95,33 +153,17 @@ export function createCategoriasFinanceirasPersistence({
       }
     }
 
-    const categoriaAtual = categorias.find((categoria) => categoria.id === editando);
     if (!categoriaAtual?.dre_subcategoria_id && primeiraSubDREIdEdit) {
       await api.put(`/categorias-financeiras/${editando}`, {
         dre_subcategoria_id: primeiraSubDREIdEdit,
       });
     }
-
-    toast.success(`${novasSubs.length} subcategoria(s) criada(s)!`);
+    return primeiraSubDREIdEdit;
   }
 
   async function criarCategoria() {
     const response = await api.post("/categorias-financeiras", buildCategoriaPayload(formData));
-    const categoriaId = response.data.id;
-    toast.success("Categoria criada com sucesso!");
-
-    const primeiraSubDREId = await criarSubcategoriasNovaCategoria(categoriaId);
-    if (primeiraSubDREId) {
-      try {
-        await api.put(`/categorias-financeiras/${categoriaId}`, {
-          dre_subcategoria_id: primeiraSubDREId,
-        });
-      } catch (vinculoError) {
-        console.error("Erro ao vincular categoria com DRE:", vinculoError);
-      }
-    }
-
-    return categoriaId;
+    return response.data.id;
   }
 
   async function criarSubcategoriasNovaCategoria(categoriaId) {
@@ -130,14 +172,14 @@ export function createCategoriasFinanceirasPersistence({
     const subsValidas = formData.novasSubcategorias.filter((subcategoria) => {
       return subcategoria.nome.trim();
     });
-    const categoriaDREId = resolverCategoriaDREId(categoriaId);
-    if (!categoriaDREId) {
-      toast.error("Categoria DRE não encontrada para vincular subcategoria");
-    }
+    if (subsValidas.length === 0) return null;
+    const categoriaDREId = await garantirCategoriaDRE(api, {
+      nome: formData.nome,
+      tipo: formData.tipo,
+    });
 
     let primeiraSubDREId = null;
     for (const subcategoria of subsValidas) {
-      if (!categoriaDREId) continue;
       const subId = await criarSubcategoriaDRE({
         categoriaDREId,
         categoriaFinanceiraId: categoriaId,
@@ -148,24 +190,15 @@ export function createCategoriasFinanceirasPersistence({
       }
     }
 
-    if (subsValidas.length > 0) {
-      toast.success(`${subsValidas.length} subcategoria(s) criada(s)!`);
-    }
     return primeiraSubDREId;
   }
 
   async function criarSubcategoriaDRE({ categoriaDREId, categoriaFinanceiraId, nome }) {
-    try {
-      const subResp = await api.post(
-        "/dre/subcategorias",
-        buildSubcategoriaDREPayload({ categoriaDREId, nome, categoriaFinanceiraId }),
-      );
-      return subResp?.data?.id || null;
-    } catch (subError) {
-      console.error("Erro ao criar subcategoria:", subError);
-      toast.error(`Erro ao criar subcategoria: ${nome}`);
-      return null;
-    }
+    const subResp = await api.post(
+      "/dre/subcategorias",
+      buildSubcategoriaDREPayload({ categoriaDREId, nome, categoriaFinanceiraId }),
+    );
+    return subResp?.data?.id || null;
   }
 
   async function handleDelete(id) {
@@ -228,11 +261,15 @@ export function createCategoriasFinanceirasPersistence({
   }
 
   async function criarSubcategoriaSolta() {
-    const categoriaDREId = resolverCategoriaDREId(formSubData.categoria_id);
-    if (!categoriaDREId) {
-      toast.error("Categoria DRE não encontrada para vincular subcategoria");
-      return;
-    }
+    const categoriaFinanceira = categorias.find(
+      (categoria) => categoria.id === formSubData.categoria_id,
+    );
+    const categoriaDREId =
+      resolverCategoriaDREId(formSubData.categoria_id) ||
+      (await garantirCategoriaDRE(api, {
+        nome: categoriaFinanceira.nome,
+        tipo: categoriaFinanceira.tipo,
+      }));
 
     const subResp = await api.post(
       "/dre/subcategorias",
@@ -243,9 +280,6 @@ export function createCategoriasFinanceirasPersistence({
       }),
     );
 
-    const categoriaFinanceira = categorias.find(
-      (categoria) => categoria.id === formSubData.categoria_id,
-    );
     if (!categoriaFinanceira?.dre_subcategoria_id && subResp?.data?.id) {
       await api.put(`/categorias-financeiras/${formSubData.categoria_id}`, {
         dre_subcategoria_id: subResp.data.id,

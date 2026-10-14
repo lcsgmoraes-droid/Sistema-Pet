@@ -53,6 +53,7 @@ def test_mobile_gestor_screen_has_requested_periods_and_indicators():
         "Do dia",
         "Como chegamos neste resultado",
         "Despesas fixas e operacionais",
+        "Custo dos serviços prestados",
     ]:
         assert label in screen
     assert '"/app/gestor/resumo"' in service
@@ -63,6 +64,7 @@ def test_mobile_gestor_screen_has_requested_periods_and_indicators():
         "descontos",
         "impostos",
         "despesas_fixas_operacionais",
+        "custo_servicos",
     ]:
         assert field in service
 

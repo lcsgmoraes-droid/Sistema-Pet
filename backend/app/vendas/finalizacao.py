@@ -6,7 +6,6 @@ eventos fora da fachada ``VendaService`` sem alterar o comportamento publico.
 """
 
 import logging
-from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any, Callable, Dict, List, Optional
 
@@ -18,6 +17,7 @@ from app.services.venda_rentabilidade_snapshot_service import (
     invalidate_venda_rentabilidade_snapshot,
 )
 from app.utils.timezone import now_brasilia
+from app.vendas.custo_original import registrar_custo_original_saida
 from app.vendas.finalizacao_eventos import publicar_eventos_finalizacao
 from app.vendas.finalizacao_pagamentos import (
     _calcular_pagamentos_finalizacao,
@@ -26,10 +26,13 @@ from app.vendas.finalizacao_pagamentos import (
 )
 from app.vendas.finalizacao_pos_commit import processar_pos_commit_finalizacao
 from app.vendas.finalizacao_recebiveis import (
+    baixar_recebiveis_dos_novos_pagamentos,
     cancelar_previsoes_apos_desconto,
     criar_recebiveis_dos_novos_pagamentos,
 )
 from app.vendas.pos_processamento import gerar_dre_competencia_venda
+from app.vendas.bloqueio_crediario import validar_bloqueio_crediario
+from app.vendas.vendedor_obrigatorio import exigir_vendedor_pdv
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +55,9 @@ def finalizar_venda(
     permitir_caixa_tenant: bool = False,
     data_ocorrencia=None,
     motivo_revisao: Optional[str] = None,
+    motivo_liberacao_crediario: Optional[str] = None,
+    nao_gerar_beneficios: bool = False,
+    justificativa_nao_gerar_beneficios: Optional[str] = None,
     *,
     processar_baixa_estoque_item: Callable[..., List[Dict[str, Any]]],
 ) -> Dict[str, Any]:
@@ -124,7 +130,6 @@ def finalizar_venda(
     from app.vendas_models import Venda, VendaPagamento
     from app.caixa.service import CaixaService
     from app.financeiro import ContasReceberService
-    from app.financeiro_models import LancamentoManual, CategoriaFinanceira
     from app.services.business_audit_service import (
         build_sale_coupon_redeemed_metadata,
         calculate_manual_discount_amount,
@@ -195,12 +200,54 @@ def finalizar_venda(
                 detail=f"Apenas vendas abertas ou com baixa parcial podem receber pagamentos (status atual: {venda.status})",
             )
 
+        exigir_vendedor_pdv(
+            db,
+            tenant_id,
+            venda.vendedor_funcionario_id or venda.funcionario_id,
+            canal=venda.canal,
+        )
+
+        validar_bloqueio_crediario(
+            db,
+            tenant_id,
+            venda.cliente_id,
+            venda_id=venda.id,
+            user_id=user_id,
+            motivo_liberacao=motivo_liberacao_crediario,
+        )
+
         # Calcular totais
         pagamentos_existentes = (
             db.query(VendaPagamento)
             .filter_by(venda_id=venda.id, tenant_id=tenant_id)
             .all()
         )
+        if nao_gerar_beneficios and not venda.nao_gerar_beneficios:
+            if pagamentos_existentes:
+                raise HTTPException(
+                    status_code=409,
+                    detail="A opção de não gerar benefícios só pode ser marcada antes do primeiro recebimento.",
+                )
+            venda.nao_gerar_beneficios = True
+            venda.justificativa_nao_gerar_beneficios = (
+                justificativa_nao_gerar_beneficios.strip()
+                if justificativa_nao_gerar_beneficios
+                and justificativa_nao_gerar_beneficios.strip()
+                else None
+            )
+            venda.beneficios_bloqueados_em = now_brasilia()
+            venda.beneficios_bloqueados_por_id = user_id
+            log_business_event(
+                db=db,
+                tenant_id=tenant_id,
+                user_id=user_id,
+                event="sale.campaign_benefits_blocked",
+                entity_type="vendas",
+                entity_id=venda.id,
+                metadata={"reason": venda.justificativa_nao_gerar_beneficios},
+                details=f"Benefícios de campanha desativados na venda #{venda.numero_venda}",
+                commit=False,
+            )
         total_venda = float(venda.total)
         totais_pagamento = _calcular_pagamentos_finalizacao(
             total_venda=total_venda,
@@ -258,48 +305,8 @@ def finalizar_venda(
                 f"📊 Venda BAIXA PARCIAL - R$ {total_pagamentos:.2f} de R$ {total_venda:.2f}"
             )
 
-            # Criar lançamento previsto para saldo em aberto
-            saldo_em_aberto = total_venda - total_pagamentos
-            if saldo_em_aberto > 0.01:
-                categoria_receitas = (
-                    db.query(CategoriaFinanceira)
-                    .filter(
-                        CategoriaFinanceira.nome.ilike("%vendas%"),
-                        CategoriaFinanceira.tipo == "receita",
-                        CategoriaFinanceira.tenant_id == tenant_id,
-                    )
-                    .first()
-                )
-
-                if not categoria_receitas:
-                    categoria_receitas = CategoriaFinanceira(
-                        nome="Receitas de Vendas",
-                        tipo="receita",
-                        user_id=user_id,
-                        tenant_id=tenant_id,  # ✅ Garantir isolamento multi-tenant
-                    )
-                    db.add(categoria_receitas)
-                    db.flush()
-
-                data_prevista = date.today() + timedelta(days=30)
-                lancamento_saldo = LancamentoManual(
-                    tipo="entrada",
-                    valor=Decimal(str(saldo_em_aberto)),
-                    descricao=f"Venda {venda.numero_venda} - Saldo em aberto",
-                    data_lancamento=data_prevista,
-                    status="previsto",
-                    categoria_id=categoria_receitas.id,
-                    documento=f"VENDA-{venda.id}-SALDO",
-                    fornecedor_cliente=venda.cliente.nome
-                    if venda.cliente
-                    else "Cliente Avulso",
-                    user_id=user_id,
-                    tenant_id=tenant_id,  # ✅ Garantir isolamento multi-tenant
-                )
-                db.add(lancamento_saldo)
-                logger.info(
-                    f"📝 Lançamento previsto criado: R$ {saldo_em_aberto:.2f} em {data_prevista}"
-                )
+            # O service financeiro mantem uma unica previsao de saldo. Criar
+            # outra VENDA-ID-SALDO aqui duplicava o valor ainda a receber.
         else:
             venda.status = "aberta"
 
@@ -358,15 +365,14 @@ def finalizar_venda(
         # ============================================================
         # ETAPA 4: BAIXAR ESTOQUE (COM SUPORTE A KIT)
         # ============================================================
-        # 🎯 LÓGICA CRÍTICA: Só baixa estoque se venda NÃO veio de status 'aberta'
-        # - Se status_anterior = 'aberta': estoque JÁ foi baixado na criação
-        # - Se status_anterior != 'aberta': venda criada direto como finalizada, baixar agora
+        # Vendas abertas e com baixa parcial já tiveram saída na criação.
+        # Receber outra parcela ou concluir o pagamento não gera nova saída.
 
         estoque_baixado = []
-        deve_baixar_estoque = status_anterior != "aberta"
+        deve_baixar_estoque = status_anterior not in {"aberta", "baixa_parcial"}
 
         if deve_baixar_estoque:
-            logger.info("📦 Baixando estoque (venda não veio de status aberta)")
+            logger.info("📦 Baixando estoque de venda sem saída anterior")
         else:
             logger.info(
                 "ℹ️  Estoque NÃO será baixado (já foi baixado quando venda estava aberta)"
@@ -386,6 +392,7 @@ def finalizar_venda(
                     item, tenant_id
                 )
 
+                resultados = []
                 with contexto_tenant_estoque(
                     tenant_estoque, tenant_id
                 ) as tenant_estoque_uuid:
@@ -434,7 +441,8 @@ def finalizar_venda(
                             ),
                             venda_item=item if not compartilhado else None,
                         )
-                        estoque_baixado.extend(resultados)
+                registrar_custo_original_saida(item, resultados, tenant_estoque_uuid)
+                estoque_baixado.extend(resultados)
 
         # ============================================================
         # ETAPA 5: VINCULAR AO CAIXA
@@ -452,29 +460,28 @@ def finalizar_venda(
 
         contas_baixadas = []
         valor_ja_baixado = Decimal("0")
+        valores_baixados_por_pagamento = {}
         if total_novos_pagamentos > 0.01:
-            forma_pag_nome = (
-                pagamentos[0]["forma_pagamento"] if pagamentos else "Diversos"
+            contas_baixadas, valores_baixados_por_pagamento = (
+                baixar_recebiveis_dos_novos_pagamentos(
+                    db=db,
+                    venda=venda,
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    pagamentos_anteriores=pagamentos_existentes,
+                    data_recebimento=data_ocorrencia.date()
+                    if data_ocorrencia
+                    else None,
+                )
             )
-
-            resultado_baixa = ContasReceberService.baixar_contas_da_venda(
-                venda_id=venda.id,
-                venda_numero=venda.numero_venda,
-                valor_total_pagamento=total_novos_pagamentos,
-                forma_pagamento_nome=forma_pag_nome,
-                user_id=user_id,
-                tenant_id=tenant_id,
-                db=db,
-                data_recebimento=data_ocorrencia.date() if data_ocorrencia else None,
+            valor_ja_baixado = sum(
+                valores_baixados_por_pagamento.values(), Decimal("0")
             )
-
-            contas_baixadas = resultado_baixa["contas_baixadas"]
-            valor_ja_baixado = resultado_baixa["valor_distribuido"]
 
             if contas_baixadas:
                 logger.info(
                     f"💰 Contas baixadas: {len(contas_baixadas)} conta(s), "
-                    f"R$ {float(resultado_baixa['valor_distribuido']):.2f} distribuído"
+                    f"R$ {float(valor_ja_baixado):.2f} distribuído"
                 )
 
             # Atualizar lançamentos manuais
@@ -502,8 +509,9 @@ def finalizar_venda(
             user_id=user_id,
             pagamentos_anteriores=pagamentos_existentes,
             valor_ja_baixado=valor_ja_baixado,
+            valores_baixados_por_pagamento=valores_baixados_por_pagamento,
         )
-        if not pagamentos and total_pagamentos >= total_venda - 0.01:
+        if total_pagamentos >= total_venda - 0.01:
             cancelar_previsoes_apos_desconto(db=db, venda=venda, tenant_id=tenant_id)
 
         # ============================================================

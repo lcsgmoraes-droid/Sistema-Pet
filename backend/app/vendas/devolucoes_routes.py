@@ -1,16 +1,20 @@
 """Rotas de devolução de vendas."""
 
+import hashlib
+import json
 import logging
 from collections import defaultdict
-from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.audit_log import log_action
 from app.auth.dependencies import get_current_user_and_tenant
+from app.categorias_integridade import normalizar_nome_categoria
 from app.caixa.service import CaixaService
 from app.caixa.escopo import buscar_caixa_acessivel
 from app.db import get_session
@@ -19,12 +23,32 @@ from app.empresa_grupo_estoque_compartilhado_service import (
     resolver_tenant_estoque_item,
 )
 from app.estoque.service import EstoqueService
-from app.produtos_models import EstoqueMovimentacao
+from app.estoque.devolucao_lotes import (
+    preparar_devolucao_lotes,
+    recompor_lotes_devolucao,
+)
+from app.financeiro_models import ContaReceber, FormaPagamento
+from app.financeiro.recebiveis_operadora import TIPOS_RECEBIVEL_OPERADORA
+from app.produtos_models import EstoqueMovimentacao, Produto
+from app.utils.timezone import now_brasilia
+from app.vendas.devolucao_dre import custo_original_item_devolvido
+from app.vendas.devolucao_restituicao import (
+    cotar_restituicao,
+    registrar_restituicao_cashback,
+    validar_opcao_restituicao,
+    validar_restituicao_prevista,
+)
+from app.vendas.devolucao_valores import (
+    cotar_devolucao,
+    quantidades_devolvidas_por_item,
+    validar_itens_devolucao,
+)
 from app.vendas.routes_common import (
     _obter_cliente_ou_404,
     _validar_tenant_e_obter_usuario,
 )
-from app.vendas_models import Venda, VendaItem
+from app.vendas_models import Venda, VendaItem, VendaPagamento
+from app.vendas_devolucoes_models import VendaDevolucao
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -47,6 +71,402 @@ def _validar_saldo_devolucao(
     return quantidade_disponivel
 
 
+def _buscar_categoria_devolucoes(db: Session, tenant_id):
+    """Reutiliza a categoria de devolução, inclusive o nome plural legado."""
+    from app.financeiro_models import CategoriaFinanceira
+
+    candidatas = (
+        db.query(CategoriaFinanceira)
+        .filter(
+            CategoriaFinanceira.tenant_id == tenant_id,
+            CategoriaFinanceira.tipo == "despesa",
+            CategoriaFinanceira.ativo.is_(True),
+            CategoriaFinanceira.nome.ilike("%devolu%"),
+        )
+        .order_by(CategoriaFinanceira.id)
+        .all()
+    )
+    return next(
+        (
+            categoria
+            for categoria in candidatas
+            if normalizar_nome_categoria(categoria.nome).startswith("devoluc")
+            and "venda" in normalizar_nome_categoria(categoria.nome)
+        ),
+        None,
+    )
+
+
+def _recebivel_exige_conciliacao(conta: ContaReceber) -> bool:
+    """Um saldo aberto impede desembolso e abatimento simultaneos ao cliente."""
+    status = str(getattr(conta, "status", "") or "").lower()
+    if status in {"cancelado", "cancelada"}:
+        return False
+    if status != "recebido":
+        return True
+    valor_final = Decimal(str(getattr(conta, "valor_final", 0) or 0))
+    valor_recebido = Decimal(str(getattr(conta, "valor_recebido", 0) or 0))
+    return valor_final > valor_recebido
+
+
+def _validar_recebiveis_liquidados(db: Session, venda_id: int, tenant_id) -> None:
+    contas_receber = (
+        db.query(ContaReceber)
+        .filter(
+            ContaReceber.venda_id == venda_id,
+            ContaReceber.tenant_id == tenant_id,
+        )
+        .all()
+    )
+    abertas = [conta for conta in contas_receber if _recebivel_exige_conciliacao(conta)]
+    if not abertas:
+        return
+    mensagem = (
+        "A venda tem recebivel em aberto. Concilie o valor recebido "
+        "antes de registrar a devolucao."
+    )
+    if any(not getattr(conta, "forma_pagamento_id", None) for conta in abertas):
+        raise HTTPException(status_code=409, detail=mensagem)
+    formas = (
+        db.query(FormaPagamento)
+        .filter(
+            FormaPagamento.tenant_id == tenant_id,
+            FormaPagamento.id.in_([conta.forma_pagamento_id for conta in abertas]),
+        )
+        .all()
+    )
+    formas_operadora = {
+        forma.id for forma in formas if forma.tipo in TIPOS_RECEBIVEL_OPERADORA
+    }
+    pagamentos = (
+        db.query(VendaPagamento)
+        .filter(
+            VendaPagamento.tenant_id == tenant_id,
+            VendaPagamento.venda_id == venda_id,
+            VendaPagamento.forma_pagamento_id.in_(formas_operadora),
+            func.lower(func.coalesce(VendaPagamento.status, "pendente")).notin_(
+                ["recusado", "estornado", "cancelado", "cancelada"]
+            ),
+        )
+        .all()
+    )
+    pago_por_forma = defaultdict(Decimal)
+    for pagamento in pagamentos:
+        pago_por_forma[pagamento.forma_pagamento_id] += Decimal(
+            str(pagamento.valor or 0)
+        )
+    contas_por_forma = defaultdict(Decimal)
+    for conta in contas_receber:
+        if str(conta.status or "").lower() not in {"cancelado", "cancelada"}:
+            contas_por_forma[conta.forma_pagamento_id] += Decimal(
+                str(conta.valor_final or 0)
+            )
+    # Cartão registrado na venda permite devolução antes do repasse bancário.
+    # Contas sem forma conhecida e saldo de crediário continuam protegidos.
+    if any(
+        conta.forma_pagamento_id not in formas_operadora
+        or pago_por_forma[conta.forma_pagamento_id]
+        < contas_por_forma[conta.forma_pagamento_id]
+        for conta in abertas
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail=mensagem,
+        )
+
+
+def _validar_pagamentos_beneficio(
+    venda: Venda, tenant_id, devolver_na_origem=False
+) -> None:
+    """Benefícios só podem voltar à carteira em que foram utilizados."""
+    validar_opcao_restituicao(venda, tenant_id, devolver_na_origem)
+
+
+def _item_controlava_estoque_na_venda(item) -> bool:
+    """O tipo salvo na venda distingue servico de catalogo com produto_id."""
+    return (
+        bool(getattr(item, "produto_id", None))
+        and str(getattr(item, "tipo", "produto") or "").lower() == "produto"
+    )
+
+
+def _produto_estoque_original(db: Session, item, tenant_id, bloquear=False):
+    """Busca o produto no tenant dono do estoque, inclusive quando compartilhado."""
+    tenant_estoque, _ = resolver_tenant_estoque_item(item, tenant_id)
+    with contexto_tenant_estoque(tenant_estoque, tenant_id) as tenant_estoque_uuid:
+        consulta = db.query(Produto).filter(
+            Produto.id == item.produto_id,
+            Produto.tenant_id == tenant_estoque_uuid,
+        )
+        if bloquear:
+            consulta = consulta.with_for_update().populate_existing()
+        produto = consulta.first()
+    return produto, tenant_estoque
+
+
+def _validar_produto_devolucao(produto):
+    if produto is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Produto original indisponivel. Concilie o estoque manualmente.",
+        )
+    if getattr(produto, "controlar_estoque", True) is False:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Produto nao controla estoque atualmente. "
+                "Concilie a devolucao e o estoque manualmente."
+            ),
+        )
+    if (
+        getattr(produto, "tipo_produto", None) == "KIT"
+        and (getattr(produto, "tipo_kit", None) or "VIRTUAL") != "FISICO"
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="KIT virtual exige devolucao e recomposicao manual dos componentes.",
+        )
+
+
+def _validar_estoque_devolucao_seguro(
+    db: Session,
+    venda_id: int,
+    tenant_id,
+    itens_venda,
+    itens_solicitados,
+    bloquear=False,
+) -> dict:
+    """Exige saida rastreavel e prepara a reposicao nos lotes originais."""
+    itens_por_id = {item.id: item for item in itens_venda}
+    grupos_solicitados = set()
+    quantidades_vendidas = defaultdict(Decimal)
+    quantidades_solicitadas = defaultdict(lambda: defaultdict(Decimal))
+    itens_por_produto = defaultdict(list)
+    for item in itens_venda:
+        if not _item_controlava_estoque_na_venda(item):
+            continue
+        tenant_estoque, _ = resolver_tenant_estoque_item(item, tenant_id)
+        quantidades_vendidas[(item.produto_id, tenant_estoque)] += Decimal(
+            str(item.quantidade or 0)
+        )
+        itens_por_produto[(item.produto_id, tenant_estoque)].append(item)
+
+    for solicitado in itens_solicitados:
+        item = itens_por_id.get(solicitado.get("item_id"))
+        if item is None or not _item_controlava_estoque_na_venda(item):
+            continue
+        produto, tenant_estoque = _produto_estoque_original(db, item, tenant_id)
+        _validar_produto_devolucao(produto)
+        grupos_solicitados.add((item.produto_id, tenant_estoque))
+        quantidades_solicitadas[(item.produto_id, tenant_estoque)][item.id] += Decimal(
+            str(solicitado["quantidade"])
+        )
+
+    planos_lotes = {}
+    # As devolucoes de vendas diferentes compartilham produto/lote; a ordem
+    # fixa evita disputar os mesmos produtos em ordens opostas.
+    for produto_id, tenant_estoque in sorted(
+        grupos_solicitados, key=lambda grupo: (str(grupo[1]), grupo[0])
+    ):
+        if bloquear:
+            produto, _ = _produto_estoque_original(
+                db, itens_por_produto[(produto_id, tenant_estoque)][0], tenant_id, True
+            )
+            _validar_produto_devolucao(produto)
+        with contexto_tenant_estoque(tenant_estoque, tenant_id) as tenant_estoque_uuid:
+            saidas = (
+                db.query(EstoqueMovimentacao)
+                .filter(
+                    EstoqueMovimentacao.tenant_id == tenant_estoque_uuid,
+                    EstoqueMovimentacao.produto_id == produto_id,
+                    EstoqueMovimentacao.referencia_tipo == "venda",
+                    EstoqueMovimentacao.referencia_id == venda_id,
+                    EstoqueMovimentacao.tipo == "saida",
+                    EstoqueMovimentacao.status != "cancelado",
+                )
+                .all()
+            )
+        quantidade_saida = sum(
+            (abs(Decimal(str(saida.quantidade or 0))) for saida in saidas),
+            Decimal("0"),
+        )
+        if abs(
+            quantidade_saida - quantidades_vendidas[(produto_id, tenant_estoque)]
+        ) > Decimal("0.000001"):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Saida original de estoque nao rastreavel para o produto. "
+                    "Concilie o estoque manualmente."
+                ),
+            )
+        with contexto_tenant_estoque(tenant_estoque, tenant_id) as tenant_estoque_uuid:
+            planos_lotes[(produto_id, tenant_estoque)] = preparar_devolucao_lotes(
+                db,
+                produto_id=produto_id,
+                tenant_id=tenant_estoque_uuid,
+                venda_id=venda_id,
+                saidas=saidas,
+                itens_venda=itens_por_produto[(produto_id, tenant_estoque)],
+                quantidades_por_item=quantidades_solicitadas[
+                    (produto_id, tenant_estoque)
+                ],
+                bloquear=bloquear,
+            )
+    return planos_lotes
+
+
+def _hash_requisicao_devolucao(venda_id: int, dados: dict, itens: list) -> str:
+    corpo = {
+        "venda_id": venda_id,
+        "itens": itens,
+        "motivo": dados.get("motivo"),
+        "gerar_credito": dados.get("gerar_credito", False),
+        "caixa_id": dados.get("caixa_id"),
+    }
+    # Mantém o hash das operações antigas sem a nova opção.
+    if dados.get("devolver_na_origem") is True:
+        corpo["devolver_na_origem"] = True
+    if dados.get("restituicao_prevista") is not None:
+        corpo["restituicao_prevista"] = dados["restituicao_prevista"]
+    canonico = json.dumps(
+        corpo, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
+    )
+    return hashlib.sha256(canonico.encode("utf-8")).hexdigest()
+
+
+@router.get("/{venda_id}/devolucao/saldos")
+def consultar_saldos_devolucao(
+    venda_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Mostra o saldo de cada linha da venda antes de selecionar a devolução."""
+    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
+    if not venda:
+        raise HTTPException(status_code=404, detail="Venda não encontrada")
+
+    itens_venda = (
+        db.query(VendaItem)
+        .filter(VendaItem.venda_id == venda_id, VendaItem.tenant_id == tenant_id)
+        .all()
+    )
+    eventos_anteriores = (
+        db.query(VendaDevolucao)
+        .filter(
+            VendaDevolucao.tenant_id == tenant_id,
+            VendaDevolucao.venda_id == venda_id,
+        )
+        .all()
+    )
+    if (
+        str(venda.status or "").lower()
+        in {
+            "finalizada_devolucao",
+            "finalizada_devolucao_parcial",
+        }
+        and not eventos_anteriores
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Esta venda tem devolução anterior sem saldo rastreável. "
+                "Concilie manualmente o histórico antes de nova devolução."
+            ),
+        )
+
+    devolvidas = quantidades_devolvidas_por_item(eventos_anteriores)
+    return {
+        "venda_id": venda_id,
+        "itens": [
+            {
+                "item_id": item.id,
+                "quantidade_vendida": float(item.quantidade),
+                "quantidade_devolvida": float(devolvidas.get(item.id, 0)),
+                "quantidade_disponivel": float(
+                    max(
+                        Decimal("0"),
+                        Decimal(str(item.quantidade)) - devolvidas.get(item.id, 0),
+                    )
+                ),
+            }
+            for item in itens_venda
+        ],
+    }
+
+
+@router.post("/{venda_id}/devolucao/previa")
+def prever_devolucao(
+    venda_id: int,
+    dados: dict,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Mostra o mesmo valor líquido que será usado no registro da devolução."""
+    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
+    if not venda:
+        raise HTTPException(status_code=404, detail="Venda não encontrada")
+    _validar_pagamentos_beneficio(
+        venda, tenant_id, dados.get("devolver_na_origem", False)
+    )
+    itens_venda = (
+        db.query(VendaItem)
+        .filter(VendaItem.venda_id == venda_id, VendaItem.tenant_id == tenant_id)
+        .all()
+    )
+    eventos_anteriores = (
+        db.query(VendaDevolucao)
+        .filter(
+            VendaDevolucao.tenant_id == tenant_id,
+            VendaDevolucao.venda_id == venda_id,
+        )
+        .all()
+    )
+    try:
+        cotacao = cotar_devolucao(
+            venda, itens_venda, eventos_anteriores, dados.get("itens") or []
+        )
+    except ValueError as erro:
+        raise HTTPException(status_code=400, detail=str(erro)) from erro
+    restituicao = cotar_restituicao(
+        db,
+        tenant_id=tenant_id,
+        venda=venda,
+        cotacao=cotacao,
+        eventos_anteriores=eventos_anteriores,
+        devolver_na_origem=dados.get("devolver_na_origem", False),
+    )
+    from app.campaigns.sale_return_service import (
+        preflight_purchase_benefits_on_return,
+    )
+
+    preflight_purchase_benefits_on_return(
+        db,
+        tenant_id=tenant_id,
+        venda=venda,
+        valor_acumulado=cotacao.valor_acumulado,
+    )
+    _validar_recebiveis_liquidados(db, venda_id, tenant_id)
+    _validar_estoque_devolucao_seguro(
+        db, venda_id, tenant_id, itens_venda, dados.get("itens") or []
+    )
+    return {
+        "valor_total_devolucao": float(cotacao.valor_total),
+        "restituicao": restituicao.resposta(),
+        "valor_ja_devolvido": float(cotacao.valor_ja_devolvido),
+        "valor_acumulado": float(cotacao.valor_acumulado),
+        "itens": [
+            {
+                "item_id": item.get("item_id"),
+                "valor_devolvido": float(valor),
+            }
+            for item, valor in zip(dados.get("itens") or [], cotacao.valores_itens)
+        ],
+    }
+
+
 @router.post("/{venda_id}/devolucao")
 def registrar_devolucao(
     venda_id: int,
@@ -65,6 +485,18 @@ def registrar_devolucao(
         logger.info("Usuario autenticado para devolucao")
         logger.info("Tenant validado para devolucao")
 
+        # Recebimentos e fechamento usam a ordem Caixa -> Venda.
+        # A validade do caixa é verificada depois da resposta idempotente.
+        caixa = None
+        if not dados.get("gerar_credito", False) and dados.get("caixa_id"):
+            caixa, _ = buscar_caixa_acessivel(
+                db,
+                caixa_id=dados["caixa_id"],
+                tenant_id=tenant_id,
+                usuario_id=current_user.id,
+                bloquear_caixa=True,
+            )
+
         # Buscar a venda
         venda = (
             db.query(Venda)
@@ -77,31 +509,73 @@ def registrar_devolucao(
             logger.info(f"❌ Venda #{venda_id} não encontrada")
             raise HTTPException(status_code=404, detail="Venda não encontrada")
 
+        status_venda = str(venda.status or "").lower()
+        if status_venda not in {
+            "finalizada",
+            "pago_nf",
+            "baixa_parcial",
+            "finalizada_devolucao",
+            "finalizada_devolucao_parcial",
+            "devolvida_total",
+        }:
+            raise HTTPException(
+                status_code=400,
+                detail="A venda não está em situação que permita devolução",
+            )
+
+        itens_devolucao = dados.get("itens", [])
+        try:
+            validar_itens_devolucao(itens_devolucao)
+        except ValueError as erro:
+            raise HTTPException(status_code=400, detail=str(erro)) from erro
+
+        try:
+            chave_operacao = str(UUID(str(dados.get("chave_operacao"))))
+        except (TypeError, ValueError, AttributeError) as erro:
+            raise HTTPException(
+                status_code=400, detail="Chave da operacao de devolucao invalida"
+            ) from erro
+        requisicao_hash = _hash_requisicao_devolucao(venda_id, dados, itens_devolucao)
+        evento_existente = (
+            db.query(VendaDevolucao)
+            .filter(
+                VendaDevolucao.tenant_id == tenant_id,
+                VendaDevolucao.chave_operacao == chave_operacao,
+            )
+            .first()
+        )
+        if evento_existente:
+            if evento_existente.venda_id != venda_id:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Chave de operacao ja utilizada em outra venda",
+                )
+            if evento_existente.requisicao_hash != requisicao_hash:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Chave de operacao reutilizada com dados diferentes",
+                )
+            return evento_existente.resposta
+        if status_venda == "devolvida_total":
+            raise HTTPException(
+                status_code=400,
+                detail="A venda nao possui saldo para outra devolucao",
+            )
+        _validar_pagamentos_beneficio(
+            venda, tenant_id, dados.get("devolver_na_origem", False)
+        )
+
         logger.info(
             f"✅ Venda encontrada: #{venda.numero_venda} - Total: R$ {venda.total}"
         )
 
         caixa_id = dados.get("caixa_id")
-        itens_devolucao = dados.get("itens", [])
         motivo = dados.get("motivo", "")
         gerar_credito = dados.get("gerar_credito", False)  # 🆕 Nova opção
 
         logger.info(f"💰 Modo: {'CRÉDITO ao cliente' if gerar_credito else 'DINHEIRO'}")
         logger.info(f"📝 Motivo: {motivo}")
         logger.info(f"📦 Itens para devolução: {len(itens_devolucao)}")
-
-        if not caixa_id and not gerar_credito:
-            logger.info("❌ Caixa ID não fornecido para devolução em dinheiro")
-            raise HTTPException(
-                status_code=400,
-                detail="ID do caixa é obrigatório para devolução em dinheiro",
-            )
-
-        if not itens_devolucao:
-            logger.info("❌ Nenhum item selecionado")
-            raise HTTPException(
-                status_code=400, detail="Nenhum item selecionado para devolução"
-            )
 
         if not motivo:
             logger.info("❌ Motivo não fornecido")
@@ -114,21 +588,6 @@ def registrar_devolucao(
                 status_code=400,
                 detail="Não é possível gerar crédito para venda sem cliente cadastrado",
             )
-
-        # Verificar se o caixa existe e está aberto (apenas se for devolução em dinheiro)
-        caixa = None
-        if not gerar_credito:
-            caixa, _ = buscar_caixa_acessivel(
-                db,
-                caixa_id=caixa_id,
-                tenant_id=tenant_id,
-                usuario_id=current_user.id,
-            )
-
-            if not caixa or caixa.status != "aberto":
-                raise HTTPException(
-                    status_code=400, detail="Caixa não encontrado ou não está aberto"
-                )
 
         itens_normais = [
             item
@@ -158,9 +617,99 @@ def registrar_devolucao(
                 detail=f"Item {item_id} não encontrado na venda",
             )
 
+        eventos_anteriores = (
+            db.query(VendaDevolucao)
+            .filter(
+                VendaDevolucao.tenant_id == tenant_id,
+                VendaDevolucao.venda_id == venda_id,
+            )
+            .all()
+        )
+        status_original_venda = (
+            str(
+                getattr(
+                    min(
+                        eventos_anteriores,
+                        key=lambda evento: getattr(evento, "id", 0),
+                    ),
+                    "status_original_venda",
+                    "",
+                )
+                or ""
+            ).lower()
+            if eventos_anteriores
+            else status_venda
+        )
+        todos_itens_venda = (
+            db.query(VendaItem)
+            .filter(VendaItem.venda_id == venda_id, VendaItem.tenant_id == tenant_id)
+            .all()
+        )
+        try:
+            cotacao = cotar_devolucao(
+                venda, todos_itens_venda, eventos_anteriores, itens_devolucao
+            )
+        except ValueError as erro:
+            raise HTTPException(status_code=400, detail=str(erro)) from erro
+        restituicao = cotar_restituicao(
+            db,
+            tenant_id=tenant_id,
+            venda=venda,
+            cotacao=cotacao,
+            eventos_anteriores=eventos_anteriores,
+            devolver_na_origem=dados.get("devolver_na_origem", False),
+            bloquear=True,
+        )
+        validar_restituicao_prevista(
+            restituicao,
+            dados.get("restituicao_prevista"),
+            exigir=validar_opcao_restituicao(
+                venda, tenant_id, dados.get("devolver_na_origem", False)
+            ),
+        )
+        valor_caixa = restituicao.valor_restante if not gerar_credito else Decimal("0")
+        if valor_caixa > 0:
+            if not caixa_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="ID do caixa é obrigatório para devolução em dinheiro",
+                )
+            if not caixa or caixa.status != "aberto":
+                raise HTTPException(
+                    status_code=400, detail="Caixa não encontrado ou não está aberto"
+                )
+        if dados.get("valor_previsto") is not None:
+            try:
+                valor_previsto = Decimal(str(dados["valor_previsto"])).quantize(
+                    Decimal("0.01")
+                )
+            except (InvalidOperation, ValueError, TypeError) as erro:
+                raise HTTPException(
+                    status_code=400, detail="Valor previsto da devolução inválido"
+                ) from erro
+            if valor_previsto != cotacao.valor_total:
+                raise HTTPException(
+                    status_code=409,
+                    detail="O valor da devolução mudou. Revise a prévia antes de confirmar.",
+                )
+        _validar_recebiveis_liquidados(db, venda_id, tenant_id)
+        planos_lotes = (
+            _validar_estoque_devolucao_seguro(
+                db, venda_id, tenant_id, todos_itens_venda, itens_devolucao, True
+            )
+            or {}
+        )
+        devolvido_por_item = defaultdict(Decimal)
+        for evento_anterior in eventos_anteriores:
+            for item_anterior in evento_anterior.itens or []:
+                if not item_anterior.get("is_componente_kit"):
+                    devolvido_por_item[item_anterior.get("venda_item_id")] += Decimal(
+                        str(item_anterior.get("quantidade") or 0)
+                    )
+
         vendido_por_produto = defaultdict(float)
-        for item_venda in db.query(VendaItem).filter_by(venda_id=venda_id).all():
-            if item_venda.produto_id:
+        for item_venda in todos_itens_venda:
+            if _item_controlava_estoque_na_venda(item_venda):
                 origem, _compartilhado = resolver_tenant_estoque_item(
                     item_venda, tenant_id
                 )
@@ -169,6 +718,7 @@ def registrar_devolucao(
                 )
 
         solicitado_por_produto = defaultdict(float)
+        solicitado_por_item = defaultdict(Decimal)
         for item_dev in itens_normais:
             item_venda = itens_normais_por_id[item_dev.get("item_id")]
             quantidade_devolvida = float(item_dev.get("quantidade", 0) or 0)
@@ -180,7 +730,15 @@ def registrar_devolucao(
                         f"quantidade vendida ({item_venda.quantidade})"
                     ),
                 )
-            if item_venda.produto_id:
+            solicitado_por_item[item_venda.id] += Decimal(str(quantidade_devolvida))
+            if devolvido_por_item[item_venda.id] + solicitado_por_item[
+                item_venda.id
+            ] > Decimal(str(item_venda.quantidade)):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Quantidade de devolução excede o saldo deste item",
+                )
+            if _item_controlava_estoque_na_venda(item_venda):
                 origem, _compartilhado = resolver_tenant_estoque_item(
                     item_venda, tenant_id
                 )
@@ -214,11 +772,15 @@ def registrar_devolucao(
                 quantidade_solicitada,
             )
 
-        valor_total_devolucao = 0
+        valor_total_devolucao = Decimal("0")
         itens_devolvidos = []
+        itens_evento_dre = []
+        custo_produtos_estornado = Decimal("0")
+        custo_servicos_estornado = Decimal("0")
+        processado_por_item = defaultdict(Decimal)
 
         # Processar cada item devolvido
-        for item_dev in itens_devolucao:
+        for indice, item_dev in enumerate(itens_devolucao):
             # 🆕 Verificar se é componente de KIT
             is_componente_kit = item_dev.get("is_componente_kit", False)
 
@@ -249,6 +811,8 @@ def registrar_devolucao(
                         db=db,
                         documento=None,
                         observacao=f"{motivo} - Componente de KIT (Item #{kit_item_id})",
+                        custo_unitario_override=0.0,
+                        valor_total_override=0.0,
                     )
 
                     # Buscar nome do produto
@@ -280,6 +844,21 @@ def registrar_devolucao(
                     str(quantidade_devolvida)
                 )
                 valor_total_devolucao += valor_componente
+                itens_evento_dre.append(
+                    {
+                        "venda_item_id": kit_item_id,
+                        "produto_id": produto_id,
+                        "tipo": "produto",
+                        "is_componente_kit": True,
+                        "quantidade": str(Decimal(str(quantidade_devolvida))),
+                        "valor_devolvido": str(
+                            valor_componente.quantize(Decimal("0.01"))
+                        ),
+                        "custo_estornado": "0.00",
+                        "origem_custo": "kit_componente_sem_rateio_original",
+                        "custo_pendente": True,
+                    }
+                )
 
                 itens_devolvidos.append(
                     {
@@ -301,17 +880,51 @@ def registrar_devolucao(
                     continue
 
                 item_venda = itens_normais_por_id[item_id]
+                quantidade_decimal = Decimal(str(quantidade_devolvida))
+                valor_item = cotacao.valores_itens[indice]
+                tipo_item = str(
+                    getattr(item_venda, "tipo", "produto") or "produto"
+                ).lower()
+                custo_original, origem_custo, custo_pendente = (
+                    custo_original_item_devolvido(
+                        db,
+                        venda,
+                        item_venda,
+                        quantidade_decimal,
+                        tenant_id,
+                        devolvido_por_item[item_id] + processado_por_item[item_id],
+                    )
+                )
+                # Reembolso de serviço não comprova reversão de mão de obra/insumos.
+                custo_item = Decimal("0") if tipo_item == "servico" else custo_original
+                if tipo_item == "servico":
+                    origem_custo = "servico_custo_mantido"
 
                 # Devolver ao estoque
-                if item_venda.produto_id:
+                produto_nome_estoque = None
+                lotes_recompostos = []
+                if _item_controlava_estoque_na_venda(item_venda):
                     try:
                         tenant_estoque, compartilhado = resolver_tenant_estoque_item(
                             item_venda, tenant_id
                         )
+                        # Sem custo original comprovado, a entrada fica com
+                        # valor zero provisório e exige ajuste manual. Nunca
+                        # usa o preço de custo atual como custo histórico.
+                        custo_estoque = {
+                            "custo_unitario_override": (
+                                0.0
+                                if custo_pendente
+                                else float(custo_item / quantidade_decimal)
+                            ),
+                            "valor_total_override": (
+                                0.0 if custo_pendente else float(custo_item)
+                            ),
+                        }
                         with contexto_tenant_estoque(
                             tenant_estoque, tenant_id
                         ) as tenant_estoque_uuid:
-                            EstoqueService.estornar_estoque(
+                            resultado_estoque = EstoqueService.estornar_estoque(
                                 produto_id=item_venda.produto_id,
                                 quantidade=quantidade_devolvida,
                                 motivo="devolucao",
@@ -326,7 +939,21 @@ def registrar_devolucao(
                                     if compartilhado
                                     else motivo
                                 ),
+                                **custo_estoque,
                             )
+                            plano_lotes = planos_lotes.get(
+                                (item_venda.produto_id, tenant_estoque)
+                            )
+                            if plano_lotes is not None:
+                                lotes_recompostos = recompor_lotes_devolucao(
+                                    db,
+                                    plano_lotes,
+                                    item_venda.id,
+                                    quantidade_decimal,
+                                    resultado_estoque["movimentacao_id"],
+                                )
+                        if isinstance(resultado_estoque, dict):
+                            produto_nome_estoque = resultado_estoque.get("produto_nome")
                         # Registrar auditoria
                         log_action(
                             db=db,
@@ -341,27 +968,110 @@ def registrar_devolucao(
                         logger.error(f"Erro ao devolver estoque: {e}")
                         raise HTTPException(status_code=400, detail=str(e)) from e
 
-                # Calcular valor devolvido
-                valor_item = item_venda.preco_unitario * Decimal(
-                    str(quantidade_devolvida)
-                )
+                # A prévia e o registro usam exatamente a mesma cotação.
                 valor_total_devolucao += valor_item
+                processado_por_item[item_id] += quantidade_decimal
+                if tipo_item == "servico":
+                    custo_servicos_estornado += custo_item
+                else:
+                    custo_produtos_estornado += custo_item
+                itens_evento_dre.append(
+                    {
+                        "venda_item_id": item_venda.id,
+                        "produto_id": item_venda.produto_id,
+                        "tipo": tipo_item,
+                        "is_componente_kit": False,
+                        "quantidade": str(Decimal(str(quantidade_devolvida))),
+                        "valor_devolvido": str(valor_item),
+                        "custo_original": (
+                            str(custo_original) if not custo_pendente else None
+                        ),
+                        "custo_estornado": str(custo_item),
+                        "origem_custo": origem_custo,
+                        "custo_pendente": custo_pendente,
+                        "lotes_recompostos": lotes_recompostos,
+                    }
+                )
 
                 itens_devolvidos.append(
                     {
                         "produto_id": item_venda.produto_id,
-                        "produto_nome": item_venda.produto.nome
-                        if item_venda.produto
-                        else item_venda.servico_descricao,
+                        "produto_nome": produto_nome_estoque
+                        or (
+                            item_venda.produto.nome
+                            if item_venda.produto
+                            else item_venda.servico_descricao
+                        ),
                         "quantidade": quantidade_devolvida,
-                        "valor_unitario": item_venda.preco_unitario,
+                        "valor_unitario": (valor_item / quantidade_decimal).quantize(
+                            Decimal("0.01")
+                        ),
+                        "preco_unitario_original": item_venda.preco_unitario,
                         "valor_total": valor_item,
                         "tipo": "item_normal",
                     }
                 )
 
-        # 💰 OPÇÃO 1: GERAR CRÉDITO PARA O CLIENTE
-        if gerar_credito:
+        if valor_total_devolucao <= 0 or not itens_evento_dre:
+            raise HTTPException(
+                status_code=400, detail="A devolução precisa ter valor positivo"
+            )
+
+        if valor_total_devolucao != cotacao.valor_total:
+            raise RuntimeError("Cotação e itens da devolução divergiram")
+
+        # O evento é a fonte da dedução na DRE. Caixa e crédito são apenas formas
+        # de liquidá-la; tudo abaixo participa da mesma transação e do mesmo commit.
+        evento_dre = VendaDevolucao(
+            tenant_id=tenant_id,
+            venda_id=venda_id,
+            chave_operacao=chave_operacao,
+            requisicao_hash=requisicao_hash,
+            resposta={},
+            user_id=current_user.id,
+            data_competencia=now_brasilia().date(),
+            canal=getattr(venda, "canal", None) or "loja_fisica",
+            status_original_venda=status_original_venda,
+            forma_estorno=(
+                "origem"
+                if restituicao.cashback or restituicao.credito_cliente
+                else "credito"
+                if gerar_credito
+                else "dinheiro"
+            ),
+            motivo=motivo,
+            valor_devolvido=valor_total_devolucao,
+            custo_produtos_estornado=custo_produtos_estornado,
+            custo_servicos_estornado=custo_servicos_estornado,
+            custo_pendente=any(item["custo_pendente"] for item in itens_evento_dre),
+            itens=itens_evento_dre,
+        )
+        db.add(evento_dre)
+        db.flush()
+        registrar_restituicao_cashback(
+            db,
+            tenant_id=tenant_id,
+            venda=venda,
+            evento_devolucao=evento_dre,
+            restituicao=restituicao,
+        )
+        from app.campaigns.sale_return_service import (
+            reconcile_purchase_benefits_on_return,
+        )
+
+        reconcile_purchase_benefits_on_return(
+            db,
+            tenant_id=tenant_id,
+            venda=venda,
+            evento_devolucao=evento_dre,
+            valor_acumulado=cotacao.valor_acumulado,
+        )
+
+        valor_credito = restituicao.credito_cliente + (
+            restituicao.valor_restante if gerar_credito else Decimal("0")
+        )
+        # Crédito utilizado volta à origem; a parcela comum segue a escolha.
+        if valor_credito > 0:
             if not venda.cliente_id:
                 raise HTTPException(
                     status_code=400,
@@ -369,60 +1079,56 @@ def registrar_devolucao(
                 )
 
             # O criador do cadastro pode ser outro funcionário da mesma loja.
-            cliente = _obter_cliente_ou_404(db, venda.cliente_id, tenant_id)
+            cliente = _obter_cliente_ou_404(
+                db, venda.cliente_id, tenant_id, bloquear_credito=True
+            )
 
             # Adicionar crédito ao cliente
-            cliente.credito = (cliente.credito or Decimal("0")) + Decimal(
-                str(valor_total_devolucao)
+            saldo_anterior = Decimal(str(cliente.credito or 0))
+            cliente.credito = saldo_anterior + valor_credito
+            from app.models import CreditoLog
+
+            db.add(
+                CreditoLog(
+                    tenant_id=tenant_id,
+                    cliente_id=cliente.id,
+                    tipo="devolucao",
+                    valor=valor_credito,
+                    saldo_anterior=saldo_anterior,
+                    saldo_atual=cliente.credito,
+                    referencia_id=venda.id,
+                    motivo=f"Devolução #{evento_dre.id} da venda {venda.numero_venda} - {motivo}",
+                    usuario_nome=current_user.nome,
+                )
             )
             credito_cliente_resultado = float(cliente.credito)
             cliente_nome_resultado = cliente.nome
             logger.info(
-                f"💰 Crédito adicionado ao cliente {cliente.nome}: +R$ {valor_total_devolucao:.2f} (Total: R$ {cliente.credito:.2f})"
+                f"💰 Crédito adicionado ao cliente {cliente.nome}: +R$ {valor_credito:.2f} (Total: R$ {cliente.credito:.2f})"
             )
 
             # Não cria MovimentacaoCaixa nem LancamentoManual (apenas crédito)
 
         # 💵 OPÇÃO 2: DEVOLUÇÃO EM DINHEIRO
-        else:
-            # Verificar se o caixa existe e está aberto
-            caixa, _ = buscar_caixa_acessivel(
-                db,
-                caixa_id=caixa_id,
-                tenant_id=tenant_id,
-                usuario_id=current_user.id,
-            )
-
-            if not caixa or caixa.status != "aberto":
-                raise HTTPException(
-                    status_code=400, detail="Caixa não encontrado ou não está aberto"
-                )
-
+        if valor_caixa > 0:
             # Registrar devolução no caixa usando o service
             movimentacao = CaixaService.registrar_devolucao(
                 caixa_id=caixa_id,
                 venda_id=venda_id,
                 venda_numero=venda.numero_venda,
-                valor=valor_total_devolucao,
+                valor=valor_caixa,
                 motivo=motivo,
                 user_id=current_user.id,
                 user_nome=current_user.nome,
                 tenant_id=tenant_id,  # 🔒 Isolamento multi-tenant
                 db=db,
             )
+            evento_dre.movimentacao_caixa_id = movimentacao["movimentacao_id"]
 
             # Criar lançamento manual de saída (estorno no fluxo de caixa)
             from app.financeiro_models import LancamentoManual, CategoriaFinanceira
 
-            categoria_devolucoes = (
-                db.query(CategoriaFinanceira)
-                .filter(
-                    CategoriaFinanceira.nome.ilike("%devolução%"),
-                    CategoriaFinanceira.tipo == "despesa",
-                    CategoriaFinanceira.tenant_id == tenant_id,
-                )
-                .first()
-            )
+            categoria_devolucoes = _buscar_categoria_devolucoes(db, tenant_id)
 
             if not categoria_devolucoes:
                 categoria_devolucoes = CategoriaFinanceira(
@@ -436,73 +1142,32 @@ def registrar_devolucao(
 
             lancamento_devolucao = LancamentoManual(
                 tipo="saida",
-                valor=Decimal(str(valor_total_devolucao)),
+                valor=valor_caixa,
                 descricao=f"Devolução venda {venda.numero_venda} - {motivo}",
-                data_lancamento=date.today(),
+                data_lancamento=evento_dre.data_competencia,
                 status="realizado",
                 categoria_id=categoria_devolucoes.id,
                 documento=f"DEVOLUCAO-{venda_id}",
-                fornecedor_cliente=venda.cliente.nome
-                if venda.cliente
-                else "Cliente Avulso",
+                fornecedor_cliente=(
+                    venda.cliente.nome if venda.cliente else "Cliente Avulso"
+                ),
                 user_id=current_user.id,
                 tenant_id=tenant_id,
             )
             db.add(lancamento_devolucao)
-            logger.info(
-                f"📊 Lançamento de devolução criado: R$ {valor_total_devolucao:.2f}"
-            )
+            logger.info(f"📊 Lançamento de devolução criado: R$ {valor_caixa:.2f}")
 
-        # 🆕 AJUSTAR CONTAS A RECEBER (sempre, independente de crédito ou dinheiro)
-        from app.financeiro_models import (
-            ContaReceber,
-            LancamentoManual,
-            CategoriaFinanceira,
+        # Recebimentos e entradas realizados permanecem como historico. O evento
+        # da devolucao registra a deducao da DRE e a saida de caixa, se houver.
+
+        # O frete não é reembolsado na devolução dos itens; o status total
+        # depende da quantidade devolvida, não do valor total com frete.
+        todos_itens_devolvidos = bool(todos_itens_venda) and all(
+            devolvido_por_item[item.id] + solicitado_por_item[item.id]
+            >= Decimal(str(item.quantidade))
+            for item in todos_itens_venda
         )
-
-        contas_receber = db.query(ContaReceber).filter_by(venda_id=venda_id).all()
-        if contas_receber:
-            # Reduzir proporcionalmente o valor das contas pendentes ou estornar pagas
-            for conta in contas_receber:
-                if conta.status in ["pendente", "parcial"]:
-                    proporcao = float(valor_total_devolucao) / float(venda.total)
-                    reducao = float(conta.valor_original) * proporcao
-
-                    conta.valor_original -= Decimal(str(reducao))
-                    conta.valor_final -= Decimal(str(reducao))
-
-                    # Se ficou zerada, marcar como cancelada
-                    if conta.valor_final <= 0:
-                        conta.status = "cancelada"
-
-                    logger.info(
-                        f"💳 Ajustando ContaReceber #{conta.id}: -R$ {reducao:.2f}"
-                    )
-                elif conta.status == "pago":
-                    # Cancelar a conta paga (estorno)
-                    conta.status = "estornada"
-                    logger.info(f"💳 Estornando ContaReceber #{conta.id} (paga)")
-
-        # 🆕 MARCAR LANÇAMENTOS MANUAIS REALIZADOS COMO ESTORNADOS (Fluxo de Caixa)
-        # Não criar novos lançamentos de estorno — o DEVOLUCAO acima já registra a saída.
-        # Apenas marcar os lançamentos de entrada da venda como estornados para controle.
-        lancamentos_entrada = (
-            db.query(LancamentoManual)
-            .filter(
-                LancamentoManual.documento == f"VENDA-{venda_id}",
-                LancamentoManual.tipo == "entrada",
-                LancamentoManual.status == "realizado",
-            )
-            .all()
-        )
-        for lanc in lancamentos_entrada:
-            lanc.status = "estornado"
-            logger.info(f"💸 LancamentoManual #{lanc.id} marcado como estornado")
-
-        # 🆕 ATUALIZAR STATUS DA VENDA
-        if (
-            float(valor_total_devolucao) >= float(venda.total) * 0.99
-        ):  # 99% devolvido = total
+        if todos_itens_devolvidos:
             venda.status = "devolvida_total"
         else:
             venda.status = "finalizada_devolucao"
@@ -511,8 +1176,8 @@ def registrar_devolucao(
         from datetime import datetime
 
         # Determinar tipo de devolução
-        if float(valor_total_devolucao) >= float(venda.total) * 0.99:
-            tipo_desc = "Devolução total"
+        if todos_itens_devolvidos:
+            tipo_desc = "Devolução total dos itens"
         else:
             # Verificar se tem componentes de KIT
             tem_componentes = any(
@@ -550,14 +1215,16 @@ def registrar_devolucao(
         historico += f"Motivo: {motivo}\n"
         historico += "Forma de estorno:\n"
 
-        if gerar_credito:
+        if restituicao.cashback > 0:
             historico += (
-                f"  • Crédito em cliente → R$ {float(valor_total_devolucao):.2f}\n"
+                f"  • Cashback na origem → R$ {float(restituicao.cashback):.2f}\n"
             )
-        else:
-            historico += (
-                f"  • Dinheiro (Caixa) → R$ {float(valor_total_devolucao):.2f}\n"
-            )
+            if restituicao.cashback_expirado:
+                historico += f"    Validade original já encerrada: R$ {float(restituicao.cashback_expirado):.2f}\n"
+        if valor_credito > 0:
+            historico += f"  • Crédito em cliente → R$ {float(valor_credito):.2f}\n"
+        if valor_caixa > 0:
+            historico += f"  • Dinheiro (Caixa) → R$ {float(valor_caixa):.2f}\n"
 
         historico += f"Valor total estornado: R$ {float(valor_total_devolucao):.2f}\n"
         historico += f"{'=' * 60}"
@@ -571,7 +1238,13 @@ def registrar_devolucao(
         logger.info("📝 Histórico de devolução adicionado às observações da venda")
 
         # Registrar auditoria da devolução
-        tipo_devolucao = "Crédito ao cliente" if gerar_credito else "Dinheiro"
+        tipo_devolucao = (
+            "Restituição na origem"
+            if restituicao.cashback or restituicao.credito_cliente
+            else "Crédito ao cliente"
+            if gerar_credito
+            else "Dinheiro"
+        )
         log_action(
             db=db,
             user_id=current_user.id,
@@ -582,8 +1255,6 @@ def registrar_devolucao(
             commit=False,
         )
 
-        db.commit()
-
         resultado = {
             "message": "Devolução registrada com sucesso",
             "venda_id": venda_id,
@@ -591,17 +1262,24 @@ def registrar_devolucao(
             "tipo_devolucao": tipo_devolucao,
             "status_venda": venda.status,
             "itens_devolvidos": itens_devolvidos,
+            "devolucao_id": evento_dre.id,
+            "custo_pendente_dre": evento_dre.custo_pendente,
+            "restituicao": restituicao.resposta(),
         }
 
-        if gerar_credito:
+        if valor_credito > 0:
             resultado["credito_cliente"] = credito_cliente_resultado
             resultado["cliente_nome"] = cliente_nome_resultado
-        else:
+        if valor_caixa > 0:
             resultado["movimentacao_caixa_id"] = movimentacao["movimentacao_id"]
+
+        resposta = jsonable_encoder(resultado)
+        evento_dre.resposta = resposta
+        db.commit()
 
         logger.info("✅ Devolução concluída com sucesso!")
         logger.info(f"{'=' * 80}\n")
-        return resultado
+        return resposta
 
     except HTTPException:
         db.rollback()

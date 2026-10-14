@@ -3,11 +3,9 @@ export default function ProdutosNovoEstoqueTab({
   formatarData,
   formatarMoeda,
   handleChange,
-  handleEditarLote,
-  handleExcluirLote,
   isEdicao,
   lotes,
-  setModalEntrada,
+  salvando,
 }) {
   return (
     <div className="space-y-6">
@@ -102,17 +100,26 @@ export default function ProdutosNovoEstoqueTab({
             </label>
           </div>
 
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <p className="text-sm text-blue-900">
+              Registre entradas e saídas nas movimentações. Na mesma tela, identifique lotes e
+              validades de quantidades que já estão no estoque, sem alterar o saldo.
+            </p>
+            <button
+              type="submit"
+              name="destino"
+              value="estoque"
+              disabled={salvando || (formData.tipo_produto === "KIT" && !formData.e_kit_fisico)}
+              className="mt-3 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {salvando ? "Salvando..." : "Salvar e abrir lançamentos de estoque e lotes"}
+            </button>
+          </div>
+
           {isEdicao && formData.controle_lote && (
             <>
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-900">Lotes (FIFO)</h3>
-                <button
-                  type="button"
-                  onClick={() => setModalEntrada(true)}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                >
-                  + Nova Entrada
-                </button>
               </div>
 
               {lotes.length === 0 ? (
@@ -137,9 +144,6 @@ export default function ProdutosNovoEstoqueTab({
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                           Custo Unit.
                         </th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                          Ações
-                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -160,50 +164,6 @@ export default function ProdutosNovoEstoqueTab({
                           <td className="px-4 py-3 text-sm text-right text-gray-900">
                             {formatarMoeda(lote.custo_unitario)}
                           </td>
-                          <td className="px-4 py-3 text-sm text-center">
-                            <div className="flex justify-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleEditarLote(lote)}
-                                className="text-blue-600 hover:text-blue-800"
-                                title="Editar lote"
-                              >
-                                <svg
-                                  className="w-5 h-5"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                  />
-                                </svg>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleExcluirLote(lote)}
-                                className="text-red-600 hover:text-red-800"
-                                title="Excluir lote"
-                              >
-                                <svg
-                                  className="w-5 h-5"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                  />
-                                </svg>
-                              </button>
-                            </div>
-                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -215,7 +175,7 @@ export default function ProdutosNovoEstoqueTab({
 
           {!isEdicao && (
             <div className="text-center py-8 text-gray-500">
-              Salve o produto primeiro para gerenciar lotes
+              Use “Salvar e abrir lançamentos de estoque e lotes” para continuar após o cadastro.
             </div>
           )}
         </>

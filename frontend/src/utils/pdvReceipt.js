@@ -1,5 +1,6 @@
 import { formatMoneyBRL } from "./formatters.js";
 import { valorPorExtenso } from "./pdvPromissory.js";
+import { resumirDescontosVenda } from "./pdvDescontosUtils.js";
 
 export const RECEIPT_WIDTH = 42;
 
@@ -338,8 +339,14 @@ function gerarParcelasCrediario(pagamento = {}) {
 
 function montarResumoVenda(venda = {}) {
   const subtotal = Number(venda.subtotal || 0);
-  const descontoTotal = Number(venda.desconto_valor || 0);
-  const totalBruto = subtotal + descontoTotal;
+  const descontos = resumirDescontosVenda(venda);
+  const totalBruto =
+    (venda.itens || []).length > 0
+      ? venda.itens.reduce(
+          (sum, item) => sum + Number(item.preco_unitario || 0) * Number(item.quantidade || 0),
+          0,
+        )
+      : subtotal + descontos.itens;
   const taxaEntrega = Number(venda?.entrega?.taxa_entrega_total || venda.taxa_entrega || 0);
   const linhas = [
     "-".repeat(RECEIPT_WIDTH),
@@ -350,8 +357,18 @@ function montarResumoVenda(venda = {}) {
     linePair("Total bruto:", formatMoneyBRL(totalBruto)),
   ];
 
-  if (descontoTotal > 0) {
-    linhas.push(linePair("Desconto:", `-${formatMoneyBRL(descontoTotal)}`));
+  if (venda.desconto_venda_valor == null && descontos.total > 0) {
+    linhas.push(linePair("Descontos anteriores:", `-${formatMoneyBRL(descontos.total)}`));
+  } else if (descontos.manual > 0) {
+    linhas.push(linePair("Desconto manual:", `-${formatMoneyBRL(descontos.manual)}`));
+  }
+  if (descontos.cupom > 0) {
+    linhas.push(
+      linePair(
+        venda.desconto_venda_valor == null ? "Cupom (ja incluido):" : "Campanha/cupom:",
+        `-${formatMoneyBRL(descontos.cupom)}`,
+      ),
+    );
   }
   if (venda.tem_entrega) {
     linhas.push(linePair("Taxa entrega:", formatMoneyBRL(taxaEntrega)));
@@ -426,6 +443,7 @@ export function montarCupomVenda(venda = {}, empresa = {}) {
     }
     linhas.push("-".repeat(RECEIPT_WIDTH));
     linhas.push(linePair("VALOR PAGO:", formatMoneyBRL(valorPagoCentavos / 100)));
+    if (valorAReceberCentavos === 0) linhas.push("STATUS: PAGO");
     if (valorAReceberCentavos > 0) {
       linhas.push(linePair("VALOR A RECEBER:", formatMoneyBRL(valorAReceberCentavos / 100)));
     } else if (trocoCentavos > 0) {
@@ -437,6 +455,31 @@ export function montarCupomVenda(venda = {}, empresa = {}) {
       linhas.push(...wrap("ATENCAO: LEVAR MAQUININHA DE CARTAO"));
     }
     linhas.push("-".repeat(RECEIPT_WIDTH));
+  }
+
+  const previsto = venda.pagamento_entrega_previsto;
+  if (venda.tem_entrega && previsto?.forma) {
+    const pago = obterValorPagoCentavos(venda, venda.pagamentos || []);
+    const restante = Math.max(0, valorEmCentavos(venda.total) - pago);
+    if (restante > 0) {
+      const nomes = {
+        dinheiro: "DINHEIRO NA ENTREGA",
+        cartao_debito: "CARTAO DE DEBITO NA ENTREGA",
+        cartao_credito: "CARTAO DE CREDITO NA ENTREGA",
+        pix: "PIX A FAZER",
+      };
+      linhas.push("PAGAMENTO NA ENTREGA (PENDENTE)");
+      linhas.push(linePair(nomes[previsto.forma] || "A COMBINAR", formatMoneyBRL(restante / 100)));
+      if (previsto.forma === "dinheiro" && Number(previsto.valor_para_troco) > 0) {
+        const valorCliente = valorEmCentavos(previsto.valor_para_troco);
+        linhas.push(linePair("CLIENTE PAGA COM:", formatMoneyBRL(valorCliente / 100)));
+        if (valorCliente >= restante) {
+          linhas.push(linePair("LEVAR TROCO:", formatMoneyBRL((valorCliente - restante) / 100)));
+        }
+      }
+      if (previsto.forma.startsWith("cartao")) linhas.push("LEVAR MAQUININHA DE CARTAO");
+      linhas.push("-".repeat(RECEIPT_WIDTH));
+    }
   }
 
   if (venda.tem_entrega && (enderecoEntrega || observacoesEntrega)) {

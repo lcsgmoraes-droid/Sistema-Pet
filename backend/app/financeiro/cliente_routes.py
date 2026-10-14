@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
+from app.services.venda_descontos import resumo_descontos_venda
 
 router = APIRouter()
 
@@ -155,6 +156,10 @@ async def get_historico_financeiro_cliente(
                         "subtotal": float(venda.subtotal) if venda.subtotal else 0,
                         "desconto": (
                             float(venda.desconto_valor) if venda.desconto_valor else 0
+                        ),
+                        **resumo_descontos_venda(venda),
+                        "cupom_discount_applied": float(
+                            venda.cupom_discount_applied or 0
                         ),
                         "total": float(venda.total) if venda.total else 0,
                         "canal": venda.canal,

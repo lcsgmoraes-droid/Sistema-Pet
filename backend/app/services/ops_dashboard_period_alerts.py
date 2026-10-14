@@ -27,6 +27,8 @@ def _build_alerts(
 ) -> list[dict[str, Any]]:
     alerts: list[dict[str, Any]] = []
     errors_5xx = int(error_summary.get("errors_5xx") or 0)
+    unknown_status_failures = int(error_summary.get("unknown_status_failures") or 0)
+    response_failures = int(error_summary.get("response_failures") or 0)
     slow_requests = int(error_summary.get("slow_requests") or 0)
     last_failed = _last_failed_deploy_after_success(deploy_events)
     recoveries = int(watchdog_summary.get("recoveries") or 0)
@@ -105,6 +107,30 @@ def _build_alerts(
                 "detail": f"Maior incidencia em {top_route}; tenant em destaque: {top_tenant}.",
                 "action": "Abrir a rota critica, localizar request_id e corrigir a causa raiz.",
                 "source": "error_events",
+            }
+        )
+
+    if response_failures:
+        alerts.append(
+            {
+                "severity": "warning",
+                "tone": "amber",
+                "title": f"{response_failures} resposta(s) interrompida(s)",
+                "detail": "Uma excecao impediu a conclusao da resposta apos o envio dos headers.",
+                "action": "Consultar o diagnostico da rota e corrigir a origem da interrupcao.",
+                "source": "response_failures",
+            }
+        )
+
+    if unknown_status_failures:
+        alerts.append(
+            {
+                "severity": "warning",
+                "tone": "amber",
+                "title": f"{unknown_status_failures} excecao(oes) sem status confirmado",
+                "detail": "Os registros antigos nao informam a resposta HTTP enviada.",
+                "action": "Consultar os eventos por tenant, rota e request_id para investigar a origem.",
+                "source": "unknown_status_failures",
             }
         )
 

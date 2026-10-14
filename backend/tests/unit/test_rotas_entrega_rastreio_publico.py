@@ -69,3 +69,22 @@ def test_token_ativa_somente_o_tenant_encontrado_e_restaura_contexto(monkeypatch
         "tenant_contexto": tenant_id,
     }
     assert get_current_tenant() is None
+
+
+def test_parada_publica_oculta_dados_de_outros_clientes():
+    from app.api.endpoints.rotas_entrega_tracking import _montar_parada_publica
+
+    parada = SimpleNamespace(
+        id=8,
+        ordem=2,
+        endereco="Rua Particular, 123",
+        status="pendente",
+        data_entrega=None,
+        venda=SimpleNamespace(
+            numero_venda="VEN-123", cliente=SimpleNamespace(nome="Maria")
+        ),
+    )
+    resultado = _montar_parada_publica(parada, {})
+    assert resultado["endereco"] == "Entrega 2"
+    assert "cliente_nome" not in resultado
+    assert "numero_venda" not in resultado

@@ -105,6 +105,32 @@ test("recibo sem CPF ou CNPJ continua sendo gerado normalmente", () => {
   assert.doesNotMatch(recibo, /CPF\/CNPJ:/);
 });
 
+test("recibo de entrega mostra PIX previsto sem declarar recebimento", () => {
+  const recibo = montarCupomVenda({
+    ...vendaBase,
+    tem_entrega: true,
+    pagamentos: [],
+    pagamento_entrega_previsto: { forma: "pix" },
+  });
+  assert.match(recibo, /PAGAMENTO NA ENTREGA \(PENDENTE\)/);
+  assert.match(recibo, /PIX A FAZER/);
+  assert.doesNotMatch(recibo, /VALOR PAGO:/);
+});
+
+test("recibo calcula troco previsto e deixa de cobrá-lo depois de pago", () => {
+  const venda = {
+    ...vendaBase,
+    tem_entrega: true,
+    pagamentos: [],
+    pagamento_entrega_previsto: { forma: "dinheiro", valor_para_troco: 400 },
+  };
+  const pendente = montarCupomVenda(venda);
+  assert.match(pendente, /CLIENTE PAGA COM:\s+R\$ 400,00/);
+  assert.match(pendente, /LEVAR TROCO:\s+R\$ 10,00/);
+  const pago = montarCupomVenda({ ...venda, pagamentos: [{ forma_pagamento: "PIX", valor: 390 }] });
+  assert.doesNotMatch(pago, /PAGAMENTO NA ENTREGA \(PENDENTE\)/);
+});
+
 test("justificativa interna de margem critica nao aparece no cupom nem na reimpressao", () => {
   const observacoes =
     "Separar pedido para retirada\n\nJUSTIFICATIVA (Margem Critica): Desconto autorizado pelo gerente\nMotivo interno detalhado";
@@ -278,4 +304,68 @@ test("venda comum continua gerando apenas o recibo simples", () => {
   assert.equal(ehVendaCrediario({ pagamentos: [{ forma_pagamento: "Dinheiro" }] }), false);
   assert.match(recibo, /RECIBO DO PDV/);
   assert.doesNotMatch(recibo, /VIA DO ESTABELECIMENTO|ASSINATURA DO CLIENTE/);
+});
+
+test("recibo separa manuais de cupom sem duplicar desconto do produto", () => {
+  const recibo = montarCupomVenda({
+    ...vendaBase,
+    itens: [
+      {
+        produto_nome: "Produto A",
+        quantidade: 1,
+        preco_unitario: 100,
+        desconto_item: 20,
+        subtotal: 80,
+      },
+      {
+        produto_nome: "Produto B",
+        quantidade: 1,
+        preco_unitario: 100,
+        desconto_item: 0,
+        subtotal: 100,
+      },
+    ],
+    subtotal: 180,
+    desconto_venda_valor: 10,
+    desconto_valor: 35,
+    cupom_code: "FIXO5",
+    cupom_discount_applied: 5,
+    total: 165,
+  });
+  assert.match(recibo, /Total bruto:\s+R\$ 200,00/);
+  assert.match(recibo, /Desconto manual:\s+-R\$ 30,00/);
+  assert.match(recibo, /Campanha\/cupom:\s+-R\$ 5,00/);
+  assert.match(recibo, /TOTAL:\s+R\$ 165,00/);
+});
+
+test("recibo legado identifica cupom ja incluido sem afirmar origem manual", () => {
+  const recibo = montarCupomVenda({
+    ...vendaBase,
+    itens: [
+      {
+        produto_nome: "Produto A",
+        quantidade: 1,
+        preco_unitario: 100,
+        desconto_item: 15,
+        subtotal: 85,
+      },
+      {
+        produto_nome: "Produto B",
+        quantidade: 1,
+        preco_unitario: 100,
+        desconto_item: 5,
+        subtotal: 95,
+      },
+    ],
+    subtotal: 180,
+    desconto_venda_valor: null,
+    desconto_valor: 20,
+    cupom_code: "OLD",
+    cupom_discount_applied: 10,
+    total: 180,
+  });
+  assert.match(recibo, /Descontos anteriores:\s+-R\$ 20,00/);
+  assert.match(recibo, /Cupom \(ja incluido\):\s+-R\$ 10,00/);
+  assert.doesNotMatch(recibo, /Desconto manual:/);
+  assert.match(recibo, /TOTAL:\s+R\$ 180,00/);
 });

@@ -5,7 +5,6 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.security.jwt_compat import JWTError, jwt
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.auth import create_access_token, create_refresh_token
@@ -293,14 +292,6 @@ def _remaining_days_until(dt: datetime, now_ref: datetime) -> int:
     return max(0, (dt - aligned_now).days)
 
 
-def _cashback_disponivel_clause(cashback_model, now_ref: datetime):
-    return or_(
-        cashback_model.expires_at.is_(None),
-        cashback_model.expires_at > now_ref,
-        cashback_model.tx_type != "credit",
-    )
-
-
 def _extract_tenant_id_from_request(request: Request) -> UUID:
     tenant_id = _normalize_tenant_uuid(request.headers.get("X-Tenant-ID"))
     if not tenant_id:
@@ -409,43 +400,45 @@ def _get_current_ecommerce_user(
 
 
 def _get_or_create_customer_role(db: Session, tenant_id: str) -> Role:
+    tenant_uuid = _normalize_tenant_uuid(str(tenant_id))
     role = (
         db.query(Role)
-        .filter(Role.tenant_id == tenant_id, Role.name == "Cliente")
+        .filter(Role.tenant_id == tenant_uuid, Role.name == "Cliente")
         .first()
     )
     if role:
         return role
 
-    role = Role(name="Cliente", tenant_id=tenant_id)
+    role = Role(name="Cliente", tenant_id=tenant_uuid)
     db.add(role)
     db.flush()
     return role
 
 
 def _ensure_active_store_access(db: Session, user: User, tenant_id: str) -> UserTenant:
+    tenant_uuid = _normalize_tenant_uuid(str(tenant_id))
     vinculo = (
         db.query(UserTenant)
         .filter(
             UserTenant.user_id == user.id,
-            UserTenant.tenant_id == tenant_id,
+            UserTenant.tenant_id == tenant_uuid,
         )
         .first()
     )
 
-    if vinculo and vinculo.is_active:
+    if vinculo:
+        if not vinculo.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acesso desativado nesta loja. Procure o administrador do ERP.",
+            )
         return vinculo
 
     role = _get_or_create_customer_role(db, tenant_id)
 
-    if vinculo:
-        vinculo.role_id = role.id
-        vinculo.is_active = True
-        return vinculo
-
     vinculo = UserTenant(
         user_id=user.id,
-        tenant_id=tenant_id,
+        tenant_id=tenant_uuid,
         role_id=role.id,
         is_active=True,
     )

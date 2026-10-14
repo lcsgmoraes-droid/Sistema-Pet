@@ -29,6 +29,73 @@ const ClientesNovoContatosStep = ({
         )}
       </div>
 
+      <div className="rounded-lg border border-gray-200 p-3 space-y-3">
+        <div>
+          <h4 className="text-sm font-semibold text-gray-900">Celulares adicionais</h4>
+          <p className="text-xs text-gray-500">
+            Cadastre o celular da mãe, irmã ou de outra pessoa. No PDV, esse número encontra o
+            cadastro principal e seus benefícios.
+          </p>
+        </div>
+        {(formData.contatos_adicionais || []).map((contato, index) => (
+          <div key={index} className="flex flex-wrap items-center gap-2">
+            <input
+              type="tel"
+              aria-label={`Celular adicional ${index + 1}`}
+              value={contato.numero}
+              onChange={(e) => {
+                const contatos = [...formData.contatos_adicionais];
+                contatos[index] = { ...contato, numero: e.target.value };
+                setFormData({ ...formData, contatos_adicionais: contatos });
+              }}
+              className="min-w-[170px] flex-1 rounded-lg border border-gray-300 px-3 py-2"
+              placeholder="(00) 00000-0000"
+              maxLength={50}
+            />
+            <input
+              type="text"
+              aria-label={`Vínculo do celular adicional ${index + 1}`}
+              value={contato.vinculo}
+              onChange={(e) => {
+                const contatos = [...formData.contatos_adicionais];
+                contatos[index] = { ...contato, vinculo: e.target.value };
+                setFormData({ ...formData, contatos_adicionais: contatos });
+              }}
+              className="min-w-[130px] flex-1 rounded-lg border border-gray-300 px-3 py-2"
+              placeholder="Mãe, irmã, pai..."
+              maxLength={60}
+            />
+            <button
+              type="button"
+              onClick={() =>
+                setFormData({
+                  ...formData,
+                  contatos_adicionais: formData.contatos_adicionais.filter((_, i) => i !== index),
+                })
+              }
+              className="rounded-lg px-3 py-2 text-sm text-red-700 hover:bg-red-50"
+            >
+              Remover
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() =>
+            setFormData({
+              ...formData,
+              contatos_adicionais: [
+                ...(formData.contatos_adicionais || []),
+                { numero: "", vinculo: "" },
+              ],
+            })
+          }
+          className="rounded-lg border border-blue-300 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
+        >
+          + Adicionar celular
+        </button>
+      </div>
+
       <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
         <span className="text-sm text-gray-700">Este número é WhatsApp?</span>
         <div className="flex gap-4">

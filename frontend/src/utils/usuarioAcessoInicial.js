@@ -63,5 +63,6 @@ export function formatInitialAccessCredentials(credentials) {
   }
   lines.push(`Senha inicial: ${credentials.password}`);
   lines.push("Login: https://corepet.com.br/login");
+  lines.push("Aplicativo CorePet: selecione a loja e use o mesmo acesso. Nao crie outra conta.");
   return lines.join("\n");
 }

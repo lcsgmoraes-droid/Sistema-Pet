@@ -41,7 +41,7 @@ export default function LoginScreen({ navigation, route }: any) {
 
   async function handleLogin() {
     if (!email.trim() || !senha.trim()) {
-      Alert.alert('Campos obrigatórios', 'Preencha e-mail ou usuário e senha.');
+      Alert.alert('Campos obrigatórios', 'Preencha celular, e-mail ou usuário e senha.');
       return;
     }
     setCarregando(true);
@@ -51,7 +51,7 @@ export default function LoginScreen({ navigation, route }: any) {
     } catch (err: any) {
       const msg =
         err?.response?.data?.detail === 'Incorrect username or password'
-          ? 'E-mail, usuário ou senha incorretos.'
+          ? 'Celular, e-mail, usuário ou senha incorretos.'
           : err?.response?.data?.detail || 'Erro ao fazer login. Tente novamente.';
       Alert.alert('Erro', msg);
     } finally {
@@ -96,10 +96,10 @@ export default function LoginScreen({ navigation, route }: any) {
             </View>
           )}
 
-          <Text style={styles.label}>E-mail ou nome de usuário</Text>
+          <Text style={styles.label}>Celular, e-mail ou nome de usuário</Text>
           <TextInput
             style={styles.input}
-            placeholder="seu@email.com ou maria.silva"
+            placeholder="(18) 99999-9999, e-mail ou usuário"
             placeholderTextColor={CORES.textoClaro}
             autoCapitalize="none"
             autoCorrect={false}
@@ -171,6 +171,9 @@ export default function LoginScreen({ navigation, route }: any) {
               Não tem conta? <Text style={styles.linkDestaque}>Cadastre-se grátis</Text>
             </Text>
           </TouchableOpacity>
+          <Text style={styles.staffHint}>
+            Funcionário? Entre com o celular e a senha cadastrados no ERP. Não precisa criar outra conta.
+          </Text>
 
           <TouchableOpacity style={styles.continueGuestButton} onPress={voltarAoConteudo}>
             <Text style={styles.continueGuestText}>Continuar explorando sem login</Text>
@@ -300,6 +303,12 @@ const styles = StyleSheet.create({
   linkDestaque: {
     color: CORES.primario,
     fontWeight: '600',
+  },
+  staffHint: {
+    color: CORES.textoSecundario,
+    fontSize: FONTE.pequena,
+    textAlign: 'center',
+    marginTop: ESPACO.sm,
   },
   beneficios: {
     gap: ESPACO.sm,

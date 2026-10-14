@@ -11,6 +11,7 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.clientes.common import _validar_tenant_e_obter_usuario
 from app.db import get_session
 from app.financeiro_models import ContaReceber
+from app.utils.timezone import now_brasilia
 from app.services.venda_rentabilidade_snapshot_service import (
     get_or_build_venda_rentabilidade_snapshot,
 )
@@ -26,6 +27,21 @@ CENT = Decimal("0.01")
 
 def _money(value) -> Decimal:
     return Decimal(str(value or 0)).quantize(CENT, rounding=ROUND_HALF_UP)
+
+
+def _saldo_venda(venda) -> tuple[Decimal, Decimal]:
+    valor_pago = sum((_money(p.valor) for p in venda.pagamentos or []), Decimal("0.00"))
+    return valor_pago, _money(venda.total) - valor_pago
+
+
+def _validar_valor_baixa(valor_total: Decimal, saldo_total: Decimal) -> None:
+    if valor_total <= 0:
+        raise HTTPException(status_code=400, detail="Informe um valor maior que zero")
+    if valor_total > saldo_total:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Valor do pagamento (R$ {valor_total:.2f}) excede o saldo devedor total (R$ {saldo_total:.2f})",
+        )
 
 
 def _date_only(value):
@@ -110,9 +126,10 @@ async def baixar_vendas_lote(
 
         # Extrair dados do body
         vendas_ids = dados.get("vendas_ids", [])
-        valor_total = float(dados.get("valor_total", 0))
+        valor_total = _money(dados.get("valor_total", 0))
         forma_pagamento = dados.get("forma_pagamento", "")
         numero_transacao = dados.get("numero_transacao")
+        instante_recebimento = now_brasilia()
 
         logger.info(f"Vendas IDs: {vendas_ids}")
         logger.info(f"Valor total: {valor_total}")
@@ -120,7 +137,7 @@ async def baixar_vendas_lote(
 
         # Validar se há caixa aberto
         caixa_aberto, _ = buscar_caixa_aberto(
-            db, tenant_id=tenant_id, usuario_id=current_user.id
+            db, tenant_id=tenant_id, usuario_id=current_user.id, bloquear_caixa=True
         )
 
         logger.info(f"Caixa aberto: {caixa_aberto}")
@@ -157,21 +174,16 @@ async def baixar_vendas_lote(
 
         # Calcular saldo devedor de cada venda
         vendas_com_saldo = []
-        total_saldo_devedor = 0
+        total_saldo_devedor = Decimal("0.00")
 
         for venda in vendas:
-            valor_ja_pago = (
-                sum(float(p.valor or 0) for p in venda.pagamentos)
-                if venda.pagamentos
-                else 0
-            )
-            saldo_devedor = float(venda.total or 0) - valor_ja_pago
+            valor_ja_pago, saldo_devedor = _saldo_venda(venda)
 
             logger.info(
                 f"Venda {venda.id}: Total={venda.total}, Pago={valor_ja_pago}, Saldo={saldo_devedor}"
             )
 
-            if saldo_devedor > 0.01:  # Tolerância de 1 centavo
+            if saldo_devedor > 0:
                 vendas_com_saldo.append(
                     {
                         "venda": venda,
@@ -190,11 +202,7 @@ async def baixar_vendas_lote(
                 status_code=400, detail="Todas as vendas já estão quitadas"
             )
 
-        if valor_total > total_saldo_devedor + 0.01:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Valor do pagamento (R$ {valor_total:.2f}) excede o saldo devedor total (R$ {total_saldo_devedor:.2f})",
-            )
+        _validar_valor_baixa(valor_total, total_saldo_devedor)
 
         # Distribuir o valor proporcionalmente entre as vendas
         valor_restante = valor_total
@@ -218,20 +226,21 @@ async def baixar_vendas_lote(
             # 🔒 ISOLAMENTO MULTI-TENANT: tenant_id obrigatório
             pagamento = VendaPagamento(
                 venda_id=venda.id,
+                caixa_id=caixa_aberto.id,
                 tenant_id=tenant_id,  # ✅ Garantir isolamento entre empresas
                 forma_pagamento=forma_pagamento,
                 valor=valor_aplicar,
                 numero_transacao=numero_transacao,
                 status="confirmado",
-                data_pagamento=dt.now(),
+                data_pagamento=instante_recebimento,
             )
             db.add(pagamento)
 
             # Atualizar status da venda
             novo_valor_pago = item["valor_ja_pago"] + valor_aplicar
-            novo_saldo = float(venda.total) - novo_valor_pago
+            novo_saldo = _money(venda.total) - novo_valor_pago
 
-            if abs(novo_saldo) < 0.01:  # Quitada
+            if novo_saldo <= 0:  # Quitada
                 venda.status = "finalizada"
                 vendas_quitadas.append(
                     {
@@ -241,7 +250,7 @@ async def baixar_vendas_lote(
                         "saldo_anterior": saldo_devedor,
                     }
                 )
-                if venda.cliente_id:
+                if venda.cliente_id and not venda.nao_gerar_beneficios:
                     try:
                         from app.campaigns.models import (
                             CampaignEventQueue,
@@ -287,16 +296,8 @@ async def baixar_vendas_lote(
                 force_refresh=True,
             )
 
-            # Registrar movimentação no caixa (apenas para formas que movimentam caixa)
-            formas_que_movimentam_caixa = [
-                "dinheiro",
-                "Dinheiro",
-                "pix",
-                "PIX",
-                "cartao_debito",
-                "Cartão de Débito",
-            ]
-            if forma_pagamento in formas_que_movimentam_caixa:
+            # PIX/cartão são auditados pelo pagamento associado, sem espelho físico.
+            if str(forma_pagamento).strip().casefold() == "dinheiro":
                 # 🔒 ISOLAMENTO MULTI-TENANT: tenant_id obrigatório
                 movimentacao = MovimentacaoCaixa(
                     caixa_id=caixa_aberto.id,
@@ -310,7 +311,7 @@ async def baixar_vendas_lote(
                     usuario_nome=current_user.nome
                     or getattr(current_user, "username", None)
                     or current_user.email,
-                    data_movimento=dt.now(),
+                    data_movimento=instante_recebimento,
                     tenant_id=tenant_id,  # ✅ Garantir isolamento entre empresas
                 )
                 db.add(movimentacao)
@@ -320,7 +321,10 @@ async def baixar_vendas_lote(
                 db.query(ContaReceber)
                 .filter(
                     ContaReceber.venda_id == venda.id,
-                    ContaReceber.status.in_(["pendente", "baixa_parcial", "parcial"]),
+                    ContaReceber.tenant_id == tenant_id,
+                    ContaReceber.status.in_(
+                        ["pendente", "baixa_parcial", "parcial", "vencido", "vencida"]
+                    ),
                 )
                 .first()
             )
@@ -332,17 +336,17 @@ async def baixar_vendas_lote(
                     current_user=current_user,
                     tenant_id=tenant_id,
                     valor_ja_recebido=item["valor_ja_pago"],
-                    data_referencia=dt.now(),
+                    data_referencia=instante_recebimento,
                 )
 
             if conta_receber:
-                valor_ja_recebido = float(conta_receber.valor_recebido or 0)
+                valor_ja_recebido = _money(conta_receber.valor_recebido)
                 novo_valor_recebido = valor_ja_recebido + valor_aplicar
 
                 conta_receber.valor_recebido = novo_valor_recebido
-                conta_receber.data_recebimento = dt.now()
+                conta_receber.data_recebimento = instante_recebimento
 
-                if abs(float(conta_receber.valor_final) - novo_valor_recebido) < 0.01:
+                if _money(conta_receber.valor_final) <= novo_valor_recebido:
                     conta_receber.status = "pago"
                 else:
                     conta_receber.status = "baixa_parcial"
@@ -351,7 +355,7 @@ async def baixar_vendas_lote(
                 recebimento = Recebimento(
                     conta_receber_id=conta_receber.id,
                     valor_recebido=valor_aplicar,
-                    data_recebimento=dt.now().date(),
+                    data_recebimento=instante_recebimento.date(),
                     observacoes=f"Baixa em lote - {forma_pagamento}",
                     user_id=current_user.id,
                     tenant_id=tenant_id,  # ✅ Garantir isolamento multi-tenant
@@ -365,7 +369,7 @@ async def baixar_vendas_lote(
                     categoria="Recebimento de Venda",
                     descricao=f"Baixa venda #{venda.numero_venda} - {venda.cliente.nome if venda.cliente else 'Cliente avulso'}",
                     valor=valor_aplicar,
-                    data_movimentacao=dt.now(),
+                    data_movimentacao=instante_recebimento,
                     data_prevista=None,
                     status="realizado",
                     origem_tipo="conta_receber",
@@ -378,8 +382,8 @@ async def baixar_vendas_lote(
                 )
 
                 # 🆕 CRIAR LANÇAMENTO PREVISTO NO FLUXO DE CAIXA (se houver saldo restante)
-                saldo_conta = float(conta_receber.valor_final) - novo_valor_recebido
-                if saldo_conta > 0.01:  # Se ainda tem saldo
+                saldo_conta = _money(conta_receber.valor_final) - novo_valor_recebido
+                if saldo_conta > 0:  # Se ainda tem saldo
                     data_previsao = dt.now() + timedelta(days=30)  # +30 dias
 
                     fluxo_previsto = FluxoCaixa(
@@ -414,10 +418,22 @@ async def baixar_vendas_lote(
         return {
             "success": True,
             "total_vendas_afetadas": len(vendas_quitadas) + len(vendas_parciais),
-            "vendas_quitadas": vendas_quitadas,
-            "vendas_parciais": vendas_parciais,
-            "valor_total_baixado": valor_total,
-            "valor_restante": valor_restante,
+            "vendas_quitadas": [
+                {
+                    chave: float(valor) if isinstance(valor, Decimal) else valor
+                    for chave, valor in item.items()
+                }
+                for item in vendas_quitadas
+            ],
+            "vendas_parciais": [
+                {
+                    chave: float(valor) if isinstance(valor, Decimal) else valor
+                    for chave, valor in item.items()
+                }
+                for item in vendas_parciais
+            ],
+            "valor_total_baixado": float(valor_total),
+            "valor_restante": float(valor_restante),
             "message": f"Baixa realizada com sucesso! {len(vendas_quitadas)} vendas quitadas, {len(vendas_parciais)} com baixa parcial.",
         }
     except HTTPException:

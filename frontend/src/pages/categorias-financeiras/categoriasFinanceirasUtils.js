@@ -2,7 +2,8 @@ import {
   ICON_FALLBACK,
   MOJIBAKE_REPLACEMENTS,
   QUESTION_MARK_WORD_FIXES,
-} from "./categoriasFinanceirasConstants";
+} from "./categoriasFinanceirasConstants.js";
+import { inferirNaturezaDRE } from "../../utils/dreCategoriaFinanceira.js";
 
 export function normalizeDisplayText(value) {
   if (typeof value !== "string") return value || "";
@@ -34,21 +35,14 @@ export function getSubcategoriasDREDaCategoria(categoria, subcategoriasDRE) {
   const porCatFinanceira = subcategoriasDRE.filter(
     (subcategoria) => subcategoria.categoria_financeira_id === categoria.id,
   );
-  if (porCatFinanceira.length > 0) return porCatFinanceira;
-
-  if (!categoria.dre_subcategoria_id) return [];
-
-  const subPrincipal = subcategoriasDRE.find(
-    (subcategoria) =>
-      subcategoria.id === categoria.dre_subcategoria_id && !subcategoria.categoria_financeira_id,
+  const principal = subcategoriasDRE.find(
+    (subcategoria) => subcategoria.id === categoria.dre_subcategoria_id,
   );
-  if (!subPrincipal) return [];
-
-  return subcategoriasDRE.filter(
-    (subcategoria) =>
-      subcategoria.categoria_id === subPrincipal.categoria_id &&
-      !subcategoria.categoria_financeira_id,
-  );
+  // O vínculo com a categoria DRE não dá propriedade das subcategorias irmãs.
+  // O vínculo legado principal pode ser exibido, mas não deve ser apagado.
+  return principal && !porCatFinanceira.some((sub) => sub.id === principal.id)
+    ? [...porCatFinanceira, principal]
+    : porCatFinanceira;
 }
 
 export function resolverCategoriaDREId({
@@ -69,18 +63,20 @@ export function resolverCategoriaDREId({
     if (subPrincipal?.categoria_id) return subPrincipal.categoria_id;
   }
 
-  const natureza = categoriaFinanceira.tipo === "receita" ? "receita" : "despesa";
-  const categoriasMesmaNatureza = dreCategorias.filter(
-    (categoria) => categoria.natureza === natureza && categoria.ativo !== false,
+  const natureza = inferirNaturezaDRE(categoriaFinanceira);
+  return (
+    dreCategorias.find(
+      (categoria) =>
+        categoria.natureza === natureza &&
+        categoria.ativo !== false &&
+        String(categoria.nome || "")
+          .trim()
+          .toLocaleLowerCase("pt-BR") ===
+          String(categoriaFinanceira.nome || "")
+            .trim()
+            .toLocaleLowerCase("pt-BR"),
+    )?.id || null
   );
-  if (natureza === "despesa") {
-    const operacional = categoriasMesmaNatureza.find((categoria) =>
-      (categoria.nome || "").toLowerCase().includes("operacion"),
-    );
-    if (operacional) return operacional.id;
-  }
-
-  return categoriasMesmaNatureza[0]?.id || null;
 }
 
 export function buildCategoriaPayload(formData) {
@@ -105,7 +101,7 @@ export function buildSubcategoriaDREPayload({ categoriaDREId, nome, categoriaFin
   };
 }
 
-export function buildSubcategoriasExistentes(subcategorias) {
+export function buildSubcategoriasExistentes(subcategorias, categoriaFinanceiraId) {
   return subcategorias.map((subcategoria) => ({
     id: subcategoria.id,
     nome: subcategoria.nome,
@@ -113,6 +109,7 @@ export function buildSubcategoriasExistentes(subcategorias) {
     ativo: subcategoria.ativo,
     tipo_custo: subcategoria.tipo_custo,
     escopo_rateio: subcategoria.escopo_rateio,
+    somenteVinculo: subcategoria.categoria_financeira_id !== categoriaFinanceiraId,
   }));
 }
 
@@ -126,6 +123,15 @@ export function filterCategoriasRaiz(categorias, filtroTipo) {
 
 export function countCategoriasByTipo(categorias, tipo) {
   return categorias.filter((categoria) => categoria.tipo === tipo).length;
+}
+
+export function podeClassificarCustoPeDRE(categoria, subcategoria) {
+  return (
+    categoria.pode_editar === true &&
+    categoria.tipo_custo === "ambos" &&
+    (subcategoria.categoria_financeira_id == null ||
+      subcategoria.categoria_financeira_id === categoria.id)
+  );
 }
 
 export function getFilhasFinanceiras(categorias, categoriaPaiId) {

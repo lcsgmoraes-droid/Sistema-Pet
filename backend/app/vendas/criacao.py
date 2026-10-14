@@ -9,6 +9,9 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.utils.timezone import now_brasilia
+from app.vendas.custo_original import registrar_custo_original_saida
+from app.services.venda_descontos import normalizar_item_venda
+from app.vendas.regras import calcular_totais_venda
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +68,7 @@ def criar_venda(
         obter_protocolo_ativo_do_produto,
     )
     from app.vendas.racao_previsao import validar_previsao_fim_racao
+    from app.vendas.pagamento_entrega_previsto import validar_valor_para_troco
 
     logger.info(f"📝 Criando nova venda para user_id={user_id}")
 
@@ -108,6 +112,23 @@ def criar_venda(
         tem_entrega = bool(payload.get("tem_entrega", False))
         taxa_entrega = (payload.get("taxa_entrega", 0) or 0) if tem_entrega else 0
         total = subtotal_itens + taxa_entrega
+        if payload.get("desconto_venda_valor") is not None:
+            try:
+                itens = [{**item, **normalizar_item_venda(item)} for item in itens]
+                totais = calcular_totais_venda(
+                    itens,
+                    desconto_valor,
+                    payload.get("desconto_percentual", 0) or 0,
+                    taxa_entrega,
+                    desconto_venda_valor=payload["desconto_venda_valor"],
+                    cupom_discount_applied=payload.get("cupom_discount_applied"),
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            subtotal_itens = totais["subtotal"]
+            desconto_valor = totais["desconto_valor"]
+            total = totais["total"]
+        validar_valor_para_troco(payload.get("pagamento_entrega_previsto"), saldo=total)
 
         # 🚚 Calcular distribuição da taxa de entrega
         percentual_taxa_entregador = (
@@ -158,8 +179,11 @@ def criar_venda(
             cliente_id=payload.get("cliente_id"),
             vendedor_id=payload.get("vendedor_id") or user_id,
             funcionario_id=payload.get("funcionario_id"),
+            vendedor_funcionario_id=payload.get("vendedor_funcionario_id")
+            or payload.get("funcionario_id"),
             subtotal=float(subtotal_itens),
             desconto_valor=float(desconto_valor),  # Desconto aplicado na venda
+            desconto_venda_valor=payload.get("desconto_venda_valor"),
             desconto_percentual=payload.get("desconto_percentual", 0) or 0,
             cupom_code=(
                 str(payload.get("cupom_code")).strip().upper()
@@ -181,6 +205,9 @@ def criar_venda(
             distancia_km=payload.get("distancia_km") if tem_entrega else None,
             valor_por_km=payload.get("valor_por_km") if tem_entrega else None,
             observacoes_entrega=payload.get("observacoes_entrega")
+            if tem_entrega
+            else None,
+            pagamento_entrega_previsto=payload.get("pagamento_entrega_previsto")
             if tem_entrega
             else None,
             status_entrega="pendente" if tem_entrega else None,
@@ -370,7 +397,6 @@ def criar_venda(
             .filter(
                 CategoriaFinanceira.nome.ilike("%vendas%"),
                 CategoriaFinanceira.tipo == "receita",
-                CategoriaFinanceira.user_id == user_id,
                 CategoriaFinanceira.tenant_id == tenant_id,
             )
             .first()
@@ -478,6 +504,9 @@ def criar_venda(
                             venda_item=item if not compartilhado else None,
                         )
 
+                    registrar_custo_original_saida(
+                        item, resultados, tenant_estoque_uuid
+                    )
                     estoque_baixado.extend(resultados)
                     logger.info(
                         f"📦 Estoque baixado ao criar venda: {produto.nome} -{item.quantidade}"

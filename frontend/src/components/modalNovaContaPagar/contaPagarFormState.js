@@ -1,13 +1,29 @@
 import { safeArray } from "../../utils/safeArray";
 import { confirmarCorePet } from "../../services/corepetDialog";
 
-const hojeISO = () => new Date().toISOString().split("T")[0];
+export const dataAtualBrasiliaISO = (instante = new Date()) => {
+  const partes = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+      .formatToParts(instante)
+      .filter(({ type }) => ["year", "month", "day"].includes(type))
+      .map(({ type, value }) => [type, value]),
+  );
+  return `${partes.year}-${partes.month}-${partes.day}`;
+};
+
+const hojeISO = () => dataAtualBrasiliaISO();
 
 export const criarDadosPadraoContaPagar = () => ({
   descricao: "",
   fornecedor_id: null,
   categoria_id: null,
   dre_subcategoria_id: null,
+  afeta_dre: true,
   tipo_despesa_id: null,
   canal: "loja_fisica",
   valor_original: "",
@@ -52,6 +68,7 @@ export const montarDadosEdicaoContaPagar = (conta) => ({
   fornecedor_id: conta?.fornecedor_id || conta?.fornecedor?.id || null,
   categoria_id: conta?.categoria_id || conta?.categoria?.id || null,
   dre_subcategoria_id: conta?.dre_subcategoria_id || null,
+  afeta_dre: conta?.afeta_dre !== false,
   tipo_despesa_id: conta?.tipo_despesa_id || null,
   canal: conta?.canal || "loja_fisica",
   valor_original: String(conta?.valor_original ?? conta?.valores?.original ?? ""),
@@ -171,6 +188,7 @@ export const montarPayloadEdicaoContaPagar = (payloadNormalizado) => ({
   fornecedor_id: payloadNormalizado.fornecedor_id,
   categoria_id: payloadNormalizado.categoria_id,
   dre_subcategoria_id: payloadNormalizado.dre_subcategoria_id,
+  afeta_dre: payloadNormalizado.afeta_dre,
   tipo_despesa_id: payloadNormalizado.tipo_despesa_id,
   canal: payloadNormalizado.canal,
   valor_original: payloadNormalizado.valor_original,

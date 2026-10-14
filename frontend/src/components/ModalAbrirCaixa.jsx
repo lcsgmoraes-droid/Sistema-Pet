@@ -170,7 +170,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                       <input
                         type="number"
                         min="0"
-                        value={notas.n2}
+                        value={notas.n2 || ""}
                         onChange={(e) => setNotas({ ...notas, n2: parseInt(e.target.value) || 0 })}
                         className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
                         placeholder="0"
@@ -193,7 +193,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                       <input
                         type="number"
                         min="0"
-                        value={notas.n5}
+                        value={notas.n5 || ""}
                         onChange={(e) => setNotas({ ...notas, n5: parseInt(e.target.value) || 0 })}
                         className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
                         placeholder="0"
@@ -216,7 +216,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                       <input
                         type="number"
                         min="0"
-                        value={notas.n10}
+                        value={notas.n10 || ""}
                         onChange={(e) => setNotas({ ...notas, n10: parseInt(e.target.value) || 0 })}
                         className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-red-500 focus:ring-2 focus:ring-red-200"
                         placeholder="0"
@@ -239,7 +239,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                       <input
                         type="number"
                         min="0"
-                        value={notas.n20}
+                        value={notas.n20 || ""}
                         onChange={(e) => setNotas({ ...notas, n20: parseInt(e.target.value) || 0 })}
                         className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
                         placeholder="0"
@@ -262,7 +262,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                       <input
                         type="number"
                         min="0"
-                        value={notas.n50}
+                        value={notas.n50 || ""}
                         onChange={(e) => setNotas({ ...notas, n50: parseInt(e.target.value) || 0 })}
                         className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                         placeholder="0"
@@ -285,7 +285,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                       <input
                         type="number"
                         min="0"
-                        value={notas.n100}
+                        value={notas.n100 || ""}
                         onChange={(e) =>
                           setNotas({ ...notas, n100: parseInt(e.target.value) || 0 })
                         }
@@ -310,7 +310,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                       <input
                         type="number"
                         min="0"
-                        value={notas.n200}
+                        value={notas.n200 || ""}
                         onChange={(e) =>
                           setNotas({ ...notas, n200: parseInt(e.target.value) || 0 })
                         }

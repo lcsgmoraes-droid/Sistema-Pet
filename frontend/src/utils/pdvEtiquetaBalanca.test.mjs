@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   calcularItemEtiquetaBalanca,
   compararPrecosEtiquetaBalanca,
+  encontrarProdutosGranelDaEtiqueta,
   lerEtiquetaBalanca,
 } from "./pdvEtiquetaBalanca.js";
 import { montarItensVendaPayload } from "./pdvVendaPayload.js";
@@ -52,6 +53,43 @@ test("etiquetas corrigidas usam seis digitos de produto e cinco de valor", () =>
     produtoCorrespondeCodigoBalanca({ codigo: "0150" }, etiqueta15.codigoProduto),
     false,
   );
+});
+
+test("etiquetas de 0,906 kg preservam SKU, valor e peso", () => {
+  for (const [codigo, sku, centavos, precoKg] of [
+    ["2000151018037", "0151", 1803, 19.9],
+    ["2000150014412", "0150", 1441, 15.9],
+  ]) {
+    const etiqueta = lerEtiquetaBalanca(codigo);
+    const produto = { ...produtoGranel, codigo: sku, preco_venda: precoKg };
+    assert.equal(etiqueta.codigoProduto, `00${sku}`);
+    assert.equal(etiqueta.totalCentavos, centavos);
+    assert.equal(produtoCorrespondeCodigoBalanca(produto, etiqueta.codigoProduto), true);
+    assert.equal(calcularItemEtiquetaBalanca(etiqueta, produto).quantidade, 0.906);
+  }
+});
+
+test("etiqueta escolhe o produto granel quando existe SKU numerico comum", () => {
+  for (const [codigo, skuGranel, skuComum] of [
+    ["2000151018037", "0151", "151"],
+    ["2000150014412", "0150", "150"],
+  ]) {
+    const etiqueta = lerEtiquetaBalanca(codigo);
+    const produtos = [
+      { codigo: skuComum, unidade: "UN", e_granel: false },
+      { codigo: skuGranel, unidade: "KG", e_granel: true },
+    ];
+    assert.deepEqual(encontrarProdutosGranelDaEtiqueta(produtos, etiqueta.codigoProduto), [
+      produtos[1],
+    ]);
+    assert.equal(
+      encontrarProdutosGranelDaEtiqueta(
+        [...produtos, { codigo: skuComum, unidade: "KG", e_granel: true }],
+        etiqueta.codigoProduto,
+      ).length,
+      2,
+    );
+  }
 });
 
 test("rejeita erro de leitura, valor zerado e formato comum", () => {

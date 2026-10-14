@@ -87,6 +87,18 @@ class EmpresaConfigGeral(BaseTenantModel):
     caixa_compartilhado = Column(
         Boolean, default=False, nullable=False, server_default="false"
     )
+    vendedor_obrigatorio_pdv = Column(
+        Boolean, default=False, nullable=False, server_default="false"
+    )
+    mostrar_endereco_cliente_pdv = Column(
+        Boolean, default=False, nullable=False, server_default="false"
+    )
+    emitir_nota_automatica_pdv = Column(
+        Boolean, default=False, nullable=False, server_default="false"
+    )
+    tipo_nota_automatica_pdv = Column(
+        String(4), default="nfce", nullable=False, server_default="nfce"
+    )
 
     # Dias para considerar contas como vencidas
     dias_tolerancia_atraso = Column(Integer, default=5)
@@ -96,6 +108,12 @@ class EmpresaConfigGeral(BaseTenantModel):
     crediario_multa_percentual = Column(Numeric(5, 2), default=2.0, nullable=False)
     crediario_juros_mensal_percentual = Column(
         Numeric(6, 3), default=1.0, nullable=False
+    )
+    bloquear_venda_crediario_atrasado = Column(
+        Boolean, default=False, nullable=False, server_default="false"
+    )
+    dias_atraso_bloqueio_venda = Column(
+        Integer, default=30, nullable=False, server_default="30"
     )
 
     # Meta de faturamento mensal (para dashboard)
@@ -170,11 +188,19 @@ class EmpresaConfigGeral(BaseTenantModel):
                 else 5
             ),
             "caixa_compartilhado": bool(self.caixa_compartilhado),
+            "vendedor_obrigatorio_pdv": bool(self.vendedor_obrigatorio_pdv),
+            "mostrar_endereco_cliente_pdv": bool(self.mostrar_endereco_cliente_pdv),
+            "emitir_nota_automatica_pdv": bool(self.emitir_nota_automatica_pdv),
+            "tipo_nota_automatica_pdv": self.tipo_nota_automatica_pdv or "nfce",
             "crediario_encargos_automaticos": bool(self.crediario_encargos_automaticos),
             "crediario_multa_percentual": float(self.crediario_multa_percentual or 0),
             "crediario_juros_mensal_percentual": float(
                 self.crediario_juros_mensal_percentual or 0
             ),
+            "bloquear_venda_crediario_atrasado": bool(
+                self.bloquear_venda_crediario_atrasado
+            ),
+            "dias_atraso_bloqueio_venda": self.dias_atraso_bloqueio_venda,
             "meta_faturamento_mensal": (
                 float(self.meta_faturamento_mensal)
                 if self.meta_faturamento_mensal

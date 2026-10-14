@@ -1,4 +1,4 @@
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { RouteProp, useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import * as Location from "expo-location";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Platform } from "react-native";
@@ -59,6 +59,7 @@ export default function DetalheEntregaScreen() {
 
   const paradasPendentes =
     rota?.paradas?.filter((p) => p.status === "pendente").length ?? 0;
+  const rotaStatus = rota?.status;
   const intervaloLocalizacaoMs = paradasPendentes <= 2 ? 4000 : 7000;
   const distanciaLocalizacaoM = paradasPendentes <= 2 ? 8 : 15;
 
@@ -86,6 +87,15 @@ export default function DetalheEntregaScreen() {
     carregar();
   }, [carregar, navigation, numero]);
 
+  useFocusEffect(
+    useCallback(() => {
+      const timer = setInterval(() => {
+        void carregar(false);
+      }, 15000);
+      return () => clearInterval(timer);
+    }, [carregar]),
+  );
+
   const voltarParaListaComRotaFinalizada = useCallback(() => {
     navigation.navigate("MinhasRotas", {
       rotaFinalizadaId: rota?.id ?? rotaId,
@@ -94,7 +104,7 @@ export default function DetalheEntregaScreen() {
   }, [navigation, rota?.id, rotaId]);
 
   useEffect(() => {
-    if (!rota || !["em_rota", "em_andamento"].includes(rota.status)) {
+    if (!rotaStatus || !["em_rota", "em_andamento"].includes(rotaStatus)) {
       setStatusRastreamento(null);
       localizacaoSubscriptionRef.current?.remove();
       localizacaoSubscriptionRef.current = null;
@@ -190,7 +200,7 @@ export default function DetalheEntregaScreen() {
       localizacaoSubscriptionRef.current?.remove();
       localizacaoSubscriptionRef.current = null;
     };
-  }, [rota, rotaId, intervaloLocalizacaoMs, distanciaLocalizacaoM, paradasPendentes]);
+  }, [rotaStatus, rotaId, intervaloLocalizacaoMs, distanciaLocalizacaoM, paradasPendentes]);
 
   // ── Ações nas paradas ─────────────────────────────────────────────────────
 

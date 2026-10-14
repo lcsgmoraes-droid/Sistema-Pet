@@ -7,6 +7,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from "react-hot-toast";
+import api from "../api";
 import { buscarClientePorId } from "../api/clientes";
 import PDVDriveAlertBanner from "../components/pdv/PDVDriveAlertBanner";
 import PDVEtiquetaBalancaModal from "../components/pdv/PDVEtiquetaBalancaModal";
@@ -34,6 +36,7 @@ import { useTour } from "../hooks/useTour";
 import { tourPDV } from "../tours/tourDefinitions";
 import { getGuiaClassNames } from "../utils/guiaHighlight";
 import { obterContextoRevisaoCaixa } from "../utils/caixaRevisao";
+import { recarregarPDVAposDevolucao } from "../utils/pdvReturnRefresh";
 
 export default function PDV() {
   const navigate = useNavigate();
@@ -53,6 +56,26 @@ export default function PDV() {
   const vendaGuiaClasses = getGuiaClassNames(destaqueVenda);
   const { user } = useAuth();
   const { iniciarTour } = useTour("pdv", tourPDV, { delay: 1200 });
+  const [vendedorObrigatorio, setVendedorObrigatorio] = useState(null);
+  const [mostrarEnderecoCliente, setMostrarEnderecoCliente] = useState(false);
+
+  useEffect(() => {
+    let ativo = true;
+    api
+      .get("/empresa/config/pdv")
+      .then(({ data }) => {
+        if (ativo) {
+          setVendedorObrigatorio(Boolean(data.vendedor_obrigatorio_pdv));
+          setMostrarEnderecoCliente(Boolean(data.mostrar_endereco_cliente_pdv));
+        }
+      })
+      .catch(() => {
+        if (ativo) toast.error("Não foi possível carregar a regra de vendedor do PDV.");
+      });
+    return () => {
+      ativo = false;
+    };
+  }, []);
 
   // 🔒 Controle de visibilidade de dados gerenciais (lucro, margem, custos)
   const podeVerMargem = user?.is_admin === true;
@@ -64,14 +87,17 @@ export default function PDV() {
     itens: [],
     subtotal: 0,
     desconto_valor: 0,
+    desconto_venda_valor: 0,
     desconto_percentual: 0,
     cupom_code: null,
     cupom_discount_applied: null,
     total: 0,
     observacoes: "",
     funcionario_id: null, // ✅ Funcionário para comissão
+    vendedor_funcionario_id: null,
     entregador_id: null, // 🚚 Entregador para entrega
     tem_entrega: false,
+    pagamento_entrega_previsto: null,
     entrega: {
       endereco_completo: "",
       taxa_entrega_total: 0,
@@ -216,6 +242,11 @@ export default function PDV() {
     setMostrarModalAbrirCaixa,
     caixaKey,
     temCaixaAberto,
+    caixaAberto,
+    contextoCaixa,
+    statusConsultaCaixa,
+    atualizandoCaixa,
+    atualizarCaixa,
     mostrarCalculadoraRacao,
     racaoIdFechada,
     fecharCalculadoraRacao,
@@ -223,6 +254,7 @@ export default function PDV() {
   } = usePDVCaixaRacao({
     vendaAtual,
     destaqueAbrirCaixa,
+    contextoCaixa: `${user?.id}:${user?.tenant?.id}`,
   });
 
   const {
@@ -275,6 +307,8 @@ export default function PDV() {
   } = usePDVEntrega(vendaAtual, setVendaAtual);
   const {
     vendaComissionada,
+    gerarComissao,
+    setGerarComissao,
     funcionarioComissao,
     funcionariosSugeridos,
     buscaFuncionario,
@@ -301,6 +335,9 @@ export default function PDV() {
     setModoVisualizacao,
     setMostrarModalPagamento,
     entregadorSelecionado,
+    vendedorObrigatorio,
+    vendaComissionada,
+    funcionarioComissao,
     limparComissao,
     sincronizarComissaoDaVenda,
     sincronizarEntregadorDaVenda,
@@ -308,14 +345,19 @@ export default function PDV() {
   });
   const { salvarVenda } = usePDVSalvarVenda({
     vendaAtual,
+    setVendaAtual,
     loading,
     setLoading,
     temCaixaAberto,
+    statusConsultaCaixa,
     entregadorSelecionado,
     vendaComissionada,
+    vendedorObrigatorio,
+    gerarComissao,
     funcionarioComissao,
     limparVenda,
     carregarVendasRecentes: () => carregarVendasRecentes(),
+    recarregarContextoClienteAtual,
   });
   const {
     mostrarModalDescontoItem,
@@ -375,6 +417,7 @@ export default function PDV() {
     setVendaAtual,
     modoVisualizacao,
     temCaixaAberto,
+    statusConsultaCaixa,
     recalcularTotais,
   });
   const {
@@ -428,6 +471,23 @@ export default function PDV() {
     limparVenda,
   });
 
+  const handleDevolucaoSucesso = async (devolucao) => {
+    try {
+      await recarregarPDVAposDevolucao({
+        devolucao,
+        vendaAtual,
+        carregarVendaEspecifica,
+        buscarClientePorId,
+        setVendaAtual,
+        recarregarContextoClientePorId,
+        carregarVendasRecentes,
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar o PDV após a devolução:", error);
+      toast.error("Devolução registrada. Não foi possível atualizar os dados do PDV.");
+    }
+  };
+
   const { driveAlertProps, containerStyle, mainAreaProps, overlayProps } = usePDVPageComposition({
     navigate,
     destaqueAbrirCaixa,
@@ -448,11 +508,17 @@ export default function PDV() {
     abrirPainelOportunidades,
     alternarPainelAssistente,
     abrirDevolucaoSignal,
+    handleDevolucaoSucesso,
     caixaKey,
     setMostrarModalAbrirCaixa,
     modoVisualizacao,
     loading,
     temCaixaAberto,
+    caixaAberto,
+    contextoCaixa,
+    statusConsultaCaixa,
+    atualizandoCaixa,
+    atualizarCaixa,
     cancelarEdicao,
     excluirVenda,
     salvarVenda,
@@ -473,6 +539,7 @@ export default function PDV() {
     clientesSugeridos,
     copiadoClienteCampo,
     setBuscarCliente,
+    mostrarEnderecoCliente,
     copiarCampoCliente,
     limparClienteSelecionado,
     selecionarCliente,
@@ -533,6 +600,9 @@ export default function PDV() {
     handleSelecionarFuncionarioComissao,
     handleToggleVendaComissionada,
     vendaComissionada,
+    vendedorObrigatorio,
+    gerarComissao,
+    setGerarComissao,
     handleNovaVenda,
     painelClienteAberto,
     setPainelClienteAberto,

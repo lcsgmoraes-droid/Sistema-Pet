@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import api from "../api";
 import { confirmarCorePet, perguntarCorePet } from "../services/corepetDialog";
 
-export default function useCampanhasGestor() {
+export default function useCampanhasGestor({ clienteCodigoInicial } = {}) {
   const [gestorSearch, setGestorSearch] = useState("");
   const [gestorSugestoes, setGestorSugestoes] = useState([]);
   const [gestorBuscando, setGestorBuscando] = useState(false);
@@ -47,7 +47,7 @@ export default function useCampanhasGestor() {
     }
   };
 
-  const selecionarClienteGestor = async (cliente) => {
+  const selecionarClienteGestor = useCallback(async (cliente) => {
     setGestorCliente(cliente);
     setGestorSearch(cliente.nome);
     setGestorSugestoes([]);
@@ -75,7 +75,38 @@ export default function useCampanhasGestor() {
     } finally {
       setGestorCarregando(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!clienteCodigoInicial) return;
+    let ativo = true;
+    const abrirCliente = async () => {
+      try {
+        const res = await api.get(
+          `/campanhas/clientes/buscar?search=${encodeURIComponent(clienteCodigoInicial)}&limit=10`,
+        );
+        if (!ativo) return;
+        const clientes = res.data?.clientes || [];
+        const cliente = clientes.find(
+          (item) => String(item.codigo) === String(clienteCodigoInicial),
+        );
+        if (cliente) {
+          setGestorModo("cliente");
+          await selecionarClienteGestor(cliente);
+          if (ativo) setGestorSecao("extrato");
+        } else {
+          setGestorSearch(clienteCodigoInicial);
+          setGestorSugestoes(clientes);
+        }
+      } catch {
+        if (ativo) setGestorSearch(clienteCodigoInicial);
+      }
+    };
+    void abrirCliente();
+    return () => {
+      ativo = false;
+    };
+  }, [clienteCodigoInicial, selecionarClienteGestor]);
 
   const recarregarGestor = async () => {
     if (gestorCliente) {

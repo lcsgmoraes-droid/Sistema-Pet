@@ -7,8 +7,22 @@ export function usePDVFuncionariosBusca() {
 
   const carregarFuncionariosComissao = async (busca = "") => {
     try {
-      const response = await api.get("/comissoes/configuracoes/funcionarios");
-      const funcionarios = response.data.data || [];
+      const [parceirosResult, funcionariosResult] = await Promise.allSettled([
+        api.get("/comissoes/configuracoes/funcionarios"),
+        api.get("/funcionarios", { params: { ativo: true } }),
+      ]);
+      if (parceirosResult.status === "rejected" && funcionariosResult.status === "rejected") {
+        throw parceirosResult.reason;
+      }
+      const parceiros =
+        parceirosResult.status === "fulfilled" ? parceirosResult.value.data.data || [] : [];
+      const funcionariosAtivos =
+        funcionariosResult.status === "fulfilled" ? funcionariosResult.value.data || [] : [];
+      const funcionarios = [
+        ...new Map(
+          [...parceiros, ...funcionariosAtivos].map((funcionario) => [funcionario.id, funcionario]),
+        ).values(),
+      ];
       const termo = String(busca || "")
         .trim()
         .toLowerCase();

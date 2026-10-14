@@ -560,13 +560,20 @@ def encontrar_produto_similar(
     ean_tributario: Optional[str] = None,
 ) -> tuple:
     """
-    Encontra produto similar no banco (ativo OU inativo).
+    Encontra produto similar no banco (ativo ou inativo com SKU ainda reservado).
 
     Retorna (produto, confianca, foi_encontrado_inativo, origem_match, referencia_match).
     Matching por similaridade de nome foi removido para evitar vinculos errados.
     """
+    # Liberar o SKU encerra o vinculo automatico com este cadastro, inclusive
+    # quando o XML ainda traz um EAN que ficou salvo no produto inativo.
+    produto_com_sku_reservado = ~Produto.codigo.startswith(
+        "__LIBERADO__", autoescape=True
+    )
     if codigo:
-        query = db.query(Produto).filter(Produto.codigo == codigo)
+        query = db.query(Produto).filter(
+            Produto.codigo == codigo, produto_com_sku_reservado
+        )
         if tenant_id is not None:
             query = query.filter(Produto.tenant_id == tenant_id)
 
@@ -615,12 +622,13 @@ def encontrar_produto_similar(
 
     for referencia in referencias_codigo_barras:
         query = db.query(Produto).filter(
+            produto_com_sku_reservado,
             or_(
                 Produto.codigo_barras == referencia,
                 Produto.gtin_ean == referencia,
                 Produto.gtin_ean_tributario == referencia,
                 Produto.codigos_barras_alternativos.ilike(f"%{referencia}%"),
-            )
+            ),
         )
         if tenant_id is not None:
             query = query.filter(Produto.tenant_id == tenant_id)

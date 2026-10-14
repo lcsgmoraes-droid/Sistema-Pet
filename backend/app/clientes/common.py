@@ -4,7 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import AppAccessProfile, Cliente, User
+from app.models import AppAccessProfile, Cliente, User, UserTenant
 
 
 def _somente_digitos_coluna(coluna):
@@ -38,6 +38,35 @@ def _somente_digitos_coluna(coluna):
 
 def _somente_digitos(valor) -> str:
     return "".join(ch for ch in str(valor or "") if ch.isdigit())
+
+
+def _validar_numero_endereco_cliente(cliente_data, cliente_atual=None) -> None:
+    campos_endereco = {
+        "cep",
+        "endereco",
+        "numero",
+        "complemento",
+        "bairro",
+        "cidade",
+        "estado",
+        "codigo_municipio",
+    }
+    dados = cliente_data.model_dump(exclude_unset=True)
+    if cliente_atual is not None and not campos_endereco.intersection(dados):
+        return
+
+    def valor(campo):
+        atual = getattr(cliente_atual, campo, None) if cliente_atual else None
+        informado = dados[campo] if campo in dados else atual
+        return str(informado if informado is not None else "").strip()
+
+    if any(valor(campo) for campo in ("cep", "endereco", "bairro")) and not valor(
+        "numero"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Informe o número do endereço. Se não houver número, use S/N ou sem número.",
+        )
 
 
 def _validar_telefone_cliente_obrigatorio(cliente_data, cliente_atual=None) -> None:
@@ -102,10 +131,19 @@ def _anexar_metadados_criacao_cliente(db: Session, clientes):
         if getattr(cliente, "auth_user_id", None)
     }
     usuarios_app_por_id = {}
+    liberacao_crediario_por_conta = {}
     if auth_user_ids:
         usuarios_app_por_id = {
             usuario.id: usuario
             for usuario in db.query(User).filter(User.id.in_(auth_user_ids)).all()
+        }
+        liberacao_crediario_por_conta = {
+            (str(vinculo.tenant_id), vinculo.user_id): bool(
+                vinculo.pode_liberar_venda_crediario_atrasado
+            )
+            for vinculo in db.query(UserTenant)
+            .filter(UserTenant.user_id.in_(auth_user_ids))
+            .all()
         }
 
     cliente_ids = [cliente.id for cliente in lista if getattr(cliente, "id", None)]
@@ -163,6 +201,13 @@ def _anexar_metadados_criacao_cliente(db: Session, clientes):
             cliente,
             "app_access_profiles",
             perfis_por_cliente.get(getattr(cliente, "id", None), []),
+        )
+        setattr(
+            cliente,
+            "pode_liberar_venda_crediario_atrasado",
+            liberacao_crediario_por_conta.get(
+                (str(cliente.tenant_id), cliente.auth_user_id), False
+            ),
         )
     return clientes
 

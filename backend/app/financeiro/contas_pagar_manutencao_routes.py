@@ -12,6 +12,7 @@ from app.dre_plano_contas_models import DRESubcategoria
 from app.financeiro.contas_pagar_common import (
     _decimal_monetario,
     _registrar_observacao_operacao_conta_pagar,
+    _resolver_dre_subcategoria_conta_pagar,
 )
 from app.financeiro.contas_pagar_recorrencia import (
     _aplicar_edicao_recorrencia_futura,
@@ -75,6 +76,17 @@ def atualizar_conta_pagar(
     )
     if not conta:
         raise HTTPException(status_code=404, detail="Conta nao encontrada")
+
+    classificacao_original = {
+        campo: getattr(conta, campo)
+        for campo in (
+            "categoria_id",
+            "dre_subcategoria_id",
+            "afeta_dre",
+            "tipo_despesa_id",
+            "canal",
+        )
+    }
 
     if "descricao" in campos:
         descricao = (payload.descricao or "").strip()
@@ -157,6 +169,22 @@ def atualizar_conta_pagar(
                     status_code=422, detail="Tipo de despesa invalido para este tenant"
                 )
             conta.tipo_despesa_id = payload.tipo_despesa_id
+
+    if "afeta_dre" in campos:
+        if payload.afeta_dre is None:
+            raise HTTPException(
+                status_code=422, detail="Afeta a DRE deve ser verdadeiro ou falso"
+            )
+        conta.afeta_dre = payload.afeta_dre
+        if conta.afeta_dre:
+            conta.dre_subcategoria_id = _resolver_dre_subcategoria_conta_pagar(
+                db,
+                tenant_id,
+                dre_subcategoria_id=conta.dre_subcategoria_id,
+                categoria_id=conta.categoria_id,
+            )
+        else:
+            conta.dre_subcategoria_id = None
 
     if "canal" in campos:
         conta.canal = payload.canal
@@ -277,7 +305,16 @@ def atualizar_conta_pagar(
     conta.valor_final = valor_original + valor_juros + valor_multa - valor_desconto
 
     valor_pago = conta.valor_pago or Decimal("0")
-    if valor_pago <= 0:
+    if (
+        conta.eh_parcelado
+        and conta.conta_principal_id is None
+        and conta.numero_parcela is None
+        and (conta.total_parcelas or 0) > 1
+    ):
+        # O registro principal é apenas controle; as parcelas são as obrigações.
+        conta.status = "parcelado"
+        conta.data_pagamento = None
+    elif valor_pago <= 0:
         conta.status = "pendente"
         conta.data_pagamento = None
     elif valor_pago >= conta.valor_final:
@@ -305,6 +342,36 @@ def atualizar_conta_pagar(
                 campos=campos,
             )
 
+    campos_classificacao_alterados = {
+        campo
+        for campo, valor_original in classificacao_original.items()
+        if getattr(conta, campo) != valor_original
+    }
+    if "afeta_dre" in campos_classificacao_alterados:
+        campos_classificacao_alterados.add("dre_subcategoria_id")
+    parcelas_classificadas = 0
+    if (
+        conta.status == "parcelado"
+        and conta.eh_parcelado
+        and conta.conta_principal_id is None
+        and conta.numero_parcela is None
+        and campos_classificacao_alterados
+    ):
+        parcelas = (
+            db.query(ContaPagar)
+            .filter(
+                ContaPagar.tenant_id == tenant_id,
+                ContaPagar.conta_principal_id == conta.id,
+            )
+            .all()
+        )
+        for parcela in parcelas:
+            for campo in campos_classificacao_alterados:
+                setattr(parcela, campo, getattr(conta, campo))
+            if not parcela.afeta_dre:
+                parcela.dre_subcategoria_id = None
+        parcelas_classificadas = len(parcelas)
+
     db.commit()
     db.refresh(conta)
 
@@ -316,6 +383,7 @@ def atualizar_conta_pagar(
         "fornecedor_id": conta.fornecedor_id,
         "categoria_id": conta.categoria_id,
         "dre_subcategoria_id": conta.dre_subcategoria_id,
+        "afeta_dre": conta.afeta_dre,
         "tipo_despesa_id": conta.tipo_despesa_id,
         "canal": conta.canal,
         "valor_original": float(conta.valor_original),
@@ -334,6 +402,7 @@ def atualizar_conta_pagar(
         "proxima_recorrencia": conta.proxima_recorrencia,
         "recorrencias_criadas": len(recorrencias_criadas),
         "recorrencias_atualizadas": recorrencias_atualizadas,
+        "parcelas_classificadas": parcelas_classificadas,
     }
 
 
@@ -610,6 +679,7 @@ def buscar_conta_pagar(
         else None,
         "categoria_id": conta.categoria_id,
         "dre_subcategoria_id": conta.dre_subcategoria_id,
+        "afeta_dre": conta.afeta_dre,
         "tipo_despesa_id": conta.tipo_despesa_id,
         "canal": conta.canal,
         "valores": {

@@ -1,3 +1,5 @@
+import { podeRegistrarRecebimentoVenda } from "../utils/pdvReturnEligibility";
+
 function criarEntregaVazia() {
   return {
     endereco_completo: "",
@@ -14,6 +16,9 @@ export function usePDVVendaAcoes({
   setModoVisualizacao,
   setMostrarModalPagamento,
   entregadorSelecionado,
+  vendedorObrigatorio,
+  vendaComissionada,
+  funcionarioComissao,
   limparComissao,
 }) {
   const abrirModalPagamento = () => {
@@ -22,8 +27,18 @@ export function usePDVVendaAcoes({
       return;
     }
 
-    if (vendaAtual.status === "finalizada" || vendaAtual.status === "pago_nf") {
-      alert('Esta venda esta finalizada. Clique em "Reabrir Venda" para modificar.');
+    if (vendedorObrigatorio === null) {
+      alert("Aguarde o carregamento das regras do PDV.");
+      return;
+    }
+
+    if ((vendaComissionada || vendedorObrigatorio) && !funcionarioComissao) {
+      alert("Selecione o vendedor antes de receber a venda.");
+      return;
+    }
+
+    if (!podeRegistrarRecebimentoVenda(vendaAtual)) {
+      alert("Esta venda não permite novos recebimentos no estado atual.");
       return;
     }
 
@@ -38,14 +53,17 @@ export function usePDVVendaAcoes({
       itens: [],
       subtotal: 0,
       desconto_valor: 0,
+      desconto_venda_valor: 0,
       desconto_percentual: 0,
       cupom_code: null,
       cupom_discount_applied: null,
       total: 0,
       observacoes: "",
       funcionario_id: null,
+      vendedor_funcionario_id: null,
       entregador_id: entregadorSelecionado?.id || null,
       tem_entrega: false,
+      pagamento_entrega_previsto: null,
       entrega: criarEntregaVazia(),
     });
     limparComissao();

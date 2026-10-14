@@ -1,8 +1,9 @@
-import { Calculator, MessageSquare, Stethoscope } from "lucide-react";
+import { Calculator, FileText, MessageSquare, Stethoscope } from "lucide-react";
 
 export default function ConsultaHeader({
   tituloConsulta,
   consultaIdAtual,
+  onAbrirDocumentos,
   onAbrirAssistente,
   onAbrirCalculadora,
 }) {
@@ -20,6 +21,14 @@ export default function ConsultaHeader({
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onAbrirDocumentos}
+          className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
+        >
+          <FileText size={16} />
+          Documentos PDF
+        </button>
         {consultaIdAtual && (
           <button
             type="button"

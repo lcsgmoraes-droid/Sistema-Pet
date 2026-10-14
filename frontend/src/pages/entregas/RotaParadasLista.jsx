@@ -26,12 +26,14 @@ function RotaParadasLista({
       {/* Paradas Expandidas */}
       {expandida && paradasOrdenadas.length > 0 && (
         <div style={{ marginTop: 20, borderTop: "2px solid #eee", paddingTop: 15 }}>
-          <h4 style={{ marginBottom: 15 }}>📍 Paradas da Rota (arraste para reordenar)</h4>
+          <h4 style={{ marginBottom: 15 }}>
+            📍 Paradas da Rota{rota.status === "pendente" ? " (arraste para reordenar)" : ""}
+          </h4>
 
           {paradasOrdenadas.map((parada, index) => (
             <div key={parada.id}>
               <div
-                draggable
+                draggable={rota.status === "pendente"}
                 onDragStart={(e) => handleDragStart(e, index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragEnd={handleDragEnd}
@@ -41,7 +43,7 @@ function RotaParadasLista({
                   border: "1px solid #ddd",
                   borderRadius: 6,
                   backgroundColor: draggedIndex === index ? "#f0f8ff" : "#fafafa",
-                  cursor: "move",
+                  cursor: rota.status === "pendente" ? "move" : "default",
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
@@ -235,27 +237,31 @@ function RotaParadasLista({
                     )}
 
                   {/* Botão Observação */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      adicionarObservacao(parada.id, rota.id);
-                    }}
-                    style={{
-                      padding: "8px 12px",
-                      backgroundColor: "#6C757D",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: 6,
-                      cursor: "pointer",
-                      fontSize: 12,
-                      fontWeight: "600",
-                      whiteSpace: "nowrap",
-                      width: "130px",
-                      textAlign: "center",
-                    }}
-                  >
-                    📝 Observação
-                  </button>
+                  {(rota.status === "pendente" ||
+                    rota.status === "em_rota" ||
+                    rota.status === "em_andamento") && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        adicionarObservacao(parada.id, rota.id);
+                      }}
+                      style={{
+                        padding: "8px 12px",
+                        backgroundColor: "#6C757D",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                        fontSize: 12,
+                        fontWeight: "600",
+                        whiteSpace: "nowrap",
+                        width: "130px",
+                        textAlign: "center",
+                      }}
+                    >
+                      📝 Observação
+                    </button>
+                  )}
 
                   {/* Botão Detalhes */}
                   <button

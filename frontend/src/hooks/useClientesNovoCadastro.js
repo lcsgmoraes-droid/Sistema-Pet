@@ -9,6 +9,7 @@ import { normalizeClienteAlertasPdv } from "../utils/clienteAlertasPdv";
 import { canManageAppAccessProfiles } from "../utils/appAccessProfiles";
 import { normalizePessoaAppLogin } from "../utils/pessoaAppLogin";
 import { resolveCepMunicipio } from "../utils/cepMunicipio";
+import { normalizarAcertoEntregador, validarAcertoEntregador } from "../utils/entregadorAcerto";
 import {
   buildInitialAccessCredentials,
   resolveTenantLoginReference,
@@ -44,10 +45,12 @@ function buildNovoClienteFormData(tipoCadastro, tipoPessoa) {
     email: "",
     telefone: "",
     celular: "",
+    contatos_adicionais: [],
     celular_whatsapp: true,
     auth_user_id: null,
     app_login: null,
     app_access_profiles: perfilInicial,
+    pode_liberar_venda_crediario_atrasado: false,
     cnpj: "",
     inscricao_estadual: "",
     razao_social: "",
@@ -102,10 +105,15 @@ function buildClienteFormData(cliente) {
     email: cliente.email || "",
     telefone: cliente.telefone || "",
     celular: cliente.celular || "",
+    contatos_adicionais: (cliente.contatos_adicionais || []).map(({ numero, vinculo }) => ({
+      numero,
+      vinculo,
+    })),
     celular_whatsapp: true,
     auth_user_id: cliente.auth_user_id || null,
     app_login: null,
     app_access_profiles: cliente.app_access_profiles || [],
+    pode_liberar_venda_crediario_atrasado: Boolean(cliente.pode_liberar_venda_crediario_atrasado),
     cnpj: cliente.cnpj || "",
     inscricao_estadual: cliente.inscricao_estadual || "",
     razao_social: cliente.razao_social || "",
@@ -483,29 +491,38 @@ export function useClientesNovoCadastro({
         return;
       }
 
-      if (formData.is_entregador) {
-        if (!formData.tipo_acerto_entrega) {
-          alert("Informe o tipo de acerto do entregador (semanal, quinzenal ou mensal)");
+      const numerosAdicionais = formData.contatos_adicionais || [];
+      const numerosVistos = new Set(
+        [formData.celular, formData.telefone].map((numero) =>
+          String(numero || "").replace(/\D/g, ""),
+        ),
+      );
+      for (const contato of numerosAdicionais) {
+        const digitos = String(contato.numero || "").replace(/\D/g, "");
+        if (digitos.length !== 11 || !String(contato.vinculo || "").trim()) {
+          setError("Informe um celular com DDD e identifique o vínculo de cada contato adicional.");
           return;
         }
-
-        if (formData.tipo_acerto_entrega === "semanal" && !formData.dia_semana_acerto) {
-          alert("Informe o dia da semana para o acerto semanal");
+        if (numerosVistos.has(digitos)) {
+          setError("Há um celular repetido entre os contatos desta pessoa.");
           return;
         }
+        numerosVistos.add(digitos);
+      }
 
-        if (formData.tipo_acerto_entrega === "mensal" && !formData.dia_mes_acerto) {
-          alert("Informe o dia do mes para o acerto mensal");
-          return;
-        }
+      const erroAcerto = validarAcertoEntregador(formData);
+      if (erroAcerto) {
+        setError(erroAcerto);
+        return;
+      }
 
-        if (formData.tipo_acerto_entrega === "mensal") {
-          const dia = parseInt(formData.dia_mes_acerto, 10);
-          if (dia < 1 || dia > 28) {
-            alert("O dia do mes deve estar entre 1 e 28");
-            return;
-          }
-        }
+      const enderecoPrincipalInformado = [formData.cep, formData.endereco, formData.bairro].some(
+        (value) => String(value ?? "").trim(),
+      );
+      if (enderecoPrincipalInformado && !String(formData.numero ?? "").trim()) {
+        setError("Informe o número do endereço. Se não houver número, use S/N ou sem número.");
+        setCurrentStep(3);
+        return;
       }
 
       const enderecoPrincipalCompleto = [
@@ -553,9 +570,11 @@ export function useClientesNovoCadastro({
         delete clienteData.auth_user_id;
         delete clienteData.app_login;
         delete clienteData.app_access_profiles;
+        delete clienteData.pode_liberar_venda_crediario_atrasado;
       }
 
       if (clienteData.is_entregador) {
+        Object.assign(clienteData, normalizarAcertoEntregador(clienteData));
         if (clienteData.tipo_cadastro === "funcionario") {
           clienteData.tipo_vinculo_entrega = "funcionario";
           clienteData.is_terceirizado = false;

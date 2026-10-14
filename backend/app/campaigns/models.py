@@ -389,12 +389,15 @@ class LoyaltyStamp(TenantScoped, Base):
     venda_id = Column(BigInteger, nullable=True)
     campaign_id = Column(BigInteger, nullable=False)
     stamp_index = Column(Integer, nullable=False, default=1)
+    # Regra usada quando a venda recebeu o carimbo. NULL indica legado sem prova.
+    stamp_value_snapshot = Column(Numeric(12, 2), nullable=True)
     is_manual = Column(Boolean, nullable=False, default=False)
     notes = Column(String(500), nullable=True)
     created_at = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     voided_at = Column(DateTime(timezone=True), nullable=True)  # Estorno
+    voided_origin = Column(String(20), nullable=True)  # manual | automatic
 
     __table_args__ = (
         UniqueConstraint(
@@ -439,13 +442,15 @@ class CashbackTransaction(TenantScoped, Base):
         nullable=False,
     )
     source_id = Column(BigInteger, nullable=True)  # campaign_execution_id ou outro
+    # Crédito original restaurado por estorno de um resgate de venda.
+    origin_credit_id = Column(BigInteger, nullable=True)
     description = Column(String(500), nullable=True)
     # expires_at: prazo de validade do crédito (apenas em lançamentos positivos)
     expires_at = Column(DateTime(timezone=True), nullable=True)
     # tx_type: 'credit' | 'debit' | 'expired' — para o extrato
     tx_type = Column(String(20), nullable=False, server_default="credit")
     created_at = Column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
+        DateTime(timezone=True), nullable=False, server_default=func.clock_timestamp()
     )
 
     __table_args__ = (
@@ -456,6 +461,12 @@ class CashbackTransaction(TenantScoped, Base):
             "created_at",
         ),
         Index("ix_ct_tenant_source", "tenant_id", "source_type", "source_id"),
+        Index(
+            "ix_ct_tenant_customer_origin_credit",
+            "tenant_id",
+            "customer_id",
+            "origin_credit_id",
+        ),
     )
 
 

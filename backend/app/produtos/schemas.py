@@ -775,6 +775,7 @@ class LoteResponse(LoteBase):
     quantidade_disponivel: float
     quantidade_reservada: Optional[float] = 0
     status: Optional[str] = "ativo"
+    apenas_identificacao: bool = False
     ordem_entrada: int
     created_at: datetime
 

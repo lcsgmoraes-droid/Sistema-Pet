@@ -10,6 +10,7 @@ import StatusBadge from "./ui/StatusBadge";
 import {
   calcularIntervaloPeriodoRapido,
   calcularValorFinalPagamentoContasPagar,
+  calcularSaldoRestanteContasPagar,
   criarFiltrosContasPagarDaUrl,
   criarFiltrosPadraoContasPagar,
   criarFiltrosDespesasCaixaContasPagar,
@@ -241,7 +242,7 @@ const ContasPagar = () => {
     // Buscar conta padrão da forma de pagamento se houver
     const formaDefault = formasPagamento.find((f) => f.id === conta.forma_pagamento_id);
     setDadosPagamento({
-      valor_pago: conta.valor_final - conta.valor_pago,
+      valor_pago: calcularSaldoRestanteContasPagar(conta),
       data_pagamento: formatarDataISO(new Date()),
       forma_pagamento_id: conta.forma_pagamento_id || "",
       conta_bancaria_id: formaDefault?.conta_bancaria_destino_id || "",
@@ -617,7 +618,19 @@ const ContasPagar = () => {
   };
 
   const getStatusBadge = (conta) => {
-    return <StatusBadge status={getStatusVisualContasPagar(conta)} />;
+    const statusVisual = getStatusVisualContasPagar(conta);
+    const vencimentoISO = String(conta.data_vencimento || "").split("T")[0];
+    const parcialVencida =
+      statusVisual === "parcial" &&
+      Boolean(vencimentoISO) &&
+      vencimentoISO < formatarDataISO(new Date());
+
+    return (
+      <div className="flex flex-wrap gap-1">
+        <StatusBadge status={statusVisual} />
+        {parcialVencida && <StatusBadge status="vencida" />}
+      </div>
+    );
   };
 
   const tiposDespesaOrdenados = ordenarTiposDespesaContasPagar(tiposDespesa, safeArray);

@@ -1,6 +1,8 @@
 import { AlertCircle, CreditCard, Save, X } from "lucide-react";
 import ActionButton from "../ui/ActionButton";
 import Panel from "../ui/Panel";
+import { podeRegistrarRecebimentoVenda } from "../../utils/pdvReturnEligibility";
+import { mensagemCaixaIndisponivel } from "../../utils/caixaAbertoMonitor";
 
 export default function PDVAcoesFooterCard({
   itensCount,
@@ -11,6 +13,7 @@ export default function PDVAcoesFooterCard({
   onSalvarVenda,
   statusVenda,
   temCaixaAberto,
+  statusConsultaCaixa,
   vendaId,
 }) {
   if (itensCount === 0) {
@@ -19,7 +22,7 @@ export default function PDVAcoesFooterCard({
 
   return (
     <Panel id="tour-pdv-resumo" padding="lg">
-      {!temCaixaAberto && (
+      {!temCaixaAberto && statusConsultaCaixa === "pronto" && (
         <div className="mb-4 flex items-center justify-center rounded-lg border border-red-200 bg-red-50 p-3">
           <div className="flex items-center gap-2 text-red-700">
             <AlertCircle className="h-5 w-5" />
@@ -54,9 +57,7 @@ export default function PDVAcoesFooterCard({
           size="md"
           className="w-full sm:w-auto"
           title={
-            !temCaixaAberto
-              ? "Caixa fechado - Abra o caixa para salvar vendas"
-              : "Salvar venda atual"
+            !temCaixaAberto ? mensagemCaixaIndisponivel(statusConsultaCaixa) : "Salvar venda atual"
           }
         >
           <span className="font-medium">Salvar Venda</span>
@@ -65,7 +66,7 @@ export default function PDVAcoesFooterCard({
         <ActionButton
           onClick={onAbrirModalPagamento}
           disabled={
-            loading || statusVenda === "finalizada" || statusVenda === "pago_nf" || !temCaixaAberto
+            loading || !podeRegistrarRecebimentoVenda({ status: statusVenda }) || !temCaixaAberto
           }
           icon={CreditCard}
           intent="create"
@@ -73,7 +74,7 @@ export default function PDVAcoesFooterCard({
           className="w-full sm:w-auto"
           title={
             !temCaixaAberto
-              ? "Caixa fechado - Abra o caixa para registrar recebimentos"
+              ? mensagemCaixaIndisponivel(statusConsultaCaixa)
               : "Registrar pagamento da venda"
           }
         >

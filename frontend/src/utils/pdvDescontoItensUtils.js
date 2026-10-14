@@ -1,9 +1,9 @@
-import { arredondarDinheiro } from "./pdvCarrinhoItensUtils.js";
+import { arredondarDinheiro, normalizarQuantidadePDV } from "./pdvCarrinhoItensUtils.js";
 
 export function recalcularItemComPrecoEDesconto(item, itemEditando) {
-  const precoUnitario = Number(itemEditando?.preco ?? item.preco_unitario ?? 0) || 0;
-  const quantidade = Math.max(1, Number(item.quantidade || itemEditando?.quantidade) || 1);
-  const subtotalSemDesconto = precoUnitario * quantidade;
+  const precoUnitario = arredondarDinheiro(itemEditando?.preco ?? item.preco_unitario ?? 0);
+  const quantidade = normalizarQuantidadePDV(item.quantidade ?? itemEditando?.quantidade);
+  const subtotalSemDesconto = arredondarDinheiro(precoUnitario * quantidade);
   let descontoValor;
   let descontoPercentual;
 
@@ -17,6 +17,7 @@ export function recalcularItemComPrecoEDesconto(item, itemEditando) {
     descontoValor = (subtotalSemDesconto * descontoPercentual) / 100;
   }
 
+  descontoValor = arredondarDinheiro(descontoValor);
   const precoComDesconto =
     quantidade > 0 ? precoUnitario - descontoValor / quantidade : precoUnitario;
 

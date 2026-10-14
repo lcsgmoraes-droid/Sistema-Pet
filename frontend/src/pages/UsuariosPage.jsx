@@ -31,9 +31,12 @@ export default function UsuariosPage() {
     showPassword,
     salvarCredenciais,
     savingCredentials,
+    savingLiberacaoId,
     setInitialAccessCredentials,
     tenantLoginReference,
     toggleStatus,
+    alterarLiberacaoCrediario,
+    excluirUsuario,
     usuarioFormError,
     usuarioCredenciais,
     usuarios,
@@ -44,7 +47,7 @@ export default function UsuariosPage() {
       <PageHeader
         icon={Users}
         title="Usuarios"
-        subtitle="Gerencie usuarios, perfis e acessos do tenant atual."
+        subtitle="Gerencie usuários, perfis e autorizações individuais desta loja."
         actions={
           <ActionButton icon={Plus} intent="create" onClick={onAbrirModalUsuario}>
             Novo usuario
@@ -59,6 +62,9 @@ export default function UsuariosPage() {
         onForcarLogout={forcarLogout}
         onManageCredentials={onAbrirCredenciais}
         onToggleStatus={toggleStatus}
+        onToggleCrediario={alterarLiberacaoCrediario}
+        savingLiberacaoId={savingLiberacaoId}
+        onDelete={excluirUsuario}
         usuarios={usuarios}
       />
 
