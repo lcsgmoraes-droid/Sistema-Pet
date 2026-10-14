@@ -33,7 +33,9 @@ const PetForm = () => {
   const returnTo = searchParams.get("return_to") || "";
   const clienteIdPreSelecionado = clienteIdFromQuery || clienteIdFromState || "";
 
-  const [loading, setLoading] = useState(false);
+  // Comeca true (nao false): evita o formulario renderizar vazio por um instante antes
+  // do primeiro carregamento comecar — ver nota sobre o padrao de loading unico no AGENTS.md.
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -76,15 +78,31 @@ const PetForm = () => {
     (especie) => String(especie.id) === String(formData.especie),
   );
 
+  // Um unico ciclo de loading cobrindo tutores + especies + pet (quando editando), em vez de um
+  // por chamada: evita o formulario "piscar" entre vazio/carregando varias vezes seguidas antes
+  // dos dados finais aparecerem. A flag `ativo` protege contra o StrictMode do React, que em dev
+  // roda este efeito duas vezes de proposito (para flagar efeitos com side effect mal limpos) —
+  // sem ela, a segunda rodada reacende o loading por um instante mesmo com os dados ja na tela.
   useEffect(() => {
+    let ativo = true;
+
     const loadData = async () => {
-      await loadClientes();
-      await loadEspecies();
-      if (isEditing) {
-        await loadPet();
+      setLoading(true);
+      try {
+        await loadClientes();
+        await loadEspecies();
+        if (isEditing) {
+          await loadPet();
+        }
+      } finally {
+        if (ativo) setLoading(false);
       }
     };
     loadData();
+
+    return () => {
+      ativo = false;
+    };
   }, [petId]);
 
   // Carregar raças quando espécie mudar
@@ -155,7 +173,6 @@ const PetForm = () => {
 
   const loadPet = async () => {
     try {
-      setLoading(true);
       const response = await api.get(`/pets/${petId}`);
       const pet = response.data;
 
@@ -193,8 +210,6 @@ const PetForm = () => {
     } catch (err) {
       console.error("Erro ao carregar pet:", err);
       setError("Erro ao carregar informações do pet");
-    } finally {
-      setLoading(false);
     }
   };
 

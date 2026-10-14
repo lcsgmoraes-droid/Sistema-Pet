@@ -178,27 +178,36 @@ export default function ClientePessoaEditar() {
     removerEndereco,
   } = useClientesNovoEnderecos();
 
-  const carregar = useCallback(async () => {
+  // `aindaAtivo` protege contra o StrictMode do React, que em dev roda este efeito duas vezes de
+  // proposito — sem isso, a segunda rodada reacende "carregando" por um instante mesmo com os
+  // dados ja exibidos na tela (mesmo problema resolvido em PetForm.jsx, ver nota no AGENTS.md).
+  const carregar = useCallback(async (aindaAtivo = () => true) => {
     setCarregando(true);
     setNaoEncontrado(false);
     try {
       const { data } = await api.get(`/clientes/${clienteId}`);
+      if (!aindaAtivo()) return;
       setCliente(data);
       setFormData(buildFormDataFromCliente(data));
       setEnderecosAdicionais(data.enderecos_adicionais || []);
     } catch (error) {
+      if (!aindaAtivo()) return;
       if (error.response?.status === 404) {
         setNaoEncontrado(true);
       } else {
         toast.error(mensagemErro(error, "Não foi possível carregar esta pessoa."));
       }
     } finally {
-      setCarregando(false);
+      if (aindaAtivo()) setCarregando(false);
     }
   }, [clienteId]);
 
   useEffect(() => {
-    carregar();
+    let ativo = true;
+    carregar(() => ativo);
+    return () => {
+      ativo = false;
+    };
   }, [carregar]);
 
   useEffect(() => {

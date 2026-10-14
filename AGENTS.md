@@ -117,6 +117,50 @@ feita nos momentos certos, sem virar repeticao a cada micro-etapa.
 - Objetivo: usuario treina o olho uma vez ("esse icone sempre faz aquilo") e
   nao precisa reaprender a interface tela por tela.
 
+## Loading unico em telas de edicao (regra geral, 2026-10-13)
+
+Toda tela que carrega dados assincronos antes de exibir um formulario (telas
+de edicao tipo `PetForm.jsx`, `ClientePessoaEditar.jsx`) deve mostrar **um
+unico** loading, do inicio ate os dados finais aparecerem — nunca um
+formulario vazio piscando por um instante, nem o loading reaparecendo depois
+dos dados ja estarem na tela. Dois erros causam isso, ambos encontrados e
+corrigidos em `PetForm.jsx`/`ClientePessoaEditar.jsx`:
+
+1. **Estado de loading comecando `false`**: se o primeiro render acontece
+   antes do efeito de carregamento rodar, a tela mostra o formulario vazio
+   por um instante (parece uma tela de cadastro, nao de edicao). Sempre
+   inicializar `useState(true)` quando a tela depende de dado assincrono
+   pra existir, e so quando *tudo* que a tela precisa (todas as chamadas,
+   nao so a principal) tiver terminado, marcar `false` — um `loading` por
+   tela, nao um por chamada.
+2. **Efeito de carregamento sem protecao contra o `StrictMode`**: em
+   desenvolvimento, o React (`main.jsx` usa `<React.StrictMode>`, nao tirar
+   isso — e uma rede de seguranca valiosa) roda de proposito o
+   `useEffect` de carregamento **duas vezes** ao montar, pra flagar efeitos
+   com side effect mal limpo. Sem protecao, a segunda rodada reacende o
+   loading por um instante mesmo com os dados corretos ja exibidos — esse e
+   o "pisca de novo" que o Lucas reportou. Corrigir sempre com uma flag de
+   cancelamento no efeito (padrao recomendado pela propria documentacao do
+   React para fetch em `useEffect`):
+
+   ```jsx
+   useEffect(() => {
+     let ativo = true;
+     (async () => {
+       setLoading(true);
+       try {
+         await carregarTudo();
+       } finally {
+         if (ativo) setLoading(false);
+       }
+     })();
+     return () => { ativo = false; };
+   }, [id]);
+   ```
+
+   A chamada da API em si roda duas vezes em dev (inofensivo, dado identico)
+   — o que a flag evita e so a transicao visual indevida do loading.
+
 ## Padrao de trabalho
 
 - Fazer mudancas pequenas e focadas.
