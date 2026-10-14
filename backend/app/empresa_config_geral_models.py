@@ -93,6 +93,12 @@ class EmpresaConfigGeral(BaseTenantModel):
     mostrar_endereco_cliente_pdv = Column(
         Boolean, default=False, nullable=False, server_default="false"
     )
+    emitir_nota_automatica_pdv = Column(
+        Boolean, default=False, nullable=False, server_default="false"
+    )
+    tipo_nota_automatica_pdv = Column(
+        String(4), default="nfce", nullable=False, server_default="nfce"
+    )
 
     # Dias para considerar contas como vencidas
     dias_tolerancia_atraso = Column(Integer, default=5)
@@ -184,6 +190,8 @@ class EmpresaConfigGeral(BaseTenantModel):
             "caixa_compartilhado": bool(self.caixa_compartilhado),
             "vendedor_obrigatorio_pdv": bool(self.vendedor_obrigatorio_pdv),
             "mostrar_endereco_cliente_pdv": bool(self.mostrar_endereco_cliente_pdv),
+            "emitir_nota_automatica_pdv": bool(self.emitir_nota_automatica_pdv),
+            "tipo_nota_automatica_pdv": self.tipo_nota_automatica_pdv or "nfce",
             "crediario_encargos_automaticos": bool(self.crediario_encargos_automaticos),
             "crediario_multa_percentual": float(self.crediario_multa_percentual or 0),
             "crediario_juros_mensal_percentual": float(

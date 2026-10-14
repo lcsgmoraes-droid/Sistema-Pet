@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, model_validator
-from typing import Optional
+from typing import Literal, Optional
 
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
@@ -57,6 +57,8 @@ class EmpresaConfigGeralCreate(BaseModel):
     caixa_compartilhado: bool = False
     vendedor_obrigatorio_pdv: bool = False
     mostrar_endereco_cliente_pdv: bool = False
+    emitir_nota_automatica_pdv: bool = False
+    tipo_nota_automatica_pdv: Literal["nfce", "nfe"] = "nfce"
     dias_tolerancia_atraso: int = 5
     crediario_encargos_automaticos: bool = False
     crediario_multa_percentual: float = Field(default=2.0, ge=0, le=2)
@@ -97,6 +99,8 @@ class EmpresaConfigGeralUpdate(BaseModel):
     caixa_compartilhado: Optional[bool] = None
     vendedor_obrigatorio_pdv: Optional[bool] = None
     mostrar_endereco_cliente_pdv: bool = False
+    emitir_nota_automatica_pdv: bool = False
+    tipo_nota_automatica_pdv: Literal["nfce", "nfe"] = "nfce"
     dias_tolerancia_atraso: Optional[int] = None
     crediario_encargos_automaticos: Optional[bool] = None
     crediario_multa_percentual: Optional[float] = Field(default=None, ge=0, le=2)
@@ -128,6 +132,8 @@ class EmpresaConfigGeralResponse(BaseModel):
     caixa_compartilhado: bool
     vendedor_obrigatorio_pdv: bool = False
     mostrar_endereco_cliente_pdv: bool = False
+    emitir_nota_automatica_pdv: bool = False
+    tipo_nota_automatica_pdv: Literal["nfce", "nfe"] = "nfce"
     aliquota_imposto_padrao: float
     dias_tolerancia_atraso: Optional[int] = 5
     crediario_encargos_automaticos: bool
@@ -183,6 +189,11 @@ def _serializar_config(
         mostrar_endereco_cliente_pdv=bool(
             getattr(config, "mostrar_endereco_cliente_pdv", False)
         ),
+        emitir_nota_automatica_pdv=bool(
+            getattr(config, "emitir_nota_automatica_pdv", False)
+        ),
+        tipo_nota_automatica_pdv=getattr(config, "tipo_nota_automatica_pdv", None)
+        or "nfce",
         aliquota_imposto_padrao=float(config.aliquota_imposto_padrao or 7),
         dias_tolerancia_atraso=(
             config.dias_tolerancia_atraso
@@ -403,6 +414,8 @@ def get_config_empresa(
             caixa_compartilhado=False,
             vendedor_obrigatorio_pdv=False,
             mostrar_endereco_cliente_pdv=False,
+            emitir_nota_automatica_pdv=False,
+            tipo_nota_automatica_pdv="nfce",
             aliquota_imposto_padrao=7.0,
             dias_tolerancia_atraso=5,
             crediario_encargos_automaticos=False,
@@ -435,6 +448,12 @@ def get_config_pdv(
         "vendedor_obrigatorio_pdv": bool(config and config.vendedor_obrigatorio_pdv),
         "mostrar_endereco_cliente_pdv": bool(
             config and getattr(config, "mostrar_endereco_cliente_pdv", False)
+        ),
+        "emitir_nota_automatica_pdv": bool(
+            config and config.emitir_nota_automatica_pdv
+        ),
+        "tipo_nota_automatica_pdv": (
+            config.tipo_nota_automatica_pdv if config else "nfce"
         ),
     }
 

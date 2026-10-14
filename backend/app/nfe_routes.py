@@ -67,6 +67,7 @@ from app.nfe.operacional_routes import (
     webhook_bling as webhook_bling,
 )
 from app.nfe.listagem_rapida import router as listagem_rapida_router
+from app.nfe.vendas_sem_nota_routes import router as vendas_sem_nota_router
 from app.nfe.listagem import (
     _NFE_LIST_CACHE_SECONDS as _NFE_LIST_CACHE_SECONDS,
     _adicionar_notas_de_pedidos_integrados as _adicionar_notas_de_pedidos_integrados,
@@ -821,5 +822,6 @@ async def reconciliar_pendentes_nfe(
 
 
 router.include_router(listagem_rapida_router)
+router.include_router(vendas_sem_nota_router)
 router.include_router(operacional_router)
 router.include_router(correcao_router)
