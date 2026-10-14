@@ -495,8 +495,8 @@ export default function SefazIntegracaoCard({ modoModal = false, onStatusChange 
             </label>
             <p id="sefaz-email-contabilidade-ajuda" className="text-xs text-amber-800">
               Combine primeiro com o escritório a troca do coletor de notas e o endereço de entrega.
-              Ao trocar o e-mail ou a data, salve com o envio desligado e depois reative.
-              A importação automática das notas é configurada separadamente na Central NF-e Entradas.
+              Ao trocar o e-mail ou a data, salve com o envio desligado e depois reative. A
+              importação automática das notas é configurada separadamente na Central NF-e Entradas.
             </p>
 
             <div className="grid grid-cols-2 gap-2 rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-700 sm:grid-cols-4">
