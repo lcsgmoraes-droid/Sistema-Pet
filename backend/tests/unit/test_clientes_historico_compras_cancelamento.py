@@ -86,9 +86,7 @@ def test_historico_compras_nao_exibe_divida_para_venda_cancelada():
                 clear_current_tenant()
 
         app.dependency_overrides[get_session] = override_session
-        app.dependency_overrides[get_current_user_and_tenant] = (
-            override_user_and_tenant
-        )
+        app.dependency_overrides[get_current_user_and_tenant] = override_user_and_tenant
         with TestClient(app) as client:
             resposta = client.get(f"/clientes/{cliente.id}/historico-compras")
     finally:
