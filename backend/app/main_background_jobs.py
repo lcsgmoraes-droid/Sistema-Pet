@@ -280,9 +280,16 @@ def _processar_encaminhamento_sefaz(tenant_id_str: str, config_path) -> None:
             finally:
                 db.close()
     except SefazLockBusy:
-        logger.debug("[SEFAZ] Encaminhamento aguardando outro processo para tenant %s", tenant_id_str)
+        logger.debug(
+            "[SEFAZ] Encaminhamento aguardando outro processo para tenant %s",
+            tenant_id_str,
+        )
     except Exception as exc:
-        logger.warning("[SEFAZ] Falha no encaminhamento do tenant %s: %s", tenant_id_str, type(exc).__name__)
+        logger.warning(
+            "[SEFAZ] Falha no encaminhamento do tenant %s: %s",
+            tenant_id_str,
+            type(exc).__name__,
+        )
 
 
 def _loop_sefaz_sync():

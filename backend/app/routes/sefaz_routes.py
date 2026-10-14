@@ -15,7 +15,10 @@ import logging
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session as get_db
 from app.models import Tenant
-from app.produtos_compras_models import SefazDocumentoDistribuido, SefazXmlEncaminhamento
+from app.produtos_compras_models import (
+    SefazDocumentoDistribuido,
+    SefazXmlEncaminhamento,
+)
 from app.security.permissions_decorator import require_permission_dependency
 from app.services.sefaz_service import SefazConsumoIndevidoError, SefazService
 from app.services.sefaz_tenant_config_service import SefazTenantConfigService
@@ -245,7 +248,9 @@ def get_encaminhamento_status(
         "ativo": bool(cfg.get("encaminhamento_email_ativo")),
         "destino": destino,
         "smtp_configurado": is_email_configured(),
-        "pendentes": consulta.filter(SefazXmlEncaminhamento.status == "pendente").count(),
+        "pendentes": consulta.filter(
+            SefazXmlEncaminhamento.status == "pendente"
+        ).count(),
         "falhas": consulta.filter(
             SefazXmlEncaminhamento.status.in_(("erro", "invalido"))
         ).count(),
@@ -319,11 +324,15 @@ def update_config(
                         status_code=422,
                         detail="A data inicial do encaminhamento não pode ser futura.",
                     )
-                inicio_envio = datetime.combine(
-                    payload.encaminhamento_inicio_em,
-                    time.min,
-                    tzinfo=ZoneInfo("America/Sao_Paulo"),
-                ).astimezone(timezone.utc).isoformat()
+                inicio_envio = (
+                    datetime.combine(
+                        payload.encaminhamento_inicio_em,
+                        time.min,
+                        tzinfo=ZoneInfo("America/Sao_Paulo"),
+                    )
+                    .astimezone(timezone.utc)
+                    .isoformat()
+                )
             if (
                 atual.get("encaminhamento_email_ativo")
                 and encaminhamento_ativo
@@ -350,7 +359,9 @@ def update_config(
             novo["encaminhamento_email_destino"] = destino
             novo["encaminhamento_inicio_em"] = inicio_envio
             if encaminhamento_ativo and not atual.get("encaminhamento_email_ativo"):
-                novo["encaminhamento_ativado_em"] = datetime.now(timezone.utc).isoformat()
+                novo["encaminhamento_ativado_em"] = datetime.now(
+                    timezone.utc
+                ).isoformat()
             if payload.cert_password is not None:
                 novo["cert_password"] = payload.cert_password
             SefazTenantConfigService.save_config(tenant_id, novo)

@@ -297,9 +297,7 @@ def test_config_bloqueia_ativacao_de_envio_sem_smtp(monkeypatch):
     monkeypatch.setattr(
         sefaz_routes.SefazTenantConfigService,
         "merged_config",
-        lambda tenant_id, tenant: {
-            "cnpj": "12345678000199", "ambiente": "producao"
-        },
+        lambda tenant_id, tenant: {"cnpj": "12345678000199", "ambiente": "producao"},
     )
     monkeypatch.setattr(sefaz_routes, "is_email_configured", lambda: False)
     monkeypatch.setattr(
@@ -326,9 +324,7 @@ def test_config_grava_inicio_do_dia_em_sao_paulo(monkeypatch):
     monkeypatch.setattr(
         sefaz_routes.SefazTenantConfigService,
         "merged_config",
-        lambda tenant_id, tenant: {
-            "cnpj": "12345678000199", "ambiente": "producao"
-        },
+        lambda tenant_id, tenant: {"cnpj": "12345678000199", "ambiente": "producao"},
     )
     monkeypatch.setattr(
         sefaz_routes.SefazTenantConfigService,

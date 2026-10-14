@@ -197,7 +197,9 @@ class SefazXmlEncaminhamento(BaseTenantModel):
     __tablename__ = "sefaz_xml_encaminhamentos"
     __table_args__ = (
         UniqueConstraint(
-            "tenant_id", "chave_acesso", name="uq_sefaz_xml_encaminhamentos_tenant_chave"
+            "tenant_id",
+            "chave_acesso",
+            name="uq_sefaz_xml_encaminhamentos_tenant_chave",
         ),
     )
 

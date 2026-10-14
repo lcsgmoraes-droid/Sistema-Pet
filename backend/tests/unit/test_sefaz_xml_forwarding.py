@@ -9,7 +9,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.notas_entrada import sefaz_importer  # noqa: F401 - registra modelos relacionados
-from app.produtos_compras_models import SefazDocumentoDistribuido, SefazXmlEncaminhamento
+from app.produtos_compras_models import (
+    SefazDocumentoDistribuido,
+    SefazXmlEncaminhamento,
+)
 from app.services import sefaz_xml_forwarding as forwarding
 from app.tenancy.context import tenant_context
 
@@ -33,10 +36,10 @@ def _xml(destinatario=CNPJ, chave=CHAVE):
     return (
         '<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe>'
         f'<infNFe Id="NFe{chave}"><ide><nNF>123</nNF></ide>'
-        '<emit><CNPJ>12345678000199</CNPJ></emit>'
-        f'<dest><CNPJ>{destinatario}</CNPJ></dest>'
-        '</infNFe></NFe><protNFe><infProt><cStat>100</cStat></infProt></protNFe>'
-        '</nfeProc>'
+        "<emit><CNPJ>12345678000199</CNPJ></emit>"
+        f"<dest><CNPJ>{destinatario}</CNPJ></dest>"
+        "</infNFe></NFe><protNFe><infProt><cStat>100</cStat></infProt></protNFe>"
+        "</nfeProc>"
     )
 
 
@@ -229,7 +232,9 @@ def test_desligar_pausa_e_novo_destino_recebe_pendencia_nao_enviada(db, monkeypa
     monkeypatch.setattr(forwarding, "is_email_configured", lambda: True)
     monkeypatch.setattr(forwarding, "resolve_tenant_reply_to", lambda *_: None)
     monkeypatch.setattr(
-        forwarding, "send_email", lambda **kwargs: enviados.append(kwargs["to"]) or False
+        forwarding,
+        "send_email",
+        lambda **kwargs: enviados.append(kwargs["to"]) or False,
     )
     cfg = _config()
     forwarding.processar_encaminhamentos_sefaz(db, str(TENANT), cfg)

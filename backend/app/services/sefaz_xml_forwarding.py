@@ -102,8 +102,7 @@ def _xml_valido_para_envio(
         cnpj_xml = _filho(dest, "CNPJ")
         return (
             cnpj_xml is not None
-            and "".join(ch for ch in str(cnpj_xml.text or "") if ch.isdigit())
-            == cnpj
+            and "".join(ch for ch in str(cnpj_xml.text or "") if ch.isdigit()) == cnpj
         )
     except Exception:  # XML malformed or entity expansion is never sent onward.
         return False
@@ -128,8 +127,7 @@ def _config_ainda_atual(
     return (
         bool(atual.get("encaminhamento_email_ativo"))
         and _destino(atual) == destino
-        and "".join(ch for ch in str(atual.get("cnpj") or "") if ch.isdigit())
-        == cnpj
+        and "".join(ch for ch in str(atual.get("cnpj") or "") if ch.isdigit()) == cnpj
         and _inicio_em(atual) == inicio_em
     )
 
@@ -266,8 +264,7 @@ def processar_encaminhamentos_sefaz(
             .join(
                 SefazDocumentoDistribuido,
                 and_(
-                    SefazDocumentoDistribuido.id
-                    == SefazXmlEncaminhamento.documento_id,
+                    SefazDocumentoDistribuido.id == SefazXmlEncaminhamento.documento_id,
                     SefazDocumentoDistribuido.tenant_id == tenant_uuid,
                 ),
             )
@@ -351,7 +348,9 @@ def processar_encaminhamentos_sefaz(
             "status": (
                 "configuracao_alterada"
                 if configuracao_alterada
-                else "ok" if falhas == 0 else "erro_envio"
+                else "ok"
+                if falhas == 0
+                else "erro_envio"
             ),
             "novos": novos,
             "redirecionados": retargeted,
