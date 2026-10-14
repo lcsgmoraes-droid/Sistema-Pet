@@ -188,11 +188,14 @@ export async function emitirNotaFiscalAssistida({
   vendaId,
   tipoNota = "nfce",
   confirmar = confirmarCorePet,
+  semInteracao = false,
 } = {}) {
   let validacao;
   for (let tentativa = 0; tentativa < 5; tentativa += 1) {
     validacao = await prevalidarNotaFiscal({ vendaId, tipoNota });
     if (!temPendenciasFiscais(validacao)) break;
+
+    if (semInteracao) throw erroComValidacaoFiscal(validacao);
 
     const corrigido = await solicitarCorrecaoFiscal({ validacao, vendaId, tipoNota });
     if (!corrigido) return { cancelado: true, validacao };
@@ -202,7 +205,11 @@ export async function emitirNotaFiscalAssistida({
     throw erroComValidacaoFiscal(validacao);
   }
 
-  if (validacao?.provedor === "intnfe" && validacao?.resumo_emissao) {
+  if (semInteracao && validacao?.pode_emitir !== true) {
+    throw new Error("A venda não está pronta para emissão fiscal. Confira os dados da nota.");
+  }
+
+  if (!semInteracao && validacao?.provedor === "intnfe" && validacao?.resumo_emissao) {
     const confirmed = await confirmar(resumoIntNFe(validacao.resumo_emissao));
     if (!confirmed) return { cancelado: true, validacao };
   }
@@ -225,7 +232,7 @@ export async function emitirNotaFiscalAssistida({
       return { data, validacao, correcoesAutorizadas: false };
     } catch (error) {
       const validacaoProvedor = validacaoFiscalDoErro(error);
-      if (!validacaoProvedor) throw error;
+      if (!validacaoProvedor || semInteracao) throw error;
 
       const corrigido = await solicitarCorrecaoFiscal({
         validacao: validacaoProvedor,

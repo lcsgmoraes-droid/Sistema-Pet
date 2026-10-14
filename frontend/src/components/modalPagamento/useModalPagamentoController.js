@@ -67,6 +67,8 @@ export default function useModalPagamentoController({
   const [erro, setErro] = useState("");
   const [totalPagoExistente, setTotalPagoExistente] = useState(0);
   const [mostrarPerguntaNFe, setMostrarPerguntaNFe] = useState(false);
+  const [emissaoAutomatica, setEmissaoAutomatica] = useState(null);
+  const [autoEmitirTipo, setAutoEmitirTipo] = useState(null);
   const [vendaFinalizadaId, setVendaFinalizadaId] = useState(null);
   const [vendaFinalizadaParaCupom, setVendaFinalizadaParaCupom] = useState(null);
 
@@ -99,6 +101,26 @@ export default function useModalPagamentoController({
   const [loadingBeneficiosCampanha, setLoadingBeneficiosCampanha] = useState(false);
 
   const modalPagamentoContentRef = useRef(null);
+
+  useEffect(() => {
+    if (!moduloFiscalAtivo) return;
+    let ativo = true;
+    api
+      .get("/empresa/config/pdv")
+      .then(({ data }) => {
+        if (ativo)
+          setEmissaoAutomatica({
+            ativa: Boolean(data?.emitir_nota_automatica_pdv),
+            tipo: data?.tipo_nota_automatica_pdv === "nfe" ? "nfe" : "nfce",
+          });
+      })
+      .catch(() => {
+        if (ativo) setEmissaoAutomatica(null);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [moduloFiscalAtivo]);
 
   // Ref para o container das opções de parcelamento
   const opcoesParcelamentoRef = useRef(null);
@@ -678,6 +700,7 @@ export default function useModalPagamentoController({
     justificativaTexto,
     margemCriticaAtual,
     moduloFiscalAtivo,
+    emissaoAutomatica,
     naoGerarBeneficios,
     justificativaBeneficios,
     nsuCartao,
@@ -700,6 +723,7 @@ export default function useModalPagamentoController({
     setLoading,
     setMostrarModalCreditoExcedente,
     setMostrarPerguntaNFe,
+    setAutoEmitirTipo,
     setNsuCartao,
     setNumeroParcelas,
     setOperadoraSelecionada,
@@ -721,6 +745,7 @@ export default function useModalPagamentoController({
   return {
     mostrarPerguntaNFe,
     modalPerguntaNFeProps: {
+      autoEmitirTipo,
       cliente: venda.cliente,
       erro,
       loading,

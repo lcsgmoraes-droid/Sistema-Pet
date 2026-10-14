@@ -34,6 +34,7 @@ export function useModalPagamentoActions({
   justificativaTexto,
   margemCriticaAtual,
   moduloFiscalAtivo,
+  emissaoAutomatica,
   naoGerarBeneficios,
   justificativaBeneficios,
   nsuCartao,
@@ -56,6 +57,7 @@ export function useModalPagamentoActions({
   setLoading,
   setMostrarModalCreditoExcedente,
   setMostrarPerguntaNFe,
+  setAutoEmitirTipo,
   setNsuCartao,
   setNumeroParcelas,
   setOperadoraSelecionada,
@@ -305,6 +307,11 @@ export function useModalPagamentoActions({
       });
 
       if (!moduloFiscalAtivo || devePerguntarNotaFiscal(resultado)) {
+        setAutoEmitirTipo(
+          moduloFiscalAtivo && emissaoAutomatica?.ativa && devePerguntarNotaFiscal(resultado)
+            ? emissaoAutomatica.tipo
+            : null,
+        );
         setMostrarPerguntaNFe(true);
       } else {
         onConfirmar();
@@ -317,7 +324,7 @@ export function useModalPagamentoActions({
     }
   };
 
-  const emitirNFe = async (tipoNota) => {
+  const emitirNFe = async (tipoNota, { automatico = false } = {}) => {
     setLoading(true);
     setErro("");
 
@@ -325,22 +332,27 @@ export function useModalPagamentoActions({
       const resultado = await emitirNotaFiscalAssistida({
         vendaId: vendaFinalizadaId,
         tipoNota,
+        semInteracao: automatico,
       });
 
       if (resultado?.cancelado) return;
 
       const transmissao = resultado?.data?.transmissao;
       if (resultado?.data?.processando) {
-        globalThis.alert(
-          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} recebida pelo emissor e ainda em processamento. Consulte novamente em Notas Fiscais.`,
-        );
-        onConfirmar();
+        if (!automatico) {
+          globalThis.alert(
+            `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} recebida pelo emissor e ainda em processamento. Consulte novamente em Notas Fiscais.`,
+          );
+          onConfirmar();
+        }
         return { autorizada: false, processando: true, data: resultado.data };
       } else if (transmissao?.success === false) {
-        globalThis.alert(
-          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} criada, mas a transmissão não foi concluída automaticamente.\n\n${transmissao.erro || ""}`.trim(),
-        );
-        onConfirmar();
+        if (!automatico) {
+          globalThis.alert(
+            `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} criada, mas a transmissão não foi concluída automaticamente.\n\n${transmissao.erro || ""}`.trim(),
+          );
+          onConfirmar();
+        }
         return { autorizada: false, processando: true, data: resultado.data };
       }
       return {
@@ -352,6 +364,10 @@ export function useModalPagamentoActions({
     } catch (error) {
       console.error("Erro ao emitir nota:", error);
       const mensagem = extrairMensagemNFe(error);
+      if (automatico) {
+        setErro(`A emissão automática não foi concluída: ${mensagem}`);
+        return;
+      }
       const recuperacao = error?.recuperacaoNFe;
       if (recuperacao) {
         setErro(mensagem);
