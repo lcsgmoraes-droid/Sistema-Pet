@@ -1,4 +1,8 @@
 const ClientesNovoEnderecoStep = ({ formData, setFormData, buscarCep, loadingCep, cepError }) => {
+  const temEndereco = [formData.cep, formData.endereco, formData.bairro].some((value) =>
+    String(value ?? "").trim(),
+  );
+
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Endereco</h3>
@@ -48,14 +52,25 @@ const ClientesNovoEnderecoStep = ({ formData, setFormData, buscarCep, loadingCep
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Numero</label>
+          <label
+            htmlFor="cliente-numero-endereco"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Numero{temEndereco ? " *" : ""}
+          </label>
           <input
+            id="cliente-numero-endereco"
             type="text"
             value={formData.numero}
             onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-            placeholder="123"
+            placeholder="123 ou S/N"
+            required={temEndereco}
+            aria-describedby="cliente-numero-endereco-ajuda"
           />
+          <p id="cliente-numero-endereco-ajuda" className="text-xs text-gray-500 mt-1">
+            Se não houver número, informe S/N ou sem número.
+          </p>
         </div>
 
         <div>
