@@ -135,11 +135,13 @@ def _emitter_credentials(connection, environment=None):
 
 def _payment_code(value):
     name = re.sub(r"[^a-z0-9]+", "_", _ascii(value)).strip("_")
+    if "cashback" in name:
+        return "19"
     if "pix" in name:
         return "17"
     if "boleto" in name:
         return "15"
-    if "crediario" in name or "credito_loja" in name:
+    if "crediario" in name or "credito_loja" in name or "credito_cliente" in name:
         return "05"
     if "deposit" in name or "transfer" in name:
         return "16"
@@ -154,6 +156,11 @@ def _payment_code(value):
     if "sem_pagamento" in name:
         return "90"
     return "99"
+
+
+def _is_crediario_payment(value):
+    name = re.sub(r"[^a-z0-9]+", "_", _ascii(value)).strip("_")
+    return "crediario" in name or "credito_loja" in name
 
 
 def _date(value):
@@ -190,12 +197,12 @@ def _crediario_accounts(venda):
         credit_payments = [
             payment
             for payment in (getattr(venda, "pagamentos", None) or [])
-            if _payment_code(getattr(payment, "forma_pagamento", None)) == "05"
+            if _is_crediario_payment(getattr(payment, "forma_pagamento", None))
         ]
         other_payments = [
             payment
             for payment in (getattr(venda, "pagamentos", None) or [])
-            if _payment_code(getattr(payment, "forma_pagamento", None)) != "05"
+            if not _is_crediario_payment(getattr(payment, "forma_pagamento", None))
         ]
         if credit_payments and not other_payments:
             accounts = [
@@ -238,7 +245,7 @@ def _crediario_installments(venda):
 
     installments = []
     for payment in getattr(venda, "pagamentos", None) or []:
-        if _payment_code(getattr(payment, "forma_pagamento", None)) != "05":
+        if not _is_crediario_payment(getattr(payment, "forma_pagamento", None)):
             continue
         first_due_date = _date(getattr(payment, "data_recebimento_prevista", None))
         if first_due_date is None:
@@ -965,7 +972,7 @@ def local_document_details(db, tenant, venda):
     payment_rows = []
     credit_rows_added = False
     for payment in venda.pagamentos or []:
-        if _payment_code(getattr(payment, "forma_pagamento", None)) == "05":
+        if _is_crediario_payment(getattr(payment, "forma_pagamento", None)):
             if credit_installments and not credit_rows_added:
                 payment_rows.extend(
                     {
