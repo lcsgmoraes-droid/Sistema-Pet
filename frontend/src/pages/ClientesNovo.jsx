@@ -275,10 +275,15 @@ const Pessoas = () => {
     await carregarPaginaCentralDuplicidades(0);
   };
 
-  const carregarSugestoesDuplicidade = async () => {
+  // `aindaAtivo` protege a chamada automatica (useEffect de montagem) contra o StrictMode do
+  // React, que roda o efeito duas vezes em dev — sem isso, a banner de duplicidade pisca o
+  // "verificando" uma segunda vez mesmo com o resultado ja exibido. Chamadas manuais (botao
+  // "Verificar") nao passam esse argumento e seguem sempre aplicando o resultado normalmente.
+  const carregarSugestoesDuplicidade = async (aindaAtivo = () => true) => {
     setDuplicidade((prev) => ({ ...prev, verificando: true }));
     try {
       const { data } = await buscarSugestoesDuplicidadePessoas({ limit: 20 });
+      if (!aindaAtivo()) return;
       setDuplicidade((prev) => ({
         ...prev,
         sugestoes: data?.sugestoes || [],
@@ -289,11 +294,13 @@ const Pessoas = () => {
     } catch (err) {
       console.error("Erro ao buscar sugestoes de duplicidade:", err);
     } finally {
-      setDuplicidade((prev) => ({
-        ...prev,
-        verificando: false,
-        varreduraInicialExecutada: true,
-      }));
+      if (aindaAtivo()) {
+        setDuplicidade((prev) => ({
+          ...prev,
+          verificando: false,
+          varreduraInicialExecutada: true,
+        }));
+      }
     }
   };
 
@@ -464,7 +471,11 @@ const Pessoas = () => {
 
   useEffect(() => {
     if (!carregamentoInicialConcluido || duplicidade.varreduraInicialExecutada) return;
-    carregarSugestoesDuplicidade();
+    let ativo = true;
+    carregarSugestoesDuplicidade(() => ativo);
+    return () => {
+      ativo = false;
+    };
   }, [carregamentoInicialConcluido, duplicidade.varreduraInicialExecutada]);
 
   useEffect(() => {

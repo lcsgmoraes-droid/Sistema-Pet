@@ -211,17 +211,25 @@ export default function ClientePessoaEditar() {
   }, [carregar]);
 
   useEffect(() => {
+    let ativo = true;
     setLoadingResumo(true);
     api
       .get(`/financeiro/cliente/${clienteId}/resumo`)
-      .then((response) => setResumoFinanceiro(response.data.resumo))
+      .then((response) => {
+        if (ativo) setResumoFinanceiro(response.data.resumo);
+      })
       .catch((error) => {
         if (error.response?.status !== 404) {
           console.error("Erro ao carregar resumo financeiro:", error);
         }
-        setResumoFinanceiro(null);
+        if (ativo) setResumoFinanceiro(null);
       })
-      .finally(() => setLoadingResumo(false));
+      .finally(() => {
+        if (ativo) setLoadingResumo(false);
+      });
+    return () => {
+      ativo = false;
+    };
   }, [clienteId, refreshKeyCredito]);
 
   useEffect(() => {
