@@ -26,6 +26,9 @@ const formatBRL = (value) => {
   return num.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 };
 
+const obterStatusVenda = (venda) =>
+  venda.status === "cancelada" ? "cancelada" : venda.status_pagamento || venda.status;
+
 export default function HistoricoCliente({ cliente, clienteId, clienteNome, onClose }) {
   const [historico, setHistorico] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -205,7 +208,7 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
   const vendasFiltradas =
     historico?.vendas?.filter((venda) => {
       if (filtroStatus === "todos") return true;
-      return (venda.status_pagamento || venda.status) === filtroStatus;
+      return obterStatusVenda(venda) === filtroStatus;
     }) || [];
 
   const valorResumo = (valor) => (mostrarResumoGerencial ? valor : "••••");
@@ -378,7 +381,7 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
                                 <h3 className="text-lg font-semibold text-gray-900">
                                   <SaleReference sale={venda} />
                                 </h3>
-                                {getStatusBadge(venda.status_pagamento || venda.status)}
+                                {getStatusBadge(obterStatusVenda(venda))}
                               </div>
 
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -421,14 +424,15 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
                                   </div>
                                 </div>
 
-                                {venda.saldo_devedor > 0 && (
-                                  <div>
-                                    <span className="text-gray-500">Saldo Devedor:</span>
-                                    <div className="font-bold text-red-600">
-                                      {formatBRL(venda.saldo_devedor)}
+                                {obterStatusVenda(venda) !== "cancelada" &&
+                                  venda.saldo_devedor > 0 && (
+                                    <div>
+                                      <span className="text-gray-500">Saldo Devedor:</span>
+                                      <div className="font-bold text-red-600">
+                                        {formatBRL(venda.saldo_devedor)}
+                                      </div>
                                     </div>
-                                  </div>
-                                )}
+                                  )}
 
                                 <div>
                                   <span className="text-gray-500">Itens:</span>
