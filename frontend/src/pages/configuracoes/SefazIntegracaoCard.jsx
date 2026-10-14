@@ -40,18 +40,39 @@ async function getConfigComFallback() {
   }
 }
 
+function emailDestinoValido(valor) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(valor || "").trim());
+}
+
+function dataEmSaoPaulo(valor) {
+  if (typeof valor === "string" && /^\d{4}-\d{2}-\d{2}$/.test(valor)) return valor;
+  const data = valor ? new Date(valor) : new Date();
+  const partes = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(Number.isNaN(data.getTime()) ? new Date() : data);
+  const parte = (tipo) => partes.find((item) => item.type === tipo)?.value;
+  return `${parte("year")}-${parte("month")}-${parte("day")}`;
+}
+
 export default function SefazIntegracaoCard({ modoModal = false, onStatusChange }) {
   const [expandido, setExpandido] = useState(false);
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [mensagem, setMensagem] = useState("");
   const [arquivoCertificado, setArquivoCertificado] = useState(null);
+  const [statusEntrega, setStatusEntrega] = useState(null);
 
   const [status, setStatus] = useState({
     enabled: false,
     cert_ok: false,
     cert_existe: false,
     cert_senha_configurada: false,
+    encaminhamento_email_ativo: false,
+    encaminhamento_email_destino: "",
+    encaminhamento_inicio_em: dataEmSaoPaulo(),
     mensagem: "",
   });
 
@@ -64,6 +85,9 @@ export default function SefazIntegracaoCard({ modoModal = false, onStatusChange 
     cert_password: "",
     importacao_automatica: false,
     importacao_intervalo_min: 15,
+    encaminhamento_email_ativo: false,
+    encaminhamento_email_destino: "",
+    encaminhamento_inicio_em: dataEmSaoPaulo(),
   });
 
   useEffect(() => {
@@ -88,6 +112,9 @@ export default function SefazIntegracaoCard({ modoModal = false, onStatusChange 
         cnpj: data.cnpj || data.empresa?.cnpj || "",
         importacao_automatica: Boolean(data.importacao_automatica),
         importacao_intervalo_min: data.importacao_intervalo_min || 15,
+        encaminhamento_email_ativo: Boolean(data.encaminhamento_email_ativo),
+        encaminhamento_email_destino: data.encaminhamento_email_destino || "",
+        encaminhamento_inicio_em: dataEmSaoPaulo(data.encaminhamento_inicio_em),
       }));
 
       setStatus({
@@ -95,6 +122,9 @@ export default function SefazIntegracaoCard({ modoModal = false, onStatusChange 
         cert_ok: Boolean(data.cert_ok),
         cert_existe: Boolean(data.cert_existe),
         cert_senha_configurada: Boolean(data.cert_senha_configurada),
+        encaminhamento_email_ativo: Boolean(data.encaminhamento_email_ativo),
+        encaminhamento_email_destino: data.encaminhamento_email_destino || "",
+        encaminhamento_inicio_em: dataEmSaoPaulo(data.encaminhamento_inicio_em),
         mensagem: data.mensagem || "",
       });
 
@@ -105,7 +135,15 @@ export default function SefazIntegracaoCard({ modoModal = false, onStatusChange 
           mensagem: data.mensagem || "",
         });
       }
+
+      try {
+        const { data: entrega } = await api.get("/sefaz/encaminhamento-status");
+        setStatusEntrega(entrega);
+      } catch {
+        setStatusEntrega(null);
+      }
     } catch (err) {
+      setStatusEntrega(null);
       setMensagem(
         err?.response?.data?.detail || "Nao foi possivel carregar configuracao da SEFAZ.",
       );
@@ -117,6 +155,20 @@ export default function SefazIntegracaoCard({ modoModal = false, onStatusChange 
   async function salvar(e) {
     e.preventDefault();
     setMensagem("");
+
+    const destinoEmail = form.encaminhamento_email_destino.trim();
+    if (destinoEmail && !emailDestinoValido(destinoEmail)) {
+      setMensagem("Informe um e-mail válido para o encaminhamento dos XMLs.");
+      return;
+    }
+    if (form.encaminhamento_email_ativo && !destinoEmail) {
+      setMensagem("Informe o e-mail do escritório antes de ativar o encaminhamento.");
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(form.encaminhamento_inicio_em)) {
+      setMensagem("Informe a data inicial dos XMLs que serão encaminhados.");
+      return;
+    }
 
     try {
       setSalvando(true);
@@ -131,6 +183,9 @@ export default function SefazIntegracaoCard({ modoModal = false, onStatusChange 
         cert_password: form.cert_password || undefined,
         importacao_automatica: form.importacao_automatica,
         importacao_intervalo_min: Number(form.importacao_intervalo_min || 15),
+        encaminhamento_email_ativo: form.encaminhamento_email_ativo,
+        encaminhamento_email_destino: destinoEmail,
+        encaminhamento_inicio_em: form.encaminhamento_inicio_em,
       });
 
       if (arquivoCertificado) {
@@ -154,7 +209,7 @@ export default function SefazIntegracaoCard({ modoModal = false, onStatusChange 
       const detalhe = err?.response?.data?.detail;
       setMensagem(
         detalhe
-          ? `Falha na validacao do certificado: ${detalhe}`
+          ? `Não foi possível salvar a configuração SEFAZ: ${detalhe}`
           : "Erro ao salvar configuracao da SEFAZ.",
       );
     } finally {
@@ -174,6 +229,10 @@ export default function SefazIntegracaoCard({ modoModal = false, onStatusChange 
   }
 
   const integradoPronto = status.cert_ok && form.enabled;
+  const alteracaoEncaminhamentoPendente =
+    status.encaminhamento_email_ativo &&
+    (form.encaminhamento_email_destino.trim() !== status.encaminhamento_email_destino ||
+      form.encaminhamento_inicio_em !== status.encaminhamento_inicio_em);
 
   const header = (
     <div className="bg-gray-50 border-b px-5 py-4 flex items-center justify-between">
@@ -352,6 +411,117 @@ export default function SefazIntegracaoCard({ modoModal = false, onStatusChange 
             />
             <span>Habilitar SEFAZ para esta empresa</span>
           </label>
+
+          <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800">
+                Encaminhar XMLs ao escritório de contabilidade
+              </h3>
+              <p className="mt-1 text-xs text-gray-600">
+                Informe o endereço confirmado pelo escritório. O CorePet encaminha apenas o XML
+                completo das NF-e de entrada destinadas a este CNPJ, após a captura e validação do
+                XML. Mesmo se a importação da compra falhar, o XML válido pode ser enviado. Resumos
+                de notas ainda sem XML completo não são enviados.
+              </p>
+            </div>
+
+            <div>
+              <label
+                htmlFor="sefaz-email-contabilidade"
+                className="mb-1 block text-sm font-medium text-gray-700"
+              >
+                E-mail para receber os XMLs
+              </label>
+              <input
+                id="sefaz-email-contabilidade"
+                type="email"
+                autoComplete="email"
+                inputMode="email"
+                maxLength={254}
+                value={form.encaminhamento_email_destino}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    encaminhamento_email_destino: e.target.value,
+                    // Trocar o destinatário exige desativar o envio antes de salvar.
+                    encaminhamento_email_ativo: false,
+                  }))
+                }
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                placeholder="Confirme o endereço com o escritório"
+                aria-describedby="sefaz-email-contabilidade-ajuda"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="sefaz-encaminhamento-inicio"
+                className="mb-1 block text-sm font-medium text-gray-700"
+              >
+                Encaminhar XMLs capturados desde
+              </label>
+              <input
+                id="sefaz-encaminhamento-inicio"
+                type="date"
+                max={dataEmSaoPaulo()}
+                value={form.encaminhamento_inicio_em}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    encaminhamento_inicio_em: e.target.value,
+                    encaminhamento_email_ativo: false,
+                  }))
+                }
+                className="w-full border rounded-lg px-3 py-2 text-sm sm:w-auto"
+                aria-describedby="sefaz-encaminhamento-inicio-ajuda"
+              />
+              <p id="sefaz-encaminhamento-inicio-ajuda" className="mt-1 text-xs text-gray-600">
+                São encaminhados os XMLs completos capturados pelo CorePet a partir dessa data. A
+                data não recupera XMLs de notas que ainda não estejam no CorePet.
+              </p>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={form.encaminhamento_email_ativo}
+                disabled={
+                  !emailDestinoValido(form.encaminhamento_email_destino) ||
+                  alteracaoEncaminhamentoPendente
+                }
+                onChange={(e) => atualizarCampo("encaminhamento_email_ativo", e.target.checked)}
+              />
+              <span>Ativar envio automático para este e-mail</span>
+            </label>
+            <p id="sefaz-email-contabilidade-ajuda" className="text-xs text-amber-800">
+              Combine primeiro com o escritório a troca do coletor de notas e o endereço de entrega.
+              Ao trocar o e-mail ou a data, salve com o envio desligado e depois reative.
+              A importação automática das notas é configurada separadamente na Central NF-e Entradas.
+            </p>
+
+            <div className="grid grid-cols-2 gap-2 rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-700 sm:grid-cols-4">
+              <div>
+                Enviados: <strong>{statusEntrega?.enviados ?? "-"}</strong>
+              </div>
+              <div>
+                Pendentes: <strong>{statusEntrega?.pendentes ?? "-"}</strong>
+              </div>
+              <div>
+                Falhas: <strong>{statusEntrega?.falhas ?? "-"}</strong>
+              </div>
+              <div>
+                Servidor de e-mail:{" "}
+                <strong>
+                  {statusEntrega ? (statusEntrega.smtp_configurado ? "pronto" : "pendente") : "-"}
+                </strong>
+              </div>
+            </div>
+            {!statusEntrega && (
+              <p className="text-xs text-gray-600">
+                Ainda não foi possível consultar o estado dos envios.
+              </p>
+            )}
+          </div>
 
           <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1">
             <div>Certificado encontrado: {status.cert_existe ? "Sim" : "Nao"}</div>

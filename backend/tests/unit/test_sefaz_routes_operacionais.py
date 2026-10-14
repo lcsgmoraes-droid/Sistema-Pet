@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from uuid import UUID
 
@@ -246,6 +246,111 @@ def test_update_config_preserva_cursor_avancado_por_sync(monkeypatch):
 
     assert salvos[0]["ultimo_nsu"] == "000000000000090"
     assert salvos[0]["importacao_automatica"] is False
+
+
+def test_config_preserva_encaminhamento_quando_outra_tela_salva_sem_campos(monkeypatch):
+    atual = {
+        "enabled": True,
+        "modo": "real",
+        "ambiente": "producao",
+        "uf": "SP",
+        "cnpj": "12345678000199",
+        "encaminhamento_email_ativo": True,
+        "encaminhamento_email_destino": "contabil@example.com",
+        "encaminhamento_ativado_em": "2026-10-14T19:00:00+00:00",
+        "encaminhamento_inicio_em": "2026-10-14T03:00:00+00:00",
+    }
+    salvos = []
+    monkeypatch.setattr(
+        sefaz_routes.SefazTenantConfigService,
+        "merged_config",
+        lambda tenant_id, tenant: dict(atual),
+    )
+    monkeypatch.setattr(
+        sefaz_routes.SefazTenantConfigService,
+        "save_config",
+        lambda tenant_id, config: salvos.append(dict(config)),
+    )
+    monkeypatch.setattr(sefaz_routes, "is_email_configured", lambda: True)
+    monkeypatch.setattr(
+        sefaz_routes.SefazService,
+        "status_configuracao",
+        lambda config: SimpleNamespace(
+            cert_ok=True, mensagem="OK", cert_existe=True, cnpj_configurado=True
+        ),
+    )
+
+    sefaz_routes.update_config(
+        _config_payload(),
+        auth=(SimpleNamespace(id=1), TENANT_ID),
+        db=_DBTenant(),
+        _permission=None,
+    )
+
+    assert salvos[0]["encaminhamento_email_ativo"] is True
+    assert salvos[0]["encaminhamento_email_destino"] == "contabil@example.com"
+    assert salvos[0]["encaminhamento_ativado_em"] == atual["encaminhamento_ativado_em"]
+    assert salvos[0]["encaminhamento_inicio_em"] == atual["encaminhamento_inicio_em"]
+
+
+def test_config_bloqueia_ativacao_de_envio_sem_smtp(monkeypatch):
+    monkeypatch.setattr(
+        sefaz_routes.SefazTenantConfigService,
+        "merged_config",
+        lambda tenant_id, tenant: {
+            "cnpj": "12345678000199", "ambiente": "producao"
+        },
+    )
+    monkeypatch.setattr(sefaz_routes, "is_email_configured", lambda: False)
+    monkeypatch.setattr(
+        sefaz_routes.SefazTenantConfigService,
+        "save_config",
+        lambda *args: pytest.fail("Nao deve ativar o envio sem SMTP"),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        sefaz_routes.update_config(
+            _config_payload(
+                encaminhamento_email_ativo=True,
+                encaminhamento_email_destino="contabil@example.com",
+            ),
+            auth=(SimpleNamespace(id=1), TENANT_ID),
+            db=_DBTenant(),
+            _permission=None,
+        )
+    assert exc.value.status_code == 422
+
+
+def test_config_grava_inicio_do_dia_em_sao_paulo(monkeypatch):
+    salvos = []
+    monkeypatch.setattr(
+        sefaz_routes.SefazTenantConfigService,
+        "merged_config",
+        lambda tenant_id, tenant: {
+            "cnpj": "12345678000199", "ambiente": "producao"
+        },
+    )
+    monkeypatch.setattr(
+        sefaz_routes.SefazTenantConfigService,
+        "save_config",
+        lambda tenant_id, config: salvos.append(dict(config)),
+    )
+    monkeypatch.setattr(
+        sefaz_routes.SefazService,
+        "status_configuracao",
+        lambda config: SimpleNamespace(
+            cert_ok=False, mensagem="Pendente", cert_existe=False, cnpj_configurado=True
+        ),
+    )
+
+    sefaz_routes.update_config(
+        _config_payload(encaminhamento_inicio_em=date(2026, 10, 14)),
+        auth=(SimpleNamespace(id=1), TENANT_ID),
+        db=_DBTenant(),
+        _permission=None,
+    )
+
+    assert salvos[0]["encaminhamento_inicio_em"] == "2026-10-14T03:00:00+00:00"
 
 
 @pytest.mark.parametrize(

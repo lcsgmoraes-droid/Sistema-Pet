@@ -4,19 +4,22 @@ Rotas SEFAZ — Consulta de NF-e por chave de acesso.
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
+from email_validator import EmailNotValidError, validate_email
 from typing import Optional, List
 from pathlib import Path
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 import logging
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session as get_db
 from app.models import Tenant
-from app.produtos_compras_models import SefazDocumentoDistribuido
+from app.produtos_compras_models import SefazDocumentoDistribuido, SefazXmlEncaminhamento
 from app.security.permissions_decorator import require_permission_dependency
 from app.services.sefaz_service import SefazConsumoIndevidoError, SefazService
 from app.services.sefaz_tenant_config_service import SefazTenantConfigService
+from app.services.email_service import is_email_configured
 from app.services.sefaz_sync_coordinator import (
     SefazLockBusy,
     bloqueio_656_ate,
@@ -69,6 +72,9 @@ class SefazConfigUpdateRequest(BaseModel):
     cert_password: Optional[str] = None
     importacao_automatica: bool = False
     importacao_intervalo_min: int = 60
+    encaminhamento_email_ativo: Optional[bool] = None
+    encaminhamento_email_destino: Optional[str] = None
+    encaminhamento_inicio_em: Optional[date] = None
 
 
 @router.post("/consultar", response_model=ConsultaNFeResponse)
@@ -166,6 +172,10 @@ def get_config(
         "uf": cfg.get("uf", "SP"),
         "cnpj": cfg.get("cnpj", ""),
         "importacao_automatica": cfg.get("importacao_automatica", False),
+        "encaminhamento_email_ativo": bool(cfg.get("encaminhamento_email_ativo")),
+        "encaminhamento_email_destino": cfg.get("encaminhamento_email_destino", ""),
+        "encaminhamento_inicio_em": cfg.get("encaminhamento_inicio_em"),
+        "encaminhamento_email_configurado": is_email_configured(),
         "importacao_automatica_status": (
             "desativada"
             if not cfg.get("importacao_automatica")
@@ -217,6 +227,32 @@ def status_config_compat(
     return get_config(auth=auth, db=db)
 
 
+@router.get("/encaminhamento-status")
+def get_encaminhamento_status(
+    auth=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_db),
+):
+    """Mostra a entrega dos XMLs deste CNPJ sem expor o conteúdo fiscal."""
+    _, tenant_id = auth
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+    cfg = SefazTenantConfigService.merged_config(tenant_id, tenant)
+    destino = str(cfg.get("encaminhamento_email_destino") or "").strip()
+    consulta = db.query(SefazXmlEncaminhamento).filter(
+        SefazXmlEncaminhamento.tenant_id == str(tenant_id),
+        SefazXmlEncaminhamento.email_destino == destino,
+    )
+    return {
+        "ativo": bool(cfg.get("encaminhamento_email_ativo")),
+        "destino": destino,
+        "smtp_configurado": is_email_configured(),
+        "pendentes": consulta.filter(SefazXmlEncaminhamento.status == "pendente").count(),
+        "falhas": consulta.filter(
+            SefazXmlEncaminhamento.status.in_(("erro", "invalido"))
+        ).count(),
+        "enviados": consulta.filter(SefazXmlEncaminhamento.status == "enviado").count(),
+    }
+
+
 @router.post("/config")
 def update_config(
     payload: SefazConfigUpdateRequest,
@@ -229,7 +265,7 @@ def update_config(
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
 
     try:
-        with sefaz_coordinator.config_guard():
+        with sefaz_coordinator.email_and_config_guard():
             atual = SefazTenantConfigService.merged_config(tenant_id, tenant)
             novo_cnpj = SefazTenantConfigService.sanitize_cnpj(payload.cnpj)
             novo_ambiente = payload.ambiente.strip().lower()
@@ -257,12 +293,71 @@ def update_config(
                 "importacao_automatica": payload.importacao_automatica,
                 "importacao_intervalo_min": payload.importacao_intervalo_min,
             }
+            destino = str(atual.get("encaminhamento_email_destino") or "").strip()
+            if payload.encaminhamento_email_destino is not None:
+                destino = payload.encaminhamento_email_destino.strip()
+                if destino:
+                    try:
+                        destino = validate_email(
+                            destino, check_deliverability=False
+                        ).normalized
+                    except EmailNotValidError as exc:
+                        raise HTTPException(
+                            status_code=422,
+                            detail="Informe um e-mail válido para receber os XMLs.",
+                        ) from exc
+            encaminhamento_ativo = (
+                bool(atual.get("encaminhamento_email_ativo"))
+                if payload.encaminhamento_email_ativo is None
+                else payload.encaminhamento_email_ativo
+            )
+            inicio_envio = atual.get("encaminhamento_inicio_em")
+            if payload.encaminhamento_inicio_em is not None:
+                hoje_sp = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+                if payload.encaminhamento_inicio_em > hoje_sp:
+                    raise HTTPException(
+                        status_code=422,
+                        detail="A data inicial do encaminhamento não pode ser futura.",
+                    )
+                inicio_envio = datetime.combine(
+                    payload.encaminhamento_inicio_em,
+                    time.min,
+                    tzinfo=ZoneInfo("America/Sao_Paulo"),
+                ).astimezone(timezone.utc).isoformat()
+            if (
+                atual.get("encaminhamento_email_ativo")
+                and encaminhamento_ativo
+                and (
+                    destino != str(atual.get("encaminhamento_email_destino") or "")
+                    or inicio_envio != atual.get("encaminhamento_inicio_em")
+                )
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail="Desative o encaminhamento antes de trocar o destinatário ou a data inicial.",
+                )
+            if encaminhamento_ativo and not destino:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Informe o e-mail do escritório antes de ativar o envio.",
+                )
+            if encaminhamento_ativo and not is_email_configured():
+                raise HTTPException(
+                    status_code=422,
+                    detail="O servidor de e-mail precisa estar configurado antes de ativar o envio.",
+                )
+            novo["encaminhamento_email_ativo"] = encaminhamento_ativo
+            novo["encaminhamento_email_destino"] = destino
+            novo["encaminhamento_inicio_em"] = inicio_envio
+            if encaminhamento_ativo and not atual.get("encaminhamento_email_ativo"):
+                novo["encaminhamento_ativado_em"] = datetime.now(timezone.utc).isoformat()
             if payload.cert_password is not None:
                 novo["cert_password"] = payload.cert_password
             SefazTenantConfigService.save_config(tenant_id, novo)
     except SefazLockBusy as exc:
         raise HTTPException(
-            status_code=409, detail="Sincronizacao SEFAZ em andamento. Tente novamente."
+            status_code=409,
+            detail="Outra operação SEFAZ ou envio de XML em andamento. Tente novamente.",
         ) from exc
     status = SefazService.status_configuracao(novo)
     return {

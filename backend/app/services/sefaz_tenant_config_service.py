@@ -128,6 +128,10 @@ class SefazTenantConfigService:
             "cert_password": "",
             "importacao_automatica": False,
             "importacao_intervalo_min": 60,
+            "encaminhamento_email_ativo": False,
+            "encaminhamento_email_destino": "",
+            "encaminhamento_ativado_em": None,
+            "encaminhamento_inicio_em": None,
             "ultimo_nsu": "000000000000000",
         }
 

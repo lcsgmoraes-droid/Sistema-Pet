@@ -327,6 +327,22 @@ export default function EntradaXmlSefazPanels({
 
               <ProgressoSefaz cfgSefaz={cfgSefaz} />
 
+              <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+                Encaminhamento de XMLs ao escritório:{" "}
+                <strong>
+                  {cfgSefaz.encaminhamento_email_ativo
+                    ? `ativo para ${cfgSefaz.encaminhamento_email_destino}`
+                    : "desativado"}
+                </strong>
+                .{" "}
+                <Link
+                  to="/configuracoes/integracoes?integracao=sefaz"
+                  className="font-semibold text-indigo-600 underline"
+                >
+                  Configurar e-mail
+                </Link>
+              </div>
+
               <div className="mb-4 grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 sm:grid-cols-2">
                 <div>
                   Documentos trazidos: <strong>{cfgSefaz.ultimo_sync_documentos}</strong>
@@ -371,6 +387,8 @@ EntradaXmlSefazPanels.propTypes = {
   chaveSefaz: PropTypes.string.isRequired,
   cfgSefaz: PropTypes.shape({
     cert_ok: PropTypes.bool,
+    encaminhamento_email_ativo: PropTypes.bool,
+    encaminhamento_email_destino: PropTypes.string,
     enabled: PropTypes.bool,
     importacao_automatica: PropTypes.bool,
     mensagem: PropTypes.string,

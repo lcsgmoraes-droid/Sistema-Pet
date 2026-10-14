@@ -23,6 +23,7 @@ import logging
 import os
 import threading
 import tempfile
+import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -31,6 +32,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 _LOCK_FILE = Path(tempfile.gettempdir()) / "sefaz_sync.lock"
+_EMAIL_LOCK_FILE = Path(tempfile.gettempdir()) / "sefaz_xml_email.lock"
 
 # Ao atingir maxNSU ou receber cStat 137, aguarda mais que a hora mínima
 # exigida pelo serviço. Quando há backlog, busca só mais um lote no próximo
@@ -115,6 +117,7 @@ class SefazSyncCoordinator:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._operation_lock = threading.Lock()
+        self._email_operation_lock = threading.Lock()
         self._running: set[str] = set()
 
     def is_syncing(self, tenant_id_str: str) -> bool:
@@ -125,12 +128,36 @@ class SefazSyncCoordinator:
     @contextmanager
     def config_guard(self):
         """Serializa sync e escrita da configuração dentro e entre workers."""
-        if not self._operation_lock.acquire(blocking=False):
+        with self._operation_guard(self._operation_lock, _LOCK_FILE):
+            yield
+
+    @contextmanager
+    def email_guard(self, wait_seconds: float = 0):
+        """Serializa a fila SMTP sem segurar o lock da consulta SEFAZ."""
+        with self._operation_guard(
+            self._email_operation_lock, _EMAIL_LOCK_FILE, wait_seconds=wait_seconds
+        ):
+            yield
+
+    @contextmanager
+    def email_and_config_guard(self):
+        """Espera envios em curso antes de salvar um novo destino de XML."""
+        with self.email_guard(wait_seconds=15):
+            with self.config_guard():
+                yield
+
+    @staticmethod
+    @contextmanager
+    def _operation_guard(
+        operation_lock: threading.Lock, lock_file: Path, wait_seconds: float = 0
+    ):
+        deadline = time.monotonic() + wait_seconds
+        if not operation_lock.acquire(timeout=max(0, wait_seconds)):
             raise SefazLockBusy()
         lock_f = None
         unlock = None
         try:
-            lock_f = open(_LOCK_FILE, "a+b")
+            lock_f = open(lock_file, "a+b")
             if os.name == "nt":
                 import msvcrt
 
@@ -138,20 +165,29 @@ class SefazSyncCoordinator:
                     lock_f.write(b"0")
                     lock_f.flush()
                 lock_f.seek(0)
-                try:
-                    msvcrt.locking(lock_f.fileno(), msvcrt.LK_NBLCK, 1)
-                except OSError as exc:
-                    raise SefazLockBusy() from exc
+                while True:
+                    try:
+                        msvcrt.locking(lock_f.fileno(), msvcrt.LK_NBLCK, 1)
+                        break
+                    except OSError as exc:
+                        if time.monotonic() >= deadline:
+                            raise SefazLockBusy() from exc
+                        time.sleep(max(0, min(0.05, deadline - time.monotonic())))
+                        lock_f.seek(0)
 
                 def unlock():
                     msvcrt.locking(lock_f.fileno(), msvcrt.LK_UNLCK, 1)
             else:
                 import fcntl
 
-                try:
-                    fcntl.flock(lock_f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                except OSError as exc:
-                    raise SefazLockBusy() from exc
+                while True:
+                    try:
+                        fcntl.flock(lock_f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        break
+                    except OSError as exc:
+                        if time.monotonic() >= deadline:
+                            raise SefazLockBusy() from exc
+                        time.sleep(max(0, min(0.05, deadline - time.monotonic())))
 
                 def unlock():
                     fcntl.flock(lock_f, fcntl.LOCK_UN)
@@ -164,7 +200,7 @@ class SefazSyncCoordinator:
             finally:
                 if lock_f is not None:
                     lock_f.close()
-                self._operation_lock.release()
+                operation_lock.release()
 
     def try_reprocess_local(
         self, tenant_id_str: str, config_path: Path

@@ -191,6 +191,31 @@ class SefazDocumentoDistribuido(BaseTenantModel):
     processado_em = Column(DateTime(timezone=True), nullable=True)
 
 
+class SefazXmlEncaminhamento(BaseTenantModel):
+    """Registro duravel do envio do XML completo ao escritorio contabil."""
+
+    __tablename__ = "sefaz_xml_encaminhamentos"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "chave_acesso", name="uq_sefaz_xml_encaminhamentos_tenant_chave"
+        ),
+    )
+
+    documento_id = Column(
+        Integer, ForeignKey("sefaz_documentos_distribuidos.id"), nullable=False
+    )
+    chave_acesso = Column(String(44), nullable=False)
+    email_destino = Column(String(320), nullable=False)
+    ativado_em = Column(DateTime(timezone=True), nullable=False)
+    status = Column(String(20), nullable=False, default="pendente", index=True)
+    tentativas = Column(Integer, nullable=False, default=0)
+    proxima_tentativa_em = Column(DateTime(timezone=True), nullable=True)
+    enviado_em = Column(DateTime(timezone=True), nullable=True)
+    ultimo_erro = Column(String(255), nullable=True)
+
+    documento = relationship("SefazDocumentoDistribuido")
+
+
 class NotaEntrada(BaseTenantModel):
     """Notas fiscais de entrada (NF-e de fornecedores)"""
 

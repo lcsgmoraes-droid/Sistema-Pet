@@ -1,4 +1,5 @@
 import json
+import threading
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -40,6 +41,29 @@ def _resultado(ultimo_nsu, max_nsu, docs, c_stat="138"):
         "c_stat": c_stat,
         "x_motivo": "ok",
     }
+
+
+def test_salvar_configuracao_espera_envio_em_andamento():
+    coordinator = SefazSyncCoordinator()
+    configuracao_salva = threading.Event()
+    falhas = []
+
+    def salvar():
+        try:
+            with coordinator.email_and_config_guard():
+                configuracao_salva.set()
+        except Exception as exc:
+            falhas.append(exc)
+
+    with coordinator.email_guard():
+        worker = threading.Thread(target=salvar)
+        worker.start()
+        assert not configuracao_salva.wait(0.1)
+
+    worker.join(timeout=2)
+    assert not worker.is_alive()
+    assert not falhas
+    assert configuracao_salva.is_set()
 
 
 def test_erro_656_preserva_checkpoint(tmp_path, monkeypatch):

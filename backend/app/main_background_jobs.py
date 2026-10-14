@@ -259,6 +259,32 @@ def _loop_renovacao_token_bling():
     logger.info(f"[BLING] Job de renovação automática finalizado (PID {worker_pid})")
 
 
+def _processar_encaminhamento_sefaz(tenant_id_str: str, config_path) -> None:
+    """Envia XMLs locais sem depender de uma nova consulta ou do NSU."""
+    import json
+
+    from app.db import SessionLocal
+    from app.services.sefaz_sync_coordinator import SefazLockBusy, sefaz_coordinator
+    from app.services.sefaz_xml_forwarding import processar_encaminhamentos_sefaz
+
+    try:
+        with sefaz_coordinator.email_guard():
+            cfg = json.loads(config_path.read_text(encoding="utf-8"))
+            if not cfg.get("encaminhamento_email_ativo"):
+                return
+            db = SessionLocal()
+            try:
+                processar_encaminhamentos_sefaz(
+                    db, tenant_id_str, cfg, config_path=config_path
+                )
+            finally:
+                db.close()
+    except SefazLockBusy:
+        logger.debug("[SEFAZ] Encaminhamento aguardando outro processo para tenant %s", tenant_id_str)
+    except Exception as exc:
+        logger.warning("[SEFAZ] Falha no encaminhamento do tenant %s: %s", tenant_id_str, type(exc).__name__)
+
+
 def _loop_sefaz_sync():
     """
     Job em background para sincronizar NF-e automaticamente via SEFAZ.
@@ -296,6 +322,11 @@ def _loop_sefaz_sync():
                     try:
                         cfg = _json.loads(config_path.read_text(encoding="utf-8"))
 
+                        tenant_id_str = tenant_dir.name
+                        # A fila de e-mail continua funcionando durante cooldown
+                        # da SEFAZ ou quando a importação automática está pausada.
+                        _processar_encaminhamento_sefaz(tenant_id_str, config_path)
+
                         # Verificações básicas de habilitação
                         if not cfg.get("importacao_automatica"):
                             continue
@@ -304,13 +335,13 @@ def _loop_sefaz_sync():
                         if cfg.get("modo") != "real":
                             continue
 
-                        tenant_id_str = tenant_dir.name
                         agora = _dt.now(_tz.utc)
                         proximo = proximo_sync_permitido(cfg)
                         if proximo is not None and proximo > agora:
                             sefaz_coordinator.try_reprocess_local(
                                 tenant_id_str, config_path
                             )
+                            _processar_encaminhamento_sefaz(tenant_id_str, config_path)
                             continue
                         if (
                             not cfg.get("cert_path")
@@ -319,6 +350,7 @@ def _loop_sefaz_sync():
                             sefaz_coordinator.try_reprocess_local(
                                 tenant_id_str, config_path
                             )
+                            _processar_encaminhamento_sefaz(tenant_id_str, config_path)
                             continue
                         result = sefaz_coordinator.try_sync(
                             tenant_id_str=tenant_id_str,
@@ -326,6 +358,7 @@ def _loop_sefaz_sync():
                             cfg=cfg,
                             reason="scheduler",
                         )
+                        _processar_encaminhamento_sefaz(tenant_id_str, config_path)
                         r_status = result.get("status")
                         if r_status == "lock_busy":
                             logger.debug(
