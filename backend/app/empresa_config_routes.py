@@ -176,8 +176,7 @@ def _serializar_config(
             config.mensagem_venda_saudavel or "✅ Venda Saudável! Margem excelente."
         ),
         mensagem_venda_alerta=(
-            config.mensagem_venda_alerta
-            or "⚠️ ATENÇÃO: Margem reduzida! Revisar preço."
+            config.mensagem_venda_alerta or "⚠️ ATENÇÃO: Margem reduzida! Revisar preço."
         ),
         mensagem_venda_critica=(
             config.mensagem_venda_critica
