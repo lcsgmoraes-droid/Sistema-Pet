@@ -129,6 +129,8 @@ def _emitter_credentials(connection, environment=None):
 
 def _payment_code(value):
     name = re.sub(r"[^a-z0-9]+", "_", _ascii(value)).strip("_")
+    if "cashback" in name:
+        return "19"
     if "pix" in name:
         return "17"
     if "boleto" in name:

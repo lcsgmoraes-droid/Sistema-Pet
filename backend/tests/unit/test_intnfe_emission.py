@@ -131,6 +131,33 @@ def test_payload_preserves_totals_and_hides_real_recipient_in_homologation():
     assert payload["pagamentos"] == [{"formaPagamento": "17", "valor": 23.0}]
 
 
+@pytest.mark.parametrize("document_type", ["nfe", "nfce"])
+@pytest.mark.parametrize("cashback_name", ["Cashback", "cashback", " CASHBACK "])
+def test_debit_and_cashback_use_specific_payment_codes(document_type, cashback_name):
+    tenant, connection, sale = _objects()
+    sale.itens[0].quantidade = 1
+    sale.itens[0].preco_unitario = "28.90"
+    sale.itens[0].desconto_item = "0.00"
+    sale.itens[0].subtotal = "28.90"
+    sale.desconto_valor = "0.00"
+    sale.taxa_entrega = "0.00"
+    sale.tem_entrega = False
+    sale.total = "28.90"
+    sale.pagamentos = [
+        SimpleNamespace(forma_pagamento="Cartão de débito", valor="27.00"),
+        SimpleNamespace(forma_pagamento=cashback_name, valor="1.90"),
+    ]
+
+    payload = emission.build_payload(None, tenant, connection, sale, document_type)
+
+    assert payload["pagamentos"] == [
+        {"formaPagamento": "04", "valor": 27.0, "tipoIntegracao": "2"},
+        {"formaPagamento": "19", "valor": 1.9},
+    ]
+    assert payload["produtos"][0]["valorTotal"] == 28.9
+    assert payload["produtos"][0].get("desconto", 0) == 0
+
+
 def test_crediario_uses_credito_loja_instead_of_outros():
     tenant, connection, sale = _objects()
     sale.pagamentos[0].forma_pagamento = "Crediário"
