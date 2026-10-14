@@ -739,6 +739,105 @@ def test_debit_and_cashback_use_specific_payment_codes(document_type, cashback_n
     assert payload["produtos"][0].get("desconto", 0) == 0
 
 
+@pytest.mark.parametrize("document_type", ["nfe", "nfce"])
+@pytest.mark.parametrize(
+    "credit_name", ["Crédito Cliente", "credito_cliente", " CRÉDITO CLIENTE "]
+)
+def test_customer_credit_uses_store_credit_without_installments(
+    document_type, credit_name
+):
+    tenant, connection, sale = _objects()
+    sale.taxa_entrega = "0.00"
+    sale.tem_entrega = False
+    sale.total = "18.00"
+    sale.pagamentos = [
+        SimpleNamespace(
+            forma_pagamento=credit_name,
+            valor="18.00",
+            data_recebimento_prevista=date(2026, 10, 14),
+            numero_parcelas=1,
+        )
+    ]
+    sale.contas_receber = [
+        SimpleNamespace(
+            id=1,
+            descricao="Venda VEN-TESTE",
+            status="recebido",
+            data_vencimento=date(2026, 10, 14),
+            valor_original="18.00",
+            forma_pagamento=SimpleNamespace(tipo="credito_cliente"),
+        )
+    ]
+
+    payload = emission.build_payload(None, tenant, connection, sale, document_type)
+
+    assert payload["pagamentos"] == [{"formaPagamento": "05", "valor": 18.0}]
+    assert "Crediario:" not in payload["informacoesAdicionais"]
+
+
+@pytest.mark.parametrize("document_type", ["nfe", "nfce"])
+def test_coupon_cashback_customer_credit_and_debit_preserve_fiscal_totals(
+    document_type,
+):
+    tenant, connection, sale = _objects()
+    first_item = sale.itens[0]
+    first_item.quantidade = 1
+    first_item.preco_unitario = "70.00"
+    first_item.desconto_item = "5.00"
+    first_item.subtotal = "65.00"
+    second_item = SimpleNamespace(
+        tipo="produto",
+        produto=first_item.produto,
+        quantidade=1,
+        preco_unitario="30.00",
+        desconto_item="0.00",
+        subtotal="30.00",
+    )
+    sale.itens = [first_item, second_item]
+    sale.desconto_venda_valor = "0.00"
+    sale.cupom_code = "CAMPANHA7"
+    sale.cupom_discount_applied = "7.00"
+    sale.desconto_valor = "12.00"
+    sale.taxa_entrega = "0.00"
+    sale.tem_entrega = False
+    sale.total = "88.00"
+    sale.pagamentos = [
+        SimpleNamespace(forma_pagamento="Crédito Cliente", valor="20.00"),
+        SimpleNamespace(forma_pagamento="Cashback", valor="8.00"),
+        SimpleNamespace(forma_pagamento="Cartão de débito", valor="60.00"),
+    ]
+
+    payload = emission.build_payload(None, tenant, connection, sale, document_type)
+
+    assert payload["pagamentos"] == [
+        {"formaPagamento": "05", "valor": 20.0},
+        {"formaPagamento": "19", "valor": 8.0},
+        {"formaPagamento": "04", "valor": 60.0, "tipoIntegracao": "2"},
+    ]
+    assert [item["valorTotal"] for item in payload["produtos"]] == [70.0, 30.0]
+    assert [item["desconto"] for item in payload["produtos"]] == [9.79, 2.21]
+    assert first_item.desconto_item == "5.00"
+    assert second_item.desconto_item == "0.00"
+    assert "Crediario:" not in payload["informacoesAdicionais"]
+
+
+@pytest.mark.parametrize("document_type", ["nfe", "nfce"])
+def test_credit_card_keeps_card_payment_code(document_type):
+    tenant, connection, sale = _objects()
+    sale.taxa_entrega = "0.00"
+    sale.tem_entrega = False
+    sale.total = "18.00"
+    sale.pagamentos = [
+        SimpleNamespace(forma_pagamento="Cartão de crédito", valor="18.00")
+    ]
+
+    payload = emission.build_payload(None, tenant, connection, sale, document_type)
+
+    assert payload["pagamentos"] == [
+        {"formaPagamento": "03", "valor": 18.0, "tipoIntegracao": "2"}
+    ]
+
+
 def test_payment_total_must_match_sale_total():
     tenant, connection, sale = _objects()
     sale.pagamentos[0].valor = "22.99"
