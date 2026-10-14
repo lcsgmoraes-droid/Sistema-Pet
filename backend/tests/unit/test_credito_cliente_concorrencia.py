@@ -5,6 +5,8 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 from uuid import uuid4
 
+import pytest
+from fastapi import HTTPException
 from app.clientes import credito_routes
 from app.clientes.schemas import AjustarCreditoRequest
 from app.models import Cliente
@@ -78,3 +80,24 @@ def test_pagamento_com_credito_bloqueia_cliente_do_mesmo_tenant():
     consulta.filter_by.assert_called_once_with(id=cliente.id, tenant_id=tenant_id)
     consulta.populate_existing.assert_called_once()
     consulta.with_for_update.assert_called_once()
+
+
+def test_credito_nao_pode_debitar_centavo_acima_da_carteira():
+    tenant_id = uuid4()
+    cliente = SimpleNamespace(id=47, credito=Decimal("19.99"))
+    consulta = _consulta_cliente(cliente)
+    db = MagicMock()
+    db.query.side_effect = lambda modelo: consulta if modelo is Cliente else None
+    venda = SimpleNamespace(id=8, numero_venda="VEN-TESTE", cliente_id=cliente.id)
+    with pytest.raises(HTTPException, match="Crédito insuficiente"):
+        processar_pagamentos_finalizacao(
+            venda=venda,
+            pagamentos=[{"forma_pagamento": "credito_cliente", "valor": 20}],
+            user_id=22,
+            user_nome="Atendente",
+            tenant_id=tenant_id,
+            db=db,
+            caixa_aberto_id=1,
+        )
+    assert cliente.credito == Decimal("19.99")
+    assert not db.commit.called

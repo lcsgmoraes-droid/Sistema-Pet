@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { colocarItemProdutoNoTopo, recalcularSubtotalItem } from "./pdvCarrinhoItensUtils.js";
+import {
+  calcularQuantidadePorSubtotal,
+  colocarItemProdutoNoTopo,
+  normalizarQuantidadePDV,
+  recalcularSubtotalItem,
+} from "./pdvCarrinhoItensUtils.js";
 
 test("coloca um novo produto no topo do carrinho", () => {
   const itens = [
@@ -78,4 +83,26 @@ test("aceita virgula como separador decimal na quantidade do item", () => {
 
   assert.equal(resultado.quantidade, 0.8);
   assert.equal(resultado.subtotal, 16);
+});
+
+test("valor digitado do granel usa o mesmo peso de tres casas que sera salvo", () => {
+  for (const caso of [
+    { digitado: 29, preco: 19.9, quantidade: 1.457, subtotal: 28.99 },
+    { digitado: 34.9, preco: 29.9, quantidade: 1.167, subtotal: 34.89 },
+  ]) {
+    const quantidade = calcularQuantidadePorSubtotal(caso.digitado, caso.preco);
+    const item = recalcularSubtotalItem({ preco_unitario: caso.preco }, quantidade);
+    assert.equal(quantidade, caso.quantidade);
+    assert.equal(item.quantidade, caso.quantidade);
+    assert.equal(item.subtotal, caso.subtotal);
+  }
+});
+
+test("quantidade digitada diretamente respeita gramas antes de calcular subtotal", () => {
+  const item = recalcularSubtotalItem({ preco_unitario: 29.9 }, "1,1672");
+  assert.equal(item.quantidade, 1.167);
+  assert.equal(item.subtotal, 34.89);
+  assert.equal(normalizarQuantidadePDV(0.0004), 0.001);
+  assert.equal(calcularQuantidadePorSubtotal(0, 29.9), null);
+  assert.equal(calcularQuantidadePorSubtotal(29, 0), null);
 });

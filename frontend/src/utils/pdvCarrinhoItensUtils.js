@@ -13,7 +13,16 @@ export function normalizarQuantidadePDV(valor, fallback = 1) {
   const numero = Number(valorNormalizado);
 
   if (!Number.isFinite(numero)) return fallback;
-  return Math.max(QUANTIDADE_MINIMA_PDV, numero);
+  // A venda e o estoque armazenam tres casas decimais. Calcula o subtotal
+  // com o mesmo peso que sera salvo, inclusive quando informado pelo valor.
+  return Math.max(QUANTIDADE_MINIMA_PDV, Math.round((numero + Number.EPSILON) * 1000) / 1000);
+}
+
+export function calcularQuantidadePorSubtotal(subtotal, precoUnitario) {
+  const valor = Number(subtotal);
+  const preco = Number(precoUnitario);
+  if (!Number.isFinite(valor) || !Number.isFinite(preco) || valor <= 0 || preco <= 0) return null;
+  return normalizarQuantidadePDV(valor / preco);
 }
 
 export function obterPrecoVendaPDV(produto) {

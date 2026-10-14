@@ -46,6 +46,7 @@ import {
   obterTotalRecebidoExistente,
   podeEnviarPagamentoStonePos,
   persistirVendaAbertaParaPagamento,
+  revisarPagamentosParaTotalPersistido,
   resolverFaixasParcelamentoDaForma,
   validarPagamentoParaAdicionar,
 } from "./modalPagamentoUtils.js";
@@ -619,6 +620,151 @@ test("calcula resumo do recebimento considerando pagamentos novos e existentes",
   });
 });
 
+test("centavo pendente permanece devido e pagamentos mistos nao produzem centavos de float", () => {
+  const pendente = calcularResumoRecebimento({ valorTotal: 34.89, totalPagoExistente: 34.88 });
+  assert.equal(pendente.valorRestante, 0.01);
+  assert.equal(pendente.vendaQuitadaComPagamentosExistentes, false);
+  assert.equal(pendente.podeConfirmarFinalizacao, false);
+
+  const misto = calcularResumoRecebimento({
+    valorTotal: 34.89,
+    pagamentos: [{ valor: 10.1 }, { valor: 4.89 }, { valor: 19.9 }],
+    valorRecebido: 0,
+  });
+  assert.equal(misto.valorPago, 34.89);
+  assert.equal(misto.valorRestante, 0);
+  assert.equal(misto.troco, 0);
+});
+
+test("cashback e credito aplicam apenas o devido e preservam o centavo na carteira", () => {
+  for (const tipo of ["cashback", "credito_cliente"]) {
+    const pagamento = montarPagamentoRecebido({
+      formaPagamento: {
+        id: tipo,
+        nome: tipo === "cashback" ? "Cashback" : "Crédito Cliente",
+        tipo,
+      },
+      valor: 34.9,
+      valorRestante: 34.89,
+    });
+    assert.equal(pagamento.valor, 34.89);
+    assert.equal(pagamento.valor_recebido, 34.89);
+    assert.equal(pagamento.troco, null);
+    assert.equal(
+      calcularSaldoBeneficioDisponivel({ saldo: 34.9, pagamentos: [pagamento], tipo }),
+      0.01,
+    );
+  }
+});
+
+test("dinheiro distingue recebido do aplicado e calcula troco mesmo sem valor de troco informado", () => {
+  const pagamento = montarPagamentoRecebido({
+    formaPagamento: { id: 1, nome: "Dinheiro", tipo: "dinheiro" },
+    valor: 29,
+    valorRestante: 28.99,
+  });
+  assert.equal(pagamento.valor, 28.99);
+  assert.equal(pagamento.valor_recebido, 29);
+  assert.equal(pagamento.troco, 0.01);
+  const parcial = montarPagamentoRecebido({
+    formaPagamento: { id: 1, nome: "Dinheiro", tipo: "dinheiro" },
+    valor: 10.1,
+    valorRestante: 28.99,
+  });
+  assert.equal(parcial.valor, 10.1);
+  assert.equal(parcial.troco, null);
+});
+
+test("pix excedente nunca compoe valor aplicado e conserva valor recebido para revisao", () => {
+  const pagamento = montarPagamentoRecebido({
+    formaPagamento: { id: 2, nome: "Pix", tipo: "pix" },
+    valor: 29,
+    valorRestante: 28.99,
+  });
+  assert.equal(pagamento.valor, 28.99);
+  assert.equal(pagamento.valor_recebido, 29);
+  assert.equal(pagamento.troco, null);
+});
+
+test("nao adiciona recebimento externo acima do restante, inclusive um centavo", () => {
+  for (const tipo of [
+    "pix",
+    "cartao_credito",
+    "cartao_debito",
+    "link_pagamento",
+    "crediario",
+    "boleto",
+  ]) {
+    assert.equal(
+      validarPagamentoParaAdicionar({
+        formaPagamento: { id: 2, nome: tipo, tipo },
+        valor: 29,
+        valorRestante: 28.99,
+        cliente: { id: 3 },
+        bandeira: "Visa",
+        operadora: { id: 4, max_parcelas: 12 },
+      }),
+      "Valor excede o restante da venda (R$ 28,99). Ajuste o valor recebido antes de adicionar.",
+    );
+  }
+  assert.equal(
+    validarPagamentoParaAdicionar({
+      formaPagamento: { id: 1, nome: "Dinheiro", tipo: "dinheiro" },
+      valor: 29,
+      valorRestante: 28.99,
+    }),
+    "",
+  );
+  assert.equal(
+    validarPagamentoParaAdicionar({
+      formaPagamento: { id: 2, nome: "Pix", tipo: "pix" },
+      valor: 28.99,
+      valorRestante: 28.99,
+    }),
+    "",
+  );
+});
+
+test("revisao de total salvo reduz beneficio antes do pagamento misto recebido", () => {
+  const pagamentos = [
+    { valor: 24.9, valor_recebido: 24.9, is_credito_cliente: true },
+    { valor: 10, valor_recebido: 10, forma_pagamento_tipo: "pix" },
+  ];
+  const revisados = revisarPagamentosParaTotalPersistido({ pagamentos, valorTotal: 34.89 });
+  assert.equal(revisados[0].valor, 24.89);
+  assert.equal(revisados[0].valor_recebido, 24.89);
+  assert.equal(revisados[1].valor, 10);
+  assert.equal(pagamentos[0].valor, 24.9, "nao modifica pagamentos anteriores por referencia");
+  assert.equal(
+    calcularResumoRecebimento({ valorTotal: 34.89, pagamentos: revisados }).valorRestante,
+    0,
+  );
+});
+
+test("revisao considera recebimento existente e nao inventa estorno ou troco em Pix", () => {
+  const cashback = revisarPagamentosParaTotalPersistido({
+    pagamentos: [{ valor: 4.9, valor_recebido: 4.9, is_cashback: true }],
+    valorTotal: 34.89,
+    totalPagoExistente: 30,
+  });
+  assert.equal(cashback[0].valor, 4.89);
+  assert.equal(cashback[0].valor_recebido, 4.89);
+  const pix = { valor: 29, valor_recebido: 29, forma_pagamento_tipo: "pix" };
+  assert.deepEqual(revisarPagamentosParaTotalPersistido({ pagamentos: [pix], valorTotal: 28.99 }), [
+    pix,
+  ]);
+});
+
+test("revisao de dinheiro recalcula troco sem alterar o valor entregue", () => {
+  const [revisado] = revisarPagamentosParaTotalPersistido({
+    pagamentos: [{ valor: 29, valor_recebido: 30, troco: 1, forma_pagamento_tipo: "dinheiro" }],
+    valorTotal: 28.99,
+  });
+  assert.equal(revisado.valor, 28.99);
+  assert.equal(revisado.valor_recebido, 30);
+  assert.equal(revisado.troco, 1.01);
+});
+
 test("reabertura preserva recebido real depois de reduzir e aumentar o total", () => {
   const resposta = {
     total_venda: 20,
@@ -1000,6 +1146,22 @@ test("reutiliza venda criada quando a primeira finalizacao falha", async () => {
   assert.equal(primeiraVendaId, 1068294);
   assert.equal(segundaVendaId, 1068294);
   assert.deepEqual(chamadas, { criar: 1, atualizar: 1 });
+});
+
+test("persistencia entrega total do servidor para revisar pagamentos antes da finalizacao", async () => {
+  const retornos = [];
+  const criada = { id: 1068294, total: 34.89 };
+  const atualizada = { ...criada, total: 28.99 };
+  const argumentos = {
+    vendaParaPersistir: { total: 34.9 },
+    payloadVenda: {},
+    criarVenda: async () => criada,
+    atualizarVenda: async () => atualizada,
+    onVendaPersistida: (vendaSalva) => retornos.push(vendaSalva),
+  };
+  const vendaId = await persistirVendaAbertaParaPagamento(argumentos);
+  await persistirVendaAbertaParaPagamento({ ...argumentos, vendaIdPersistida: vendaId });
+  assert.deepEqual(retornos, [criada, atualizada]);
 });
 
 test("monta pagamento a vista com a forma cadastrada no tenant", () => {

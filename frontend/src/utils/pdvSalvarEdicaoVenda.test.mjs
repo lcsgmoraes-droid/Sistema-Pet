@@ -80,6 +80,16 @@ test("saldo pendente fica aberto sem PATCH status ou fechamento automatico", asy
   assert.equal(resultado.venda.total - resultado.recebido, 20);
 });
 
+test("salvar venda com um centavo pendente mantem aberto para receber diferenca", async () => {
+  const { chamadas, argumentos } = dependencias({ total: 34.89, recebido: 34.88 });
+  const resultado = await salvarEdicaoVenda(argumentos);
+  assert.equal(resultado.finalizada, false);
+  assert.deepEqual(
+    chamadas.map((chamada) => chamada.metodo),
+    ["PUT", "GET"],
+  );
+});
+
 test("decisao de fechar usa total persistido e efetivo recebido, nao plano de pagamento", async () => {
   const { chamadas, argumentos } = dependencias({ total: 225, recebido: 0 });
   const resultado = await salvarEdicaoVenda(argumentos);

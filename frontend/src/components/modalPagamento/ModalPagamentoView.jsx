@@ -1,7 +1,6 @@
 import { X, CreditCard, CheckCircle, AlertCircle } from "lucide-react";
 
 import StatusMargemIndicador from "../StatusMargemIndicador";
-import ModalAdicionarCredito from "../ModalAdicionarCredito";
 import ModalPagamentoResumoLateral from "../ModalPagamentoResumoLateral";
 import ModalPagamentoFormaPanel from "./ModalPagamentoFormaPanel";
 
@@ -29,8 +28,6 @@ export default function ModalPagamentoView({
   operadoraSelecionada,
   setOperadoraSelecionada,
   troco,
-  opcaoExcedente,
-  setOpcaoExcedente,
   opcoesParcelamentoRef,
   estiloVisualParcelamento,
   valorTotal,
@@ -70,9 +67,6 @@ export default function ModalPagamentoView({
   mostrarBotaoAdicionarRodape,
   handleFinalizar,
   podeConfirmarFinalizacao,
-  mostrarModalCreditoExcedente,
-  setMostrarModalCreditoExcedente,
-  valorExcedente,
   bandeirasDisponiveis,
   parcelasDisponiveis,
   taxaCartaoSelecionada,
@@ -121,8 +115,6 @@ export default function ModalPagamentoView({
                 formasPagamento={formasPagamento}
                 valorRecebido={valorRecebido}
                 troco={troco}
-                opcaoExcedente={opcaoExcedente}
-                setOpcaoExcedente={setOpcaoExcedente}
                 operadoras={operadoras}
                 operadoraSelecionada={operadoraSelecionada}
                 setOperadoraSelecionada={setOperadoraSelecionada}
@@ -420,17 +412,6 @@ export default function ModalPagamentoView({
           </div>
         </div>
       </div>
-
-      {/* Modal de Crédito para excedente */}
-      {mostrarModalCreditoExcedente && venda.cliente && (
-        <ModalAdicionarCredito
-          cliente={venda.cliente}
-          valorInicial={valorExcedente}
-          motivoPadrao="Crédito de excedente no pagamento"
-          onConfirmar={() => setMostrarModalCreditoExcedente(false)}
-          onClose={() => setMostrarModalCreditoExcedente(false)}
-        />
-      )}
     </>
   );
 }

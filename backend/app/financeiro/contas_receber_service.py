@@ -564,8 +564,10 @@ class ContasReceberService:
         """
         from app.financeiro_models import ContaReceber, Recebimento, FormaPagamento
         from app.financeiro.recebiveis_operadora import TIPOS_RECEBIVEL_OPERADORA
+        from app.services.venda_descontos import moeda
         from sqlalchemy import and_, or_
 
+        valor_total_pagamento = moeda(valor_total_pagamento)
         logger.debug(
             f"💰 Baixando contas da venda #{venda_numero} - "
             f"Valor: R$ {valor_total_pagamento:.2f}"
@@ -602,7 +604,7 @@ class ContasReceberService:
                 "contas_baixadas": [],
                 "recebimentos_criados": [],
                 "valor_distribuido": Decimal("0"),
-                "valor_restante": Decimal(str(valor_total_pagamento)),
+                "valor_restante": valor_total_pagamento,
             }
 
         # Buscar forma de pagamento
@@ -623,27 +625,27 @@ class ContasReceberService:
         recebimentos_criados = []
 
         for conta in contas_originais:
-            if valor_disponivel <= 0.01:
+            if valor_disponivel <= 0:
                 break
 
             # Calcular quanto ainda falta nesta conta
-            valor_pendente_conta = float(conta.valor_final) - float(
-                conta.valor_recebido or 0
+            valor_pendente_conta = max(
+                moeda(conta.valor_final) - moeda(conta.valor_recebido), Decimal("0")
             )
 
             # Calcular quanto pode baixar desta conta
             valor_a_baixar = min(valor_pendente_conta, valor_disponivel)
 
-            if valor_a_baixar > 0.01:
+            if valor_a_baixar > 0:
                 # Atualizar valor recebido
-                novo_valor_recebido = float(conta.valor_recebido or 0) + valor_a_baixar
-                conta.valor_recebido = Decimal(str(novo_valor_recebido))
+                novo_valor_recebido = moeda(conta.valor_recebido) + valor_a_baixar
+                conta.valor_recebido = novo_valor_recebido
 
                 # Criar registro de recebimento
                 # 🔒 ISOLAMENTO MULTI-TENANT: tenant_id obrigatório
                 recebimento = Recebimento(
                     conta_receber_id=conta.id,
-                    valor_recebido=Decimal(str(valor_a_baixar)),
+                    valor_recebido=valor_a_baixar,
                     data_recebimento=data_recebimento or date.today(),
                     forma_pagamento_id=forma_pag_id,
                     observacoes=marcar_pagamento(
@@ -657,7 +659,7 @@ class ContasReceberService:
                 recebimentos_criados.append(recebimento.id)
 
                 # Atualizar status
-                if abs(novo_valor_recebido - float(conta.valor_final)) < 0.01:
+                if novo_valor_recebido >= moeda(conta.valor_final):
                     # Conta totalmente paga
                     conta.status = "recebido"
                     conta.data_recebimento = data_recebimento or date.today()
@@ -679,7 +681,7 @@ class ContasReceberService:
                     {
                         "conta_id": conta.id,
                         "descricao": conta.descricao,
-                        "valor_baixado": Decimal(str(valor_a_baixar)),
+                        "valor_baixado": valor_a_baixar,
                         "valor_total": conta.valor_final,
                         "valor_recebido": conta.valor_recebido,
                         "status": conta.status,
@@ -699,8 +701,8 @@ class ContasReceberService:
         return {
             "contas_baixadas": contas_baixadas,
             "recebimentos_criados": recebimentos_criados,
-            "valor_distribuido": Decimal(str(valor_distribuido)),
-            "valor_restante": Decimal(str(valor_disponivel)),
+            "valor_distribuido": valor_distribuido,
+            "valor_restante": valor_disponivel,
         }
 
     @staticmethod
@@ -740,6 +742,10 @@ class ContasReceberService:
             }
         """
         from app.financeiro_models import LancamentoManual
+        from app.services.venda_descontos import moeda
+
+        total_venda = moeda(total_venda)
+        total_recebido = moeda(total_recebido)
 
         logger.debug(
             f"📝 Atualizando lançamentos da venda #{venda_numero} - "
@@ -783,21 +789,21 @@ class ContasReceberService:
             )
             espelhado = sum(
                 (
-                    Decimal(str(lancamento.valor))
+                    moeda(lancamento.valor)
                     for lancamento in realizados
                     if lancamento.documento == f"VENDA-{venda_id}"
                 ),
                 Decimal("0"),
             ) + max(
                 (
-                    Decimal(str(lancamento.valor))
+                    moeda(lancamento.valor)
                     for lancamento in realizados
                     if lancamento.documento == f"VENDA-{venda_id}-REALIZADO"
                 ),
                 default=Decimal("0"),
             )
-            saldo = max(Decimal(str(total_venda)) - espelhado, Decimal("0"))
-            if saldo > Decimal("0.01"):
+            saldo = max(total_venda - espelhado, Decimal("0"))
+            if saldo > 0:
                 modelo = next(iter(saldos_legados or realizados), None)
                 lancamento = LancamentoManual(
                     tipo="entrada",
@@ -835,7 +841,7 @@ class ContasReceberService:
         lancamentos_criados = []
 
         # Verificar se pagou tudo
-        if total_recebido >= total_venda - 0.01:
+        if total_recebido >= total_venda:
             # TOTALMENTE PAGO: Marcar lançamentos como realizados
             for lanc_prev in lancamentos_previstos:
                 lanc_prev.status = "realizado"
@@ -850,13 +856,13 @@ class ContasReceberService:
                 "status": "totalmente_pago",
             }
 
-        elif total_recebido > 0.01:
+        elif total_recebido > 0:
             # PARCIALMENTE PAGO: Criar lançamento realizado + ajustar previsto
             for lanc_prev in lancamentos_previstos:
                 # Criar lançamento realizado
                 lanc_realizado = LancamentoManual(
                     tipo="entrada",
-                    valor=Decimal(str(total_recebido)),
+                    valor=total_recebido,
                     descricao=f"Venda {venda_numero} - Recebido (parcial)",
                     data_lancamento=data_recebimento or date.today(),
                     status="realizado",
@@ -871,8 +877,8 @@ class ContasReceberService:
                 lancamentos_criados.append(lanc_realizado.id)
 
                 # Ajustar lançamento previsto para saldo restante
-                saldo_restante = max(total_venda - total_recebido, 0)
-                lanc_prev.valor = Decimal(str(saldo_restante))
+                saldo_restante = max(total_venda - total_recebido, Decimal("0"))
+                lanc_prev.valor = saldo_restante
                 if "Saldo restante" not in (lanc_prev.descricao or ""):
                     lanc_prev.descricao = f"{lanc_prev.descricao} - Saldo restante"
                 db.add(lanc_prev)
