@@ -62,7 +62,7 @@ export default function EntradaXmlDocumentosSefaz({ api, abrirDetalhes, formatMo
       }
     }
 
-    carregarDocumentos();
+    void carregarDocumentos();
     return () => {
       ativa = false;
     };

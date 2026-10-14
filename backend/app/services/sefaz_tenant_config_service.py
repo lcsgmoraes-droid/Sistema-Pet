@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import secrets
@@ -100,6 +101,13 @@ class SefazTenantConfigService:
             )
 
         cert_name = f"cert_{secrets.token_hex(8)}.pfx"
+        return await asyncio.to_thread(
+            cls._write_certificate, tenant_id, cert_name, content
+        )
+
+    @classmethod
+    def _write_certificate(cls, tenant_id: UUID, cert_name: str, content: bytes) -> str:
+        """Grava o arquivo fora da thread assíncrona da requisição."""
         cert_path = cls._tenant_dir(tenant_id) / cert_name
         fd = os.open(cert_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "wb") as arquivo:
