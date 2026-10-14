@@ -45,6 +45,32 @@ def test_pagamento_do_cliente_fica_pago_mesmo_com_repasse_pendente(forma_pagamen
     assert resumo["valor_restante"] == 0
 
 
+@pytest.mark.parametrize("legado", [False, True])
+@pytest.mark.parametrize(
+    "total, recebido, status, restante",
+    [
+        ("1.00", "0.99", "parcial", "0.01"),
+        ("1.00", "0.01", "parcial", "0.99"),
+        ("0.01", "0.00", "em_aberto", "0.01"),
+        ("0.01", "0.01", "pago", "0.00"),
+    ],
+)
+def test_status_preserva_centavo_a_receber_e_centavo_pago(
+    legado, total, recebido, status, restante
+):
+    resumo = calcular_resumo_pagamento_venda(
+        total=Decimal(total),
+        pagamentos=[]
+        if legado
+        else [_pagamento(valor=Decimal(recebido), forma_pagamento="PIX")],
+        contas_receber=[_conta(valor_recebido=Decimal(recebido))] if legado else [],
+    )
+
+    assert resumo["status_pagamento"] == status
+    assert resumo["valor_pago"] == Decimal(recebido)
+    assert resumo["valor_restante"] == Decimal(restante)
+
+
 def test_crediario_aberto_nao_conta_plano_como_pagamento():
     resumo = calcular_resumo_pagamento_venda(
         total=100,

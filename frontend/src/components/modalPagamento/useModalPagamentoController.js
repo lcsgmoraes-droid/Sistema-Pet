@@ -38,12 +38,22 @@ import {
 } from "../modalPagamentoUtils";
 
 export default function useModalPagamentoController({
-  venda,
+  venda: vendaOriginal,
   cupomAplicado,
   onClose,
   onConfirmar,
   onVendaAtualizada,
 }) {
+  const [vendaPersistida, setVendaPersistida] = useState(null);
+  const venda = useMemo(
+    () => ({
+      ...vendaOriginal,
+      ...vendaPersistida,
+      cliente: vendaOriginal.cliente,
+      entrega: vendaOriginal.entrega,
+    }),
+    [vendaOriginal, vendaPersistida],
+  );
   const { moduloAtivo } = useModulos();
   const moduloCampanhasAtivo = moduloAtivo("campanhas");
   const moduloFiscalAtivo = moduloAtivo("fiscal");
@@ -87,11 +97,6 @@ export default function useModalPagamentoController({
   const [simulacoesParcelamento, setSimulacoesParcelamento] = useState({});
   const [loadingSimulacao, setLoadingSimulacao] = useState(false);
   const [faixasParcelamento, setFaixasParcelamento] = useState(null);
-
-  // 🆕 Estados para excedente (troco vs crédito) em métodos não-dinheiro
-  const [opcaoExcedente, setOpcaoExcedente] = useState(null); // 'troco' | 'credito'
-  const [mostrarModalCreditoExcedente, setMostrarModalCreditoExcedente] = useState(false);
-  const [valorExcedente, setValorExcedente] = useState(0);
 
   // 💰 Cashback de campanhas
   const [saldoCashback, setSaldoCashback] = useState(0);
@@ -384,7 +389,7 @@ export default function useModalPagamentoController({
     corParcelamentoAtual,
     justificativaTexto,
   });
-  const mostrarBotaoAdicionarRodape = Boolean(formaPagamentoSelecionada) && valorRestante > 0.01;
+  const mostrarBotaoAdicionarRodape = Boolean(formaPagamentoSelecionada) && valorRestante > 0;
 
   const rolarElementoNoModal = useCallback((elemento, { focusElement } = {}) => {
     if (!elemento) return;
@@ -710,7 +715,6 @@ export default function useModalPagamentoController({
     operadoraSelecionada,
     operadoras,
     parcelasDisponiveis,
-    opcaoExcedente,
     pagamentos,
     podeConfirmarFinalizacao,
     revelarJustificativaObrigatoria,
@@ -721,21 +725,19 @@ export default function useModalPagamentoController({
     setErroJustificativa,
     setFormaPagamentoSelecionada,
     setLoading,
-    setMostrarModalCreditoExcedente,
     setMostrarPerguntaNFe,
     setAutoEmitirTipo,
     setNsuCartao,
     setNumeroParcelas,
     setOperadoraSelecionada,
-    setOpcaoExcedente,
     setPagamentos,
     setPagamentosExistentes,
     setTotalPagoExistente,
-    setValorExcedente,
     setValorRecebido,
     setVendaFinalizadaId,
     setVendaFinalizadaParaCupom,
-    troco,
+    setVendaPersistida,
+    totalPagoExistente,
     valorRecebido,
     valorRestante,
     venda,
@@ -786,8 +788,6 @@ export default function useModalPagamentoController({
       parcelasDisponiveis,
       taxaCartaoSelecionada,
       troco,
-      opcaoExcedente,
-      setOpcaoExcedente,
       opcoesParcelamentoRef,
       estiloVisualParcelamento,
       valorTotal,
@@ -828,9 +828,6 @@ export default function useModalPagamentoController({
       mostrarBotaoAdicionarRodape,
       handleFinalizar,
       podeConfirmarFinalizacao,
-      mostrarModalCreditoExcedente,
-      setMostrarModalCreditoExcedente,
-      valorExcedente,
     },
   };
 }
