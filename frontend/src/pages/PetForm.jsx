@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import { HeartPulse, PawPrint, Ruler } from "lucide-react";
+import toast from "react-hot-toast";
 import api from "../api";
 import PetFormView from "./petForm/PetFormView";
 import { buildReturnWithNovoPet } from "../utils/petReturnFlow";
@@ -38,6 +40,8 @@ const PetForm = () => {
   const [clientes, setClientes] = useState([]);
   const [especies, setEspecies] = useState([]);
   const [racas, setRacas] = useState([]);
+
+  const [abaAtiva, setAbaAtiva] = useState("dados-gerais");
 
   // Estados para modal rápido
   const [showQuickAddModal, setShowQuickAddModal] = useState(false);
@@ -202,6 +206,12 @@ const PetForm = () => {
     setFormData((prev) => ({ ...prev, especie: value, raca: "" }));
   };
 
+  // Desmarcar "castrado" limpa a data de castracao escondida — evita submeter uma
+  // data de castracao presa no estado enquanto o pet nao esta mais marcado como castrado.
+  const handleCastradoChange = (castrado) => {
+    setFormData((prev) => ({ ...prev, castrado, castrado_data: castrado ? prev.castrado_data : "" }));
+  };
+
   // Funções para Quick Add
   const abrirQuickAdd = (tipo) => {
     if (tipo === "raca" && !especieSelecionadaAtual) {
@@ -241,28 +251,49 @@ const PetForm = () => {
     }
   };
 
-  const validateForm = () => {
-    if (!formData.nome.trim()) {
-      setError("Nome do pet é obrigatório");
-      return false;
-    }
-    if (!formData.especie) {
-      setError("Espécie é obrigatória");
-      return false;
-    }
-    if (!formData.cliente_id) {
-      setError("Cliente (tutor) é obrigatório");
-      return false;
-    }
-    return true;
-  };
+  const erros = useMemo(() => {
+    const proximosErros = {};
+    if (!formData.nome.trim()) proximosErros.nome = "Informe o nome do pet.";
+    if (!formData.especie) proximosErros.especie = "Selecione a espécie.";
+    if (!formData.cliente_id) proximosErros.cliente_id = "Selecione o tutor.";
+    return proximosErros;
+  }, [formData.nome, formData.especie, formData.cliente_id]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const abas = useMemo(
+    () => [
+      {
+        id: "dados-gerais",
+        label: "Dados gerais",
+        icon: PawPrint,
+        descricao: "Tutor, identificação e observações",
+        invalida: Boolean(erros.nome || erros.especie || erros.cliente_id),
+      },
+      {
+        id: "caracteristicas",
+        label: "Características físicas",
+        icon: Ruler,
+        descricao: "Idade, peso, porte e demais características",
+      },
+      {
+        id: "saude",
+        label: "Saúde",
+        icon: HeartPulse,
+        descricao: "Alergias, doenças, medicamentos e histórico clínico",
+      },
+    ],
+    [erros],
+  );
+
+  const handleSubmit = async () => {
     setError("");
     setSuccess("");
 
-    if (!validateForm()) {
+    if (Object.keys(erros).length > 0) {
+      setAbaAtiva((atual) => {
+        const abaComErro = abas.find((aba) => aba.invalida);
+        return abaComErro ? abaComErro.id : atual;
+      });
+      toast.error("Corrija os campos destacados antes de salvar.");
       return;
     }
 
@@ -334,8 +365,10 @@ const PetForm = () => {
       clienteIdPreSelecionado={clienteIdPreSelecionado}
       handleSubmit={handleSubmit}
       formData={formData}
+      erros={erros}
       setField={setField}
       handleEspecieChange={handleEspecieChange}
+      handleCastradoChange={handleCastradoChange}
       clientes={clientes}
       abrirQuickAdd={abrirQuickAdd}
       especies={especies}
@@ -343,6 +376,9 @@ const PetForm = () => {
       especieSelecionadaAtual={especieSelecionadaAtual}
       setFormData={setFormData}
       saving={saving}
+      abaAtiva={abaAtiva}
+      setAbaAtiva={setAbaAtiva}
+      abas={abas}
       showQuickAddModal={showQuickAddModal}
       quickAddTipo={quickAddTipo}
       handleQuickAddSuccess={handleQuickAddSuccess}
