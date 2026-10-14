@@ -14,7 +14,8 @@ import {
 import { CORES } from "../../theme";
 import { formatarMoeda } from "../../utils/format";
 import {
-  erroCadastroProduto, formatarCampoMonetarioProduto, gerarChaveCadastroProduto, valorMonetarioProduto,
+  dataIsoProduto, erroCadastroProduto, formatarCampoMonetarioProduto, formatarDataProduto,
+  gerarChaveCadastroProduto, valorMonetarioProduto,
 } from "../../utils/produtoRapido";
 import { FuncionarioPdvScanner } from "./pdv/FuncionarioPdvScanner";
 import { novoProdutoStyles as styles } from "./produto/NovoProdutoStyles";
@@ -43,6 +44,10 @@ export default function FuncionarioNovoProdutoScreen() {
   const fotos = useProdutoRapidoFotos();
   const [preco, setPreco] = useState("");
   const [custo, setCusto] = useState("");
+  const [quantidadeEntrada, setQuantidadeEntrada] = useState("");
+  const [numeroLote, setNumeroLote] = useState("");
+  const [validade, setValidade] = useState("");
+  const [fabricacao, setFabricacao] = useState("");
   const [unidade, setUnidade] = useState<ProdutoRapidoPayload["unidade"]>("UN");
   const [produto, setProduto] = useState<ProdutoRapido | null>(null);
   const [salvando, setOcupado] = useState(false);
@@ -66,14 +71,14 @@ export default function FuncionarioNovoProdutoScreen() {
       Alert.alert("Aguarde", "Estamos concluindo a operação. Aguarde antes de sair.");
       return;
     }
-    if (fotos.pendentes || ((etapa === "formulario" || etapa === "codigo") && (nome || sku || descricao || preco || custo))) {
+    if (fotos.pendentes || ((etapa === "formulario" || etapa === "codigo") && (nome || sku || descricao || preco || custo || quantidadeEntrada || numeroLote || validade || fabricacao))) {
       event.preventDefault();
       Alert.alert("Há dados sem enviar", "Se sair agora, os dados e fotos pendentes desta tela serão descartados.", [
         { text: "Continuar aqui", style: "cancel" },
         { text: "Sair", style: "destructive", onPress: () => { descartarSaida.current = true; navigation.dispatch(event.data.action); } },
       ]);
     }
-  }), [navigation, ocupado, fotos.pendentes, etapa, nome, sku, descricao, preco, custo]);
+  }), [navigation, ocupado, fotos.pendentes, etapa, nome, sku, descricao, preco, custo, quantidadeEntrada, numeroLote, validade, fabricacao]);
 
   async function consultar(valor: string, tipo = tipoBusca) {
     if (operacaoEmCurso.current) return;
@@ -138,6 +143,26 @@ export default function FuncionarioNovoProdutoScreen() {
     if (skuInfo.status === "ocupado") { setErro(skuInfo.mensagem); return; }
     const precoVenda = valorMonetarioProduto(preco);
     const precoCusto = valorMonetarioProduto(custo);
+    const quantidadeTexto = quantidadeEntrada.trim().replace(".", ",");
+    if (quantidadeTexto && !/^\d{1,6}(,\d{1,3})?$/.test(quantidadeTexto)) {
+      setErro("Informe uma quantidade válida, com até 3 casas decimais.");
+      return;
+    }
+    const quantidade = quantidadeTexto ? Number(quantidadeTexto.replace(",", ".")) : 0;
+    const validadeIso = dataIsoProduto(validade);
+    const fabricacaoIso = dataIsoProduto(fabricacao);
+    if ((validade.trim() && !validadeIso) || (fabricacao.trim() && !fabricacaoIso)) {
+      setErro("Informe datas válidas no formato DD/MM/AAAA.");
+      return;
+    }
+    if (quantidade === 0 && (numeroLote.trim() || validadeIso || fabricacaoIso)) {
+      setErro("Informe a quantidade para registrar lote ou datas.");
+      return;
+    }
+    if (validadeIso && fabricacaoIso && fabricacaoIso > validadeIso) {
+      setErro("A fabricação não pode ser posterior à validade.");
+      return;
+    }
     if (!nome.trim() || precoVenda <= 0) {
       setErro("Preencha o nome e um preço de venda maior que zero.");
       return;
@@ -159,6 +184,10 @@ export default function FuncionarioNovoProdutoScreen() {
         codigo_barras: codigo.trim() || undefined, chave_cadastro: chaveCadastro.current,
         nome: nome.trim(), preco_venda: precoVenda,
         preco_custo: precoCusto, unidade,
+        quantidade_entrada: quantidade,
+        numero_lote: numeroLote.trim() || undefined,
+        data_validade: validadeIso,
+        data_fabricacao: fabricacaoIso,
         codigo: sku.trim().toUpperCase() || undefined,
         descricao_curta: descricao.trim() || undefined,
       });
@@ -185,7 +214,8 @@ export default function FuncionarioNovoProdutoScreen() {
 
   function limparFormulario() {
     setEtapa("codigo"); setCodigo(""); setNome(""); setPreco(""); setCusto("");
-    setUnidade("UN"); setProduto(null); setErro(""); setSku(""); setDescricao(""); fotos.limpar();
+    setUnidade("UN"); setProduto(null); setErro(""); setSku(""); setDescricao("");
+    setQuantidadeEntrada(""); setNumeroLote(""); setValidade(""); setFabricacao(""); fotos.limpar();
     setBusca(""); setTipoBusca("barras"); chaveCadastro.current = null;
   }
 
@@ -311,8 +341,36 @@ export default function FuncionarioNovoProdutoScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+            <Text style={styles.label}>Quantidade de entrada · opcional</Text>
+            <TextInput
+              accessibilityLabel="Quantidade de entrada" style={styles.input} value={quantidadeEntrada}
+              onChangeText={(valor) => setQuantidadeEntrada(valor.replace(".", ","))}
+              keyboardType="decimal-pad" maxLength={10} placeholder="0"
+              placeholderTextColor={CORES.textoClaro} editable={!ocupado}
+            />
+            <Text style={styles.texto}>Informe o que está entrando agora. Se deixar vazio, o estoque começa em zero.</Text>
+            <Text style={styles.label}>Número do lote · opcional</Text>
+            <TextInput
+              accessibilityLabel="Número do lote" style={styles.input} value={numeroLote}
+              onChangeText={setNumeroLote} maxLength={50} editable={!ocupado}
+              placeholder="Ex.: LOTE-001" placeholderTextColor={CORES.textoClaro}
+            />
+            <Text style={styles.label}>Validade · opcional</Text>
+            <TextInput
+              accessibilityLabel="Validade" style={styles.input} value={validade}
+              onChangeText={(valor) => setValidade(formatarDataProduto(valor))}
+              keyboardType="number-pad" maxLength={10} editable={!ocupado}
+              placeholder="DD/MM/AAAA" placeholderTextColor={CORES.textoClaro}
+            />
+            <Text style={styles.label}>Fabricação · opcional</Text>
+            <TextInput
+              accessibilityLabel="Fabricação" style={styles.input} value={fabricacao}
+              onChangeText={(valor) => setFabricacao(formatarDataProduto(valor))}
+              keyboardType="number-pad" maxLength={10} editable={!ocupado}
+              placeholder="DD/MM/AAAA" placeholderTextColor={CORES.textoClaro}
+            />
             <ProdutoRapidoFotos fotos={fotos.fotos} ocupado={ocupado} salvo={false} adicionar={fotos.adicionar} remover={fotos.remover} />
-            <Text style={styles.texto}>O estoque começa em zero. Depois, registre o saldo em Balanço de estoque. Categoria e dados fiscais podem ser preenchidos no ERP.</Text>
+            <Text style={styles.texto}>Categoria e dados fiscais podem ser preenchidos no ERP.</Text>
             <TouchableOpacity accessibilityRole="button" style={[styles.primario, (ocupado || skuInfo.status === "ocupado") && styles.desabilitado]} disabled={ocupado || skuInfo.status === "ocupado"} onPress={salvar}>
               <Text style={styles.primarioTexto}>{ocupado ? "Salvando..." : "Cadastrar produto"}</Text>
             </TouchableOpacity>
@@ -327,6 +385,7 @@ export default function FuncionarioNovoProdutoScreen() {
             <Text style={styles.texto}>Código interno: {produto.codigo}</Text>
             <Text style={styles.texto}>Código de barras: {produto.codigo_barras || "Não informado"}</Text>
             <Text style={styles.preco}>{formatarMoeda(produto.preco_venda)} / {produto.unidade}</Text>
+            {etapa === "salvo" ? <Text style={styles.texto}>Estoque inicial: {new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 3 }).format(produto.estoque_atual)} {produto.unidade}</Text> : null}
             {produto.descricao_curta ? <Text style={styles.texto}>{produto.descricao_curta}</Text> : null}
             {etapa === "salvo" && fotos.fotos.length > 0 ? <>
               <ProdutoRapidoFotos fotos={fotos.fotos} ocupado={ocupado} salvo adicionar={fotos.adicionar} remover={fotos.remover} />

@@ -32,6 +32,7 @@ export type ProdutoRapido = {
   situacao: boolean | null;
   descricao_curta?: string | null;
   imagem_principal?: string | null;
+  estoque_atual: number;
 };
 
 export type ProdutoRapidoPayload = {
@@ -41,6 +42,10 @@ export type ProdutoRapidoPayload = {
   preco_venda: number;
   preco_custo: number;
   unidade: "UN" | "KG" | "CX" | "PC" | "LT";
+  quantidade_entrada: number;
+  numero_lote?: string;
+  data_validade?: string;
+  data_fabricacao?: string;
   codigo?: string;
   descricao_curta?: string;
 };
