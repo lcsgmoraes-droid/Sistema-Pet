@@ -52,7 +52,7 @@ export default function useProdutosNovoSubmit({
     if (falhas.length > 0) throw new Error(falhas.join("; "));
   };
 
-  const salvarEdicao = async (dados, produtosCompostosIds, abrirEstoque = false) => {
+  const salvarEdicao = async (dados, produtosCompostosIds) => {
     await salvarFiscal({ id, tipo_produto: formData.tipo_produto });
     const payload =
       produtosCompostosIds === undefined
@@ -71,7 +71,7 @@ export default function useProdutosNovoSubmit({
       return;
     }
     alert("Produto atualizado com sucesso!");
-    navigate(abrirEstoque ? `/produtos/${id}/movimentacoes?aba=lotes` : "/produtos");
+    navigate("/produtos");
   };
 
   const fecharPreviewPrecosCompostos = () => {
@@ -86,11 +86,7 @@ export default function useProdutosNovoSubmit({
 
     try {
       setSalvando(true);
-      await salvarEdicao(
-        dadosPendentes.dados,
-        precosCompostosSelecionados,
-        dadosPendentes.abrirEstoque,
-      );
+      await salvarEdicao(dadosPendentes, precosCompostosSelecionados);
       fecharPreviewPrecosCompostos();
     } catch (error) {
       console.error("Erro ao salvar produto:", error);
@@ -102,7 +98,6 @@ export default function useProdutosNovoSubmit({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const abrirEstoque = e.nativeEvent?.submitter?.value === "estoque";
 
     if (!formData.nome) {
       alert("Preencha o campo Nome");
@@ -125,6 +120,34 @@ export default function useProdutosNovoSubmit({
         alert(erroRecorrencia);
         return;
       }
+    }
+
+    const quantidadeTexto = String(formData.entrada_inicial_quantidade || "").trim();
+    if (!isEdicao && quantidadeTexto && !/^\d{1,6}([.,]\d{1,3})?$/.test(quantidadeTexto)) {
+      alert("Informe uma quantidade de entrada válida, com até 3 casas decimais.");
+      return;
+    }
+    const quantidadeInicial = quantidadeTexto ? Number(quantidadeTexto.replace(",", ".")) : 0;
+    const numeroLote = String(formData.entrada_inicial_numero_lote || "").trim();
+    const validade = formData.entrada_inicial_data_validade || null;
+    const fabricacao = formData.entrada_inicial_data_fabricacao || null;
+    if (!isEdicao && quantidadeInicial === 0 && (numeroLote || validade || fabricacao)) {
+      alert("Informe a quantidade para registrar lote ou datas.");
+      return;
+    }
+    if (!isEdicao && validade && fabricacao && fabricacao > validade) {
+      alert("A fabricação não pode ser posterior à validade.");
+      return;
+    }
+    if (
+      !isEdicao &&
+      quantidadeInicial > 0 &&
+      (formData.tipo === "servico" ||
+        formData.tipo_produto === "PAI" ||
+        (formData.tipo_produto === "KIT" && !formData.e_kit_fisico))
+    ) {
+      alert("Este tipo de produto não recebe entrada inicial de estoque.");
+      return;
     }
 
     try {
@@ -247,16 +270,24 @@ export default function useProdutosNovoSubmit({
         const sugestoes = Array.isArray(preview.sugestoes) ? preview.sugestoes : [];
 
         if (sugestoes.length > 0) {
-          setDadosPendentes({ dados, abrirEstoque });
+          setDadosPendentes(dados);
           setPreviewPrecosCompostos(preview);
           setPrecosCompostosSelecionados(sugestoes.map((item) => item.produto_id));
           return;
         }
 
-        await salvarEdicao(dados, undefined, abrirEstoque);
+        await salvarEdicao(dados);
         return;
       }
 
+      if (quantidadeInicial > 0) {
+        dados.entrada_inicial = {
+          quantidade: quantidadeInicial,
+          numero_lote: numeroLote || null,
+          data_validade: validade,
+          data_fabricacao: fabricacao,
+        };
+      }
       const response = await createProduto(dados);
       const produtoId = response.data.id;
       try {
@@ -276,7 +307,7 @@ export default function useProdutosNovoSubmit({
       }
 
       alert(isClone ? "Produto clonado com sucesso!" : "Produto cadastrado com sucesso!");
-      navigate(abrirEstoque ? `/produtos/${produtoId}/movimentacoes?aba=lotes` : "/produtos");
+      navigate("/produtos");
     } catch (error) {
       console.error("Erro ao salvar produto:", error);
       alert(error.response?.data?.detail || "Erro ao salvar produto");

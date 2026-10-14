@@ -5,7 +5,6 @@ export default function ProdutosNovoEstoqueTab({
   handleChange,
   isEdicao,
   lotes,
-  salvando,
 }) {
   return (
     <div className="space-y-6">
@@ -100,21 +99,87 @@ export default function ProdutosNovoEstoqueTab({
             </label>
           </div>
 
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-            <p className="text-sm text-blue-900">
-              Registre entradas e saídas nas movimentações. Na mesma tela, identifique lotes e
-              validades de quantidades que já estão no estoque, sem alterar o saldo.
-            </p>
-            <button
-              type="submit"
-              name="destino"
-              value="estoque"
-              disabled={salvando || (formData.tipo_produto === "KIT" && !formData.e_kit_fisico)}
-              className="mt-3 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {salvando ? "Salvando..." : "Salvar e abrir lançamentos de estoque e lotes"}
-            </button>
-          </div>
+          {!isEdicao &&
+            !(formData.tipo_produto === "KIT" && !formData.e_kit_fisico) &&
+            !formData.e_granel &&
+            !String(formData.nome || "")
+              .toLowerCase()
+              .includes("granel") && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-4">
+                <div>
+                  <h3 className="font-semibold text-blue-900">Entrada inicial no cadastro</h3>
+                  <p className="text-sm text-blue-800">
+                    Informe a quantidade que está entrando agora. Lote, validade e fabricação são
+                    opcionais.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label className="text-sm font-medium text-gray-700">
+                    Quantidade de entrada
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      maxLength={10}
+                      value={formData.entrada_inicial_quantidade || ""}
+                      onChange={(e) => handleChange("entrada_inicial_quantidade", e.target.value)}
+                      placeholder="Ex.: 10 ou 1,5"
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                    />
+                  </label>
+                  <label className="text-sm font-medium text-gray-700">
+                    Unidade
+                    <select
+                      value={formData.unidade || "UN"}
+                      onChange={(e) => handleChange("unidade", e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                    >
+                      <option value="UN">UN - Unidade</option>
+                      <option value="KG">KG - Quilograma</option>
+                      <option value="G">G - Grama</option>
+                      <option value="L">L - Litro</option>
+                      <option value="ML">ML - Mililitro</option>
+                      <option value="M">M - Metro</option>
+                      <option value="CX">CX - Caixa</option>
+                      <option value="PCT">PCT - Pacote</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <label className="text-sm font-medium text-gray-700">
+                    Número do lote · opcional
+                    <input
+                      type="text"
+                      maxLength={50}
+                      value={formData.entrada_inicial_numero_lote || ""}
+                      onChange={(e) => handleChange("entrada_inicial_numero_lote", e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                    />
+                  </label>
+                  <label className="text-sm font-medium text-gray-700">
+                    Validade · opcional
+                    <input
+                      type="date"
+                      value={formData.entrada_inicial_data_validade || ""}
+                      onChange={(e) =>
+                        handleChange("entrada_inicial_data_validade", e.target.value)
+                      }
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                    />
+                  </label>
+                  <label className="text-sm font-medium text-gray-700">
+                    Fabricação · opcional
+                    <input
+                      type="date"
+                      value={formData.entrada_inicial_data_fabricacao || ""}
+                      onChange={(e) =>
+                        handleChange("entrada_inicial_data_fabricacao", e.target.value)
+                      }
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                    />
+                  </label>
+                </div>
+              </div>
+            )}
 
           {isEdicao && formData.controle_lote && (
             <>
@@ -171,12 +236,6 @@ export default function ProdutosNovoEstoqueTab({
                 </div>
               )}
             </>
-          )}
-
-          {!isEdicao && (
-            <div className="text-center py-8 text-gray-500">
-              Use “Salvar e abrir lançamentos de estoque e lotes” para continuar após o cadastro.
-            </div>
           )}
         </>
       )}

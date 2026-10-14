@@ -31,7 +31,7 @@ function tela(servicos = {}) {
     useRef(inicial) { return slots[cursor++] ??= { current: inicial }; },
     useEffect() {},
   };
-  const produto = (payload) => ({ ...payload, id: 17, codigo: payload.codigo || "APP-GERADO", codigo_barras: payload.codigo_barras || null, ativo: true, situacao: true });
+  const produto = (payload) => ({ ...payload, id: 17, codigo: payload.codigo || "APP-GERADO", codigo_barras: payload.codigo_barras || null, estoque_atual: payload.quantidade_entrada, ativo: true, situacao: true });
   const componente = carregar("screens/funcionario/FuncionarioNovoProdutoScreen.tsx", {
     react: { ...react, default: react },
     "@expo/vector-icons": { Ionicons: "Ionicons" },
@@ -86,9 +86,61 @@ test("cadastra sem barras e sem SKU e informa a ausência de EAN no resultado", 
   assert.equal(app.envios[0].codigo_barras, undefined);
   assert.equal(app.envios[0].codigo, undefined);
   assert.equal(app.envios[0].preco_venda, 12.5);
+  assert.equal(app.envios[0].quantidade_entrada, 0);
   assert.match(app.envios[0].chave_cadastro, /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/);
   assert.match(app.texto(), /Produto cadastrado!/);
   assert.match(app.texto(), /Código de barras: Não informado/);
+});
+
+test("quantidade informada no cadastro entra no estoque e aparece na confirmação", async () => {
+  const app = tela();
+  await app.clicar("Adicionar sem código de barras");
+  preencherMinimo(app);
+  app.input("Quantidade de entrada").onChangeText("12,750");
+  await app.clicar("Cadastrar produto");
+  assert.equal(app.envios[0].quantidade_entrada, 12.75);
+  assert.match(app.texto(), /Estoque inicial: 12,75 UN/);
+});
+
+test("cadastro envia lote, validade e fabricação junto da entrada", async () => {
+  const app = tela();
+  await app.clicar("Adicionar sem código de barras");
+  preencherMinimo(app);
+  app.input("Quantidade de entrada").onChangeText("4");
+  app.input("Número do lote").onChangeText("L-4");
+  app.input("Fabricação").onChangeText("01092026");
+  app.input("Validade").onChangeText("01092027");
+  assert.equal(app.input("Validade").value, "01/09/2027");
+  await app.clicar("Cadastrar produto");
+  assert.equal(app.envios[0].quantidade_entrada, 4);
+  assert.equal(app.envios[0].numero_lote, "L-4");
+  assert.equal(app.envios[0].data_fabricacao, "2026-09-01");
+  assert.equal(app.envios[0].data_validade, "2027-09-01");
+});
+
+test("validade impossível e lote sem quantidade impedem cadastro", async () => {
+  const app = tela();
+  await app.clicar("Adicionar sem código de barras");
+  preencherMinimo(app);
+  app.input("Validade").onChangeText("31022027");
+  await app.clicar("Cadastrar produto");
+  assert.equal(app.envios.length, 0);
+  assert.match(app.texto(), /datas válidas/);
+  app.input("Validade").onChangeText("");
+  app.input("Número do lote").onChangeText("L-1");
+  await app.clicar("Cadastrar produto");
+  assert.equal(app.envios.length, 0);
+  assert.match(app.texto(), /Informe a quantidade/);
+});
+
+test("quantidade inválida impede cadastro e mantém o formulário", async () => {
+  const app = tela();
+  await app.clicar("Adicionar sem código de barras");
+  preencherMinimo(app);
+  app.input("Quantidade de entrada").onChangeText("1,2345");
+  await app.clicar("Cadastrar produto");
+  assert.equal(app.envios.length, 0);
+  assert.match(app.texto(), /até 3 casas decimais/);
 });
 
 test("inicia por SKU de 50 caracteres e preenche somente o código interno", async () => {
