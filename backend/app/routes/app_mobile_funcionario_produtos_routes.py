@@ -1,12 +1,13 @@
 """Cadastro rapido de produtos no perfil operacional, para completar no ERP."""
 
+from datetime import date
 from decimal import Decimal
 import logging
 from typing import Literal
 from uuid import UUID, uuid4, uuid5
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -15,6 +16,10 @@ from app.db import get_session
 from app.models import User
 from app.produtos.search import _valores_codigo_produto
 from app.produtos_models import Produto, ProdutoHistoricoPreco
+from app.produtos.entrada_inicial import (
+    EntradaInicialProduto,
+    registrar_entrada_inicial,
+)
 from app.routes.app_mobile_funcionario_pdv.auth import (
     _get_funcionario_operacional_or_403,
 )
@@ -46,6 +51,12 @@ class ProdutoRapidoRequest(BaseModel):
         default=Decimal("0"), ge=0, max_digits=10, decimal_places=2
     )
     unidade: Literal["UN", "KG", "CX", "PC", "LT"] = "UN"
+    quantidade_entrada: Decimal = Field(
+        default=Decimal("0"), ge=0, max_digits=9, decimal_places=3
+    )
+    numero_lote: str | None = Field(default=None, max_length=50)
+    data_validade: date | None = None
+    data_fabricacao: date | None = None
 
     @field_validator("codigo_barras", mode="before")
     @classmethod
@@ -56,6 +67,16 @@ class ProdutoRapidoRequest(BaseModel):
     @classmethod
     def normalizar_codigo(cls, valor):
         return normalizar_sku_produto(valor) if str(valor or "").strip() else None
+
+    @model_validator(mode="after")
+    def validar_entrada(self):
+        EntradaInicialProduto(
+            quantidade=self.quantidade_entrada,
+            numero_lote=self.numero_lote,
+            data_validade=self.data_validade,
+            data_fabricacao=self.data_fabricacao,
+        )
+        return self
 
 
 class ProdutoRapidoResponse(BaseModel):
@@ -71,6 +92,7 @@ class ProdutoRapidoResponse(BaseModel):
     situacao: bool | None = None
     descricao_curta: str | None = None
     imagem_principal: str | None = None
+    estoque_atual: float = 0
 
     @field_validator("unidade", mode="before")
     @classmethod
@@ -81,6 +103,11 @@ class ProdutoRapidoResponse(BaseModel):
     @classmethod
     def status_legado(cls, valor):
         return bool(valor)
+
+    @field_validator("estoque_atual", mode="before")
+    @classmethod
+    def estoque_legado(cls, valor):
+        return float(valor or 0)
 
 
 def _codigo_comparavel(valor: str) -> str:
@@ -416,7 +443,15 @@ def criar_produto_rapido(
         raise _sku_indisponivel()
 
     dados = {
-        **payload.model_dump(exclude={"chave_cadastro"}),
+        **payload.model_dump(
+            exclude={
+                "chave_cadastro",
+                "quantidade_entrada",
+                "numero_lote",
+                "data_validade",
+                "data_fabricacao",
+            }
+        ),
         "preco_venda": float(payload.preco_venda),
         "preco_custo": float(payload.preco_custo),
         "codigo": codigo,
@@ -430,7 +465,25 @@ def criar_produto_rapido(
         "anunciar_ecommerce": False,
     }
     try:
-        return ProdutoService.create_produto(dados=dados, db=db, tenant_id=tenant_uuid)
+        produto = ProdutoService.create_produto(
+            dados=dados, db=db, tenant_id=tenant_uuid, commit=False
+        )
+        registrar_entrada_inicial(
+            db,
+            produto=produto,
+            entrada=EntradaInicialProduto(
+                quantidade=payload.quantidade_entrada,
+                numero_lote=payload.numero_lote,
+                data_validade=payload.data_validade,
+                data_fabricacao=payload.data_fabricacao,
+            ),
+            user_id=current_user.id,
+            tenant_id=tenant_uuid,
+            origem="app funcionario",
+        )
+        db.commit()
+        db.refresh(produto)
+        return produto
     except ValueError as exc:
         # O indice unico do ERP continua sendo a barreira final para outra criacao
         # que ocorrer entre a consulta e o commit, inclusive fora do app.
@@ -441,4 +494,11 @@ def criar_produto_rapido(
         raise HTTPException(
             status_code=500,
             detail="Nao foi possivel salvar o produto. Tente novamente.",
+        ) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.exception("Falha ao registrar entrada inicial pelo app")
+        raise HTTPException(
+            status_code=500,
+            detail="Nao foi possivel salvar o produto e a entrada. Tente novamente.",
         ) from exc

@@ -10,6 +10,7 @@ from typing import List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.produtos.tipos import normalizar_tipo_catalogo
+from app.produtos.entrada_inicial import EntradaInicialProduto
 
 
 # ==========================================
@@ -314,6 +315,7 @@ class ProdutoCreate(ProdutoBase):
     - Se e_kit_fisico=True, terá estoque próprio controlado manualmente
     """
 
+    entrada_inicial: Optional[EntradaInicialProduto] = None
     composicao_kit: Optional[List[KitComponenteCreate]] = Field(default_factory=list)
     protocolos_recorrencia: Optional[List[ProdutoProtocoloRecorrenciaSchema]] = Field(
         default_factory=list

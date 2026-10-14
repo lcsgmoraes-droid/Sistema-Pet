@@ -191,7 +191,6 @@ export default function useProdutosNovoPageComposition({
     handleChange,
     isEdicao,
     lotes,
-    salvando,
   };
 
   const fornecedoresTabProps = {

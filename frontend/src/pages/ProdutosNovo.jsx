@@ -98,6 +98,10 @@ export default function ProdutosNovo() {
     controle_lote: true,
     estoque_minimo: "",
     estoque_maximo: "",
+    entrada_inicial_quantidade: "",
+    entrada_inicial_numero_lote: "",
+    entrada_inicial_data_validade: "",
+    entrada_inicial_data_fabricacao: "",
     participa_sugestao_compra: true,
 
     // Aba 5: Tributação (Fiscal V2)

@@ -5,9 +5,10 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.db import get_session
-from app.produtos_models import Produto
+from app.produtos_models import EstoqueMovimentacao, Produto, ProdutoLote
 from app.routes import app_mobile_funcionario_produtos_routes as routes
 from app.routes.app_mobile_funcionario_pdv import auth
 from app.routes.ecommerce_auth import _get_current_ecommerce_user
@@ -73,6 +74,7 @@ def test_cadastra_minimo_e_fica_disponivel_para_completar_no_erp(ambiente):
     assert str(produto["tenant_id"]) == str(TENANT_A)
     assert produto["user_id"] == 1
     assert produto["estoque_atual"] == 0
+    assert db.execute(select(EstoqueMovimentacao.__table__)).first() is None
     assert produto["preco_custo"] == 0
     assert produto["anunciar_app"] is False
     assert produto["anunciar_ecommerce"] is False
@@ -202,6 +204,107 @@ def test_aceita_custo_e_unidade(ambiente):
     assert criado.json()["unidade"] == "CX"
     produto = db.execute(select(Produto.__table__)).mappings().one()
     assert produto["preco_custo"] == 112.35
+
+
+def test_entrada_inicial_cria_saldo_e_movimentacao_uma_vez(ambiente):
+    client, db, _ = ambiente
+    payload = {**PAYLOAD, "preco_custo": 4.5, "quantidade_entrada": 12.75}
+    primeira = client.post(
+        "/app/funcionario/produtos/rapido",
+        json={
+            **payload,
+            "codigo_barras": None,
+            "chave_cadastro": "43c7286f-2117-4a5f-9aba-94aa67f8b3b2",
+        },
+    )
+    assert primeira.status_code == 201, primeira.text
+    assert primeira.json()["estoque_atual"] == 12.75
+    segunda = client.post(
+        "/app/funcionario/produtos/rapido",
+        json={
+            **payload,
+            "codigo_barras": None,
+            "chave_cadastro": "43c7286f-2117-4a5f-9aba-94aa67f8b3b2",
+        },
+    )
+    assert segunda.status_code == 200
+    assert segunda.json()["id"] == primeira.json()["id"]
+    produto = db.execute(select(Produto.__table__)).mappings().one()
+    movimento = db.execute(select(EstoqueMovimentacao.__table__)).mappings().one()
+    assert produto["estoque_atual"] == 12.75
+    assert movimento["tipo"] == "entrada"
+    assert movimento["motivo"] == "cadastro_produto"
+    assert movimento["quantidade"] == 12.75
+    assert movimento["quantidade_anterior"] == 0
+    assert movimento["quantidade_nova"] == 12.75
+    assert movimento["valor_total"] == 57.375
+
+
+def test_entrada_inicial_com_lote_e_datas_fica_no_erp(ambiente):
+    client, db, _ = ambiente
+    criado = cadastrar(
+        client,
+        quantidade_entrada=5,
+        numero_lote=" LOTE-5 ",
+        data_fabricacao="2026-09-01",
+        data_validade="2027-09-01",
+    )
+    assert criado.status_code == 201, criado.text
+    lote = db.execute(select(ProdutoLote.__table__)).mappings().one()
+    movimento = db.execute(select(EstoqueMovimentacao.__table__)).mappings().one()
+    assert lote["nome_lote"] == "LOTE-5"
+    assert lote["quantidade_disponivel"] == 5
+    assert lote["data_fabricacao"].date().isoformat() == "2026-09-01"
+    assert lote["data_validade"].date().isoformat() == "2027-09-01"
+    assert movimento["lote_id"] == lote["id"]
+
+
+def test_validade_sem_numero_gera_lote_automatico(ambiente):
+    client, db, _ = ambiente
+    criado = cadastrar(client, quantidade_entrada=2, data_validade="2027-10-14")
+    assert criado.status_code == 201, criado.text
+    lote = db.execute(select(ProdutoLote.__table__)).mappings().one()
+    assert lote["nome_lote"].startswith("CAD-")
+
+
+@pytest.mark.parametrize("quantidade", [-1, 0.0001, 1000000, "NaN"])
+def test_rejeita_quantidade_inicial_invalida(ambiente, quantidade):
+    client, db, _ = ambiente
+    assert cadastrar(client, quantidade_entrada=quantidade).status_code == 422
+    assert db.execute(select(Produto.__table__)).first() is None
+
+
+@pytest.mark.parametrize(
+    "campos",
+    [
+        {"numero_lote": "LOTE-1"},
+        {"data_validade": "2027-01-01"},
+        {
+            "quantidade_entrada": 2,
+            "data_fabricacao": "2028-01-01",
+            "data_validade": "2027-01-01",
+        },
+    ],
+)
+def test_rejeita_lote_sem_quantidade_e_datas_invertidas(ambiente, campos):
+    client, db, _ = ambiente
+    assert cadastrar(client, **campos).status_code == 422
+    assert db.execute(select(Produto.__table__)).first() is None
+
+
+def test_falha_ao_gravar_entrada_desfaz_tambem_o_produto(ambiente, monkeypatch):
+    client, db, _ = ambiente
+    original_commit = db.commit
+
+    def falhar_commit():
+        raise SQLAlchemyError("banco indisponivel")
+
+    monkeypatch.setattr(db, "commit", falhar_commit)
+    resposta = cadastrar(client, quantidade_entrada=3)
+    monkeypatch.setattr(db, "commit", original_commit)
+    assert resposta.status_code == 500
+    assert db.execute(select(Produto.__table__)).first() is None
+    assert db.execute(select(EstoqueMovimentacao.__table__)).first() is None
 
 
 def test_produto_legado_com_unidade_ou_status_nulo_tambem_bloqueia_duplicidade(
