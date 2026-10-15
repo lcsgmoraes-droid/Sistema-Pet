@@ -52,7 +52,7 @@ export function ChannelBadge({ channel, className = "", label, title }) {
   return (
     <span
       className={[
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium",
+        "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium",
         config.className,
         className,
       ]

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { markdownToPlainText } from "../../utils/safeMarkdown";
 import BotaoMenuAcoes from "../v2/BotaoMenuAcoes/BotaoMenuAcoes";
+import InputCheckbox from "../v2/InputCheckbox/InputCheckbox";
 import ChannelBadges from "../ui/ChannelBadges";
 import {
   isKitFisicoProduto,
@@ -34,7 +35,7 @@ function renderBlingStatusBadge(produto, props) {
 
   if (produto?.tipo_produto === "PAI") {
     return (
-      <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600">
+      <span className="inline-flex items-center whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600">
         Agrupador
       </span>
     );
@@ -42,7 +43,7 @@ function renderBlingStatusBadge(produto, props) {
 
   if (!blingId) {
     return (
-      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">
+      <span className="inline-flex items-center whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">
         Sem Bling
       </span>
     );
@@ -56,7 +57,7 @@ function renderBlingStatusBadge(produto, props) {
         props.onValidarVinculoProdutoBling?.(produto);
       }}
       disabled={loading || !props.onValidarVinculoProdutoBling}
-      className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium ${
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-1 text-xs font-medium ${
         temErro
           ? "border-amber-200 bg-amber-50 text-amber-700"
           : "border-emerald-200 bg-emerald-50 text-emerald-700"
@@ -84,23 +85,21 @@ export function createProdutosColunas() {
       visible: true,
       renderHeader: (props) => (
         <th className="px-4 py-3 text-left">
-          <input
-            type="checkbox"
+          <InputCheckbox
+            rotulo="Selecionar todos os produtos"
             checked={
               props.produtos.length > 0 && props.selecionados.length === props.produtos.length
             }
             onChange={props.handleSelecionarTodos}
-            className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
           />
         </th>
       ),
       renderCell: (produto, props) => (
         <td className="px-4 py-3">
-          <input
-            type="checkbox"
+          <InputCheckbox
+            rotulo={`Selecionar ${produto.nome}`}
             checked={props.selecionados.includes(produto.id)}
             onChange={(e) => props.handleSelecionar(produto.id, e.nativeEvent)}
-            className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
           />
         </td>
       ),
@@ -301,30 +300,30 @@ export function createProdutosColunas() {
                       </svg>
                     </button>
                   )}
-                  <div className="text-sm font-medium text-gray-900">
-                    {produto.nome}
+                  <div className="flex flex-wrap items-center gap-x-2 text-sm font-medium text-gray-900">
+                    <span>{produto.nome}</span>
                     {isPai && (
-                      <span className="ml-2 text-xs text-blue-600">
+                      <span className="whitespace-nowrap text-xs text-blue-600">
                         (Pai {produto.total_variacoes || 0})
                       </span>
                     )}
                     {isKitVirtualProduto(produto) && (
-                      <span className="ml-2 text-xs text-indigo-600">(Kit • Virtual)</span>
+                      <span className="whitespace-nowrap text-xs text-indigo-600">(Kit • Virtual)</span>
                     )}
                     {isKitFisicoProduto(produto) && (
-                      <span className="ml-2 text-xs text-green-600">(Kit • Físico)</span>
+                      <span className="whitespace-nowrap text-xs text-green-600">(Kit • Físico)</span>
                     )}
                     {produto.data_descontinuacao && (
-                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                      <span className="inline-flex items-center whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800">
                         Descontinuado
                       </span>
                     )}
                     {produto.acesso_catalogo_completo ? (
-                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-violet-100 text-violet-700">
+                      <span className="inline-flex items-center whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-700">
                         Catálogo de {produto.estoque_origem_nome || "empresa do grupo"}
                       </span>
                     ) : produto.de_parceiro ? (
-                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                      <span className="inline-flex items-center whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700">
                         Pet Shop Parceiro
                       </span>
                     ) : null}

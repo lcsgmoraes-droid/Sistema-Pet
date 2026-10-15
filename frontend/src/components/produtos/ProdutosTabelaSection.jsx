@@ -5,6 +5,8 @@ import ChannelBadges from "../ui/ChannelBadges";
 import DataTable from "../ui/DataTable";
 import MoneyCell from "../ui/MoneyCell";
 import PaginationControls from "../ui/PaginationControls";
+import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
+import InputCheckbox from "../v2/InputCheckbox/InputCheckbox";
 import {
   getKitComponentAvailableStock,
   isExpandIdSelected,
@@ -204,16 +206,15 @@ export default function ProdutosTabelaSection({
             {comErro && (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded border border-red-200 bg-white px-3 py-3 text-xs text-red-700">
                 <span>{detalhes.erro}</span>
-                <button
-                  type="button"
+                <BotaoInteracao
+                  tamanho="pequeno"
                   onClick={(event) => {
                     event.stopPropagation();
                     recarregarDetalhesKit(produto.id);
                   }}
-                  className="rounded border border-red-200 px-2 py-1 font-semibold hover:bg-red-50"
                 >
                   Tentar novamente
-                </button>
+                </BotaoInteracao>
               </div>
             )}
 
@@ -346,13 +347,14 @@ export default function ProdutosTabelaSection({
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start gap-2">
-                          <input
-                            type="checkbox"
-                            checked={selecionados.includes(produto.id)}
-                            onClick={(event) => event.stopPropagation()}
-                            onChange={(event) => handleSelecionar(produto.id, event.nativeEvent)}
-                            className="mt-1 h-4 w-4 rounded text-blue-600"
-                          />
+                          <div className="mt-0.5">
+                            <InputCheckbox
+                              rotulo={`Selecionar ${produto.nome}`}
+                              checked={selecionados.includes(produto.id)}
+                              onClick={(event) => event.stopPropagation()}
+                              onChange={(event) => handleSelecionar(produto.id, event.nativeEvent)}
+                            />
+                          </div>
                           <div className="min-w-0 flex-1">
                             <h3 className="line-clamp-2 text-sm font-semibold text-gray-900">
                               {produto.nome}
@@ -364,12 +366,12 @@ export default function ProdutosTabelaSection({
                                 </span>
                               )}
                               {produto.marca?.nome || produto.marca_nome ? (
-                                <span className="rounded-full bg-gray-100 px-2 py-0.5">
+                                <span className="whitespace-nowrap rounded-full bg-gray-100 px-2 py-0.5">
                                   {produto.marca?.nome || produto.marca_nome}
                                 </span>
                               ) : null}
                               {produto.ativo === false && (
-                                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-slate-700">
+                                <span className="whitespace-nowrap rounded-full bg-slate-200 px-2 py-0.5 text-slate-700">
                                   Inativo
                                 </span>
                               )}
@@ -382,7 +384,7 @@ export default function ProdutosTabelaSection({
                                     onValidarVinculoProdutoBling(produto);
                                   }
                                 }}
-                                className={`rounded-full px-2 py-0.5 ${
+                                className={`whitespace-nowrap rounded-full px-2 py-0.5 ${
                                   blingId
                                     ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:cursor-wait"
                                     : isPai
