@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { confirmarCorePet } from "../services/corepetDialog";
-import { resolveCepMunicipio } from "../utils/cepMunicipio";
+import { aplicarConsultaCepEndereco, resolveCepMunicipio } from "../utils/cepMunicipio";
 
 const createEnderecoVazio = () => ({
   tipo: "entrega",
@@ -43,17 +43,7 @@ export function useClientesNovoEnderecos() {
     try {
       const data = await resolveCepMunicipio(cep);
 
-      setEnderecoAtual((prev) => {
-        if (!prev || String(prev.cep || "").replace(/\D/g, "") !== cepConsultado) return prev;
-        return {
-          ...prev,
-          endereco: data.endereco,
-          bairro: data.bairro || "",
-          cidade: data.cidade,
-          estado: data.estado,
-          codigo_municipio: data.codigo_municipio,
-        };
-      });
+      setEnderecoAtual((prev) => aplicarConsultaCepEndereco(prev, cepConsultado, data));
     } catch (error) {
       console.error("Erro ao buscar CEP:", error);
       alert(error.message || "Erro ao buscar CEP");

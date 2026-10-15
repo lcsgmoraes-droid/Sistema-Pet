@@ -3,7 +3,7 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 
 import { criarPayloadEnderecoAdicional } from "./pdvEndereco.js";
-import { resolveCepMunicipio } from "../utils/cepMunicipio.js";
+import { aplicarConsultaCepEndereco, resolveCepMunicipio } from "../utils/cepMunicipio.js";
 
 test("PDV envia somente os enderecos adicionais ao atualizar o cliente", () => {
   const clienteAtual = {
@@ -66,7 +66,7 @@ function criarRenderHook(arquivo, nome, dependencias) {
   const source = readFileSync(new URL(arquivo, import.meta.url), "utf8")
     .replace(/^import[^\r\n]+\r?\n/gm, "")
     .replace(/^export /gm, "");
-  const deps = { useState, alert: () => {}, ...dependencias };
+  const deps = { useState, alert: () => {}, aplicarConsultaCepEndereco, ...dependencias };
   const hook = new Function(...Object.keys(deps), `${source}\nreturn ${nome};`)(
     ...Object.values(deps),
   );
