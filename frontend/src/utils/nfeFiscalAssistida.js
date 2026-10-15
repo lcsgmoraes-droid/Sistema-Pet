@@ -115,6 +115,24 @@ function resumoIntNFe(resumo) {
   ];
   const destinatario = resumo.destinatario?.razaoSocial || resumo.destinatario?.nome;
   if (destinatario) linhas.push(`Destinatário: ${destinatario}`);
+  if (resumo.indicador_presenca === "4") {
+    const endereco = resumo.destinatario?.endereco || {};
+    const enderecoEntrega = [
+      endereco.logradouro,
+      endereco.numero,
+      endereco.complemento,
+      endereco.bairro,
+      [endereco.municipio, endereco.uf].filter(Boolean).join(" - "),
+      endereco.cep ? `CEP ${endereco.cep}` : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+    linhas.push(
+      "Entrega própria",
+      `Endereço de entrega: ${enderecoEntrega || "não informado"}`,
+      `Taxa de entrega: ${formatMoneyBRL(resumo.frete ?? 0)}`,
+    );
+  }
   if (resumo.ambiente_codigo === 1) {
     linhas.unshift("ATENÇÃO: esta confirmação transmitirá uma nota fiscal real.", "");
   }

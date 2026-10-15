@@ -15,6 +15,7 @@ export default function PDVEnderecoModal({
   const atualizarCampo = (campo, valor) => {
     onChange({
       ...enderecoAtual,
+      ...(["cep", "cidade", "estado"].includes(campo) ? { codigo_municipio: "" } : {}),
       [campo]: valor,
     });
   };
@@ -160,6 +161,27 @@ export default function PDVEnderecoModal({
                 placeholder="SP"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Código IBGE do município
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={enderecoAtual.codigo_municipio || ""}
+              onChange={(e) =>
+                atualizarCampo("codigo_municipio", e.target.value.replace(/\D/g, "").slice(0, 7))
+              }
+              maxLength="7"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              placeholder="7 dígitos"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              A busca pelo CEP preenche este código. Confira o município antes de informar
+              manualmente.
+            </p>
           </div>
 
           <p className="text-xs text-gray-500">* Campos obrigatórios</p>

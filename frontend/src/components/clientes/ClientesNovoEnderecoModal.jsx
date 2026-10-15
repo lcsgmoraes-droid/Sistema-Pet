@@ -79,7 +79,7 @@ function ClientesNovoEnderecoModal({
                     const value = e.target.value.replace(/\D/g, "");
                     const formatted =
                       value.length > 5 ? `${value.slice(0, 5)}-${value.slice(5, 8)}` : value;
-                    setEnderecoAtual({ ...enderecoAtual, cep: formatted });
+                    setEnderecoAtual({ ...enderecoAtual, cep: formatted, codigo_municipio: "" });
                   }}
                   onBlur={(e) => buscarCepModal(e.target.value)}
                   maxLength="9"
@@ -173,6 +173,7 @@ function ClientesNovoEnderecoModal({
                   setEnderecoAtual({
                     ...enderecoAtual,
                     cidade: e.target.value,
+                    codigo_municipio: "",
                   })
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
@@ -189,6 +190,7 @@ function ClientesNovoEnderecoModal({
                   setEnderecoAtual({
                     ...enderecoAtual,
                     estado: e.target.value,
+                    codigo_municipio: "",
                   })
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
@@ -196,6 +198,30 @@ function ClientesNovoEnderecoModal({
                 placeholder="SP"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Código IBGE do município
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={enderecoAtual.codigo_municipio || ""}
+              onChange={(e) =>
+                setEnderecoAtual({
+                  ...enderecoAtual,
+                  codigo_municipio: e.target.value.replace(/\D/g, "").slice(0, 7),
+                })
+              }
+              maxLength="7"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              placeholder="7 dígitos"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              A busca pelo CEP preenche este código. Confira o município antes de informar
+              manualmente.
+            </p>
           </div>
 
           <p className="text-xs text-gray-500">* Campos obrigatorios</p>
