@@ -1,4 +1,5 @@
 import { FiX } from "react-icons/fi";
+import CampoCodigoMunicipio from "../CampoCodigoMunicipio";
 
 function ClientesNovoEnderecoModal({
   enderecoAtual,
@@ -79,7 +80,7 @@ function ClientesNovoEnderecoModal({
                     const value = e.target.value.replace(/\D/g, "");
                     const formatted =
                       value.length > 5 ? `${value.slice(0, 5)}-${value.slice(5, 8)}` : value;
-                    setEnderecoAtual({ ...enderecoAtual, cep: formatted });
+                    setEnderecoAtual({ ...enderecoAtual, cep: formatted, codigo_municipio: "" });
                   }}
                   onBlur={(e) => buscarCepModal(e.target.value)}
                   maxLength="9"
@@ -173,6 +174,7 @@ function ClientesNovoEnderecoModal({
                   setEnderecoAtual({
                     ...enderecoAtual,
                     cidade: e.target.value,
+                    codigo_municipio: "",
                   })
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
@@ -189,6 +191,7 @@ function ClientesNovoEnderecoModal({
                   setEnderecoAtual({
                     ...enderecoAtual,
                     estado: e.target.value,
+                    codigo_municipio: "",
                   })
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
@@ -197,6 +200,11 @@ function ClientesNovoEnderecoModal({
               />
             </div>
           </div>
+
+          <CampoCodigoMunicipio
+            value={enderecoAtual.codigo_municipio}
+            onChange={(codigo) => setEnderecoAtual({ ...enderecoAtual, codigo_municipio: codigo })}
+          />
 
           <p className="text-xs text-gray-500">* Campos obrigatorios</p>
         </div>

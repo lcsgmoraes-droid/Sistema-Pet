@@ -19,6 +19,7 @@ from app.bling_integration_fiscal import (
 )
 from app.financeiro.crediario_parcelamento import montar_plano_crediario
 from app.intnfe.client import IntNFeError
+from app.intnfe.delivery_address import DeliveryAddressError, resolver_endereco_entrega
 from app.intnfe.fiscal_profile import local_profile
 from app.intnfe.models import IntNFeConnection, IntNFeEmissionSequence
 from app.intnfe.rejection_diagnostics import (
@@ -503,6 +504,44 @@ def _contribution(cst, rate, taxable_amount):
     return result
 
 
+def _product_taxes(fiscal, origin, taxable):
+    return {
+        "icms": _tax(fiscal["cst_icms"], origin, fiscal.get("icms_aliquota"), taxable),
+        "pis": _contribution(fiscal["pis_cst"], fiscal.get("pis_aliquota"), taxable),
+        "cofins": _contribution(
+            fiscal["cofins_cst"], fiscal.get("cofins_aliquota"), taxable
+        ),
+    }
+
+
+def _delivery_freight(products, tax_contexts, freight):
+    """Envia rateio manual documentado para manter frete e bases coerentes.
+
+    A IntNFe aceita produtos[].frete numerico e conserva os valores manuais.
+    Usamos o bruto fiscal de cada linha como peso, com maior resto em centavos.
+    Nao dependemos de recálculo de bases/tributos explicitos pelo provedor.
+    """
+    if not freight:
+        return
+    weights = [_money(product["valorTotal"]) for product in products]
+    if not any(weights):
+        weights = [Decimal(str(product["quantidade"])) for product in products]
+    portions = ratear_centavos(freight, weights)
+    for product, (fiscal, origin, taxable), portion in zip(
+        products, tax_contexts, portions
+    ):
+        product["frete"] = float(portion)
+        product["impostos"] = _product_taxes(fiscal, origin, taxable + portion)
+
+
+def _third_party_delivery(venda):
+    courier = getattr(venda, "entregador", None)
+    return courier is not None and (
+        bool(getattr(courier, "is_terceirizado", False))
+        or _ascii(getattr(courier, "tipo_vinculo_entrega", None)) == "terceirizado"
+    )
+
+
 def _lot_from_recorded_fifo(db, venda, item):
     """Recupera o lote fiscal de vendas antigas que não salvaram ``lote_id``.
 
@@ -569,29 +608,12 @@ def build_payload(db, tenant, connection, venda, document_type):
         raise DirectEmissionError(" ".join(emitter_pending))
     environment = 1 if connection.emission_environment == 1 else 2
     sale_total = _money(venda.total)
-    if document_type == "nfce" and venda.tem_entrega:
-        # NFC-e admite entrega a domicilio (SEFA/PR, perguntas 1466 e 1508).
-        # Este adaptador ainda nao envia endereco do consumidor nem possui
-        # contrato validado de frete/indPres=4 para NFC-e na IntNFe. Mesmo sem
-        # taxa, nao transmitir a entrega como uma venda presencial de balcao.
-        # Informar o limite antes de solicitar CPF ou outras correcoes locais.
-        message = (
-            "A emissão de NFC-e com entrega a domicílio ainda não está habilitada "
-            "nesta integração. A entrega própria pode usar NFC-e (modelo 65), "
-            "com identificação e endereço do cliente; cobrar uma taxa de entrega "
-            "não obriga, por si só, a usar NF-e (modelo 55). "
-            "Solicite ao suporte a habilitação dos dados de entrega antes de emitir."
-        )
+    nfce_delivery = document_type == "nfce" and bool(venda.tem_entrega)
+    if nfce_delivery and _third_party_delivery(venda):
         raise DirectEmissionError(
-            message,
-            code="nfce_delivery_not_supported",
-            validation={
-                "success": True,
-                "pode_emitir": False,
-                "requer_autorizacao": False,
-                "correcoes": [],
-                "bloqueios": [{"campo": "entrega", "mensagem": message}],
-            },
+            "Esta integração de NFC-e está habilitada para entrega própria. "
+            "O entregador selecionado está cadastrado como terceirizado; "
+            "confira o vínculo e a modalidade de transporte antes de emitir."
         )
     nfce_requires_recipient = document_type == "nfce" and (
         bool(getattr(venda, "tem_entrega", False)) or sale_total >= Decimal("10000")
@@ -613,6 +635,27 @@ def build_payload(db, tenant, connection, venda, document_type):
             require_identity=nfce_requires_recipient,
             require_address=document_type == "nfe",
         )
+    if nfce_delivery:
+        try:
+            delivery_address = resolver_endereco_entrega(venda)
+        except DeliveryAddressError as exc:
+            raise DirectEmissionError(
+                str(exc),
+                code="nfce_delivery_address_required",
+                validation={
+                    "success": True,
+                    "pode_emitir": False,
+                    "requer_autorizacao": False,
+                    "correcoes": [],
+                    "bloqueios": [{"campo": exc.field, "mensagem": str(exc)}],
+                },
+            ) from exc
+        if delivery_address["uf"] != emitter["endereco"]["uf"]:
+            raise DirectEmissionError(
+                "A entrega em NFC-e deve ocorrer dentro do estado do emitente. "
+                "Confira a UF do endereço selecionado para a entrega."
+            )
+        recipient["endereco"] = delivery_address
     destination_uf = (
         recipient.get("endereco", {}).get("uf") or emitter["endereco"]["uf"]
         if recipient and document_type == "nfe"
@@ -627,6 +670,7 @@ def build_payload(db, tenant, connection, venda, document_type):
     fiscal_pending = []
     product_total = Decimal("0")
     item_discount_total = Decimal("0")
+    tax_contexts = []
     legacy_grosses = _legacy_aggregate_gross(venda)
     descontos_fiscais = (
         {
@@ -823,17 +867,7 @@ def build_payload(db, tenant, connection, venda, document_type):
             "quantidade": _number(quantity),
             "valorUnitario": float(fiscal_unit_price),
             "valorTotal": float(gross),
-            "impostos": {
-                "icms": _tax(
-                    fiscal["cst_icms"], origin, fiscal.get("icms_aliquota"), taxable
-                ),
-                "pis": _contribution(
-                    fiscal["pis_cst"], fiscal.get("pis_aliquota"), taxable
-                ),
-                "cofins": _contribution(
-                    fiscal["cofins_cst"], fiscal.get("cofins_aliquota"), taxable
-                ),
-            },
+            "impostos": _product_taxes(fiscal, origin, taxable),
         }
         cest = _digits(fiscal.get("cest"))
         if cest:
@@ -841,6 +875,7 @@ def build_payload(db, tenant, connection, venda, document_type):
         if discount:
             product["desconto"] = float(discount)
         products.append(product)
+        tax_contexts.append((fiscal, origin, taxable))
         product_total += gross
         item_discount_total += discount
 
@@ -866,6 +901,10 @@ def build_payload(db, tenant, connection, venda, document_type):
             "O desconto da venda difere da soma dos descontos dos itens."
         )
     freight = _money(venda.taxa_entrega if venda.tem_entrega else 0)
+    if nfce_delivery:
+        if freight < 0:
+            raise DirectEmissionError("A taxa de entrega não pode ser negativa.")
+        _delivery_freight(products, tax_contexts, freight)
     calculated_total = product_total - total_discount + freight
     if calculated_total != sale_total:
         raise DirectEmissionError(
@@ -897,6 +936,9 @@ def build_payload(db, tenant, connection, venda, document_type):
             "Pedidos de marketplace não podem ser emitidos por este fluxo."
         )
 
+    presence = "1" if channel == "loja_fisica" else "9"
+    if nfce_delivery:
+        presence = "4"
     payload = {
         "serie": (
             connection.nfe_series if document_type == "nfe" else connection.nfce_series
@@ -907,11 +949,13 @@ def build_payload(db, tenant, connection, venda, document_type):
         "produtos": products,
         "pagamentos": payments,
         "informacoesAdicionais": _additional_information(venda, credit_installments),
-        "indicadorPresenca": "1" if channel == "loja_fisica" else "9",
+        "indicadorPresenca": presence,
     }
     if document_type == "nfe":
         payload["frete"] = {"modalidade": "9", "valor": float(freight)}
         payload["documentosReferenciados"] = []
+    elif nfce_delivery:
+        payload["frete"] = {"modalidade": "3", "valor": float(freight)}
     if recipient:
         key = "destinatario" if document_type == "nfe" else "consumidor"
         payload[key] = recipient
@@ -935,6 +979,7 @@ def preview(db, tenant, venda, document_type):
                 "quantidade": item["quantidade"],
                 "valor_total": item["valorTotal"],
                 "desconto": item.get("desconto", 0),
+                "frete": item.get("frete", 0),
                 "ncm": item["ncm"],
                 "cfop": item["cfop"],
                 "icms": item["impostos"]["icms"]["cst"],
@@ -955,6 +1000,8 @@ def preview(db, tenant, venda, document_type):
         ],
         "informacoes_adicionais": payload["informacoesAdicionais"],
         "frete": payload.get("frete", {}).get("valor", 0),
+        "indicador_presenca": payload["indicadorPresenca"],
+        "modalidade_frete": payload.get("frete", {}).get("modalidade"),
         "total": float(_money(venda.total)),
     }
 
@@ -976,6 +1023,18 @@ def local_document_details(db, tenant, venda):
     permanecem vinculados à venda.
     """
     cliente = venda.cliente
+    nfce_delivery = bool(venda.tem_entrega) and (
+        venda.nfe_tipo == "nfce" or str(getattr(venda, "nfe_modelo", "")) == "65"
+    )
+    own_delivery = nfce_delivery and not _third_party_delivery(venda)
+    delivery_address = {}
+    if nfce_delivery:
+        try:
+            delivery_address = resolver_endereco_entrega(venda)
+        except DeliveryAddressError:
+            # A consulta de uma tentativa rejeitada precisa continuar exibindo
+            # o texto salvo, inclusive quando o endereco ainda exige revisao.
+            pass
     emitter_uf = (_text(getattr(tenant, "uf", None)) or "").upper()
     destination_uf = (
         (_text(getattr(cliente, "estado", None)) or emitter_uf).upper()
@@ -1128,6 +1187,16 @@ def local_document_details(db, tenant, venda):
             }
         )
 
+    presence_label = (
+        "1 - Operação presencial" if channel == "loja_fisica" else "9 - Outros"
+    )
+    transport_type = "Entrega local" if venda.tem_entrega else "Sem transporte"
+    freight_account = "9 - Sem ocorrência de transporte"
+    if nfce_delivery:
+        presence_label = "4 - NFC-e com entrega a domicílio"
+    if own_delivery:
+        transport_type = "Entrega própria"
+        freight_account = "3 - Transporte próprio por conta do remetente"
     details = {
         "id": venda.id,
         "numero": venda.nfe_numero,
@@ -1145,9 +1214,7 @@ def local_document_details(db, tenant, venda):
         "hora_emissao": issue_at.strftime("%H:%M:%S") if issue_at else None,
         "natureza_operacao": "Venda de mercadoria",
         "finalidade": "1 - NF-e normal",
-        "indicador_presenca": (
-            "1 - Operação presencial" if channel == "loja_fisica" else "9 - Outros"
-        ),
+        "indicador_presenca": presence_label,
         "cliente": (
             {
                 "id": getattr(cliente, "id", None),
@@ -1198,10 +1265,7 @@ def local_document_details(db, tenant, venda):
             "valor_desconto": float(total_discount),
             "valor_total": float(_money(venda.total)),
         },
-        "transporte": {
-            "tipo": "Entrega local" if venda.tem_entrega else "Sem transporte",
-            "frete_por_conta": "9 - Sem ocorrência de transporte",
-        },
+        "transporte": {"tipo": transport_type, "frete_por_conta": freight_account},
         "endereco_entrega": {
             "nome": getattr(cliente, "nome", None) if venda.tem_entrega else None,
             "endereco": venda.endereco_entrega if venda.tem_entrega else None,
@@ -1227,6 +1291,19 @@ def local_document_details(db, tenant, venda):
         },
         "pessoas_autorizadas_xml": [],
     }
+    if delivery_address:
+        selected_fields = {
+            "endereco": delivery_address["logradouro"],
+            "numero": delivery_address["numero"],
+            "complemento": delivery_address.get("complemento"),
+            "bairro": delivery_address["bairro"],
+            "municipio": delivery_address["municipio"],
+            "uf": delivery_address["uf"],
+            "cep": delivery_address["cep"],
+            "codigo_municipio": delivery_address["codigoMunicipio"],
+        }
+        details["cliente"].update(selected_fields)
+        details["endereco_entrega"].update(selected_fields)
     details["diagnostico_rejeicao"] = rejection_diagnostics(venda, db=db, items=items)
     return details
 
