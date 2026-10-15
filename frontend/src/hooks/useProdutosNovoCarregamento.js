@@ -8,11 +8,13 @@ import {
   getFornecedoresProduto,
   getLotes,
   getMarcas,
+  getPreCadastroProdutoGrupo,
   getProduto,
 } from "../api/produtos";
 import { calcularMargemSobreVenda } from "../utils/produtoMargem";
 import {
   montarEstadoProdutoClonado,
+  montarEstadoProdutoPreCadastroGrupo,
   normalizarCodigosBarrasAlternativosCampo,
 } from "../pages/produtosFormUtils";
 
@@ -39,6 +41,8 @@ const construirListaHierarquica = (categorias, parentId = null, nivel = 0) => {
 
 export default function useProdutosNovoCarregamento({
   cloneId,
+  preCadastroGrupoId,
+  preCadastroGrupoTenantOrigem,
   id,
   isEdicao,
   formData,
@@ -387,6 +391,38 @@ export default function useProdutosNovoCarregamento({
     }
   };
 
+  const carregarProdutoParaPreCadastroGrupo = async () => {
+    try {
+      setLoading(true);
+      setErroCarregamento(null);
+      setPredecessorInfo(null);
+      setSucessorInfo(null);
+      setImagens([]);
+      setLotes([]);
+      setFornecedores([]);
+
+      const response = await getPreCadastroProdutoGrupo(
+        preCadastroGrupoId,
+        preCadastroGrupoTenantOrigem,
+      );
+      const pre = montarEstadoProdutoPreCadastroGrupo(response.data);
+
+      setFormData((prev) => ({
+        ...prev,
+        ...pre,
+      }));
+    } catch (error) {
+      console.error("Erro ao carregar produto de outra loja do grupo:", error);
+      setErroCarregamento(
+        error.response?.data?.detail ||
+          error.message ||
+          "Não foi possível trazer os dados desse produto.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const salvarFiscal = async (produto) => {
     const payload = {
       origem_mercadoria: formData.tributacao.origem_mercadoria,
@@ -418,15 +454,18 @@ export default function useProdutosNovoCarregamento({
       carregarProduto();
     } else if (cloneId) {
       carregarProdutoParaClone();
+    } else if (preCadastroGrupoId && preCadastroGrupoTenantOrigem) {
+      carregarProdutoParaPreCadastroGrupo();
     }
 
     return () => {
       produtoRequestRef.current += 1;
     };
-  }, [id, isEdicao, cloneId]);
+  }, [id, isEdicao, cloneId, preCadastroGrupoId, preCadastroGrupoTenantOrigem]);
 
   return {
     carregarDadosAuxiliares,
+    carregarProdutoParaPreCadastroGrupo,
     carregarProdutoParaClone,
     carregarProduto,
     salvarFiscal,

@@ -35,6 +35,7 @@ from app.services.ecommerce_catalog_health import catalog_health_filter_expressi
 from app.grupo_comercial_estoque_compartilhado_service import (
     GrupoComercialEstoqueCompartilhadoService,
 )
+from app.services.produto_busca_grupo_service import buscar_produtos_outras_lojas_grupo
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -315,10 +316,16 @@ def listar_produtos(
         incluir_bling_sync=incluir_bling_sync,
         estoque_compartilhado_por_produto=compartilhamentos_catalogo,
     )
-    return _montar_resposta_produtos_paginados(
+    resposta = _montar_resposta_produtos_paginados(
         produtos_expandidos,
         total=total,
         page=page,
         page_size=page_size,
         offset=offset,
     )
+    # So roda com busca ativa — ver docstring de buscar_produtos_outras_lojas_grupo
+    # pra entender por que isso fica deliberadamente fora da query/paginacao principal.
+    resposta["produtos_outras_lojas"] = buscar_produtos_outras_lojas_grupo(
+        db, tenant_id, termo_busca
+    )
+    return resposta

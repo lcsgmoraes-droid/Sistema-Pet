@@ -167,6 +167,7 @@ export default function useProdutosListagem({
   });
   const estadoPersistidoInicial = useMemo(() => lerEstadoPersistido(persistirBusca), []);
   const [produtosBrutos, setProdutosBrutos] = useState([]);
+  const [produtosOutrasLojas, setProdutosOutrasLojas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selecionados, setSelecionados] = useState([]);
   const [filtros, setFiltros] = useState(estadoPersistidoInicial.filtros);
@@ -341,6 +342,11 @@ export default function useProdutosListagem({
       setProdutosBrutos(produtosData);
       setTotalItensServidor(totalApi);
       setTotalPaginasServidor(Math.max(pagesApi, 1));
+      setProdutosOutrasLojas(
+        Array.isArray(response.data.produtos_outras_lojas)
+          ? response.data.produtos_outras_lojas
+          : [],
+      );
     } catch (error) {
       if (isCarregamentoCancelado(error) || requisicaoProdutosIdRef.current !== requisicaoId) {
         return;
@@ -454,6 +460,7 @@ export default function useProdutosListagem({
     persistirBusca,
     produtos,
     produtosBrutos,
+    produtosOutrasLojas,
     produtosVisiveisRef,
     selecionados,
     setItensPorPagina,
