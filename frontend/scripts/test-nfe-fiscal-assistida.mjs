@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { formatMoneyBRL } from "../src/utils/formatters.js";
+import { createServer } from "vite";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(resolve(__dirname, "../src/utils/nfeFiscalAssistida.js"), "utf8");
@@ -300,107 +300,107 @@ assert.match(
   "modulo fiscal deve ser tratado como contratacao separada",
 );
 
-// Exercise the confirmation flow without loading browser dialogs or the real API.
-const carregarAssistente = new Function(
-  "api",
-  "formatMoneyBRL",
-  "confirmarCorePet",
-  "solicitarCorrecaoFiscal",
-  "MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO",
-  "rejeicaoResponsavelTecnico",
-  `${source
-    .replace(/^import[\s\S]*?from "[^"]+";\r?\n/gm, "")
-    .replace(/^export /gm, "")}\nreturn { emitirNotaFiscalAssistida };`,
-);
-
-async function obterConfirmacao(resumo) {
-  const chamadas = [];
-  const validacao = { provedor: "intnfe", pode_emitir: true, resumo_emissao: resumo };
-  const { emitirNotaFiscalAssistida } = carregarAssistente(
-    {
-      async post(url, payload) {
-        chamadas.push({ url, payload });
-        assert.equal(url, "/nfe/prevalidar", "cancelar a confirmação não deve emitir nota");
-        return { data: validacao };
-      },
-    },
-    formatMoneyBRL,
-    () => assert.fail("o diálogo real não deve ser aberto"),
-    () => assert.fail("uma pré-validação sem pendências não deve pedir correções"),
-    "Suporte técnico",
-    () => false,
+// Load the real module through the same SSR runner used by other frontend tests.
+const servidor = await createServer({
+  root: resolve(__dirname, ".."),
+  configFile: false,
+  optimizeDeps: { noDiscovery: true },
+  server: { middlewareMode: true, watch: null, ws: false },
+});
+try {
+  const { default: api } = await servidor.ssrLoadModule("/src/api.js");
+  const { emitirNotaFiscalAssistida } = await servidor.ssrLoadModule(
+    "/src/utils/nfeFiscalAssistida.js",
   );
-  let mensagem;
-  const resultado = await emitirNotaFiscalAssistida({
-    vendaId: 123,
-    confirmar: (texto) => {
-      mensagem = texto;
-      return false;
-    },
-  });
-  assert.equal(resultado.cancelado, true);
-  assert.deepEqual(chamadas, [
-    { url: "/nfe/prevalidar", payload: { venda_id: 123, tipo_nota: "nfce" } },
-  ]);
-  return mensagem;
-}
 
-const resumoBalcao = {
-  modelo: 65,
-  ambiente: "homologação",
-  ambiente_codigo: 2,
-  serie: 2,
-  total: 28.9,
-  itens: [{}],
-  indicador_presenca: "1",
-  destinatario: { nome: "Cliente teste" },
-};
-const enderecoEntrega = {
-  logradouro: "Rua de Teste",
-  numero: "123",
-  complemento: "Casa 2",
-  bairro: "Centro",
-  municipio: "Curitiba",
-  uf: "PR",
-  cep: "80000000",
-};
-const resumoEntrega = {
-  ...resumoBalcao,
-  indicador_presenca: "4",
-  destinatario: { nome: "Cliente teste", endereco: enderecoEntrega },
-  frete: 5.5,
-};
-const confirmacaoEntrega = await obterConfirmacao(resumoEntrega);
-assert.match(confirmacaoEntrega, /^Entrega própria$/m);
-assert.ok(
-  confirmacaoEntrega.includes(
-    "Endereço de entrega: Rua de Teste, 123, Casa 2, Centro, Curitiba - PR, CEP 80000000",
-  ),
-  "a confirmação deve mostrar o endereço estruturado da pré-validação",
-);
-assert.ok(confirmacaoEntrega.includes("Taxa de entrega: R$ 5,50"));
+  async function obterConfirmacao(resumo) {
+    const chamadas = [];
+    const validacao = { provedor: "intnfe", pode_emitir: true, resumo_emissao: resumo };
+    const postOriginal = api.post;
+    api.post = async (url, payload) => {
+      chamadas.push({ url, payload });
+      assert.equal(url, "/nfe/prevalidar", "cancelar a confirmação não deve emitir nota");
+      return { data: validacao };
+    };
+    try {
+      let mensagem = "";
+      const resultado = await emitirNotaFiscalAssistida({
+        vendaId: 123,
+        confirmar: (texto) => {
+          mensagem = texto;
+          return false;
+        },
+      });
+      assert.equal(resultado.cancelado, true);
+      assert.notEqual(mensagem, "", "o fluxo deve solicitar confirmação antes de emitir");
+      assert.deepEqual(chamadas, [
+        { url: "/nfe/prevalidar", payload: { venda_id: 123, tipo_nota: "nfce" } },
+      ]);
+      return mensagem;
+    } finally {
+      api.post = postOriginal;
+    }
+  }
 
-const confirmacaoEntregaGratuita = await obterConfirmacao({ ...resumoEntrega, frete: 0 });
-assert.match(confirmacaoEntregaGratuita, /^Entrega própria$/m);
-assert.ok(confirmacaoEntregaGratuita.includes("Taxa de entrega: R$ 0,00"));
-assert.ok(confirmacaoEntregaGratuita.includes("Rua de Teste, 123, Casa 2"));
-
-assert.equal(
-  await obterConfirmacao(resumoBalcao),
-  "NFC-e em homologação, série 2\nTotal: R$ 28,90\nItens: 1\nDestinatário: Cliente teste\n\nConfirmar a transmissão destes dados?",
-  "o resumo de balcão deve manter o conteúdo atual",
-);
-assert.equal(
-  await obterConfirmacao({
+  const resumoBalcao = {
+    modelo: 65,
+    ambiente: "homologação",
+    ambiente_codigo: 2,
+    serie: 2,
+    total: 28.9,
+    itens: [{}],
+    indicador_presenca: "1",
+    destinatario: { nome: "Cliente teste" },
+  };
+  const enderecoEntrega = {
+    logradouro: "Rua de Teste",
+    numero: "123",
+    complemento: "Casa 2",
+    bairro: "Centro",
+    municipio: "Curitiba",
+    uf: "PR",
+    cep: "80000000",
+  };
+  const resumoEntrega = {
     ...resumoBalcao,
-    modelo: 55,
-    ambiente: "produção",
-    ambiente_codigo: 1,
-    destinatario: { razaoSocial: "Empresa teste", endereco: enderecoEntrega },
+    indicador_presenca: "4",
+    destinatario: { nome: "Cliente teste", endereco: enderecoEntrega },
     frete: 5.5,
-  }),
-  "ATENÇÃO: esta confirmação transmitirá uma nota fiscal real.\n\nNF-e em produção, série 2\nTotal: R$ 28,90\nItens: 1\nDestinatário: Empresa teste\n\nConfirmar a transmissão destes dados?",
-  "o resumo de NF-e e o aviso de produção devem permanecer iguais",
-);
+  };
+  const confirmacaoEntrega = await obterConfirmacao(resumoEntrega);
+  assert.match(confirmacaoEntrega, /^Entrega própria$/m);
+  assert.ok(
+    confirmacaoEntrega.includes(
+      "Endereço de entrega: Rua de Teste, 123, Casa 2, Centro, Curitiba - PR, CEP 80000000",
+    ),
+    "a confirmação deve mostrar o endereço estruturado da pré-validação",
+  );
+  assert.ok(confirmacaoEntrega.includes("Taxa de entrega: R$ 5,50"));
+
+  const confirmacaoEntregaGratuita = await obterConfirmacao({ ...resumoEntrega, frete: 0 });
+  assert.match(confirmacaoEntregaGratuita, /^Entrega própria$/m);
+  assert.ok(confirmacaoEntregaGratuita.includes("Taxa de entrega: R$ 0,00"));
+  assert.ok(confirmacaoEntregaGratuita.includes("Rua de Teste, 123, Casa 2"));
+
+  assert.equal(
+    await obterConfirmacao(resumoBalcao),
+    "NFC-e em homologação, série 2\nTotal: R$ 28,90\nItens: 1\nDestinatário: Cliente teste\n\nConfirmar a transmissão destes dados?",
+    "o resumo de balcão deve manter o conteúdo atual",
+  );
+  assert.equal(
+    await obterConfirmacao({
+      ...resumoBalcao,
+      modelo: 55,
+      ambiente: "produção",
+      ambiente_codigo: 1,
+      destinatario: { razaoSocial: "Empresa teste", endereco: enderecoEntrega },
+      frete: 5.5,
+    }),
+    "ATENÇÃO: esta confirmação transmitirá uma nota fiscal real.\n\nNF-e em produção, série 2\nTotal: R$ 28,90\nItens: 1\nDestinatário: Empresa teste\n\nConfirmar a transmissão destes dados?",
+    "o resumo de NF-e e o aviso de produção devem permanecer iguais",
+  );
+} finally {
+  await servidor.close();
+}
 
 console.log("NFe fiscal assistant checks passed.");

@@ -123,13 +123,13 @@ def _validated(address):
             "Confira a UF de duas letras do endereco de entrega selecionado.",
             field="entrega.endereco.uf",
         )
-    if not re.fullmatch(r"[0-9]{7}", address["codigoMunicipio"]):
+    if not re.fullmatch(r"\d{7}", address["codigoMunicipio"], flags=re.ASCII):
         raise DeliveryAddressError(
             "Confira o codigo IBGE de sete digitos do endereco de entrega selecionado.",
             field="entrega.endereco.codigoMunicipio",
         )
     cep = re.sub(r"[\s.-]", "", address["cep"])
-    if not re.fullmatch(r"[0-9]{8}", cep):
+    if not re.fullmatch(r"\d{8}", cep, flags=re.ASCII):
         raise DeliveryAddressError(
             "Confira o CEP de oito digitos do endereco de entrega selecionado.",
             field="entrega.endereco.cep",

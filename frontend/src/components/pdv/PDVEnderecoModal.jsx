@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import CampoCodigoMunicipio from "../CampoCodigoMunicipio";
 
 export default function PDVEnderecoModal({
   enderecoAtual,
@@ -163,26 +164,10 @@ export default function PDVEnderecoModal({
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Código IBGE do município
-            </label>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={enderecoAtual.codigo_municipio || ""}
-              onChange={(e) =>
-                atualizarCampo("codigo_municipio", e.target.value.replace(/\D/g, "").slice(0, 7))
-              }
-              maxLength="7"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              placeholder="7 dígitos"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              A busca pelo CEP preenche este código. Confira o município antes de informar
-              manualmente.
-            </p>
-          </div>
+          <CampoCodigoMunicipio
+            value={enderecoAtual.codigo_municipio}
+            onChange={(codigo) => atualizarCampo("codigo_municipio", codigo)}
+          />
 
           <p className="text-xs text-gray-500">* Campos obrigatórios</p>
         </div>

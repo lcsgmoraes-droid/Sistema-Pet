@@ -936,6 +936,9 @@ def build_payload(db, tenant, connection, venda, document_type):
             "Pedidos de marketplace não podem ser emitidos por este fluxo."
         )
 
+    presence = "1" if channel == "loja_fisica" else "9"
+    if nfce_delivery:
+        presence = "4"
     payload = {
         "serie": (
             connection.nfe_series if document_type == "nfe" else connection.nfce_series
@@ -946,9 +949,7 @@ def build_payload(db, tenant, connection, venda, document_type):
         "produtos": products,
         "pagamentos": payments,
         "informacoesAdicionais": _additional_information(venda, credit_installments),
-        "indicadorPresenca": (
-            "4" if nfce_delivery else "1" if channel == "loja_fisica" else "9"
-        ),
+        "indicadorPresenca": presence,
     }
     if document_type == "nfe":
         payload["frete"] = {"modalidade": "9", "valor": float(freight)}
@@ -1186,6 +1187,16 @@ def local_document_details(db, tenant, venda):
             }
         )
 
+    presence_label = (
+        "1 - Operação presencial" if channel == "loja_fisica" else "9 - Outros"
+    )
+    transport_type = "Entrega local" if venda.tem_entrega else "Sem transporte"
+    freight_account = "9 - Sem ocorrência de transporte"
+    if nfce_delivery:
+        presence_label = "4 - NFC-e com entrega a domicílio"
+    if own_delivery:
+        transport_type = "Entrega própria"
+        freight_account = "3 - Transporte próprio por conta do remetente"
     details = {
         "id": venda.id,
         "numero": venda.nfe_numero,
@@ -1203,13 +1214,7 @@ def local_document_details(db, tenant, venda):
         "hora_emissao": issue_at.strftime("%H:%M:%S") if issue_at else None,
         "natureza_operacao": "Venda de mercadoria",
         "finalidade": "1 - NF-e normal",
-        "indicador_presenca": (
-            "4 - NFC-e com entrega a domicílio"
-            if nfce_delivery
-            else "1 - Operação presencial"
-            if channel == "loja_fisica"
-            else "9 - Outros"
-        ),
+        "indicador_presenca": presence_label,
         "cliente": (
             {
                 "id": getattr(cliente, "id", None),
@@ -1260,20 +1265,7 @@ def local_document_details(db, tenant, venda):
             "valor_desconto": float(total_discount),
             "valor_total": float(_money(venda.total)),
         },
-        "transporte": {
-            "tipo": (
-                "Entrega própria"
-                if own_delivery
-                else "Entrega local"
-                if venda.tem_entrega
-                else "Sem transporte"
-            ),
-            "frete_por_conta": (
-                "3 - Transporte próprio por conta do remetente"
-                if own_delivery
-                else "9 - Sem ocorrência de transporte"
-            ),
-        },
+        "transporte": {"tipo": transport_type, "frete_por_conta": freight_account},
         "endereco_entrega": {
             "nome": getattr(cliente, "nome", None) if venda.tem_entrega else None,
             "endereco": venda.endereco_entrega if venda.tem_entrega else None,
