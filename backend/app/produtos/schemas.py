@@ -501,6 +501,7 @@ class ProdutoResponse(ProdutoBase):
 
     id: int
     origem_tenant_id: Optional[UUID] = None
+    produto_identidade_id: Optional[int] = None
     estoque_atual: Optional[float] = 0
     controlar_estoque: bool = True
     markup_percentual: Optional[float] = None  # Campo calculado

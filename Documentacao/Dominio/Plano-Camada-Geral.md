@@ -42,7 +42,21 @@ Toda entidade "mestre" segue a mesma forma:
 
 **Critério de pronto:** uma espécie cadastrada como mestre num grupo aparece disponível (herdada) em todas as lojas do grupo; loja continua podendo ter espécie 100% própria sem tocar no mestre; testes cobrindo os dois casos.
 
-## Checkpoint 2 — Produto mestre ✅ Feito
+## Checkpoint 2 — Produto mestre ⚠️ Eliminado em 10/2026
+
+**Superado**: o mecanismo de `produto_mestre` descrito abaixo (vínculo opcional
+entre cópias de Produto por loja, cópia única no momento do vínculo, nunca mais
+sincronizada depois) foi **removido por inteiro** — modelo (`ProdutoMestre` +
+`CategoriaMestre`/`MarcaMestre`/`DepartamentoMestre`), service, rotas e as 4
+tabelas (migration `zzzzc20261015a1_drop_produto_mestre.py`). Produto passou a
+ter identidade compartilhada automática: uma única `ProdutoIdentidade` por item
+físico, vinculada por correspondência automática de código de barras/GTIN
+dentro do grupo comercial (sem vínculo manual), editável por qualquer loja do
+grupo, com a mudança propagando pra todas as lojas ligadas — mesmo padrão já
+usado em Cliente/Pet (`origem_tenant_id` + RLS), adaptado pra dividir campos
+(preço/estoque/lote continuam 100% por loja, só a identidade física é
+compartilhada). Ver Checkpoint 7 abaixo e `app/services/produto_identidade_service.py`.
+Resto desta seção fica só como histórico do desenho anterior.
 
 **Escopo** (já desenhado em detalhe na [[Proposta-Modelo-Proprietario-Lojas]], seção 5.2):
 - `produto_mestre` (nome, descrição, fotos, categoria/marca/departamento, ficha técnica, GTIN, dados fiscais de referência) + `categoria_mestre`/`marca_mestre`/`departamento_mestre` andando junto.
@@ -96,6 +110,53 @@ Depois dos 4 domínios prontos no backend: uma tela única (provavelmente dentro
 ## Checkpoint 6 — Adoção assistida (opcional, avaliar depois)
 
 Ferramenta de matching pra lojas que **já tinham** produtos/pets/clientes duplicados entre si antes da camada mestre existir — sugere pares prováveis (mesmo GTIN, mesmo CPF, nome de pet + tutor iguais) pra vincular em lote. Mais complexo (matching difuso, revisão humana antes de aplicar), decisão separada sobre se vale o esforço ou se a adoção orgânica (vincular conforme cadastra de novo) já resolve.
+
+## Checkpoint 7 — Produto: identidade compartilhada (fase D) ✅ Backend feito
+
+**Por quê revisitar Produto**: o Checkpoint 2 (`produto_mestre`) provou o
+desenho de "tabela mestre + FK opcional" mas nunca saiu do papel na prática —
+vínculo manual, cópia única, nunca exposto no formulário de produto de
+verdade. O Lucas pediu o mesmo tratamento já dado a Pessoa no Checkpoint 4:
+compartilhamento automático (sem vínculo manual) e vivo (edição em qualquer
+loja propaga pra todas), só que, diferente de Pessoa, Produto precisa de
+**divisão de campos** — preço/estoque/lote/fornecedor continuam 100% por
+loja, só o que é fisicamente o mesmo item (nome, código de barras/GTIN, peso,
+dimensões, foto, descrição, classificação de ração) é compartilhado.
+
+**Escopo**:
+- Tabela nova `produto_identidades` (model `ProdutoIdentidade`,
+  `app/produto_identidade_models.py`) — mesmo padrão `origem_tenant_id` + RLS
+  de grupo já usado em `Cliente`/`Pet` (`app/tenancy/filters.py`, clonado da
+  migration `zzzv20261005a1_rls_grupo_pessoas_pets.py`), aplicado só a essa
+  tabela nova. `Produto` ganha `produto_identidade_id` (nullable) e continua
+  com as mesmas colunas inerentes de sempre, funcionando como espelho
+  sincronizado — nenhum dos ~169 arquivos que já leem `Produto.nome`/
+  `codigo_barras`/etc. direto precisou mudar.
+- Correspondência automática por código de barras/GTIN exato (reaproveita a
+  query já existente em `grupo_duplicados_service.py::produtos_duplicados`) —
+  0 correspondências cria identidade nova, exatamente 1 vincula e herda os
+  valores já estabelecidos, 2+ vai pra fila de conflito
+  (`produto_identidade_conflitos`), nunca escolhe sozinho.
+- Funil único de escrita (`app/services/produto_identidade_service.py`):
+  grava na identidade, audita (`produto_identidades_historico_alteracoes`), e
+  propaga (sobrescreve, nunca diff) pra toda loja do grupo ligada àquela
+  identidade, cada uma dentro do seu próprio `tenant_context()` — nunca um
+  UPDATE cross-tenant direto. Ligado em `ProdutoService.create_produto`,
+  `atualizar_produto` e no endpoint de edição em lote (`AtualizacaoLoteRequest`).
+- `ProdutoMestre` eliminado por inteiro (ver nota no Checkpoint 2 acima).
+
+**Fora do escopo desta rodada**: varredura/fusão dos produtos já cadastrados
+em lojas diferentes do grupo (script `backend/scripts/backfill_produto_identidades.py`
+— desenhado no plano, ainda não implementado/rodado) e a separação visual do
+formulário de produto (`ProdutosNovo.jsx`) em "dados compartilhados" vs. "dados
+desta loja" — telas ainda não tocadas, produto recém-criado/editado já funciona
+corretamente por baixo, só a UI não comunica isso ainda.
+
+**Critério de pronto (backend)**: criar produto com GTIN batendo em outra loja
+do mesmo grupo vincula e herda automaticamente; editar campo inerente em
+qualquer loja aparece nas outras lojas ligadas; editar preço/estoque nunca
+propaga; confirmado via teste manual real contra o grupo "Grupo Atacadão e
+Gabi" (GS Multi Marcas + Atacadão das Rações Pet) no banco de dev.
 
 ---
 

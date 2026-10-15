@@ -25,17 +25,18 @@ from app.variacao_config_fiscal_models import VariacaoConfigFiscal  # noqa
 # módulo próprio, não reexportado por app.models.
 from app.especie_raca_mestre_models import EspecieMestre, RacaMestre  # noqa
 
-# Produto mestre + categoria/marca/departamento mestre (Checkpoint 2)
-from app.produto_mestre_models import (  # noqa
-    CategoriaMestre,
-    DepartamentoMestre,
-    MarcaMestre,
-    ProdutoMestre,
-)
-
 # Importando produtos
 from app.produtos_models import Produto, Marca, Categoria  # noqa
 from app.produto_identity_models import ProdutoSkuAlias, ProdutoFusaoLog  # noqa
+
+# Identidade de produto compartilhada entre lojas do grupo comercial (fase D,
+# substitui o ProdutoMestre) — ver app/produto_identidade_models.py.
+from app.produto_identidade_models import (  # noqa
+    ProdutoIdentidade,
+    ProdutoIdentidadeBackfillRun,
+    ProdutoIdentidadeConflito,
+    ProdutoIdentidadeHistoricoAlteracao,
+)
 
 # Importando vendas
 from app.vendas_models import Venda, VendaItem  # noqa

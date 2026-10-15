@@ -247,6 +247,10 @@ class ProdutoService:
 
                 KitCustoService.sincronizar_custo_kit(db, novo_produto.id)
 
+            from .produto_identidade_service import resolver_ou_vincular
+
+            resolver_ou_vincular(novo_produto, db)
+
             db.commit()
             db.refresh(novo_produto)
             logger.info(

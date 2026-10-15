@@ -21,6 +21,7 @@ from app.produtos.validators import (
     _validar_tenant_e_obter_usuario,
 )
 from app.produtos_models import Produto
+from app.services.produto_identidade_service import processar_alteracoes_inerentes
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -33,7 +34,7 @@ def atualizar_produtos_lote(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Atualiza dados comerciais e operacionais de múltiplos produtos."""
-    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     logger.info(f"📦 Atualizando {len(dados.produto_ids)} produtos em lote")
 
@@ -88,6 +89,22 @@ def atualizar_produtos_lote(
             )
             .first()
         )
+
+    # Campos inerentes (identidade compartilhada do grupo comercial) que este
+    # lote pode tocar — classificacao_racao/categoria_racao/especies_indicadas
+    # sao os unicos 3 da lista de INHERENT_FIELDS editaveis por aqui; o resto
+    # do endpoint (marca/categoria/departamento/fornecedor/estoque/etc.) e
+    # sempre local, nunca propaga. Calculado uma vez, igual pra cada produto
+    # do lote — cada um e aplicado com o valor final JA setado nele.
+    campos_inerentes_do_lote = {
+        campo
+        for campo, tocado in (
+            ("classificacao_racao", dados.eh_racao is not None or dados.classificacao_racao is not None or dados.linha_racao_id is not None),
+            ("categoria_racao", dados.categoria_racao is not None),
+            ("especies_indicadas", dados.especies_indicadas is not None),
+        )
+        if tocado
+    }
 
     # Atualizar campos fornecidos
     atualizado = 0
@@ -201,6 +218,14 @@ def atualizar_produtos_lote(
                 produto.anunciar_app = dados.anunciar_app
 
         produto.updated_at = datetime.utcnow()
+
+        if campos_inerentes_do_lote:
+            processar_alteracoes_inerentes(
+                produto,
+                {campo: getattr(produto, campo) for campo in campos_inerentes_do_lote},
+                db,
+                current_user.id,
+            )
 
     db.commit()
 

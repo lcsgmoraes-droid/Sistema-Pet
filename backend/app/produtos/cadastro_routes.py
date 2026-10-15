@@ -731,6 +731,14 @@ def atualizar_produto(
             )
             db.add(produto)
 
+        from app.services.produto_identidade_service import (
+            processar_alteracoes_inerentes,
+        )
+
+        processar_alteracoes_inerentes(
+            produto, dados_recebidos, db, current_user.id
+        )
+
         db.commit()
         db.refresh(produto)
         logger.info(f"✅ Produto #{produto_id} atualizado com sucesso")

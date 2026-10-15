@@ -40,11 +40,6 @@ class Categoria(BaseTenantModel):
     icone = Column(String(50), nullable=True)
     cor = Column(String(7), nullable=True)  # Hex color
     ordem = Column(Integer, default=0)
-    # Vínculo opcional com a categoria-mestre do grupo comercial (ver
-    # app/produto_mestre_models.py) — sem vínculo, funciona como hoje.
-    categoria_mestre_id = Column(
-        Integer, ForeignKey("categoria_mestre.id", ondelete="SET NULL"), nullable=True
-    )
 
     # Auditoria
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -70,9 +65,6 @@ class Marca(BaseTenantModel):
     descricao = Column(Text, nullable=True)
     logo = Column(String(255), nullable=True)
     site = Column(String(255), nullable=True)
-    marca_mestre_id = Column(
-        Integer, ForeignKey("marca_mestre.id", ondelete="SET NULL"), nullable=True
-    )
 
     # Auditoria
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -94,11 +86,6 @@ class Departamento(BaseTenantModel):
     id = Column(Integer, primary_key=True)
     nome = Column(String(100), nullable=False)
     descricao = Column(Text, nullable=True)
-    departamento_mestre_id = Column(
-        Integer,
-        ForeignKey("departamento_mestre.id", ondelete="SET NULL"),
-        nullable=True,
-    )
 
     # Auditoria
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -124,12 +111,18 @@ class Produto(BaseTenantModel):
     nome = Column(String(200), nullable=False)
     tipo = Column(String(20), default="produto")  # produto, servico, produto_servico
     situacao = Column(Boolean, default=True)  # ativo/inativo
-    # Vínculo opcional com o produto-mestre do grupo comercial (ver
-    # app/produto_mestre_models.py). Sem vínculo, cadastro 100% independente
-    # igual hoje; preço/estoque/fornecedor continuam sempre locais, com ou
-    # sem vínculo.
-    produto_mestre_id = Column(
-        Integer, ForeignKey("produto_mestre.id", ondelete="SET NULL"), nullable=True
+    # Vínculo com a identidade compartilhada do grupo comercial (nome, código
+    # de barras/GTIN, peso, dimensões, foto, descrição, classificação de ração
+    # — ver app/produto_identidade_models.py). Nullable: produto sem GTIN
+    # confiável, ou loja fora de qualquer grupo, fica sem vínculo normalmente.
+    # Os campos inerentes continuam também aqui em Produto, como espelho
+    # sincronizado pelo app/services/produto_identidade_service.py — nenhum
+    # consumidor existente de Produto.nome/codigo_barras/etc. precisa mudar.
+    produto_identidade_id = Column(
+        Integer,
+        ForeignKey("produto_identidades.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     @property
@@ -503,6 +496,13 @@ class Produto(BaseTenantModel):
         Index(
             "idx_produtos_variation_signature", "tenant_id", "variation_signature"
         ),  # Sprint 2: Variações        {'extend_existing': True}
+        Index(
+            "ux_produtos_tenant_identidade",
+            "tenant_id",
+            "produto_identidade_id",
+            unique=True,
+            postgresql_where=(produto_identidade_id.isnot(None) & deleted_at.is_(None)),
+        ),
     )
 
     @property

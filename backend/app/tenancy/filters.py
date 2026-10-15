@@ -128,6 +128,13 @@ def _tenant_read_filter(cls, tenant_id):
         active_membership = active_membership.correlate_except(UserTenant)
         return or_(cls.tenant_id == tenant_id, active_membership.exists())
 
+    if table_name == "produto_identidades":
+        # Identidade de produto (nome/codigo de barras/peso/foto) e compartilhada
+        # so dentro do grupo comercial, nunca com parceiro veterinario — sem o
+        # guard de VetPartnerLink usado abaixo pra clientes/pets/produtos. Mesma
+        # regra espelhada em RLS real (migration zzzzb20261015a1).
+        return or_(cls.tenant_id == tenant_id, pessoa_visivel_no_grupo(cls, tenant_id))
+
     if table_name not in PARTNER_READABLE_TENANT_TABLES:
         return cls.tenant_id == tenant_id
 

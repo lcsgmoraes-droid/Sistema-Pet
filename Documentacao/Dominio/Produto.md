@@ -11,16 +11,39 @@ Ver [[Produtos-Estoque]], [[Venda]], [[Bling]], [[Tenant]], [[EmpresaGrupo]], [[
 
 Mesmo modelo descrito em [[Cliente]] (leia lá primeiro): **1 [[Tenant]] = 1 loja**, sem conceito de "loja" separado dentro de um Tenant. Um cliente do CorePet com 7 lojas físicas tem **7 Tenants**, não 1 Tenant com 7 lojas internamente.
 
-Cada linha da tabela `produtos` pertence a exatamente um `tenant_id`. O catálogo de cada loja é uma base própria — **não há nenhuma linha de produto compartilhada por padrão** entre as 7 lojas do mesmo cliente/grupo, mesmo que vendam exatamente os mesmos itens.
+Cada linha da tabela `produtos` pertence a exatamente um `tenant_id` — isso não
+muda. O que mudou em 10/2026 (ver Checkpoint 7 de [[Plano-Camada-Geral]]): os
+campos que são fisicamente o mesmo item (nome, código de barras/GTIN, peso,
+dimensões, foto, descrição, classificação de ração — ver `INHERENT_FIELDS` em
+`app/services/produto_identidade_service.py`) passaram a ter uma identidade
+compartilhada automática quando a loja participa de um [[EmpresaGrupo|grupo
+comercial]] ativo: `ProdutoIdentidade` (tabela `produto_identidades`), uma
+linha por item físico, vinculada via correspondência automática de código de
+barras/GTIN exato entre lojas do mesmo grupo — sem vínculo manual, sem opt-in.
+Preço, custo, estoque, lote/validade e fornecedor continuam **100% por loja,
+sem exceção**.
 
-**Quando 7 lojas do mesmo grupo comercial têm "o mesmo produto"** (ex.: a mesma ração vendida nas 7 unidades), isso vira **7 linhas de `produtos` independentes**, uma por tenant, com IDs sem nenhuma relação entre si. Isso é confirmado explicitamente no próprio código-fonte (`empresa_grupo_models.py`, docstring de `EmpresaGrupoProdutoVinculo`): *"Os IDs de produto não recebem chave estrangeira porque pertencem a tenants diferentes e podem se repetir."* O sistema não funde nem sincroniza automaticamente o catálogo entre lojas.
+**Quando duas lojas do mesmo grupo têm "o mesmo produto"** (ex.: a mesma
+ração vendida nas duas unidades), cada uma ainda tem sua própria linha em
+`produtos` (preço/estoque continuam por loja) — mas, se o código de barras/GTIN
+bate exatamente entre as duas, ambas as linhas ficam ligadas (`produto_identidade_id`)
+à mesma `ProdutoIdentidade`, e os campos inerentes continuam sincronizados:
+editar o nome ou a foto em qualquer uma das duas lojas atualiza a outra
+automaticamente. Sem GTIN confiável, o produto fica sem vínculo (cada loja
+com sua linha independente, como sempre foi) até alguém vincular manualmente
+depois. Mecânica completa em `app/services/produto_identidade_service.py` e
+`app/tenancy/filters.py` (mesmo padrão `origem_tenant_id` + RLS já usado em
+[[Cliente]]/[[Pet]]).
 
-Se as lojas estiverem no mesmo [[EmpresaGrupo]], existem dois mecanismos **opcionais** (nada disso acontece sozinho):
+Separado disso, continuam existindo dois mecanismos **opcionais**, que resolvem
+problemas diferentes e não são afetados pela identidade compartilhada:
 
-1. **Equivalência manual entre produtos de lojas diferentes** (`EmpresaGrupoProdutoVinculo`) — um vínculo manual dizendo "o produto X da loja 1 é o mesmo item que o produto Y da loja 3". Não é uma FK real de banco (não pode ser — os IDs pertencem a tenants/tabelas logicamente separadas); é uma tabela de associação própria, validada pelo service a cada uso.
-2. **Estoque seletivamente compartilhado** (`EmpresaGrupoEstoqueCompartilhado`) — autoriza a loja 3 a vender, no seu próprio PDV, o saldo de estoque que pertence fisicamente à loja 1, sem duplicar o produto nem mover estoque de fato. O produto e o estoque continuam sendo 100% da loja de origem; a loja consumidora só ganha permissão de leitura/venda sobre aquele saldo (ou sobre o catálogo inteiro, se `acesso_catalogo_completo=True`).
+1. **Equivalência manual entre produtos de lojas diferentes** (`GrupoComercialProdutoVinculo`) — um vínculo manual dizendo "o produto X da loja 1 é o mesmo item que o produto Y da loja 3", usado só pra comparações analíticas/BI entre lojas (relatórios consolidados) quando não há GTIN comum pra correspondência automática reconhecer. Não é uma FK real de banco (não pode ser — os IDs pertencem a tenants/tabelas logicamente separadas); é uma tabela de associação própria, validada pelo service a cada uso.
+2. **Estoque seletivamente compartilhado** (`GrupoComercialEstoqueCompartilhado`) — autoriza a loja 3 a vender, no seu próprio PDV, o saldo de estoque que pertence fisicamente à loja 1, sem duplicar o produto nem mover estoque de fato. O produto e o estoque continuam sendo 100% da loja de origem; a loja consumidora só ganha permissão de leitura/venda sobre aquele saldo (ou sobre o catálogo inteiro, se `acesso_catalogo_completo=True`).
 
-Fora desses dois mecanismos opt-in, cadastrar um produto na loja 1 **não** cria, atualiza ou reflete nada nas lojas 2 a 7.
+Um produto pode ter identidade compartilhada, estoque seletivamente
+compartilhado, vínculo analítico manual — todos juntos, alguns, ou nenhum —
+são mecanismos independentes.
 
 ✅ **Existe, sim, uma visão consolidada de vendas/estoque das 7 lojas** — mas é um relatório agregado, não uma fusão de cadastro: `GET /grupos-empresas/{grupo_id}/visao-consolidada` soma quantidade/valor de vendas e valor de estoque das lojas do grupo (calculado com segurança, loja por loja, sem furar o isolamento de cada uma), e `GET /grupos-empresas/{grupo_id}/produtos-vendidos` lista os produtos vendidos das 7 lojas numa lista só, com filtro por loja. Ver [[EmpresaGrupo]] para os detalhes — isso não muda nada do que já foi dito acima: cada `produtos.id` continua sendo uma linha própria de uma loja só.
 
@@ -31,6 +54,7 @@ Fora desses dois mecanismos opt-in, cadastrar um produto na loja 1 **não** cria
 - `categoria_id` → `categorias.id`, `marca_id` → `marcas.id`, `departamento_id` → `departamentos.id`.
 - `fornecedor_id` → `clientes.id` (reaproveitamento de `Cliente`, ver [[Cliente]]).
 - `produto_pai_id` → auto-FK (`produtos.id`) para variações/kits.
+- `produto_identidade_id` → `produto_identidades.id`, nullable — identidade compartilhada do grupo comercial (ver seção acima e `app/produto_identidade_models.py`); índice único parcial `ux_produtos_tenant_identidade` garante no máximo 1 linha por tenant ligada à mesma identidade.
 - Relaciona-se com `ProdutoLote` (controle de lote/validade), `ProdutoImagem`, `EstoqueMovimentacao`, `ListaPreco`.
 - Faz parte também de um **Catálogo Mestre global** (`catalogo_mestre_models.py`), com worker dedicado de enriquecimento contínuo (`backend/scripts/run_catalogo_mestre_worker.py`) — um conceito de catálogo compartilhado entre tenants, além do catálogo próprio de cada empresa.
 - Recorrência de compra (protocolos de recompra) é tratada em `services/product_recurrence.py` e modelos de lembrete associados.

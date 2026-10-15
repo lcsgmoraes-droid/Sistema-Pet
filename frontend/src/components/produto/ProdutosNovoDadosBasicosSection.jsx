@@ -1,4 +1,4 @@
-import { Loader2, Plus, Sparkles } from "lucide-react";
+import { Loader2, Plus, Sparkles, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import SafeMarkdown from "../ui/SafeMarkdown";
 import {
@@ -36,233 +36,258 @@ export default function ProdutosNovoDadosBasicosSection({
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">SKU *</label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={formData.sku}
-              onChange={(e) => handleChange("sku", e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Ex: PROD0001"
-            />
-            <ActionButton type="button" onClick={handleGerarSKU} intent="neutral">
-              Gerar
-            </ActionButton>
-          </div>
-          <p className="mt-1 text-xs text-gray-500">
-            Esse valor e salvo como o SKU oficial do produto.
-            {formData.codigo ? ` Atual: ${formData.codigo}` : ""}
-          </p>
+      <section>
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-semibold text-gray-700">Dados do produto</h3>
+          {formData.produto_identidade_id ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+              <Users className="h-3 w-3" aria-hidden="true" />
+              Compartilhado no grupo
+            </span>
+          ) : null}
         </div>
+        <p className="mb-3 text-xs text-gray-500">
+          Nome, codigo de barras/GTIN, unidade e descricao sao do item em si. Se esta
+          loja faz parte de um grupo comercial e outra loja ja vende o mesmo item
+          (mesmo codigo de barras), esses campos ficam ligados — editar aqui atualiza
+          la tambem.
+        </p>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            EAN principal (codigo de barras)
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={formData.codigo_barras}
-              onChange={(e) => handleChange("codigo_barras", e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="EAN-13"
-            />
-            <ActionButton type="button" onClick={handleGerarCodigoBarras} intent="neutral">
-              Gerar
-            </ActionButton>
-          </div>
-        </div>
-      </div>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                EAN principal (codigo de barras)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={formData.codigo_barras}
+                  onChange={(e) => handleChange("codigo_barras", e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="EAN-13"
+                />
+                <ActionButton type="button" onClick={handleGerarCodigoBarras} intent="neutral">
+                  Gerar
+                </ActionButton>
+              </div>
+            </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">EAN comercial</label>
-          <input
-            type="text"
-            value={formData.gtin_ean}
-            onChange={(e) => handleChange("gtin_ean", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="cEAN da NF"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">EAN fiscal</label>
-          <input
-            type="text"
-            value={formData.gtin_ean_tributario}
-            onChange={(e) => handleChange("gtin_ean_tributario", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="cEANTrib da NF"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">EANs alternativos</label>
-          <input
-            type="text"
-            value={formData.codigos_barras_alternativos}
-            onChange={(e) => handleChange("codigos_barras_alternativos", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Separe por virgula"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Produto *</label>
-        <input
-          type="text"
-          value={formData.nome}
-          onChange={(e) => handleChange("nome", e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          placeholder="Ex: Racao Golden para Caes Adultos 15kg"
-          required
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-          <select
-            value={formData.tipo}
-            onChange={(e) => handleChange("tipo", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="produto">Produto</option>
-            <option value="servico">Servico</option>
-            <option value="ambos">Produto e Servico</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
-          <div className="flex gap-2">
-            <select
-              value={formData.departamento_id}
-              onChange={(e) => handleChange("departamento_id", e.target.value)}
-              className="min-w-0 flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">Selecione...</option>
-              {departamentos.map((dep) => (
-                <option key={dep.id} value={dep.id}>
-                  {dep.nome}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => onNovoCatalogo?.("departamento")}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
-              title="Cadastrar departamento"
-              aria-label="Cadastrar departamento"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <CategoriaProdutoSelector
-            label="Categoria"
-            categorias={categoriasHierarquicas}
-            value={formData.categoria_id}
-            onChange={(valor) => handleChange("categoria_id", valor)}
-            placeholder="Selecione..."
-            searchPlaceholder="Digite para buscar categoria..."
-            inputClassName="border-gray-300"
-            onCreateOption={() => onNovoCatalogo?.("categoria")}
-            createOptionLabel="Cadastrar categoria"
-          />
-        </div>
-
-        <div>
-          <MarcaProdutoSelector
-            label="Marca"
-            marcas={marcas}
-            value={formData.marca_id}
-            onChange={(valor) => handleChange("marca_id", valor)}
-            placeholder="Selecione..."
-            searchPlaceholder="Digite para buscar marca..."
-            inputClassName="border-gray-300"
-            onCreateOption={() => onNovoCatalogo?.("marca")}
-            createOptionLabel="Cadastrar marca"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Unidade</label>
-          <select
-            value={formData.unidade}
-            onChange={(e) => handleChange("unidade", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="UN">UN - Unidade</option>
-            <option value="KG">KG - Quilograma</option>
-            <option value="G">G - Grama</option>
-            <option value="L">L - Litro</option>
-            <option value="ML">ML - Mililitro</option>
-            <option value="M">M - Metro</option>
-            <option value="CX">CX - Caixa</option>
-            <option value="PCT">PCT - Pacote</option>
-          </select>
-        </div>
-
-        <div className="md:col-span-3">
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <label className="block text-sm font-medium text-gray-700">Descricao</label>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <ActionButton
-                type="button"
-                icon={preenchendoComIA ? Loader2 : Sparkles}
-                onClick={onPreencherComIA}
-                disabled={preenchendoComIA || !formData.codigo_barras}
-                intent="create"
-                size="sm"
-              >
-                {preenchendoComIA ? "Pesquisando..." : "Preencher com IA"}
-              </ActionButton>
-              <SegmentedControl
-                ariaLabel="Modo da descricao do produto"
-                value={descricaoModo}
-                onChange={setDescricaoModo}
-                options={[
-                  { value: "editar", label: "Editar" },
-                  { value: "previa", label: "Previa" },
-                ]}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Produto *</label>
+              <input
+                type="text"
+                value={formData.nome}
+                onChange={(e) => handleChange("nome", e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Ex: Racao Golden para Caes Adultos 15kg"
+                required
               />
             </div>
           </div>
 
-          {descricaoModo === "editar" ? (
-            <textarea
-              value={formData.descricao}
-              onChange={(e) => handleChange("descricao", e.target.value)}
-              onBlur={handleDescricaoBlur}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              rows="4"
-              placeholder="Descricao detalhada do produto..."
-            />
-          ) : (
-            <div className="min-h-[104px] rounded-lg border border-gray-200 bg-white px-3 py-2">
-              <SafeMarkdown value={descricaoNormalizada} empty="Sem descricao" />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">EAN comercial</label>
+              <input
+                type="text"
+                value={formData.gtin_ean}
+                onChange={(e) => handleChange("gtin_ean", e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="cEAN da NF"
+              />
             </div>
-          )}
-          <p className="mt-1 text-xs text-gray-500">
-            A IA pesquisa pelo EAN, prepara a descricao e sugere NCM, CEST e origem. Revise os dados
-            fiscais antes de salvar.
-          </p>
-          {assistenteIAAviso ? (
-            <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              {assistenteIAAviso}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">EAN fiscal</label>
+              <input
+                type="text"
+                value={formData.gtin_ean_tributario}
+                onChange={(e) => handleChange("gtin_ean_tributario", e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="cEANTrib da NF"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">EANs alternativos</label>
+              <input
+                type="text"
+                value={formData.codigos_barras_alternativos}
+                onChange={(e) => handleChange("codigos_barras_alternativos", e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Separe por virgula"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Unidade</label>
+              <select
+                value={formData.unidade}
+                onChange={(e) => handleChange("unidade", e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="UN">UN - Unidade</option>
+                <option value="KG">KG - Quilograma</option>
+                <option value="G">G - Grama</option>
+                <option value="L">L - Litro</option>
+                <option value="ML">ML - Mililitro</option>
+                <option value="M">M - Metro</option>
+                <option value="CX">CX - Caixa</option>
+                <option value="PCT">PCT - Pacote</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <label className="block text-sm font-medium text-gray-700">Descricao</label>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <ActionButton
+                  type="button"
+                  icon={preenchendoComIA ? Loader2 : Sparkles}
+                  onClick={onPreencherComIA}
+                  disabled={preenchendoComIA || !formData.codigo_barras}
+                  intent="create"
+                  size="sm"
+                >
+                  {preenchendoComIA ? "Pesquisando..." : "Preencher com IA"}
+                </ActionButton>
+                <SegmentedControl
+                  ariaLabel="Modo da descricao do produto"
+                  value={descricaoModo}
+                  onChange={setDescricaoModo}
+                  options={[
+                    { value: "editar", label: "Editar" },
+                    { value: "previa", label: "Previa" },
+                  ]}
+                />
+              </div>
+            </div>
+
+            {descricaoModo === "editar" ? (
+              <textarea
+                value={formData.descricao}
+                onChange={(e) => handleChange("descricao", e.target.value)}
+                onBlur={handleDescricaoBlur}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                rows="4"
+                placeholder="Descricao detalhada do produto..."
+              />
+            ) : (
+              <div className="min-h-[104px] rounded-lg border border-gray-200 bg-white px-3 py-2">
+                <SafeMarkdown value={descricaoNormalizada} empty="Sem descricao" />
+              </div>
+            )}
+            <p className="mt-1 text-xs text-gray-500">
+              A IA pesquisa pelo EAN, prepara a descricao e sugere NCM, CEST e origem. Revise os dados
+              fiscais antes de salvar.
             </p>
-          ) : null}
+            {assistenteIAAviso ? (
+              <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                {assistenteIAAviso}
+              </p>
+            ) : null}
+          </div>
         </div>
-      </div>
+      </section>
+
+      <section className="mt-6 border-t border-gray-100 pt-6">
+        <h3 className="mb-3 text-sm font-semibold text-gray-700">Dados desta loja</h3>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">SKU *</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={formData.sku}
+                  onChange={(e) => handleChange("sku", e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Ex: PROD0001"
+                />
+                <ActionButton type="button" onClick={handleGerarSKU} intent="neutral">
+                  Gerar
+                </ActionButton>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Esse valor e salvo como o SKU oficial do produto.
+                {formData.codigo ? ` Atual: ${formData.codigo}` : ""}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+              <select
+                value={formData.tipo}
+                onChange={(e) => handleChange("tipo", e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="produto">Produto</option>
+                <option value="servico">Servico</option>
+                <option value="ambos">Produto e Servico</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
+              <div className="flex gap-2">
+                <select
+                  value={formData.departamento_id}
+                  onChange={(e) => handleChange("departamento_id", e.target.value)}
+                  className="min-w-0 flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Selecione...</option>
+                  {departamentos.map((dep) => (
+                    <option key={dep.id} value={dep.id}>
+                      {dep.nome}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => onNovoCatalogo?.("departamento")}
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
+                  title="Cadastrar departamento"
+                  aria-label="Cadastrar departamento"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <CategoriaProdutoSelector
+                label="Categoria"
+                categorias={categoriasHierarquicas}
+                value={formData.categoria_id}
+                onChange={(valor) => handleChange("categoria_id", valor)}
+                placeholder="Selecione..."
+                searchPlaceholder="Digite para buscar categoria..."
+                inputClassName="border-gray-300"
+                onCreateOption={() => onNovoCatalogo?.("categoria")}
+                createOptionLabel="Cadastrar categoria"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <MarcaProdutoSelector
+                label="Marca"
+                marcas={marcas}
+                value={formData.marca_id}
+                onChange={(valor) => handleChange("marca_id", valor)}
+                placeholder="Selecione..."
+                searchPlaceholder="Digite para buscar marca..."
+                inputClassName="border-gray-300"
+                onCreateOption={() => onNovoCatalogo?.("marca")}
+                createOptionLabel="Cadastrar marca"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
     </>
   );
 }
