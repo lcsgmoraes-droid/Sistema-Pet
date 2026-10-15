@@ -16,7 +16,7 @@ from app.models import Cliente
 from app.produtos_models import Produto  # noqa: F401 - registra a relação de VendaItem
 from app.nfe.vendas_sem_nota_routes import listar_vendas_sem_nota
 from app.tenancy.context import tenant_context
-from app.vendas_models import Venda
+from app.vendas_models import Venda, VendaItem
 from app.empresa_config_geral_models import EmpresaConfigGeral
 from app.empresa_config_routes import (
     EmpresaConfigGeralCreate,
@@ -30,6 +30,8 @@ def test_lista_somente_vendas_finalizadas_sem_tentativa_no_periodo():
     engine = create_engine("sqlite:///:memory:")
     Cliente.__table__.create(engine)
     Venda.__table__.create(engine)
+    Produto.__table__.create(engine)
+    VendaItem.__table__.create(engine)
     tenant, outra_empresa = uuid4(), uuid4()
 
     def inserir(db, numero, data, *, empresa=tenant, status="finalizada", **extras):
@@ -88,6 +90,100 @@ def test_lista_somente_vendas_finalizadas_sem_tentativa_no_periodo():
             assert paginada["total"] == 2
             assert paginada["vendas"][0]["numero_venda"] == "inicio"
 
+    engine.dispose()
+
+
+def test_servicos_puros_e_mistos_ficam_visiveis_mas_fora_da_selecao_fiscal():
+    engine = create_engine("sqlite:///:memory:")
+    for model in (Cliente, Venda, Produto, VendaItem):
+        model.__table__.create(engine)
+    tenant, outra_empresa = uuid4(), uuid4()
+    with Session(engine) as db:
+        with tenant_context(tenant):
+            db.execute(
+                Produto.__table__.insert().values(
+                    id=10,
+                    tenant_id=tenant,
+                    user_id=1,
+                    nome="Banho cadastrado",
+                    codigo="BANHO-10",
+                )
+            )
+            for ident, numero, itens in (
+                (1, "produto", [("produto", None, "Mercadoria")]),
+                (2, "servico", [("servico", None, "Banho avulso")]),
+                (
+                    3,
+                    "mista",
+                    [("produto", None, "Mercadoria"), ("servico", None, "Tosa")],
+                ),
+                (4, "servico_com_produto", [("servico", 10, None)]),
+                (5, "entrega", [("servico", None, "TAXA DE ENTREGA")]),
+            ):
+                db.execute(
+                    Venda.__table__.insert().values(
+                        id=ident,
+                        tenant_id=tenant,
+                        numero_venda=numero,
+                        vendedor_id=1,
+                        user_id=1,
+                        subtotal=100,
+                        total=100,
+                        data_venda=datetime(2026, 10, 14),
+                        status="finalizada",
+                        canal="loja_fisica",
+                    )
+                )
+                for tipo, produto_id, descricao in itens:
+                    db.execute(
+                        VendaItem.__table__.insert().values(
+                            tenant_id=tenant,
+                            venda_id=ident,
+                            tipo=tipo,
+                            produto_id=produto_id,
+                            servico_descricao=descricao,
+                            quantidade=1,
+                            preco_unitario=100,
+                            subtotal=100,
+                        )
+                    )
+            # Um item de outra empresa nao pode bloquear uma venda deste tenant.
+            with tenant_context(outra_empresa):
+                db.execute(
+                    VendaItem.__table__.insert().values(
+                        tenant_id=outra_empresa,
+                        venda_id=1,
+                        tipo="servico",
+                        servico_descricao="Servico de outra empresa",
+                        quantidade=1,
+                        preco_unitario=100,
+                        subtotal=100,
+                    )
+                )
+            db.commit()
+            resultado = listar_vendas_sem_nota(
+                data_inicial=date(2026, 10, 1),
+                data_final=date(2026, 10, 14),
+                pagina=1,
+                por_pagina=20,
+                db=db,
+                user_and_tenant=(None, tenant),
+            )
+        vendas = {venda["numero_venda"]: venda for venda in resultado["vendas"]}
+        assert resultado["total"] == 5
+        assert vendas["produto"]["compativel_nfe_nfce"] is True
+        assert vendas["produto"]["bloqueios_modelo"] == []
+        for numero in ("servico", "mista", "servico_com_produto", "entrega"):
+            assert vendas[numero]["compativel_nfe_nfce"] is False
+            assert vendas[numero]["total"] == 100
+        assert (
+            vendas["servico_com_produto"]["bloqueios_modelo"][0]["produto_nome"]
+            == "Banho cadastrado"
+        )
+        entrega = vendas["entrega"]["bloqueios_modelo"][0]
+        assert entrega["codigo"] == "taxa_entrega_como_servico"
+        assert "lancamento de entrega" in entrega["mensagem"]
+        assert "Banho" not in entrega["mensagem"]
     engine.dispose()
 
 

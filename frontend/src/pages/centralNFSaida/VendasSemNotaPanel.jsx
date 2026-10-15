@@ -3,6 +3,11 @@ import api from "../../api";
 import { confirmarCorePet } from "../../services/corepetDialog";
 import { formatMoneyBRL } from "../../utils/formatters";
 import { emitirNotaFiscalAssistida, extrairMensagemNFe } from "../../utils/nfeFiscalAssistida";
+import {
+  selecionarPaginaCompativel,
+  vendaCompativelNfeNfce,
+  vendasSelecionadasParaEmissao,
+} from "./vendasSemNotaUtils";
 
 function dataLocal(date) {
   const ano = date.getFullYear();
@@ -81,6 +86,7 @@ export default function VendasSemNotaPanel({ onEmissaoConcluida }) {
   };
 
   const alternarVenda = (id) => {
+    if (!vendas.some((venda) => venda.id === id && vendaCompativelNfeNfce(venda))) return;
     setSelecionados((atual) => {
       const proximo = new Set(atual);
       if (proximo.has(id)) proximo.delete(id);
@@ -89,14 +95,15 @@ export default function VendasSemNotaPanel({ onEmissaoConcluida }) {
     });
   };
 
+  const vendasCompativeis = vendas.filter(vendaCompativelNfeNfce);
   const todasSelecionadas =
-    vendas.length > 0 && vendas.every((venda) => selecionados.has(venda.id));
+    vendasCompativeis.length > 0 && vendasCompativeis.every((venda) => selecionados.has(venda.id));
   const alternarPagina = () => {
-    setSelecionados(todasSelecionadas ? new Set() : new Set(vendas.map((venda) => venda.id)));
+    setSelecionados((atual) => selecionarPaginaCompativel(vendas, atual));
   };
 
   const emitirSelecionadas = async () => {
-    const lote = vendas.filter((venda) => selecionados.has(venda.id));
+    const lote = vendasSelecionadasParaEmissao(vendas, selecionados);
     if (!lote.length) return;
     const modelo = tipoNota === "nfe" ? "NF-e" : "NFC-e";
     const confirmado = await confirmarCorePet(
@@ -148,7 +155,8 @@ export default function VendasSemNotaPanel({ onEmissaoConcluida }) {
       <h2 className="text-lg font-semibold text-gray-800">Vendas sem nota fiscal</h2>
       <p className="mt-1 text-sm text-gray-600">
         Vendas finalizadas sem tentativa de emissão. Notas rejeitadas ou em processamento são
-        tratadas na lista de notas abaixo.
+        tratadas na lista de notas abaixo. Vendas com serviços ficam visíveis para revisão e não
+        podem ser selecionadas neste fluxo de NF-e/NFC-e.
       </p>
 
       <form onSubmit={pesquisar} className="mt-4 flex flex-wrap items-end gap-3">
@@ -221,12 +229,13 @@ export default function VendasSemNotaPanel({ onEmissaoConcluida }) {
                   aria-label="Selecionar vendas desta página"
                   checked={todasSelecionadas}
                   onChange={alternarPagina}
-                  disabled={emitindo || carregando || !vendas.length}
+                  disabled={emitindo || carregando || !vendasCompativeis.length}
                 />
               </th>
               <th className="px-3 py-2">Venda</th>
               <th className="px-3 py-2">Data</th>
               <th className="px-3 py-2">Cliente</th>
+              <th className="px-3 py-2">Emissão NF-e/NFC-e</th>
               <th className="px-3 py-2 text-right">Total</th>
             </tr>
           </thead>
@@ -240,7 +249,7 @@ export default function VendasSemNotaPanel({ onEmissaoConcluida }) {
                       aria-label={`Selecionar venda ${venda.numero_venda}`}
                       checked={selecionados.has(venda.id)}
                       onChange={() => alternarVenda(venda.id)}
-                      disabled={emitindo}
+                      disabled={emitindo || !vendaCompativelNfeNfce(venda)}
                     />
                   </td>
                   <td className="px-3 py-2">{venda.numero_venda}</td>
@@ -248,19 +257,31 @@ export default function VendasSemNotaPanel({ onEmissaoConcluida }) {
                     {new Date(venda.data_venda).toLocaleString("pt-BR")}
                   </td>
                   <td className="px-3 py-2">{venda.cliente_nome || "Consumidor"}</td>
+                  <td className="max-w-sm px-3 py-2">
+                    {vendaCompativelNfeNfce(venda) ? (
+                      <span className="text-gray-600">
+                        Dados fiscais serão conferidos na emissão.
+                      </span>
+                    ) : (
+                      <span className="text-amber-800">
+                        {venda.bloqueios_modelo?.map((bloqueio) => bloqueio.mensagem).join(" ") ||
+                          "Composição da venda precisa de revisão antes de emitir NF-e/NFC-e."}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-right">{formatMoneyBRL(venda.total)}</td>
                 </tr>
               ))}
             {!carregando && !vendas.length && (
               <tr>
-                <td colSpan="5" className="px-3 py-5 text-center text-gray-500">
+                <td colSpan="6" className="px-3 py-5 text-center text-gray-500">
                   Nenhuma venda sem nota neste período.
                 </td>
               </tr>
             )}
             {carregando && (
               <tr>
-                <td colSpan="5" className="px-3 py-5 text-center text-gray-500">
+                <td colSpan="6" className="px-3 py-5 text-center text-gray-500">
                   Carregando vendas...
                 </td>
               </tr>
