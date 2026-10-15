@@ -63,7 +63,7 @@ export default function ProdutosFiltrosPanel({
 
   return (
     <FilterBar id="tour-produtos-filtros" className="mb-4 md:mb-6" onSubmit={handleSubmit}>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-4 md:gap-4 xl:grid-cols-9">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-4 md:gap-4 xl:grid-cols-6">
         <div id="tour-produtos-busca" className="md:col-span-2">
           <ProdutoSelector
             placeholder="Buscar por SKU, nome ou qualquer EAN..."
@@ -137,7 +137,7 @@ export default function ProdutosFiltrosPanel({
           />
         </div>
 
-        <div>
+        <div className="md:col-span-2">
           <InputCombobox
             opcoes={OPCOES_SITUACAO_CATALOGO}
             value={filtros.catalogo_online_situacao}
@@ -177,7 +177,7 @@ export default function ProdutosFiltrosPanel({
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:col-span-4 md:grid-cols-4 xl:col-span-9">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:col-span-4 md:grid-cols-4 xl:col-span-6">
           <div className="flex min-h-10 items-center rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
             <InputCheckTexto
               id="produtos-filtro-estoque-baixo"
