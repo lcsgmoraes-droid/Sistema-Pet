@@ -1,6 +1,16 @@
 ﻿import { actionButtonClasses } from "../ui/actionStyles";
-import { AlertTriangle, CheckCircle2, UploadCloud } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Copy,
+  History,
+  Pencil,
+  Unlock,
+  UploadCloud,
+  XCircle,
+} from "lucide-react";
 import { markdownToPlainText } from "../../utils/safeMarkdown";
+import BotaoMenuAcoes from "../v2/BotaoMenuAcoes/BotaoMenuAcoes";
 import ChannelBadges from "../ui/ChannelBadges";
 import {
   isKitFisicoProduto,
@@ -94,6 +104,59 @@ export function createProdutosColunas() {
           />
         </td>
       ),
+    },
+    {
+      key: "acoes",
+      label: "Ações",
+      visible: true,
+      renderHeader: () => (
+        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+          Ações
+        </th>
+      ),
+      renderCell: (produto, props) => {
+        const podeGerenciarCatalogo = !produto.de_parceiro || produto.acesso_catalogo_completo;
+        const podeLiberarSku =
+          produto.ativo === false &&
+          !String(produto.codigo || "").startsWith("__LIBERADO__") &&
+          podeGerenciarCatalogo;
+
+        const acoes = [
+          {
+            icon: History,
+            label: "Movimentações de estoque",
+            onClick: () => props.navigate(`/produtos/${produto.id}/movimentacoes`),
+          },
+          {
+            icon: Pencil,
+            label: "Editar",
+            onClick: () => props.navigate(`/produtos/${produto.id}/editar`),
+          },
+          {
+            icon: Copy,
+            label: "Clonar produto",
+            onClick: () => props.navigate(`/produtos/novo?clone=${produto.id}`),
+          },
+          podeGerenciarCatalogo && {
+            icon: produto.ativo === false ? CheckCircle2 : XCircle,
+            label: produto.ativo === false ? "Ativar" : "Desativar",
+            onClick: () => props.handleToggleAtivo(produto),
+            tom: produto.ativo === false ? undefined : "perigo",
+          },
+          podeLiberarSku && {
+            icon: Unlock,
+            label: "Liberar SKU",
+            title: "Liberar SKU para outro produto",
+            onClick: () => props.handleLiberarSku(produto),
+          },
+        ];
+
+        return (
+          <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+            <BotaoMenuAcoes acoes={acoes} rotulo={`Ações de ${produto.nome}`} />
+          </td>
+        );
+      },
     },
     {
       key: "imagem",
@@ -464,140 +527,6 @@ export function createProdutosColunas() {
         return (
           <td className="px-4 py-3 text-center">
             <ChannelBadges channels={canaisAtivos} />
-          </td>
-        );
-      },
-    },
-    {
-      key: "acoes",
-      label: "Ações",
-      visible: true,
-      renderHeader: () => (
-        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-          Ações
-        </th>
-      ),
-      renderCell: (produto, props) => {
-        const estoqueVisual = obterEstoqueVisualProduto(produto);
-        let classeMovimentacao = "text-gray-500 border-gray-200 bg-gray-50 hover:bg-gray-100";
-
-        if (produto.controlar_estoque === true) {
-          if (estoqueVisual > 0) {
-            classeMovimentacao = "text-green-700 border-green-200 bg-green-50 hover:bg-green-100";
-          } else if (estoqueVisual === 0) {
-            classeMovimentacao = "text-red-700 border-red-200 bg-red-50 hover:bg-red-100";
-          }
-        }
-
-        const iconButtonClass = (intent, tone = "soft") =>
-          actionButtonClasses({
-            intent,
-            tone,
-            size: "xs",
-            className: "h-8 w-8 rounded-lg p-0",
-          });
-
-        return (
-          <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-center gap-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  console.log(
-                    "Produto:",
-                    produto.nome,
-                    "Controla estoque:",
-                    produto.controlar_estoque,
-                    "Estoque atual:",
-                    estoqueVisual,
-                  );
-                  props.navigate(`/produtos/${produto.id}/movimentacoes`);
-                }}
-                className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${classeMovimentacao}`}
-                title="Ver movimentações de estoque"
-              >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                </svg>
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  props.navigate(`/produtos/${produto.id}/editar`);
-                }}
-                className={iconButtonClass("edit")}
-                title="Editar"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                  />
-                </svg>
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  props.navigate(`/produtos/novo?clone=${produto.id}`);
-                }}
-                className={iconButtonClass("neutral")}
-                title="Clonar produto"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  />
-                </svg>
-              </button>
-              {(!produto.de_parceiro || produto.acesso_catalogo_completo) && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    props.handleToggleAtivo(produto);
-                  }}
-                  className={iconButtonClass(produto.ativo === false ? "create" : "warning")}
-                  title={produto.ativo === false ? "Ativar" : "Desativar"}
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    {produto.ativo === false ? (
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    ) : (
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 9v4m0 0l-1.5-1.5M12 13l1.5-1.5M5.636 5.636a9 9 0 1012.728 12.728M9.88 9.88a3 3 0 104.24 4.24"
-                      />
-                    )}
-                  </svg>
-                </button>
-              )}
-              {produto.ativo === false &&
-                !String(produto.codigo || "").startsWith("__LIBERADO__") &&
-                (!produto.de_parceiro || produto.acesso_catalogo_completo) && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      props.handleLiberarSku(produto);
-                    }}
-                    className={iconButtonClass("warning")}
-                    title="Liberar SKU para outro produto"
-                    aria-label={`Liberar SKU ${produto.codigo}`}
-                  >
-                    <span className="text-xs font-bold">SKU</span>
-                  </button>
-                )}
-            </div>
           </td>
         );
       },
