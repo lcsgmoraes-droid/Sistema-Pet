@@ -27,7 +27,7 @@ from app.intnfe.rejection_diagnostics import (
     rejection_diagnostics,
 )
 from app.produtos_estoque_models import EstoqueMovimentacao, ProdutoLote
-from app.services.venda_descontos import ratear_descontos_venda
+from app.services.venda_descontos import ratear_centavos, ratear_descontos_venda
 
 CENT = Decimal("0.01")
 AUTHORIZED_STATUS = 3
@@ -80,6 +80,93 @@ def _money(value):
 def _number(value):
     result = Decimal(str(value or 0))
     return int(result) if result == result.to_integral() else float(result)
+
+
+def _legacy_quantity_rounding(venda, item, gross):
+    """Reconhece o subtotal antigo com quantidade calculada em 4 e salva em 3 casas."""
+    if (
+        getattr(venda, "desconto_venda_valor", None) is not None
+        or getattr(item, "subtotal", None) is None
+    ):
+        return False
+    quantity = Decimal(str(item.quantidade or 0))
+    unit_price = Decimal(str(item.preco_unitario or 0))
+    if (
+        not quantity.is_finite()
+        or not unit_price.is_finite()
+        or quantity <= 0
+        or unit_price <= 0
+        or quantity == quantity.to_integral()
+        or quantity != quantity.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+        or gross <= 0
+    ):
+        return False
+    previous_quantity = (gross / unit_price).quantize(
+        Decimal("0.0001"), rounding=ROUND_HALF_UP
+    )
+    return (
+        abs(previous_quantity - quantity) <= Decimal("0.0005")
+        and previous_quantity.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+        == quantity
+        and _money(previous_quantity * unit_price) == gross
+    )
+
+
+def _legacy_aggregate_gross(venda):
+    """Reproduz apenas a soma legada crua, conservando os descontos salvos.
+
+    O rateio existe somente no payload. Cada linha deve estar coerente antes
+    dele e o bruto agregado deve reproduzir exatamente o total persistido.
+    """
+    if getattr(venda, "desconto_venda_valor", None) is not None:
+        return {}
+    items = list(venda.itens or [])
+    sale_discount = _money(venda.desconto_valor)
+    if len(items) < 2 or sale_discount <= 0:
+        return {}
+    raw_grosses, saved_grosses, discounts, quantities = [], [], [], []
+    for item in items:
+        if _ascii(item.tipo) != "produto" or getattr(item, "subtotal", None) is None:
+            return {}
+        quantity = Decimal(str(item.quantidade or 0))
+        unit_price = Decimal(str(item.preco_unitario or 0))
+        if (
+            not quantity.is_finite()
+            or not unit_price.is_finite()
+            or quantity <= 0
+            or unit_price < 0
+        ):
+            return {}
+        discount = _money(item.desconto_item)
+        gross = _money(item.subtotal) + discount
+        raw = quantity * unit_price
+        if discount < 0 or discount > gross or gross != _money(raw):
+            return {}
+        raw_grosses.append(raw)
+        saved_grosses.append(gross)
+        discounts.append(discount)
+        quantities.append(quantity)
+    if sum(discounts, Decimal("0")) != sale_discount or all(
+        quantity == quantity.to_integral() for quantity in quantities
+    ):
+        return {}
+    freight = _money(venda.taxa_entrega if venda.tem_entrega else 0)
+    target = _money(venda.total) + sale_discount - freight
+    saved_total = sum(saved_grosses, Decimal("0"))
+    if (
+        target <= 0
+        or target == saved_total
+        or target != _money(sum(raw_grosses, Decimal("0")))
+        or abs(saved_total - target) > CENT * (len(items) - 1)
+    ):
+        return {}
+    allocated = ratear_centavos(target, raw_grosses)
+    if any(
+        gross < discount or abs(gross - saved) > CENT
+        for gross, discount, saved in zip(allocated, discounts, saved_grosses)
+    ):
+        return {}
+    return {id(item): gross for item, gross in zip(items, allocated)}
 
 
 def _ascii(value):
@@ -482,6 +569,30 @@ def build_payload(db, tenant, connection, venda, document_type):
         raise DirectEmissionError(" ".join(emitter_pending))
     environment = 1 if connection.emission_environment == 1 else 2
     sale_total = _money(venda.total)
+    if document_type == "nfce" and venda.tem_entrega:
+        # NFC-e admite entrega a domicilio (SEFA/PR, perguntas 1466 e 1508).
+        # Este adaptador ainda nao envia endereco do consumidor nem possui
+        # contrato validado de frete/indPres=4 para NFC-e na IntNFe. Mesmo sem
+        # taxa, nao transmitir a entrega como uma venda presencial de balcao.
+        # Informar o limite antes de solicitar CPF ou outras correcoes locais.
+        message = (
+            "A emissão de NFC-e com entrega a domicílio ainda não está habilitada "
+            "nesta integração. A entrega própria pode usar NFC-e (modelo 65), "
+            "com identificação e endereço do cliente; cobrar uma taxa de entrega "
+            "não obriga, por si só, a usar NF-e (modelo 55). "
+            "Solicite ao suporte a habilitação dos dados de entrega antes de emitir."
+        )
+        raise DirectEmissionError(
+            message,
+            code="nfce_delivery_not_supported",
+            validation={
+                "success": True,
+                "pode_emitir": False,
+                "requer_autorizacao": False,
+                "correcoes": [],
+                "bloqueios": [{"campo": "entrega", "mensagem": message}],
+            },
+        )
     nfce_requires_recipient = document_type == "nfce" and (
         bool(getattr(venda, "tem_entrega", False)) or sale_total >= Decimal("10000")
     )
@@ -516,6 +627,7 @@ def build_payload(db, tenant, connection, venda, document_type):
     fiscal_pending = []
     product_total = Decimal("0")
     item_discount_total = Decimal("0")
+    legacy_grosses = _legacy_aggregate_gross(venda)
     descontos_fiscais = (
         {
             id(item): parte["total"]
@@ -683,11 +795,14 @@ def build_payload(db, tenant, connection, venda, document_type):
             if stored_subtotal is not None
             else calculated_gross
         )
+        gross = legacy_grosses.get(id(item), gross)
         if quantity <= 0 or unit_price < 0 or discount < 0 or discount > gross:
             raise DirectEmissionError(
                 f"Produto {item.produto.nome}: confira quantidade, preço e desconto."
             )
-        if abs(gross - calculated_gross) > CENT:
+        if abs(gross - calculated_gross) > CENT and not _legacy_quantity_rounding(
+            venda, item, gross
+        ):
             raise DirectEmissionError(
                 f"Produto {item.produto.nome}: o subtotal salvo difere da quantidade e do preço."
             )
@@ -751,10 +866,6 @@ def build_payload(db, tenant, connection, venda, document_type):
             "O desconto da venda difere da soma dos descontos dos itens."
         )
     freight = _money(venda.taxa_entrega if venda.tem_entrega else 0)
-    if document_type == "nfce" and freight:
-        raise DirectEmissionError(
-            "A NFC-e não aceita frete. Para uma venda com taxa de entrega, escolha NF-e (modelo 55)."
-        )
     calculated_total = product_total - total_discount + freight
     if calculated_total != sale_total:
         raise DirectEmissionError(
@@ -881,6 +992,7 @@ def local_document_details(db, tenant, venda):
     items = []
     product_total = Decimal("0")
     item_discount_total = Decimal("0")
+    legacy_grosses = _legacy_aggregate_gross(venda)
     descontos_fiscais = (
         {
             id(item): parte["total"]
@@ -899,6 +1011,20 @@ def local_document_details(db, tenant, venda):
         gross = subtotal + desconto_manual_item
         if gross == 0 and quantity:
             gross = (quantity * unit_price).quantize(CENT, rounding=ROUND_HALF_UP)
+        gross = legacy_grosses.get(id(sale_item), gross)
+        calculated_gross = _money(quantity * unit_price)
+        fiscal_unit_price = unit_price
+        if (
+            quantity > 0
+            and gross != calculated_gross
+            and (
+                abs(gross - calculated_gross) <= CENT
+                or _legacy_quantity_rounding(venda, sale_item, gross)
+            )
+        ):
+            fiscal_unit_price = (gross / quantity).quantize(
+                Decimal("0.0000000001"), rounding=ROUND_HALF_UP
+            )
 
         fiscal = {}
         lot = getattr(sale_item, "lote", None)
@@ -939,7 +1065,7 @@ def local_document_details(db, tenant, venda):
                 ),
                 "unidade": _text(getattr(product, "unidade", None)) or "UN",
                 "quantidade": _number(quantity),
-                "valor_unitario": float(unit_price),
+                "valor_unitario": float(fiscal_unit_price),
                 "valor_total": float(gross),
                 "desconto": float(discount),
                 "ncm": _digits(fiscal.get("ncm")) or None,

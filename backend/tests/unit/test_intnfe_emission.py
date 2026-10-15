@@ -284,37 +284,50 @@ def test_nfce_bloqueia_regra_386_no_item_tres_antes_da_transmissao(monkeypatch):
     assert all(item["produto_id"] == 11 for item in bloqueios)
 
 
-def test_nfce_with_delivery_fee_requires_nfe():
+def test_nfce_delivery_fee_explains_integration_limit_without_requiring_nfe():
     tenant, connection, sale = _objects()
 
-    with pytest.raises(emission.DirectEmissionError, match="não aceita frete"):
+    with pytest.raises(emission.DirectEmissionError) as error:
         emission.build_payload(None, tenant, connection, sale, "nfce")
 
+    assert error.value.code == "nfce_delivery_not_supported"
+    assert "entrega própria pode usar NFC-e" in str(error.value)
+    assert "não obriga, por si só" in str(error.value)
+    assert error.value.validation["bloqueios"][0]["campo"] == "entrega"
+    assert error.value.validation["pode_emitir"] is False
 
-def test_delivery_nfce_without_fee_requires_identity_but_not_address():
+
+@pytest.mark.parametrize("complete_address", [True, False])
+def test_delivery_nfce_without_fee_cannot_be_transmitted_as_counter_sale(
+    complete_address,
+):
     tenant, connection, sale = _objects()
     sale.taxa_entrega = "0.00"
     sale.total = "18.00"
     sale.pagamentos[0].valor = "18.00"
-    sale.cliente.endereco = None
-    sale.cliente.numero = None
-    sale.cliente.bairro = None
-    sale.cliente.cidade = None
-    sale.cliente.codigo_municipio = None
-    sale.cliente.estado = None
+    if not complete_address:
+        sale.cliente.endereco = None
+        sale.cliente.numero = None
+        sale.cliente.bairro = None
+        sale.cliente.cidade = None
+        sale.cliente.codigo_municipio = None
+        sale.cliente.estado = None
 
-    payload = emission.build_payload(None, tenant, connection, sale, "nfce")
+    with pytest.raises(emission.DirectEmissionError) as error:
+        emission.build_payload(None, tenant, connection, sale, "nfce")
 
-    assert payload["consumidor"]["cpf"] == "52998224725"
-    assert payload["produtos"][0]["cfop"] == "5102"
+    assert error.value.code == "nfce_delivery_not_supported"
 
 
-def test_delivery_nfce_requires_identified_recipient():
+def test_delivery_nfce_reports_integration_limit_before_requesting_customer_data():
     tenant, connection, sale = _objects()
     sale.cliente = None
 
-    with pytest.raises(emission.DirectEmissionError, match="consumidor identificado"):
+    with pytest.raises(emission.DirectEmissionError) as error:
         emission.build_payload(None, tenant, connection, sale, "nfce")
+
+    assert error.value.code == "nfce_delivery_not_supported"
+    assert error.value.validation["bloqueios"][0]["campo"] == "entrega"
 
 
 def test_nfce_uses_sale_cpf_without_customer_registration():
@@ -551,6 +564,9 @@ def test_non_contributor_with_incompatible_csosn_is_blocked(monkeypatch):
 
 def test_cst_00_nao_e_enviado_como_csosn(monkeypatch):
     tenant, connection, sale = _objects()
+    sale.tem_entrega = False
+    sale.taxa_entrega = "0.00"
+    sale.total = sale.pagamentos[0].valor = "18.00"
     fiscal_original = emission._resolver_fiscal_item_nfe
     monkeypatch.setattr(
         emission,
@@ -570,6 +586,9 @@ def test_cst_00_nao_e_enviado_como_csosn(monkeypatch):
 
 def test_missing_product_taxes_return_editable_fiscal_fields(monkeypatch):
     tenant, connection, sale = _objects()
+    sale.tem_entrega = False
+    sale.taxa_entrega = "0.00"
+    sale.total = sale.pagamentos[0].valor = "18.00"
     monkeypatch.setattr(
         emission,
         "_resolver_fiscal_item_nfe",

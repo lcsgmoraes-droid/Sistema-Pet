@@ -3,12 +3,15 @@
 from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.models import Cliente
-from app.vendas_models import Venda
+from app.produtos_models import Produto
+from app.services.nfe_service_items import bloqueio_item_servico
+from app.vendas_models import Venda, VendaItem
 
 router = APIRouter()
 
@@ -61,6 +64,33 @@ def listar_vendas_sem_nota(
         .limit(por_pagina)
         .all()
     )
+    bloqueios_por_venda = {}
+    if vendas:
+        servicos = (
+            db.query(
+                VendaItem.id,
+                VendaItem.venda_id,
+                VendaItem.tipo,
+                VendaItem.produto_id,
+                VendaItem.servico_descricao,
+                Produto.nome.label("produto_nome"),
+            )
+            .outerjoin(
+                Produto,
+                (Produto.id == VendaItem.produto_id) & (Produto.tenant_id == tenant_id),
+            )
+            .filter(
+                VendaItem.tenant_id == tenant_id,
+                VendaItem.venda_id.in_([venda.id for venda in vendas]),
+                func.lower(func.trim(VendaItem.tipo)).in_(["servico", "serviço"]),
+            )
+            .order_by(VendaItem.id)
+            .all()
+        )
+        for item in servicos:
+            bloqueio = bloqueio_item_servico(item)
+            if bloqueio:
+                bloqueios_por_venda.setdefault(item.venda_id, []).append(bloqueio)
     return {
         "total": total,
         "pagina": pagina,
@@ -72,6 +102,8 @@ def listar_vendas_sem_nota(
                 "data_venda": venda.data_venda.isoformat(),
                 "cliente_nome": venda.cliente_nome,
                 "total": float(venda.total),
+                "compativel_nfe_nfce": venda.id not in bloqueios_por_venda,
+                "bloqueios_modelo": bloqueios_por_venda.get(venda.id, []),
             }
             for venda in vendas
         ],

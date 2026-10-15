@@ -12,6 +12,7 @@ from app.empresa_config_fiscal_models import EmpresaConfigFiscal
 from app.produto_config_fiscal_models import ProdutoConfigFiscal
 from app.produtos_models import Produto
 from app.services.fiscal_sugestao_service import sugerir_fiscal_por_descricao
+from app.services.nfe_service_items import bloqueio_item_servico
 
 
 def _limpar_texto_fiscal(value) -> Optional[str]:
@@ -630,6 +631,10 @@ def prevalidar_produtos_fiscais_venda(
         )
 
     for item_numero, item in enumerate(getattr(venda, "itens", []) or [], start=1):
+        bloqueio_servico = bloqueio_item_servico(item, item_numero=item_numero)
+        if bloqueio_servico:
+            bloqueios.append(bloqueio_servico)
+            continue
         produto = getattr(item, "produto", None)
         if not produto:
             bloqueios.append(
