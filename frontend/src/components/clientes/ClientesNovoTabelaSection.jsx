@@ -103,7 +103,13 @@ function PessoaMobileCard({
           <div onClick={(event) => event.stopPropagation()}>
             <BotaoMenuAcoes
               rotulo={`Mais ações para ${cliente.nome}`}
-              acoes={montarAcoesPessoa({ cliente, listaUrl, navigate, handleDelete, onIniciarFusao })}
+              acoes={montarAcoesPessoa({
+                cliente,
+                listaUrl,
+                navigate,
+                handleDelete,
+                onIniciarFusao,
+              })}
             />
           </div>
         )}
@@ -366,7 +372,11 @@ const ClientesNovoTabelaSection = ({
                       <Fragment key={cliente.id}>
                         <tr
                           id={`cliente-${cliente.id}`}
-                          onClick={() => navigate(`/clientes/${cliente.id}/editar`, { state: { from: listaUrl } })}
+                          onClick={() =>
+                            navigate(`/clientes/${cliente.id}/editar`, {
+                              state: { from: listaUrl },
+                            })
+                          }
                           className={`cursor-pointer transition-colors ${
                             clienteSelecionadoFusao
                               ? "bg-amber-50 hover:bg-amber-100"
@@ -480,9 +490,7 @@ const ClientesNovoTabelaSection = ({
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span className="text-xs text-gray-600">
-                              {cliente.is_cliente
-                                ? nomeOrigemCliente(cliente.origem_cliente)
-                                : "-"}
+                              {cliente.is_cliente ? nomeOrigemCliente(cliente.origem_cliente) : "-"}
                             </span>
                           </td>
                         </tr>

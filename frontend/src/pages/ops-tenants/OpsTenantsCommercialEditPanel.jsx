@@ -34,9 +34,7 @@ export default function OpsTenantsCommercialEditPanel({
   const original = buildOpsTenantCommercialForm(tenant);
   const payload = buildOpsTenantCommercialPayload(original, form);
   const hasChanges = Object.keys(payload).length > 0;
-  const planosSegmento = Object.entries(ROTULO_PLANO_SEGMENTO).filter(
-    ([campo]) => tenant[campo],
-  );
+  const planosSegmento = Object.entries(ROTULO_PLANO_SEGMENTO).filter(([campo]) => tenant[campo]);
 
   return (
     <div>
@@ -70,24 +68,22 @@ export default function OpsTenantsCommercialEditPanel({
             </span>
           ) : (
             planosSegmento.map(([campo, rotuloSegmento]) => (
-              <OpsTenantsBadge key={campo} className="bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
+              <OpsTenantsBadge
+                key={campo}
+                className="bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"
+              >
                 {rotuloSegmento}: {tenant[campo]}
               </OpsTenantsBadge>
             ))
           )}
         </div>
         <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-          Para mudar o plano, use uma proposta comercial (aditivo) — o cliente
-          precisa aceitar antes de valer.
+          Para mudar o plano, use uma proposta comercial (aditivo) — o cliente precisa aceitar antes
+          de valer.
         </p>
       </div>
 
-      <form
-        id="tenant-comercial-form"
-        onSubmit={onSubmit}
-        noValidate
-        className="mt-4 space-y-3"
-      >
+      <form id="tenant-comercial-form" onSubmit={onSubmit} noValidate className="mt-4 space-y-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <InputCombobox
             id="tenant-comercial-status"

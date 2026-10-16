@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
-import { AlertTriangle, DollarSign, ExternalLink, MapPin, PawPrint, Phone, User } from "lucide-react";
+import {
+  AlertTriangle,
+  DollarSign,
+  ExternalLink,
+  MapPin,
+  PawPrint,
+  Phone,
+  User,
+} from "lucide-react";
 import { FiChevronLeft } from "react-icons/fi";
 import api from "../api";
 import { useModulos } from "../contexts/ModulosContext";
@@ -181,26 +189,29 @@ export default function ClientePessoaEditar() {
   // `aindaAtivo` protege contra o StrictMode do React, que em dev roda este efeito duas vezes de
   // proposito — sem isso, a segunda rodada reacende "carregando" por um instante mesmo com os
   // dados ja exibidos na tela (mesmo problema resolvido em PetForm.jsx, ver nota no AGENTS.md).
-  const carregar = useCallback(async (aindaAtivo = () => true) => {
-    setCarregando(true);
-    setNaoEncontrado(false);
-    try {
-      const { data } = await api.get(`/clientes/${clienteId}`);
-      if (!aindaAtivo()) return;
-      setCliente(data);
-      setFormData(buildFormDataFromCliente(data));
-      setEnderecosAdicionais(data.enderecos_adicionais || []);
-    } catch (error) {
-      if (!aindaAtivo()) return;
-      if (error.response?.status === 404) {
-        setNaoEncontrado(true);
-      } else {
-        toast.error(mensagemErro(error, "Não foi possível carregar esta pessoa."));
+  const carregar = useCallback(
+    async (aindaAtivo = () => true) => {
+      setCarregando(true);
+      setNaoEncontrado(false);
+      try {
+        const { data } = await api.get(`/clientes/${clienteId}`);
+        if (!aindaAtivo()) return;
+        setCliente(data);
+        setFormData(buildFormDataFromCliente(data));
+        setEnderecosAdicionais(data.enderecos_adicionais || []);
+      } catch (error) {
+        if (!aindaAtivo()) return;
+        if (error.response?.status === 404) {
+          setNaoEncontrado(true);
+        } else {
+          toast.error(mensagemErro(error, "Não foi possível carregar esta pessoa."));
+        }
+      } finally {
+        if (aindaAtivo()) setCarregando(false);
       }
-    } finally {
-      if (aindaAtivo()) setCarregando(false);
-    }
-  }, [clienteId]);
+    },
+    [clienteId],
+  );
 
   useEffect(() => {
     let ativo = true;
@@ -258,7 +269,9 @@ export default function ClientePessoaEditar() {
       setEnderecoAtual({
         tipo: "principal",
         apelido: "",
-        ...Object.fromEntries(CAMPOS_ENDERECO_PRINCIPAL.map((campo) => [campo, formData[campo] || ""])),
+        ...Object.fromEntries(
+          CAMPOS_ENDERECO_PRINCIPAL.map((campo) => [campo, formData[campo] || ""]),
+        ),
         index: "principal",
       });
       return;
@@ -277,16 +290,21 @@ export default function ClientePessoaEditar() {
     const principalAntigo = {
       tipo: tipoAntigoPrincipal,
       apelido: "",
-      ...Object.fromEntries(CAMPOS_ENDERECO_PRINCIPAL.map((campo) => [campo, formData[campo] || ""])),
+      ...Object.fromEntries(
+        CAMPOS_ENDERECO_PRINCIPAL.map((campo) => [campo, formData[campo] || ""]),
+      ),
     };
 
     setFormData((prev) => ({
       ...prev,
-      ...Object.fromEntries(CAMPOS_ENDERECO_PRINCIPAL.map((campo) => [campo, entrada[campo] || ""])),
+      ...Object.fromEntries(
+        CAMPOS_ENDERECO_PRINCIPAL.map((campo) => [campo, entrada[campo] || ""]),
+      ),
     }));
 
     setEnderecosAdicionais((prev) => {
-      let proximos = typeof entrada.index === "number" ? prev.filter((_, i) => i !== entrada.index) : [...prev];
+      let proximos =
+        typeof entrada.index === "number" ? prev.filter((_, i) => i !== entrada.index) : [...prev];
       if (principalTemDados) {
         proximos = [...proximos, principalAntigo];
       }
@@ -306,7 +324,9 @@ export default function ClientePessoaEditar() {
     if (enderecoAtual.index === "principal") {
       setFormData((prev) => ({
         ...prev,
-        ...Object.fromEntries(CAMPOS_ENDERECO_PRINCIPAL.map((campo) => [campo, enderecoAtual[campo]])),
+        ...Object.fromEntries(
+          CAMPOS_ENDERECO_PRINCIPAL.map((campo) => [campo, enderecoAtual[campo]]),
+        ),
       }));
       fecharModalEndereco();
       return;
@@ -428,9 +448,7 @@ export default function ClientePessoaEditar() {
       const errorDetails = error.response?.data?.details;
       let mensagem = "";
       if (errorDetails && Array.isArray(errorDetails)) {
-        const camposFaltando = errorDetails
-          .map((detail) => detail.msg)
-          .filter(Boolean);
+        const camposFaltando = errorDetails.map((detail) => detail.msg).filter(Boolean);
         if (camposFaltando.length > 0) {
           mensagem = camposFaltando.join(" · ");
         }
@@ -452,7 +470,10 @@ export default function ClientePessoaEditar() {
           <FiChevronLeft aria-hidden="true" />
           Voltar para Pessoas
         </LinkPadrao>
-        <EmptyState title="Pessoa não encontrada" description="Este cadastro pode ter sido removido." />
+        <EmptyState
+          title="Pessoa não encontrada"
+          description="Este cadastro pode ter sido removido."
+        />
       </div>
     );
   }
@@ -499,9 +520,17 @@ export default function ClientePessoaEditar() {
         <div className="p-4">
           {abaAtiva === "dados-gerais" ? (
             <div className="space-y-8">
-              <ClientePessoaDadosGeraisTab erros={erros} formData={formData} setFormData={setFormData} />
+              <ClientePessoaDadosGeraisTab
+                erros={erros}
+                formData={formData}
+                setFormData={setFormData}
+              />
 
-              <ClientePessoaHistoricoPanel clienteId={clienteId} origemTenantId={cliente?.origem_tenant_id} versao={cliente} />
+              <ClientePessoaHistoricoPanel
+                clienteId={clienteId}
+                origemTenantId={cliente?.origem_tenant_id}
+                versao={cliente}
+              />
 
               <div className="border-t border-slate-200 pt-6 dark:border-slate-700">
                 <h3 className="mb-4 text-base font-semibold text-slate-900 dark:text-slate-100">

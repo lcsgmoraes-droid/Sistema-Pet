@@ -125,9 +125,7 @@ export default function ClientePessoaDadosGeraisTab({
             id="pessoa-data-nascimento"
             label="Data de nascimento"
             value={formData.data_nascimento || ""}
-            onChange={(data_nascimento) =>
-              setFormData((prev) => ({ ...prev, data_nascimento }))
-            }
+            onChange={(data_nascimento) => setFormData((prev) => ({ ...prev, data_nascimento }))}
           />
         </div>
       ) : (

@@ -37,13 +37,10 @@ export default function OpsAdicionarLojaModal({ grupo, onClose, onCreated }) {
     setErro("");
     setEnviando(true);
     try {
-      const { data } = await platformApi.post(
-        `/admin/grupos-comerciais/${grupo.grupoId}/lojas`,
-        {
-          nome_loja: nomeLoja.trim(),
-          plan: plan || undefined,
-        },
-      );
+      const { data } = await platformApi.post(`/admin/grupos-comerciais/${grupo.grupoId}/lojas`, {
+        nome_loja: nomeLoja.trim(),
+        plan: plan || undefined,
+      });
       setResultado(data);
       setNomeLoja("");
       setPlan("");

@@ -305,7 +305,9 @@ export default function useOpsTenantsController() {
       setOnboardingSuccess("Credenciais marcadas como repassadas.");
       await loadTenants();
     } catch (err) {
-      setOnboardingError(extractError(err, "Nao foi possivel confirmar o repasse das credenciais."));
+      setOnboardingError(
+        extractError(err, "Nao foi possivel confirmar o repasse das credenciais."),
+      );
     } finally {
       setOnboardingSaving(false);
     }
@@ -330,9 +332,7 @@ export default function useOpsTenantsController() {
       // Modulo que passou a vir de um plano selecionado sai da lista de
       // extras (ficaria redundante e escondido das opcoes disponiveis).
       const modulosDosPlanos = new Set(planosSelecionados.flatMap((plano) => plano.modulos || []));
-      next.extra_modules = current.extra_modules.filter(
-        (modulo) => !modulosDosPlanos.has(modulo),
-      );
+      next.extra_modules = current.extra_modules.filter((modulo) => !modulosDosPlanos.has(modulo));
       return next;
     });
     setBillingOfferError("");

@@ -7,12 +7,7 @@ import OpsTenantsBadge from "./OpsTenantsBadge";
 import OpsTenantsCommercialEditPanel from "./OpsTenantsCommercialEditPanel";
 import OpsTenantBillingOfferPanel from "./OpsTenantBillingOfferPanel";
 import OpsTenantPaymentProofPanel from "./OpsTenantPaymentProofPanel";
-import {
-  billingBadge,
-  formatDate,
-  shortId,
-  tenantPlanosSegmento,
-} from "./opsTenantsFormatters";
+import { billingBadge, formatDate, shortId, tenantPlanosSegmento } from "./opsTenantsFormatters";
 
 export default function OpsTenantsBillingTab({
   items,
@@ -159,7 +154,11 @@ export default function OpsTenantsBillingTab({
       </section>
 
       {modalOpen && selectedTenant ? (
-        <ModalPadrao titulo={`Manutencao comercial — ${selectedTenant.name}`} tamanho="grande" onFechar={onCloseManage}>
+        <ModalPadrao
+          titulo={`Manutencao comercial — ${selectedTenant.name}`}
+          tamanho="grande"
+          onFechar={onCloseManage}
+        >
           <div className="space-y-4">
             <OpsTenantPaymentProofPanel tenant={selectedTenant} onUpdated={onProofUpdated} />
             <OpsTenantBillingOfferPanel
@@ -192,6 +191,5 @@ export default function OpsTenantsBillingTab({
         </ModalPadrao>
       ) : null}
     </>
-
   );
 }

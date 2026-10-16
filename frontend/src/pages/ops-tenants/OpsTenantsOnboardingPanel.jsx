@@ -66,11 +66,13 @@ export default function OpsTenantsOnboardingPanel({
         </div>
       </div>
 
-      {tenant?.pilot?.attention_reasons?.some((motivo) => motivo.code === "credential_email_failed") ? (
+      {tenant?.pilot?.attention_reasons?.some(
+        (motivo) => motivo.code === "credential_email_failed",
+      ) ? (
         <div className="mt-4 space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
           <p>
-            O e-mail de definição de senha do titular não foi enviado. Depois de repassar
-            as credenciais por outro canal, confirme aqui.
+            O e-mail de definição de senha do titular não foi enviado. Depois de repassar as
+            credenciais por outro canal, confirme aqui.
           </p>
           <BotaoInteracao
             icon={FiCheckCircle}

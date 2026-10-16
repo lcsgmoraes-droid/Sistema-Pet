@@ -256,14 +256,15 @@ export function createProdutosPricingColumns() {
                   </button>
                 )}
               </div>
-              {!produto.dados_incompletos_nesta_loja && obterResumoPrecoPorKg(produto).disponivel && (
-                <span
-                  className="text-xs font-semibold text-teal-700"
-                  title={`${obterResumoPrecoPorKg(produto).pesoFormatado} - ${obterResumoPrecoPorKg(produto).precoFormatado}`}
-                >
-                  {obterResumoPrecoPorKg(produto).precoPorKgFormatado}
-                </span>
-              )}
+              {!produto.dados_incompletos_nesta_loja &&
+                obterResumoPrecoPorKg(produto).disponivel && (
+                  <span
+                    className="text-xs font-semibold text-teal-700"
+                    title={`${obterResumoPrecoPorKg(produto).pesoFormatado} - ${obterResumoPrecoPorKg(produto).precoFormatado}`}
+                  >
+                    {obterResumoPrecoPorKg(produto).precoPorKgFormatado}
+                  </span>
+                )}
             </div>
           )}
         </td>

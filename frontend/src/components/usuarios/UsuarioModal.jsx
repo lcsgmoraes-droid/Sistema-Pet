@@ -20,7 +20,14 @@ const OPCOES_TIPO_PESSOA = [
   { value: "PJ", label: "Pessoa Jurídica" },
 ];
 
-const CAMPOS_EM_ORDEM = ["nome", "login_phone", "email", "password", "role_id", "app_access_profiles"];
+const CAMPOS_EM_ORDEM = [
+  "nome",
+  "login_phone",
+  "email",
+  "password",
+  "role_id",
+  "app_access_profiles",
+];
 
 const ID_DO_CAMPO = {
   nome: "novo-usuario-nome",
@@ -87,9 +94,7 @@ export default function UsuarioModal({
       .then(({ data }) => {
         if (!ativo) return;
         const membros = (data?.grupos || []).flatMap((grupo) => grupo.membros || []);
-        setOutrasLojasDoGrupo(
-          membros.filter((membro) => membro.empresa_id !== tenantAtualId),
-        );
+        setOutrasLojasDoGrupo(membros.filter((membro) => membro.empresa_id !== tenantAtualId));
       })
       .catch(() => {
         if (ativo) setOutrasLojasDoGrupo([]);
@@ -103,7 +108,7 @@ export default function UsuarioModal({
 
   const erros = validar(novoUsuario);
   const erroVisivel = (campo) =>
-    usuarioServerErrors[campo] || ((tocados[campo] || tentouEnviar) ? erros[campo] : undefined);
+    usuarioServerErrors[campo] || (tocados[campo] || tentouEnviar ? erros[campo] : undefined);
   const marcarTocado = (campo) => setTocados((atual) => ({ ...atual, [campo]: true }));
 
   const verificarDuplicata = async (campo, valor) => {
@@ -234,7 +239,9 @@ export default function UsuarioModal({
               verificarDuplicata("celular", evento.target.value);
             }}
             whatsapp={novoUsuario.celular_whatsapp}
-            onChangeWhatsapp={(celular_whatsapp) => atualizarCampo("celular_whatsapp", celular_whatsapp)}
+            onChangeWhatsapp={(celular_whatsapp) =>
+              atualizarCampo("celular_whatsapp", celular_whatsapp)
+            }
             help="Será o login do usuário no ERP e no app CorePet, após selecionar a loja."
           />
 
@@ -269,18 +276,15 @@ export default function UsuarioModal({
         {duplicata ? (
           <div className="flex flex-col gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-500/30 dark:bg-amber-500/10">
             <p className="font-semibold text-amber-900 dark:text-amber-200">
-              Já existe uma pessoa cadastrada com esse {duplicata.campo === "email" ? "e-mail" : "celular"}.
+              Já existe uma pessoa cadastrada com esse{" "}
+              {duplicata.campo === "email" ? "e-mail" : "celular"}.
             </p>
             <p className="text-amber-800 dark:text-amber-200">{duplicata.cliente.nome}</p>
             <div className="mt-1 flex flex-wrap gap-2">
               <BotaoCancelar tamanho="pequeno" onClick={() => setDuplicata(null)}>
                 Criar pessoa separada
               </BotaoCancelar>
-              <BotaoInteracao
-                tamanho="pequeno"
-                icon={UserCheck}
-                onClick={vincularPessoaEncontrada}
-              >
+              <BotaoInteracao tamanho="pequeno" icon={UserCheck} onClick={vincularPessoaEncontrada}>
                 Vincular a esta pessoa
               </BotaoInteracao>
             </div>
@@ -325,9 +329,7 @@ export default function UsuarioModal({
                 label: membro.empresa_nome,
               }))}
               value={novoUsuario.lojas_adicionais || []}
-              onChange={(lojas_adicionais) =>
-                setNovoUsuario({ ...novoUsuario, lojas_adicionais })
-              }
+              onChange={(lojas_adicionais) => setNovoUsuario({ ...novoUsuario, lojas_adicionais })}
             />
           </div>
         ) : null}

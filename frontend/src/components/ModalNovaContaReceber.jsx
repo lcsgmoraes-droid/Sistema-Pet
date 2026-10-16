@@ -56,12 +56,14 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
 
   const carregarDados = async () => {
     try {
-      const [clientesRes, categoriasRes, subcategoriasDRERes, categoriasDRERes] = await Promise.all([
-        api.get("/clientes/?is_cliente=true"),
-        api.get("/categorias-financeiras"),
-        api.get("/dre/subcategorias"),
-        api.get("/dre/categorias"),
-      ]);
+      const [clientesRes, categoriasRes, subcategoriasDRERes, categoriasDRERes] = await Promise.all(
+        [
+          api.get("/clientes/?is_cliente=true"),
+          api.get("/categorias-financeiras"),
+          api.get("/dre/subcategorias"),
+          api.get("/dre/categorias"),
+        ],
+      );
 
       console.log("📦 Categorias recebidas:", categoriasRes.data);
 

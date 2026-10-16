@@ -126,7 +126,8 @@ export default function PetFormDadosGeraisTab({
           </div>
           {formData.especie && racas.length === 0 && (
             <p className="mt-1 text-xs text-amber-800">
-              Nenhuma raça cadastrada para {especieSelecionadaAtual?.nome || "a espécie selecionada"}.
+              Nenhuma raça cadastrada para{" "}
+              {especieSelecionadaAtual?.nome || "a espécie selecionada"}.
             </p>
           )}
         </div>

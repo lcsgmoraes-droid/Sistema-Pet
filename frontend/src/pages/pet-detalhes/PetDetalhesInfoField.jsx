@@ -5,7 +5,9 @@ export default function PetDetalhesInfoField({ icon: Icone, label, mono = false,
   return (
     <div className="min-w-0">
       <dt className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
-        {Icone ? <Icone className="h-3.5 w-3.5 flex-none text-gray-500" aria-hidden="true" /> : null}
+        {Icone ? (
+          <Icone className="h-3.5 w-3.5 flex-none text-gray-500" aria-hidden="true" />
+        ) : null}
         {label}
       </dt>
       <dd

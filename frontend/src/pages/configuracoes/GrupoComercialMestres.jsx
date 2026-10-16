@@ -93,9 +93,7 @@ export default function GrupoComercialMestres() {
                   <span className="flex items-center gap-2">
                     <Icone className="text-slate-500" aria-hidden="true" />
                     {secao.titulo}
-                    <span className="text-xs font-normal text-slate-400">
-                      ({itens.length})
-                    </span>
+                    <span className="text-xs font-normal text-slate-400">({itens.length})</span>
                   </span>
                 }
               >

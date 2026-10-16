@@ -171,11 +171,10 @@ export default function OpsTenantBillingOfferPanel({
                   .map((plano) => ({ value: plano.codigo, label: plano.nome })),
               ];
               return (
-                <div
-                  key={chave}
-                  className={`rounded-lg border p-2.5 ${BLOCO_CLASSES[chave]}`}
-                >
-                  <p className={`text-xs font-bold uppercase tracking-wide ${TITULO_CLASSES[chave]}`}>
+                <div key={chave} className={`rounded-lg border p-2.5 ${BLOCO_CLASSES[chave]}`}>
+                  <p
+                    className={`text-xs font-bold uppercase tracking-wide ${TITULO_CLASSES[chave]}`}
+                  >
                     {titulo}
                   </p>
                   <div className="mt-2">
@@ -245,7 +244,10 @@ export default function OpsTenantBillingOfferPanel({
             </span>
             <div className="mt-1 grid gap-1.5 rounded-lg border border-slate-200 bg-white p-2.5 sm:grid-cols-2 dark:border-slate-700 dark:bg-slate-900">
               {[...modulosDosPlanosSelecionados].sort().map((modulo) => (
-                <div key={modulo} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                <div
+                  key={modulo}
+                  className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200"
+                >
                   {SEGMENTOS.filter(({ chave }) =>
                     planosCatalogo
                       .find((plano) => plano.codigo === form[`plan_${chave}_code`])

@@ -140,7 +140,9 @@ export default function UsuariosTable({
             disabled={savingLiberacaoId === usuario.user_id}
             onChange={(event) => onToggleCrediario(usuario, event.target.checked)}
           />
-          <span>{usuario.pode_liberar_venda_crediario_atrasado ? "Concedida" : "Não concedida"}</span>
+          <span>
+            {usuario.pode_liberar_venda_crediario_atrasado ? "Concedida" : "Não concedida"}
+          </span>
         </div>
       ),
     },

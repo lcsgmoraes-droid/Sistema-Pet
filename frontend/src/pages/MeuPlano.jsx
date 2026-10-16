@@ -196,8 +196,8 @@ export default function MeuPlano() {
   const customOffer = billing?.custom_offer;
   const hasCustomOffer = Boolean(
     customOffer &&
-      customOfferPrimaryPlan?.code === selectedPlan &&
-      customOffer.status !== "replaced",
+    customOfferPrimaryPlan?.code === selectedPlan &&
+    customOffer.status !== "replaced",
   );
   const billingMatchesSelectedPlan = billing?.plan?.codigo === selectedPlan || hasCustomOffer;
   const currentAcceptance = billing?.contract_acceptance;

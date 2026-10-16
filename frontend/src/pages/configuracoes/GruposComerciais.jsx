@@ -169,7 +169,9 @@ function GrupoComercialPainel({ acao, empresaAtualId, grupo, navigate, onRemover
                     <span className="text-xs text-slate-500">
                       {membro.papel === "responsavel" ? "Loja responsável" : "Loja do grupo"}
                     </span>
-                    {status ? <StatusBadge intent={status.intent}>{status.label}</StatusBadge> : null}
+                    {status ? (
+                      <StatusBadge intent={status.intent}>{status.label}</StatusBadge>
+                    ) : null}
                   </div>
                   <div className="mt-0.5 text-xs text-slate-500">
                     {carregandoBilling

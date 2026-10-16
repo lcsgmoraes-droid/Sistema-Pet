@@ -87,11 +87,7 @@ const QuickAddModal = ({ tipo, especieId, especieNome, onSuccess, onClose }) => 
       rodape={
         <>
           <BotaoCancelar disabled={saving} onClick={onClose} />
-          <BotaoSalva
-            disabled={isRaca && !especieValida}
-            loading={saving}
-            onClick={handleSubmit}
-          >
+          <BotaoSalva disabled={isRaca && !especieValida} loading={saving} onClick={handleSubmit}>
             Salvar
           </BotaoSalva>
         </>

@@ -74,7 +74,10 @@ export async function removerVinculoProdutosGrupo(grupoId, vinculoId) {
  * de um grupo crescer hoje (nao existe mais convite entre empresas ja
  * independentes). Reaproveita o usuario logado, sem pedir e-mail novo.
  */
-export async function adicionarLojaGrupo(grupoId, { nomeLoja, nomeAcesso, plan, organizationType } = {}) {
+export async function adicionarLojaGrupo(
+  grupoId,
+  { nomeLoja, nomeAcesso, plan, organizationType } = {},
+) {
   const { data } = await api.post(`/grupos-comerciais/${grupoId}/lojas`, {
     nome_loja: nomeLoja,
     nome_acesso: nomeAcesso || undefined,
@@ -166,4 +169,3 @@ export async function sincronizarBillingLojaGrupo(grupoId, tenantId) {
   );
   return data;
 }
-

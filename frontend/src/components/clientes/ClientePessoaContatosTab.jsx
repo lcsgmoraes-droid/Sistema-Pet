@@ -2,7 +2,12 @@ import InputTelefone from "../v2/InputTelefone/InputTelefone";
 import InputTexto from "../v2/InputTexto/InputTexto";
 import InputTextoLongo from "../v2/InputTextoLongo/InputTextoLongo";
 
-export default function ClientePessoaContatosTab({ erros = {}, formData, onBlurCampo, setFormData }) {
+export default function ClientePessoaContatosTab({
+  erros = {},
+  formData,
+  onBlurCampo,
+  setFormData,
+}) {
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
       <div className="flex w-full flex-col gap-4 lg:max-w-xs">

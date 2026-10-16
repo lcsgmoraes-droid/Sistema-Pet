@@ -15,9 +15,7 @@ export default function LegendaBolinha({ tom = "pet", rotulo }) {
         className={`h-2.5 w-2.5 flex-none rounded-full ${CORES_TOM[tom] || CORES_TOM.pet}`}
         aria-hidden="true"
       />
-      {rotulo ? (
-        <span className="sr-only">{rotulo}</span>
-      ) : null}
+      {rotulo ? <span className="sr-only">{rotulo}</span> : null}
     </span>
   );
 }

@@ -22,7 +22,11 @@ export default function PetAvatar({ alt = "Pet", className = "", name = "", size
       aria-label={name || alt}
       className={[
         "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200",
-        imageUrl ? "bg-slate-100" : letra ? "bg-[#0f5f63] dark:bg-cyan-700" : "bg-slate-100 text-slate-400",
+        imageUrl
+          ? "bg-slate-100"
+          : letra
+            ? "bg-[#0f5f63] dark:bg-cyan-700"
+            : "bg-slate-100 text-slate-400",
         tamanho.caixa,
         className,
       ]

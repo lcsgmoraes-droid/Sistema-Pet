@@ -27,7 +27,11 @@ function extrairErro(error, padrao) {
   return error?.response?.data?.detail || padrao;
 }
 
-export default function OpsGrupoComercialOnboardingModal({ onClose, onCreated, onDefinirProposta }) {
+export default function OpsGrupoComercialOnboardingModal({
+  onClose,
+  onCreated,
+  onDefinirProposta,
+}) {
   const [titularEmail, setTitularEmail] = useState("");
   const [titularNome, setTitularNome] = useState("");
   const [titularTipoPessoa, setTitularTipoPessoa] = useState("PF");
@@ -154,8 +158,8 @@ export default function OpsGrupoComercialOnboardingModal({ onClose, onCreated, o
     >
       <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
         Esta etapa só cria as lojas. Depois de criadas, defina o plano e o valor de cada uma
-        individualmente pela "Proposta comercial" — o link aparece ao lado de cada loja assim que
-        o grupo é criado.
+        individualmente pela "Proposta comercial" — o link aparece ao lado de cada loja assim que o
+        grupo é criado.
       </p>
 
       {resultado ? (

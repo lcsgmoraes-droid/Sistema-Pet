@@ -62,7 +62,10 @@ export default function ProdutoHistoricoPanel({ produtoId }) {
             </thead>
             <tbody>
               {itens.map((item, indice) => (
-                <tr key={`${item.alterado_em}-${item.campo}-${indice}`} className="border-b border-gray-100">
+                <tr
+                  key={`${item.alterado_em}-${item.campo}-${indice}`}
+                  className="border-b border-gray-100"
+                >
                   <td className="py-2 pr-4">{formatarData(item.alterado_em)}</td>
                   <td className="py-2 pr-4">{item.usuario || "-"}</td>
                   <td className="py-2 pr-4">{item.campo}</td>

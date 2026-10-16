@@ -68,8 +68,8 @@ function ClientePessoaEnderecoModal({
               aria-hidden="true"
             />
             <p className="text-sm text-amber-900 dark:text-amber-200">
-              Só pode haver um endereço Principal. Este endereço vai virar o novo principal, e o
-              que é principal hoje deixa de ser — escolha abaixo para qual tipo ele passa.
+              Só pode haver um endereço Principal. Este endereço vai virar o novo principal, e o que
+              é principal hoje deixa de ser — escolha abaixo para qual tipo ele passa.
             </p>
           </div>
 

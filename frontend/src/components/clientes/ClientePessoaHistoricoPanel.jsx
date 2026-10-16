@@ -16,12 +16,11 @@ export default function ClientePessoaHistoricoPanel({ clienteId, origemTenantId,
   const [erro, setErro] = useState("");
 
   const lojaAtualId = user?.tenant?.id;
-  const origemLabel =
-    !origemTenantId
-      ? "-"
-      : String(origemTenantId) === String(lojaAtualId)
-        ? user?.tenant?.login_name || user?.tenant?.name || "Loja atual"
-        : "Outra loja do grupo";
+  const origemLabel = !origemTenantId
+    ? "-"
+    : String(origemTenantId) === String(lojaAtualId)
+      ? user?.tenant?.login_name || user?.tenant?.name || "Loja atual"
+      : "Outra loja do grupo";
 
   useEffect(() => {
     let ativo = true;
@@ -45,7 +44,9 @@ export default function ClientePessoaHistoricoPanel({ clienteId, origemTenantId,
   return (
     <section className="space-y-4">
       <InputTexto id="pessoa-origem-loja" label="Loja de origem" value={origemLabel} readOnly />
-      <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Histórico de alterações</h3>
+      <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+        Histórico de alterações
+      </h3>
       {carregando ? <p className="text-sm text-slate-500">Carregando histórico...</p> : null}
       {erro ? <p className="text-sm text-red-600">{erro}</p> : null}
       {!carregando && !erro && itens.length === 0 ? (
@@ -65,7 +66,10 @@ export default function ClientePessoaHistoricoPanel({ clienteId, origemTenantId,
             </thead>
             <tbody>
               {itens.map((item, indice) => (
-                <tr key={`${item.alterado_em}-${item.campo}-${indice}`} className="border-b border-slate-100 dark:border-slate-800">
+                <tr
+                  key={`${item.alterado_em}-${item.campo}-${indice}`}
+                  className="border-b border-slate-100 dark:border-slate-800"
+                >
                   <td className="py-2 pr-4">{formatarData(item.alterado_em)}</td>
                   <td className="py-2 pr-4">{item.usuario || "-"}</td>
                   <td className="py-2 pr-4">{item.campo}</td>

@@ -3,8 +3,7 @@
 // proposta comercial em ops-tenants). "azul" é o padrão (mesma cor de sempre,
 // nenhuma tela existente precisa passar a prop `tom`).
 const TONS_RADIO = {
-  azul:
-    "peer-checked:border-blue-600 peer-checked:bg-blue-600 peer-checked:hover:bg-blue-700 peer-focus-visible:ring-blue-500 dark:peer-checked:border-blue-500 dark:peer-checked:bg-blue-600 dark:peer-checked:hover:bg-blue-700",
+  azul: "peer-checked:border-blue-600 peer-checked:bg-blue-600 peer-checked:hover:bg-blue-700 peer-focus-visible:ring-blue-500 dark:peer-checked:border-blue-500 dark:peer-checked:bg-blue-600 dark:peer-checked:hover:bg-blue-700",
   pet: "peer-checked:border-blue-600 peer-checked:bg-blue-600 peer-checked:hover:bg-blue-700 peer-focus-visible:ring-blue-500 dark:peer-checked:border-blue-500 dark:peer-checked:bg-blue-600 dark:peer-checked:hover:bg-blue-700",
   vet: "peer-checked:border-emerald-600 peer-checked:bg-emerald-600 peer-checked:hover:bg-emerald-700 peer-focus-visible:ring-emerald-500 dark:peer-checked:border-emerald-500 dark:peer-checked:bg-emerald-600 dark:peer-checked:hover:bg-emerald-700",
   grooming:

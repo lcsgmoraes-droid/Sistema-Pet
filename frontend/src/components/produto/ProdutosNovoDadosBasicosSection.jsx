@@ -47,10 +47,9 @@ export default function ProdutosNovoDadosBasicosSection({
           ) : null}
         </div>
         <p className="mb-3 text-xs text-gray-500">
-          Nome, codigo de barras/GTIN, unidade e descricao sao do item em si. Se esta
-          loja faz parte de um grupo comercial e outra loja ja vende o mesmo item
-          (mesmo codigo de barras), esses campos ficam ligados — editar aqui atualiza
-          la tambem.
+          Nome, codigo de barras/GTIN, unidade e descricao sao do item em si. Se esta loja faz parte
+          de um grupo comercial e outra loja ja vende o mesmo item (mesmo codigo de barras), esses
+          campos ficam ligados — editar aqui atualiza la tambem.
         </p>
 
         <div className="space-y-4">
@@ -74,7 +73,9 @@ export default function ProdutosNovoDadosBasicosSection({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Produto *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nome do Produto *
+              </label>
               <input
                 type="text"
                 value={formData.nome}
@@ -110,7 +111,9 @@ export default function ProdutosNovoDadosBasicosSection({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">EANs alternativos</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                EANs alternativos
+              </label>
               <input
                 type="text"
                 value={formData.codigos_barras_alternativos}
@@ -180,8 +183,8 @@ export default function ProdutosNovoDadosBasicosSection({
               </div>
             )}
             <p className="mt-1 text-xs text-gray-500">
-              A IA pesquisa pelo EAN, prepara a descricao e sugere NCM, CEST e origem. Revise os dados
-              fiscais antes de salvar.
+              A IA pesquisa pelo EAN, prepara a descricao e sugere NCM, CEST e origem. Revise os
+              dados fiscais antes de salvar.
             </p>
             {assistenteIAAviso ? (
               <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">

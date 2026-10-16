@@ -332,10 +332,14 @@ export function createProdutosColunas() {
                       </span>
                     )}
                     {isKitVirtualProduto(produto) && (
-                      <span className="whitespace-nowrap text-xs text-indigo-600">(Kit • Virtual)</span>
+                      <span className="whitespace-nowrap text-xs text-indigo-600">
+                        (Kit • Virtual)
+                      </span>
                     )}
                     {isKitFisicoProduto(produto) && (
-                      <span className="whitespace-nowrap text-xs text-green-600">(Kit • Físico)</span>
+                      <span className="whitespace-nowrap text-xs text-green-600">
+                        (Kit • Físico)
+                      </span>
                     )}
                     {produto.data_descontinuacao && (
                       <span className="inline-flex items-center whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800">

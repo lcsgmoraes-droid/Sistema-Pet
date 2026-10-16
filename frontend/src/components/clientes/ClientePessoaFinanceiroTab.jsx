@@ -8,7 +8,11 @@ import WhatsAppHistorico from "../WhatsAppHistorico";
 import { formatBRL } from "../../utils/formatters";
 
 const RANK_INFO = {
-  platinum: { emoji: "👑", label: "Platina", classe: "bg-purple-50 border-purple-300 text-purple-700" },
+  platinum: {
+    emoji: "👑",
+    label: "Platina",
+    classe: "bg-purple-50 border-purple-300 text-purple-700",
+  },
   diamond: { emoji: "💎", label: "Diamante", classe: "bg-cyan-50 border-cyan-300 text-cyan-700" },
   gold: { emoji: "🥇", label: "Ouro", classe: "bg-yellow-50 border-yellow-300 text-yellow-700" },
   silver: { emoji: "🥈", label: "Prata", classe: "bg-gray-50 border-gray-300 text-gray-600" },
@@ -34,7 +38,8 @@ export default function ClientePessoaFinanceiroTab({
           <div>
             <p className="mb-1 text-sm font-medium text-green-800">Saldo de crédito</p>
             <p className="text-3xl font-bold text-green-600">
-              R$ {cliente?.credito ? parseFloat(cliente.credito).toFixed(2).replace(".", ",") : "0,00"}
+              R${" "}
+              {cliente?.credito ? parseFloat(cliente.credito).toFixed(2).replace(".", ",") : "0,00"}
             </p>
             <p className="mt-1 text-xs text-green-700">Disponível para uso em compras</p>
           </div>

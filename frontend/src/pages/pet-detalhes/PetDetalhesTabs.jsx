@@ -11,7 +11,5 @@ const ABAS = [
 ];
 
 export default function PetDetalhesTabs({ abaAtiva, onChange }) {
-  return (
-    <AbasNavegacao abas={ABAS} ativa={abaAtiva} onChange={onChange} className="mb-6" />
-  );
+  return <AbasNavegacao abas={ABAS} ativa={abaAtiva} onChange={onChange} className="mb-6" />;
 }

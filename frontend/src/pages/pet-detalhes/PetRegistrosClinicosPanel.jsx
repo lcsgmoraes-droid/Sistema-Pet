@@ -141,7 +141,10 @@ export default function PetRegistrosClinicosPanel({
           {registrosPeso.length > 0 ? (
             <GraficoPeso registros={registrosPeso} />
           ) : (
-            <EstadoVazio title="Sem pesagens registradas" description="Registre a primeira pesagem abaixo." />
+            <EstadoVazio
+              title="Sem pesagens registradas"
+              description="Registre a primeira pesagem abaixo."
+            />
           )}
           <div className="mt-4 flex items-end gap-3">
             <div className="w-32">
@@ -152,7 +155,12 @@ export default function PetRegistrosClinicosPanel({
                 onChange={setNovoPeso}
               />
             </div>
-            <BotaoSalva tamanho="normal" loading={salvando} disabled={!novoPeso} onClick={salvarPeso}>
+            <BotaoSalva
+              tamanho="normal"
+              loading={salvando}
+              disabled={!novoPeso}
+              onClick={salvarPeso}
+            >
               Registrar peso
             </BotaoSalva>
           </div>
@@ -172,7 +180,9 @@ export default function PetRegistrosClinicosPanel({
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <ListaRegistros
             registros={registrosHistorico}
-            renderValor={(r) => <p className="whitespace-pre-line text-sm text-gray-900">{r.texto}</p>}
+            renderValor={(r) => (
+              <p className="whitespace-pre-line text-sm text-gray-900">{r.texto}</p>
+            )}
             onExcluir={onExcluirRegistro}
             empty="Nenhum histórico clínico registrado"
           />

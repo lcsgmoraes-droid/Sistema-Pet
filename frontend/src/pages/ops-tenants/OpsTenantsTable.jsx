@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { FiChevronDown, FiChevronLeft, FiChevronRight, FiEdit3, FiPlusCircle } from "react-icons/fi";
+import {
+  FiChevronDown,
+  FiChevronLeft,
+  FiChevronRight,
+  FiEdit3,
+  FiPlusCircle,
+} from "react-icons/fi";
 
 import { formatMoneyBRL } from "../../utils/formatters";
 import OpsAdicionarLojaModal from "./OpsAdicionarLojaModal";
@@ -295,7 +301,12 @@ function GroupRows({
 }) {
   return (
     <>
-      <GroupHeaderRow group={group} collapsed={collapsed} onToggle={onToggle} onAddLoja={onAddLoja} />
+      <GroupHeaderRow
+        group={group}
+        collapsed={collapsed}
+        onToggle={onToggle}
+        onAddLoja={onAddLoja}
+      />
       {collapsed
         ? null
         : group.lojas.map((tenant) => (

@@ -224,7 +224,11 @@ const PetForm = () => {
   // Desmarcar "castrado" limpa a data de castracao escondida — evita submeter uma
   // data de castracao presa no estado enquanto o pet nao esta mais marcado como castrado.
   const handleCastradoChange = (castrado) => {
-    setFormData((prev) => ({ ...prev, castrado, castrado_data: castrado ? prev.castrado_data : "" }));
+    setFormData((prev) => ({
+      ...prev,
+      castrado,
+      castrado_data: castrado ? prev.castrado_data : "",
+    }));
   };
 
   // Funções para Quick Add

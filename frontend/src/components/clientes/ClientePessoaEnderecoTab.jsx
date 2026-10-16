@@ -73,9 +73,7 @@ function CardEndereco({ apelido, badge, endereco, onEditar, onExcluir }) {
               <p className="mt-1 text-xs text-slate-500">CEP: {endereco.cep}</p>
             </>
           ) : (
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Nenhum endereço cadastrado
-            </p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Nenhum endereço cadastrado</p>
           )}
         </div>
         <div className="flex flex-none gap-1">
@@ -118,12 +116,15 @@ export default function ClientePessoaEnderecoTab({
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-2">
-          <MapPin className="mt-0.5 h-4 w-4 flex-none text-blue-600 dark:text-blue-300" aria-hidden="true" />
+          <MapPin
+            className="mt-0.5 h-4 w-4 flex-none text-blue-600 dark:text-blue-300"
+            aria-hidden="true"
+          />
           <div>
             <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Endereço</h4>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              O principal é usado como endereço padrão do cadastro; adicione outros para
-              entrega, cobrança etc.
+              O principal é usado como endereço padrão do cadastro; adicione outros para entrega,
+              cobrança etc.
             </p>
           </div>
         </div>

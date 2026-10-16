@@ -3,7 +3,10 @@ import toast from "react-hot-toast";
 import api from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import { confirmarCorePet } from "../services/corepetDialog";
-import { buildInitialAccessCredentials, resolveTenantLoginReference } from "../utils/usuarioAcessoInicial";
+import {
+  buildInitialAccessCredentials,
+  resolveTenantLoginReference,
+} from "../utils/usuarioAcessoInicial";
 import { isBrazilianMobileLogin, normalizeBrazilianLoginPhone } from "../utils/loginPhone";
 
 const USUARIO_INICIAL = {

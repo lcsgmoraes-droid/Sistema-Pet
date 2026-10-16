@@ -21,10 +21,7 @@ import {
 } from "react-icons/fi";
 import { applyLayoutMenuStructure } from "./menuStructure.js";
 
-export function createLayoutMenuItems({
-  lembretesCount = 0,
-  orcamentosGrupoAtivo = false,
-} = {}) {
+export function createLayoutMenuItems({ lembretesCount = 0, orcamentosGrupoAtivo = false } = {}) {
   const items = [
     {
       path: "/alertas-gestor",

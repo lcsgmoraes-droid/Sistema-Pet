@@ -151,7 +151,12 @@ export default function CampoIdadeInteligente({
         </div>
       ) : (
         <div>
-          <InputData name={name} value={dataNascimento} onChange={handleDataChange} required={required} />
+          <InputData
+            name={name}
+            value={dataNascimento}
+            onChange={handleDataChange}
+            required={required}
+          />
           {renderFeedback()}
           <p className="mt-1 text-xs text-gray-500">Data de nascimento do pet</p>
         </div>

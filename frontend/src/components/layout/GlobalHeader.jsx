@@ -137,11 +137,7 @@ export default function GlobalHeader({ isMobile, sidebarOpen, onToggleSidebar, u
   return (
     <header className="erp-topbar relative z-[60] flex h-14 w-full flex-shrink-0 items-center justify-between gap-3 border-b border-[#d8eee9] bg-white/90 px-4 dark:border-slate-800 dark:bg-slate-950/90">
       <div className="flex items-center gap-2">
-        <img
-          src={COREPET_LOGO}
-          alt="CorePet"
-          className="h-8 w-auto max-w-[140px] object-contain"
-        />
+        <img src={COREPET_LOGO} alt="CorePet" className="h-8 w-auto max-w-[140px] object-contain" />
         <BotaoAlternarMenu
           aberto={sidebarOpen}
           onClick={onToggleSidebar}
@@ -166,9 +162,15 @@ export default function GlobalHeader({ isMobile, sidebarOpen, onToggleSidebar, u
             aria-haspopup={podeTrocarLoja ? "menu" : undefined}
             aria-expanded={podeTrocarLoja ? seletorLojaAberto : undefined}
             className={`flex items-center gap-2 rounded-lg border-2 border-[#0f5f63] bg-[#0f5f63] px-3.5 py-2 text-sm font-bold text-white shadow-sm transition-colors dark:border-cyan-500 dark:bg-cyan-700 ${
-              podeTrocarLoja ? "cursor-pointer hover:bg-[#0c4d50] dark:hover:bg-cyan-600" : "cursor-default"
+              podeTrocarLoja
+                ? "cursor-pointer hover:bg-[#0c4d50] dark:hover:bg-cyan-600"
+                : "cursor-default"
             }`}
-            title={podeTrocarLoja ? `Loja selecionada: ${tenantLabel} — clique para trocar` : `Loja selecionada: ${tenantLabel}`}
+            title={
+              podeTrocarLoja
+                ? `Loja selecionada: ${tenantLabel} — clique para trocar`
+                : `Loja selecionada: ${tenantLabel}`
+            }
           >
             <FiCheckCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
             <span className="max-w-[12rem] truncate" title={tenantLabel}>
@@ -211,7 +213,9 @@ export default function GlobalHeader({ isMobile, sidebarOpen, onToggleSidebar, u
                 </button>
               ))}
               {erroTroca ? (
-                <div className="px-4 py-2 text-xs text-rose-600 dark:text-rose-400">{erroTroca}</div>
+                <div className="px-4 py-2 text-xs text-rose-600 dark:text-rose-400">
+                  {erroTroca}
+                </div>
               ) : null}
             </div>
           ) : null}

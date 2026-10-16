@@ -42,9 +42,7 @@ function SecaoCampos({ children, titulo }) {
       <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
         {titulo}
       </h3>
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-4">
-        {children}
-      </dl>
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-4">{children}</dl>
     </div>
   );
 }
@@ -123,9 +121,17 @@ export default function PetDetalhesGeralTab({ pet, ultimaAlta, ultimaVacina }) {
         </SecaoCampos>
 
         <SecaoCampos titulo="Características físicas">
-          <PetDetalhesInfoField icon={Cake} label="Data de Nascimento" value={formatarData(pet.data_nascimento)} />
+          <PetDetalhesInfoField
+            icon={Cake}
+            label="Data de Nascimento"
+            value={formatarData(pet.data_nascimento)}
+          />
           <PetDetalhesInfoField icon={Hourglass} label="Idade" value={idade} />
-          <PetDetalhesInfoField icon={Scale} label="Peso" value={pet.peso ? `${pet.peso} kg` : "-"} />
+          <PetDetalhesInfoField
+            icon={Scale}
+            label="Peso"
+            value={pet.peso ? `${pet.peso} kg` : "-"}
+          />
           <PetDetalhesInfoField icon={Ruler} label="Porte" value={pet.porte} />
           <PetDetalhesInfoField icon={Palette} label="Cor/Pelagem" value={pet.cor} />
           <PetDetalhesInfoField

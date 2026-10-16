@@ -89,4 +89,3 @@ export function attentionBadge(level) {
   }
   return "border-emerald-200 bg-emerald-50 text-emerald-700";
 }
-
