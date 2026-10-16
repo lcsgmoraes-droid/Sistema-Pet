@@ -142,9 +142,9 @@ def calcular_resumo_pagamento_venda(
     # do recebido real para comparar com o novo total, antes de salvar a edicao.
     valor_pago = min(total_recebido, total_venda)
 
-    if valor_pago >= total_venda - CENTAVOS:
+    if valor_pago >= total_venda:
         status = "pago"
-    elif valor_pago > CENTAVOS:
+    elif valor_pago > 0:
         status = "parcial"
     else:
         status = "em_aberto"

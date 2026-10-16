@@ -171,3 +171,40 @@ def test_rota_de_emissao_nao_contem_chamada_ao_bling():
 
     assert "BlingAPI" not in fonte
     assert "emitir_nota_fiscal" not in fonte
+
+
+def test_rejeicao_historica_nao_bloqueia_prevalidacao_atual_valida(monkeypatch):
+    produto = SimpleNamespace(id=9, nome="Produto corrigido", codigo="9405")
+    item = SimpleNamespace(id=23, produto_id=9, tipo="produto", produto=produto)
+    venda = SimpleNamespace(
+        id=30,
+        itens=[item],
+        nfe_bling_id=None,
+        nfe_correlation_id=None,
+        nfe_provider="intnfe",
+        nfe_status="rejeitada",
+        nfe_codigo_erro="778",
+        nfe_motivo_rejeicao="Rejeição: Informado NCM inexistente [nItem:1]",
+    )
+    monkeypatch.setattr(nfe_routes, "_buscar_venda_para_nfe", lambda *a: venda)
+    monkeypatch.setattr(
+        nfe_routes,
+        "prevalidar_produtos_fiscais_venda",
+        lambda *a, **kw: {"pode_emitir": True, "bloqueios": [], "correcoes": []},
+    )
+    monkeypatch.setattr(nfe_routes, "get_tenant", lambda *a: SimpleNamespace(id="t"))
+    monkeypatch.setattr(nfe_routes, "preview_intnfe", lambda *a: {"itens": []})
+
+    resposta = asyncio.run(
+        nfe_routes.prevalidar_nfe(
+            nfe_routes.PrevalidarNFeRequest(venda_id=30),
+            db=SimpleNamespace(),
+            user_and_tenant=(SimpleNamespace(id=2), "tenant-teste"),
+        )
+    )
+
+    assert resposta["pode_emitir"] is True
+    assert resposta["correcoes"] == []
+    assert resposta["bloqueios"] == []
+    assert resposta["diagnostico_rejeicao"]["correcoes"][0]["item_id"] == 23
+    assert resposta["diagnostico_rejeicao"]["correcoes"][0]["historico"] is True

@@ -146,11 +146,11 @@ export const formatarQuantidadeLote = (valor) => {
 };
 
 export const obterLotesValidadeDisponiveis = (produto) => {
-  const lotesResumo = Array.isArray(produto?.lotes_validade_resumo)
-    ? produto.lotes_validade_resumo
-    : [];
+  if (!(obterEstoqueVisualProduto(produto) > 0)) return [];
+
+  const temResumoLotes = Array.isArray(produto?.lotes_validade_resumo);
   const lotesCompletos = Array.isArray(produto?.lotes) ? produto.lotes : [];
-  const origem = lotesResumo.length > 0 ? lotesResumo : lotesCompletos;
+  const origem = temResumoLotes ? produto.lotes_validade_resumo : lotesCompletos;
 
   return origem
     .map((lote) => {
@@ -177,6 +177,22 @@ export const obterLotesValidadeDisponiveis = (produto) => {
       if (dataA !== dataB) return dataA - dataB;
       return String(a.nome_lote).localeCompare(String(b.nome_lote), "pt-BR");
     });
+};
+
+export const obterValidadeMaisProximaProduto = (produto) => {
+  if (!(obterEstoqueVisualProduto(produto) > 0)) return null;
+
+  const loteComValidade = obterLotesValidadeDisponiveis(produto).find((lote) => lote.data_validade);
+  if (loteComValidade) return loteComValidade.data_validade;
+
+  if (
+    produto?.controle_lote === true ||
+    (Array.isArray(produto?.lotes_validade_resumo) && produto?.controle_lote !== false)
+  ) {
+    return null;
+  }
+
+  return produto?.validade_proxima_listagem || produto?.validade_proxima || null;
 };
 
 export const montarTooltipLotesValidade = (lotes, formatarData) => {

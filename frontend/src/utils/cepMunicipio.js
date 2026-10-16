@@ -2,6 +2,18 @@ function onlyDigits(value) {
   return String(value || "").replace(/\D/g, "");
 }
 
+export function aplicarConsultaCepEndereco(enderecoAtual, cepConsultado, dadosCep) {
+  if (!enderecoAtual || onlyDigits(enderecoAtual.cep) !== cepConsultado) return enderecoAtual;
+  return {
+    ...enderecoAtual,
+    endereco: dadosCep.endereco,
+    bairro: dadosCep.bairro || "",
+    cidade: dadosCep.cidade,
+    estado: dadosCep.estado,
+    codigo_municipio: dadosCep.codigo_municipio,
+  };
+}
+
 function normalizeText(value) {
   return String(value || "")
     .normalize("NFD")

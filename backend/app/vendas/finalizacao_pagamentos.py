@@ -6,7 +6,6 @@ deixar ``finalizacao.py`` focado na transacao principal da venda.
 """
 
 import logging
-import math
 import re
 from datetime import date as _date
 from decimal import Decimal
@@ -17,6 +16,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.campaigns.cashback_wallet import get_cashback_wallet, lock_cashback_customer
+from app.services.venda_descontos import moeda
 from app.utils.timezone import now_brasilia
 from app.vendas.status_pagamento import pagamento_valido_para_saldo
 
@@ -68,31 +68,42 @@ def _calcular_pagamentos_finalizacao(
     pagamentos_existentes: List[Any],
     pagamentos_novos: List[Dict[str, Any]],
 ) -> Dict[str, float]:
-    total_venda_float = float(total_venda or 0)
+    total_venda_decimal = moeda(total_venda)
     total_ja_pago = sum(
-        float(p.valor) for p in pagamentos_existentes if pagamento_valido_para_saldo(p)
+        (
+            moeda(p.valor)
+            for p in pagamentos_existentes
+            if pagamento_valido_para_saldo(p)
+        ),
+        Decimal("0.00"),
     )
     for pagamento in pagamentos_novos:
-        valor = float(pagamento.get("valor") or 0)
-        if not math.isfinite(valor) or valor < 0.01:
+        try:
+            valor = moeda(pagamento.get("valor"))
+        except ValueError:
+            valor = Decimal("0.00")
+        if valor <= 0:
             raise HTTPException(
                 status_code=400,
                 detail="O valor de cada pagamento deve ser maior que zero",
             )
-    total_novos_pagamentos = sum(float(p.get("valor") or 0) for p in pagamentos_novos)
-    valor_restante_bruto = total_venda_float - total_ja_pago
+        pagamento["valor"] = float(valor)
+    total_novos_pagamentos = sum(
+        (moeda(p["valor"]) for p in pagamentos_novos), Decimal("0.00")
+    )
+    valor_restante_bruto = total_venda_decimal - total_ja_pago
 
-    if not pagamentos_novos and total_ja_pago < total_venda_float - 0.01:
+    if not pagamentos_novos and total_ja_pago < total_venda_decimal:
         raise HTTPException(
             status_code=400, detail="Informe pelo menos uma forma de pagamento"
         )
 
-    if valor_restante_bruto <= 0.01 and total_novos_pagamentos > 0.01:
+    if valor_restante_bruto <= 0 and total_novos_pagamentos > 0:
         raise HTTPException(status_code=400, detail="Venda já está totalmente paga")
 
     # A edição pode reduzir o total abaixo do valor recebido anteriormente.
     # Sem pagamento novo, a refinalização preserva esse histórico financeiro.
-    if total_novos_pagamentos > max(0, valor_restante_bruto) + 0.01:
+    if total_novos_pagamentos > max(Decimal("0.00"), valor_restante_bruto):
         raise HTTPException(
             status_code=400,
             detail=(
@@ -102,12 +113,59 @@ def _calcular_pagamentos_finalizacao(
             ),
         )
 
+    for pagamento in pagamentos_novos:
+        _normalizar_recebido_e_troco(pagamento)
+
     return {
-        "total_ja_pago": total_ja_pago,
-        "total_novos_pagamentos": total_novos_pagamentos,
-        "total_pagamentos": total_ja_pago + total_novos_pagamentos,
-        "valor_restante": max(0, valor_restante_bruto),
+        "total_ja_pago": float(total_ja_pago),
+        "total_novos_pagamentos": float(total_novos_pagamentos),
+        "total_pagamentos": float(total_ja_pago + total_novos_pagamentos),
+        "valor_restante": float(max(Decimal("0.00"), valor_restante_bruto)),
     }
+
+
+def _normalizar_recebido_e_troco(pagamento: Dict[str, Any]) -> None:
+    from app.caixa.service import CaixaService
+
+    aplicado = moeda(pagamento["valor"])
+    for campo in ("valor_recebido", "troco"):
+        if pagamento.get(campo) is not None:
+            try:
+                valor = moeda(pagamento[campo])
+            except ValueError as exc:
+                raise HTTPException(400, "Confira o valor recebido e o troco.") from exc
+            if valor < 0:
+                raise HTTPException(400, "Confira o valor recebido e o troco.")
+            pagamento[campo] = float(valor)
+
+    forma = str(pagamento.get("forma_pagamento") or "").strip().lower()
+    beneficio = forma in {"cashback", "credito_cliente", "crédito cliente"}
+    if beneficio:
+        recebido = moeda(
+            aplicado
+            if pagamento.get("valor_recebido") is None
+            else pagamento["valor_recebido"]
+        )
+        if recebido != aplicado or moeda(pagamento.get("troco")) != 0:
+            raise HTTPException(
+                400,
+                "Cashback e crédito cliente só podem utilizar o valor aplicado à venda.",
+            )
+        pagamento["valor_recebido"] = float(aplicado)
+        pagamento["troco"] = 0.0
+    elif CaixaService.eh_forma_dinheiro(pagamento.get("forma_pagamento")):
+        recebido = moeda(
+            aplicado
+            if pagamento.get("valor_recebido") is None
+            else pagamento["valor_recebido"]
+        )
+        troco = recebido - aplicado
+        if troco < 0 or (
+            pagamento.get("troco") is not None and moeda(pagamento["troco"]) != troco
+        ):
+            raise HTTPException(400, "Confira o valor recebido e o troco.")
+        pagamento["valor_recebido"] = float(recebido)
+        pagamento["troco"] = float(troco)
 
 
 def consumir_cupom_finalizacao(
@@ -514,9 +572,9 @@ def processar_pagamentos_finalizacao(
             if not cliente:
                 raise HTTPException(status_code=404, detail="Cliente não encontrado")
 
-            credito_disponivel = Decimal(str(cliente.credito or 0))
-            valor_credito = Decimal(str(pag_data["valor"]))
-            if valor_credito > credito_disponivel + Decimal("0.01"):
+            credito_disponivel = moeda(cliente.credito)
+            valor_credito = moeda(pag_data["valor"])
+            if valor_credito > credito_disponivel:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Crédito insuficiente. Disponível: R$ {credito_disponivel:.2f}",
@@ -582,7 +640,7 @@ def processar_pagamentos_finalizacao(
                 db, tenant_id=tenant_id, customer_id=venda.cliente_id
             ).available
 
-            valor_cashback = Decimal(str(pag_data["valor"])).quantize(Decimal("0.01"))
+            valor_cashback = moeda(pag_data["valor"])
             if valor_cashback <= 0 or valor_cashback > saldo_disponivel:
                 raise HTTPException(
                     status_code=400,

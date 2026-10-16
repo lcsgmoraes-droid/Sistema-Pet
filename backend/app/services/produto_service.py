@@ -68,7 +68,9 @@ class ProdutoService:
     """
 
     @staticmethod
-    def create_produto(dados: Dict[str, Any], db: Session, tenant_id: str) -> Produto:
+    def create_produto(
+        dados: Dict[str, Any], db: Session, tenant_id: str, *, commit: bool = True
+    ) -> Produto:
         """
         Cria um novo produto aplicando regras de negócio
 
@@ -76,6 +78,7 @@ class ProdutoService:
             dados: Dicionário com dados do produto
             db: Sessão do banco de dados
             tenant_id: ID do tenant (isolamento multi-tenant)
+            commit: Quando falso, deixa o commit para o fluxo que registra a entrada.
 
         Returns:
             Produto criado e persistido
@@ -251,8 +254,9 @@ class ProdutoService:
 
             resolver_ou_vincular(novo_produto, db)
 
-            db.commit()
-            db.refresh(novo_produto)
+            if commit:
+                db.commit()
+                db.refresh(novo_produto)
             logger.info(
                 f"✅ ProdutoService: Produto criado com sucesso! ID: {novo_produto.id}"
             )

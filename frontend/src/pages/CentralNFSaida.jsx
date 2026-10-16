@@ -275,10 +275,7 @@ export default function CentralNFSaida() {
   }
 
   async function corrigirEReemitir(nota, { correcaoConcluida = false } = {}) {
-    if (
-      !correcaoConcluida &&
-      rejeicaoResponsavelTecnico({ codigo: nota?.codigo_erro, motivo: nota?.motivo_rejeicao })
-    ) {
+    if (!correcaoConcluida) {
       await abrirCorrecao(nota);
       return;
     }
@@ -330,9 +327,19 @@ export default function CentralNFSaida() {
     setDiagnosticandoNotaId(String(vendaId));
     try {
       for (let tentativa = 0; tentativa < 4; tentativa += 1) {
-        const validacao = await prevalidarNotaFiscal({ vendaId, tipoNota });
+        const [validacaoResult, detalheResult] = await Promise.allSettled([
+          prevalidarNotaFiscal({ vendaId, tipoNota }),
+          api.get(`/nfe/vendas/${vendaId}/detalhes`),
+        ]);
+        if (validacaoResult.status === "rejected") throw validacaoResult.reason;
+        const validacao = validacaoResult.value;
         const corrigido = await solicitarCorrecaoFiscal({
           validacao,
+          nota,
+          detalheNota:
+            detalheResult.status === "fulfilled"
+              ? detalheResult.value.data
+              : montarDetalheFallback(nota),
           vendaId,
           tipoNota,
           apenasCorrigir: true,
@@ -388,6 +395,10 @@ export default function CentralNFSaida() {
   }
 
   async function abrirDetalhes(nota) {
+    if (nota.provedor === "intnfe" && nota.status?.toLowerCase() === "rejeitada") {
+      await abrirCorrecao(nota);
+      return;
+    }
     setNotaSelecionada(nota);
     setDetalheNota(montarDetalheFallback(nota));
     setErroDetalhe("");

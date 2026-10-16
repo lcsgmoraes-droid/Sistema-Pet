@@ -521,19 +521,29 @@ class Produto(BaseTenantModel):
 
     @property
     def validade_proxima(self):
-        """Retorna a validade mais próxima dos lotes ativos"""
-        if not self.controle_lote or not self.lotes:
-            return self.data_validade
-
-        lotes_ativos = [
-            lote
-            for lote in self.lotes
-            if lote.status == "ativo" and lote.quantidade_disponivel > 0
-        ]
-        if not lotes_ativos:
+        """Retorna a validade do estoque atual, sem reutilizar lotes esgotados."""
+        kit_virtual = (
+            self.tipo_produto in ("KIT", "VARIACAO") and self.tipo_kit == "VIRTUAL"
+        )
+        estoque = (
+            getattr(self, "estoque_virtual", self.estoque_atual)
+            if kit_virtual
+            else self.estoque_atual
+        )
+        if float(estoque or 0) <= 0:
             return None
 
-        return min(lote.data_validade for lote in lotes_ativos)
+        if not self.controle_lote:
+            return self.data_validade
+
+        validades = [
+            lote.data_validade
+            for lote in self.lotes
+            if lote.status == "ativo"
+            and float(lote.quantidade_disponivel or 0) > 0
+            and lote.data_validade is not None
+        ]
+        return min(validades, default=None)
 
     @property
     def imagem_principal_thumbnail(self):

@@ -11,6 +11,23 @@ export function formatarCampoMonetarioProduto(texto: string): string {
   }).format(valorMonetarioProduto(texto));
 }
 
+export function formatarDataProduto(texto: string): string {
+  const digitos = texto.replace(/\D/g, "").slice(0, 8);
+  if (digitos.length <= 2) return digitos;
+  if (digitos.length <= 4) return `${digitos.slice(0, 2)}/${digitos.slice(2)}`;
+  return `${digitos.slice(0, 2)}/${digitos.slice(2, 4)}/${digitos.slice(4)}`;
+}
+
+export function dataIsoProduto(texto: string): string | undefined {
+  if (!texto.trim()) return undefined;
+  const partes = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(texto);
+  if (!partes) return undefined;
+  const [, dia, mes, ano] = partes;
+  const data = new Date(Date.UTC(Number(ano), Number(mes) - 1, Number(dia)));
+  if (data.getUTCFullYear() !== Number(ano) || data.getUTCMonth() + 1 !== Number(mes) || data.getUTCDate() !== Number(dia)) return undefined;
+  return `${ano}-${mes}-${dia}`;
+}
+
 export function erroCadastroProduto(error: unknown, fallback: string): string {
   const detail = (error as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
   if (typeof detail === "string") return detail;

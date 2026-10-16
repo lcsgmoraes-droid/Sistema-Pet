@@ -209,6 +209,36 @@ def cenario(monkeypatch, tenant_context):
     engine.dispose()
 
 
+def test_excesso_de_centavo_e_rejeitado_sem_gravar_pagamento(cenario):
+    cenario.venda.total = Decimal("28.99")
+    cenario.venda.subtotal = Decimal("28.99")
+    cenario.db.commit()
+    with pytest.raises(HTTPException, match="excede o saldo"):
+        cenario.finalizar(29)
+    assert cenario.db.query(VendaPagamento).count() == 0
+    assert cenario.db.query(Recebimento).count() == 0
+    assert cenario.db.query(ContaReceber).count() == 0
+    assert cenario.venda.status == "aberta"
+
+
+def test_ultimo_centavo_baixa_recebivel_e_finaliza(cenario):
+    cenario.venda.total = Decimal("28.99")
+    cenario.venda.subtotal = Decimal("28.99")
+    cenario.db.commit()
+    parcial = cenario.finalizar(28.98)
+    assert parcial["venda"]["status"] == "baixa_parcial"
+    assert cenario.db.query(LancamentoManual).filter_by(
+        status="previsto"
+    ).one().valor == Decimal("0.01")
+    completo = cenario.finalizar(0.01)
+    assert completo["venda"]["status"] == "finalizada"
+    assert cenario.db.query(Recebimento).count() == 2
+    assert cenario.db.query(func.sum(Recebimento.valor_recebido)).scalar() == Decimal(
+        "28.99"
+    )
+    assert cenario.db.query(LancamentoManual).filter_by(status="previsto").count() == 0
+
+
 def test_reabertura_com_desconto_nao_repete_recebimento(cenario):
     cenario.finalizar(121)
     cenario.venda.status = "aberta"
@@ -651,6 +681,63 @@ def test_baixa_em_conta_existente_nao_cria_outro_recebimento(cenario):
     assert cenario.db.query(func.sum(Recebimento.valor_recebido)).scalar() == Decimal(
         "121"
     )
+
+
+def test_complemento_centavo_baixa_conta_parcial_legada_sem_duplicar(cenario):
+    cenario.venda.total = Decimal("1.00")
+    cenario.venda.subtotal = Decimal("1.00")
+    cenario.venda.status = "baixa_parcial"
+    cenario.db.get(LancamentoManual, 1).valor = Decimal("0.01")
+    cenario.db.add(
+        VendaPagamento(
+            tenant_id=cenario.tenant,
+            venda_id=1,
+            forma_pagamento_id=1,
+            forma_pagamento="PIX",
+            valor=Decimal("0.99"),
+        )
+    )
+    conta = ContaReceber(
+        tenant_id=cenario.tenant,
+        venda_id=1,
+        descricao="Conta parcial anterior",
+        dre_subcategoria_id=1,
+        canal="loja_fisica",
+        valor_original=Decimal("1.00"),
+        valor_final=Decimal("1.00"),
+        valor_recebido=Decimal("0.99"),
+        status="parcial",
+        user_id=1,
+        data_emissao=date.today(),
+        data_vencimento=date.today(),
+    )
+    cenario.db.add(conta)
+    cenario.db.flush()
+    cenario.db.add(
+        Recebimento(
+            tenant_id=cenario.tenant,
+            conta_receber_id=conta.id,
+            valor_recebido=Decimal("0.99"),
+            data_recebimento=date.today(),
+            forma_pagamento_id=1,
+            user_id=1,
+        )
+    )
+    cenario.db.commit()
+
+    resultado = cenario.finalizar(0.01)
+
+    assert resultado["venda"]["status"] == "finalizada"
+    assert resultado["operacoes"]["contas_criadas"] == []
+    assert cenario.db.query(ContaReceber).count() == 1
+    assert conta.status == "recebido"
+    assert conta.valor_recebido == Decimal("1.00")
+    recebimentos = cenario.db.query(Recebimento).order_by(Recebimento.id).all()
+    assert [r.conta_receber_id for r in recebimentos] == [conta.id, conta.id]
+    assert [r.valor_recebido for r in recebimentos] == [
+        Decimal("0.99"),
+        Decimal("0.01"),
+    ]
 
 
 def test_parcelas_novas_preservam_regra_persistida(cenario):

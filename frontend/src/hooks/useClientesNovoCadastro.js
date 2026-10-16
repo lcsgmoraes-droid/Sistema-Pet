@@ -516,6 +516,15 @@ export function useClientesNovoCadastro({
         return;
       }
 
+      const enderecoPrincipalInformado = [formData.cep, formData.endereco, formData.bairro].some(
+        (value) => String(value ?? "").trim(),
+      );
+      if (enderecoPrincipalInformado && !String(formData.numero ?? "").trim()) {
+        setError("Informe o número do endereço. Se não houver número, use S/N ou sem número.");
+        setCurrentStep(3);
+        return;
+      }
+
       const enderecoPrincipalCompleto = [
         formData.cep,
         formData.endereco,

@@ -39,9 +39,17 @@ def test_regra_de_vendedor_e_isolada_por_empresa():
     db = FakeSession(
         [
             SimpleNamespace(
-                tenant_id=tenant_obrigatorio, vendedor_obrigatorio_pdv=True
+                tenant_id=tenant_obrigatorio,
+                vendedor_obrigatorio_pdv=True,
+                emitir_nota_automatica_pdv=False,
+                tipo_nota_automatica_pdv="nfce",
             ),
-            SimpleNamespace(tenant_id=tenant_opcional, vendedor_obrigatorio_pdv=False),
+            SimpleNamespace(
+                tenant_id=tenant_opcional,
+                vendedor_obrigatorio_pdv=False,
+                emitir_nota_automatica_pdv=False,
+                tipo_nota_automatica_pdv="nfce",
+            ),
         ]
     )
 
@@ -58,12 +66,16 @@ def test_regra_de_vendedor_e_isolada_por_empresa():
     ) == {
         "vendedor_obrigatorio_pdv": False,
         "mostrar_endereco_cliente_pdv": False,
+        "emitir_nota_automatica_pdv": False,
+        "tipo_nota_automatica_pdv": "nfce",
     }
     assert get_config_pdv.__wrapped__(
         user_and_tenant=(None, tenant_obrigatorio), db=db
     ) == {
         "vendedor_obrigatorio_pdv": True,
         "mostrar_endereco_cliente_pdv": False,
+        "emitir_nota_automatica_pdv": False,
+        "tipo_nota_automatica_pdv": "nfce",
     }
 
 
@@ -75,4 +87,6 @@ def test_preferencia_e_opcional_por_padrao():
     assert get_config_pdv.__wrapped__(user_and_tenant=(None, tenant_id), db=db) == {
         "vendedor_obrigatorio_pdv": False,
         "mostrar_endereco_cliente_pdv": False,
+        "emitir_nota_automatica_pdv": False,
+        "tipo_nota_automatica_pdv": "nfce",
     }

@@ -18,10 +18,10 @@ import {
 } from "../lazyPages";
 import { ModuleGate } from "./RouteGates";
 
-function financeiroPage(children) {
+function financeiroPage(children, permission = "relatorios.financeiro") {
   return (
     <ModuleGate modulo="financeiro_erp">
-      <ProtectedRoute permission="relatorios.financeiro">{children}</ProtectedRoute>
+      <ProtectedRoute permission={permission}>{children}</ProtectedRoute>
     </ModuleGate>
   );
 }
@@ -55,7 +55,10 @@ export function createFinanceRoutes() {
       />
       <Route path="financeiro/ponto-equilibrio" element={financeiroPage(<PontoEquilibrio />)} />
       <Route path="financeiro/contas-pagar" element={financeiroPage(<ContasPagar />)} />
-      <Route path="financeiro/contas-receber" element={financeiroPage(<ContasReceber />)} />
+      <Route
+        path="financeiro/contas-receber"
+        element={financeiroPage(<ContasReceber />, "financeiro.contas_receber")}
+      />
       <Route path="financeiro/bancos" element={financeiroPage(<BancosFinanceiro />)} />
       <Route
         path="financeiro/conciliacao-3abas"

@@ -1,5 +1,16 @@
 import { campaignAllowsSaleChannel } from "../utils/campaignChannelScope.js";
 import { formatMoneyBRL } from "../utils/formatters.js";
+import { arredondarDinheiro } from "../utils/pdvCarrinhoItensUtils.js";
+
+const centavos = (valor) => Math.round(arredondarDinheiro(valor) * 100);
+
+function pagamentoEhBeneficio(pagamento) {
+  return (
+    pagamento.is_cashback ||
+    pagamento.is_credito_cliente ||
+    ["cashback", "credito_cliente"].includes(pagamento.forma_pagamento_tipo)
+  );
+}
 
 export const BANDEIRAS_CARTAO = [
   "Visa",
@@ -207,11 +218,13 @@ export async function persistirVendaAbertaParaPagamento({
   vendaIdPersistida = null,
   criarVenda,
   atualizarVenda,
+  onVendaPersistida,
 }) {
   const vendaId = vendaParaPersistir.id || vendaIdPersistida;
 
   if (vendaId) {
-    await atualizarVenda(vendaId, payloadVenda);
+    const atualizada = await atualizarVenda(vendaId, payloadVenda);
+    onVendaPersistida?.(atualizada);
     return vendaId;
   }
 
@@ -219,6 +232,8 @@ export async function persistirVendaAbertaParaPagamento({
   if (!vendaCriada?.id) {
     throw new Error("A venda foi criada sem retornar um identificador");
   }
+
+  onVendaPersistida?.(vendaCriada);
 
   return vendaCriada.id;
 }
@@ -313,20 +328,57 @@ export function calcularResumoRecebimento({
   totalPagoExistente = 0,
   valorRecebido = 0,
 }) {
-  const total = Number(valorTotal || 0);
-  const pagoExistente = Number(totalPagoExistente || 0);
-  const pagoNovo = pagamentos.reduce((sum, pagamento) => sum + Number(pagamento.valor || 0), 0);
+  const total = centavos(valorTotal);
+  const pagoExistente = centavos(totalPagoExistente);
+  const pagoNovo = pagamentos.reduce((sum, pagamento) => sum + centavos(pagamento.valor), 0);
   const valorPago = pagoNovo + pagoExistente;
   const valorRestante = Math.max(0, total - valorPago);
-  const vendaQuitadaComPagamentosExistentes = pagoExistente >= total - 0.01;
+  const vendaQuitadaComPagamentosExistentes = pagoExistente >= total;
 
   return {
-    valorPago,
-    valorRestante,
+    valorPago: valorPago / 100,
+    valorRestante: valorRestante / 100,
     vendaQuitadaComPagamentosExistentes,
     podeConfirmarFinalizacao: pagamentos.length > 0 || vendaQuitadaComPagamentosExistentes,
-    troco: Number(valorRecebido || 0) > 0 ? Number(valorRecebido || 0) - valorRestante : 0,
+    troco: Math.max(0, centavos(valorRecebido) - valorRestante) / 100,
   };
+}
+
+export function revisarPagamentosParaTotalPersistido({
+  pagamentos = [],
+  valorTotal,
+  totalPagoExistente = 0,
+}) {
+  const saldo = Math.max(0, centavos(valorTotal) - centavos(totalPagoExistente));
+  let excedente = Math.max(
+    0,
+    pagamentos.reduce((sum, pagamento) => sum + centavos(pagamento.valor), 0) - saldo,
+  );
+  const revisados = pagamentos.map((pagamento) => ({ ...pagamento }));
+  // O beneficio nao foi consumido ainda. Deixa o excedente na carteira antes
+  // de recalcular um pagamento em dinheiro; outros recebimentos exigem revisao.
+  for (const beneficio of [true, false]) {
+    for (let index = revisados.length - 1; index >= 0 && excedente > 0; index -= 1) {
+      const pagamento = revisados[index];
+      if (
+        beneficio ? !pagamentoEhBeneficio(pagamento) : pagamento.forma_pagamento_tipo !== "dinheiro"
+      ) {
+        continue;
+      }
+      const valor = centavos(pagamento.valor);
+      const reducao = Math.min(valor, excedente);
+      pagamento.valor = (valor - reducao) / 100;
+      if (beneficio) {
+        pagamento.valor_recebido = pagamento.valor;
+        pagamento.troco = null;
+      } else {
+        pagamento.troco =
+          Math.max(0, centavos(pagamento.valor_recebido ?? valor / 100) - valor + reducao) / 100;
+      }
+      excedente -= reducao;
+    }
+  }
+  return revisados.filter((pagamento) => centavos(pagamento.valor) > 0);
 }
 
 export function calcularSaldoBeneficioDisponivel({ saldo = 0, pagamentos = [], tipo }) {
@@ -477,7 +529,6 @@ export function montarPagamentoRecebido({
   nsuCartao = "",
   operadora = null,
   numeroParcelas = 1,
-  troco = 0,
 }) {
   const tipo = formaPagamento?.tipo;
   const isCartao = ["cartao_credito", "cartao_debito", "link_pagamento"].includes(tipo);
@@ -486,6 +537,11 @@ export function montarPagamentoRecebido({
   const formaPagamentoId = normalizarFormaPagamentoId(formaPagamento?.id);
   const dataVencimentoCrediario =
     tipo === "crediario" ? dataCrediarioParaIso(formaPagamento?.data_vencimento_crediario) : null;
+  const ehCreditoCliente = formaPagamento.nome === "Crédito Cliente" || tipo === "credito_cliente";
+  const ehCashback = formaPagamento.id === "cashback" || tipo === "cashback";
+  const recebido = Math.max(0, centavos(valor));
+  const aplicado = Math.min(recebido, Math.max(0, centavos(valorRestante)));
+  const troco = tipo === "dinheiro" ? recebido - aplicado : 0;
 
   return {
     forma_pagamento: formaPagamento.nome,
@@ -493,17 +549,17 @@ export function montarPagamentoRecebido({
     forma_id: formaPagamento.id,
     forma_pagamento_id: formaPagamentoId,
     nome: formaPagamento.nome,
-    valor: Math.min(Number(valor || 0), Number(valorRestante || 0)),
+    valor: aplicado / 100,
     bandeira: isCartao ? bandeira : null,
     nsu_cartao: isCartao && nsuCartao ? nsuCartao : null,
     operadora_id: isCartao ? operadora?.id || null : null,
     modalidade_cartao: isCartao ? obterModalidadeCartao(formaPagamento) : null,
     numero_parcelas: parcelas,
     parcelas,
-    valor_recebido: Number(valor || 0),
-    troco: tipo === "dinheiro" && troco > 0 ? troco : null,
-    is_credito_cliente: formaPagamento.nome === "Crédito Cliente" || tipo === "credito_cliente",
-    is_cashback: formaPagamento.id === "cashback",
+    valor_recebido: (ehCreditoCliente || ehCashback ? aplicado : recebido) / 100,
+    troco: troco > 0 ? troco / 100 : null,
+    is_credito_cliente: ehCreditoCliente,
+    is_cashback: ehCashback,
     ...(dataVencimentoCrediario
       ? {
           data_recebimento_prevista: dataVencimentoCrediario,
@@ -547,11 +603,14 @@ export function validarPagamentoParaAdicionar({
   }
 
   if (
-    ["credito_cliente", "cashback"].includes(formaPagamento.id) &&
+    formaPagamento.tipo !== "dinheiro" &&
     valorRestante !== undefined &&
-    Math.round(valorNumerico * 100) > Math.round(valorRestante * 100)
+    centavos(valorNumerico) > centavos(valorRestante)
   ) {
-    return `Valor excede o restante da venda (${formatMoneyBRL(valorRestante)})`;
+    const mensagem = `Valor excede o restante da venda (${formatMoneyBRL(valorRestante)})`;
+    return ["credito_cliente", "cashback"].includes(formaPagamento.id)
+      ? mensagem
+      : `${mensagem}. Ajuste o valor recebido antes de adicionar.`;
   }
 
   if (formaPagamento.tipo === "crediario" && !cliente?.id) {

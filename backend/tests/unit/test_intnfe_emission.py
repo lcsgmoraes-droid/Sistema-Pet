@@ -1,4 +1,6 @@
+from copy import deepcopy
 from datetime import date
+from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
@@ -53,6 +55,7 @@ def _objects(channel="loja_fisica"):
         desconto_valor="2.00",
         taxa_entrega="5.00",
         tem_entrega=True,
+        endereco_entrega="Rua Um, 10, Centro, Presidente Prudente/SP",
         total="23.00",
         canal=channel,
         numero_venda="VEN-TESTE",
@@ -104,6 +107,221 @@ def fiscal_data(monkeypatch):
             "cofins_aliquota": 0,
         },
     )
+
+
+@pytest.mark.parametrize("environment", [1, 2])
+@pytest.mark.parametrize("document", ["52998224725", "33590794000140"])
+def test_delivery_uses_selected_additional_address_without_changing_sale(
+    environment, document
+):
+    tenant, connection, sale = _objects()
+    connection.emission_environment = environment
+    sale.cliente.cpf = document if len(document) == 11 else None
+    sale.cliente.cnpj = document if len(document) == 14 else None
+    sale.cliente.enderecos_adicionais = [
+        {
+            "endereco": "Rua Dois",
+            "numero": "20",
+            "complemento": "Casa B",
+            "bairro": "Vila Nova",
+            "cidade": "Presidente Prudente",
+            "estado": "SP",
+            "cep": "19020-000",
+            "codigo_municipio": "3541406",
+        }
+    ]
+    sale.endereco_entrega = "Rua Dois, 20 - Casa B, Vila Nova, Presidente Prudente/SP"
+    before = deepcopy(sale)
+
+    payload = emission.build_payload(None, tenant, connection, sale, "nfce")
+
+    assert sale == before
+    consumer = payload["consumidor"]
+    assert consumer["cpf" if len(document) == 11 else "cnpj"] == document
+    assert consumer["endereco"]["logradouro"] == "Rua Dois"
+    assert consumer["endereco"]["complemento"] == "Casa B"
+    assert consumer["endereco"]["cep"] == "19020000"
+    assert payload["indicadorPresenca"] == "4"
+    assert "transportadora" not in payload["frete"]
+
+
+def test_delivery_freight_includes_explicit_tax_values(monkeypatch):
+    tenant, connection, sale = _objects()
+    profile = emission.local_profile
+    fiscal = emission._resolver_fiscal_item_nfe
+    monkeypatch.setattr(
+        emission, "local_profile", lambda *args: ({**profile(*args)[0], "crt": "3"}, [])
+    )
+    monkeypatch.setattr(
+        emission,
+        "_resolver_fiscal_item_nfe",
+        lambda *args: {
+            **fiscal(*args),
+            "cst_icms": "00",
+            "pis_cst": "01",
+            "pis_aliquota": "1.65",
+            "cofins_cst": "01",
+            "cofins_aliquota": "7.60",
+        },
+    )
+
+    product = emission.build_payload(None, tenant, connection, sale, "nfce")[
+        "produtos"
+    ][0]
+
+    assert product["frete"] == 5
+    assert product["impostos"]["icms"]["valor"] == 4.14
+    assert product["impostos"]["pis"]["baseCalculo"] == 23
+    assert product["impostos"]["pis"]["valor"] == 0.38
+    assert product["impostos"]["cofins"]["baseCalculo"] == 23
+    assert product["impostos"]["cofins"]["valor"] == 1.75
+
+
+@pytest.mark.parametrize(
+    "fee, expected", [("0.01", [0.01, 0, 0]), ("0.02", [0.01, 0.01, 0])]
+)
+def test_delivery_freight_distributes_residual_cents_and_preserves_payments(
+    fee, expected
+):
+    tenant, connection, sale = _objects()
+    sale.itens = [deepcopy(sale.itens[0]) for _ in range(3)]
+    sale.taxa_entrega = fee
+    sale.desconto_valor = "6.00"
+    sale.total = str(Decimal("54.00") + Decimal(fee))
+    sale.pagamentos = [
+        SimpleNamespace(forma_pagamento="pix", valor="50.00"),
+        SimpleNamespace(forma_pagamento="Cashback", valor="2.00"),
+        SimpleNamespace(
+            forma_pagamento="Crédito Cliente", valor=str(Decimal("2.00") + Decimal(fee))
+        ),
+    ]
+    before = deepcopy(sale)
+
+    payload = emission.build_payload(None, tenant, connection, sale, "nfce")
+
+    assert [item["frete"] for item in payload["produtos"]] == expected
+    assert sum(Decimal(str(item["frete"])) for item in payload["produtos"]) == Decimal(
+        fee
+    )
+    assert [item["formaPagamento"] for item in payload["pagamentos"]] == [
+        "17",
+        "19",
+        "05",
+    ]
+    assert sale == before
+
+
+def test_delivery_preview_has_address_and_freight_contract(monkeypatch):
+    tenant, connection, sale = _objects()
+    monkeypatch.setattr(emission, "_connection", lambda *_: connection)
+
+    preview = emission.preview(None, tenant, sale, "nfce")
+
+    assert preview["indicador_presenca"] == "4"
+    assert preview["modalidade_frete"] == "3"
+    assert preview["frete"] == 5
+    assert preview["itens"][0]["frete"] == 5
+    assert preview["destinatario"]["endereco"]["logradouro"] == "Rua Um"
+
+
+@pytest.mark.parametrize("field", ["cep", "codigo_municipio"])
+def test_delivery_missing_fiscal_address_returns_clear_block(field):
+    tenant, connection, sale = _objects()
+    setattr(sale.cliente, field, None)
+
+    with pytest.raises(emission.DirectEmissionError) as error:
+        emission.build_payload(None, tenant, connection, sale, "nfce")
+
+    assert error.value.code == "nfce_delivery_address_required"
+    assert error.value.validation["pode_emitir"] is False
+    assert error.value.validation["bloqueios"][0]["campo"].startswith(
+        "entrega.endereco."
+    )
+
+
+def test_delivery_cpf_without_customer_cannot_replace_structured_address():
+    tenant, connection, sale = _objects()
+    sale.cliente = None
+    sale.nfe_consumidor_cpf = "52998224725"
+
+    with pytest.raises(emission.DirectEmissionError, match="Vincule um cliente"):
+        emission.build_payload(None, tenant, connection, sale, "nfce")
+
+
+def test_delivery_cannot_use_interstate_destination():
+    tenant, connection, sale = _objects()
+    sale.cliente.estado = "PR"
+    sale.endereco_entrega = "Rua Um, 10, Centro, Presidente Prudente/PR"
+
+    with pytest.raises(emission.DirectEmissionError, match="dentro do estado"):
+        emission.build_payload(None, tenant, connection, sale, "nfce")
+
+
+def test_delivery_negative_fee_is_blocked():
+    tenant, connection, sale = _objects()
+    sale.taxa_entrega = "-0.01"
+
+    with pytest.raises(emission.DirectEmissionError, match="não pode ser negativa"):
+        emission.build_payload(None, tenant, connection, sale, "nfce")
+
+
+@pytest.mark.parametrize(
+    "courier",
+    [
+        SimpleNamespace(is_terceirizado=True),
+        SimpleNamespace(tipo_vinculo_entrega="terceirizado"),
+    ],
+)
+def test_delivery_does_not_silently_classify_third_party_as_own(courier):
+    tenant, connection, sale = _objects()
+    sale.entregador = courier
+
+    with pytest.raises(emission.DirectEmissionError, match="terceirizado"):
+        emission.build_payload(None, tenant, connection, sale, "nfce")
+
+
+@pytest.mark.parametrize("valid_address", [True, False])
+def test_delivery_details_show_selected_address_and_keep_rejected_attempt_visible(
+    valid_address,
+):
+    tenant, _connection, sale = _objects()
+    sale.id = 123
+    for field in (
+        "nfe_numero",
+        "nfe_serie",
+        "nfe_chave",
+        "nfe_codigo_erro",
+        "nfe_motivo_rejeicao",
+        "nfe_protocolo",
+        "nfe_data_emissao",
+        "vendedor",
+    ):
+        setattr(sale, field, None)
+    sale.nfe_tipo, sale.nfe_modelo = "nfce", "65"
+    sale.nfe_status, sale.nfe_ambiente = "rejeitada", 2
+    sale.endereco_entrega = "Rua Dois, 20, Centro, Presidente Prudente/SP"
+    sale.cliente.enderecos_adicionais = [
+        {
+            "endereco": "Rua Dois",
+            "numero": "20",
+            "bairro": "Centro",
+            "cidade": "Presidente Prudente",
+            "estado": "SP",
+            "codigo_municipio": "3541406",
+            "cep": "19020000" if valid_address else None,
+        }
+    ]
+
+    details = emission.local_document_details(None, tenant, sale)
+
+    assert details["indicador_presenca"].startswith("4 -")
+    assert details["transporte"]["frete_por_conta"].startswith("3 -")
+    if valid_address:
+        assert details["cliente"]["endereco"] == "Rua Dois"
+        assert details["cliente"]["numero"] == "20"
+        assert details["endereco_entrega"]["cep"] == "19020000"
+    else:
+        assert details["endereco_entrega"]["endereco"] == sale.endereco_entrega
 
 
 def test_payload_preserves_totals_and_hides_real_recipient_in_homologation():
@@ -284,29 +502,28 @@ def test_nfce_bloqueia_regra_386_no_item_tres_antes_da_transmissao(monkeypatch):
     assert all(item["produto_id"] == 11 for item in bloqueios)
 
 
-def test_nfce_with_delivery_fee_requires_nfe():
+def test_nfce_accepts_own_delivery_fee_with_recipient_address():
     tenant, connection, sale = _objects()
 
-    with pytest.raises(emission.DirectEmissionError, match="não aceita frete"):
-        emission.build_payload(None, tenant, connection, sale, "nfce")
+    payload = emission.build_payload(None, tenant, connection, sale, "nfce")
+    assert payload["indicadorPresenca"] == "4"
+    assert payload["frete"] == {"modalidade": "3", "valor": 5.0}
+    assert payload["consumidor"]["endereco"]["logradouro"] == "Rua Um"
+    assert payload["consumidor"]["endereco"]["codigoMunicipio"] == "3541406"
+    assert payload["produtos"][0]["frete"] == 5.0
+    assert payload["pagamentos"] == [{"formaPagamento": "17", "valor": 23.0}]
 
 
-def test_delivery_nfce_without_fee_requires_identity_but_not_address():
+def test_free_delivery_nfce_still_has_presence_freight_and_address():
     tenant, connection, sale = _objects()
     sale.taxa_entrega = "0.00"
     sale.total = "18.00"
     sale.pagamentos[0].valor = "18.00"
-    sale.cliente.endereco = None
-    sale.cliente.numero = None
-    sale.cliente.bairro = None
-    sale.cliente.cidade = None
-    sale.cliente.codigo_municipio = None
-    sale.cliente.estado = None
-
     payload = emission.build_payload(None, tenant, connection, sale, "nfce")
-
-    assert payload["consumidor"]["cpf"] == "52998224725"
-    assert payload["produtos"][0]["cfop"] == "5102"
+    assert payload["indicadorPresenca"] == "4"
+    assert payload["frete"] == {"modalidade": "3", "valor": 0.0}
+    assert payload["consumidor"]["endereco"]["cep"] == "19010000"
+    assert "frete" not in payload["produtos"][0]
 
 
 def test_delivery_nfce_requires_identified_recipient():
@@ -551,6 +768,9 @@ def test_non_contributor_with_incompatible_csosn_is_blocked(monkeypatch):
 
 def test_cst_00_nao_e_enviado_como_csosn(monkeypatch):
     tenant, connection, sale = _objects()
+    sale.tem_entrega = False
+    sale.taxa_entrega = "0.00"
+    sale.total = sale.pagamentos[0].valor = "18.00"
     fiscal_original = emission._resolver_fiscal_item_nfe
     monkeypatch.setattr(
         emission,
@@ -570,6 +790,9 @@ def test_cst_00_nao_e_enviado_como_csosn(monkeypatch):
 
 def test_missing_product_taxes_return_editable_fiscal_fields(monkeypatch):
     tenant, connection, sale = _objects()
+    sale.tem_entrega = False
+    sale.taxa_entrega = "0.00"
+    sale.total = sale.pagamentos[0].valor = "18.00"
     monkeypatch.setattr(
         emission,
         "_resolver_fiscal_item_nfe",
@@ -634,6 +857,9 @@ def test_local_document_details_keeps_sale_items_visible_after_rejection():
     assert details["cliente"]["nome"] == "Cliente Teste"
     assert details["itens"] == [
         {
+            "item_id": None,
+            "item_numero": 1,
+            "lote_id": None,
             "produto_id": 9,
             "codigo": "PET-9",
             "descricao": "Ração Teste",
@@ -644,12 +870,14 @@ def test_local_document_details_keeps_sale_items_visible_after_rejection():
             "desconto": 2.0,
             "ncm": "23091000",
             "cest": None,
+            "origem_mercadoria": "0",
             "cfop": "5102",
             "icms": "102",
             "pis": "49",
             "cofins": "49",
         }
     ]
+    assert details["diagnostico_rejeicao"]["correcoes"][0]["campo"] == "cst_icms"
     assert details["totais"] == {
         "valor_produtos": 20.0,
         "valor_frete": 5.0,
@@ -705,6 +933,132 @@ def test_direct_emission_is_blocked_for_every_marketplace_channel(channel):
     tenant, connection, sale = _objects(channel=channel)
     with pytest.raises(emission.DirectEmissionError, match="apenas para vendas do PDV"):
         emission.build_payload(None, tenant, connection, sale, "nfe")
+
+
+@pytest.mark.parametrize("document_type", ["nfe", "nfce"])
+@pytest.mark.parametrize("cashback_name", ["Cashback", "cashback", " CASHBACK "])
+def test_debit_and_cashback_use_specific_payment_codes(document_type, cashback_name):
+    tenant, connection, sale = _objects()
+    sale.itens[0].quantidade = 1
+    sale.itens[0].preco_unitario = "28.90"
+    sale.itens[0].desconto_item = "0.00"
+    sale.itens[0].subtotal = "28.90"
+    sale.desconto_valor = "0.00"
+    sale.taxa_entrega = "0.00"
+    sale.tem_entrega = False
+    sale.total = "28.90"
+    sale.pagamentos = [
+        SimpleNamespace(forma_pagamento="Cartão de débito", valor="27.00"),
+        SimpleNamespace(forma_pagamento=cashback_name, valor="1.90"),
+    ]
+
+    payload = emission.build_payload(None, tenant, connection, sale, document_type)
+
+    assert payload["pagamentos"] == [
+        {"formaPagamento": "04", "valor": 27.0, "tipoIntegracao": "2"},
+        {"formaPagamento": "19", "valor": 1.9},
+    ]
+    assert payload["produtos"][0]["valorTotal"] == 28.9
+    assert payload["produtos"][0].get("desconto", 0) == 0
+
+
+@pytest.mark.parametrize("document_type", ["nfe", "nfce"])
+@pytest.mark.parametrize(
+    "credit_name", ["Crédito Cliente", "credito_cliente", " CRÉDITO CLIENTE "]
+)
+def test_customer_credit_uses_store_credit_without_installments(
+    document_type, credit_name
+):
+    tenant, connection, sale = _objects()
+    sale.taxa_entrega = "0.00"
+    sale.tem_entrega = False
+    sale.total = "18.00"
+    sale.pagamentos = [
+        SimpleNamespace(
+            forma_pagamento=credit_name,
+            valor="18.00",
+            data_recebimento_prevista=date(2026, 10, 14),
+            numero_parcelas=1,
+        )
+    ]
+    sale.contas_receber = [
+        SimpleNamespace(
+            id=1,
+            descricao="Venda VEN-TESTE",
+            status="recebido",
+            data_vencimento=date(2026, 10, 14),
+            valor_original="18.00",
+            forma_pagamento=SimpleNamespace(tipo="credito_cliente"),
+        )
+    ]
+
+    payload = emission.build_payload(None, tenant, connection, sale, document_type)
+
+    assert payload["pagamentos"] == [{"formaPagamento": "05", "valor": 18.0}]
+    assert "Crediario:" not in payload["informacoesAdicionais"]
+
+
+@pytest.mark.parametrize("document_type", ["nfe", "nfce"])
+def test_coupon_cashback_customer_credit_and_debit_preserve_fiscal_totals(
+    document_type,
+):
+    tenant, connection, sale = _objects()
+    first_item = sale.itens[0]
+    first_item.quantidade = 1
+    first_item.preco_unitario = "70.00"
+    first_item.desconto_item = "5.00"
+    first_item.subtotal = "65.00"
+    second_item = SimpleNamespace(
+        tipo="produto",
+        produto=first_item.produto,
+        quantidade=1,
+        preco_unitario="30.00",
+        desconto_item="0.00",
+        subtotal="30.00",
+    )
+    sale.itens = [first_item, second_item]
+    sale.desconto_venda_valor = "0.00"
+    sale.cupom_code = "CAMPANHA7"
+    sale.cupom_discount_applied = "7.00"
+    sale.desconto_valor = "12.00"
+    sale.taxa_entrega = "0.00"
+    sale.tem_entrega = False
+    sale.total = "88.00"
+    sale.pagamentos = [
+        SimpleNamespace(forma_pagamento="Crédito Cliente", valor="20.00"),
+        SimpleNamespace(forma_pagamento="Cashback", valor="8.00"),
+        SimpleNamespace(forma_pagamento="Cartão de débito", valor="60.00"),
+    ]
+
+    payload = emission.build_payload(None, tenant, connection, sale, document_type)
+
+    assert payload["pagamentos"] == [
+        {"formaPagamento": "05", "valor": 20.0},
+        {"formaPagamento": "19", "valor": 8.0},
+        {"formaPagamento": "04", "valor": 60.0, "tipoIntegracao": "2"},
+    ]
+    assert [item["valorTotal"] for item in payload["produtos"]] == [70.0, 30.0]
+    assert [item["desconto"] for item in payload["produtos"]] == [9.79, 2.21]
+    assert first_item.desconto_item == "5.00"
+    assert second_item.desconto_item == "0.00"
+    assert "Crediario:" not in payload["informacoesAdicionais"]
+
+
+@pytest.mark.parametrize("document_type", ["nfe", "nfce"])
+def test_credit_card_keeps_card_payment_code(document_type):
+    tenant, connection, sale = _objects()
+    sale.taxa_entrega = "0.00"
+    sale.tem_entrega = False
+    sale.total = "18.00"
+    sale.pagamentos = [
+        SimpleNamespace(forma_pagamento="Cartão de crédito", valor="18.00")
+    ]
+
+    payload = emission.build_payload(None, tenant, connection, sale, document_type)
+
+    assert payload["pagamentos"] == [
+        {"formaPagamento": "03", "valor": 18.0, "tipoIntegracao": "2"}
+    ]
 
 
 def test_payment_total_must_match_sale_total():

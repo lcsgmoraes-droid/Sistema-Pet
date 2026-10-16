@@ -2,7 +2,7 @@ import { Wallet, AlertCircle } from "lucide-react";
 
 import CurrencyInput from "../CurrencyInput";
 import PaymentMethodIcon from "../PaymentMethodIcon";
-import { formatMoneyBRL, formatPercent } from "../../utils/formatters";
+import { formatBRL, formatMoneyBRL, formatPercent } from "../../utils/formatters";
 import {
   gerarPlanoCrediario,
   mascararDataCrediario,
@@ -27,8 +27,6 @@ export default function ModalPagamentoFormaPanel({
   formasPagamento,
   valorRecebido,
   troco,
-  opcaoExcedente,
-  setOpcaoExcedente,
   operadoras,
   operadoraSelecionada,
   setOperadoraSelecionada,
@@ -252,7 +250,7 @@ export default function ModalPagamentoFormaPanel({
                       setValorRecebido(v);
                     }
                   }}
-                  placeholder={valorRestante.toFixed(2).replace(".", ",")}
+                  placeholder={formatBRL(valorRestante)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   autoFocus
                 />
@@ -340,7 +338,7 @@ export default function ModalPagamentoFormaPanel({
                           <span>
                             {parcela.numero}/{parcela.total_parcelas} · {parcela.data_vencimento}
                           </span>
-                          <strong>R$ {parcela.valor.toFixed(2).replace(".", ",")}</strong>
+                          <strong>{formatMoneyBRL(parcela.valor)}</strong>
                         </div>
                       ))}
                     </div>
@@ -361,47 +359,17 @@ export default function ModalPagamentoFormaPanel({
             {formaPagamentoSelecionada?.tipo !== "dinheiro" &&
               formaPagamentoSelecionada?.tipo !== "credito_cliente" &&
               formaPagamentoSelecionada?.tipo !== "cashback" &&
-              troco > 0.005 && (
+              troco > 0 && (
                 <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-2">
                   <div className="flex items-center gap-2 text-amber-800 text-sm font-semibold">
                     <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                    Valor R$ {valorRecebido.toFixed(2).replace(".", ",")} supera o total em{" "}
-                    <span className="font-bold">R$ {troco.toFixed(2).replace(".", ",")}</span>
+                    Valor {formatMoneyBRL(valorRecebido)} supera o restante em{" "}
+                    <span className="font-bold">{formatMoneyBRL(troco)}</span>
                   </div>
-                  {venda.cliente ? (
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setOpcaoExcedente(opcaoExcedente === "troco" ? null : "troco")
-                        }
-                        className={`flex-1 py-2 text-xs font-semibold rounded-xl border-2 transition-colors ${
-                          opcaoExcedente === "troco"
-                            ? "bg-yellow-500 border-yellow-500 text-white"
-                            : "bg-white border-yellow-300 text-yellow-800 hover:bg-yellow-50"
-                        }`}
-                      >
-                        💵 Troco em dinheiro
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setOpcaoExcedente(opcaoExcedente === "credito" ? null : "credito")
-                        }
-                        className={`flex-1 py-2 text-xs font-semibold rounded-xl border-2 transition-colors ${
-                          opcaoExcedente === "credito"
-                            ? "bg-green-500 border-green-500 text-white"
-                            : "bg-white border-green-300 text-green-800 hover:bg-green-50"
-                        }`}
-                      >
-                        💳 Gerar crédito
-                      </button>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-amber-700">
-                      Sem cliente associado — o excedente será desconsiderado.
-                    </p>
-                  )}
+                  <p className="text-xs text-amber-700">
+                    Ajuste o valor recebido para até {formatMoneyBRL(valorRestante)} antes de
+                    adicionar o pagamento.
+                  </p>
                 </div>
               )}
 
@@ -412,7 +380,7 @@ export default function ModalPagamentoFormaPanel({
               >
                 <div className="text-sm font-medium">
                   <span className={troco > 0 ? "text-yellow-800" : "text-gray-600"}>
-                    Troco: R$ {troco.toFixed(2)}
+                    Troco: {formatMoneyBRL(troco)}
                   </span>
                 </div>
               </div>
@@ -527,8 +495,8 @@ export default function ModalPagamentoFormaPanel({
                     return (
                       <option key={n} value={n} className={estilo.optionClass}>
                         {estilo.prefixo}
-                        {n}x de R$ {valorParcela.toFixed(2)}{" "}
-                        {valorRecebido > 0 ? `(Total: R$ ${valorParaParcelar.toFixed(2)})` : ""}
+                        {n}x de {formatMoneyBRL(valorParcela)}{" "}
+                        {valorRecebido > 0 ? `(Total: ${formatMoneyBRL(valorParaParcelar)})` : ""}
                       </option>
                     );
                   })}
@@ -539,10 +507,10 @@ export default function ModalPagamentoFormaPanel({
                   >
                     <p className={`text-sm font-medium ${estiloVisualParcelamento.tituloClass}`}>
                       {estiloVisualParcelamento.prefixo}
-                      💳 {numeroParcelas}x de R$ {(valorRecebido / numeroParcelas).toFixed(2)}
+                      💳 {numeroParcelas}x de {formatMoneyBRL(valorRecebido / numeroParcelas)}
                     </p>
                     <p className={`text-xs mt-1 ${estiloVisualParcelamento.descricaoClass}`}>
-                      Valor total parcelado: R$ {valorRecebido.toFixed(2)}
+                      Valor total parcelado: {formatMoneyBRL(valorRecebido)}
                       {estiloVisualParcelamento.aviso}
                     </p>
                   </div>

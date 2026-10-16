@@ -38,12 +38,22 @@ import {
 } from "../modalPagamentoUtils";
 
 export default function useModalPagamentoController({
-  venda,
+  venda: vendaOriginal,
   cupomAplicado,
   onClose,
   onConfirmar,
   onVendaAtualizada,
 }) {
+  const [vendaPersistida, setVendaPersistida] = useState(null);
+  const venda = useMemo(
+    () => ({
+      ...vendaOriginal,
+      ...vendaPersistida,
+      cliente: vendaOriginal.cliente,
+      entrega: vendaOriginal.entrega,
+    }),
+    [vendaOriginal, vendaPersistida],
+  );
   const { moduloAtivo } = useModulos();
   const moduloCampanhasAtivo = moduloAtivo("campanhas");
   const moduloFiscalAtivo = moduloAtivo("fiscal");
@@ -67,6 +77,8 @@ export default function useModalPagamentoController({
   const [erro, setErro] = useState("");
   const [totalPagoExistente, setTotalPagoExistente] = useState(0);
   const [mostrarPerguntaNFe, setMostrarPerguntaNFe] = useState(false);
+  const [emissaoAutomatica, setEmissaoAutomatica] = useState(null);
+  const [autoEmitirTipo, setAutoEmitirTipo] = useState(null);
   const [vendaFinalizadaId, setVendaFinalizadaId] = useState(null);
   const [vendaFinalizadaParaCupom, setVendaFinalizadaParaCupom] = useState(null);
 
@@ -86,11 +98,6 @@ export default function useModalPagamentoController({
   const [loadingSimulacao, setLoadingSimulacao] = useState(false);
   const [faixasParcelamento, setFaixasParcelamento] = useState(null);
 
-  // 🆕 Estados para excedente (troco vs crédito) em métodos não-dinheiro
-  const [opcaoExcedente, setOpcaoExcedente] = useState(null); // 'troco' | 'credito'
-  const [mostrarModalCreditoExcedente, setMostrarModalCreditoExcedente] = useState(false);
-  const [valorExcedente, setValorExcedente] = useState(0);
-
   // 💰 Cashback de campanhas
   const [saldoCashback, setSaldoCashback] = useState(0);
   const [cashbackLimitPercent, setCashbackLimitPercent] = useState(null);
@@ -99,6 +106,26 @@ export default function useModalPagamentoController({
   const [loadingBeneficiosCampanha, setLoadingBeneficiosCampanha] = useState(false);
 
   const modalPagamentoContentRef = useRef(null);
+
+  useEffect(() => {
+    if (!moduloFiscalAtivo) return;
+    let ativo = true;
+    api
+      .get("/empresa/config/pdv")
+      .then(({ data }) => {
+        if (ativo)
+          setEmissaoAutomatica({
+            ativa: Boolean(data?.emitir_nota_automatica_pdv),
+            tipo: data?.tipo_nota_automatica_pdv === "nfe" ? "nfe" : "nfce",
+          });
+      })
+      .catch(() => {
+        if (ativo) setEmissaoAutomatica(null);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [moduloFiscalAtivo]);
 
   // Ref para o container das opções de parcelamento
   const opcoesParcelamentoRef = useRef(null);
@@ -362,7 +389,7 @@ export default function useModalPagamentoController({
     corParcelamentoAtual,
     justificativaTexto,
   });
-  const mostrarBotaoAdicionarRodape = Boolean(formaPagamentoSelecionada) && valorRestante > 0.01;
+  const mostrarBotaoAdicionarRodape = Boolean(formaPagamentoSelecionada) && valorRestante > 0;
 
   const rolarElementoNoModal = useCallback((elemento, { focusElement } = {}) => {
     if (!elemento) return;
@@ -678,6 +705,7 @@ export default function useModalPagamentoController({
     justificativaTexto,
     margemCriticaAtual,
     moduloFiscalAtivo,
+    emissaoAutomatica,
     naoGerarBeneficios,
     justificativaBeneficios,
     nsuCartao,
@@ -687,7 +715,6 @@ export default function useModalPagamentoController({
     operadoraSelecionada,
     operadoras,
     parcelasDisponiveis,
-    opcaoExcedente,
     pagamentos,
     podeConfirmarFinalizacao,
     revelarJustificativaObrigatoria,
@@ -698,20 +725,19 @@ export default function useModalPagamentoController({
     setErroJustificativa,
     setFormaPagamentoSelecionada,
     setLoading,
-    setMostrarModalCreditoExcedente,
     setMostrarPerguntaNFe,
+    setAutoEmitirTipo,
     setNsuCartao,
     setNumeroParcelas,
     setOperadoraSelecionada,
-    setOpcaoExcedente,
     setPagamentos,
     setPagamentosExistentes,
     setTotalPagoExistente,
-    setValorExcedente,
     setValorRecebido,
     setVendaFinalizadaId,
     setVendaFinalizadaParaCupom,
-    troco,
+    setVendaPersistida,
+    totalPagoExistente,
     valorRecebido,
     valorRestante,
     venda,
@@ -721,6 +747,7 @@ export default function useModalPagamentoController({
   return {
     mostrarPerguntaNFe,
     modalPerguntaNFeProps: {
+      autoEmitirTipo,
       cliente: venda.cliente,
       erro,
       loading,
@@ -761,8 +788,6 @@ export default function useModalPagamentoController({
       parcelasDisponiveis,
       taxaCartaoSelecionada,
       troco,
-      opcaoExcedente,
-      setOpcaoExcedente,
       opcoesParcelamentoRef,
       estiloVisualParcelamento,
       valorTotal,
@@ -803,9 +828,6 @@ export default function useModalPagamentoController({
       mostrarBotaoAdicionarRodape,
       handleFinalizar,
       podeConfirmarFinalizacao,
-      mostrarModalCreditoExcedente,
-      setMostrarModalCreditoExcedente,
-      valorExcedente,
     },
   };
 }

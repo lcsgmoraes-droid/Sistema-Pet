@@ -11,6 +11,7 @@
  * Permite apagar tudo e redigitar sem conflito.
  */
 import { useState, useEffect } from "react";
+import { normalizarQuantidadePDV } from "../utils/pdvCarrinhoItensUtils";
 
 export default function QuantidadeInput({ value, onChange, disabled, className, min = 0.001 }) {
   const [display, setDisplay] = useState("");
@@ -40,7 +41,7 @@ export default function QuantidadeInput({ value, onChange, disabled, className, 
     // Converte vírgula em ponto para parsear
     const normalized = raw.replace(",", ".");
     const num = parseFloat(normalized);
-    const final = !isNaN(num) && num > 0 ? num : min;
+    const final = normalizarQuantidadePDV(!isNaN(num) && num > 0 ? num : min, min);
     onChange(final);
     setDisplay(String(final));
   };

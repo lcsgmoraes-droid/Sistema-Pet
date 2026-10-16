@@ -17,6 +17,7 @@ from app.services.venda_rentabilidade_snapshot_service import (
     invalidate_venda_rentabilidade_snapshot,
 )
 from app.utils.timezone import now_brasilia
+from app.services.venda_descontos import moeda
 from app.vendas.custo_original import registrar_custo_original_saida
 from app.vendas.finalizacao_eventos import publicar_eventos_finalizacao
 from app.vendas.finalizacao_pagamentos import (
@@ -248,7 +249,7 @@ def finalizar_venda(
                 details=f"Benefícios de campanha desativados na venda #{venda.numero_venda}",
                 commit=False,
             )
-        total_venda = float(venda.total)
+        total_venda = float(moeda(venda.total))
         totais_pagamento = _calcular_pagamentos_finalizacao(
             total_venda=total_venda,
             pagamentos_existentes=pagamentos_existentes,
@@ -293,7 +294,7 @@ def finalizar_venda(
         status_anterior = venda.status
         logger.info(f"📋 Status anterior: {status_anterior}")
 
-        if total_pagamentos >= total_venda - 0.01:
+        if total_pagamentos >= total_venda:
             # Pagamento completo
             venda.status = "finalizada"
             venda.data_finalizacao = data_ocorrencia or now_brasilia()
@@ -461,7 +462,7 @@ def finalizar_venda(
         contas_baixadas = []
         valor_ja_baixado = Decimal("0")
         valores_baixados_por_pagamento = {}
-        if total_novos_pagamentos > 0.01:
+        if total_novos_pagamentos > 0:
             contas_baixadas, valores_baixados_por_pagamento = (
                 baixar_recebiveis_dos_novos_pagamentos(
                     db=db,
@@ -511,7 +512,7 @@ def finalizar_venda(
             valor_ja_baixado=valor_ja_baixado,
             valores_baixados_por_pagamento=valores_baixados_por_pagamento,
         )
-        if total_pagamentos >= total_venda - 0.01:
+        if total_pagamentos >= total_venda:
             cancelar_previsoes_apos_desconto(db=db, venda=venda, tenant_id=tenant_id)
 
         # ============================================================

@@ -67,7 +67,7 @@ export async function salvarEdicaoVenda({
   const recebido = obterTotalRecebidoExistente(resumo);
   const total = Number(atualizada.total ?? vendaAtual.total);
 
-  if (recebido > 0 && recebido >= total - 0.01) {
+  if (recebido > 0 && arredondarDinheiro(recebido) >= arredondarDinheiro(total)) {
     // Uma venda reaberta devolveu estoque e beneficios. Fechar pelo mesmo
     // orquestrador do pagamento reaplica esses efeitos sem cobrar de novo.
     const resultado = await finalizarVenda(vendaAtual.id, [], {

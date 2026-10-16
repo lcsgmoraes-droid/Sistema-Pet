@@ -16,15 +16,12 @@ import {
   obterEstoqueVisualProduto,
   obterFontesImagemProduto,
   obterLotesValidadeDisponiveis,
+  obterValidadeMaisProximaProduto,
 } from "./produtosUtils";
 
 function obterValidadeResumoProduto(produto) {
   const lotes = obterLotesValidadeDisponiveis(produto);
-  const primeiroLoteComValidade = lotes.find((lote) => lote.data_validade);
-  const validadeProxima =
-    primeiroLoteComValidade?.data_validade ||
-    produto?.validade_proxima_listagem ||
-    produto?.validade_proxima;
+  const validadeProxima = obterValidadeMaisProximaProduto(produto);
   const tooltip = montarTooltipLotesValidade(lotes, formatarData);
 
   if (!validadeProxima) {

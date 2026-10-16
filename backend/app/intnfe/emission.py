@@ -19,10 +19,16 @@ from app.bling_integration_fiscal import (
 )
 from app.financeiro.crediario_parcelamento import montar_plano_crediario
 from app.intnfe.client import IntNFeError
+from app.intnfe.delivery_address import DeliveryAddressError, resolver_endereco_entrega
 from app.intnfe.fiscal_profile import local_profile
 from app.intnfe.models import IntNFeConnection, IntNFeEmissionSequence
+from app.intnfe.rejection_diagnostics import (
+    enrich_validation_items,
+    message_corrections,
+    rejection_diagnostics,
+)
 from app.produtos_estoque_models import EstoqueMovimentacao, ProdutoLote
-from app.services.venda_descontos import ratear_descontos_venda
+from app.services.venda_descontos import ratear_centavos, ratear_descontos_venda
 
 CENT = Decimal("0.01")
 AUTHORIZED_STATUS = 3
@@ -75,6 +81,93 @@ def _money(value):
 def _number(value):
     result = Decimal(str(value or 0))
     return int(result) if result == result.to_integral() else float(result)
+
+
+def _legacy_quantity_rounding(venda, item, gross):
+    """Reconhece o subtotal antigo com quantidade calculada em 4 e salva em 3 casas."""
+    if (
+        getattr(venda, "desconto_venda_valor", None) is not None
+        or getattr(item, "subtotal", None) is None
+    ):
+        return False
+    quantity = Decimal(str(item.quantidade or 0))
+    unit_price = Decimal(str(item.preco_unitario or 0))
+    if (
+        not quantity.is_finite()
+        or not unit_price.is_finite()
+        or quantity <= 0
+        or unit_price <= 0
+        or quantity == quantity.to_integral()
+        or quantity != quantity.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+        or gross <= 0
+    ):
+        return False
+    previous_quantity = (gross / unit_price).quantize(
+        Decimal("0.0001"), rounding=ROUND_HALF_UP
+    )
+    return (
+        abs(previous_quantity - quantity) <= Decimal("0.0005")
+        and previous_quantity.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+        == quantity
+        and _money(previous_quantity * unit_price) == gross
+    )
+
+
+def _legacy_aggregate_gross(venda):
+    """Reproduz apenas a soma legada crua, conservando os descontos salvos.
+
+    O rateio existe somente no payload. Cada linha deve estar coerente antes
+    dele e o bruto agregado deve reproduzir exatamente o total persistido.
+    """
+    if getattr(venda, "desconto_venda_valor", None) is not None:
+        return {}
+    items = list(venda.itens or [])
+    sale_discount = _money(venda.desconto_valor)
+    if len(items) < 2 or sale_discount <= 0:
+        return {}
+    raw_grosses, saved_grosses, discounts, quantities = [], [], [], []
+    for item in items:
+        if _ascii(item.tipo) != "produto" or getattr(item, "subtotal", None) is None:
+            return {}
+        quantity = Decimal(str(item.quantidade or 0))
+        unit_price = Decimal(str(item.preco_unitario or 0))
+        if (
+            not quantity.is_finite()
+            or not unit_price.is_finite()
+            or quantity <= 0
+            or unit_price < 0
+        ):
+            return {}
+        discount = _money(item.desconto_item)
+        gross = _money(item.subtotal) + discount
+        raw = quantity * unit_price
+        if discount < 0 or discount > gross or gross != _money(raw):
+            return {}
+        raw_grosses.append(raw)
+        saved_grosses.append(gross)
+        discounts.append(discount)
+        quantities.append(quantity)
+    if sum(discounts, Decimal("0")) != sale_discount or all(
+        quantity == quantity.to_integral() for quantity in quantities
+    ):
+        return {}
+    freight = _money(venda.taxa_entrega if venda.tem_entrega else 0)
+    target = _money(venda.total) + sale_discount - freight
+    saved_total = sum(saved_grosses, Decimal("0"))
+    if (
+        target <= 0
+        or target == saved_total
+        or target != _money(sum(raw_grosses, Decimal("0")))
+        or abs(saved_total - target) > CENT * (len(items) - 1)
+    ):
+        return {}
+    allocated = ratear_centavos(target, raw_grosses)
+    if any(
+        gross < discount or abs(gross - saved) > CENT
+        for gross, discount, saved in zip(allocated, discounts, saved_grosses)
+    ):
+        return {}
+    return {id(item): gross for item, gross in zip(items, allocated)}
 
 
 def _ascii(value):
@@ -130,11 +223,13 @@ def _emitter_credentials(connection, environment=None):
 
 def _payment_code(value):
     name = re.sub(r"[^a-z0-9]+", "_", _ascii(value)).strip("_")
+    if "cashback" in name:
+        return "19"
     if "pix" in name:
         return "17"
     if "boleto" in name:
         return "15"
-    if "crediario" in name or "credito_loja" in name:
+    if "crediario" in name or "credito_loja" in name or "credito_cliente" in name:
         return "05"
     if "deposit" in name or "transfer" in name:
         return "16"
@@ -149,6 +244,11 @@ def _payment_code(value):
     if "sem_pagamento" in name:
         return "90"
     return "99"
+
+
+def _is_crediario_payment(value):
+    name = re.sub(r"[^a-z0-9]+", "_", _ascii(value)).strip("_")
+    return "crediario" in name or "credito_loja" in name
 
 
 def _date(value):
@@ -185,12 +285,12 @@ def _crediario_accounts(venda):
         credit_payments = [
             payment
             for payment in (getattr(venda, "pagamentos", None) or [])
-            if _payment_code(getattr(payment, "forma_pagamento", None)) == "05"
+            if _is_crediario_payment(getattr(payment, "forma_pagamento", None))
         ]
         other_payments = [
             payment
             for payment in (getattr(venda, "pagamentos", None) or [])
-            if _payment_code(getattr(payment, "forma_pagamento", None)) != "05"
+            if not _is_crediario_payment(getattr(payment, "forma_pagamento", None))
         ]
         if credit_payments and not other_payments:
             accounts = [
@@ -233,7 +333,7 @@ def _crediario_installments(venda):
 
     installments = []
     for payment in getattr(venda, "pagamentos", None) or []:
-        if _payment_code(getattr(payment, "forma_pagamento", None)) != "05":
+        if not _is_crediario_payment(getattr(payment, "forma_pagamento", None)):
             continue
         first_due_date = _date(getattr(payment, "data_recebimento_prevista", None))
         if first_due_date is None:
@@ -404,6 +504,44 @@ def _contribution(cst, rate, taxable_amount):
     return result
 
 
+def _product_taxes(fiscal, origin, taxable):
+    return {
+        "icms": _tax(fiscal["cst_icms"], origin, fiscal.get("icms_aliquota"), taxable),
+        "pis": _contribution(fiscal["pis_cst"], fiscal.get("pis_aliquota"), taxable),
+        "cofins": _contribution(
+            fiscal["cofins_cst"], fiscal.get("cofins_aliquota"), taxable
+        ),
+    }
+
+
+def _delivery_freight(products, tax_contexts, freight):
+    """Envia rateio manual documentado para manter frete e bases coerentes.
+
+    A IntNFe aceita produtos[].frete numerico e conserva os valores manuais.
+    Usamos o bruto fiscal de cada linha como peso, com maior resto em centavos.
+    Nao dependemos de recálculo de bases/tributos explicitos pelo provedor.
+    """
+    if not freight:
+        return
+    weights = [_money(product["valorTotal"]) for product in products]
+    if not any(weights):
+        weights = [Decimal(str(product["quantidade"])) for product in products]
+    portions = ratear_centavos(freight, weights)
+    for product, (fiscal, origin, taxable), portion in zip(
+        products, tax_contexts, portions
+    ):
+        product["frete"] = float(portion)
+        product["impostos"] = _product_taxes(fiscal, origin, taxable + portion)
+
+
+def _third_party_delivery(venda):
+    courier = getattr(venda, "entregador", None)
+    return courier is not None and (
+        bool(getattr(courier, "is_terceirizado", False))
+        or _ascii(getattr(courier, "tipo_vinculo_entrega", None)) == "terceirizado"
+    )
+
+
 def _lot_from_recorded_fifo(db, venda, item):
     """Recupera o lote fiscal de vendas antigas que não salvaram ``lote_id``.
 
@@ -470,6 +608,13 @@ def build_payload(db, tenant, connection, venda, document_type):
         raise DirectEmissionError(" ".join(emitter_pending))
     environment = 1 if connection.emission_environment == 1 else 2
     sale_total = _money(venda.total)
+    nfce_delivery = document_type == "nfce" and bool(venda.tem_entrega)
+    if nfce_delivery and _third_party_delivery(venda):
+        raise DirectEmissionError(
+            "Esta integração de NFC-e está habilitada para entrega própria. "
+            "O entregador selecionado está cadastrado como terceirizado; "
+            "confira o vínculo e a modalidade de transporte antes de emitir."
+        )
     nfce_requires_recipient = document_type == "nfce" and (
         bool(getattr(venda, "tem_entrega", False)) or sale_total >= Decimal("10000")
     )
@@ -490,6 +635,27 @@ def build_payload(db, tenant, connection, venda, document_type):
             require_identity=nfce_requires_recipient,
             require_address=document_type == "nfe",
         )
+    if nfce_delivery:
+        try:
+            delivery_address = resolver_endereco_entrega(venda)
+        except DeliveryAddressError as exc:
+            raise DirectEmissionError(
+                str(exc),
+                code="nfce_delivery_address_required",
+                validation={
+                    "success": True,
+                    "pode_emitir": False,
+                    "requer_autorizacao": False,
+                    "correcoes": [],
+                    "bloqueios": [{"campo": exc.field, "mensagem": str(exc)}],
+                },
+            ) from exc
+        if delivery_address["uf"] != emitter["endereco"]["uf"]:
+            raise DirectEmissionError(
+                "A entrega em NFC-e deve ocorrer dentro do estado do emitente. "
+                "Confira a UF do endereço selecionado para a entrega."
+            )
+        recipient["endereco"] = delivery_address
     destination_uf = (
         recipient.get("endereco", {}).get("uf") or emitter["endereco"]["uf"]
         if recipient and document_type == "nfe"
@@ -504,6 +670,8 @@ def build_payload(db, tenant, connection, venda, document_type):
     fiscal_pending = []
     product_total = Decimal("0")
     item_discount_total = Decimal("0")
+    tax_contexts = []
+    legacy_grosses = _legacy_aggregate_gross(venda)
     descontos_fiscais = (
         {
             id(item): parte["total"]
@@ -671,11 +839,14 @@ def build_payload(db, tenant, connection, venda, document_type):
             if stored_subtotal is not None
             else calculated_gross
         )
+        gross = legacy_grosses.get(id(item), gross)
         if quantity <= 0 or unit_price < 0 or discount < 0 or discount > gross:
             raise DirectEmissionError(
                 f"Produto {item.produto.nome}: confira quantidade, preço e desconto."
             )
-        if abs(gross - calculated_gross) > CENT:
+        if abs(gross - calculated_gross) > CENT and not _legacy_quantity_rounding(
+            venda, item, gross
+        ):
             raise DirectEmissionError(
                 f"Produto {item.produto.nome}: o subtotal salvo difere da quantidade e do preço."
             )
@@ -696,17 +867,7 @@ def build_payload(db, tenant, connection, venda, document_type):
             "quantidade": _number(quantity),
             "valorUnitario": float(fiscal_unit_price),
             "valorTotal": float(gross),
-            "impostos": {
-                "icms": _tax(
-                    fiscal["cst_icms"], origin, fiscal.get("icms_aliquota"), taxable
-                ),
-                "pis": _contribution(
-                    fiscal["pis_cst"], fiscal.get("pis_aliquota"), taxable
-                ),
-                "cofins": _contribution(
-                    fiscal["cofins_cst"], fiscal.get("cofins_aliquota"), taxable
-                ),
-            },
+            "impostos": _product_taxes(fiscal, origin, taxable),
         }
         cest = _digits(fiscal.get("cest"))
         if cest:
@@ -714,6 +875,7 @@ def build_payload(db, tenant, connection, venda, document_type):
         if discount:
             product["desconto"] = float(discount)
         products.append(product)
+        tax_contexts.append((fiscal, origin, taxable))
         product_total += gross
         item_discount_total += discount
 
@@ -739,10 +901,10 @@ def build_payload(db, tenant, connection, venda, document_type):
             "O desconto da venda difere da soma dos descontos dos itens."
         )
     freight = _money(venda.taxa_entrega if venda.tem_entrega else 0)
-    if document_type == "nfce" and freight:
-        raise DirectEmissionError(
-            "A NFC-e não aceita frete. Para uma venda com taxa de entrega, escolha NF-e (modelo 55)."
-        )
+    if nfce_delivery:
+        if freight < 0:
+            raise DirectEmissionError("A taxa de entrega não pode ser negativa.")
+        _delivery_freight(products, tax_contexts, freight)
     calculated_total = product_total - total_discount + freight
     if calculated_total != sale_total:
         raise DirectEmissionError(
@@ -774,6 +936,9 @@ def build_payload(db, tenant, connection, venda, document_type):
             "Pedidos de marketplace não podem ser emitidos por este fluxo."
         )
 
+    presence = "1" if channel == "loja_fisica" else "9"
+    if nfce_delivery:
+        presence = "4"
     payload = {
         "serie": (
             connection.nfe_series if document_type == "nfe" else connection.nfce_series
@@ -784,11 +949,13 @@ def build_payload(db, tenant, connection, venda, document_type):
         "produtos": products,
         "pagamentos": payments,
         "informacoesAdicionais": _additional_information(venda, credit_installments),
-        "indicadorPresenca": "1" if channel == "loja_fisica" else "9",
+        "indicadorPresenca": presence,
     }
     if document_type == "nfe":
         payload["frete"] = {"modalidade": "9", "valor": float(freight)}
         payload["documentosReferenciados"] = []
+    elif nfce_delivery:
+        payload["frete"] = {"modalidade": "3", "valor": float(freight)}
     if recipient:
         key = "destinatario" if document_type == "nfe" else "consumidor"
         payload[key] = recipient
@@ -812,6 +979,7 @@ def preview(db, tenant, venda, document_type):
                 "quantidade": item["quantidade"],
                 "valor_total": item["valorTotal"],
                 "desconto": item.get("desconto", 0),
+                "frete": item.get("frete", 0),
                 "ncm": item["ncm"],
                 "cfop": item["cfop"],
                 "icms": item["impostos"]["icms"]["cst"],
@@ -832,6 +1000,8 @@ def preview(db, tenant, venda, document_type):
         ],
         "informacoes_adicionais": payload["informacoesAdicionais"],
         "frete": payload.get("frete", {}).get("valor", 0),
+        "indicador_presenca": payload["indicadorPresenca"],
+        "modalidade_frete": payload.get("frete", {}).get("modalidade"),
         "total": float(_money(venda.total)),
     }
 
@@ -853,17 +1023,35 @@ def local_document_details(db, tenant, venda):
     permanecem vinculados à venda.
     """
     cliente = venda.cliente
+    nfce_delivery = bool(venda.tem_entrega) and (
+        venda.nfe_tipo == "nfce" or str(getattr(venda, "nfe_modelo", "")) == "65"
+    )
+    own_delivery = nfce_delivery and not _third_party_delivery(venda)
+    delivery_address = {}
+    if nfce_delivery:
+        try:
+            delivery_address = resolver_endereco_entrega(venda)
+        except DeliveryAddressError:
+            # A consulta de uma tentativa rejeitada precisa continuar exibindo
+            # o texto salvo, inclusive quando o endereco ainda exige revisao.
+            pass
     emitter_uf = (_text(getattr(tenant, "uf", None)) or "").upper()
     destination_uf = (
         (_text(getattr(cliente, "estado", None)) or emitter_uf).upper()
         if cliente
         else emitter_uf
     )
-    interstate = bool(emitter_uf and destination_uf and emitter_uf != destination_uf)
+    interstate = venda.nfe_tipo == "nfe" and bool(
+        emitter_uf and destination_uf and emitter_uf != destination_uf
+    )
+    recipient_non_taxpayer = cliente is not None and not _text(
+        getattr(cliente, "inscricao_estadual", None)
+    )
 
     items = []
     product_total = Decimal("0")
     item_discount_total = Decimal("0")
+    legacy_grosses = _legacy_aggregate_gross(venda)
     descontos_fiscais = (
         {
             id(item): parte["total"]
@@ -872,7 +1060,7 @@ def local_document_details(db, tenant, venda):
         if getattr(venda, "desconto_venda_valor", None) is not None
         else {}
     )
-    for sale_item in venda.itens or []:
+    for item_numero, sale_item in enumerate(venda.itens or [], start=1):
         product = getattr(sale_item, "produto", None)
         quantity = Decimal(str(getattr(sale_item, "quantidade", 0) or 0))
         unit_price = Decimal(str(getattr(sale_item, "preco_unitario", 0) or 0))
@@ -882,23 +1070,48 @@ def local_document_details(db, tenant, venda):
         gross = subtotal + desconto_manual_item
         if gross == 0 and quantity:
             gross = (quantity * unit_price).quantize(CENT, rounding=ROUND_HALF_UP)
+        gross = legacy_grosses.get(id(sale_item), gross)
+        calculated_gross = _money(quantity * unit_price)
+        fiscal_unit_price = unit_price
+        if (
+            quantity > 0
+            and gross != calculated_gross
+            and (
+                abs(gross - calculated_gross) <= CENT
+                or _legacy_quantity_rounding(venda, sale_item, gross)
+            )
+        ):
+            fiscal_unit_price = (gross / quantity).quantize(
+                Decimal("0.0000000001"), rounding=ROUND_HALF_UP
+            )
 
         fiscal = {}
+        lot = getattr(sale_item, "lote", None)
         if product and _ascii(getattr(sale_item, "tipo", None)) == "produto":
             try:
-                fiscal = _resolver_fiscal_item_nfe(db, venda, sale_item) or {}
+                inferred_lot = _lot_from_recorded_fifo(db, venda, sale_item)
+                if inferred_lot is not None:
+                    lot = inferred_lot
+                fiscal_item = SimpleNamespace(produto=product, lote=lot)
+                fiscal = _resolver_fiscal_item_nfe(db, venda, fiscal_item) or {}
             except Exception:
                 # O item precisa continuar visível mesmo se seu cadastro fiscal
                 # tiver sido alterado ou estiver incompleto depois da emissão.
                 fiscal = {}
 
-        cfop = (
-            fiscal.get("cfop_interestadual")
-            if interstate
-            else fiscal.get("cfop_interno")
-        )
+        if interstate and recipient_non_taxpayer:
+            cfop = fiscal.get("cfop_interestadual_nao_contribuinte")
+        else:
+            cfop = (
+                fiscal.get("cfop_interestadual")
+                if interstate
+                else fiscal.get("cfop_interno")
+            )
         items.append(
             {
+                "item_id": getattr(sale_item, "id", None),
+                "item_numero": item_numero,
+                "lote_id": getattr(lot, "id", None),
                 "produto_id": getattr(sale_item, "produto_id", None),
                 "codigo": (
                     _text(getattr(product, "codigo", None))
@@ -911,11 +1124,12 @@ def local_document_details(db, tenant, venda):
                 ),
                 "unidade": _text(getattr(product, "unidade", None)) or "UN",
                 "quantidade": _number(quantity),
-                "valor_unitario": float(unit_price),
+                "valor_unitario": float(fiscal_unit_price),
                 "valor_total": float(gross),
                 "desconto": float(discount),
                 "ncm": _digits(fiscal.get("ncm")) or None,
                 "cest": _digits(fiscal.get("cest")) or None,
+                "origem_mercadoria": _text(fiscal.get("origem_mercadoria")),
                 "cfop": _text(cfop),
                 "icms": _text(fiscal.get("cst_icms")),
                 "pis": _text(fiscal.get("pis_cst")),
@@ -943,7 +1157,7 @@ def local_document_details(db, tenant, venda):
     payment_rows = []
     credit_rows_added = False
     for payment in venda.pagamentos or []:
-        if _payment_code(getattr(payment, "forma_pagamento", None)) == "05":
+        if _is_crediario_payment(getattr(payment, "forma_pagamento", None)):
             if credit_installments and not credit_rows_added:
                 payment_rows.extend(
                     {
@@ -973,7 +1187,17 @@ def local_document_details(db, tenant, venda):
             }
         )
 
-    return {
+    presence_label = (
+        "1 - Operação presencial" if channel == "loja_fisica" else "9 - Outros"
+    )
+    transport_type = "Entrega local" if venda.tem_entrega else "Sem transporte"
+    freight_account = "9 - Sem ocorrência de transporte"
+    if nfce_delivery:
+        presence_label = "4 - NFC-e com entrega a domicílio"
+    if own_delivery:
+        transport_type = "Entrega própria"
+        freight_account = "3 - Transporte próprio por conta do remetente"
+    details = {
         "id": venda.id,
         "numero": venda.nfe_numero,
         "serie": venda.nfe_serie,
@@ -990,9 +1214,7 @@ def local_document_details(db, tenant, venda):
         "hora_emissao": issue_at.strftime("%H:%M:%S") if issue_at else None,
         "natureza_operacao": "Venda de mercadoria",
         "finalidade": "1 - NF-e normal",
-        "indicador_presenca": (
-            "1 - Operação presencial" if channel == "loja_fisica" else "9 - Outros"
-        ),
+        "indicador_presenca": presence_label,
         "cliente": (
             {
                 "id": getattr(cliente, "id", None),
@@ -1016,6 +1238,8 @@ def local_document_details(db, tenant, venda):
                 "endereco": getattr(cliente, "endereco", None),
                 "numero": getattr(cliente, "numero", None),
                 "complemento": getattr(cliente, "complemento", None),
+                "codigo_municipio": getattr(cliente, "codigo_municipio", None),
+                "inscricao_estadual": getattr(cliente, "inscricao_estadual", None),
             }
             if cliente
             else (
@@ -1041,10 +1265,7 @@ def local_document_details(db, tenant, venda):
             "valor_desconto": float(total_discount),
             "valor_total": float(_money(venda.total)),
         },
-        "transporte": {
-            "tipo": "Entrega local" if venda.tem_entrega else "Sem transporte",
-            "frete_por_conta": "9 - Sem ocorrência de transporte",
-        },
+        "transporte": {"tipo": transport_type, "frete_por_conta": freight_account},
         "endereco_entrega": {
             "nome": getattr(cliente, "nome", None) if venda.tem_entrega else None,
             "endereco": venda.endereco_entrega if venda.tem_entrega else None,
@@ -1070,6 +1291,21 @@ def local_document_details(db, tenant, venda):
         },
         "pessoas_autorizadas_xml": [],
     }
+    if delivery_address:
+        selected_fields = {
+            "endereco": delivery_address["logradouro"],
+            "numero": delivery_address["numero"],
+            "complemento": delivery_address.get("complemento"),
+            "bairro": delivery_address["bairro"],
+            "municipio": delivery_address["municipio"],
+            "uf": delivery_address["uf"],
+            "cep": delivery_address["cep"],
+            "codigo_municipio": delivery_address["codigoMunicipio"],
+        }
+        details["cliente"].update(selected_fields)
+        details["endereco_entrega"].update(selected_fields)
+    details["diagnostico_rejeicao"] = rejection_diagnostics(venda, db=db, items=items)
+    return details
 
 
 def _access_token(api, connection, environment=None):
@@ -1089,56 +1325,20 @@ def _provider_validation(venda, messages):
     if not messages:
         return None
 
-    products = [
-        item.produto
-        for item in (venda.itens or [])
-        if _ascii(getattr(item, "tipo", None)) == "produto"
-        and getattr(item, "produto", None)
-    ]
-    single_product = products[0] if len(products) == 1 else None
-    field_patterns = (
-        ("ncm", ("ncm",)),
-        ("cfop", ("cfop",)),
-        ("origem_mercadoria", ("origem", "mercadoria")),
-        ("cst_icms", ("csosn",)),
-        ("cst_icms", ("cst", "icms")),
-        ("pis_cst", ("pis",)),
-        ("cofins_cst", ("cofins",)),
-    )
     blocks = []
     for message in messages:
-        normalized = _ascii(message)
-        field = next(
-            (
-                candidate
-                for candidate, terms in field_patterns
-                if all(term in normalized for term in terms)
-            ),
-            None,
-        )
-        block = {
-            "campo": field or "intnfe",
-            "mensagem": message,
-        }
-        if field and single_product:
-            block.update(
-                {
-                    "produto_id": single_product.id,
-                    "produto_nome": single_product.nome,
-                    "produto_tipo": getattr(single_product, "tipo_produto", None),
-                    "sku": _text(getattr(single_product, "codigo", None))
-                    or _text(getattr(single_product, "codigo_barras", None))
-                    or str(single_product.id),
-                }
-            )
-        blocks.append(block)
-    return {
-        "success": True,
-        "pode_emitir": False,
-        "requer_autorizacao": False,
-        "correcoes": [],
-        "bloqueios": blocks,
-    }
+        for block in message_corrections(venda, message):
+            blocks.append({**block, "origem": "intnfe", "historico": False})
+    return enrich_validation_items(
+        venda,
+        {
+            "success": True,
+            "pode_emitir": False,
+            "requer_autorizacao": False,
+            "correcoes": [],
+            "bloqueios": blocks,
+        },
+    )
 
 
 def issue(db, tenant, venda, document_type, api):

@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import CampoCodigoMunicipio from "../CampoCodigoMunicipio";
 
 export default function PDVEnderecoModal({
   enderecoAtual,
@@ -15,6 +16,7 @@ export default function PDVEnderecoModal({
   const atualizarCampo = (campo, valor) => {
     onChange({
       ...enderecoAtual,
+      ...(["cep", "cidade", "estado"].includes(campo) ? { codigo_municipio: "" } : {}),
       [campo]: valor,
     });
   };
@@ -161,6 +163,11 @@ export default function PDVEnderecoModal({
               />
             </div>
           </div>
+
+          <CampoCodigoMunicipio
+            value={enderecoAtual.codigo_municipio}
+            onChange={(codigo) => atualizarCampo("codigo_municipio", codigo)}
+          />
 
           <p className="text-xs text-gray-500">* Campos obrigatórios</p>
         </div>

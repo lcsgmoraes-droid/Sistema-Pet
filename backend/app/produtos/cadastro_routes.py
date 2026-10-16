@@ -18,6 +18,7 @@ from app.produtos.core import (
     _normalizar_sku_produto,
 )
 from app.produtos.listagem import _resolver_promocao_erp_produto
+from app.produtos.entrada_inicial import registrar_entrada_inicial
 from app.produtos.racao import _normalizar_payload_racao
 from app.produtos.schemas import (
     ProdutoCompostoPrecoVendaPreviewRequest,
@@ -275,7 +276,11 @@ def criar_produto(
     try:
         # Preparar dados do produto
         produto_data = _normalizar_promocao_erp_payload(
-            _normalizar_payload_granel(_normalizar_payload_racao(produto.model_dump()))
+            _normalizar_payload_granel(
+                _normalizar_payload_racao(
+                    produto.model_dump(exclude={"entrada_inicial"})
+                )
+            )
         )
         if "protocolos_recorrencia" not in produto.model_fields_set:
             produto_data.pop("protocolos_recorrencia", None)
@@ -285,19 +290,34 @@ def criar_produto(
 
         # Chamar service com regras de negócio
         novo_produto = ProdutoService.create_produto(
-            dados=produto_data, db=db, tenant_id=tenant_id
+            dados=produto_data, db=db, tenant_id=tenant_id, commit=False
         )
+
+        if produto.entrada_inicial:
+            registrar_entrada_inicial(
+                db,
+                produto=novo_produto,
+                entrada=produto.entrada_inicial,
+                user_id=current_user.id,
+                tenant_id=tenant_id,
+                origem="ERP",
+            )
+        db.commit()
+        db.refresh(novo_produto)
 
         logger.info(f"✅ Produto criado com sucesso! ID: {novo_produto.id}")
         return novo_produto
 
     except ValueError as e:
         # Erros de validação de negócio
+        db.rollback()
         logger.warning(f"⚠️ Validação de negócio falhou: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
+        db.rollback()
         logger.error(f"❌ Erro ao criar produto: {str(e)}")
         logger.error(f"❌ Tipo do erro: {type(e).__name__}")
         raise HTTPException(status_code=500, detail=f"Erro ao criar produto: {str(e)}")

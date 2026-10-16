@@ -119,14 +119,17 @@ async def get_historico_compras(
 
     # Última compra
     ultima_compra = vendas[0].data_venda if vendas else None
-    resumo_pagamento_por_venda = {
-        venda.id: calcular_resumo_pagamento_venda(
+    resumo_pagamento_por_venda = {}
+    for venda in vendas:
+        resumo_pagamento = calcular_resumo_pagamento_venda(
             total=venda.total,
             contas_receber=venda.contas_receber,
             pagamentos=venda.pagamentos,
         )
-        for venda in vendas
-    }
+        if venda.status == "cancelada":
+            resumo_pagamento["status_pagamento"] = "cancelado"
+            resumo_pagamento["valor_restante"] = 0
+        resumo_pagamento_por_venda[venda.id] = resumo_pagamento
 
     return {
         "cliente_id": cliente.id,

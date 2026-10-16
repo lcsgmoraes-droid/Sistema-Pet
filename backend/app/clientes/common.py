@@ -40,6 +40,35 @@ def _somente_digitos(valor) -> str:
     return "".join(ch for ch in str(valor or "") if ch.isdigit())
 
 
+def _validar_numero_endereco_cliente(cliente_data, cliente_atual=None) -> None:
+    campos_endereco = {
+        "cep",
+        "endereco",
+        "numero",
+        "complemento",
+        "bairro",
+        "cidade",
+        "estado",
+        "codigo_municipio",
+    }
+    dados = cliente_data.model_dump(exclude_unset=True)
+    if cliente_atual is not None and not campos_endereco.intersection(dados):
+        return
+
+    def valor(campo):
+        atual = getattr(cliente_atual, campo, None) if cliente_atual else None
+        informado = dados[campo] if campo in dados else atual
+        return str(informado if informado is not None else "").strip()
+
+    if any(valor(campo) for campo in ("cep", "endereco", "bairro")) and not valor(
+        "numero"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Informe o número do endereço. Se não houver número, use S/N ou sem número.",
+        )
+
+
 def _validar_telefone_cliente_obrigatorio(cliente_data, cliente_atual=None) -> None:
     is_cliente = getattr(cliente_data, "is_cliente", None)
     if is_cliente is None and cliente_atual is not None:

@@ -2,6 +2,7 @@ import { useState } from "react";
 import api from "../api";
 import { buscarClientePorId } from "../api/clientes";
 import { criarPayloadEnderecoAdicional } from "./pdvEndereco";
+import { aplicarConsultaCepEndereco, resolveCepMunicipio } from "../utils/cepMunicipio";
 
 const criarEnderecoVazio = () => ({
   tipo: "entrega",
@@ -13,6 +14,7 @@ const criarEnderecoVazio = () => ({
   bairro: "",
   cidade: "",
   estado: "",
+  codigo_municipio: "",
 });
 
 export function usePDVEndereco({ vendaAtual, setVendaAtual }) {
@@ -31,28 +33,17 @@ export function usePDVEndereco({ vendaAtual, setVendaAtual }) {
   };
 
   const buscarCepModal = async (cep) => {
-    if (!cep || cep.length !== 9) return;
+    const cepConsultado = String(cep || "").replace(/\D/g, "");
+    if (cepConsultado.length !== 8) return;
 
     setLoadingCep(true);
     try {
-      const response = await fetch(`https://viacep.com.br/ws/${cep.replace("-", "")}/json/`);
-      const data = await response.json();
+      const data = await resolveCepMunicipio(cep);
 
-      if (data.erro) {
-        alert("CEP não encontrado");
-        return;
-      }
-
-      setEnderecoAtual((prev) => ({
-        ...prev,
-        endereco: data.logradouro || "",
-        bairro: data.bairro || "",
-        cidade: data.localidade || "",
-        estado: data.uf || "",
-      }));
+      setEnderecoAtual((prev) => aplicarConsultaCepEndereco(prev, cepConsultado, data));
     } catch (error) {
       console.error("Erro ao buscar CEP:", error);
-      alert("Erro ao buscar CEP");
+      alert(error.message || "Erro ao buscar CEP");
     } finally {
       setLoadingCep(false);
     }

@@ -766,7 +766,16 @@ def _enriquecer_produto_listagem(
         produto.composicao_kit = []
         produto.estoque_virtual = int(produto.estoque_atual or 0)
 
-    validade_info = validade_por_produto.get(produto.id, {})
+    estoque_para_validade = (
+        produto.estoque_virtual
+        if produto.tipo_produto in ("KIT", "VARIACAO") and produto.tipo_kit == "VIRTUAL"
+        else produto.estoque_atual
+    )
+    validade_info = (
+        validade_por_produto.get(produto.id, {})
+        if float(estoque_para_validade or 0) > 0
+        else {}
+    )
     produto.validade_proxima_listagem = validade_info.get("validade_proxima_listagem")
     produto.lote_validade_proxima = validade_info.get("lote_validade_proxima")
     produto.lotes_validade_resumo = validade_info.get("lotes_validade_resumo", [])

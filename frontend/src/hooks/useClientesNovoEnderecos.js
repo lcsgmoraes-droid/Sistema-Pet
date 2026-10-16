@@ -1,5 +1,7 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
+import { confirmarCorePet } from "../services/corepetDialog";
+import { aplicarConsultaCepEndereco, resolveCepMunicipio } from "../utils/cepMunicipio";
 
 const createEnderecoVazio = () => ({
   tipo: "entrega",
@@ -11,6 +13,7 @@ const createEnderecoVazio = () => ({
   bairro: "",
   cidade: "",
   estado: "",
+  codigo_municipio: "",
 });
 
 export function useClientesNovoEnderecos() {
@@ -34,28 +37,17 @@ export function useClientesNovoEnderecos() {
   };
 
   const buscarCepModal = async (cep) => {
-    if (!cep || cep.length !== 9) return;
+    const cepConsultado = String(cep || "").replace(/\D/g, "");
+    if (cepConsultado.length !== 8) return;
 
     setLoadingCepEndereco(true);
     try {
-      const response = await fetch(`https://viacep.com.br/ws/${cep.replace("-", "")}/json/`);
-      const data = await response.json();
+      const data = await resolveCepMunicipio(cep);
 
-      if (data.erro) {
-        toast.error("CEP não encontrado.");
-        return;
-      }
-
-      setEnderecoAtual((prev) => ({
-        ...prev,
-        endereco: data.logradouro || "",
-        bairro: data.bairro || "",
-        cidade: data.localidade || "",
-        estado: data.uf || "",
-      }));
+      setEnderecoAtual((prev) => aplicarConsultaCepEndereco(prev, cepConsultado, data));
     } catch (error) {
       console.error("Erro ao buscar CEP:", error);
-      toast.error("Erro ao buscar CEP.");
+      toast.error(error.message || "Erro ao buscar CEP.");
     } finally {
       setLoadingCepEndereco(false);
     }
@@ -80,8 +72,10 @@ export function useClientesNovoEnderecos() {
     fecharModalEndereco();
   };
 
-  const removerEndereco = (index) => {
-    setEnderecosAdicionais((prev) => prev.filter((_, i) => i !== index));
+  const removerEndereco = async (index) => {
+    if (await confirmarCorePet("Deseja realmente remover este endereço?")) {
+      setEnderecosAdicionais((prev) => prev.filter((_, i) => i !== index));
+    }
   };
 
   return {

@@ -12,6 +12,8 @@ import {
 import { rejeicaoResponsavelTecnico } from "../../utils/fiscalRejectionGuidance.mjs";
 import { ehVendaCrediario } from "../../utils/pdvReceipt";
 import { montarPayloadVenda } from "../../utils/pdvVendaPayload";
+import { arredondarDinheiro } from "../../utils/pdvCarrinhoItensUtils";
+import { formatMoneyBRL } from "../../utils/formatters";
 import {
   devePerguntarNotaFiscal,
   montarItensParaVerificarEstoqueNegativo,
@@ -21,6 +23,7 @@ import {
   montarVendaParaPersistirComCupom,
   obterTotalRecebidoExistente,
   persistirVendaAbertaParaPagamento,
+  revisarPagamentosParaTotalPersistido,
   validarPagamentoParaAdicionar,
 } from "../modalPagamentoUtils";
 import { confirmarCorePet, perguntarCorePet } from "../../services/corepetDialog";
@@ -34,6 +37,7 @@ export function useModalPagamentoActions({
   justificativaTexto,
   margemCriticaAtual,
   moduloFiscalAtivo,
+  emissaoAutomatica,
   naoGerarBeneficios,
   justificativaBeneficios,
   nsuCartao,
@@ -43,7 +47,6 @@ export function useModalPagamentoActions({
   operadoraSelecionada,
   operadoras,
   parcelasDisponiveis,
-  opcaoExcedente,
   pagamentos,
   podeConfirmarFinalizacao,
   revelarJustificativaObrigatoria,
@@ -54,20 +57,19 @@ export function useModalPagamentoActions({
   setErroJustificativa,
   setFormaPagamentoSelecionada,
   setLoading,
-  setMostrarModalCreditoExcedente,
   setMostrarPerguntaNFe,
+  setAutoEmitirTipo,
   setNsuCartao,
   setNumeroParcelas,
   setOperadoraSelecionada,
-  setOpcaoExcedente,
   setPagamentos,
   setPagamentosExistentes,
   setTotalPagoExistente,
-  setValorExcedente,
   setValorRecebido,
   setVendaFinalizadaId,
   setVendaFinalizadaParaCupom,
-  troco,
+  setVendaPersistida,
+  totalPagoExistente,
   valorRecebido,
   valorRestante,
   venda,
@@ -106,7 +108,6 @@ export function useModalPagamentoActions({
       nsuCartao,
       operadora: operadoraSelecionada,
       numeroParcelas,
-      troco,
     });
     console.log("DEBUG novoPagamento:", novoPagamento);
     console.log(
@@ -130,11 +131,6 @@ export function useModalPagamentoActions({
       });
     }
 
-    const trocoParaCredito =
-      opcaoExcedente === "credito" && troco > 0 && formaPagamentoSelecionada?.tipo !== "dinheiro"
-        ? troco
-        : 0;
-
     setPagamentos([...pagamentos, novoPagamento]);
     setFormaPagamentoSelecionada(null);
     setValorRecebido(0);
@@ -144,12 +140,6 @@ export function useModalPagamentoActions({
     setNumeroParcelas(1);
     setErro("");
     setErroJustificativa("");
-    setOpcaoExcedente(null);
-
-    if (trocoParaCredito > 0) {
-      setValorExcedente(trocoParaCredito);
-      setMostrarModalCreditoExcedente(true);
-    }
   };
 
   const removerPagamento = (index) => {
@@ -218,16 +208,19 @@ export function useModalPagamentoActions({
       cupomParaFinalizar,
     });
     const payloadVenda = montarPayloadVenda(vendaParaPersistir);
-
+    let vendaPersistida;
     const vendaId = await persistirVendaAbertaParaPagamento({
       vendaParaPersistir,
       payloadVenda,
       vendaIdPersistida: vendaIdPersistidaRef.current,
       criarVenda,
       atualizarVenda,
+      onVendaPersistida: (persistida) => {
+        vendaPersistida = persistida;
+      },
     });
     vendaIdPersistidaRef.current = vendaId;
-    return vendaId;
+    return { vendaId, vendaPersistida };
   };
 
   const handleFinalizar = async () => {
@@ -246,7 +239,24 @@ export function useModalPagamentoActions({
         return;
       }
 
-      const vendaId = await salvarVendaAbertaParaPagamento();
+      const { vendaId, vendaPersistida } = await salvarVendaAbertaParaPagamento();
+      if (
+        vendaPersistida?.total != null &&
+        arredondarDinheiro(vendaPersistida.total) !== arredondarDinheiro(venda.total)
+      ) {
+        setVendaPersistida(vendaPersistida);
+        setPagamentos(
+          revisarPagamentosParaTotalPersistido({
+            pagamentos,
+            valorTotal: vendaPersistida.total,
+            totalPagoExistente,
+          }),
+        );
+        setErro(
+          `O total da venda foi atualizado para ${formatMoneyBRL(vendaPersistida.total)}. Confira os pagamentos e confirme novamente. O cashback e o crédito utilizam somente o valor devido.`,
+        );
+        return;
+      }
       const opcoesFinalizacao = {
         cupom_code: cupomParaFinalizar?.code || null,
         cupom_discount_applied: cupomParaFinalizar?.discount_applied ?? null,
@@ -305,6 +315,11 @@ export function useModalPagamentoActions({
       });
 
       if (!moduloFiscalAtivo || devePerguntarNotaFiscal(resultado)) {
+        setAutoEmitirTipo(
+          moduloFiscalAtivo && emissaoAutomatica?.ativa && devePerguntarNotaFiscal(resultado)
+            ? emissaoAutomatica.tipo
+            : null,
+        );
         setMostrarPerguntaNFe(true);
       } else {
         onConfirmar();
@@ -317,7 +332,7 @@ export function useModalPagamentoActions({
     }
   };
 
-  const emitirNFe = async (tipoNota) => {
+  const emitirNFe = async (tipoNota, { automatico = false } = {}) => {
     setLoading(true);
     setErro("");
 
@@ -325,22 +340,27 @@ export function useModalPagamentoActions({
       const resultado = await emitirNotaFiscalAssistida({
         vendaId: vendaFinalizadaId,
         tipoNota,
+        semInteracao: automatico,
       });
 
       if (resultado?.cancelado) return;
 
       const transmissao = resultado?.data?.transmissao;
       if (resultado?.data?.processando) {
-        globalThis.alert(
-          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} recebida pelo emissor e ainda em processamento. Consulte novamente em Notas Fiscais.`,
-        );
-        onConfirmar();
+        if (!automatico) {
+          globalThis.alert(
+            `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} recebida pelo emissor e ainda em processamento. Consulte novamente em Notas Fiscais.`,
+          );
+          onConfirmar();
+        }
         return { autorizada: false, processando: true, data: resultado.data };
       } else if (transmissao?.success === false) {
-        globalThis.alert(
-          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} criada, mas a transmissão não foi concluída automaticamente.\n\n${transmissao.erro || ""}`.trim(),
-        );
-        onConfirmar();
+        if (!automatico) {
+          globalThis.alert(
+            `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} criada, mas a transmissão não foi concluída automaticamente.\n\n${transmissao.erro || ""}`.trim(),
+          );
+          onConfirmar();
+        }
         return { autorizada: false, processando: true, data: resultado.data };
       }
       return {
@@ -352,6 +372,10 @@ export function useModalPagamentoActions({
     } catch (error) {
       console.error("Erro ao emitir nota:", error);
       const mensagem = extrairMensagemNFe(error);
+      if (automatico) {
+        setErro(`A emissão automática não foi concluída: ${mensagem}`);
+        return;
+      }
       const recuperacao = error?.recuperacaoNFe;
       if (recuperacao) {
         setErro(mensagem);

@@ -19,6 +19,7 @@ from app.clientes.common import (
     _somente_digitos_coluna,
     _validar_flags_tipo_criacao,
     _validar_flags_tipo_update,
+    _validar_numero_endereco_cliente,
     _validar_telefone_cliente_obrigatorio,
     _validar_tenant_e_obter_usuario,
     gerar_codigo_cliente,
@@ -95,6 +96,7 @@ def create_cliente(
         )
     _validar_flags_tipo_criacao(cliente_data)
     _validar_telefone_cliente_obrigatorio(cliente_data)
+    _validar_numero_endereco_cliente(cliente_data)
     _validar_documentos_unicos_criacao(db, cliente_data, tenant_id)
 
     codigo = gerar_codigo_cliente(db, cliente_data.tipo_pessoa, tenant_id)
@@ -435,6 +437,7 @@ def update_cliente(
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
     _validar_flags_tipo_update(cliente_data, cliente)
     _validar_telefone_cliente_obrigatorio(cliente_data, cliente)
+    _validar_numero_endereco_cliente(cliente_data, cliente)
     _validar_documentos_unicos_update(db, cliente, cliente_data, cliente_id, tenant_id)
 
     dados_payload = cliente_data.model_dump(exclude_unset=True)
