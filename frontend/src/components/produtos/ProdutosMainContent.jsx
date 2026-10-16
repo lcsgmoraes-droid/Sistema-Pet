@@ -1,6 +1,5 @@
 import ProdutosFiltrosPanel from "./ProdutosFiltrosPanel";
 import ProdutosHeaderActions from "./ProdutosHeaderActions";
-import ProdutosOutrasLojasSection from "./ProdutosOutrasLojasSection";
 import ProdutosTabelaSection from "./ProdutosTabelaSection";
 
 export default function ProdutosMainContent({
@@ -103,10 +102,6 @@ export default function ProdutosMainContent({
         persistirBusca={persistirBusca}
         setPersistirBusca={setPersistirBusca}
       />
-      <ProdutosOutrasLojasSection
-        navigate={navigate}
-        produtosOutrasLojas={produtosOutrasLojas}
-      />
       <ProdutosTabelaSection
         colunasVisiveis={colunasVisiveis}
         copiarTexto={copiarTexto}
@@ -143,6 +138,7 @@ export default function ProdutosMainContent({
         paginaAtual={paginaAtual}
         paisExpandidos={paisExpandidos}
         produtos={produtos}
+        produtosOutrasLojas={produtosOutrasLojas}
         recarregarDetalhesKit={recarregarDetalhesKit}
         selecionados={selecionados}
         selecionadosCount={selecionadosCount}

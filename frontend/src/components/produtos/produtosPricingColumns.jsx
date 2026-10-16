@@ -26,7 +26,11 @@ export function createProdutosPricingColumns() {
       ),
       renderCell: (produto) => (
         <td className="px-4 py-3 text-right">
-          <MoneyCell className="text-sm text-gray-900" value={produto.preco_custo} />
+          {produto.dados_incompletos_nesta_loja ? (
+            <span className="text-sm text-gray-400">-</span>
+          ) : (
+            <MoneyCell className="text-sm text-gray-900" value={produto.preco_custo} />
+          )}
         </td>
       ),
     },
@@ -47,7 +51,7 @@ export function createProdutosPricingColumns() {
         const setEditandoMargem = props.setEditandoMargem;
         const editandoPreco = props.editandoPreco;
 
-        if (!custo || editandoPreco === produto.id) {
+        if (!custo || (!produto.dados_incompletos_nesta_loja && editandoPreco === produto.id)) {
           return (
             <td className="px-4 py-3 text-right">
               <span className="text-sm text-gray-400">-</span>
@@ -58,7 +62,7 @@ export function createProdutosPricingColumns() {
         const corMargem =
           margem >= 30 ? "text-emerald-600" : margem >= 15 ? "text-yellow-600" : "text-red-600";
 
-        if (editandoMargem?.produtoId === produto.id) {
+        if (!produto.dados_incompletos_nesta_loja && editandoMargem?.produtoId === produto.id) {
           const modo = editandoMargem.modo;
           return (
             <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
@@ -183,7 +187,7 @@ export function createProdutosPricingColumns() {
       ),
       renderCell: (produto, props) => (
         <td className="px-4 py-3 text-right">
-          {props.editandoPreco === produto.id ? (
+          {!produto.dados_incompletos_nesta_loja && props.editandoPreco === produto.id ? (
             <div
               className="flex items-center gap-1 justify-end"
               onClick={(e) => e.stopPropagation()}
@@ -232,25 +236,27 @@ export function createProdutosPricingColumns() {
                   className="text-sm font-semibold text-green-600"
                   value={produto.preco_venda}
                 />
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    props.handleEditarPreco(produto.id, produto.preco_venda);
-                  }}
-                  className="text-blue-600 hover:text-blue-800"
-                  title="Editar preco"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                    />
-                  </svg>
-                </button>
+                {!produto.dados_incompletos_nesta_loja && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      props.handleEditarPreco(produto.id, produto.preco_venda);
+                    }}
+                    className="text-blue-600 hover:text-blue-800"
+                    title="Editar preco"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                      />
+                    </svg>
+                  </button>
+                )}
               </div>
-              {obterResumoPrecoPorKg(produto).disponivel && (
+              {!produto.dados_incompletos_nesta_loja && obterResumoPrecoPorKg(produto).disponivel && (
                 <span
                   className="text-xs font-semibold text-teal-700"
                   title={`${obterResumoPrecoPorKg(produto).pesoFormatado} - ${obterResumoPrecoPorKg(produto).precoFormatado}`}

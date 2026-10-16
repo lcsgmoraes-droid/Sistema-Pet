@@ -85,6 +85,32 @@ function obterValidadeResumoProduto(produto) {
 const getProdutoBlingId = (produto) => String(produto?.bling_produto_id || "").trim();
 const getProdutoBlingActionKey = (produtoId) => `produto-bling-${produtoId}`;
 
+// O produto é um só pro grupo comercial inteiro — o que existe é dado ainda
+// não cadastrado NESTA loja (preço, estoque, categoria etc.), não "produto de
+// outra loja". Esses resultados (ver app/services/produto_busca_grupo_service.py)
+// entram na mesma tabela, com os campos exclusivos desta loja de propósito
+// ausentes, pra cair no "-" que as colunas já usam pra dado faltante.
+function obterChaveLinhaProduto(produto) {
+  return produto.dados_incompletos_nesta_loja
+    ? `incompleto-${produto.tenant_id}-${produto.id}`
+    : produto.id;
+}
+
+function adaptarProdutoDadosIncompletos(produto) {
+  return {
+    id: produto.id,
+    tenant_id: produto.tenant_id,
+    loja_nome: produto.loja_nome,
+    nome: produto.nome,
+    codigo: produto.codigo,
+    codigo_barras: produto.codigo_barras,
+    imagem_principal: produto.imagem_principal,
+    preco_venda: produto.preco_venda,
+    tipo_produto: "SIMPLES",
+    dados_incompletos_nesta_loja: true,
+  };
+}
+
 export default function ProdutosTabelaSection({
   blingActionKey,
   colunasVisiveis,
@@ -117,6 +143,7 @@ export default function ProdutosTabelaSection({
   paginaAtual,
   paisExpandidos,
   produtos,
+  produtosOutrasLojas,
   recarregarDetalhesKit,
   selecionados,
   selecionadosCount,
@@ -135,6 +162,11 @@ export default function ProdutosTabelaSection({
 
     return true;
   });
+
+  const produtosComDadosIncompletos = (produtosOutrasLojas || []).map(
+    adaptarProdutoDadosIncompletos,
+  );
+  const produtosParaExibir = [...produtosValidos, ...produtosComDadosIncompletos];
 
   const produtoHeaderContext = {
     produtos: produtosValidos,
@@ -285,11 +317,13 @@ export default function ProdutosTabelaSection({
         <div className="md:hidden">
           {loading ? (
             <div className="px-4 py-8 text-center text-gray-500">Carregando produtos...</div>
-          ) : produtos.length === 0 ? (
+          ) : produtosParaExibir.length === 0 ? (
             <div className="px-4 py-8 text-center text-gray-500">Nenhum produto encontrado</div>
           ) : (
             <div className="space-y-3 bg-gray-50 p-3">
-              {produtosValidos.map((produto) => {
+              {produtosParaExibir.map((produto) => {
+                const incompleto = produto.dados_incompletos_nesta_loja;
+                const chave = obterChaveLinhaProduto(produto);
                 const validade = obterValidadeResumoProduto(produto);
                 const estoqueAtual = obterEstoqueVisualProduto(produto);
                 const reservado = Number(produto.estoque_reservado || 0);
@@ -300,19 +334,24 @@ export default function ProdutosTabelaSection({
                 const blingId = getProdutoBlingId(produto);
                 const isPai = produto.tipo_produto === "PAI";
                 const blingLoading = blingActionKey === getProdutoBlingActionKey(produto.id);
-                const podeCriarBling = !blingId && !isPai && onExportarProdutoBling;
+                const podeCriarBling = !incompleto && !blingId && !isPai && onExportarProdutoBling;
+                const urlCompletar = `/produtos/novo?pre_cadastro_grupo=${produto.id}&tenant_origem=${produto.tenant_id}`;
 
                 return (
                   <article
-                    key={produto.id}
+                    key={chave}
                     ref={(element) => {
-                      linhaProdutoRefs.current[produto.id] = element;
+                      linhaProdutoRefs.current[chave] = element;
                     }}
-                    onClick={() => navigate(`/produtos/${produto.id}/editar`)}
+                    onClick={() =>
+                      navigate(incompleto ? urlCompletar : `/produtos/${produto.id}/editar`)
+                    }
                     className={`rounded-lg border bg-white p-3 shadow-sm ${
-                      produto.ativo === false
-                        ? "border-slate-200 bg-slate-50 opacity-80"
-                        : "border-gray-200"
+                      incompleto
+                        ? "border-amber-200 bg-amber-50/40"
+                        : produto.ativo === false
+                          ? "border-slate-200 bg-slate-50 opacity-80"
+                          : "border-gray-200"
                     }`}
                   >
                     <div className="flex gap-3">
@@ -347,14 +386,18 @@ export default function ProdutosTabelaSection({
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start gap-2">
-                          <div className="mt-0.5">
-                            <InputCheckbox
-                              rotulo={`Selecionar ${produto.nome}`}
-                              checked={selecionados.includes(produto.id)}
-                              onClick={(event) => event.stopPropagation()}
-                              onChange={(event) => handleSelecionar(produto.id, event.nativeEvent)}
-                            />
-                          </div>
+                          {!incompleto && (
+                            <div className="mt-0.5">
+                              <InputCheckbox
+                                rotulo={`Selecionar ${produto.nome}`}
+                                checked={selecionados.includes(produto.id)}
+                                onClick={(event) => event.stopPropagation()}
+                                onChange={(event) =>
+                                  handleSelecionar(produto.id, event.nativeEvent)
+                                }
+                              />
+                            </div>
+                          )}
                           <div className="min-w-0 flex-1">
                             <h3 className="line-clamp-2 text-sm font-semibold text-gray-900">
                               {produto.nome}
@@ -365,45 +408,56 @@ export default function ProdutosTabelaSection({
                                   Cod: {codigo}
                                 </span>
                               )}
-                              {produto.marca?.nome || produto.marca_nome ? (
-                                <span className="whitespace-nowrap rounded-full bg-gray-100 px-2 py-0.5">
-                                  {produto.marca?.nome || produto.marca_nome}
+                              {incompleto ? (
+                                <span
+                                  className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-amber-700"
+                                  title={`Este produto já existe no grupo, mas esta loja ainda não tem os dados dela (preço, estoque etc.) — já cadastrado em ${produto.loja_nome}.`}
+                                >
+                                  Dados incompletos aqui
                                 </span>
-                              ) : null}
-                              {produto.ativo === false && (
-                                <span className="whitespace-nowrap rounded-full bg-slate-200 px-2 py-0.5 text-slate-700">
-                                  Inativo
-                                </span>
+                              ) : (
+                                <>
+                                  {produto.marca?.nome || produto.marca_nome ? (
+                                    <span className="whitespace-nowrap rounded-full bg-gray-100 px-2 py-0.5">
+                                      {produto.marca?.nome || produto.marca_nome}
+                                    </span>
+                                  ) : null}
+                                  {produto.ativo === false && (
+                                    <span className="whitespace-nowrap rounded-full bg-slate-200 px-2 py-0.5 text-slate-700">
+                                      Inativo
+                                    </span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    disabled={blingLoading || !blingId}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      if (blingId && onValidarVinculoProdutoBling) {
+                                        onValidarVinculoProdutoBling(produto);
+                                      }
+                                    }}
+                                    className={`whitespace-nowrap rounded-full px-2 py-0.5 ${
+                                      blingId
+                                        ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:cursor-wait"
+                                        : isPai
+                                          ? "bg-slate-100 text-slate-600"
+                                          : "bg-amber-50 text-amber-700"
+                                    }`}
+                                    title={
+                                      blingId ? "Clique para conferir se ainda existe no Bling" : ""
+                                    }
+                                  >
+                                    {blingLoading && blingId
+                                      ? "Conferindo..."
+                                      : blingId
+                                        ? `Bling #${blingId}`
+                                        : isPai
+                                          ? "Agrupador"
+                                          : "Sem Bling"}
+                                  </button>
+                                  <ChannelBadges channels={canaisAtivos} layout="row" empty="" />
+                                </>
                               )}
-                              <button
-                                type="button"
-                                disabled={blingLoading || !blingId}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  if (blingId && onValidarVinculoProdutoBling) {
-                                    onValidarVinculoProdutoBling(produto);
-                                  }
-                                }}
-                                className={`whitespace-nowrap rounded-full px-2 py-0.5 ${
-                                  blingId
-                                    ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:cursor-wait"
-                                    : isPai
-                                      ? "bg-slate-100 text-slate-600"
-                                      : "bg-amber-50 text-amber-700"
-                                }`}
-                                title={
-                                  blingId ? "Clique para conferir se ainda existe no Bling" : ""
-                                }
-                              >
-                                {blingLoading && blingId
-                                  ? "Conferindo..."
-                                  : blingId
-                                    ? `Bling #${blingId}`
-                                    : isPai
-                                      ? "Agrupador"
-                                      : "Sem Bling"}
-                              </button>
-                              <ChannelBadges channels={canaisAtivos} layout="row" empty="" />
                             </div>
                           </div>
                         </div>
@@ -443,90 +497,108 @@ export default function ProdutosTabelaSection({
                     </div>
 
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <ActionButton
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          navigate(`/produtos/${produto.id}/editar`);
-                        }}
-                        intent="edit"
-                        tone="solid"
-                        size="sm"
-                        className="flex-1"
-                      >
-                        Editar
-                      </ActionButton>
-                      <ActionButton
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          navigate(`/produtos/novo?clone=${produto.id}`);
-                        }}
-                        intent="neutral"
-                        tone="soft"
-                        size="sm"
-                        className="flex-1"
-                      >
-                        Clonar
-                      </ActionButton>
-                      {codigo && (
+                      {incompleto ? (
                         <ActionButton
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
-                            copiarTexto(codigo, "Codigo");
-                          }}
-                          intent="neutral"
-                          tone="soft"
-                          size="sm"
-                        >
-                          Copiar
-                        </ActionButton>
-                      )}
-                      {podeCriarBling && (
-                        <ActionButton
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onExportarProdutoBling(produto);
+                            navigate(urlCompletar);
                           }}
                           intent="create"
-                          tone="soft"
+                          tone="solid"
                           size="sm"
-                          icon={UploadCloud}
-                          loading={blingLoading}
                           className="flex-1"
                         >
-                          {blingLoading ? "Criando..." : "Cadastrar Bling"}
+                          Completar aqui
                         </ActionButton>
-                      )}
-                      <ActionButton
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleToggleAtivo(produto);
-                        }}
-                        intent={produto.ativo === false ? "create" : "warning"}
-                        tone="soft"
-                        size="sm"
-                      >
-                        {produto.ativo === false ? "Ativar" : "Inativar"}
-                      </ActionButton>
-                      {produto.ativo === false &&
-                        !String(produto.codigo || "").startsWith("__LIBERADO__") && (
+                      ) : (
+                        <>
                           <ActionButton
                             type="button"
                             onClick={(event) => {
                               event.stopPropagation();
-                              handleLiberarSku(produto);
+                              navigate(`/produtos/${produto.id}/editar`);
                             }}
-                            intent="warning"
+                            intent="edit"
+                            tone="solid"
+                            size="sm"
+                            className="flex-1"
+                          >
+                            Editar
+                          </ActionButton>
+                          <ActionButton
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              navigate(`/produtos/novo?clone=${produto.id}`);
+                            }}
+                            intent="neutral"
+                            tone="soft"
+                            size="sm"
+                            className="flex-1"
+                          >
+                            Clonar
+                          </ActionButton>
+                          {codigo && (
+                            <ActionButton
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                copiarTexto(codigo, "Codigo");
+                              }}
+                              intent="neutral"
+                              tone="soft"
+                              size="sm"
+                            >
+                              Copiar
+                            </ActionButton>
+                          )}
+                          {podeCriarBling && (
+                            <ActionButton
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onExportarProdutoBling(produto);
+                              }}
+                              intent="create"
+                              tone="soft"
+                              size="sm"
+                              icon={UploadCloud}
+                              loading={blingLoading}
+                              className="flex-1"
+                            >
+                              {blingLoading ? "Criando..." : "Cadastrar Bling"}
+                            </ActionButton>
+                          )}
+                          <ActionButton
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleToggleAtivo(produto);
+                            }}
+                            intent={produto.ativo === false ? "create" : "warning"}
                             tone="soft"
                             size="sm"
                           >
-                            Liberar SKU
+                            {produto.ativo === false ? "Ativar" : "Inativar"}
                           </ActionButton>
-                        )}
+                          {produto.ativo === false &&
+                            !String(produto.codigo || "").startsWith("__LIBERADO__") && (
+                              <ActionButton
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleLiberarSku(produto);
+                                }}
+                                intent="warning"
+                                tone="soft"
+                                size="sm"
+                              >
+                                Liberar SKU
+                              </ActionButton>
+                            )}
+                        </>
+                      )}
                     </div>
                   </article>
                 );
@@ -538,12 +610,12 @@ export default function ProdutosTabelaSection({
         <div className="hidden overflow-x-auto md:block">
           <DataTable
             columns={colunasVisiveis}
-            data={produtosValidos}
+            data={produtosParaExibir}
             emptyMessage="Nenhum produto encontrado"
             getCellContext={getProdutoCellContext}
-            getRowKey={(produto) => produto.id}
+            getRowKey={obterChaveLinhaProduto}
             getRowRef={(produto, _rowIndex, element) => {
-              linhaProdutoRefs.current[produto.id] = element;
+              linhaProdutoRefs.current[obterChaveLinhaProduto(produto)] = element;
             }}
             headerContext={produtoHeaderContext}
             isRowExpanded={isProdutoExpandido}
@@ -551,7 +623,11 @@ export default function ProdutosTabelaSection({
             loadingMessage="Carregando produtos..."
             onRowClick={(produto, _rowIndex, event) => {
               if (!event.target.closest("button, input, a, svg")) {
-                navigate(`/produtos/${produto.id}/editar`);
+                navigate(
+                  produto.dados_incompletos_nesta_loja
+                    ? `/produtos/novo?pre_cadastro_grupo=${produto.id}&tenant_origem=${produto.tenant_id}`
+                    : `/produtos/${produto.id}/editar`,
+                );
               }
             }}
             renderExpandedRow={renderProdutoExpandido}
@@ -559,6 +635,7 @@ export default function ProdutosTabelaSection({
               const isKit = isProdutoComComposicao(produto);
               return [
                 "hover:bg-gray-50 transition-colors cursor-pointer",
+                produto.dados_incompletos_nesta_loja ? "bg-amber-50/40" : "",
                 produto.ativo === false ? "bg-slate-100 opacity-70" : "",
                 produto.tipo_produto === "VARIACAO" ? "bg-blue-50/30" : "",
                 isKit ? "bg-amber-50/30" : "",

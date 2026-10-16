@@ -10,6 +10,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { markdownToPlainText } from "../../utils/safeMarkdown";
+import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
 import BotaoMenuAcoes from "../v2/BotaoMenuAcoes/BotaoMenuAcoes";
 import InputCheckbox from "../v2/InputCheckbox/InputCheckbox";
 import ChannelBadges from "../ui/ChannelBadges";
@@ -94,15 +95,21 @@ export function createProdutosColunas() {
           />
         </th>
       ),
-      renderCell: (produto, props) => (
-        <td className="px-4 py-3">
-          <InputCheckbox
-            rotulo={`Selecionar ${produto.nome}`}
-            checked={props.selecionados.includes(produto.id)}
-            onChange={(e) => props.handleSelecionar(produto.id, e.nativeEvent)}
-          />
-        </td>
-      ),
+      renderCell: (produto, props) => {
+        if (produto.dados_incompletos_nesta_loja) {
+          return <td className="px-4 py-3" />;
+        }
+
+        return (
+          <td className="px-4 py-3">
+            <InputCheckbox
+              rotulo={`Selecionar ${produto.nome}`}
+              checked={props.selecionados.includes(produto.id)}
+              onChange={(e) => props.handleSelecionar(produto.id, e.nativeEvent)}
+            />
+          </td>
+        );
+      },
     },
     {
       key: "acoes",
@@ -114,6 +121,23 @@ export function createProdutosColunas() {
         </th>
       ),
       renderCell: (produto, props) => {
+        if (produto.dados_incompletos_nesta_loja) {
+          return (
+            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+              <BotaoInteracao
+                tamanho="pequeno"
+                onClick={() =>
+                  props.navigate(
+                    `/produtos/novo?pre_cadastro_grupo=${produto.id}&tenant_origem=${produto.tenant_id}`,
+                  )
+                }
+              >
+                Completar aqui
+              </BotaoInteracao>
+            </td>
+          );
+        }
+
         const podeGerenciarCatalogo = !produto.de_parceiro || produto.acesso_catalogo_completo;
         const podeLiberarSku =
           produto.ativo === false &&
@@ -327,6 +351,14 @@ export function createProdutosColunas() {
                         Pet Shop Parceiro
                       </span>
                     ) : null}
+                    {produto.dados_incompletos_nesta_loja && (
+                      <span
+                        className="inline-flex items-center whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700"
+                        title={`Este produto já existe no grupo, mas esta loja ainda não tem os dados dela (preço, estoque etc.) — já cadastrado em ${produto.loja_nome}.`}
+                      >
+                        Dados incompletos aqui
+                      </span>
+                    )}
                   </div>
                 </div>
                 {produto.descricao && (
@@ -421,6 +453,14 @@ export function createProdutosColunas() {
         </th>
       ),
       renderCell: (produto, props) => {
+        if (produto.dados_incompletos_nesta_loja) {
+          return (
+            <td className="px-4 py-3 text-center">
+              <span className="text-sm text-gray-400">-</span>
+            </td>
+          );
+        }
+
         const blingId = getProdutoBlingId(produto);
         const isPai = produto.tipo_produto === "PAI";
         const loading = props.blingActionKey === getProdutoBlingActionKey(produto.id);
