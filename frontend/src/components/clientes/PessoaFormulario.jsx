@@ -564,10 +564,7 @@ export default function PessoaFormulario({
         }
       }
 
-      if (temPessoaSalva) {
-        clienteData.enderecos_adicionais =
-          enderecosAdicionais.length > 0 ? enderecosAdicionais : null;
-      }
+      clienteData.enderecos_adicionais = enderecosAdicionais;
 
       Object.keys(clienteData).forEach((key) => {
         if (clienteData[key] === "") clienteData[key] = null;

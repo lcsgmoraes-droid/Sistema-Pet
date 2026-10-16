@@ -88,16 +88,25 @@ def test_cadastro_publico_nao_duplica_funcionario_pelo_celular():
     assert db.query(User).first().id == existing.id
 
 
-def test_cadastro_publico_exige_erp_para_ficha_de_funcionario(monkeypatch):
-    employee = SimpleNamespace(
+@pytest.mark.parametrize(
+    "perfil_operacional", ["is_funcionario", "is_veterinario", "is_entregador"]
+)
+def test_cadastro_publico_exige_erp_para_pessoa_operacional_multitipo(
+    monkeypatch, perfil_operacional
+):
+    employee = Cliente(
         id=1,
         telefone="(67) 99999-1111",
         celular=None,
         auth_user_id=None,
-        tipo_cadastro="funcionario",
+        is_cliente=True,
+        is_fornecedor=True,
+        is_funcionario=False,
+        is_veterinario=False,
         is_entregador=False,
         merged_into_id=None,
     )
+    setattr(employee, perfil_operacional, True)
     db = MagicMock()
 
     def query_for(model):
@@ -263,13 +272,15 @@ def test_promocao_funde_ficha_cliente_na_ficha_operacional(monkeypatch):
 
 def test_cadastro_publico_funde_fichas_de_cliente_com_mesmo_telefone(monkeypatch):
     people = [
-        SimpleNamespace(
+        Cliente(
             id=1,
             codigo="1",
             telefone="67999991111",
             celular=None,
             auth_user_id=None,
-            tipo_cadastro="cliente",
+            is_cliente=True,
+            is_funcionario=False,
+            is_veterinario=False,
             is_entregador=False,
             merged_into_id=None,
             cpf="12345678901",
@@ -277,13 +288,15 @@ def test_cadastro_publico_funde_fichas_de_cliente_com_mesmo_telefone(monkeypatch
             ativo=True,
             nome="Ana Silva",
         ),
-        SimpleNamespace(
+        Cliente(
             id=2,
             codigo="2",
             telefone=None,
             celular="(67) 99999-1111",
             auth_user_id=None,
-            tipo_cadastro="cliente",
+            is_cliente=True,
+            is_funcionario=False,
+            is_veterinario=False,
             is_entregador=False,
             merged_into_id=None,
             cpf="12345678901",

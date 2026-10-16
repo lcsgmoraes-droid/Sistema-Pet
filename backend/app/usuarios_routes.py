@@ -540,6 +540,7 @@ def listar_usuarios(
             "role_id": row.role_id,
             "role": row.role,
             "is_active": row.is_active,
+            "pode_liberar_venda_crediario_atrasado": row.pode_liberar_venda_crediario_atrasado,
             "pessoa_id": row.pessoa_id,
             "pessoa_codigo": row.pessoa_codigo,
             "pessoa_nome": row.pessoa_nome,
@@ -595,11 +596,17 @@ def criar_usuario(
             role_id=payload.role_id,
             nome=payload.nome,
         )
-        pessoa = _criar_pessoa_operacional_para_usuario(
+        pessoa = _vincular_ou_criar_pessoa_para_usuario(
             db,
             actor=actor,
             tenant_id=tenant_id,
             user=user,
+            pessoa_id=payload.pessoa_id,
+            nome=payload.nome,
+            login_phone=user.login_phone,
+            email=payload.email,
+            tipo_pessoa=payload.tipo_pessoa,
+            celular_whatsapp=payload.celular_whatsapp,
         )
         log_business_event(
             db=db,
@@ -619,18 +626,6 @@ def criar_usuario(
             commit=False,
         )
 
-        pessoa = _vincular_ou_criar_pessoa_para_usuario(
-            db,
-            actor=actor,
-            tenant_id=tenant_id,
-            user=user,
-            pessoa_id=payload.pessoa_id,
-            nome=payload.nome,
-            login_phone=user.login_phone,
-            email=payload.email,
-            tipo_pessoa=payload.tipo_pessoa,
-            celular_whatsapp=payload.celular_whatsapp,
-        )
         if payload.app_access_profiles:
             sync_cliente_app_access_profiles(
                 db,
@@ -827,7 +822,11 @@ def atualizar_credenciais_usuario(
     selected_role: Role | None = None
     generated_password: str | None = None
 
-    if payload.role_id is not None and target_user.master_grupo_id is not None:
+    if (
+        payload.role_id is not None
+        and payload.role_id != vinculo.role_id
+        and target_user.master_grupo_id is not None
+    ):
         raise HTTPException(
             status_code=403,
             detail=(

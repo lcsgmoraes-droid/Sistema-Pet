@@ -48,7 +48,7 @@ def validar_vendedor_funcionario(
             Cliente.tenant_id == tenant_id,
             Cliente.ativo.is_(True),
             or_(
-                Cliente.tipo_cadastro == "funcionario",
+                Cliente.is_funcionario.is_(True),
                 Cliente.parceiro_ativo.is_(True),
             ),
         )

@@ -19,6 +19,26 @@ const textareaToList = (value = "") =>
     .map((item) => item.trim())
     .filter(Boolean);
 
+const normalizarNomeEspecie = (nome = "") =>
+  nome
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLocaleLowerCase("pt-BR");
+
+const grupoNomeEspecie = (nome) => {
+  const normalizado = normalizarNomeEspecie(nome);
+  if (["cao", "caes", "cachorro", "cachorros", "canino", "canina"].includes(normalizado)) {
+    return "canina";
+  }
+  if (["gato", "gatos", "felino", "felina"].includes(normalizado)) return "felina";
+  return normalizado;
+};
+
+const encontrarEspecieCadastrada = (lista, nome) =>
+  lista.find((especie) => normalizarNomeEspecie(especie.nome) === normalizarNomeEspecie(nome)) ||
+  lista.find((especie) => grupoNomeEspecie(especie.nome) === grupoNomeEspecie(nome));
+
 const PetForm = () => {
   const { petId } = useParams();
   const navigate = useNavigate();
@@ -42,6 +62,8 @@ const PetForm = () => {
   const [clientes, setClientes] = useState([]);
   const [especies, setEspecies] = useState([]);
   const [racas, setRacas] = useState([]);
+  const [especieOriginal, setEspecieOriginal] = useState("");
+  const [especieAlterada, setEspecieAlterada] = useState(false);
 
   const [abaAtiva, setAbaAtiva] = useState("dados-gerais");
 
@@ -89,10 +111,11 @@ const PetForm = () => {
     const loadData = async () => {
       setLoading(true);
       try {
-        await loadClientes();
-        await loadEspecies();
-        if (isEditing) {
-          await loadPet();
+        const clientesCarregados = await loadClientes(() => ativo);
+        if (!ativo) return;
+        const especiesCarregadas = await loadEspecies(() => ativo);
+        if (ativo && isEditing) {
+          await loadPet(especiesCarregadas, clientesCarregados, () => ativo);
         }
       } finally {
         if (ativo) setLoading(false);
@@ -114,7 +137,7 @@ const PetForm = () => {
     }
   }, [formData.especie]);
 
-  const loadClientes = async () => {
+  const loadClientes = async (deveAplicar = () => true) => {
     try {
       const response = await api.get("/clientes/");
       const lista = response.data?.items || response.data?.clientes || response.data || [];
@@ -139,19 +162,23 @@ const PetForm = () => {
       const clientesUnicos = Array.from(
         new Map(clientesCarregados.map((cliente) => [String(cliente.id), cliente])).values(),
       );
-      setClientes(clientesUnicos);
+      if (deveAplicar()) setClientes(clientesUnicos);
+      return clientesUnicos;
     } catch (err) {
       console.error("Erro ao carregar clientes:", err);
-      setClientes([]);
+      if (deveAplicar()) setClientes([]);
+      return [];
     }
   };
 
-  const loadEspecies = async () => {
+  const loadEspecies = async (deveAplicar = () => true) => {
     try {
       const response = await api.get("/cadastros/especies", { params: { ativo: true } });
-      setEspecies(response.data);
+      if (deveAplicar()) setEspecies(response.data);
+      return response.data;
     } catch (err) {
       console.error("Erro ao carregar espécies:", err);
+      return [];
     }
   };
 
@@ -171,13 +198,35 @@ const PetForm = () => {
     }
   };
 
-  const loadPet = async () => {
+  const loadPet = async (especiesCarregadas, clientesCarregados, deveAplicar) => {
     try {
       const response = await api.get(`/pets/${petId}`);
       const pet = response.data;
+      if (!deveAplicar()) return;
 
-      // Converter nome da espécie para ID
-      const especieEncontrada = especies.find((e) => e.nome === pet.especie);
+      if (
+        pet.cliente_id &&
+        !clientesCarregados.some((cliente) => String(cliente.id) === String(pet.cliente_id))
+      ) {
+        try {
+          const responseTutor = await api.get(`/clientes/${pet.cliente_id}`);
+          if (deveAplicar() && responseTutor.data?.id) {
+            setClientes((atuais) => [
+              responseTutor.data,
+              ...atuais.filter((cliente) => String(cliente.id) !== String(pet.cliente_id)),
+            ]);
+          }
+        } catch (erroTutor) {
+          console.warn("Não foi possível carregar o tutor do pet:", erroTutor);
+        }
+      }
+      if (!deveAplicar()) return;
+
+      // A lista vem da resposta desta carga, sem depender do estado do render anterior.
+      // Cadastros antigos também usam Cão/Cachorro e Gato no lugar de Canina/Felina.
+      const especieEncontrada = encontrarEspecieCadastrada(especiesCarregadas, pet.especie);
+      setEspecieOriginal(pet.especie || "");
+      setEspecieAlterada(false);
 
       setFormData({
         cliente_id: pet.cliente_id || "",
@@ -209,7 +258,7 @@ const PetForm = () => {
       });
     } catch (err) {
       console.error("Erro ao carregar pet:", err);
-      setError("Erro ao carregar informações do pet");
+      if (deveAplicar()) setError("Erro ao carregar informações do pet");
     }
   };
 
@@ -218,6 +267,7 @@ const PetForm = () => {
   };
 
   const handleEspecieChange = (value) => {
+    setEspecieAlterada(true);
     setFormData((prev) => ({ ...prev, especie: value, raca: "" }));
   };
 
@@ -251,6 +301,7 @@ const PetForm = () => {
 
   const handleQuickAddSuccess = (novoItem) => {
     if (quickAddTipo === "especie") {
+      setEspecieAlterada(true);
       setEspecies((prev) => {
         const semDuplicar = prev.filter((especie) => especie.id !== novoItem.id);
         return [...semDuplicar, novoItem].sort((a, b) => a.nome.localeCompare(b.nome));
@@ -325,7 +376,11 @@ const PetForm = () => {
       // Preparar dados para envio
       const dataToSend = {
         ...formData,
-        especie: especieSelecionada?.nome || formData.especie,
+        // Resolver um alias ao carregar não é uma alteração solicitada pelo usuário.
+        especie:
+          isEditing && !especieAlterada && especieOriginal
+            ? especieOriginal
+            : especieSelecionada?.nome || formData.especie,
         cliente_id: parseInt(formData.cliente_id),
         peso: formData.peso ? parseFloat(String(formData.peso).replace(",", ".")) : null,
         idade_aproximada: formData.idade_aproximada ? parseInt(formData.idade_aproximada) : null,
@@ -339,6 +394,8 @@ const PetForm = () => {
 
       if (isEditing) {
         await api.put(`/pets/${petId}`, dataToSend);
+        setEspecieOriginal(dataToSend.especie);
+        setEspecieAlterada(false);
         setSuccess("Pet atualizado com sucesso!");
         setTimeout(() => navigate(`/pets/${petId}`), 1500);
       } else {
