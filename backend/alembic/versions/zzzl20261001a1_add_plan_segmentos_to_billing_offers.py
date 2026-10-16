@@ -27,11 +27,13 @@ def upgrade() -> None:
     columns = _columns("billing_offers")
     if "plan_pet_code" not in columns:
         op.add_column(
-            "billing_offers", sa.Column("plan_pet_code", sa.String(length=50), nullable=True)
+            "billing_offers",
+            sa.Column("plan_pet_code", sa.String(length=50), nullable=True),
         )
     if "plan_vet_code" not in columns:
         op.add_column(
-            "billing_offers", sa.Column("plan_vet_code", sa.String(length=50), nullable=True)
+            "billing_offers",
+            sa.Column("plan_vet_code", sa.String(length=50), nullable=True),
         )
     if "plan_grooming_code" not in columns:
         op.add_column(
@@ -47,10 +49,14 @@ def upgrade() -> None:
     vet_list = "'vet-start','vet-gestao','vet-completo'"
     grooming_list = "'grooming-start','grooming-gestao','grooming-completo'"
     bind.execute(
-        sa.text(f"UPDATE billing_offers SET plan_pet_code = plan_code WHERE plan_code IN ({pet_list})")
+        sa.text(
+            f"UPDATE billing_offers SET plan_pet_code = plan_code WHERE plan_code IN ({pet_list})"
+        )
     )
     bind.execute(
-        sa.text(f"UPDATE billing_offers SET plan_vet_code = plan_code WHERE plan_code IN ({vet_list})")
+        sa.text(
+            f"UPDATE billing_offers SET plan_vet_code = plan_code WHERE plan_code IN ({vet_list})"
+        )
     )
     bind.execute(
         sa.text(

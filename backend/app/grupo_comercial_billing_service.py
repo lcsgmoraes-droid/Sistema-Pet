@@ -31,7 +31,9 @@ class GrupoComercialBillingService:
         self.grupos = GrupoComercialService(db)
 
     def _exigir_acesso(self, grupo_id: int, usuario: User) -> GrupoComercial:
-        grupo = self.db.query(GrupoComercial).filter(GrupoComercial.id == grupo_id).first()
+        grupo = (
+            self.db.query(GrupoComercial).filter(GrupoComercial.id == grupo_id).first()
+        )
         if grupo is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

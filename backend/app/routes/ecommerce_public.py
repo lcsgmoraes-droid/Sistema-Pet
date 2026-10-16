@@ -59,10 +59,8 @@ _ANALYTICS_EVENT_NAMES = {
 
 
 def _escopo_catalogo_publico(db: Session, tenant_id):
-    compartilhados = (
-        GrupoComercialEstoqueCompartilhadoService.mapa_catalogo_completo_para_consumidora(
-            db, tenant_id
-        )
+    compartilhados = GrupoComercialEstoqueCompartilhadoService.mapa_catalogo_completo_para_consumidora(
+        db, tenant_id
     )
     return or_(
         Produto.tenant_id == tenant_id,

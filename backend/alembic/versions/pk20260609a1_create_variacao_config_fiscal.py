@@ -56,11 +56,15 @@ def _criar_tabela() -> None:
         sa.Column("cofins_aliquota", sa.Numeric(precision=5, scale=2), nullable=True),
         sa.Column("observacao_fiscal", sa.Text(), nullable=True),
         sa.Column("configuracao_sugerida", sa.Boolean(), nullable=True),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=True),
+        sa.Column(
+            "created_at", sa.DateTime(), server_default=sa.func.now(), nullable=True
+        ),
         sa.Column("updated_at", sa.DateTime(), nullable=True),
         # produto_variacao NÃO tem modelo/tabela mapeada no projeto, portanto
         # variacao_id fica sem ForeignKey (apenas UNIQUE), como em kit_composicao.
-        sa.ForeignKeyConstraint(["produto_config_fiscal_id"], ["produto_config_fiscal.id"]),
+        sa.ForeignKeyConstraint(
+            ["produto_config_fiscal_id"], ["produto_config_fiscal.id"]
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("variacao_id"),
     )

@@ -39,24 +39,40 @@ def _criar_tabela() -> None:
         TABELA,
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("preco_combustivel", sa.Numeric(precision=10, scale=2), nullable=False),
+        sa.Column(
+            "preco_combustivel", sa.Numeric(precision=10, scale=2), nullable=False
+        ),
         sa.Column("km_por_litro", sa.Numeric(precision=10, scale=2), nullable=False),
         sa.Column("km_troca_oleo", sa.Integer(), nullable=True),
         sa.Column("custo_troca_oleo", sa.Numeric(precision=10, scale=2), nullable=True),
         sa.Column("km_troca_pneu_dianteiro", sa.Integer(), nullable=True),
-        sa.Column("custo_pneu_dianteiro", sa.Numeric(precision=10, scale=2), nullable=True),
+        sa.Column(
+            "custo_pneu_dianteiro", sa.Numeric(precision=10, scale=2), nullable=True
+        ),
         sa.Column("km_troca_pneu_traseiro", sa.Integer(), nullable=True),
-        sa.Column("custo_pneu_traseiro", sa.Numeric(precision=10, scale=2), nullable=True),
+        sa.Column(
+            "custo_pneu_traseiro", sa.Numeric(precision=10, scale=2), nullable=True
+        ),
         sa.Column("km_troca_kit_traseiro", sa.Integer(), nullable=True),
-        sa.Column("custo_kit_traseiro", sa.Numeric(precision=10, scale=2), nullable=True),
+        sa.Column(
+            "custo_kit_traseiro", sa.Numeric(precision=10, scale=2), nullable=True
+        ),
         sa.Column("km_manutencao_geral", sa.Integer(), nullable=True),
-        sa.Column("custo_manutencao_geral", sa.Numeric(precision=10, scale=2), nullable=True),
+        sa.Column(
+            "custo_manutencao_geral", sa.Numeric(precision=10, scale=2), nullable=True
+        ),
         sa.Column("seguro_mensal", sa.Numeric(precision=10, scale=2), nullable=True),
-        sa.Column("licenciamento_mensal", sa.Numeric(precision=10, scale=2), nullable=True),
+        sa.Column(
+            "licenciamento_mensal", sa.Numeric(precision=10, scale=2), nullable=True
+        ),
         sa.Column("ipva_mensal", sa.Numeric(precision=10, scale=2), nullable=True),
-        sa.Column("outros_custos_mensais", sa.Numeric(precision=10, scale=2), nullable=True),
+        sa.Column(
+            "outros_custos_mensais", sa.Numeric(precision=10, scale=2), nullable=True
+        ),
         sa.Column("km_medio_mensal", sa.Numeric(precision=10, scale=2), nullable=True),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=True),
+        sa.Column(
+            "created_at", sa.DateTime(), server_default=sa.func.now(), nullable=True
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("tenant_id", name=UQ_TENANT),
     )

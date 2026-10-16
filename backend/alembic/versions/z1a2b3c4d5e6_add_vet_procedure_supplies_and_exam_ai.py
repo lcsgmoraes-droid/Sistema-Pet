@@ -17,17 +17,42 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("vet_catalogo_procedimentos", sa.Column("insumos", sa.JSON(), nullable=True))
-    op.add_column("vet_procedimentos_consulta", sa.Column("insumos", sa.JSON(), nullable=True))
-    op.add_column("vet_procedimentos_consulta", sa.Column("estoque_baixado", sa.Boolean(), nullable=False, server_default=sa.text("false")))
-    op.add_column("vet_procedimentos_consulta", sa.Column("estoque_movimentacao_ids", sa.JSON(), nullable=True))
+    op.add_column(
+        "vet_catalogo_procedimentos", sa.Column("insumos", sa.JSON(), nullable=True)
+    )
+    op.add_column(
+        "vet_procedimentos_consulta", sa.Column("insumos", sa.JSON(), nullable=True)
+    )
+    op.add_column(
+        "vet_procedimentos_consulta",
+        sa.Column(
+            "estoque_baixado",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
+    )
+    op.add_column(
+        "vet_procedimentos_consulta",
+        sa.Column("estoque_movimentacao_ids", sa.JSON(), nullable=True),
+    )
 
-    op.add_column("vet_exames", sa.Column("interpretacao_ia_resumo", sa.Text(), nullable=True))
-    op.add_column("vet_exames", sa.Column("interpretacao_ia_confianca", sa.Float(), nullable=True))
-    op.add_column("vet_exames", sa.Column("interpretacao_ia_alertas", sa.JSON(), nullable=True))
-    op.add_column("vet_exames", sa.Column("interpretacao_ia_payload", sa.JSON(), nullable=True))
+    op.add_column(
+        "vet_exames", sa.Column("interpretacao_ia_resumo", sa.Text(), nullable=True)
+    )
+    op.add_column(
+        "vet_exames", sa.Column("interpretacao_ia_confianca", sa.Float(), nullable=True)
+    )
+    op.add_column(
+        "vet_exames", sa.Column("interpretacao_ia_alertas", sa.JSON(), nullable=True)
+    )
+    op.add_column(
+        "vet_exames", sa.Column("interpretacao_ia_payload", sa.JSON(), nullable=True)
+    )
 
-    op.alter_column("vet_procedimentos_consulta", "estoque_baixado", server_default=None)
+    op.alter_column(
+        "vet_procedimentos_consulta", "estoque_baixado", server_default=None
+    )
 
 
 def downgrade() -> None:

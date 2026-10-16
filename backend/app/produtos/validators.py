@@ -27,8 +27,10 @@ def _resolver_tenant_produto_catalogo(
     db: Session, tenant_solicitante_id, produto_id: int
 ):
     """Valida o acesso ao catalogo e entra no tenant que possui o produto."""
-    acesso_catalogo = GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
-        db, tenant_solicitante_id, produto_id
+    acesso_catalogo = (
+        GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
+            db, tenant_solicitante_id, produto_id
+        )
     )
     tenant_origem_id = UUID(str(acesso_catalogo.tenant_origem_id))
     set_current_tenant(tenant_origem_id)
@@ -100,7 +102,11 @@ def _validar_sku_unico(
             "AND lower(trim(codigo)) = :codigo AND (CAST(:excluir AS integer) IS NULL OR id <> CAST(:excluir AS integer)) "
             "LIMIT 1"
         ),
-        {"ids": list(tenants_do_grupo(db, tenant_id)), "codigo": sku_normalizado.lower(), "excluir": produto_id},
+        {
+            "ids": list(tenants_do_grupo(db, tenant_id)),
+            "codigo": sku_normalizado.lower(),
+            "excluir": produto_id,
+        },
     ).first()
 
     if existe:
@@ -125,7 +131,11 @@ def _validar_codigo_barras_unico(
             "AND trim(codigo_barras) = :codigo "
             "AND (CAST(:excluir AS integer) IS NULL OR id <> CAST(:excluir AS integer)) LIMIT 1"
         ),
-        {"ids": list(tenants_do_grupo(db, tenant_id)), "codigo": codigo_barras.strip(), "excluir": produto_id},
+        {
+            "ids": list(tenants_do_grupo(db, tenant_id)),
+            "codigo": codigo_barras.strip(),
+            "excluir": produto_id,
+        },
     ).first()
 
     if existe:

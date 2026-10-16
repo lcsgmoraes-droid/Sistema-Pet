@@ -29,9 +29,12 @@ def upgrade() -> None:
         )
     ).fetchall()
     if duplicados:
-        pares = ", ".join(f"(user_id={u}, tenant_id={t}, linhas={n})" for u, t, n in duplicados)
+        pares = ", ".join(
+            f"(user_id={u}, tenant_id={t}, linhas={n})" for u, t, n in duplicados
+        )
         raise RuntimeError(
-            "Existem vinculos duplicados em user_tenants; resolver antes de aplicar: " + pares
+            "Existem vinculos duplicados em user_tenants; resolver antes de aplicar: "
+            + pares
         )
     op.create_unique_constraint(
         "uq_user_tenants_user_tenant", "user_tenants", ["user_id", "tenant_id"]

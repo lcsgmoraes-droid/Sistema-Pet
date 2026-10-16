@@ -30,7 +30,12 @@ def downgrade() -> None:
     op.create_table(
         "pet_mestre",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column("grupo_id", sa.Integer(), sa.ForeignKey("grupos_comerciais.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "grupo_id",
+            sa.Integer(),
+            sa.ForeignKey("grupos_comerciais.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("nome", sa.String(255), nullable=False),
         sa.Column("especie", sa.String(50), nullable=False),
         sa.Column("raca", sa.String(100), nullable=True),
@@ -60,14 +65,31 @@ def downgrade() -> None:
         sa.Column("medo_tesoura", sa.String(50), nullable=True),
         sa.Column("aceita_focinheira", sa.String(50), nullable=True),
         sa.Column("comportamento_carro", sa.String(50), nullable=True),
-        sa.Column("ativo", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        sa.Column(
+            "ativo", sa.Boolean(), nullable=False, server_default=sa.text("true")
+        ),
         sa.Column("criado_por_usuario_id", sa.Integer(), nullable=False),
-        sa.Column("criado_em", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.Column("atualizado_em", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "criado_em",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
+        sa.Column(
+            "atualizado_em",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
     )
     op.create_index("ix_pet_mestre_grupo_id", "pet_mestre", ["grupo_id"])
     op.create_index("ix_pet_mestre_microchip", "pet_mestre", ["microchip"])
     op.add_column("pets", sa.Column("pet_mestre_id", sa.Integer(), nullable=True))
     op.create_foreign_key(
-        "pets_pet_mestre_id_fkey", "pets", "pet_mestre", ["pet_mestre_id"], ["id"], ondelete="SET NULL"
+        "pets_pet_mestre_id_fkey",
+        "pets",
+        "pet_mestre",
+        ["pet_mestre_id"],
+        ["id"],
+        ondelete="SET NULL",
     )

@@ -361,7 +361,9 @@ def get_modulos_status(
     recursos_ativos = (
         recursos_trial
         if trial_completo
-        else sorted({recurso for plano in planos_catalogo for recurso in plano.entitlements})
+        else sorted(
+            {recurso for plano in planos_catalogo for recurso in plano.entitlements}
+        )
         if planos_catalogo and plano_ativo
         else []
     )

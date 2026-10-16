@@ -44,9 +44,10 @@ def buscar_produtos_outras_lojas_grupo(
         return []
 
     termo_like = f"%{termo_busca}%"
-    linhas = db.execute(
-        text(
-            """
+    linhas = (
+        db.execute(
+            text(
+                """
             SELECT p.id, p.tenant_id::text AS tenant_id, t.name AS loja_nome,
                    p.nome, p.codigo, p.codigo_barras, p.imagem_principal,
                    p.preco_venda, p.estoque_atual, p.produto_identidade_id
@@ -65,7 +66,10 @@ def buscar_produtos_outras_lojas_grupo(
             ORDER BY p.nome
             LIMIT :limite
             """
-        ),
-        {"tenants": outros_tenants, "termo": termo_like, "limite": limite},
-    ).mappings().all()
+            ),
+            {"tenants": outros_tenants, "termo": termo_like, "limite": limite},
+        )
+        .mappings()
+        .all()
+    )
     return [dict(linha) for linha in linhas]

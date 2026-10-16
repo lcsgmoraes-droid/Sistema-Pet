@@ -57,6 +57,7 @@ def test_fusao_preserva_todos_os_perfis_quando_pessoa_tem_varios():
 
     assert _perfis_inerentes(pessoa) == {"cliente", "veterinario", "funcionario"}
 
+
 def test_fusao_recarrega_credito_de_pessoas_ja_carregadas_antes_do_lock():
     tenant_id = uuid4()
     principal = SimpleNamespace(

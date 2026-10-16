@@ -28,8 +28,18 @@ def upgrade() -> None:
         "usuario_menu_favoritos",
         sa.Column("id", sa.Integer(), sa.Identity(always=True), nullable=False),
         sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.Column("user_id", sa.Integer(), nullable=False),
         sa.Column("path", sa.String(length=255), nullable=False),
         sa.Column("label", sa.String(length=120), nullable=False),
@@ -77,7 +87,14 @@ def downgrade() -> None:
         table_names=USUARIO_MENU_FAVORITOS_RLS_TABLES,
         enable=False,
     )
-    op.drop_index("ix_usuario_menu_favoritos_tenant_user_position", table_name="usuario_menu_favoritos")
-    op.drop_index("ix_usuario_menu_favoritos_user_id", table_name="usuario_menu_favoritos")
-    op.drop_index("ix_usuario_menu_favoritos_tenant_id", table_name="usuario_menu_favoritos")
+    op.drop_index(
+        "ix_usuario_menu_favoritos_tenant_user_position",
+        table_name="usuario_menu_favoritos",
+    )
+    op.drop_index(
+        "ix_usuario_menu_favoritos_user_id", table_name="usuario_menu_favoritos"
+    )
+    op.drop_index(
+        "ix_usuario_menu_favoritos_tenant_id", table_name="usuario_menu_favoritos"
+    )
     op.drop_table("usuario_menu_favoritos")

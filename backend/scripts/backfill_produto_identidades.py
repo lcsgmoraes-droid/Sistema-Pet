@@ -49,11 +49,13 @@ logger = logging.getLogger("backfill_produto_identidades")
 
 def _grupos_ativos_com_2_mais_membros(db) -> list[int]:
     membros_por_grupo: dict[int, int] = defaultdict(int)
-    for grupo_id, in db.query(GrupoComercialMembro.grupo_id).join(
-        GrupoComercial, GrupoComercial.id == GrupoComercialMembro.grupo_id
-    ).filter(
-        GrupoComercialMembro.status == "ativo",
-        GrupoComercial.status == "ativo",
+    for (grupo_id,) in (
+        db.query(GrupoComercialMembro.grupo_id)
+        .join(GrupoComercial, GrupoComercial.id == GrupoComercialMembro.grupo_id)
+        .filter(
+            GrupoComercialMembro.status == "ativo",
+            GrupoComercial.status == "ativo",
+        )
     ):
         membros_por_grupo[grupo_id] += 1
     return sorted(gid for gid, qtd in membros_por_grupo.items() if qtd >= 2)
@@ -62,9 +64,10 @@ def _grupos_ativos_com_2_mais_membros(db) -> list[int]:
 def _candidatos_por_chave(db, tenant_ids: list[str]) -> dict[str, list[dict[str, Any]]]:
     """Scan leve (so id/tenant_id/produto_identidade_id), so produto ativo e
     nao deletado, com chave de correspondencia nao vazia."""
-    linhas = db.execute(
-        text(
-            """
+    linhas = (
+        db.execute(
+            text(
+                """
             SELECT id, tenant_id::text AS tenant_id, produto_identidade_id,
                    COALESCE(NULLIF(trim(codigo_barras), ''), NULLIF(trim(gtin_ean), '')) AS chave
             FROM produtos
@@ -74,9 +77,12 @@ def _candidatos_por_chave(db, tenant_ids: list[str]) -> dict[str, list[dict[str,
               AND tipo <> 'servico'
               AND COALESCE(NULLIF(trim(codigo_barras), ''), NULLIF(trim(gtin_ean), '')) IS NOT NULL
             """
-        ),
-        {"ids": tenant_ids},
-    ).mappings().all()
+            ),
+            {"ids": tenant_ids},
+        )
+        .mappings()
+        .all()
+    )
 
     por_chave: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for linha in linhas:
@@ -100,7 +106,9 @@ def _reconciliar_campos(produtos: list[Produto]) -> dict[str, Any]:
     """Campo a campo, mais recente-atualizado primeiro, só usa valor
     preenchido — nunca deixa um produto mais recente mas incompleto apagar um
     campo que outro produto do grupo já tinha preenchido."""
-    ordenados = sorted(produtos, key=lambda p: p.updated_at or p.created_at, reverse=True)
+    ordenados = sorted(
+        produtos, key=lambda p: p.updated_at or p.created_at, reverse=True
+    )
     valores: dict[str, Any] = {}
     for campo in INHERENT_FIELDS:
         for produto in ordenados:
@@ -121,9 +129,7 @@ def _processar_chave(
 ) -> None:
     produtos = [
         p
-        for p in (
-            _carregar_produto(db, r["tenant_id"], r["id"]) for r in registros
-        )
+        for p in (_carregar_produto(db, r["tenant_id"], r["id"]) for r in registros)
         if p is not None
     ]
     if len(produtos) < 2:
@@ -214,7 +220,9 @@ def _processar_chave(
                         produto_id=produto.id,
                         user_id=None,
                         campo=campo,
-                        valor_anterior=str(valor_atual) if valor_atual is not None else None,
+                        valor_anterior=str(valor_atual)
+                        if valor_atual is not None
+                        else None,
                         valor_novo=str(valor_novo) if valor_novo is not None else None,
                     )
                 )
@@ -306,9 +314,13 @@ def _primeiro_tenant_do_grupo(db, grupo_id: int) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--grupo-id", type=int, default=None, help="Processa só este grupo")
     parser.add_argument(
-        "--dry-run", action="store_true", help="Calcula e mostra o plano, nao escreve nada"
+        "--grupo-id", type=int, default=None, help="Processa só este grupo"
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Calcula e mostra o plano, nao escreve nada",
     )
     args = parser.parse_args()
 

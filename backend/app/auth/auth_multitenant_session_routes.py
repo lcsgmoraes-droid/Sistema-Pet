@@ -304,9 +304,7 @@ def get_me_multitenant(
     if master_grupo_id is not None and tenant_pertence_ao_grupo(
         db, tenant_id, master_grupo_id
     ):
-        permissions = [
-            codigo for (codigo,) in db.query(Permission.code).all()
-        ]
+        permissions = [codigo for (codigo,) in db.query(Permission.code).all()]
 
     return {
         "id": current_user.id,

@@ -196,7 +196,9 @@ def ops_tenants_session():
         session.close()
 
 
-def test_list_ops_tenants_exposes_grupo_comercial_when_tables_exist(ops_tenants_session):
+def test_list_ops_tenants_exposes_grupo_comercial_when_tables_exist(
+    ops_tenants_session,
+):
     from app.services.ops_tenants_service import list_ops_tenants
 
     ops_tenants_session.execute(
@@ -218,7 +220,9 @@ def test_list_ops_tenants_exposes_grupo_comercial_when_tables_exist(ops_tenants_
             """)
     )
     ops_tenants_session.execute(
-        text("INSERT INTO grupos_comerciais (id, nome) VALUES (1, 'Clinica Sao Jose - Grupo')")
+        text(
+            "INSERT INTO grupos_comerciais (id, nome) VALUES (1, 'Clinica Sao Jose - Grupo')"
+        )
     )
     ops_tenants_session.execute(
         text("""

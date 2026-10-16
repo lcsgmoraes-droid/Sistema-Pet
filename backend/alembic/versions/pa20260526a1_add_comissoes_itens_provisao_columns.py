@@ -38,7 +38,9 @@ def _foreign_keys(table_name: str) -> set[str]:
     inspector = sa.inspect(bind)
     if not inspector.has_table(table_name):
         return set()
-    return {fk["name"] for fk in inspector.get_foreign_keys(table_name) if fk.get("name")}
+    return {
+        fk["name"] for fk in inspector.get_foreign_keys(table_name) if fk.get("name")
+    }
 
 
 def upgrade() -> None:
@@ -47,7 +49,12 @@ def upgrade() -> None:
     if "comissao_provisionada" not in existing_columns:
         op.add_column(
             "comissoes_itens",
-            sa.Column("comissao_provisionada", sa.Boolean(), nullable=True, server_default=sa.false()),
+            sa.Column(
+                "comissao_provisionada",
+                sa.Boolean(),
+                nullable=True,
+                server_default=sa.false(),
+            ),
         )
 
     if "conta_pagar_id" not in existing_columns:
@@ -94,13 +101,19 @@ def downgrade() -> None:
     if "ix_comissoes_itens_conta_pagar_id" in existing_indexes:
         op.drop_index("ix_comissoes_itens_conta_pagar_id", table_name="comissoes_itens")
     if "ix_comissoes_itens_comissao_provisionada" in existing_indexes:
-        op.drop_index("ix_comissoes_itens_comissao_provisionada", table_name="comissoes_itens")
+        op.drop_index(
+            "ix_comissoes_itens_comissao_provisionada", table_name="comissoes_itens"
+        )
 
     existing_columns = _columns("comissoes_itens")
     existing_fks = _foreign_keys("comissoes_itens")
     if "conta_pagar_id" in existing_columns:
         if "fk_comissoes_itens_conta_pagar_id" in existing_fks:
-            op.drop_constraint("fk_comissoes_itens_conta_pagar_id", "comissoes_itens", type_="foreignkey")
+            op.drop_constraint(
+                "fk_comissoes_itens_conta_pagar_id",
+                "comissoes_itens",
+                type_="foreignkey",
+            )
         op.drop_column("comissoes_itens", "conta_pagar_id")
     if "data_provisao" in existing_columns:
         op.drop_column("comissoes_itens", "data_provisao")

@@ -10,7 +10,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.duplicatas_ignoradas_models import DuplicataIgnorada
-from app.grupo_comercial_models import GrupoComercialEstoqueCompartilhado, GrupoComercialMembro
+from app.grupo_comercial_models import (
+    GrupoComercialEstoqueCompartilhado,
+    GrupoComercialMembro,
+)
 from app.estoque_reserva_service import EstoqueReservaService
 from app.models import Tenant, User
 from app.pedido_integrado_item_models import PedidoIntegradoItem

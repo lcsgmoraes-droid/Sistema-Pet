@@ -33,7 +33,9 @@ def _table_exists(table_name: str) -> bool:
 def _index_exists(table_name: str, index_name: str) -> bool:
     if not _table_exists(table_name):
         return False
-    return any(index["name"] == index_name for index in _inspector().get_indexes(table_name))
+    return any(
+        index["name"] == index_name for index in _inspector().get_indexes(table_name)
+    )
 
 
 def _create_index_once(index_name: str, table_name: str, columns: list[str]) -> None:
@@ -55,13 +57,29 @@ def upgrade() -> None:
             sa.Column("version", sa.String(length=40), nullable=False),
             sa.Column("name", sa.String(length=160), nullable=False),
             sa.Column("description", sa.Text(), nullable=True),
-            sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-            sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
-            sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
-            sa.UniqueConstraint("bundle_code", "version", name="uq_template_bundles_code_version"),
+            sa.Column(
+                "active", sa.Boolean(), nullable=False, server_default=sa.text("true")
+            ),
+            sa.Column(
+                "created_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.text("CURRENT_TIMESTAMP"),
+            ),
+            sa.Column(
+                "updated_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.text("CURRENT_TIMESTAMP"),
+            ),
+            sa.UniqueConstraint(
+                "bundle_code", "version", name="uq_template_bundles_code_version"
+            ),
         )
     _create_index_once("ix_template_bundles_id", "template_bundles", ["id"])
-    _create_index_once("ix_template_bundles_bundle_code", "template_bundles", ["bundle_code"])
+    _create_index_once(
+        "ix_template_bundles_bundle_code", "template_bundles", ["bundle_code"]
+    )
     _create_index_once("ix_template_bundles_version", "template_bundles", ["version"])
 
     if not _table_exists("template_items"):
@@ -75,9 +93,21 @@ def upgrade() -> None:
             sa.Column("name", sa.String(length=180), nullable=False),
             sa.Column("payload", sa.JSON(), nullable=False),
             sa.Column("sort_order", sa.Integer(), nullable=False, server_default="0"),
-            sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-            sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
-            sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
+            sa.Column(
+                "active", sa.Boolean(), nullable=False, server_default=sa.text("true")
+            ),
+            sa.Column(
+                "created_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.text("CURRENT_TIMESTAMP"),
+            ),
+            sa.Column(
+                "updated_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.text("CURRENT_TIMESTAMP"),
+            ),
             sa.UniqueConstraint(
                 "bundle_code",
                 "bundle_version",
@@ -87,10 +117,16 @@ def upgrade() -> None:
             ),
         )
     _create_index_once("ix_template_items_id", "template_items", ["id"])
-    _create_index_once("ix_template_items_bundle_code", "template_items", ["bundle_code"])
-    _create_index_once("ix_template_items_bundle_version", "template_items", ["bundle_version"])
+    _create_index_once(
+        "ix_template_items_bundle_code", "template_items", ["bundle_code"]
+    )
+    _create_index_once(
+        "ix_template_items_bundle_version", "template_items", ["bundle_version"]
+    )
     _create_index_once("ix_template_items_item_type", "template_items", ["item_type"])
-    _create_index_once("ix_template_items_template_code", "template_items", ["template_code"])
+    _create_index_once(
+        "ix_template_items_template_code", "template_items", ["template_code"]
+    )
 
     if not _table_exists("tenant_template_installs"):
         op.create_table(
@@ -99,12 +135,31 @@ def upgrade() -> None:
             sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
             sa.Column("bundle_code", sa.String(length=80), nullable=False),
             sa.Column("bundle_version", sa.String(length=40), nullable=False),
-            sa.Column("status", sa.String(length=40), nullable=False, server_default="completed"),
-            sa.Column("dry_run", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+            sa.Column(
+                "status",
+                sa.String(length=40),
+                nullable=False,
+                server_default="completed",
+            ),
+            sa.Column(
+                "dry_run", sa.Boolean(), nullable=False, server_default=sa.text("false")
+            ),
             sa.Column("created_by_user_id", sa.Integer(), nullable=True),
-            sa.Column("summary", sa.JSON(), nullable=False, server_default=sa.text("'{}'")),
-            sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
-            sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
+            sa.Column(
+                "summary", sa.JSON(), nullable=False, server_default=sa.text("'{}'")
+            ),
+            sa.Column(
+                "created_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.text("CURRENT_TIMESTAMP"),
+            ),
+            sa.Column(
+                "updated_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.text("CURRENT_TIMESTAMP"),
+            ),
             sa.UniqueConstraint(
                 "tenant_id",
                 "bundle_code",
@@ -112,10 +167,24 @@ def upgrade() -> None:
                 name="uq_tenant_template_installs_tenant_bundle_version",
             ),
         )
-    _create_index_once("ix_tenant_template_installs_id", "tenant_template_installs", ["id"])
-    _create_index_once("ix_tenant_template_installs_tenant_id", "tenant_template_installs", ["tenant_id"])
-    _create_index_once("ix_tenant_template_installs_bundle_code", "tenant_template_installs", ["bundle_code"])
-    _create_index_once("ix_tenant_template_installs_bundle_version", "tenant_template_installs", ["bundle_version"])
+    _create_index_once(
+        "ix_tenant_template_installs_id", "tenant_template_installs", ["id"]
+    )
+    _create_index_once(
+        "ix_tenant_template_installs_tenant_id",
+        "tenant_template_installs",
+        ["tenant_id"],
+    )
+    _create_index_once(
+        "ix_tenant_template_installs_bundle_code",
+        "tenant_template_installs",
+        ["bundle_code"],
+    )
+    _create_index_once(
+        "ix_tenant_template_installs_bundle_version",
+        "tenant_template_installs",
+        ["bundle_version"],
+    )
 
 
 def downgrade() -> None:

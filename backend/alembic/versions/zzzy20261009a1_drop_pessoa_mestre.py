@@ -23,9 +23,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.drop_constraint(
-        "fk_clientes_pessoa_mestre", "clientes", type_="foreignkey"
-    )
+    op.drop_constraint("fk_clientes_pessoa_mestre", "clientes", type_="foreignkey")
     op.drop_column("clientes", "pessoa_mestre_id")
     op.drop_table("pessoa_mestre")
 
@@ -63,9 +61,7 @@ def downgrade() -> None:
         sa.Column("cidade", sa.String(length=100), nullable=True),
         sa.Column("estado", sa.String(length=2), nullable=True),
         sa.Column("codigo_municipio", sa.String(length=7), nullable=True),
-        sa.Column(
-            "ativo", sa.Boolean(), nullable=False, server_default=sa.true()
-        ),
+        sa.Column("ativo", sa.Boolean(), nullable=False, server_default=sa.true()),
         sa.Column("criado_por_usuario_id", sa.Integer(), nullable=False),
         sa.Column(
             "criado_em",
@@ -91,12 +87,8 @@ def downgrade() -> None:
         sa.Column(
             "is_funcionario", sa.Boolean(), nullable=False, server_default=sa.false()
         ),
-        sa.UniqueConstraint(
-            "grupo_id", "cpf", name="uq_pessoa_mestre_grupo_cpf"
-        ),
-        sa.UniqueConstraint(
-            "grupo_id", "cnpj", name="uq_pessoa_mestre_grupo_cnpj"
-        ),
+        sa.UniqueConstraint("grupo_id", "cpf", name="uq_pessoa_mestre_grupo_cpf"),
+        sa.UniqueConstraint("grupo_id", "cnpj", name="uq_pessoa_mestre_grupo_cnpj"),
     )
     op.create_index("ix_pessoa_mestre_grupo_id", "pessoa_mestre", ["grupo_id"])
     op.create_index("ix_pessoa_mestre_cpf", "pessoa_mestre", ["cpf"])

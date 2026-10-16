@@ -17,7 +17,10 @@ from .auth.dependencies import get_current_user_and_tenant
 from .models import Cliente, Pet, Tenant
 from .pet_clinical_utils import normalize_clinical_list, normalize_pet_clinical_payload
 from .services import pet_registros_clinicos_service as registros_service
-from .services.pet_historico_service import CAMPOS_RASTREADOS_PET, registrar_alteracoes_pet
+from .services.pet_historico_service import (
+    CAMPOS_RASTREADOS_PET,
+    registrar_alteracoes_pet,
+)
 from .security.permissions_decorator import require_permission
 from sqlalchemy.orm import object_session
 from app.partner_utils import get_all_accessible_tenant_ids
@@ -253,10 +256,14 @@ def listar_pets(
     empresas_grupo = listar_empresas_do_grupo(db, tenant_id)
 
     # Filtrar por tenant_id (multi-tenant)
-    query = db.query(Pet).join(Cliente).filter(
-        or_(
-            Cliente.tenant_id.in_(access_ids),
-            Pet.tenant_id.in_(empresas_grupo),
+    query = (
+        db.query(Pet)
+        .join(Cliente)
+        .filter(
+            or_(
+                Cliente.tenant_id.in_(access_ids),
+                Pet.tenant_id.in_(empresas_grupo),
+            )
         )
     )
     query = query.options(joinedload(Pet.cliente))
@@ -348,10 +355,20 @@ def criar_pet(
     db.add(novo_pet)
     db.flush()
     registros_service.registrar_se_mudou(
-        db, pet_id=novo_pet.id, tenant_id=tenant_id, user_id=current_user.id, tipo="peso", novo=peso_inicial
+        db,
+        pet_id=novo_pet.id,
+        tenant_id=tenant_id,
+        user_id=current_user.id,
+        tipo="peso",
+        novo=peso_inicial,
     )
     registros_service.registrar_se_mudou(
-        db, pet_id=novo_pet.id, tenant_id=tenant_id, user_id=current_user.id, tipo="historico", novo=historico_inicial
+        db,
+        pet_id=novo_pet.id,
+        tenant_id=tenant_id,
+        user_id=current_user.id,
+        tipo="historico",
+        novo=historico_inicial,
     )
     db.commit()
     db.refresh(novo_pet)
@@ -417,7 +434,9 @@ def atualizar_pet(
 
     # Se mudou o cliente, validar
     if pet_data.cliente_id and pet_data.cliente_id != pet.cliente_id:
-        novo_cliente = registros_service.cliente_visivel(db, pet_data.cliente_id, tenant_id)
+        novo_cliente = registros_service.cliente_visivel(
+            db, pet_data.cliente_id, tenant_id
+        )
 
         if not novo_cliente:
             raise HTTPException(
@@ -482,11 +501,21 @@ def atualizar_pet(
 
     if registrar_peso:
         registros_service.registrar_se_mudou(
-            db, pet_id=pet.id, tenant_id=tenant_id, user_id=current_user.id, tipo="peso", novo=peso_informado
+            db,
+            pet_id=pet.id,
+            tenant_id=tenant_id,
+            user_id=current_user.id,
+            tipo="peso",
+            novo=peso_informado,
         )
     if registrar_historico:
         registros_service.registrar_se_mudou(
-            db, pet_id=pet.id, tenant_id=tenant_id, user_id=current_user.id, tipo="historico", novo=historico_informado
+            db,
+            pet_id=pet.id,
+            tenant_id=tenant_id,
+            user_id=current_user.id,
+            tipo="historico",
+            novo=historico_informado,
         )
 
     db.commit()
@@ -614,10 +643,14 @@ class RegistroClinicoUpdate(BaseModel):
 
 def _serializar_registros(db: Session, registros, tenant_id):
     ids_lojas = {str(r.tenant_id) for r in registros}
-    nomes = {
-        str(t.id): t.name
-        for t in db.query(Tenant).filter(Tenant.id.in_(ids_lojas)).all()
-    } if ids_lojas else {}
+    nomes = (
+        {
+            str(t.id): t.name
+            for t in db.query(Tenant).filter(Tenant.id.in_(ids_lojas)).all()
+        }
+        if ids_lojas
+        else {}
+    )
     return [
         {
             "id": r.id,
@@ -699,7 +732,9 @@ def atualizar_registro_clinico(
     return _serializar_registros(db, [registro], tenant_id)[0]
 
 
-@router.delete("/{pet_id}/registros-clinicos/{registro_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{pet_id}/registros-clinicos/{registro_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 @require_permission("clientes.editar")
 def excluir_registro_clinico(
     pet_id: int,
@@ -709,7 +744,9 @@ def excluir_registro_clinico(
 ):
     _current_user, tenant_id = user_and_tenant
     try:
-        registros_service.excluir_registro(db, registro_id=registro_id, pet_id=pet_id, tenant_id=tenant_id)
+        registros_service.excluir_registro(
+            db, registro_id=registro_id, pet_id=pet_id, tenant_id=tenant_id
+        )
         db.commit()
     except HTTPException:
         db.rollback()

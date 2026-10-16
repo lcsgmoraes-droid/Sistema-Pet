@@ -188,7 +188,9 @@ def _tenant_read_filter(cls, tenant_id):
                 == (cls.id if table_name == "produtos" else cls.produto_id),
                 empresa_id_sql(GrupoComercialEstoqueCompartilhado.empresa_origem_id)
                 == empresa_id_sql(cls.tenant_id),
-                empresa_id_sql(GrupoComercialEstoqueCompartilhado.empresa_consumidora_id)
+                empresa_id_sql(
+                    GrupoComercialEstoqueCompartilhado.empresa_consumidora_id
+                )
                 == func.replace(cast(tenant_id, String), "-", ""),
                 GrupoComercialEstoqueCompartilhado.status == "ativo",
                 GrupoComercial.status == "ativo",

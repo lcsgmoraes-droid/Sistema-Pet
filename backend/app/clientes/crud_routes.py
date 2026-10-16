@@ -36,7 +36,15 @@ from app.clientes.schemas import (
     ClienteUpdate,
 )
 from app.db import get_session
-from app.models import AppAccessProfile, Cliente, ClienteContato, Role, Tenant, User, UserTenant
+from app.models import (
+    AppAccessProfile,
+    Cliente,
+    ClienteContato,
+    Role,
+    Tenant,
+    User,
+    UserTenant,
+)
 from app.segmentacao_models import ClienteSegmento
 from app.vendas_models import Venda
 from app.partner_utils import get_all_accessible_tenant_ids
@@ -403,7 +411,10 @@ def listar_historico_cliente(
         db.query(ClienteHistoricoAlteracao, User.nome, User.email)
         .outerjoin(User, User.id == ClienteHistoricoAlteracao.user_id)
         .filter(ClienteHistoricoAlteracao.cliente_id == cliente_id)
-        .order_by(ClienteHistoricoAlteracao.alterado_em.desc(), ClienteHistoricoAlteracao.id.desc())
+        .order_by(
+            ClienteHistoricoAlteracao.alterado_em.desc(),
+            ClienteHistoricoAlteracao.id.desc(),
+        )
         .limit(limite)
         .all()
     )
@@ -413,7 +424,9 @@ def listar_historico_cliente(
                 "campo": registro.campo,
                 "valor_anterior": registro.valor_anterior,
                 "valor_novo": registro.valor_novo,
-                "alterado_em": registro.alterado_em.isoformat() if registro.alterado_em else None,
+                "alterado_em": registro.alterado_em.isoformat()
+                if registro.alterado_em
+                else None,
                 "usuario": nome or email,
                 "tenant_id": str(registro.tenant_id),
             }
@@ -840,7 +853,9 @@ def _validar_campo_unico(
     if existente:
         if str(existente.tenant_id) != str(tenant_id):
             loja_existente = (
-                db.query(Tenant.name).filter(Tenant.id == str(existente.tenant_id)).scalar()
+                db.query(Tenant.name)
+                .filter(Tenant.id == str(existente.tenant_id))
+                .scalar()
             )
             detail = f"{detail} (já cadastrado na loja {loja_existente or existente.tenant_id} do grupo)"
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
@@ -1196,7 +1211,9 @@ def _montar_resposta_update(cliente: Cliente) -> dict:
         "is_fornecedor": cliente.is_fornecedor,
         "is_veterinario": cliente.is_veterinario,
         "is_funcionario": cliente.is_funcionario,
-        "origem_tenant_id": str(cliente.origem_tenant_id) if cliente.origem_tenant_id else None,
+        "origem_tenant_id": str(cliente.origem_tenant_id)
+        if cliente.origem_tenant_id
+        else None,
         "tipo_pessoa": cliente.tipo_pessoa,
         "cpf": cliente.cpf,
         "cnpj": cliente.cnpj,

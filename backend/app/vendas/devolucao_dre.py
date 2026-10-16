@@ -4,7 +4,9 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from sqlalchemy.orm import Session
 
-from app.grupo_comercial_estoque_compartilhado_service import resolver_tenant_estoque_item
+from app.grupo_comercial_estoque_compartilhado_service import (
+    resolver_tenant_estoque_item,
+)
 
 
 CENTAVO = Decimal("0.01")

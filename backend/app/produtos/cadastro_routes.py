@@ -135,7 +135,9 @@ def pre_cadastro_produto_grupo(
         if not produto:
             raise HTTPException(status_code=404, detail="Produto não encontrado")
 
-        campos_resposta = set(ProdutoPreCadastroGrupoResponse.model_fields) & INHERENT_FIELDS
+        campos_resposta = (
+            set(ProdutoPreCadastroGrupoResponse.model_fields) & INHERENT_FIELDS
+        )
         dados = {campo: getattr(produto, campo) for campo in campos_resposta}
 
     return ProdutoPreCadastroGrupoResponse(
@@ -344,8 +346,10 @@ def obter_produto(
     current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
         user_and_tenant
     )
-    acesso_catalogo = GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
-        db, tenant_solicitante_id, produto_id
+    acesso_catalogo = (
+        GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
+            db, tenant_solicitante_id, produto_id
+        )
     )
     tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
     set_current_tenant(tenant_id)
@@ -469,8 +473,10 @@ def preview_precos_venda_produtos_compostos(
     """Mostra os precos de venda sugeridos sem alterar nenhum produto."""
 
     _, tenant_solicitante_id = _validar_tenant_e_obter_usuario(user_and_tenant)
-    acesso_catalogo = GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
-        db, tenant_solicitante_id, produto_id
+    acesso_catalogo = (
+        GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
+            db, tenant_solicitante_id, produto_id
+        )
     )
     tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
     set_current_tenant(tenant_id)
@@ -514,8 +520,10 @@ def atualizar_produto(
     current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
         user_and_tenant
     )
-    acesso_catalogo = GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
-        db, tenant_solicitante_id, produto_id
+    acesso_catalogo = (
+        GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
+            db, tenant_solicitante_id, produto_id
+        )
     )
     tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
     set_current_tenant(tenant_id)
@@ -809,9 +817,7 @@ def atualizar_produto(
             processar_alteracoes_inerentes,
         )
 
-        processar_alteracoes_inerentes(
-            produto, dados_recebidos, db, current_user.id
-        )
+        processar_alteracoes_inerentes(produto, dados_recebidos, db, current_user.id)
 
         db.commit()
         db.refresh(produto)

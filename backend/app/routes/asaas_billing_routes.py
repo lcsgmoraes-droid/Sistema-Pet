@@ -131,7 +131,9 @@ def get_billing_status(
     if custom_offer:
         result["contract_acceptance"] = acceptance_to_public(
             latest_current_acceptance(
-                db, tenant_id=tenant_id, plan_code=offer_combined_plan_code(custom_offer)
+                db,
+                tenant_id=tenant_id,
+                plan_code=offer_combined_plan_code(custom_offer),
             )
         )
     return result

@@ -98,7 +98,9 @@ def upgrade() -> None:
             server_default="1",
             nullable=False,
         ),
-        sa.Column("ativo", sa.Boolean(), server_default=sa.text("true"), nullable=False),
+        sa.Column(
+            "ativo", sa.Boolean(), server_default=sa.text("true"), nullable=False
+        ),
         sa.Column("id", sa.Integer(), sa.Identity(always=True), nullable=False),
         sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column(

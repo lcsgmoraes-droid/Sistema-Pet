@@ -28,7 +28,9 @@ def upgrade() -> None:
         sa.Column("origem_tenant_id", postgresql.UUID(as_uuid=True), nullable=True),
     )
     op.create_index("ix_clientes_origem_tenant_id", "clientes", ["origem_tenant_id"])
-    op.execute("UPDATE clientes SET origem_tenant_id = tenant_id WHERE origem_tenant_id IS NULL")
+    op.execute(
+        "UPDATE clientes SET origem_tenant_id = tenant_id WHERE origem_tenant_id IS NULL"
+    )
 
     op.create_table(
         "clientes_historico_alteracoes",
@@ -40,7 +42,12 @@ def upgrade() -> None:
             sa.ForeignKey("clientes.id", ondelete="CASCADE"),
             nullable=False,
         ),
-        sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "user_id",
+            sa.Integer(),
+            sa.ForeignKey("users.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
         sa.Column("campo", sa.String(length=100), nullable=False),
         sa.Column("valor_anterior", sa.Text(), nullable=True),
         sa.Column("valor_novo", sa.Text(), nullable=True),
@@ -64,8 +71,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_clientes_historico_alteracoes_cliente_id", table_name="clientes_historico_alteracoes")
-    op.drop_index("ix_clientes_historico_alteracoes_tenant_id", table_name="clientes_historico_alteracoes")
+    op.drop_index(
+        "ix_clientes_historico_alteracoes_cliente_id",
+        table_name="clientes_historico_alteracoes",
+    )
+    op.drop_index(
+        "ix_clientes_historico_alteracoes_tenant_id",
+        table_name="clientes_historico_alteracoes",
+    )
     op.drop_table("clientes_historico_alteracoes")
     op.drop_index("ix_clientes_origem_tenant_id", table_name="clientes")
     op.drop_column("clientes", "origem_tenant_id")

@@ -112,11 +112,15 @@ class ProdutoIdentidadeHistoricoAlteracao(TenantScoped, Base):
         nullable=False,
         index=True,
     )
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     campo = Column(String(100), nullable=False)
     valor_anterior = Column(Text, nullable=True)
     valor_novo = Column(Text, nullable=True)
-    alterado_em = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    alterado_em = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
 
 class ProdutoIdentidadeConflito(Base):
@@ -135,9 +139,13 @@ class ProdutoIdentidadeConflito(Base):
     chave_matching = Column(String(20), nullable=False)
     # Lista de {"tenant_id": "...", "produto_id": N} envolvidos no conflito.
     produto_ids = Column(JSON, nullable=False)
-    detectado_em = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    detectado_em = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
     resolvido = Column(Boolean, nullable=False, default=False, server_default="false")
-    resolvido_por_usuario_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    resolvido_por_usuario_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     resolvido_em = Column(DateTime(timezone=True), nullable=True)
 
 
@@ -155,11 +163,17 @@ class ProdutoIdentidadeBackfillRun(Base):
         nullable=False,
         index=True,
     )
-    executado_em = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    executado_em = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
     dry_run = Column(Boolean, nullable=False, default=True, server_default="true")
-    total_produtos_ativos = Column(Integer, nullable=False, default=0, server_default="0")
+    total_produtos_ativos = Column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
     total_com_gtin = Column(Integer, nullable=False, default=0, server_default="0")
-    total_identidades_criadas = Column(Integer, nullable=False, default=0, server_default="0")
+    total_identidades_criadas = Column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
     total_vinculados = Column(Integer, nullable=False, default=0, server_default="0")
     total_sem_gtin = Column(Integer, nullable=False, default=0, server_default="0")
     total_conflitos = Column(Integer, nullable=False, default=0, server_default="0")

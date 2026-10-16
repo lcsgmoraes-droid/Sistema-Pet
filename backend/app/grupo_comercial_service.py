@@ -120,9 +120,7 @@ class GrupoComercialService:
             commit=False,
         )
 
-    def _titular_tem_cadastro_no_grupo(
-        self, *, grupo_id: int, usuario_id: int
-    ) -> bool:
+    def _titular_tem_cadastro_no_grupo(self, *, grupo_id: int, usuario_id: int) -> bool:
         """Pessoa e compartilhada pelo grupo inteiro (ver
         app.tenancy.filters.pessoa_visivel_no_grupo): se o titular ja tem um
         Cliente ativo em qualquer loja membro deste grupo, esse cadastro ja

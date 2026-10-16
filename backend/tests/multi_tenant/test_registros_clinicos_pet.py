@@ -44,17 +44,23 @@ def sessao():
 
 def _loja(session, nome):
     tenant_id = str(uuid4())
-    session.add(Tenant(id=tenant_id, name=nome, name_normalized=nome.lower(), status="active"))
+    session.add(
+        Tenant(id=tenant_id, name=nome, name_normalized=nome.lower(), status="active")
+    )
     session.flush()
     return tenant_id
 
 
 def _grupo(session, lojas):
-    grupo = GrupoComercial(nome="Grupo teste", criado_por_empresa_id=lojas[0], criado_por_usuario_id=1)
+    grupo = GrupoComercial(
+        nome="Grupo teste", criado_por_empresa_id=lojas[0], criado_por_usuario_id=1
+    )
     session.add(grupo)
     session.flush()
     for loja in lojas:
-        session.add(GrupoComercialMembro(grupo_id=grupo.id, empresa_id=loja, status="ativo"))
+        session.add(
+            GrupoComercialMembro(grupo_id=grupo.id, empresa_id=loja, status="ativo")
+        )
         session.flush()
 
 
@@ -64,7 +70,13 @@ def _usuario(session):
 
 def _pet(session, loja):
     set_current_tenant(loja)
-    tutor = Cliente(tenant_id=loja, origem_tenant_id=loja, user_id=_usuario(session), nome="Tutor", is_cliente=True)
+    tutor = Cliente(
+        tenant_id=loja,
+        origem_tenant_id=loja,
+        user_id=_usuario(session),
+        nome="Tutor",
+        is_cliente=True,
+    )
     session.add(tutor)
     session.flush()
     pet = Pet(
@@ -90,7 +102,14 @@ def test_registro_da_loja_a_aparece_para_loja_b_do_grupo(sessao):
     set_current_tenant(loja_a)
     pet_id = _pet(sessao, loja_a)
     set_current_tenant(loja_a)
-    servico.criar_registro(sessao, pet_id=pet_id, tenant_id=loja_a, user_id=None, tipo="historico", texto="Vacina V10")
+    servico.criar_registro(
+        sessao,
+        pet_id=pet_id,
+        tenant_id=loja_a,
+        user_id=None,
+        tipo="historico",
+        texto="Vacina V10",
+    )
     sessao.commit()
 
     set_current_tenant(loja_b)
@@ -118,11 +137,15 @@ def test_so_a_loja_que_registrou_pode_apagar(sessao):
     set_current_tenant(loja_a)
     pet_id = _pet(sessao, loja_a)
     set_current_tenant(loja_a)
-    registro = servico.criar_registro(sessao, pet_id=pet_id, tenant_id=loja_a, user_id=None, tipo="peso", valor=5.2)
+    registro = servico.criar_registro(
+        sessao, pet_id=pet_id, tenant_id=loja_a, user_id=None, tipo="peso", valor=5.2
+    )
     sessao.commit()
 
     with pytest.raises(HTTPException) as excinfo:
-        servico.excluir_registro(sessao, registro_id=registro.id, pet_id=pet_id, tenant_id=loja_b)
+        servico.excluir_registro(
+            sessao, registro_id=registro.id, pet_id=pet_id, tenant_id=loja_b
+        )
     assert excinfo.value.status_code == 403
     set_current_tenant(loja_a)
     assert sessao.query(PetRegistroClinico).filter_by(id=registro.id).count() == 1
@@ -134,13 +157,22 @@ def test_valor_igual_ao_anterior_nao_gera_registro_novo(sessao):
     set_current_tenant(loja_a)
     pet_id = _pet(sessao, loja_a)
     set_current_tenant(loja_a)
-    primeiro = servico.registrar_se_mudou(sessao, pet_id=pet_id, tenant_id=loja_a, user_id=None, tipo="peso", novo=4.0)
-    repetido = servico.registrar_se_mudou(sessao, pet_id=pet_id, tenant_id=loja_a, user_id=None, tipo="peso", novo=4.0)
-    mudou = servico.registrar_se_mudou(sessao, pet_id=pet_id, tenant_id=loja_a, user_id=None, tipo="peso", novo=4.3)
+    primeiro = servico.registrar_se_mudou(
+        sessao, pet_id=pet_id, tenant_id=loja_a, user_id=None, tipo="peso", novo=4.0
+    )
+    repetido = servico.registrar_se_mudou(
+        sessao, pet_id=pet_id, tenant_id=loja_a, user_id=None, tipo="peso", novo=4.0
+    )
+    mudou = servico.registrar_se_mudou(
+        sessao, pet_id=pet_id, tenant_id=loja_a, user_id=None, tipo="peso", novo=4.3
+    )
     sessao.commit()
 
     assert primeiro is not None
     assert repetido is None
     assert mudou is not None
     set_current_tenant(loja_a)
-    assert sessao.query(PetRegistroClinico).filter_by(pet_id=pet_id, tipo="peso").count() == 2
+    assert (
+        sessao.query(PetRegistroClinico).filter_by(pet_id=pet_id, tipo="peso").count()
+        == 2
+    )

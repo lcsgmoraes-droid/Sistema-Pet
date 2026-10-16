@@ -44,7 +44,9 @@ def sessao():
 
 def _loja(session, nome):
     tenant_id = str(uuid4())
-    session.add(Tenant(id=tenant_id, name=nome, name_normalized=nome.lower(), status="active"))
+    session.add(
+        Tenant(id=tenant_id, name=nome, name_normalized=nome.lower(), status="active")
+    )
     session.flush()
     return tenant_id
 
@@ -58,7 +60,9 @@ def _grupo_com_lojas(session, lojas):
     session.add(grupo)
     session.flush()
     for loja in lojas:
-        session.add(GrupoComercialMembro(grupo_id=grupo.id, empresa_id=loja, status="ativo"))
+        session.add(
+            GrupoComercialMembro(grupo_id=grupo.id, empresa_id=loja, status="ativo")
+        )
         session.flush()
     return grupo
 
@@ -91,11 +95,15 @@ def test_pessoa_de_uma_loja_aparece_para_as_demais_do_grupo(sessao):
     sessao.commit()
 
     set_current_tenant(loja_b)
-    visiveis = {c.id for c in sessao.query(Cliente).filter(Cliente.id == pessoa.id).all()}
+    visiveis = {
+        c.id for c in sessao.query(Cliente).filter(Cliente.id == pessoa.id).all()
+    }
     assert pessoa.id in visiveis
 
     set_current_tenant(loja_fora)
-    visiveis_fora = {c.id for c in sessao.query(Cliente).filter(Cliente.id == pessoa.id).all()}
+    visiveis_fora = {
+        c.id for c in sessao.query(Cliente).filter(Cliente.id == pessoa.id).all()
+    }
     assert pessoa.id not in visiveis_fora
 
 
@@ -112,7 +120,9 @@ def test_loja_do_grupo_pode_editar_pessoa_de_outra_loja(sessao):
     sessao.commit()
 
     sessao.expire_all()
-    assert sessao.query(Cliente).filter(Cliente.id == pessoa.id).one().nome == "Nome novo"
+    assert (
+        sessao.query(Cliente).filter(Cliente.id == pessoa.id).one().nome == "Nome novo"
+    )
 
 
 def test_grupo_inativo_nao_compartilha(sessao):
@@ -124,7 +134,9 @@ def test_grupo_inativo_nao_compartilha(sessao):
     sessao.commit()
 
     set_current_tenant(loja_b)
-    visiveis = {c.id for c in sessao.query(Cliente).filter(Cliente.id == pessoa.id).all()}
+    visiveis = {
+        c.id for c in sessao.query(Cliente).filter(Cliente.id == pessoa.id).all()
+    }
     assert pessoa.id not in visiveis
 
 
@@ -242,7 +254,9 @@ def test_pet_de_uma_loja_aparece_para_as_demais_do_grupo(sessao):
     set_current_tenant(loja_b)
     assert pet.id in {p.id for p in sessao.query(Pet).filter(Pet.id == pet.id).all()}
     set_current_tenant(loja_fora)
-    assert pet.id not in {p.id for p in sessao.query(Pet).filter(Pet.id == pet.id).all()}
+    assert pet.id not in {
+        p.id for p in sessao.query(Pet).filter(Pet.id == pet.id).all()
+    }
 
 
 def test_listagem_de_pets_inclui_cadastros_do_grupo(sessao):
@@ -341,7 +355,10 @@ def test_loja_do_grupo_pode_editar_pet_de_outra_loja_e_grava_historico(sessao):
     assert sessao.query(Pet).filter(Pet.id == pet.id).one().porte == "grande"
     historico = (
         sessao.query(PetHistoricoAlteracao)
-        .filter(PetHistoricoAlteracao.pet_id == pet.id, PetHistoricoAlteracao.campo == "porte")
+        .filter(
+            PetHistoricoAlteracao.pet_id == pet.id,
+            PetHistoricoAlteracao.campo == "porte",
+        )
         .one()
     )
     clear_current_tenant()

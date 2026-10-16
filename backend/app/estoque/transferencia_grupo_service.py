@@ -114,7 +114,9 @@ def _validar_vinculo(
         db.query(GrupoComercialMembro)
         .filter(
             GrupoComercialMembro.grupo_id == grupo.id,
-            GrupoComercialMembro.empresa_id.in_([empresa_origem_id, empresa_destino_id]),
+            GrupoComercialMembro.empresa_id.in_(
+                [empresa_origem_id, empresa_destino_id]
+            ),
             GrupoComercialMembro.status == "ativo",
         )
         .all()

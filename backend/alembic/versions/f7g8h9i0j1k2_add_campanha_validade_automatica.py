@@ -22,12 +22,27 @@ def upgrade():
         "campanha_validade_automatica",
         sa.Column("id", sa.Integer(), sa.Identity(always=True), primary_key=True),
         sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("ativo", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("aplicar_app", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-        sa.Column("aplicar_ecommerce", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-        sa.Column("desconto_60_dias", sa.Float(), nullable=False, server_default=sa.text("10")),
-        sa.Column("desconto_30_dias", sa.Float(), nullable=False, server_default=sa.text("20")),
-        sa.Column("desconto_7_dias", sa.Float(), nullable=False, server_default=sa.text("35")),
+        sa.Column(
+            "ativo", sa.Boolean(), nullable=False, server_default=sa.text("false")
+        ),
+        sa.Column(
+            "aplicar_app", sa.Boolean(), nullable=False, server_default=sa.text("true")
+        ),
+        sa.Column(
+            "aplicar_ecommerce",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("true"),
+        ),
+        sa.Column(
+            "desconto_60_dias", sa.Float(), nullable=False, server_default=sa.text("10")
+        ),
+        sa.Column(
+            "desconto_30_dias", sa.Float(), nullable=False, server_default=sa.text("20")
+        ),
+        sa.Column(
+            "desconto_7_dias", sa.Float(), nullable=False, server_default=sa.text("35")
+        ),
         sa.Column("rotulo_publico", sa.String(length=80), nullable=True),
         sa.Column("mensagem_publica", sa.Text(), nullable=True),
         sa.Column(
@@ -61,7 +76,9 @@ def upgrade():
         sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("produto_id", sa.Integer(), nullable=False),
         sa.Column("lote_id", sa.Integer(), nullable=True),
-        sa.Column("ativo", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        sa.Column(
+            "ativo", sa.Boolean(), nullable=False, server_default=sa.text("true")
+        ),
         sa.Column("motivo", sa.String(length=120), nullable=True),
         sa.Column("observacao", sa.Text(), nullable=True),
         sa.Column(
@@ -100,9 +117,18 @@ def upgrade():
 
 
 def downgrade():
-    op.drop_index("ix_campanha_validade_exclusoes_lote_id", table_name="campanha_validade_exclusoes")
-    op.drop_index("ix_campanha_validade_exclusoes_produto_id", table_name="campanha_validade_exclusoes")
-    op.drop_index("ix_campanha_validade_exclusoes_tenant_id", table_name="campanha_validade_exclusoes")
+    op.drop_index(
+        "ix_campanha_validade_exclusoes_lote_id",
+        table_name="campanha_validade_exclusoes",
+    )
+    op.drop_index(
+        "ix_campanha_validade_exclusoes_produto_id",
+        table_name="campanha_validade_exclusoes",
+    )
+    op.drop_index(
+        "ix_campanha_validade_exclusoes_tenant_id",
+        table_name="campanha_validade_exclusoes",
+    )
     op.drop_table("campanha_validade_exclusoes")
 
     op.drop_constraint(
@@ -110,5 +136,8 @@ def downgrade():
         "campanha_validade_automatica",
         type_="unique",
     )
-    op.drop_index("ix_campanha_validade_automatica_tenant_id", table_name="campanha_validade_automatica")
+    op.drop_index(
+        "ix_campanha_validade_automatica_tenant_id",
+        table_name="campanha_validade_automatica",
+    )
     op.drop_table("campanha_validade_automatica")

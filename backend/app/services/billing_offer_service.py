@@ -247,7 +247,9 @@ def _offer_planos_catalogo(offer: BillingOffer) -> list[PlanDefinition]:
 
 
 def _included_modules(offer: BillingOffer) -> list[str]:
-    modulos = {modulo for plano in _offer_planos_catalogo(offer) for modulo in plano.modules}
+    modulos = {
+        modulo for plano in _offer_planos_catalogo(offer) for modulo in plano.modules
+    }
     return sorted(modulos | set(_extra_modules(offer)))
 
 
@@ -356,7 +358,9 @@ def _validate_segment_plans(
         "grooming": plan_grooming_code,
     }
     if not any(informados.values()):
-        raise BillingOfferError("Selecione pelo menos um plano (Pet, Vet ou Banho & Tosa)")
+        raise BillingOfferError(
+            "Selecione pelo menos um plano (Pet, Vet ou Banho & Tosa)"
+        )
 
     planos: dict[str, PlanDefinition | None] = {}
     for segmento, codigo in informados.items():
@@ -445,10 +449,16 @@ def create_billing_offer(
         token_sha256=_token_hash(token),
         created_by_platform_admin_id=created_by.id,
         title=normalized_title,
-        plan_pet_code=planos_por_segmento["pet"].code if planos_por_segmento["pet"] else None,
-        plan_vet_code=planos_por_segmento["vet"].code if planos_por_segmento["vet"] else None,
+        plan_pet_code=planos_por_segmento["pet"].code
+        if planos_por_segmento["pet"]
+        else None,
+        plan_vet_code=planos_por_segmento["vet"].code
+        if planos_por_segmento["vet"]
+        else None,
         plan_grooming_code=(
-            planos_por_segmento["grooming"].code if planos_por_segmento["grooming"] else None
+            planos_por_segmento["grooming"].code
+            if planos_por_segmento["grooming"]
+            else None
         ),
         price_cents=int(price_cents),
         billing_type=normalized_type,

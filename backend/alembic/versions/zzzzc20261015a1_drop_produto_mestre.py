@@ -157,9 +157,7 @@ def downgrade() -> None:
         ondelete="SET NULL",
     )
 
-    op.add_column(
-        "marcas", sa.Column("marca_mestre_id", sa.Integer(), nullable=True)
-    )
+    op.add_column("marcas", sa.Column("marca_mestre_id", sa.Integer(), nullable=True))
     op.create_foreign_key(
         "fk_marcas_marca_mestre",
         "marcas",

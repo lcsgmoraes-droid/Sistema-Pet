@@ -306,7 +306,9 @@ def _vincular_ou_criar_pessoa_para_usuario(
             .first()
         )
         if not pessoa:
-            raise UserAccountError("Pessoa selecionada não encontrada.", status_code=404)
+            raise UserAccountError(
+                "Pessoa selecionada não encontrada.", status_code=404
+            )
         if pessoa.auth_user_id is not None and pessoa.auth_user_id != user.id:
             raise UserAccountError(
                 "Esta pessoa já está vinculada a outro usuário.", status_code=409
@@ -315,7 +317,12 @@ def _vincular_ou_criar_pessoa_para_usuario(
         return pessoa
 
     nome_pessoa = (
-        nome or user.nome or user.email or user.username or user.login_phone or f"Usuario {user.id}"
+        nome
+        or user.nome
+        or user.email
+        or user.username
+        or user.login_phone
+        or f"Usuario {user.id}"
     )
     pessoa = Cliente(
         tenant_id=tenant_id,
@@ -1234,7 +1241,9 @@ def vincular_usuario_outra_loja(
     db.commit()
 
 
-def _usuario_visivel_neste_tenant(db: Session, *, user_id: int, tenant_id) -> User | None:
+def _usuario_visivel_neste_tenant(
+    db: Session, *, user_id: int, tenant_id
+) -> User | None:
     """Mesmo criterio da listagem (`GET /usuarios`): o usuario aparece aqui
     se tiver um UserTenant pra este tenant, mesmo que a loja "de origem"
     dele (`User.tenant_id`) seja outra — acontece justamente com usuario

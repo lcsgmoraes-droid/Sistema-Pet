@@ -32,9 +32,7 @@ def upgrade() -> None:
             sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
             sa.Column("grupo_id", sa.Integer(), nullable=False),
             sa.Column("nome", sa.String(length=100), nullable=False),
-            sa.Column(
-                "ativo", sa.Boolean(), server_default=sa.true(), nullable=False
-            ),
+            sa.Column("ativo", sa.Boolean(), server_default=sa.true(), nullable=False),
             sa.Column("criado_por_usuario_id", sa.Integer(), nullable=False),
             sa.Column(
                 "criado_em",
@@ -56,9 +54,7 @@ def upgrade() -> None:
                 "grupo_id", "nome", name="uq_especie_mestre_grupo_nome"
             ),
         )
-        op.create_index(
-            "ix_especie_mestre_grupo_id", "especie_mestre", ["grupo_id"]
-        )
+        op.create_index("ix_especie_mestre_grupo_id", "especie_mestre", ["grupo_id"])
 
     if "raca_mestre" not in tabelas:
         op.create_table(
@@ -67,9 +63,7 @@ def upgrade() -> None:
             sa.Column("grupo_id", sa.Integer(), nullable=False),
             sa.Column("especie_mestre_id", sa.Integer(), nullable=False),
             sa.Column("nome", sa.String(length=100), nullable=False),
-            sa.Column(
-                "ativo", sa.Boolean(), server_default=sa.true(), nullable=False
-            ),
+            sa.Column("ativo", sa.Boolean(), server_default=sa.true(), nullable=False),
             sa.Column("criado_por_usuario_id", sa.Integer(), nullable=False),
             sa.Column(
                 "criado_em",

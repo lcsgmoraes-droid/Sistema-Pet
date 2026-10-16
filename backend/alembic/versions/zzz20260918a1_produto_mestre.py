@@ -44,9 +44,7 @@ def _criar_taxonomia_mestre(inspector, nome_tabela: str) -> None:
             ["grupo_id"], ["grupos_comerciais.id"], ondelete="CASCADE"
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint(
-            "grupo_id", "nome", name=f"uq_{nome_tabela}_grupo_nome"
-        ),
+        sa.UniqueConstraint("grupo_id", "nome", name=f"uq_{nome_tabela}_grupo_nome"),
     )
     op.create_index(f"ix_{nome_tabela}_grupo_id", nome_tabela, ["grupo_id"])
 
@@ -127,25 +125,36 @@ def upgrade() -> None:
                 ondelete="SET NULL",
             ),
             sa.PrimaryKeyConstraint("id"),
-            sa.UniqueConstraint("grupo_id", "nome", name="uq_produto_mestre_grupo_nome"),
+            sa.UniqueConstraint(
+                "grupo_id", "nome", name="uq_produto_mestre_grupo_nome"
+            ),
         )
         op.create_index("ix_produto_mestre_grupo_id", "produto_mestre", ["grupo_id"])
         op.create_index("ix_produto_mestre_gtin_ean", "produto_mestre", ["gtin_ean"])
 
     inspector = sa.inspect(bind)
     _adicionar_fk_mestre(
-        inspector, "categorias", "categoria_mestre_id", "categoria_mestre",
+        inspector,
+        "categorias",
+        "categoria_mestre_id",
+        "categoria_mestre",
         "fk_categorias_categoria_mestre",
     )
     _adicionar_fk_mestre(
         inspector, "marcas", "marca_mestre_id", "marca_mestre", "fk_marcas_marca_mestre"
     )
     _adicionar_fk_mestre(
-        inspector, "departamentos", "departamento_mestre_id", "departamento_mestre",
+        inspector,
+        "departamentos",
+        "departamento_mestre_id",
+        "departamento_mestre",
         "fk_departamentos_departamento_mestre",
     )
     _adicionar_fk_mestre(
-        inspector, "produtos", "produto_mestre_id", "produto_mestre",
+        inspector,
+        "produtos",
+        "produto_mestre_id",
+        "produto_mestre",
         "fk_produtos_produto_mestre",
     )
 
@@ -157,7 +166,11 @@ def downgrade() -> None:
 
     for tabela_local, coluna, nome_fk in (
         ("produtos", "produto_mestre_id", "fk_produtos_produto_mestre"),
-        ("departamentos", "departamento_mestre_id", "fk_departamentos_departamento_mestre"),
+        (
+            "departamentos",
+            "departamento_mestre_id",
+            "fk_departamentos_departamento_mestre",
+        ),
         ("marcas", "marca_mestre_id", "fk_marcas_marca_mestre"),
         ("categorias", "categoria_mestre_id", "fk_categorias_categoria_mestre"),
     ):
@@ -168,6 +181,11 @@ def downgrade() -> None:
                     batch_op.drop_constraint(nome_fk, type_="foreignkey")
                     batch_op.drop_column(coluna)
 
-    for tabela in ("produto_mestre", "departamento_mestre", "marca_mestre", "categoria_mestre"):
+    for tabela in (
+        "produto_mestre",
+        "departamento_mestre",
+        "marca_mestre",
+        "categoria_mestre",
+    ):
         if tabela in sa.inspect(bind).get_table_names():
             op.drop_table(tabela)

@@ -51,13 +51,17 @@ def _criar_tenant(db, tenant_id: str, nome: str):
     db.add(Tenant(id=tenant_id, name=nome, name_normalized=nome.lower()))
 
 
-def _criar_role_e_vinculo(db, *, tenant_id: str, usuario_id: int, nome_role: str = "Vendedor"):
+def _criar_role_e_vinculo(
+    db, *, tenant_id: str, usuario_id: int, nome_role: str = "Vendedor"
+):
     set_current_tenant(tenant_id)
     role = Role(name=nome_role, tenant_id=tenant_id)
     db.add(role)
     db.flush()
     db.add(
-        UserTenant(user_id=usuario_id, tenant_id=tenant_id, role_id=role.id, is_active=True)
+        UserTenant(
+            user_id=usuario_id, tenant_id=tenant_id, role_id=role.id, is_active=True
+        )
     )
     db.flush()
     clear_current_tenant()
@@ -77,7 +81,9 @@ def _grupo(db, *, grupo_id_hint, criado_por_empresa_id, criado_por_usuario_id, l
             GrupoComercialMembro(
                 grupo_id=grupo.id,
                 empresa_id=empresa_id,
-                papel="responsavel" if empresa_id == criado_por_empresa_id else "membro",
+                papel="responsavel"
+                if empresa_id == criado_por_empresa_id
+                else "membro",
                 status="ativo",
                 usuario_referencia_id=criado_por_usuario_id,
             )
@@ -106,7 +112,9 @@ def test_vincula_usuario_a_outra_loja_do_mesmo_grupo(db):
     _criar_tenant(db, TENANT_A2, "Loja A2")
     usuario = _usuario(db, email="titular@grupo-a.com", tenant_id=TENANT_A1)
     _criar_role_e_vinculo(db, tenant_id=TENANT_A1, usuario_id=usuario.id)
-    _criar_role_e_vinculo(db, tenant_id=TENANT_A2, usuario_id=999999)  # so pra existir a Role
+    _criar_role_e_vinculo(
+        db, tenant_id=TENANT_A2, usuario_id=999999
+    )  # so pra existir a Role
     _grupo(
         db,
         grupo_id_hint="A",
@@ -291,8 +299,12 @@ def test_vincular_a_qualquer_loja_resolve_origem_sozinho(db):
     da A2 automaticamente."""
     usuario = _usuario(db, email="titular@grupo-a.com", tenant_id=TENANT_A1)
     _grupo_abc(db, usuario)
-    _criar_role_e_vinculo(db, tenant_id=TENANT_A2, usuario_id=usuario.id, nome_role="Gerente")
-    _criar_role_e_vinculo(db, tenant_id=TENANT_A3, usuario_id=999999, nome_role="Gerente")
+    _criar_role_e_vinculo(
+        db, tenant_id=TENANT_A2, usuario_id=usuario.id, nome_role="Gerente"
+    )
+    _criar_role_e_vinculo(
+        db, tenant_id=TENANT_A3, usuario_id=999999, nome_role="Gerente"
+    )
     db.commit()
 
     vinculo = vincular_usuario_a_qualquer_loja_do_grupo(
@@ -320,7 +332,10 @@ def test_rejeita_desvincular_loja_de_outro_grupo_e_mantem_vinculo(db):
     with tenant_context(UUID(TENANT_B1)):
         vinculo_b1 = (
             db.query(UserTenant)
-            .filter(UserTenant.user_id == usuario.id, UserTenant.tenant_id == UUID(TENANT_B1))
+            .filter(
+                UserTenant.user_id == usuario.id,
+                UserTenant.tenant_id == UUID(TENANT_B1),
+            )
             .first()
         )
     assert vinculo_b1.is_active is True
@@ -335,7 +350,14 @@ def test_banco_rejeita_segundo_vinculo_do_mesmo_usuario_na_mesma_loja(db):
     db.commit()
 
     with tenant_context(UUID(TENANT_A1)):
-        db.add(UserTenant(user_id=usuario.id, tenant_id=UUID(TENANT_A1), role_id=role_id, is_active=True))
+        db.add(
+            UserTenant(
+                user_id=usuario.id,
+                tenant_id=UUID(TENANT_A1),
+                role_id=role_id,
+                is_active=True,
+            )
+        )
         with pytest.raises(IntegrityError):
             db.flush()
     db.rollback()

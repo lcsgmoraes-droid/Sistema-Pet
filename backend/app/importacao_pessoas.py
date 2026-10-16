@@ -197,7 +197,10 @@ async def criar_template_pessoas(current_user=Depends(get_current_user)):
     orientacoes = [
         ("CAMPO", "DESCRIÇÃO"),
         ("", ""),
-        ("Tipo Cadastro", "Obrigatório. Valores: cliente, fornecedor, veterinario, funcionario"),
+        (
+            "Tipo Cadastro",
+            "Obrigatório. Valores: cliente, fornecedor, veterinario, funcionario",
+        ),
         (
             "Tipo Pessoa",
             "Obrigatório. Valores: PF (Pessoa Física) ou PJ (Pessoa Jurídica)",

@@ -20,7 +20,10 @@ def upgrade() -> None:
     )
     op.create_foreign_key(
         "fk_vendas_vendedor_funcionario_id_clientes",
-        "vendas", "clientes", ["vendedor_funcionario_id"], ["id"],
+        "vendas",
+        "clientes",
+        ["vendedor_funcionario_id"],
+        ["id"],
     )
     op.create_index(
         "ix_vendas_vendedor_funcionario_id", "vendas", ["vendedor_funcionario_id"]

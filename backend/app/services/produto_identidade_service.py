@@ -217,7 +217,9 @@ def processar_alteracoes_inerentes(
     (app/produtos/cadastro_routes.py::atualizar_produto). Decide se propaga pra
     identidade compartilhada (produto ja vinculado) ou tenta vincular agora
     (produto sem vinculo que acabou de ganhar/mudar codigo de barras/GTIN)."""
-    campos_inerentes = {k: v for k, v in campos_alterados.items() if k in INHERENT_FIELDS}
+    campos_inerentes = {
+        k: v for k, v in campos_alterados.items() if k in INHERENT_FIELDS
+    }
     if not campos_inerentes:
         return
 

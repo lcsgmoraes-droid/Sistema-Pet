@@ -26,7 +26,9 @@ class VinculoLojaError(Exception):
         super().__init__(detail)
 
 
-def _mesmo_grupo_comercial(db: Session, tenant_origem_id: str, tenant_destino_id: str) -> bool:
+def _mesmo_grupo_comercial(
+    db: Session, tenant_origem_id: str, tenant_destino_id: str
+) -> bool:
     grupos_origem = {
         grupo_id
         for (grupo_id,) in db.query(GrupoComercialMembro.grupo_id).filter(
@@ -97,7 +99,9 @@ def vincular_usuario_a_loja_do_grupo(
             .first()
         )
         if vinculo_origem is None:
-            raise VinculoLojaError(400, "Usuario nao tem acesso ativo na loja de origem.")
+            raise VinculoLojaError(
+                400, "Usuario nao tem acesso ativo na loja de origem."
+            )
 
         role_origem = db.query(Role).filter(Role.id == vinculo_origem.role_id).first()
         nome_role = role_origem.name if role_origem else None

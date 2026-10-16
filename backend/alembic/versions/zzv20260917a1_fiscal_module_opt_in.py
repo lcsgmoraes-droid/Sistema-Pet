@@ -33,7 +33,11 @@ def _modulos(raw: str | None) -> list[str]:
         value = json.loads(raw) if raw else []
     except (TypeError, json.JSONDecodeError):
         value = []
-    return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
+    return (
+        [item for item in value if isinstance(item, str)]
+        if isinstance(value, list)
+        else []
+    )
 
 
 def upgrade() -> None:

@@ -30,7 +30,9 @@ def _has_table(table_name: str) -> bool:
 def _columns(table_name: str) -> set[str]:
     if not _has_table(table_name):
         return set()
-    return {column["name"] for column in sa.inspect(op.get_bind()).get_columns(table_name)}
+    return {
+        column["name"] for column in sa.inspect(op.get_bind()).get_columns(table_name)
+    }
 
 
 def _add_column_once(table_name: str, column: sa.Column) -> None:

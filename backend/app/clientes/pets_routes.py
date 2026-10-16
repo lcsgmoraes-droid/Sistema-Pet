@@ -29,7 +29,10 @@ def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
         db.query(Cliente)
         .filter(
             Cliente.id == cliente_id,
-            or_(Cliente.tenant_id == tenant_id, pessoa_visivel_no_grupo(Cliente, tenant_id)),
+            or_(
+                Cliente.tenant_id == tenant_id,
+                pessoa_visivel_no_grupo(Cliente, tenant_id),
+            ),
         )
         .first()
     )
@@ -144,9 +147,7 @@ def listar_todos_pets(
     pets = (
         db.query(Pet)
         .join(Cliente)
-        .filter(
-            or_(Cliente.tenant_id == tenant_id, Pet.tenant_id.in_(empresas_grupo))
-        )
+        .filter(or_(Cliente.tenant_id == tenant_id, Pet.tenant_id.in_(empresas_grupo)))
         .order_by(Pet.nome)
         .all()
     )
@@ -188,7 +189,9 @@ def get_pet(
         .join(Cliente)
         .filter(
             Pet.id == pet_id,
-            or_(Cliente.tenant_id == tenant_id, pessoa_visivel_no_grupo(Pet, tenant_id)),
+            or_(
+                Cliente.tenant_id == tenant_id, pessoa_visivel_no_grupo(Pet, tenant_id)
+            ),
         )
         .first()
     )
@@ -216,7 +219,9 @@ def update_pet(
         .join(Cliente)
         .filter(
             Pet.id == pet_id,
-            or_(Cliente.tenant_id == tenant_id, pessoa_visivel_no_grupo(Pet, tenant_id)),
+            or_(
+                Cliente.tenant_id == tenant_id, pessoa_visivel_no_grupo(Pet, tenant_id)
+            ),
         )
         .first()
     )
@@ -295,7 +300,9 @@ def delete_pet(
         .join(Cliente)
         .filter(
             Pet.id == pet_id,
-            or_(Cliente.tenant_id == tenant_id, pessoa_visivel_no_grupo(Pet, tenant_id)),
+            or_(
+                Cliente.tenant_id == tenant_id, pessoa_visivel_no_grupo(Pet, tenant_id)
+            ),
         )
         .first()
     )

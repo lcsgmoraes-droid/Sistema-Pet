@@ -33,13 +33,18 @@ def cliente_visivel(db: Session, cliente_id: int, tenant_id) -> Cliente | None:
         db.query(Cliente)
         .filter(
             Cliente.id == cliente_id,
-            or_(Cliente.tenant_id == tenant_id, pessoa_visivel_no_grupo(Cliente, tenant_id)),
+            or_(
+                Cliente.tenant_id == tenant_id,
+                pessoa_visivel_no_grupo(Cliente, tenant_id),
+            ),
         )
         .first()
     )
 
 
-def ultimo_registro(db: Session, pet_id: int, tipo: str, tenant_id=None) -> PetRegistroClinico | None:
+def ultimo_registro(
+    db: Session, pet_id: int, tipo: str, tenant_id=None
+) -> PetRegistroClinico | None:
     consulta = db.query(PetRegistroClinico).filter(
         PetRegistroClinico.pet_id == pet_id,
         PetRegistroClinico.tipo == tipo,
@@ -51,7 +56,9 @@ def ultimo_registro(db: Session, pet_id: int, tipo: str, tenant_id=None) -> PetR
     ).first()
 
 
-def listar_registros(db: Session, pet_id: int, tipo: str | None = None) -> list[PetRegistroClinico]:
+def listar_registros(
+    db: Session, pet_id: int, tipo: str | None = None
+) -> list[PetRegistroClinico]:
     consulta = db.query(PetRegistroClinico).filter(PetRegistroClinico.pet_id == pet_id)
     if tipo:
         consulta = consulta.filter(PetRegistroClinico.tipo == tipo)
@@ -107,17 +114,30 @@ def registrar_se_mudou(
     if tipo == "peso":
         if anterior is not None and anterior.valor == float(novo):
             return None
-        return criar_registro(db, pet_id=pet_id, tenant_id=tenant_id, user_id=user_id, tipo=tipo, valor=float(novo))
+        return criar_registro(
+            db,
+            pet_id=pet_id,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            tipo=tipo,
+            valor=float(novo),
+        )
     texto = str(novo).strip()
     if anterior is not None and (anterior.texto or "").strip() == texto:
         return None
-    return criar_registro(db, pet_id=pet_id, tenant_id=tenant_id, user_id=user_id, tipo=tipo, texto=texto)
+    return criar_registro(
+        db, pet_id=pet_id, tenant_id=tenant_id, user_id=user_id, tipo=tipo, texto=texto
+    )
 
 
-def _obter_registro_da_loja(db: Session, registro_id: int, pet_id: int, tenant_id) -> PetRegistroClinico:
+def _obter_registro_da_loja(
+    db: Session, registro_id: int, pet_id: int, tenant_id
+) -> PetRegistroClinico:
     registro = (
         db.query(PetRegistroClinico)
-        .filter(PetRegistroClinico.id == registro_id, PetRegistroClinico.pet_id == pet_id)
+        .filter(
+            PetRegistroClinico.id == registro_id, PetRegistroClinico.pet_id == pet_id
+        )
         .first()
     )
     if registro is None:

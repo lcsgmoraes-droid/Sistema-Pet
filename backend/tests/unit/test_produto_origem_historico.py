@@ -62,5 +62,9 @@ def test_historico_registra_so_campos_base_alterados(db):
     set_current_tenant(loja)
     registro = db.query(ProdutoHistoricoAlteracao).one()
     clear_current_tenant()
-    assert (registro.campo, registro.valor_anterior, registro.valor_novo) == ("nome", "Racao A", "Racao B")
+    assert (registro.campo, registro.valor_anterior, registro.valor_novo) == (
+        "nome",
+        "Racao A",
+        "Racao B",
+    )
     assert registro.user_id == 2

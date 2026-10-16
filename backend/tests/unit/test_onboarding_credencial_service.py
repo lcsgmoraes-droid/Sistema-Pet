@@ -1,4 +1,3 @@
-
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -45,13 +44,23 @@ def _tenant(db, tenant_id: str, *, pendente: bool):
 
 def _usuario_com_vinculo(db, *, email: str, tenant_id: str, ativo: bool = True):
     set_current_tenant(tenant_id)
-    usuario = User(email=email, hashed_password="hash", nome=email, is_active=True, tenant_id=tenant_id)
+    usuario = User(
+        email=email,
+        hashed_password="hash",
+        nome=email,
+        is_active=True,
+        tenant_id=tenant_id,
+    )
     db.add(usuario)
     db.flush()
     role = Role(name="Vendedor", tenant_id=tenant_id)
     db.add(role)
     db.flush()
-    db.add(UserTenant(user_id=usuario.id, tenant_id=tenant_id, role_id=role.id, is_active=ativo))
+    db.add(
+        UserTenant(
+            user_id=usuario.id, tenant_id=tenant_id, role_id=role.id, is_active=ativo
+        )
+    )
     db.flush()
     clear_current_tenant()
     return usuario
@@ -62,13 +71,22 @@ def _vinculo(db, usuario, *, tenant_id: str, ativo: bool):
     role = Role(name="Vendedor", tenant_id=tenant_id)
     db.add(role)
     db.flush()
-    db.add(UserTenant(user_id=usuario.id, tenant_id=tenant_id, role_id=role.id, is_active=ativo))
+    db.add(
+        UserTenant(
+            user_id=usuario.id, tenant_id=tenant_id, role_id=role.id, is_active=ativo
+        )
+    )
     db.flush()
     clear_current_tenant()
 
 
 def _flag(db, tenant_id: str) -> bool:
-    return db.query(Tenant).filter(Tenant.id == tenant_id).first().onboarding_credencial_email_pendente
+    return (
+        db.query(Tenant)
+        .filter(Tenant.id == tenant_id)
+        .first()
+        .onboarding_credencial_email_pendente
+    )
 
 
 def test_senha_definida_limpa_flag_apenas_das_lojas_com_acesso_ativo(db):

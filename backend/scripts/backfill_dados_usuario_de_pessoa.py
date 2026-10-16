@@ -96,7 +96,9 @@ def backfill_dados_usuario_de_pessoa(
     # com contexto proprio por iteracao — mesmo padrao de loyalty_service.py /
     # coupon_service.py (backfill_loyalty_reward_consumption_meta).
     if tenant_id is not None:
-        return _backfill_um_tenant(db, tenant_id=tenant_id, marcar_funcionario=marcar_funcionario)
+        return _backfill_um_tenant(
+            db, tenant_id=tenant_id, marcar_funcionario=marcar_funcionario
+        )
 
     tocados: list[dict] = []
     for (tid_raw,) in db.query(Tenant.id).all():
@@ -105,7 +107,9 @@ def backfill_dados_usuario_de_pessoa(
         except (TypeError, ValueError):
             continue
         tocados.extend(
-            _backfill_um_tenant(db, tenant_id=tid, marcar_funcionario=marcar_funcionario)
+            _backfill_um_tenant(
+                db, tenant_id=tid, marcar_funcionario=marcar_funcionario
+            )
         )
     return tocados
 

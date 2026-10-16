@@ -245,8 +245,11 @@ class Produto(BaseTenantModel):
     def _origem_imutavel(self, key, valor):
         atual = self.__dict__.get("origem_tenant_id")
         if atual is not None and valor != atual:
-            raise ValueError("A loja de origem do produto e definida na criacao e nao pode ser alterada.")
+            raise ValueError(
+                "A loja de origem do produto e definida na criacao e nao pode ser alterada."
+            )
         return valor
+
     gtin_ean_tributario = Column(String(20), nullable=True)
     origem = Column(String(1), nullable=True)  # 0-8
     perfil_tributario = Column(String(50), nullable=True)
@@ -573,8 +576,12 @@ class ProdutoHistoricoAlteracao(TenantScoped, Base):
         nullable=False,
         index=True,
     )
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     campo = Column(String(100), nullable=False)
     valor_anterior = Column(Text, nullable=True)
     valor_novo = Column(Text, nullable=True)
-    alterado_em = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    alterado_em = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

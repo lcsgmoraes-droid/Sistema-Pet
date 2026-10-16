@@ -65,12 +65,8 @@ def upgrade() -> None:
                 ["grupo_id"], ["grupos_comerciais.id"], ondelete="CASCADE"
             ),
             sa.PrimaryKeyConstraint("id"),
-            sa.UniqueConstraint(
-                "grupo_id", "cpf", name="uq_pessoa_mestre_grupo_cpf"
-            ),
-            sa.UniqueConstraint(
-                "grupo_id", "cnpj", name="uq_pessoa_mestre_grupo_cnpj"
-            ),
+            sa.UniqueConstraint("grupo_id", "cpf", name="uq_pessoa_mestre_grupo_cpf"),
+            sa.UniqueConstraint("grupo_id", "cnpj", name="uq_pessoa_mestre_grupo_cnpj"),
         )
         op.create_index("ix_pessoa_mestre_grupo_id", "pessoa_mestre", ["grupo_id"])
         op.create_index("ix_pessoa_mestre_cpf", "pessoa_mestre", ["cpf"])

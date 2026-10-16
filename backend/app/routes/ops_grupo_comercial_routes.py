@@ -23,7 +23,9 @@ from app.services.ops_grupo_comercial_onboarding_service import (
     onboard_grupo_comercial,
 )
 
-router = APIRouter(prefix="/admin/grupos-comerciais", tags=["Admin - Grupos Comerciais"])
+router = APIRouter(
+    prefix="/admin/grupos-comerciais", tags=["Admin - Grupos Comerciais"]
+)
 
 
 class OpsLojaOnboardingRequest(BaseModel):

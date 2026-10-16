@@ -306,8 +306,10 @@ def adicionar_item_carrinho(
     _expirar_reservas_automaticamente(db, tenant_id)
     tenant_config = db.query(Tenant).filter(Tenant.id == tenant_id).first()
 
-    acesso_catalogo = GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
-        db, tenant_id, payload.produto_id
+    acesso_catalogo = (
+        GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
+            db, tenant_id, payload.produto_id
+        )
     )
     with tenant_context(acesso_catalogo.tenant_origem_id) as tenant_origem:
         produto = (
@@ -454,8 +456,10 @@ def atualizar_item_carrinho(
             detail="Item do carrinho não encontrado",
         )
 
-    acesso_catalogo = GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
-        db, tenant_id, item.produto_id
+    acesso_catalogo = (
+        GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
+            db, tenant_id, item.produto_id
+        )
     )
     with tenant_context(acesso_catalogo.tenant_origem_id) as tenant_origem:
         produto = (

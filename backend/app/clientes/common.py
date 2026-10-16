@@ -112,7 +112,9 @@ _MSG_TIPO_OBRIGATORIO = "Selecione ao menos um tipo de cadastro (cliente, fornec
 
 
 def _validar_flags_tipo_criacao(cliente_data) -> None:
-    if not any(getattr(cliente_data, campo) for campo in CAMPO_FLAG_POR_TIPO_CADASTRO.values()):
+    if not any(
+        getattr(cliente_data, campo) for campo in CAMPO_FLAG_POR_TIPO_CADASTRO.values()
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=_MSG_TIPO_OBRIGATORIO
         )
@@ -149,7 +151,10 @@ def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
         db.query(Cliente)
         .filter(
             Cliente.id == cliente_id,
-            or_(Cliente.tenant_id == tenant_id, pessoa_visivel_no_grupo(Cliente, tenant_id)),
+            or_(
+                Cliente.tenant_id == tenant_id,
+                pessoa_visivel_no_grupo(Cliente, tenant_id),
+            ),
         )
         .first()
     )

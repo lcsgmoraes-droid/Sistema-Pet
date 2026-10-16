@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.db import Base
 from app.db import base as _base  # noqa: F401 - registra Produto etc. no metadata,
+
 # necessario pra resolver a FK de produto_origem_id mesmo so criando um
 # subconjunto de tabelas abaixo (create_all so cria o que esta em `tables`,
 # mas ainda precisa achar a tabela referenciada pra montar a FK).
@@ -63,9 +64,24 @@ def db(monkeypatch):
     session.execute(
         User.__table__.insert(),
         [
-            {"id": 10, "tenant_id": UUID(EMPRESA_A), "email": "dono-a@teste.com", "nome": "Dono A"},
-            {"id": 20, "tenant_id": UUID(EMPRESA_B), "email": "dono-b@teste.com", "nome": "Dono B"},
-            {"id": 30, "tenant_id": UUID(EMPRESA_C), "email": "dono-c@teste.com", "nome": "Dono C"},
+            {
+                "id": 10,
+                "tenant_id": UUID(EMPRESA_A),
+                "email": "dono-a@teste.com",
+                "nome": "Dono A",
+            },
+            {
+                "id": 20,
+                "tenant_id": UUID(EMPRESA_B),
+                "email": "dono-b@teste.com",
+                "nome": "Dono B",
+            },
+            {
+                "id": 30,
+                "tenant_id": UUID(EMPRESA_C),
+                "email": "dono-c@teste.com",
+                "nome": "Dono C",
+            },
             {
                 "id": 99,
                 "tenant_id": UUID(EMPRESA_A),
@@ -109,7 +125,11 @@ def _usuario(db, user_id: int) -> User:
 def test_criar_grupo_marca_fundador_como_master(db):
     service = GrupoComercialService(db, agora=AGORA)
     grupo = service.criar_grupo(
-        EMPRESA_A, 10, "Grupo Centro", titular_tipo_pessoa="PJ", titular_telefone="11988887777"
+        EMPRESA_A,
+        10,
+        "Grupo Centro",
+        titular_tipo_pessoa="PJ",
+        titular_telefone="11988887777",
     )
 
     fundador = _usuario(db, 10)
@@ -183,7 +203,9 @@ def test_adicionar_loja_provisiona_tenant_e_anexa_como_membro(db, monkeypatch):
     clear_tenant_context()
 
     assert resultado["tenant_id"] == nova_loja_id
-    assert chamadas["user"] is not None  # reaproveitou o usuario logado, nao criou um novo
+    assert (
+        chamadas["user"] is not None
+    )  # reaproveitou o usuario logado, nao criou um novo
     assert chamadas["restore_tenant_id"] == EMPRESA_A
 
     membro_novo = (
@@ -203,7 +225,9 @@ def test_adicionar_loja_provisiona_tenant_e_anexa_como_membro(db, monkeypatch):
     # adicionou a loja.
     vinculos_master = (
         db.query(UserTenant)
-        .filter(UserTenant.user_id == master.id, UserTenant.tenant_id == UUID(nova_loja_id))
+        .filter(
+            UserTenant.user_id == master.id, UserTenant.tenant_id == UUID(nova_loja_id)
+        )
         .all()
     )
     assert len(vinculos_master) == 1
@@ -212,18 +236,24 @@ def test_adicionar_loja_provisiona_tenant_e_anexa_como_membro(db, monkeypatch):
     # loja fundadora, entao a loja nova NAO cria uma copia - o cadastro da
     # fundadora ja fica visivel/editavel automaticamente nela (RLS de grupo).
     set_tenant_context(UUID(EMPRESA_A))
-    cliente_loja_fundadora = db.query(Cliente).filter(Cliente.auth_user_id == master.id).one()
+    cliente_loja_fundadora = (
+        db.query(Cliente).filter(Cliente.auth_user_id == master.id).one()
+    )
     clear_tenant_context()
 
     set_tenant_context(UUID(nova_loja_id))
-    clientes_loja_nova = db.query(Cliente).filter(Cliente.auth_user_id == master.id).all()
+    clientes_loja_nova = (
+        db.query(Cliente).filter(Cliente.auth_user_id == master.id).all()
+    )
     clear_tenant_context()
 
     assert cliente_loja_fundadora is not None
     assert clientes_loja_nova == []
 
 
-def test_adicionar_loja_exige_acesso_de_gestao_mesmo_sendo_empresa_responsavel(db, monkeypatch):
+def test_adicionar_loja_exige_acesso_de_gestao_mesmo_sendo_empresa_responsavel(
+    db, monkeypatch
+):
     """Antes, qualquer usuario com permissao generica de configuracoes na
     empresa responsavel conseguia adicionar loja. Agora precisa tambem ter
     acesso de gestao do grupo (ser o master)."""
@@ -232,7 +262,9 @@ def test_adicionar_loja_exige_acesso_de_gestao_mesmo_sendo_empresa_responsavel(d
     monkeypatch.setattr(
         modulo,
         "provision_tenant",
-        lambda *_args, **_kwargs: pytest.fail("nao deveria provisionar sem autorizacao"),
+        lambda *_args, **_kwargs: pytest.fail(
+            "nao deveria provisionar sem autorizacao"
+        ),
     )
 
     service = GrupoComercialService(db, agora=AGORA)
@@ -293,7 +325,9 @@ def test_responsavel_remove_membro_sem_poder_remover_a_si_mesmo(db, monkeypatch)
     assert remover_responsavel.value.status_code == 400
 
 
-def test_duas_lojas_adicionadas_em_chamadas_separadas_nao_duplicam_cliente_titular(db, monkeypatch):
+def test_duas_lojas_adicionadas_em_chamadas_separadas_nao_duplicam_cliente_titular(
+    db, monkeypatch
+):
     """_titular_tem_cadastro_no_grupo precisa achar o Cliente de uma loja que
     ja existe, nao so reaproveitar algo que ainda esta em memoria no mesmo
     laco (caso onboard_grupo_comercial) - aqui cada adicionar_loja e uma
@@ -329,22 +363,30 @@ def test_duas_lojas_adicionadas_em_chamadas_separadas_nao_duplicam_cliente_titul
 
     monkeypatch.setattr(modulo, "provision_tenant", _fake_com_id(loja_1_id))
     service.adicionar_loja(
-        grupo_id=grupo["id"], usuario=master, nome_loja="Loja Um",
-        empresa_acionadora_id=EMPRESA_A, restore_tenant_id=EMPRESA_A,
+        grupo_id=grupo["id"],
+        usuario=master,
+        nome_loja="Loja Um",
+        empresa_acionadora_id=EMPRESA_A,
+        restore_tenant_id=EMPRESA_A,
     )
     clear_tenant_context()
 
     monkeypatch.setattr(modulo, "provision_tenant", _fake_com_id(loja_2_id))
     service.adicionar_loja(
-        grupo_id=grupo["id"], usuario=master, nome_loja="Loja Dois",
-        empresa_acionadora_id=EMPRESA_A, restore_tenant_id=EMPRESA_A,
+        grupo_id=grupo["id"],
+        usuario=master,
+        nome_loja="Loja Dois",
+        empresa_acionadora_id=EMPRESA_A,
+        restore_tenant_id=EMPRESA_A,
     )
     clear_tenant_context()
 
     # O titular ja tinha Cliente na loja fundadora (EMPRESA_A, criada por
     # criar_grupo) - nenhuma das duas lojas novas deveria duplicar o cadastro.
     set_tenant_context(UUID(EMPRESA_A))
-    clientes_fundadora = db.query(Cliente).filter(Cliente.auth_user_id == master.id).all()
+    clientes_fundadora = (
+        db.query(Cliente).filter(Cliente.auth_user_id == master.id).all()
+    )
     clear_tenant_context()
     set_tenant_context(UUID(loja_1_id))
     clientes_loja_1 = db.query(Cliente).filter(Cliente.auth_user_id == master.id).all()
@@ -372,8 +414,11 @@ def test_criar_cliente_titular_nao_duplica_se_ja_existir(db):
     # criar_grupo/adicionar_loja) precisa do proprio contexto de tenant.
     set_tenant_context(UUID(EMPRESA_A))
     service._criar_cliente_titular(
-        tenant_id=EMPRESA_A, usuario=master, grupo_id=grupo["id"],
-        tipo_pessoa="PF", telefone=None,
+        tenant_id=EMPRESA_A,
+        usuario=master,
+        grupo_id=grupo["id"],
+        tipo_pessoa="PF",
+        telefone=None,
     )
     clear_tenant_context()
 

@@ -29,7 +29,12 @@ def upgrade() -> None:
         "produto_identidades",
         sa.Column("id", sa.Integer(), sa.Identity(always=True), primary_key=True),
         sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
@@ -65,15 +70,33 @@ def upgrade() -> None:
         sa.Column("categoria_racao", sa.String(length=50), nullable=True),
         sa.Column("especies_indicadas", sa.String(length=100), nullable=True),
         sa.Column("tabela_consumo", sa.Text(), nullable=True),
-        sa.Column("porte_animal", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.Column("fase_publico", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.Column("tipo_tratamento", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column(
+            "porte_animal", postgresql.JSONB(astext_type=sa.Text()), nullable=True
+        ),
+        sa.Column(
+            "fase_publico", postgresql.JSONB(astext_type=sa.Text()), nullable=True
+        ),
+        sa.Column(
+            "tipo_tratamento", postgresql.JSONB(astext_type=sa.Text()), nullable=True
+        ),
         sa.Column("sabor_proteina", sa.String(length=100), nullable=True),
-        sa.Column("auto_classificar_nome", sa.Boolean(), nullable=False, server_default="true"),
+        sa.Column(
+            "auto_classificar_nome", sa.Boolean(), nullable=False, server_default="true"
+        ),
     )
-    op.create_index("ix_produto_identidades_tenant_id", "produto_identidades", ["tenant_id"])
-    op.create_index("ix_produto_identidades_origem_tenant_id", "produto_identidades", ["origem_tenant_id"])
-    op.create_index("ix_produto_identidades_chave_matching", "produto_identidades", ["chave_matching"])
+    op.create_index(
+        "ix_produto_identidades_tenant_id", "produto_identidades", ["tenant_id"]
+    )
+    op.create_index(
+        "ix_produto_identidades_origem_tenant_id",
+        "produto_identidades",
+        ["origem_tenant_id"],
+    )
+    op.create_index(
+        "ix_produto_identidades_chave_matching",
+        "produto_identidades",
+        ["chave_matching"],
+    )
 
     op.create_table(
         "produto_identidades_historico_alteracoes",
@@ -85,7 +108,12 @@ def upgrade() -> None:
             sa.ForeignKey("produto_identidades.id", ondelete="CASCADE"),
             nullable=False,
         ),
-        sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "user_id",
+            sa.Integer(),
+            sa.ForeignKey("users.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
         sa.Column("campo", sa.String(length=100), nullable=False),
         sa.Column("valor_anterior", sa.Text(), nullable=True),
         sa.Column("valor_novo", sa.Text(), nullable=True),
@@ -116,13 +144,17 @@ def upgrade() -> None:
             nullable=True,
         ),
     )
-    op.create_index("ix_produtos_produto_identidade_id", "produtos", ["produto_identidade_id"])
+    op.create_index(
+        "ix_produtos_produto_identidade_id", "produtos", ["produto_identidade_id"]
+    )
     op.create_index(
         "ux_produtos_tenant_identidade",
         "produtos",
         ["tenant_id", "produto_identidade_id"],
         unique=True,
-        postgresql_where=sa.text("produto_identidade_id IS NOT NULL AND deleted_at IS NULL"),
+        postgresql_where=sa.text(
+            "produto_identidade_id IS NOT NULL AND deleted_at IS NULL"
+        ),
     )
 
     op.create_table(
@@ -135,7 +167,9 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("chave_matching", sa.String(length=20), nullable=False),
-        sa.Column("produto_ids", postgresql.JSON(astext_type=sa.Text()), nullable=False),
+        sa.Column(
+            "produto_ids", postgresql.JSON(astext_type=sa.Text()), nullable=False
+        ),
         sa.Column(
             "detectado_em",
             sa.DateTime(timezone=True),
@@ -152,7 +186,9 @@ def upgrade() -> None:
         sa.Column("resolvido_em", sa.DateTime(timezone=True), nullable=True),
     )
     op.create_index(
-        "ix_produto_identidade_conflitos_grupo_id", "produto_identidade_conflitos", ["grupo_id"]
+        "ix_produto_identidade_conflitos_grupo_id",
+        "produto_identidade_conflitos",
+        ["grupo_id"],
     )
 
     op.create_table(
@@ -171,9 +207,16 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
         ),
         sa.Column("dry_run", sa.Boolean(), nullable=False, server_default="true"),
-        sa.Column("total_produtos_ativos", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column(
+            "total_produtos_ativos", sa.Integer(), nullable=False, server_default="0"
+        ),
         sa.Column("total_com_gtin", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("total_identidades_criadas", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column(
+            "total_identidades_criadas",
+            sa.Integer(),
+            nullable=False,
+            server_default="0",
+        ),
         sa.Column("total_vinculados", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("total_sem_gtin", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("total_conflitos", sa.Integer(), nullable=False, server_default="0"),
@@ -186,10 +229,16 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_produto_identidade_backfill_runs_grupo_id", table_name="produto_identidade_backfill_runs")
+    op.drop_index(
+        "ix_produto_identidade_backfill_runs_grupo_id",
+        table_name="produto_identidade_backfill_runs",
+    )
     op.drop_table("produto_identidade_backfill_runs")
 
-    op.drop_index("ix_produto_identidade_conflitos_grupo_id", table_name="produto_identidade_conflitos")
+    op.drop_index(
+        "ix_produto_identidade_conflitos_grupo_id",
+        table_name="produto_identidade_conflitos",
+    )
     op.drop_table("produto_identidade_conflitos")
 
     op.drop_index("ux_produtos_tenant_identidade", table_name="produtos")
@@ -206,7 +255,11 @@ def downgrade() -> None:
     )
     op.drop_table("produto_identidades_historico_alteracoes")
 
-    op.drop_index("ix_produto_identidades_chave_matching", table_name="produto_identidades")
-    op.drop_index("ix_produto_identidades_origem_tenant_id", table_name="produto_identidades")
+    op.drop_index(
+        "ix_produto_identidades_chave_matching", table_name="produto_identidades"
+    )
+    op.drop_index(
+        "ix_produto_identidades_origem_tenant_id", table_name="produto_identidades"
+    )
     op.drop_index("ix_produto_identidades_tenant_id", table_name="produto_identidades")
     op.drop_table("produto_identidades")

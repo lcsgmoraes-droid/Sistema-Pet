@@ -99,7 +99,12 @@ def atualizar_produtos_lote(
     campos_inerentes_do_lote = {
         campo
         for campo, tocado in (
-            ("classificacao_racao", dados.eh_racao is not None or dados.classificacao_racao is not None or dados.linha_racao_id is not None),
+            (
+                "classificacao_racao",
+                dados.eh_racao is not None
+                or dados.classificacao_racao is not None
+                or dados.linha_racao_id is not None,
+            ),
             ("categoria_racao", dados.categoria_racao is not None),
             ("especies_indicadas", dados.especies_indicadas is not None),
         )

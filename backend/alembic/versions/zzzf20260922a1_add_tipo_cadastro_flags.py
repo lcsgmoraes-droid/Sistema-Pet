@@ -33,7 +33,9 @@ def _has_table(table_name: str) -> bool:
 def _columns(table_name: str) -> set[str]:
     if not _has_table(table_name):
         return set()
-    return {column["name"] for column in sa.inspect(op.get_bind()).get_columns(table_name)}
+    return {
+        column["name"] for column in sa.inspect(op.get_bind()).get_columns(table_name)
+    }
 
 
 def _add_column_once(table_name: str, column: sa.Column) -> None:
@@ -49,19 +51,27 @@ def _drop_column_once(table_name: str, column_name: str) -> None:
 def upgrade() -> None:
     _add_column_once(
         "clientes",
-        sa.Column("is_cliente", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column(
+            "is_cliente", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
     )
     _add_column_once(
         "clientes",
-        sa.Column("is_fornecedor", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column(
+            "is_fornecedor", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
     )
     _add_column_once(
         "clientes",
-        sa.Column("is_veterinario", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column(
+            "is_veterinario", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
     )
     _add_column_once(
         "clientes",
-        sa.Column("is_funcionario", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column(
+            "is_funcionario", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
     )
 
 

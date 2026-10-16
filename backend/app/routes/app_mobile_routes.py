@@ -561,8 +561,10 @@ def buscar_produto_app_por_id(
     estao anunciados no app, para orientar compra no e-commerce ou loja fisica.
     """
     tenant_id = _activate_user_tenant_context(current_user)
-    acesso_catalogo = GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
-        db, tenant_id, produto_id
+    acesso_catalogo = (
+        GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
+            db, tenant_id, produto_id
+        )
     )
     tenant_produto_id = UUID(str(acesso_catalogo.tenant_origem_id))
     set_current_tenant(tenant_produto_id)
@@ -611,10 +613,8 @@ def buscar_produto_barcode(
 
     prioridade_estoque = case((func.coalesce(Produto.estoque_atual, 0) > 0, 0), else_=1)
 
-    compartilhados = (
-        GrupoComercialEstoqueCompartilhadoService.mapa_catalogo_completo_para_consumidora(
-            db, tenant_id
-        )
+    compartilhados = GrupoComercialEstoqueCompartilhadoService.mapa_catalogo_completo_para_consumidora(
+        db, tenant_id
     )
     produto = (
         db.query(Produto)
@@ -639,8 +639,10 @@ def buscar_produto_barcode(
             detail="Produto não encontrado para este código de barras.",
         )
 
-    acesso_catalogo = GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
-        db, tenant_id, produto.id
+    acesso_catalogo = (
+        GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
+            db, tenant_id, produto.id
+        )
     )
     tenant_produto_id = UUID(str(acesso_catalogo.tenant_origem_id))
     set_current_tenant(tenant_produto_id)

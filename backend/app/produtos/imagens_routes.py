@@ -193,8 +193,10 @@ def listar_imagens_produto(
     current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
         user_and_tenant
     )
-    acesso_catalogo = GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
-        db, tenant_solicitante_id, produto_id
+    acesso_catalogo = (
+        GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
+            db, tenant_solicitante_id, produto_id
+        )
     )
     tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
     set_current_tenant(tenant_id)

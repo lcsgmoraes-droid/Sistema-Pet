@@ -27,16 +27,40 @@ def upgrade() -> None:
         "pets_registros_clinicos",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
         sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("pet_id", sa.Integer(), sa.ForeignKey("pets.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "pet_id",
+            sa.Integer(),
+            sa.ForeignKey("pets.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("tipo", sa.String(length=20), nullable=False),
         sa.Column("texto", sa.Text(), nullable=True),
         sa.Column("valor", sa.Float(), nullable=True),
-        sa.Column("registrado_em", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("criado_em", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "registrado_em",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
+        sa.Column(
+            "user_id",
+            sa.Integer(),
+            sa.ForeignKey("users.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+        sa.Column(
+            "criado_em",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
     )
-    op.create_index("ix_pets_registros_clinicos_tenant_id", "pets_registros_clinicos", ["tenant_id"])
-    op.create_index("ix_pets_registros_clinicos_pet_id", "pets_registros_clinicos", ["pet_id"])
+    op.create_index(
+        "ix_pets_registros_clinicos_tenant_id", "pets_registros_clinicos", ["tenant_id"]
+    )
+    op.create_index(
+        "ix_pets_registros_clinicos_pet_id", "pets_registros_clinicos", ["pet_id"]
+    )
     op.execute(
         """
         INSERT INTO pets_registros_clinicos (tenant_id, pet_id, tipo, texto, registrado_em)
@@ -58,6 +82,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_pets_registros_clinicos_pet_id", table_name="pets_registros_clinicos")
-    op.drop_index("ix_pets_registros_clinicos_tenant_id", table_name="pets_registros_clinicos")
+    op.drop_index(
+        "ix_pets_registros_clinicos_pet_id", table_name="pets_registros_clinicos"
+    )
+    op.drop_index(
+        "ix_pets_registros_clinicos_tenant_id", table_name="pets_registros_clinicos"
+    )
     op.drop_table("pets_registros_clinicos")

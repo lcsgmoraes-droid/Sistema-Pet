@@ -27,7 +27,9 @@ def upgrade() -> None:
         sa.Column("origem_tenant_id", postgresql.UUID(as_uuid=True), nullable=True),
     )
     op.create_index("ix_produtos_origem_tenant_id", "produtos", ["origem_tenant_id"])
-    op.execute("UPDATE produtos SET origem_tenant_id = tenant_id WHERE origem_tenant_id IS NULL")
+    op.execute(
+        "UPDATE produtos SET origem_tenant_id = tenant_id WHERE origem_tenant_id IS NULL"
+    )
 
     op.create_table(
         "produtos_historico_alteracoes",
@@ -39,7 +41,12 @@ def upgrade() -> None:
             sa.ForeignKey("produtos.id", ondelete="CASCADE"),
             nullable=False,
         ),
-        sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "user_id",
+            sa.Integer(),
+            sa.ForeignKey("users.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
         sa.Column("campo", sa.String(length=100), nullable=False),
         sa.Column("valor_anterior", sa.Text(), nullable=True),
         sa.Column("valor_novo", sa.Text(), nullable=True),
@@ -50,13 +57,27 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
         ),
     )
-    op.create_index("ix_produtos_historico_alteracoes_tenant_id", "produtos_historico_alteracoes", ["tenant_id"])
-    op.create_index("ix_produtos_historico_alteracoes_produto_id", "produtos_historico_alteracoes", ["produto_id"])
+    op.create_index(
+        "ix_produtos_historico_alteracoes_tenant_id",
+        "produtos_historico_alteracoes",
+        ["tenant_id"],
+    )
+    op.create_index(
+        "ix_produtos_historico_alteracoes_produto_id",
+        "produtos_historico_alteracoes",
+        ["produto_id"],
+    )
 
 
 def downgrade() -> None:
-    op.drop_index("ix_produtos_historico_alteracoes_produto_id", table_name="produtos_historico_alteracoes")
-    op.drop_index("ix_produtos_historico_alteracoes_tenant_id", table_name="produtos_historico_alteracoes")
+    op.drop_index(
+        "ix_produtos_historico_alteracoes_produto_id",
+        table_name="produtos_historico_alteracoes",
+    )
+    op.drop_index(
+        "ix_produtos_historico_alteracoes_tenant_id",
+        table_name="produtos_historico_alteracoes",
+    )
     op.drop_table("produtos_historico_alteracoes")
     op.drop_index("ix_produtos_origem_tenant_id", table_name="produtos")
     op.drop_column("produtos", "origem_tenant_id")

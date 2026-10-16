@@ -30,11 +30,17 @@ def _columns(table_name: str) -> set[str]:
 def upgrade() -> None:
     columns = _columns("tenants")
     if "plan_pet" not in columns:
-        op.add_column("tenants", sa.Column("plan_pet", sa.String(length=50), nullable=True))
+        op.add_column(
+            "tenants", sa.Column("plan_pet", sa.String(length=50), nullable=True)
+        )
     if "plan_vet" not in columns:
-        op.add_column("tenants", sa.Column("plan_vet", sa.String(length=50), nullable=True))
+        op.add_column(
+            "tenants", sa.Column("plan_vet", sa.String(length=50), nullable=True)
+        )
     if "plan_grooming" not in columns:
-        op.add_column("tenants", sa.Column("plan_grooming", sa.String(length=50), nullable=True))
+        op.add_column(
+            "tenants", sa.Column("plan_grooming", sa.String(length=50), nullable=True)
+        )
 
     # Backfill a partir do `plan` legado: so os 10 codigos reais do catalogo
     # (plan_catalog.py) casam com um segmento. Codigos legado (free/legacy/
@@ -45,10 +51,16 @@ def upgrade() -> None:
     pet_list = ", ".join(f"'{codigo}'" for codigo in PLANOS_PET)
     vet_list = ", ".join(f"'{codigo}'" for codigo in PLANOS_VET)
     grooming_list = ", ".join(f"'{codigo}'" for codigo in PLANOS_GROOMING)
-    bind.execute(sa.text(f"UPDATE tenants SET plan_pet = plan WHERE plan IN ({pet_list})"))
-    bind.execute(sa.text(f"UPDATE tenants SET plan_vet = plan WHERE plan IN ({vet_list})"))
     bind.execute(
-        sa.text(f"UPDATE tenants SET plan_grooming = plan WHERE plan IN ({grooming_list})")
+        sa.text(f"UPDATE tenants SET plan_pet = plan WHERE plan IN ({pet_list})")
+    )
+    bind.execute(
+        sa.text(f"UPDATE tenants SET plan_vet = plan WHERE plan IN ({vet_list})")
+    )
+    bind.execute(
+        sa.text(
+            f"UPDATE tenants SET plan_grooming = plan WHERE plan IN ({grooming_list})"
+        )
     )
 
 

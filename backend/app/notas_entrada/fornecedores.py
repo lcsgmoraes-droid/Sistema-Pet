@@ -89,8 +89,7 @@ def criar_fornecedor_automatico(
             fornecedor.telefone = dados_xml.get("fornecedor_telefone", "")
 
             if not fornecedor.codigo:
-                fornecedor.codigo = gerar_codigo_cliente(db, "PJ", tenant_id
-                )
+                fornecedor.codigo = gerar_codigo_cliente(db, "PJ", tenant_id)
 
             db.commit()
             db.refresh(fornecedor)

@@ -10,7 +10,11 @@ mas o e-mail de definicao de senha do titular nao sai. Ela e desligada quando:
 from sqlalchemy.orm import Session
 
 from app.models import Tenant, UserTenant
-from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
+from app.tenancy.context import (
+    clear_current_tenant,
+    get_current_tenant,
+    set_current_tenant,
+)
 
 
 def confirmar_credenciais_do_usuario(db: Session, *, user_id: int) -> int:

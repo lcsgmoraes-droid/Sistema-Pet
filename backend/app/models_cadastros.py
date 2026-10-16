@@ -110,8 +110,11 @@ class Cliente(BaseTenantModel):
     def _origem_imutavel(self, key, valor):
         atual = self.__dict__.get("origem_tenant_id")
         if atual is not None and valor != atual:
-            raise ValueError("A loja de origem do cadastro e definida na criacao e nao pode ser alterada.")
+            raise ValueError(
+                "A loja de origem do cadastro e definida na criacao e nao pode ser alterada."
+            )
         return valor
+
     is_cliente = Column(Boolean, nullable=False, default=False, server_default="0")
     is_fornecedor = Column(Boolean, nullable=False, default=False, server_default="0")
     is_veterinario = Column(Boolean, nullable=False, default=False, server_default="0")
@@ -131,7 +134,9 @@ class Cliente(BaseTenantModel):
     cpf = Column(String(14), nullable=True, index=True)
     telefone = Column(String(50), nullable=True)
     celular = Column(String(50), nullable=True)
-    celular_whatsapp = Column(Boolean, nullable=False, default=False, server_default="0")
+    celular_whatsapp = Column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
     email = Column(String(255), nullable=True)
     data_nascimento = Column(
         DateTime, nullable=True
@@ -427,7 +432,9 @@ class Pet(BaseTenantModel):
     def _origem_imutavel(self, key, valor):
         atual = self.__dict__.get("origem_tenant_id")
         if atual is not None and valor != atual:
-            raise ValueError("A loja de origem do pet e definida na criacao e nao pode ser alterada.")
+            raise ValueError(
+                "A loja de origem do pet e definida na criacao e nao pode ser alterada."
+            )
         return valor
 
     # Relacionamento
@@ -444,23 +451,33 @@ class ClienteHistoricoAlteracao(TenantScoped, Base):
         nullable=False,
         index=True,
     )
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     campo = Column(String(100), nullable=False)
     valor_anterior = Column(Text, nullable=True)
     valor_novo = Column(Text, nullable=True)
-    alterado_em = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    alterado_em = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
 
 class PetHistoricoAlteracao(TenantScoped, Base):
     __tablename__ = "pets_historico_alteracoes"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    pet_id = Column(Integer, ForeignKey("pets.id", ondelete="CASCADE"), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    pet_id = Column(
+        Integer, ForeignKey("pets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     campo = Column(String(100), nullable=False)
     valor_anterior = Column(Text, nullable=True)
     valor_novo = Column(Text, nullable=True)
-    alterado_em = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    alterado_em = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
 
 class PetRegistroClinico(TenantScoped, Base):
@@ -473,10 +490,18 @@ class PetRegistroClinico(TenantScoped, Base):
     __tablename__ = "pets_registros_clinicos"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    pet_id = Column(Integer, ForeignKey("pets.id", ondelete="CASCADE"), nullable=False, index=True)
+    pet_id = Column(
+        Integer, ForeignKey("pets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     tipo = Column(String(20), nullable=False)
     texto = Column(Text, nullable=True)
     valor = Column(Float, nullable=True)
-    registrado_em = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    criado_em = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    registrado_em = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    criado_em = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

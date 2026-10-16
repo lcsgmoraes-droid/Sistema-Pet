@@ -88,7 +88,10 @@ def listar_duplicidades_grupo(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Pares de pessoas (CPF/CNPJ) e produtos (codigo de barras/GTIN) repetidos entre lojas do grupo."""
-    from app.services.grupo_duplicados_service import pessoas_duplicadas, produtos_duplicados
+    from app.services.grupo_duplicados_service import (
+        pessoas_duplicadas,
+        produtos_duplicados,
+    )
 
     _usuario, _empresa_id = user_and_tenant
     return {
@@ -119,7 +122,9 @@ def buscar_produtos_para_estoque_compartilhado(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _usuario, empresa_id = user_and_tenant
-    return GrupoComercialEstoqueCompartilhadoService(db).buscar_produtos_compartilhaveis(
+    return GrupoComercialEstoqueCompartilhadoService(
+        db
+    ).buscar_produtos_compartilhaveis(
         grupo_id,
         empresa_id,
         empresa_consumidora_id,

@@ -545,7 +545,9 @@ def _ensure_person(
         # kind e sempre um literal interno fixo deste script (nunca entrada
         # de usuario), seguro pra entrar no nome da coluna.
         db.execute(
-            text(f"UPDATE clientes SET {CAMPO_FLAG_POR_TIPO[kind]} = true WHERE id = :id"),
+            text(
+                f"UPDATE clientes SET {CAMPO_FLAG_POR_TIPO[kind]} = true WHERE id = :id"
+            ),
             {"id": existing},
         )
         return int(existing)

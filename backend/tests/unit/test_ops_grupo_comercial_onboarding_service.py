@@ -7,6 +7,7 @@ import app.services.ops_grupo_comercial_onboarding_service as onboarding_module
 import app.services.tenant_provisioning_service as tenant_provisioning_service
 from app.db import Base
 from app.db import base as _base  # noqa: F401 - registra todo o metadata (evita
+
 # InvalidRequestError ao resolver relationship() por nome de outras classes,
 # mesmo criando so um subconjunto de tabelas abaixo).
 from app.grupo_comercial_models import (
@@ -37,7 +38,9 @@ def _contar(db, tabela: str, condicao: str = "1=1", **params) -> int:
     bloqueiam consultas ORM sem contexto de tenant ativo (fail-fast do
     tenancy guard), e apos onboard_grupo_comercial() o contexto sempre
     termina limpo/restaurado para outro tenant, nunca o dos tenants criados."""
-    return db.execute(text(f"SELECT count(*) FROM {tabela} WHERE {condicao}"), params).scalar_one()
+    return db.execute(
+        text(f"SELECT count(*) FROM {tabela} WHERE {condicao}"), params
+    ).scalar_one()
 
 
 def _campo_usuario(db, email: str, campo: str):
@@ -175,7 +178,9 @@ def test_onboard_grupo_comercial_cria_grupo_unico_com_titular_responsavel_nas_n_
 
     for tenant_id in tenants_membro:
         with tenant_context(tenant_id):
-            clientes = db.query(Cliente).filter(Cliente.email == "titular@example.com").all()
+            clientes = (
+                db.query(Cliente).filter(Cliente.email == "titular@example.com").all()
+            )
         assert clientes == []
 
 
@@ -288,7 +293,9 @@ def test_onboard_grupo_comercial_falha_na_primeira_loja_desfaz_tudo(db, monkeypa
 
     assert excinfo.value.status_code == 500
     assert _contar(db, "tenants") == 0
-    assert _contar(db, "users", "email = :email", email="falha-primeira@example.com") == 0
+    assert (
+        _contar(db, "users", "email = :email", email="falha-primeira@example.com") == 0
+    )
     assert _contar(db, "grupos_comerciais") == 0
 
 
@@ -351,7 +358,9 @@ def test_onboard_grupo_comercial_cria_lojas_mesmo_se_email_nao_enviar(db, monkey
     assert _contar(db, "tenants") == 2
     assert _contar(db, "grupos_comerciais") == 1
     for loja in resultado.lojas:
-        assert _campo_tenant(db, loja["tenant_id"], "onboarding_credencial_email_pendente") in (
+        assert _campo_tenant(
+            db, loja["tenant_id"], "onboarding_credencial_email_pendente"
+        ) in (
             True,
             1,
         )

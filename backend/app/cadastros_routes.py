@@ -787,7 +787,9 @@ def vincular_mestre_raca(
     return raca
 
 
-@router.delete("/especies/{especie_id}/vincular-mestre", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/especies/{especie_id}/vincular-mestre", status_code=status.HTTP_204_NO_CONTENT
+)
 def remover_vinculo_mestre_especie(
     especie_id: int,
     db: Session = Depends(get_session),
@@ -807,7 +809,9 @@ def remover_vinculo_mestre_especie(
     return None
 
 
-@router.delete("/racas/{raca_id}/vincular-mestre", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/racas/{raca_id}/vincular-mestre", status_code=status.HTTP_204_NO_CONTENT
+)
 def remover_vinculo_mestre_raca(
     raca_id: int,
     db: Session = Depends(get_session),

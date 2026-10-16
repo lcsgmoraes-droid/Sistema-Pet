@@ -229,7 +229,9 @@ def test_modulos_admin_activation_sets_target_tenant_context(monkeypatch):
         lambda: tenant_context_calls.append("cleared"),
         raising=False,
     )
-    monkeypatch.setattr(modulo_activation_service, "log_business_event", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        modulo_activation_service, "log_business_event", lambda **_kwargs: None
+    )
 
     db = _FakeAdminModuleDb()
     current_user = SimpleNamespace(id=7, is_superadmin=True, is_system_admin=False)

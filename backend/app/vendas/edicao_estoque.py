@@ -108,8 +108,10 @@ def ajustar_estoque_edicao_venda(
             continue
         produto_id = int(item.produto_id)
         try:
-            resolucao = GrupoComercialEstoqueCompartilhadoService.resolver_produto_venda(
-                db, tenant_venda, produto_id
+            resolucao = (
+                GrupoComercialEstoqueCompartilhadoService.resolver_produto_venda(
+                    db, tenant_venda, produto_id
+                )
             )
         except HTTPException as error:
             antigo = antigos_por_produto.get(produto_id)

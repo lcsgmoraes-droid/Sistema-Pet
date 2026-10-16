@@ -40,7 +40,9 @@ def trava_codigos_do_grupo(db: Session, tenant_id, recurso: str) -> None:
     db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:chave))"), {"chave": chave})
 
 
-def codigo_em_uso_no_grupo(db: Session, *, tenant_id, coluna, valor: str, excluir_id=None, modelo=None) -> bool:
+def codigo_em_uso_no_grupo(
+    db: Session, *, tenant_id, coluna, valor: str, excluir_id=None, modelo=None
+) -> bool:
     ids = ids_uuid_do_grupo(db, tenant_id)
     consulta = db.query(modelo).filter(
         modelo.tenant_id.in_(ids),

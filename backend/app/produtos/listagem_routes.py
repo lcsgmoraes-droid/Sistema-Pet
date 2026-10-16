@@ -226,10 +226,8 @@ def listar_produtos(
 
     # Incluir produtos de tenants parceiros (ex.: pet shop parceiro da clínica)
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
-    compartilhamentos_catalogo = (
-        GrupoComercialEstoqueCompartilhadoService.mapa_catalogo_completo_para_consumidora(
-            db, tenant_id
-        )
+    compartilhamentos_catalogo = GrupoComercialEstoqueCompartilhadoService.mapa_catalogo_completo_para_consumidora(
+        db, tenant_id
     )
 
     # QUERY BASE

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.db import Base
 from app.db import base as _base  # noqa: F401 - registra todo o metadata (evita
+
 # InvalidRequestError ao resolver relationship() por nome de outras classes,
 # mesmo criando so um subconjunto de tabelas abaixo).
 from app.especie_raca_mestre_models import EspecieMestre, RacaMestre
@@ -67,7 +68,9 @@ def _criar_raca_local(db, especie_id: int, nome="Labrador") -> Raca:
     return raca
 
 
-def _criar_especie_mestre(db, grupo_id=GRUPO_1, nome="Cão", ativo=True) -> EspecieMestre:
+def _criar_especie_mestre(
+    db, grupo_id=GRUPO_1, nome="Cão", ativo=True
+) -> EspecieMestre:
     mestre = EspecieMestre(
         grupo_id=grupo_id, nome=nome, ativo=ativo, criado_por_usuario_id=USUARIO_ID
     )

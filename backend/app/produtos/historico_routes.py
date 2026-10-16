@@ -25,14 +25,21 @@ def listar_historico_produto(
     from app.produtos_catalogo_models import ProdutoHistoricoAlteracao
 
     _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
-    produto = db.query(Produto).filter(Produto.id == produto_id, Produto.tenant_id == tenant_id).first()
+    produto = (
+        db.query(Produto)
+        .filter(Produto.id == produto_id, Produto.tenant_id == tenant_id)
+        .first()
+    )
     if produto is None:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
     linhas = (
         db.query(ProdutoHistoricoAlteracao, User.nome, User.email)
         .outerjoin(User, User.id == ProdutoHistoricoAlteracao.user_id)
         .filter(ProdutoHistoricoAlteracao.produto_id == produto_id)
-        .order_by(ProdutoHistoricoAlteracao.alterado_em.desc(), ProdutoHistoricoAlteracao.id.desc())
+        .order_by(
+            ProdutoHistoricoAlteracao.alterado_em.desc(),
+            ProdutoHistoricoAlteracao.id.desc(),
+        )
         .limit(limite)
         .all()
     )
@@ -42,7 +49,9 @@ def listar_historico_produto(
                 "campo": registro.campo,
                 "valor_anterior": registro.valor_anterior,
                 "valor_novo": registro.valor_novo,
-                "alterado_em": registro.alterado_em.isoformat() if registro.alterado_em else None,
+                "alterado_em": registro.alterado_em.isoformat()
+                if registro.alterado_em
+                else None,
                 "usuario": nome or email,
             }
             for registro, nome, email in linhas

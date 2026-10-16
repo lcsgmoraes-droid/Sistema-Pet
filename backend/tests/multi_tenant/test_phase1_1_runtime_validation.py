@@ -270,7 +270,9 @@ def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(
     # o Checkpoint 0 (fundacao do grupo comercial obrigatorio) - o mock
     # precisa mirar o modulo que efetivamente chama a funcao, nao mais
     # auth_routes.
-    monkeypatch.setattr(tenant_provisioning_service, "onboard_tenant_defaults", fake_onboard)
+    monkeypatch.setattr(
+        tenant_provisioning_service, "onboard_tenant_defaults", fake_onboard
+    )
     monkeypatch.setattr(auth_routes, "EMAIL_VERIFICATION_REQUIRED", False)
 
     auth_db_session.add_all(
@@ -476,7 +478,9 @@ def test_register_fails_closed_when_required_onboarding_fails(
         assert kwargs.get("strict_required") is True
         raise RuntimeError("Onboarding obrigatorio incompleto")
 
-    monkeypatch.setattr(tenant_provisioning_service, "onboard_tenant_defaults", fail_onboard)
+    monkeypatch.setattr(
+        tenant_provisioning_service, "onboard_tenant_defaults", fail_onboard
+    )
     monkeypatch.setattr(auth_routes, "EMAIL_VERIFICATION_REQUIRED", False)
 
     with pytest.raises(auth_routes.HTTPException) as exc_info:

@@ -25,18 +25,22 @@ def pessoas_duplicadas(db: Session, grupo_id: int) -> list[dict]:
     ids = _tenants_do_grupo(db, grupo_id)
     if len(ids) < 2:
         return []
-    linhas = db.execute(
-        text(
-            """
+    linhas = (
+        db.execute(
+            text(
+                """
             SELECT regexp_replace(COALESCE(cnpj, cpf), '\D', '', 'g') AS documento,
                    id, nome, codigo, tenant_id::text AS loja_id, ativo
             FROM clientes
             WHERE tenant_id::text = ANY(:ids)
               AND regexp_replace(COALESCE(cnpj, cpf, ''), '\D', '', 'g') <> ''
             """
-        ),
-        {"ids": ids},
-    ).mappings().all()
+            ),
+            {"ids": ids},
+        )
+        .mappings()
+        .all()
+    )
     grupos = defaultdict(list)
     for linha in linhas:
         grupos[linha["documento"]].append(dict(linha))
@@ -51,18 +55,22 @@ def produtos_duplicados(db: Session, grupo_id: int) -> list[dict]:
     ids = _tenants_do_grupo(db, grupo_id)
     if len(ids) < 2:
         return []
-    linhas = db.execute(
-        text(
-            """
+    linhas = (
+        db.execute(
+            text(
+                """
             SELECT COALESCE(NULLIF(trim(codigo_barras), ''), NULLIF(trim(gtin_ean), '')) AS codigo,
                    id, nome, codigo AS sku, tenant_id::text AS loja_id
             FROM produtos
             WHERE tenant_id::text = ANY(:ids)
               AND COALESCE(NULLIF(trim(codigo_barras), ''), NULLIF(trim(gtin_ean), '')) IS NOT NULL
             """
-        ),
-        {"ids": ids},
-    ).mappings().all()
+            ),
+            {"ids": ids},
+        )
+        .mappings()
+        .all()
+    )
     grupos = defaultdict(list)
     for linha in linhas:
         grupos[linha["codigo"]].append(dict(linha))

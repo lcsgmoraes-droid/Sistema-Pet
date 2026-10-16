@@ -46,24 +46,40 @@ def sessao():
 
 def _loja(session, nome):
     tenant_id = str(uuid4())
-    session.add(Tenant(id=tenant_id, name=nome, name_normalized=nome.lower(), status="active"))
+    session.add(
+        Tenant(id=tenant_id, name=nome, name_normalized=nome.lower(), status="active")
+    )
     session.flush()
     return tenant_id
 
 
 def _grupo(session, lojas):
-    grupo = GrupoComercial(nome="Grupo teste", criado_por_empresa_id=lojas[0], criado_por_usuario_id=1)
+    grupo = GrupoComercial(
+        nome="Grupo teste", criado_por_empresa_id=lojas[0], criado_por_usuario_id=1
+    )
     session.add(grupo)
     session.flush()
     for loja in lojas:
-        session.add(GrupoComercialMembro(grupo_id=grupo.id, empresa_id=loja, status="ativo"))
+        session.add(
+            GrupoComercialMembro(grupo_id=grupo.id, empresa_id=loja, status="ativo")
+        )
         session.flush()
 
 
 def _produto(session, loja, codigo):
     set_current_tenant(loja)
     usuario = session.execute(text("SELECT id FROM users ORDER BY id LIMIT 1")).scalar()
-    session.add(Produto(tenant_id=UUID(loja), user_id=usuario, nome="Racao", codigo=codigo, tipo_produto="simples", tipo="produto", is_parent=False))
+    session.add(
+        Produto(
+            tenant_id=UUID(loja),
+            user_id=usuario,
+            nome="Racao",
+            codigo=codigo,
+            tipo_produto="simples",
+            tipo="produto",
+            is_parent=False,
+        )
+    )
     session.flush()
     clear_current_tenant()
 
@@ -76,7 +92,16 @@ def test_codigo_de_pessoa_nao_se_repete_entre_lojas_do_grupo(sessao):
 
     set_current_tenant(loja_a)
     codigo_a = gerar_codigo_cliente(sessao, "PF", UUID(loja_a))
-    sessao.add(Cliente(tenant_id=UUID(loja_a), origem_tenant_id=UUID(loja_a), user_id=usuario, codigo=codigo_a, nome="A", is_cliente=True))
+    sessao.add(
+        Cliente(
+            tenant_id=UUID(loja_a),
+            origem_tenant_id=UUID(loja_a),
+            user_id=usuario,
+            codigo=codigo_a,
+            nome="A",
+            is_cliente=True,
+        )
+    )
     sessao.flush()
 
     set_current_tenant(loja_b)
@@ -114,7 +139,18 @@ def test_codigo_de_barras_ja_usado_em_outra_loja_do_grupo_e_recusado(sessao):
     _grupo(sessao, [loja_a, loja_b])
     set_current_tenant(loja_a)
     usuario = sessao.execute(text("SELECT id FROM users ORDER BY id LIMIT 1")).scalar()
-    sessao.add(Produto(tenant_id=UUID(loja_a), user_id=usuario, nome="Racao", codigo="BAR-1", codigo_barras="7891234567890", tipo_produto="simples", tipo="produto", is_parent=False))
+    sessao.add(
+        Produto(
+            tenant_id=UUID(loja_a),
+            user_id=usuario,
+            nome="Racao",
+            codigo="BAR-1",
+            codigo_barras="7891234567890",
+            tipo_produto="simples",
+            tipo="produto",
+            is_parent=False,
+        )
+    )
     sessao.flush()
     clear_current_tenant()
 

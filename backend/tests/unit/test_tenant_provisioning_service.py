@@ -7,15 +7,28 @@ from sqlalchemy.orm import Session
 import app.services.tenant_provisioning_service as tenant_provisioning_service
 from app.db import Base
 from app.db import base as _base  # noqa: F401 - registra todo o metadata (evita
+
 # InvalidRequestError ao resolver relationship() por nome de outras classes,
 # mesmo criando so um subconjunto de tabelas abaixo).
-from app.models import Permission, Role, RolePermission, Tenant, TenantLoginName, User, UserTenant
+from app.models import (
+    Permission,
+    Role,
+    RolePermission,
+    Tenant,
+    TenantLoginName,
+    User,
+    UserTenant,
+)
 from app.services.default_roles_service import DEFAULT_TENANT_ROLES
 from app.services.tenant_provisioning_service import (
     TenantOnboardingError,
     provision_tenant,
 )
-from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
+from app.tenancy.context import (
+    clear_current_tenant,
+    get_current_tenant,
+    set_current_tenant,
+)
 
 
 TENANT_EXISTENTE = uuid.UUID("55555555-5555-5555-5555-555555555555")
@@ -82,11 +95,17 @@ def test_provision_tenant_cria_usuario_novo_tenant_e_roles_e_limpa_contexto(db):
     assert usuario.tenant_id == resultado.tenant_id
 
     roles = db.query(Role).filter(Role.tenant_id == resultado.tenant_id).all()
-    assert {role.name for role in roles} == {"Administrador", *DEFAULT_TENANT_ROLES.keys()}
+    assert {role.name for role in roles} == {
+        "Administrador",
+        *DEFAULT_TENANT_ROLES.keys(),
+    }
 
     vinculo = (
         db.query(UserTenant)
-        .filter(UserTenant.user_id == usuario.id, UserTenant.tenant_id == resultado.tenant_id)
+        .filter(
+            UserTenant.user_id == usuario.id,
+            UserTenant.tenant_id == resultado.tenant_id,
+        )
         .one()
     )
     assert vinculo.role_id == resultado.admin_role.id

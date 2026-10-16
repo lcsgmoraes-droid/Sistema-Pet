@@ -26,7 +26,9 @@ def _obter_cliente_ou_404(
 ):
     consulta = db.query(Cliente).filter(
         Cliente.id == cliente_id,
-        or_(Cliente.tenant_id == tenant_id, pessoa_visivel_no_grupo(Cliente, tenant_id)),
+        or_(
+            Cliente.tenant_id == tenant_id, pessoa_visivel_no_grupo(Cliente, tenant_id)
+        ),
     )
     if bloquear_credito:
         consulta = consulta.populate_existing().with_for_update()

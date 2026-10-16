@@ -16,7 +16,12 @@ depends_on = None
 def upgrade():
     op.add_column(
         "produto_lotes",
-        sa.Column("apenas_identificacao", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column(
+            "apenas_identificacao",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.false(),
+        ),
     )
 
 

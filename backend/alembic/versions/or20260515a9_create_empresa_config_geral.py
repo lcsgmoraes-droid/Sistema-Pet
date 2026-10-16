@@ -34,20 +34,36 @@ def _indexes(table_name: str) -> set[str]:
     return {index["name"] for index in inspector.get_indexes(table_name)}
 
 
-def _create_index_if_missing(index_name: str, table_name: str, columns: list[str], *, unique: bool = False) -> None:
+def _create_index_if_missing(
+    index_name: str, table_name: str, columns: list[str], *, unique: bool = False
+) -> None:
     if index_name not in _indexes(table_name):
         op.create_index(index_name, table_name, columns, unique=unique)
 
 
 EMPRESA_CONFIG_GERAL_COLUMNS = {
     "tenant_id": sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
-    "created_at": sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-    "updated_at": sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+    "created_at": sa.Column(
+        "created_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.text("now()"),
+        nullable=False,
+    ),
+    "updated_at": sa.Column(
+        "updated_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.text("now()"),
+        nullable=False,
+    ),
     "razao_social": sa.Column("razao_social", sa.String(length=200), nullable=True),
     "nome_fantasia": sa.Column("nome_fantasia", sa.String(length=200), nullable=True),
     "cnpj": sa.Column("cnpj", sa.String(length=18), nullable=True),
-    "inscricao_estadual": sa.Column("inscricao_estadual", sa.String(length=20), nullable=True),
-    "inscricao_municipal": sa.Column("inscricao_municipal", sa.String(length=20), nullable=True),
+    "inscricao_estadual": sa.Column(
+        "inscricao_estadual", sa.String(length=20), nullable=True
+    ),
+    "inscricao_municipal": sa.Column(
+        "inscricao_municipal", sa.String(length=20), nullable=True
+    ),
     "logradouro": sa.Column("logradouro", sa.String(length=200), nullable=True),
     "numero": sa.Column("numero", sa.String(length=20), nullable=True),
     "complemento": sa.Column("complemento", sa.String(length=100), nullable=True),
@@ -58,17 +74,51 @@ EMPRESA_CONFIG_GERAL_COLUMNS = {
     "telefone": sa.Column("telefone", sa.String(length=20), nullable=True),
     "email": sa.Column("email", sa.String(length=100), nullable=True),
     "site": sa.Column("site", sa.String(length=100), nullable=True),
-    "margem_saudavel_minima": sa.Column("margem_saudavel_minima", sa.Numeric(precision=5, scale=2), nullable=True, server_default="30.0"),
-    "margem_alerta_minima": sa.Column("margem_alerta_minima", sa.Numeric(precision=5, scale=2), nullable=True, server_default="15.0"),
-    "mensagem_venda_saudavel": sa.Column("mensagem_venda_saudavel", sa.Text(), nullable=True),
-    "mensagem_venda_alerta": sa.Column("mensagem_venda_alerta", sa.Text(), nullable=True),
-    "mensagem_venda_critica": sa.Column("mensagem_venda_critica", sa.Text(), nullable=True),
-    "dias_tolerancia_atraso": sa.Column("dias_tolerancia_atraso", sa.Integer(), nullable=True, server_default="5"),
-    "meta_faturamento_mensal": sa.Column("meta_faturamento_mensal", sa.Numeric(precision=12, scale=2), nullable=True, server_default="0"),
-    "alerta_estoque_percentual": sa.Column("alerta_estoque_percentual", sa.Integer(), nullable=True, server_default="20"),
-    "dias_produto_parado": sa.Column("dias_produto_parado", sa.Integer(), nullable=True, server_default="90"),
-    "aliquota_imposto_padrao": sa.Column("aliquota_imposto_padrao", sa.Numeric(precision=5, scale=2), nullable=True, server_default="7.0"),
-    "ativo": sa.Column("ativo", sa.Boolean(), nullable=True, server_default=sa.text("true")),
+    "margem_saudavel_minima": sa.Column(
+        "margem_saudavel_minima",
+        sa.Numeric(precision=5, scale=2),
+        nullable=True,
+        server_default="30.0",
+    ),
+    "margem_alerta_minima": sa.Column(
+        "margem_alerta_minima",
+        sa.Numeric(precision=5, scale=2),
+        nullable=True,
+        server_default="15.0",
+    ),
+    "mensagem_venda_saudavel": sa.Column(
+        "mensagem_venda_saudavel", sa.Text(), nullable=True
+    ),
+    "mensagem_venda_alerta": sa.Column(
+        "mensagem_venda_alerta", sa.Text(), nullable=True
+    ),
+    "mensagem_venda_critica": sa.Column(
+        "mensagem_venda_critica", sa.Text(), nullable=True
+    ),
+    "dias_tolerancia_atraso": sa.Column(
+        "dias_tolerancia_atraso", sa.Integer(), nullable=True, server_default="5"
+    ),
+    "meta_faturamento_mensal": sa.Column(
+        "meta_faturamento_mensal",
+        sa.Numeric(precision=12, scale=2),
+        nullable=True,
+        server_default="0",
+    ),
+    "alerta_estoque_percentual": sa.Column(
+        "alerta_estoque_percentual", sa.Integer(), nullable=True, server_default="20"
+    ),
+    "dias_produto_parado": sa.Column(
+        "dias_produto_parado", sa.Integer(), nullable=True, server_default="90"
+    ),
+    "aliquota_imposto_padrao": sa.Column(
+        "aliquota_imposto_padrao",
+        sa.Numeric(precision=5, scale=2),
+        nullable=True,
+        server_default="7.0",
+    ),
+    "ativo": sa.Column(
+        "ativo", sa.Boolean(), nullable=True, server_default=sa.text("true")
+    ),
 }
 
 
@@ -82,7 +132,12 @@ def upgrade() -> None:
             *EMPRESA_CONFIG_GERAL_COLUMNS.values(),
             sa.PrimaryKeyConstraint("id"),
         )
-        op.create_index("ix_empresa_config_geral_tenant_id", "empresa_config_geral", ["tenant_id"], unique=False)
+        op.create_index(
+            "ix_empresa_config_geral_tenant_id",
+            "empresa_config_geral",
+            ["tenant_id"],
+            unique=False,
+        )
         return
 
     existing_columns = _columns("empresa_config_geral")
@@ -90,7 +145,9 @@ def upgrade() -> None:
         if column_name not in existing_columns:
             op.add_column("empresa_config_geral", column)
 
-    _create_index_if_missing("ix_empresa_config_geral_tenant_id", "empresa_config_geral", ["tenant_id"])
+    _create_index_if_missing(
+        "ix_empresa_config_geral_tenant_id", "empresa_config_geral", ["tenant_id"]
+    )
 
 
 def downgrade() -> None:

@@ -37,7 +37,11 @@ def db():
 
 def test_grava_so_os_campos_que_mudaram(db):
     antes = {"nome": "Ana", "telefone": "11911112222", "cidade": "Presidente Prudente"}
-    depois = {"nome": "Ana Maria", "telefone": "11911112222", "cidade": "Presidente Prudente"}
+    depois = {
+        "nome": "Ana Maria",
+        "telefone": "11911112222",
+        "cidade": "Presidente Prudente",
+    }
 
     total = registrar_alteracoes_cliente(
         db, cliente_id=7, tenant_id=LOJA, user_id=3, antes=antes, depois=depois

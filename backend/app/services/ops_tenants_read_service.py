@@ -748,8 +748,10 @@ def _bulk_grupo_comercial_by_tenant(
     paginacao por cliente, que precisa saber o grupo de todo mundo antes de
     decidir quem entra em cada pagina, sem virar uma consulta por tenant.
     """
-    if not tenant_ids or not _table_exists(db, "grupo_comercial_membros") or not _table_exists(
-        db, "grupos_comerciais"
+    if (
+        not tenant_ids
+        or not _table_exists(db, "grupo_comercial_membros")
+        or not _table_exists(db, "grupos_comerciais")
     ):
         return {}
 
@@ -792,7 +794,13 @@ def list_ops_tenants_grouped(
     tornar a aba Tenants rapida mesmo com muitos tenants cadastrados.
     """
     if not _table_exists(db, "tenants"):
-        return {"items": [], "page": page, "page_size": page_size, "total_groups": 0, "total_pages": 0}
+        return {
+            "items": [],
+            "page": page,
+            "page_size": page_size,
+            "total_groups": 0,
+            "total_pages": 0,
+        }
 
     clauses = []
     params: dict[str, Any] = {}
@@ -838,12 +846,16 @@ def list_ops_tenants_grouped(
 
     grupos_ordenados = sorted(
         grupos.values(),
-        key=lambda grupo: grupo["sort_key"] or datetime.min.replace(tzinfo=timezone.utc),
+        key=lambda grupo: (
+            grupo["sort_key"] or datetime.min.replace(tzinfo=timezone.utc)
+        ),
         reverse=True,
     )
 
     total_groups = len(grupos_ordenados)
-    total_pages = max((total_groups + page_size - 1) // page_size, 1) if total_groups else 0
+    total_pages = (
+        max((total_groups + page_size - 1) // page_size, 1) if total_groups else 0
+    )
     pagina_segura = max(page, 1)
     inicio = (pagina_segura - 1) * page_size
     pagina_grupos = grupos_ordenados[inicio : inicio + page_size]

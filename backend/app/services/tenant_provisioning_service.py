@@ -112,7 +112,9 @@ def provision_tenant(
         billing_status="trial" if grant_trial else "pending",
         trial_started_at=trial_started_at,
         trial_ends_at=(
-            trial_started_at + timedelta(days=DEFAULT_TRIAL_DAYS) if grant_trial else None
+            trial_started_at + timedelta(days=DEFAULT_TRIAL_DAYS)
+            if grant_trial
+            else None
         ),
         subscription_source="manual",
         organization_type=organization_type,

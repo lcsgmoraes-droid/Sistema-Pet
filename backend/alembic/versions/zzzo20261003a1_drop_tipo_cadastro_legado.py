@@ -45,7 +45,9 @@ def upgrade() -> None:
     for campo in ("is_cliente", "is_fornecedor", "is_veterinario", "is_funcionario"):
         op.add_column(
             "pessoa_mestre",
-            sa.Column(campo, sa.Boolean(), nullable=False, server_default=sa.text("false")),
+            sa.Column(
+                campo, sa.Boolean(), nullable=False, server_default=sa.text("false")
+            ),
         )
     for tipo in ("cliente", "fornecedor", "veterinario", "funcionario"):
         op.execute(

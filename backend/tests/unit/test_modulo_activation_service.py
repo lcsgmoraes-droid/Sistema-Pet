@@ -36,7 +36,9 @@ def db():
 
 
 def _contar(db, tabela: str, condicao: str = "1=1", **params) -> int:
-    return db.execute(text(f"SELECT count(*) FROM {tabela} WHERE {condicao}"), params).scalar_one()
+    return db.execute(
+        text(f"SELECT count(*) FROM {tabela} WHERE {condicao}"), params
+    ).scalar_one()
 
 
 def _hex(tenant_id: str) -> str:
@@ -124,4 +126,7 @@ def test_ativar_modulo_manual_commit_false_nao_commita(db):
     )
     session.rollback()
 
-    assert _contar(session, "assinaturas_modulos", "tenant_id = :tid", tid=_hex(tenant_id)) == 0
+    assert (
+        _contar(session, "assinaturas_modulos", "tenant_id = :tid", tid=_hex(tenant_id))
+        == 0
+    )

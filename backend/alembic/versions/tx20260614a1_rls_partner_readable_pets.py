@@ -74,7 +74,9 @@ def _drop_custom_policies(table_name: str, *, reverse: bool = False) -> None:
 
 
 def _enable_partner_readable_rls(table_name: str) -> None:
-    select_policy, insert_policy, update_policy, delete_policy = _policy_names(table_name)
+    select_policy, insert_policy, update_policy, delete_policy = _policy_names(
+        table_name
+    )
 
     op.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY")
     op.execute(f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY")

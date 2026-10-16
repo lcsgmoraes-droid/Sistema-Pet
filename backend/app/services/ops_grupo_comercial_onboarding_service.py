@@ -37,7 +37,11 @@ from app.services.tenant_provisioning_service import (
     TenantOnboardingError,
     provision_tenant,
 )
-from app.tenancy.context import clear_tenant_context, get_current_tenant, set_tenant_context
+from app.tenancy.context import (
+    clear_tenant_context,
+    get_current_tenant,
+    set_tenant_context,
+)
 
 
 class OpsGrupoComercialOnboardingError(Exception):
