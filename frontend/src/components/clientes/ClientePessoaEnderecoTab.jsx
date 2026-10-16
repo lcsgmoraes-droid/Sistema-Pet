@@ -20,16 +20,18 @@ const COR_TIPO_ENDERECO = {
   trabalho: "bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-200",
 };
 
-function CardEndereco({ apelido, badge, endereco, onEditar, onExcluir }) {
+function CardEndereco({ apelido, badge, endereco, erro, onEditar, onExcluir }) {
   const temDados = Boolean(endereco.cep || endereco.endereco || endereco.cidade);
 
   return (
     <div
       className={[
         "rounded-lg border p-3",
-        badge.principal
-          ? "border-indigo-300 bg-indigo-50/60 dark:border-indigo-500/40 dark:bg-indigo-500/10"
-          : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800",
+        erro
+          ? "border-red-300 bg-red-50/60 dark:border-red-500/40 dark:bg-red-500/10"
+          : badge.principal
+            ? "border-indigo-300 bg-indigo-50/60 dark:border-indigo-500/40 dark:bg-indigo-500/10"
+            : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800",
       ].join(" ")}
     >
       <div className="flex items-start justify-between gap-2">
@@ -75,6 +77,10 @@ function CardEndereco({ apelido, badge, endereco, onEditar, onExcluir }) {
           ) : (
             <p className="text-sm text-slate-500 dark:text-slate-400">Nenhum endereço cadastrado</p>
           )}
+
+          {erro ? (
+            <p className="mt-1.5 text-xs font-medium text-red-700 dark:text-red-400">{erro}</p>
+          ) : null}
         </div>
         <div className="flex flex-none gap-1">
           <BotaoInteracao icon={Edit2} tamanho="pequeno" onClick={onEditar}>
@@ -98,6 +104,7 @@ function CardEndereco({ apelido, badge, endereco, onEditar, onExcluir }) {
 export default function ClientePessoaEnderecoTab({
   abrirModalEndereco,
   enderecosAdicionais,
+  erroEnderecoPrincipal,
   formData,
   removerEndereco,
 }) {
@@ -141,6 +148,7 @@ export default function ClientePessoaEnderecoTab({
         <CardEndereco
           endereco={enderecoPrincipal}
           badge={{ principal: true }}
+          erro={erroEnderecoPrincipal}
           onEditar={() => abrirModalEndereco("principal")}
           onExcluir={() => removerEndereco("principal")}
         />
