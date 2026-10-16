@@ -58,13 +58,15 @@ def test_validation_error_does_not_echo_submitted_secret(caplog):
 
 
 def test_custom_validation_context_is_removed():
+    """input/ctx (where the raw submitted value lives) are always dropped,
+    regardless of what the validator's own message says."""
     errors = [
         {
             "type": "value_error",
             "loc": ("body", "password"),
-            "msg": f"Value error, {SENSITIVE_VALUE}",
+            "msg": "Value error, Informe uma senha valida.",
             "input": SENSITIVE_VALUE,
-            "ctx": {"error": ValueError(SENSITIVE_VALUE)},
+            "ctx": {"error": ValueError("Informe uma senha valida.")},
         }
     ]
 
@@ -72,8 +74,31 @@ def test_custom_validation_context_is_removed():
         {
             "type": "value_error",
             "loc": ["body", "password"],
-            "msg": "Valor invalido",
+            "msg": "Informe uma senha valida.",
         }
+    ]
+
+
+def test_validator_message_is_shown_without_pydantic_prefix():
+    """Validators in this codebase only raise static, safe, user-facing
+    text — that message now passes through, just without the internal
+    'Value error, '/'Assertion failed, ' framing Pydantic v2 adds."""
+    errors = [
+        {
+            "type": "value_error",
+            "loc": ("body", "crmv"),
+            "msg": "Value error, Informe o CRMV.",
+        },
+        {
+            "type": "assertion_error",
+            "loc": ("body", "cnpj"),
+            "msg": "Assertion failed, Informe o CNPJ.",
+        },
+    ]
+
+    assert sanitize_validation_errors(errors) == [
+        {"type": "value_error", "loc": ["body", "crmv"], "msg": "Informe o CRMV."},
+        {"type": "assertion_error", "loc": ["body", "cnpj"], "msg": "Informe o CNPJ."},
     ]
 
 

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Building2, ChevronDown, Plus, Search, X } from "lucide-react";
-import { buscarClientes, criarCliente } from "../../api/clientes";
-import ActionButton from "../ui/ActionButton";
+import { ChevronDown, Plus, Search, X } from "lucide-react";
+import { buscarClientes } from "../../api/clientes";
+import PessoaFormularioModal from "../clientes/PessoaFormularioModal";
 
 export function getFornecedorNome(fornecedor) {
   return (
@@ -48,191 +48,16 @@ function mergeFornecedores(...listas) {
   return Array.from(porId.values());
 }
 
+// Wrapper fino em cima da modal única de Pessoa — cadastro rápido de fornecedor a
+// partir do combobox usa o mesmo formulário/modal do resto do sistema, pré-marcado
+// como fornecedor com o termo buscado já no nome.
 function NovoFornecedorRapidoModal({ nomeInicial, onClose, onCreated }) {
-  const [formData, setFormData] = useState({
-    nome: nomeInicial || "",
-    cpf: "",
-    cnpj: "",
-    telefone: "",
-    email: "",
-  });
-  const [tipoPessoa, setTipoPessoa] = useState("PF");
-  const [erro, setErro] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const nome = formData.nome.trim();
-
-    if (!nome) {
-      setErro("Informe o nome do fornecedor.");
-      return;
-    }
-
-    if (tipoPessoa === "PJ" && !formData.cnpj.trim()) {
-      setErro("Informe o CNPJ para pessoa jurídica.");
-      return;
-    }
-
-    setLoading(true);
-    setErro("");
-
-    try {
-      const fornecedor = await criarCliente({
-        is_fornecedor: true,
-        tipo_pessoa: tipoPessoa,
-        nome,
-        razao_social: tipoPessoa === "PJ" ? nome : null,
-        nome_fantasia: tipoPessoa === "PJ" ? nome : null,
-        cpf: tipoPessoa === "PF" ? formData.cpf.trim() || null : null,
-        cnpj: tipoPessoa === "PJ" ? formData.cnpj.trim() || null : null,
-        telefone: formData.telefone || null,
-        email: formData.email || null,
-      });
-
-      onCreated?.(fornecedor);
-    } catch (error) {
-      setErro(
-        error.response?.data?.detail ||
-          error.response?.data?.message ||
-          "Erro ao cadastrar fornecedor.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b px-5 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-              <Building2 className="h-5 w-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-slate-900">Novo fornecedor</h3>
-              <p className="text-xs text-slate-500">Cadastro rápido para continuar o fluxo.</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4 p-5">
-          {erro ? (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {erro}
-            </div>
-          ) : null}
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Nome do fornecedor *
-            </label>
-            <input
-              autoFocus
-              type="text"
-              value={formData.nome}
-              onChange={(event) => setFormData((prev) => ({ ...prev, nome: event.target.value }))}
-              className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">Tipo de pessoa</label>
-            <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
-              {[
-                { value: "PF", label: "Pessoa Física" },
-                { value: "PJ", label: "Pessoa Jurídica" },
-              ].map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => {
-                    setTipoPessoa(option.value);
-                    setErro("");
-                  }}
-                  className={[
-                    "rounded-md px-3 py-2 text-sm font-medium transition",
-                    tipoPessoa === option.value
-                      ? "bg-white text-emerald-700 shadow-sm"
-                      : "text-slate-600 hover:bg-white/70",
-                  ].join(" ")}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                {tipoPessoa === "PF" ? "CPF" : "CNPJ *"}
-              </label>
-              <input
-                type="text"
-                value={tipoPessoa === "PF" ? formData.cpf : formData.cnpj}
-                onChange={(event) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    [tipoPessoa === "PF" ? "cpf" : "cnpj"]: event.target.value,
-                  }))
-                }
-                placeholder={tipoPessoa === "PF" ? "CPF do fornecedor" : "CNPJ do fornecedor"}
-                className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Telefone</label>
-              <input
-                type="text"
-                value={formData.telefone}
-                onChange={(event) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    telefone: event.target.value,
-                  }))
-                }
-                className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">E-mail</label>
-            <input
-              type="email"
-              value={formData.email}
-              onChange={(event) => setFormData((prev) => ({ ...prev, email: event.target.value }))}
-              className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <ActionButton
-              type="button"
-              tone="soft"
-              intent="neutral"
-              onClick={onClose}
-              disabled={loading}
-            >
-              Cancelar
-            </ActionButton>
-            <ActionButton type="submit" intent="create" icon={Plus} loading={loading}>
-              Cadastrar
-            </ActionButton>
-          </div>
-        </form>
-      </div>
-    </div>
+    <PessoaFormularioModal
+      onFechar={onClose}
+      onSalvo={onCreated}
+      prefill={{ is_fornecedor: true, nome: nomeInicial || "" }}
+    />
   );
 }
 

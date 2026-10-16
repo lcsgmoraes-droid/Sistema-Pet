@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 
 STRICT_ENVIRONMENTS = {"production", "prod", "staging"}
+
+# Pydantic v2 prefixes a @validator-raised ValueError/AssertionError message
+# with "Value error, "/"Assertion failed, " — stripped before showing it to
+# the user, who doesn't care about that internal framing.
+_PYDANTIC_VALIDATOR_PREFIX = re.compile(r"^(Value error|Assertion failed), ")
 
 
 def is_strict_runtime_environment() -> bool:
@@ -17,13 +23,20 @@ def is_strict_runtime_environment() -> bool:
 
 
 def sanitize_validation_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Keep field diagnostics while removing submitted values and unsafe context."""
+    """Keep field diagnostics and the validator's own message; still remove
+    the submitted value and any other unsafe context.
+
+    Validators in this codebase (`@validator`/`@field_validator`) are written
+    to raise only static, Portuguese, user-facing text and never interpolate
+    the submitted value into the message — that invariant is what makes it
+    safe to pass `msg` through unmodified here. `input`/`ctx` (where the real
+    submitted value lives) are always dropped below, regardless of type.
+    """
     sanitized: list[dict[str, Any]] = []
     for error in errors:
         error_type = str(error.get("type") or "validation_error")
         message = str(error.get("msg") or "Valor invalido")
-        if error_type.startswith(("value_error", "assertion_error")):
-            message = "Valor invalido"
+        message = _PYDANTIC_VALIDATOR_PREFIX.sub("", message, count=1)
 
         location = error.get("loc") or ()
         sanitized.append(
