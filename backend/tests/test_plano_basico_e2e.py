@@ -160,7 +160,7 @@ def _create_cliente(api: E2EApi) -> int:
         {200, 201},
         "clientes.create",
         json={
-            "tipo_cadastro": "cliente",
+            "is_cliente": True,
             "tipo_pessoa": "PF",
             "nome": f"{api.config.prefix} Cliente",
             "telefone": f"119{suffix[-8:]}",
