@@ -28,6 +28,7 @@ from app.models_cadastros import Cliente
 from app.services.ops_grupo_comercial_onboarding_service import (
     OpsGrupoComercialOnboardingError,
     OpsLojaOnboarding,
+    mover_loja_entre_grupos_comerciais,
     onboard_grupo_comercial,
 )
 from app.tenancy.context import clear_current_tenant, set_current_tenant, tenant_context
@@ -370,6 +371,75 @@ def _campo_tenant(db, tenant_id: str, campo: str):
     return db.execute(
         text(f"SELECT {campo} FROM tenants WHERE id = :id"), {"id": tenant_id}
     ).scalar_one()
+
+
+def test_mover_loja_para_grupo_com_master_definido(db):
+    resultado_onboarding = onboard_grupo_comercial(
+        db,
+        request=_request(),
+        titular_email="dono-destino@example.com",
+        titular_nome="Dono Destino",
+        titular_cpf_cnpj="123.456.789-01",
+        lojas=[OpsLojaOnboarding(nome_loja="Loja Destino")],
+    )
+    grupo_destino_id = resultado_onboarding.grupo_id
+
+    loja_solta_id = "99999999-9999-9999-9999-999999999999"
+    set_current_tenant(loja_solta_id)
+    db.add(Tenant(id=loja_solta_id, name="Loja Solta", name_normalized="loja solta"))
+    db.commit()
+    clear_current_tenant()
+
+    resultado = mover_loja_entre_grupos_comerciais(
+        db, empresa_id=loja_solta_id, grupo_destino_id=grupo_destino_id
+    )
+
+    assert resultado["grupo_origem_id"] is None
+    assert resultado["grupo_destino_id"] == grupo_destino_id
+
+    membro = (
+        db.query(GrupoComercialMembro)
+        .filter_by(grupo_id=grupo_destino_id, empresa_id=loja_solta_id)
+        .one()
+    )
+    assert membro.status == "ativo"
+    assert membro.papel == "membro"
+
+
+def test_mover_loja_para_grupo_sem_master_e_recusado(db):
+    """Grupo montado sem passar por criar_grupo/onboard_grupo_comercial - sem
+    nenhum User.master_grupo_id apontando pra ele - nao pode receber loja."""
+    tenant_sem_master = "55555555-5555-5555-5555-555555555555"
+    set_current_tenant(tenant_sem_master)
+    db.add(
+        Tenant(
+            id=tenant_sem_master,
+            name="Loja Sem Master",
+            name_normalized="loja sem master",
+        )
+    )
+    db.commit()
+    clear_current_tenant()
+
+    grupo = GrupoComercial(
+        nome="Grupo Sem Master",
+        criado_por_empresa_id=tenant_sem_master,
+        criado_por_usuario_id=1,
+    )
+    db.add(grupo)
+    db.commit()
+
+    loja_solta_id = "44444444-4444-4444-4444-444444444444"
+    set_current_tenant(loja_solta_id)
+    db.add(Tenant(id=loja_solta_id, name="Loja Solta", name_normalized="loja solta"))
+    db.commit()
+    clear_current_tenant()
+
+    with pytest.raises(OpsGrupoComercialOnboardingError) as excinfo:
+        mover_loja_entre_grupos_comerciais(
+            db, empresa_id=loja_solta_id, grupo_destino_id=grupo.id
+        )
+    assert excinfo.value.status_code == 409
 
 
 def test_onboard_grupo_comercial_grant_trial_false_nao_concede_trial(db):

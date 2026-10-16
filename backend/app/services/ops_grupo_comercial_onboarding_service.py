@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
-from fastapi import Request
+from fastapi import HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.auth.auth_multitenant_support import (
@@ -270,3 +270,57 @@ def adicionar_loja_a_grupo_existente(
         raise OpsGrupoComercialOnboardingError(
             500, f"Nao foi possivel provisionar a loja '{loja.nome_loja}'."
         ) from exc
+
+
+def mover_loja_entre_grupos_comerciais(
+    db: Session,
+    *,
+    empresa_id: str,
+    grupo_destino_id: int,
+) -> dict:
+    """Move uma loja (tenant) ja provisionada de onde ela estiver hoje
+    (outro grupo comercial, ou nenhum) para dentro de um grupo comercial
+    que ja existe — ferramenta provisoria de ops para consolidar lojas
+    pre-existentes que ficaram em grupos errados antes do fluxo atual de
+    onboarding existir. Nao ha equivalente self-service, de proposito: ver
+    `GrupoComercialService.mover_empresa_para_grupo`.
+
+    Atribui a entrada nova ao usuario master do grupo destino, mesmo
+    usuario que ganharia a loja se ela tivesse sido criada ali via
+    `adicionar_loja_a_grupo_existente` - se o grupo destino nao tiver
+    master definido, recusa pelo mesmo motivo que aquela funcao recusa.
+    """
+    contexto_anterior = get_current_tenant()
+    clear_tenant_context()
+    try:
+        master = db.query(User).filter(User.master_grupo_id == grupo_destino_id).first()
+    finally:
+        if contexto_anterior is not None:
+            set_tenant_context(contexto_anterior)
+
+    if master is None:
+        raise OpsGrupoComercialOnboardingError(
+            409,
+            "Este grupo comercial de destino nao tem um usuario master definido. "
+            "Nao e possivel mover uma loja pra dentro dele.",
+        )
+
+    # _auditar grava audit_logs (tabela multi-tenant) com tenant_id=empresa_id
+    # - precisa do contexto apontando pra ela, mesmo padrao que criar_grupo
+    # ja usa antes de auditar em nome do tenant novo.
+    set_tenant_context(empresa_id)
+    try:
+        return GrupoComercialService(db).mover_empresa_para_grupo(
+            empresa_id=empresa_id,
+            grupo_destino_id=grupo_destino_id,
+            usuario_id=master.id,
+        )
+    except HTTPException as exc:
+        raise OpsGrupoComercialOnboardingError(
+            exc.status_code, str(exc.detail)
+        ) from exc
+    finally:
+        if contexto_anterior is not None:
+            set_tenant_context(contexto_anterior)
+        else:
+            clear_tenant_context()

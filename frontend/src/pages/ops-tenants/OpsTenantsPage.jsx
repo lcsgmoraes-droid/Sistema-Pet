@@ -79,6 +79,7 @@ export default function OpsTenantsPage() {
     <div className="p-6">
       <div className="mx-auto max-w-[1600px] space-y-5">
         <OpsTenantsHeader
+          items={items}
           loading={loading}
           onRefresh={loadTenants}
           onGrupoCriado={refreshAfterLojaAdded}
