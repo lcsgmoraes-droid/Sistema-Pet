@@ -357,6 +357,144 @@ class GrupoComercialService:
         self.db.commit()
         return {"mensagem": "Empresa removida do grupo."}
 
+    def mover_empresa_para_grupo(
+        self,
+        *,
+        empresa_id,
+        grupo_destino_id: int,
+        usuario_id: int,
+        commit: bool = True,
+    ) -> dict:
+        """Move uma empresa (loja) ja provisionada para dentro de um grupo
+        comercial diferente — inclusive quando ela e a "responsavel" do
+        grupo de origem. Ferramenta administrativa provisoria (ver
+        ops_grupo_comercial_routes.py) para consolidar lojas que ficaram em
+        grupos comerciais errados antes do fluxo atual de onboarding
+        existir; sem equivalente self-service, de proposito: ignora a regra
+        de `remover_membro` que impede o responsavel de sair do proprio
+        grupo, porque aqui quem decide e a equipe CorePet, nao o cliente.
+
+        Se o grupo de origem ficar sem nenhum membro ativo depois da saida,
+        ele e marcado `status = "inativo"` (valor que o schema ja aceita,
+        mas que nenhum fluxo grava hoje - ver nota em
+        grupo_comercial_models.py). Nao e hard delete: fica reversivel.
+
+        Nao concede acesso administrativo do master do grupo destino na
+        empresa movida (diferente de `adicionar_loja`/`_garantir_acesso_master`)
+        - e so uma correcao de vinculo, nao um onboarding; se o usuario
+        master precisar de acesso a loja movida, isso e um passo manual
+        separado.
+        """
+        empresa_id = self._empresa_id(empresa_id)
+        self._empresa_ativa(empresa_id)
+        grupo_destino = self._grupo_ativo(grupo_destino_id, travar=True)
+
+        membros_atuais = (
+            self.db.query(GrupoComercialMembro)
+            .filter(
+                GrupoComercialMembro.empresa_id == empresa_id,
+                GrupoComercialMembro.status == "ativo",
+            )
+            .with_for_update()
+            .all()
+        )
+        if len(membros_atuais) > 1:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Esta loja participa de mais de um grupo comercial ao mesmo "
+                    "tempo - mover automaticamente nao e seguro aqui. Ajuste "
+                    "manualmente antes de tentar de novo."
+                ),
+            )
+        membro_atual = membros_atuais[0] if membros_atuais else None
+
+        if membro_atual is not None and membro_atual.grupo_id == grupo_destino.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Esta loja ja pertence a este grupo comercial.",
+            )
+
+        grupo_origem = None
+        if membro_atual is not None:
+            grupo_origem = (
+                self.db.query(GrupoComercial)
+                .filter(GrupoComercial.id == membro_atual.grupo_id)
+                .with_for_update()
+                .first()
+            )
+            membro_atual.status = "removido"
+            membro_atual.removido_em = self.agora
+            if grupo_origem is not None:
+                grupo_origem.versao_membros = int(grupo_origem.versao_membros or 1) + 1
+
+        # UniqueConstraint(grupo_id, empresa_id) nao filtra por status: se esta
+        # empresa ja passou por este grupo destino antes (removida no passado),
+        # a linha antiga precisa ser reaproveitada em vez de duplicada.
+        membro_no_destino = (
+            self.db.query(GrupoComercialMembro)
+            .filter(
+                GrupoComercialMembro.grupo_id == grupo_destino.id,
+                GrupoComercialMembro.empresa_id == empresa_id,
+            )
+            .with_for_update()
+            .first()
+        )
+        if membro_no_destino is not None:
+            membro_no_destino.status = "ativo"
+            membro_no_destino.papel = "membro"
+            membro_no_destino.removido_em = None
+            membro_no_destino.usuario_referencia_id = usuario_id
+        else:
+            self.db.add(
+                GrupoComercialMembro(
+                    grupo_id=grupo_destino.id,
+                    empresa_id=empresa_id,
+                    papel="membro",
+                    status="ativo",
+                    usuario_referencia_id=usuario_id,
+                )
+            )
+        grupo_destino.versao_membros = int(grupo_destino.versao_membros or 1) + 1
+
+        grupo_origem_extinto = False
+        if grupo_origem is not None:
+            # .count() via _legacy_from_self confunde o filtro automatico de
+            # tenant (nao acha a tabela na subquery gerada) - .all()/len()
+            # evita isso, mesmo caminho que o resto deste arquivo ja usa.
+            membros_restantes = (
+                self.db.query(GrupoComercialMembro)
+                .filter(
+                    GrupoComercialMembro.grupo_id == grupo_origem.id,
+                    GrupoComercialMembro.status == "ativo",
+                )
+                .all()
+            )
+            if len(membros_restantes) == 0:
+                grupo_origem.status = "inativo"
+                grupo_origem_extinto = True
+
+        self._auditar(
+            empresa_id=empresa_id,
+            usuario_id=usuario_id,
+            evento="grupo_comercial_loja_movida_ops",
+            grupo_id=grupo_destino.id,
+            metadados={
+                "grupo_origem_id": grupo_origem.id
+                if grupo_origem is not None
+                else None,
+                "grupo_origem_extinto": grupo_origem_extinto,
+            },
+        )
+        if commit:
+            self.db.commit()
+        return {
+            "empresa_id": empresa_id,
+            "grupo_origem_id": grupo_origem.id if grupo_origem is not None else None,
+            "grupo_origem_extinto": grupo_origem_extinto,
+            "grupo_destino_id": grupo_destino.id,
+        }
+
     def _garantir_acesso_master(self, *, grupo_id: int, tenant_id) -> None:
         """Garante que o usuario master do grupo (se existir) tenha acesso
         administrativo completo na loja que acabou de entrar no grupo - sem

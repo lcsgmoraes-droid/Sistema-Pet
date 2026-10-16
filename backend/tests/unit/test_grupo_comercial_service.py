@@ -400,6 +400,190 @@ def test_duas_lojas_adicionadas_em_chamadas_separadas_nao_duplicam_cliente_titul
     assert len(clientes_loja_2) == 0
 
 
+def test_mover_empresa_para_outro_grupo_sem_esvaziar_origem(db):
+    service = GrupoComercialService(db, agora=AGORA)
+    grupo_origem = service.criar_grupo(EMPRESA_A, 10, "Grupo Origem")
+    grupo_destino = service.criar_grupo(EMPRESA_B, 20, "Grupo Destino")
+    db.add(
+        GrupoComercialMembro(
+            grupo_id=grupo_origem["id"],
+            empresa_id=EMPRESA_C,
+            papel="membro",
+            status="ativo",
+            usuario_referencia_id=10,
+        )
+    )
+    db.commit()
+
+    resultado = service.mover_empresa_para_grupo(
+        empresa_id=EMPRESA_C,
+        grupo_destino_id=grupo_destino["id"],
+        usuario_id=20,
+    )
+
+    assert resultado == {
+        "empresa_id": EMPRESA_C,
+        "grupo_origem_id": grupo_origem["id"],
+        "grupo_origem_extinto": False,
+        "grupo_destino_id": grupo_destino["id"],
+    }
+
+    membro_antigo = (
+        db.query(GrupoComercialMembro)
+        .filter_by(grupo_id=grupo_origem["id"], empresa_id=EMPRESA_C)
+        .one()
+    )
+    assert membro_antigo.status == "removido"
+
+    membro_novo = (
+        db.query(GrupoComercialMembro)
+        .filter_by(grupo_id=grupo_destino["id"], empresa_id=EMPRESA_C)
+        .one()
+    )
+    assert membro_novo.status == "ativo"
+    assert membro_novo.papel == "membro"
+
+    # EMPRESA_A (responsavel) continua no grupo origem - ele nao esvaziou.
+    grupo_origem_atualizado = (
+        db.query(GrupoComercial).filter_by(id=grupo_origem["id"]).one()
+    )
+    assert grupo_origem_atualizado.status == "ativo"
+
+
+def test_mover_responsavel_esvazia_e_desativa_grupo_origem(db):
+    """Diferente de remover_membro, mover_empresa_para_grupo pode tirar o
+    proprio responsavel do grupo - e exatamente o caso que a ferramenta
+    administrativa precisa cobrir (loja unica, pre-existente, no grupo
+    errado). Se isso esvaziar o grupo de origem, ele vira 'inativo'."""
+    service = GrupoComercialService(db, agora=AGORA)
+    grupo_origem = service.criar_grupo(EMPRESA_A, 10, "Grupo Sozinho")
+    grupo_destino = service.criar_grupo(EMPRESA_B, 20, "Grupo Destino")
+
+    resultado = service.mover_empresa_para_grupo(
+        empresa_id=EMPRESA_A,
+        grupo_destino_id=grupo_destino["id"],
+        usuario_id=20,
+    )
+
+    assert resultado["grupo_origem_extinto"] is True
+    grupo_origem_atualizado = (
+        db.query(GrupoComercial).filter_by(id=grupo_origem["id"]).one()
+    )
+    assert grupo_origem_atualizado.status == "inativo"
+
+    membro_movido = (
+        db.query(GrupoComercialMembro)
+        .filter_by(grupo_id=grupo_destino["id"], empresa_id=EMPRESA_A)
+        .one()
+    )
+    assert membro_movido.status == "ativo"
+    assert membro_movido.papel == "membro"  # nunca vira responsavel do destino
+
+
+def test_mover_empresa_sem_grupo_anterior(db):
+    service = GrupoComercialService(db, agora=AGORA)
+    grupo_destino = service.criar_grupo(EMPRESA_A, 10, "Grupo Destino")
+
+    resultado = service.mover_empresa_para_grupo(
+        empresa_id=EMPRESA_B,
+        grupo_destino_id=grupo_destino["id"],
+        usuario_id=10,
+    )
+
+    assert resultado["grupo_origem_id"] is None
+    assert resultado["grupo_origem_extinto"] is False
+    membro = (
+        db.query(GrupoComercialMembro)
+        .filter_by(grupo_id=grupo_destino["id"], empresa_id=EMPRESA_B)
+        .one()
+    )
+    assert membro.status == "ativo"
+
+
+def test_mover_empresa_que_ja_esta_no_grupo_destino_falha(db):
+    service = GrupoComercialService(db, agora=AGORA)
+    grupo = service.criar_grupo(EMPRESA_A, 10, "Grupo Unico")
+
+    with pytest.raises(HTTPException) as excinfo:
+        service.mover_empresa_para_grupo(
+            empresa_id=EMPRESA_A,
+            grupo_destino_id=grupo["id"],
+            usuario_id=10,
+        )
+    assert excinfo.value.status_code == 400
+
+
+def test_mover_empresa_com_dupla_participacao_ativa_e_recusado(db):
+    """Estado hipotetico (nao deveria ocorrer organicamente): se a empresa
+    tiver mais de uma participacao ativa ao mesmo tempo, a ferramenta se
+    recusa a adivinhar qual delas sair - exige ajuste manual antes."""
+    service = GrupoComercialService(db, agora=AGORA)
+    grupo_1 = service.criar_grupo(EMPRESA_A, 10, "Grupo Um")
+    grupo_2 = service.criar_grupo(EMPRESA_B, 20, "Grupo Dois")
+    db.add(
+        GrupoComercialMembro(
+            grupo_id=grupo_1["id"],
+            empresa_id=EMPRESA_C,
+            papel="membro",
+            status="ativo",
+            usuario_referencia_id=10,
+        )
+    )
+    db.add(
+        GrupoComercialMembro(
+            grupo_id=grupo_2["id"],
+            empresa_id=EMPRESA_C,
+            papel="membro",
+            status="ativo",
+            usuario_referencia_id=20,
+        )
+    )
+    db.commit()
+
+    with pytest.raises(HTTPException) as excinfo:
+        service.mover_empresa_para_grupo(
+            empresa_id=EMPRESA_C,
+            grupo_destino_id=grupo_1["id"],
+            usuario_id=10,
+        )
+    assert excinfo.value.status_code == 409
+
+
+def test_mover_reaproveita_linha_removida_do_mesmo_grupo_destino(db):
+    """UniqueConstraint(grupo_id, empresa_id) nao filtra por status: ir e
+    voltar pro mesmo grupo nao pode tentar inserir uma segunda linha."""
+    service = GrupoComercialService(db, agora=AGORA)
+    grupo_x = service.criar_grupo(EMPRESA_A, 10, "Grupo X")
+    grupo_y = service.criar_grupo(EMPRESA_B, 20, "Grupo Y")
+    db.add(
+        GrupoComercialMembro(
+            grupo_id=grupo_x["id"],
+            empresa_id=EMPRESA_C,
+            papel="membro",
+            status="ativo",
+            usuario_referencia_id=10,
+        )
+    )
+    db.commit()
+
+    service.mover_empresa_para_grupo(
+        empresa_id=EMPRESA_C, grupo_destino_id=grupo_y["id"], usuario_id=20
+    )
+    resultado = service.mover_empresa_para_grupo(
+        empresa_id=EMPRESA_C, grupo_destino_id=grupo_x["id"], usuario_id=10
+    )
+
+    assert resultado["grupo_destino_id"] == grupo_x["id"]
+    linhas_em_x = (
+        db.query(GrupoComercialMembro)
+        .filter_by(grupo_id=grupo_x["id"], empresa_id=EMPRESA_C)
+        .all()
+    )
+    assert len(linhas_em_x) == 1
+    assert linhas_em_x[0].status == "ativo"
+    assert linhas_em_x[0].papel == "membro"
+
+
 def test_criar_cliente_titular_nao_duplica_se_ja_existir(db):
     """Guarda de defesa: chamar criar_grupo (ou o helper interno) duas vezes
     sobre o mesmo tenant/usuario nao pode violar a constraint unica de

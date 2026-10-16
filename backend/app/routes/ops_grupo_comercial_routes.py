@@ -20,6 +20,7 @@ from app.services.ops_grupo_comercial_onboarding_service import (
     OpsGrupoComercialOnboardingError,
     OpsLojaOnboarding,
     adicionar_loja_a_grupo_existente,
+    mover_loja_entre_grupos_comerciais,
     onboard_grupo_comercial,
 )
 
@@ -105,5 +106,30 @@ def adicionar_loja_ops(
     )
     try:
         return adicionar_loja_a_grupo_existente(db, grupo_id=grupo_id, loja=loja)
+    except OpsGrupoComercialOnboardingError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+class OpsMoverLojaRequest(BaseModel):
+    empresa_id: str = Field(min_length=1, max_length=36)
+
+
+@router.post("/{grupo_destino_id}/mover-loja")
+def mover_loja_para_grupo_ops(
+    grupo_destino_id: int,
+    payload: OpsMoverLojaRequest,
+    _current_admin: PlatformAdmin = Depends(require_platform_admin),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Ferramenta administrativa provisoria: "puxa" uma loja de qualquer
+    grupo comercial (ou sem grupo) para dentro deste grupo destino. Ver
+    `mover_loja_entre_grupos_comerciais` para as regras completas - inclui
+    desativar o grupo de origem se ele ficar sem nenhuma loja depois da
+    saida.
+    """
+    try:
+        return mover_loja_entre_grupos_comerciais(
+            db, empresa_id=payload.empresa_id, grupo_destino_id=grupo_destino_id
+        )
     except OpsGrupoComercialOnboardingError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
