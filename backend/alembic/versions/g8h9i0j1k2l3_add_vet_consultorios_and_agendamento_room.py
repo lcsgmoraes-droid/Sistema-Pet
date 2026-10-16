@@ -23,17 +23,39 @@ def upgrade() -> None:
         sa.Column("nome", sa.String(length=120), nullable=False),
         sa.Column("descricao", sa.Text(), nullable=True),
         sa.Column("ordem", sa.Integer(), nullable=False, server_default="1"),
-        sa.Column("ativo", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-        sa.Column("id", sa.Integer(), sa.Identity(always=True), primary_key=True, nullable=False),
+        sa.Column(
+            "ativo", sa.Boolean(), nullable=False, server_default=sa.text("true")
+        ),
+        sa.Column(
+            "id",
+            sa.Integer(),
+            sa.Identity(always=True),
+            primary_key=True,
+            nullable=False,
+        ),
         sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
     )
     op.create_index("ix_vet_consultorios_tenant_id", "vet_consultorios", ["tenant_id"])
     op.create_index("ix_vet_consultorios_nome", "vet_consultorios", ["nome"])
 
-    op.add_column("vet_agendamentos", sa.Column("consultorio_id", sa.Integer(), nullable=True))
-    op.create_index("ix_vet_agendamentos_consultorio_id", "vet_agendamentos", ["consultorio_id"])
+    op.add_column(
+        "vet_agendamentos", sa.Column("consultorio_id", sa.Integer(), nullable=True)
+    )
+    op.create_index(
+        "ix_vet_agendamentos_consultorio_id", "vet_agendamentos", ["consultorio_id"]
+    )
     op.create_foreign_key(
         "fk_vet_agendamentos_consultorio_id",
         "vet_agendamentos",
@@ -47,7 +69,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint("fk_vet_agendamentos_consultorio_id", "vet_agendamentos", type_="foreignkey")
+    op.drop_constraint(
+        "fk_vet_agendamentos_consultorio_id", "vet_agendamentos", type_="foreignkey"
+    )
     op.drop_index("ix_vet_agendamentos_consultorio_id", table_name="vet_agendamentos")
     op.drop_column("vet_agendamentos", "consultorio_id")
 

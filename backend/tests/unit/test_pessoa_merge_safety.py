@@ -35,9 +35,27 @@ def test_fusao_preserva_enderecos_adicionais_sem_repetir():
 
 
 def test_fusao_preserva_perfis_operacionais_da_pessoa():
-    pessoa = SimpleNamespace(tipo_cadastro="funcionario", is_entregador=True)
+    pessoa = SimpleNamespace(
+        is_cliente=False,
+        is_fornecedor=False,
+        is_veterinario=False,
+        is_funcionario=True,
+        is_entregador=True,
+    )
 
     assert _perfis_inerentes(pessoa) == {"funcionario", "entregador"}
+
+
+def test_fusao_preserva_todos_os_perfis_quando_pessoa_tem_varios():
+    pessoa = SimpleNamespace(
+        is_cliente=True,
+        is_fornecedor=False,
+        is_veterinario=True,
+        is_funcionario=True,
+        is_entregador=False,
+    )
+
+    assert _perfis_inerentes(pessoa) == {"cliente", "veterinario", "funcionario"}
 
 
 def test_fusao_recarrega_credito_de_pessoas_ja_carregadas_antes_do_lock():

@@ -85,8 +85,8 @@ export default function ModalCadastroCliente({ onClose, onClienteCriado, valorBu
         cpf: formData.cpf,
         email: formData.email,
         data_nascimento: formData.data_nascimento || null,
-        tipo_cadastro: "cliente",
         tipo_pessoa: "PF",
+        is_cliente: true,
       });
 
       onClienteCriado(clienteCriado);

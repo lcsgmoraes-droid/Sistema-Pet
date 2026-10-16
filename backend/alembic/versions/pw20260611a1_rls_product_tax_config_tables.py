@@ -35,7 +35,11 @@ def get_postgresql_bind():
 
 def existing_tax_config_tables(bind) -> set[str]:
     inspector = sa.inspect(bind)
-    return {table_name for table_name in TAX_CONFIG_TABLES if inspector.has_table(table_name)}
+    return {
+        table_name
+        for table_name in TAX_CONFIG_TABLES
+        if inspector.has_table(table_name)
+    }
 
 
 def _policy_name(table_name: str) -> str:

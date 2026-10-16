@@ -28,7 +28,12 @@ def upgrade() -> None:
     )
     op.add_column(
         "ecommerce_payment_gateway_configs",
-        sa.Column("oauth_connected", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column(
+            "oauth_connected",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
     )
     op.add_column(
         "ecommerce_payment_gateway_configs",

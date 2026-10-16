@@ -19,8 +19,8 @@ from app.db import get_session
 from app.evolucao_corepet import listar_evolucao_corepet
 from app.models import AppNotification, Cliente, User, UserPushDevice
 from app.produtos_models import Produto
-from app.empresa_grupo_estoque_compartilhado_service import (
-    EmpresaGrupoEstoqueCompartilhadoService,
+from app.grupo_comercial_estoque_compartilhado_service import (
+    GrupoComercialEstoqueCompartilhadoService,
 )
 from app.tenancy.context import set_current_tenant
 from app.routes.ecommerce_auth import (
@@ -561,8 +561,10 @@ def buscar_produto_app_por_id(
     estao anunciados no app, para orientar compra no e-commerce ou loja fisica.
     """
     tenant_id = _activate_user_tenant_context(current_user)
-    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
-        db, tenant_id, produto_id
+    acesso_catalogo = (
+        GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
+            db, tenant_id, produto_id
+        )
     )
     tenant_produto_id = UUID(str(acesso_catalogo.tenant_origem_id))
     set_current_tenant(tenant_produto_id)
@@ -611,10 +613,8 @@ def buscar_produto_barcode(
 
     prioridade_estoque = case((func.coalesce(Produto.estoque_atual, 0) > 0, 0), else_=1)
 
-    compartilhados = (
-        EmpresaGrupoEstoqueCompartilhadoService.mapa_catalogo_completo_para_consumidora(
-            db, tenant_id
-        )
+    compartilhados = GrupoComercialEstoqueCompartilhadoService.mapa_catalogo_completo_para_consumidora(
+        db, tenant_id
     )
     produto = (
         db.query(Produto)
@@ -639,8 +639,10 @@ def buscar_produto_barcode(
             detail="Produto não encontrado para este código de barras.",
         )
 
-    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
-        db, tenant_id, produto.id
+    acesso_catalogo = (
+        GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
+            db, tenant_id, produto.id
+        )
     )
     tenant_produto_id = UUID(str(acesso_catalogo.tenant_origem_id))
     set_current_tenant(tenant_produto_id)

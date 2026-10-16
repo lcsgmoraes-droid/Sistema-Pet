@@ -241,15 +241,15 @@ def test_funcionario_pdv_searches_products_and_clients_like_web_pdv():
         "cnpj_digits.ilike",
     ]:
         assert field in client_block
-    assert '"tipo_cadastro": cliente.tipo_cadastro' in serializer_block
-    assert "tipo_cadastro?: string | null" in types
-    assert "tipo_cadastro: data.tipo_cadastro ?? null" in service
+    assert '"tipos_cadastro": tipos_cadastro_da_pessoa(cliente)' in serializer_block
+    assert "tipos_cadastro?: string[] | null" in types
+    assert "tipos_cadastro: data.tipos_cadastro ?? null" in service
 
     assert "autocompleteProdutosTimer" in screen
     assert "autocompleteClientesTimer" in screen
     assert 'placeholder="Buscar produto por nome, codigo ou barras"' in screen
     assert 'placeholder="Buscar pessoa por nome ou telefone"' in screen
-    assert "item.tipo_cadastro" in screen
+    assert "item.tipos_cadastro" in screen
 
 
 def test_mobile_app_has_employee_pdv_navigation_service_and_screen():

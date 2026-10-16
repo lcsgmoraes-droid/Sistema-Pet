@@ -3,6 +3,7 @@
 import logging
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -19,6 +20,7 @@ from app.contas_receber_encargos import (
 )
 from app.financeiro_models import ContaReceber, FormaPagamento
 from app.models import Cliente
+from app.tenancy.filters import pessoa_visivel_no_grupo
 from app.services.venda_descontos import resumo_descontos_venda
 
 logger = logging.getLogger(__name__)
@@ -36,7 +38,13 @@ def _validar_tenant_e_obter_usuario(user_and_tenant):
 def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
     cliente = (
         db.query(Cliente)
-        .filter(Cliente.id == cliente_id, Cliente.tenant_id == tenant_id)
+        .filter(
+            Cliente.id == cliente_id,
+            or_(
+                Cliente.tenant_id == tenant_id,
+                pessoa_visivel_no_grupo(Cliente, tenant_id),
+            ),
+        )
         .first()
     )
     if not cliente:

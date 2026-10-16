@@ -54,7 +54,7 @@ def _folha_gerencial_estimada(db: Session, tenant_id: str) -> dict:
         .join(Cargo, Cliente.cargo_id == Cargo.id)
         .filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "funcionario",
+            Cliente.is_funcionario.is_(True),
             Cliente.ativo.is_(True),
             Cliente.cargo_id.isnot(None),
             Cargo.tenant_id == tenant_id,

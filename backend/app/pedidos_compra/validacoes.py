@@ -21,7 +21,7 @@ def validar_fornecedor_pedido(
         .filter(
             Cliente.id == fornecedor_id,
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "fornecedor",
+            Cliente.is_fornecedor.is_(True),
         )
         .first()
     )

@@ -21,6 +21,7 @@ import useProdutosNovoTributacao from "../hooks/useProdutosNovoTributacao";
 import useProdutosNovoVariacoes from "../hooks/useProdutosNovoVariacoes";
 import useProdutosNovoPageComposition from "../hooks/useProdutosNovoPageComposition";
 import api from "../api";
+import ProdutoHistoricoPanel from "../components/produto/ProdutoHistoricoPanel";
 import { formatarMoeda, formatarData } from "../api/produtos";
 import { calcularMargemSobreVenda, calcularPrecoVendaPorMargem } from "../utils/produtoMargem";
 
@@ -42,6 +43,10 @@ export default function ProdutosNovo() {
   const isEdicao = !!id;
   const cloneId = searchParams.get("clone") || searchParams.get("clone_id");
   const isClone = !isEdicao && !!cloneId;
+  const preCadastroGrupoId = searchParams.get("pre_cadastro_grupo");
+  const preCadastroGrupoTenantOrigem = searchParams.get("tenant_origem");
+  const isPreCadastroGrupo =
+    !isEdicao && !isClone && !!preCadastroGrupoId && !!preCadastroGrupoTenantOrigem;
 
   // Estado das abas
   const [abaAtiva, setAbaAtiva] = useState(1);
@@ -345,8 +350,15 @@ export default function ProdutosNovo() {
     handleDeleteFornecedor,
   } = useProdutosNovoFornecedores({ id });
 
-  const { carregarProduto, carregarProdutoParaClone, salvarFiscal } = useProdutosNovoCarregamento({
+  const {
+    carregarProduto,
+    carregarProdutoParaClone,
+    carregarProdutoParaPreCadastroGrupo,
+    salvarFiscal,
+  } = useProdutosNovoCarregamento({
     cloneId,
+    preCadastroGrupoId,
+    preCadastroGrupoTenantOrigem,
     id,
     isEdicao,
     formData,
@@ -772,7 +784,11 @@ export default function ProdutosNovo() {
     return (
       <div className="p-6 flex justify-center items-center h-96">
         <div className="text-gray-600">
-          {isClone ? "Preparando clone do produto..." : "Carregando produto..."}
+          {isClone
+            ? "Preparando clone do produto..."
+            : isPreCadastroGrupo
+              ? "Trazendo dados do produto da outra loja..."
+              : "Carregando produto..."}
         </div>
       </div>
     );
@@ -795,7 +811,13 @@ export default function ProdutosNovo() {
             <button
               type="button"
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              onClick={() => (isClone ? carregarProdutoParaClone() : carregarProduto())}
+              onClick={() =>
+                isClone
+                  ? carregarProdutoParaClone()
+                  : isPreCadastroGrupo
+                    ? carregarProdutoParaPreCadastroGrupo()
+                    : carregarProduto()
+              }
             >
               Tentar novamente
             </button>
@@ -806,11 +828,15 @@ export default function ProdutosNovo() {
   }
 
   // Proteção: Se é edição mas o formData ainda não foi carregado
-  if ((isEdicao || isClone) && !formData.nome) {
+  if ((isEdicao || isClone || isPreCadastroGrupo) && !formData.nome) {
     return (
       <div className="p-6 flex justify-center items-center h-96">
         <div className="text-gray-600">
-          {isClone ? "Preparando dados para clonar..." : "Carregando dados..."}
+          {isClone
+            ? "Preparando dados para clonar..."
+            : isPreCadastroGrupo
+              ? "Trazendo dados do produto da outra loja..."
+              : "Carregando dados..."}
         </div>
       </div>
     );
@@ -819,6 +845,8 @@ export default function ProdutosNovo() {
   return (
     <>
       <ProdutosNovoMainContent handleSubmit={handleSubmit} {...mainContentProps} />
+
+      {isEdicao ? <ProdutoHistoricoPanel produtoId={id} /> : null}
 
       <ProdutosNovoModalsLayer
         {...modalsLayerProps}

@@ -49,7 +49,7 @@ def _pessoa(db, tenant_id, nome, celular):
         user_id=1,
         nome=nome,
         celular=celular,
-        tipo_cadastro="cliente",
+        is_cliente=True,
         tipo_pessoa="PF",
     )
     db.add(pessoa)

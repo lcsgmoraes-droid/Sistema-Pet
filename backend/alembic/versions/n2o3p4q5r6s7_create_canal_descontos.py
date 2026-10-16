@@ -5,6 +5,7 @@ Revises: m1n2o3p4q5r6, k4l5m6n7o8p9
 Create Date: 2025-01-01 00:00:00.000000
 
 """
+
 from typing import Sequence, Union
 
 import sqlalchemy as sa
@@ -28,7 +29,9 @@ def upgrade() -> None:
             sa.Column("canal", sa.String(length=20), nullable=False),
             sa.Column("nome", sa.String(length=200), nullable=False),
             sa.Column("desconto_pct", sa.Numeric(precision=5, scale=2), nullable=False),
-            sa.Column("ativo", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+            sa.Column(
+                "ativo", sa.Boolean(), nullable=False, server_default=sa.text("true")
+            ),
             sa.Column("data_inicio", sa.TIMESTAMP(timezone=True), nullable=True),
             sa.Column("data_fim", sa.TIMESTAMP(timezone=True), nullable=True),
             sa.Column(
@@ -45,7 +48,9 @@ def upgrade() -> None:
             ),
             sa.PrimaryKeyConstraint("id"),
         )
-        op.create_index("ix_canal_descontos_tenant_id", "canal_descontos", ["tenant_id"])
+        op.create_index(
+            "ix_canal_descontos_tenant_id", "canal_descontos", ["tenant_id"]
+        )
         op.create_index("ix_canal_descontos_canal", "canal_descontos", ["canal"])
         op.create_index("ix_canal_descontos_ativo", "canal_descontos", ["ativo"])
 

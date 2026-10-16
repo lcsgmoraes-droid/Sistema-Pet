@@ -59,6 +59,7 @@ export default function ProdutosMainContent({
   persistirBusca,
   produtos,
   produtosColunas,
+  produtosOutrasLojas,
   recarregarDetalhesKit,
   selecionados,
   selecionadosCount,
@@ -137,6 +138,7 @@ export default function ProdutosMainContent({
         paginaAtual={paginaAtual}
         paisExpandidos={paisExpandidos}
         produtos={produtos}
+        produtosOutrasLojas={produtosOutrasLojas}
         recarregarDetalhesKit={recarregarDetalhesKit}
         selecionados={selecionados}
         selecionadosCount={selecionadosCount}

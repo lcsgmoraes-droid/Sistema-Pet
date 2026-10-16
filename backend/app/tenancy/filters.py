@@ -17,7 +17,7 @@ import logging
 from sqlalchemy import String, cast, event, func, or_, select
 from sqlalchemy.orm import Session, aliased, with_loader_criteria
 
-from app.empresa_grupo_sql import empresa_id_sql
+from app.grupo_comercial_sql import empresa_id_sql
 from app.tenancy.context import get_current_tenant
 from app.tenancy.rls import sync_rls_tenant
 
@@ -77,6 +77,39 @@ PARTNER_READABLE_TENANT_TABLES = {
 }
 
 
+# Historicos e registros clinicos (modelos TenantScoped) ficam visiveis a loja do
+# grupo quando o registro-pai (pessoa, pet ou produto) e visivel para ela. Assim o
+# filtro automatico nao esconde da loja B o historico gravado pela loja A.
+_PAI_DO_HISTORICO = {
+    "clientes_historico_alteracoes": ("Cliente", "cliente_id"),
+    "pets_historico_alteracoes": ("Pet", "pet_id"),
+    "pets_registros_clinicos": ("Pet", "pet_id"),
+    "produtos_historico_alteracoes": ("Produto", "produto_id"),
+}
+
+
+def _tenant_scoped_read_filter(cls, tenant_id):
+    table_name = getattr(cls, "__tablename__", None)
+    pai = _PAI_DO_HISTORICO.get(table_name)
+    if pai is None:
+        return cls.tenant_id == tenant_id
+
+    from app import models_cadastros, produtos_catalogo_models
+
+    modelos = {
+        "Cliente": models_cadastros.Cliente,
+        "Pet": models_cadastros.Pet,
+        "Produto": produtos_catalogo_models.Produto,
+    }
+    nome_pai, coluna_fk = pai
+    pai_cls = modelos[nome_pai]
+    pais_visiveis = select(pai_cls.id).where(_tenant_read_filter(pai_cls, tenant_id))
+    return or_(
+        cls.tenant_id == tenant_id,
+        getattr(cls, coluna_fk).in_(pais_visiveis),
+    )
+
+
 def _tenant_read_filter(cls, tenant_id):
     table_name = getattr(cls, "__tablename__", None)
 
@@ -95,6 +128,13 @@ def _tenant_read_filter(cls, tenant_id):
         active_membership = active_membership.correlate_except(UserTenant)
         return or_(cls.tenant_id == tenant_id, active_membership.exists())
 
+    if table_name == "produto_identidades":
+        # Identidade de produto (nome/codigo de barras/peso/foto) e compartilhada
+        # so dentro do grupo comercial, nunca com parceiro veterinario — sem o
+        # guard de VetPartnerLink usado abaixo pra clientes/pets/produtos. Mesma
+        # regra espelhada em RLS real (migration zzzzb20261015a1).
+        return or_(cls.tenant_id == tenant_id, pessoa_visivel_no_grupo(cls, tenant_id))
+
     if table_name not in PARTNER_READABLE_TENANT_TABLES:
         return cls.tenant_id == tenant_id
 
@@ -106,27 +146,27 @@ def _tenant_read_filter(cls, tenant_id):
     )
     criterios = [cls.tenant_id == tenant_id, cls.tenant_id.in_(partner_tenant_ids)]
     if table_name in {"produtos", "produto_imagens"}:
-        from app.empresa_grupo_models import (
-            EmpresaGrupo,
-            EmpresaGrupoEstoqueCompartilhado,
-            EmpresaGrupoMembro,
+        from app.grupo_comercial_models import (
+            GrupoComercial,
+            GrupoComercialEstoqueCompartilhado,
+            GrupoComercialMembro,
         )
 
-        membro_origem = aliased(EmpresaGrupoMembro)
-        membro_consumidora = aliased(EmpresaGrupoMembro)
+        membro_origem = aliased(GrupoComercialMembro)
+        membro_consumidora = aliased(GrupoComercialMembro)
         compartilhamento_ativo = (
-            select(EmpresaGrupoEstoqueCompartilhado.id)
+            select(GrupoComercialEstoqueCompartilhado.id)
             .join(
-                EmpresaGrupo,
-                EmpresaGrupo.id == EmpresaGrupoEstoqueCompartilhado.grupo_id,
+                GrupoComercial,
+                GrupoComercial.id == GrupoComercialEstoqueCompartilhado.grupo_id,
             )
             .join(
                 membro_origem,
-                (membro_origem.grupo_id == EmpresaGrupoEstoqueCompartilhado.grupo_id)
+                (membro_origem.grupo_id == GrupoComercialEstoqueCompartilhado.grupo_id)
                 & (
                     empresa_id_sql(membro_origem.empresa_id)
                     == empresa_id_sql(
-                        EmpresaGrupoEstoqueCompartilhado.empresa_origem_id
+                        GrupoComercialEstoqueCompartilhado.empresa_origem_id
                     )
                 ),
             )
@@ -134,30 +174,58 @@ def _tenant_read_filter(cls, tenant_id):
                 membro_consumidora,
                 (
                     membro_consumidora.grupo_id
-                    == EmpresaGrupoEstoqueCompartilhado.grupo_id
+                    == GrupoComercialEstoqueCompartilhado.grupo_id
                 )
                 & (
                     empresa_id_sql(membro_consumidora.empresa_id)
                     == empresa_id_sql(
-                        EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id
+                        GrupoComercialEstoqueCompartilhado.empresa_consumidora_id
                     )
                 ),
             )
             .where(
-                EmpresaGrupoEstoqueCompartilhado.produto_origem_id
+                GrupoComercialEstoqueCompartilhado.produto_origem_id
                 == (cls.id if table_name == "produtos" else cls.produto_id),
-                empresa_id_sql(EmpresaGrupoEstoqueCompartilhado.empresa_origem_id)
+                empresa_id_sql(GrupoComercialEstoqueCompartilhado.empresa_origem_id)
                 == empresa_id_sql(cls.tenant_id),
-                empresa_id_sql(EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id)
+                empresa_id_sql(
+                    GrupoComercialEstoqueCompartilhado.empresa_consumidora_id
+                )
                 == func.replace(cast(tenant_id, String), "-", ""),
-                EmpresaGrupoEstoqueCompartilhado.status == "ativo",
-                EmpresaGrupo.status == "ativo",
+                GrupoComercialEstoqueCompartilhado.status == "ativo",
+                GrupoComercial.status == "ativo",
                 membro_origem.status == "ativo",
                 membro_consumidora.status == "ativo",
             )
         )
         criterios.append(compartilhamento_ativo.exists())
+    if table_name in {"clientes", "pets"}:
+        criterios.append(pessoa_visivel_no_grupo(cls, tenant_id))
     return or_(*criterios)
+
+
+def pessoa_visivel_no_grupo(cls, tenant_id):
+    """Pessoa criada por uma loja do grupo comercial e visivel para todas as lojas
+    ativas do mesmo grupo (origem_tenant_id e a loja que introduziu o cadastro)."""
+    from app.grupo_comercial_models import GrupoComercial, GrupoComercialMembro
+
+    membro_eu = aliased(GrupoComercialMembro)
+    membro_origem = aliased(GrupoComercialMembro)
+    colega_no_grupo = (
+        select(membro_origem.id)
+        .join(membro_eu, membro_eu.grupo_id == membro_origem.grupo_id)
+        .join(GrupoComercial, GrupoComercial.id == membro_eu.grupo_id)
+        .where(
+            empresa_id_sql(membro_eu.empresa_id)
+            == func.replace(cast(tenant_id, String), "-", ""),
+            empresa_id_sql(membro_origem.empresa_id)
+            == empresa_id_sql(cls.origem_tenant_id),
+            membro_eu.status == "ativo",
+            membro_origem.status == "ativo",
+            GrupoComercial.status == "ativo",
+        )
+    )
+    return colega_no_grupo.exists()
 
 
 def _supports_partner_read_filter(session) -> bool:
@@ -263,7 +331,7 @@ def _add_tenant_filter(execute_state):
             ),
             with_loader_criteria(
                 TenantScoped,
-                lambda cls: cls.tenant_id == tenant_id,
+                lambda cls: _tenant_scoped_read_filter(cls, tenant_id),
                 include_aliases=True,
             ),
         )

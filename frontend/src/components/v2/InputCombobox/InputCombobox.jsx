@@ -18,6 +18,7 @@ export default function InputCombobox({
 }) {
   const containerRef = useRef(null);
   const panelRef = useRef(null);
+  const inputRef = useRef(null);
   const [aberto, setAberto] = useState(false);
   const [termo, setTermo] = useState("");
   const [indiceAtivo, setIndiceAtivo] = useState(0);
@@ -129,7 +130,9 @@ export default function InputCombobox({
           </div>
         ) : null}
         <input
+          ref={inputRef}
           id={id}
+          autoComplete="off"
           disabled={disabled}
           value={termo}
           placeholder={selecionada?.label || placeholder}
@@ -146,9 +149,9 @@ export default function InputCombobox({
           aria-autocomplete="list"
           aria-labelledby={labelId}
           aria-label={label ? undefined : placeholder}
-          className="absolute inset-0 z-10 h-9 w-full rounded-lg border-0 bg-transparent px-3 pr-16 text-sm text-slate-900 outline-none disabled:cursor-not-allowed disabled:text-slate-400 dark:!bg-transparent dark:!text-slate-100 dark:placeholder:!text-slate-500 dark:disabled:!text-slate-500"
+          className="absolute inset-0 z-10 h-9 w-full truncate rounded-lg border-0 bg-transparent px-3 pr-16 text-sm text-slate-900 outline-none disabled:cursor-not-allowed disabled:text-slate-400 dark:!bg-transparent dark:!text-slate-100 dark:placeholder:!text-slate-500 dark:disabled:!text-slate-500"
         />
-        <div className="absolute inset-y-0 right-1 z-20 flex items-center gap-0.5">
+        <div className="pointer-events-none absolute inset-y-0 right-1 z-20 flex items-center gap-0.5">
           {permitirLimpar && selecionada ? (
             <button
               type="button"
@@ -158,12 +161,27 @@ export default function InputCombobox({
                 onChange?.("", null);
                 setTermo("");
               }}
-              className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+              className="pointer-events-auto rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
             >
               <X className="h-3.5 w-3.5" />
             </button>
           ) : null}
-          <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden="true" />
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label={aberto ? "Fechar lista" : "Abrir lista"}
+            onMouseDown={(evento) => {
+              evento.preventDefault();
+              setAberto((atual) => {
+                const proximo = !atual;
+                if (proximo) inputRef.current?.focus();
+                return proximo;
+              });
+            }}
+            className="pointer-events-auto rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+          >
+            <ChevronDown className="h-4 w-4" aria-hidden="true" />
+          </button>
         </div>
 
         {aberto ? (
@@ -171,7 +189,7 @@ export default function InputCombobox({
             ref={panelRef}
             id={listboxId}
             role="listbox"
-            className="absolute left-0 top-full z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-900"
+            className="absolute left-0 top-full z-30 mt-1 max-h-56 w-max min-w-full max-w-xs overflow-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-900"
           >
             {filtradas.length === 0 ? (
               <div className="px-3 py-2 text-slate-400 dark:text-slate-500">
@@ -188,7 +206,7 @@ export default function InputCombobox({
                   onMouseDown={(evento) => evento.preventDefault()}
                   onClick={() => escolher(opcao)}
                   className={[
-                    "block w-full px-3 py-2 text-left",
+                    "block w-full truncate px-3 py-2 text-left",
                     indice === indiceAtivo
                       ? "bg-blue-50 text-blue-700 dark:bg-slate-800 dark:text-cyan-300"
                       : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800",

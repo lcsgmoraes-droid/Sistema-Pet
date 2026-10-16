@@ -28,6 +28,11 @@ class FakeQuery:
     def count(self):
         return self.count_result
 
+    def __iter__(self):
+        # tenants_do_grupo() itera o resultado para achar outras lojas do mesmo
+        # grupo; nestes testes a loja nao pertence a nenhum grupo.
+        return iter([])
+
 
 class FakeDb:
     def __init__(self, query):
@@ -42,6 +47,9 @@ class FakeDb:
 
     def get_bind(self):
         return SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
+
+    def execute(self, *args, **kwargs):
+        return self.query_instance
 
 
 class ProdutoFake:

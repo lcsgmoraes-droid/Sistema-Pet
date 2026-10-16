@@ -216,8 +216,8 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "caminho_ajuda": "/ajuda?aba=central&artigo=lancar-granel-bipagem",
     },
     {
-        "id": "grupos-empresas-convites",
-        "titulo": "Grupos de empresas por convite",
+        "id": "grupos-comerciais-convites",
+        "titulo": "Grupos Comerciais por convite",
         "resumo": (
             "Cada empresa recebe um código mensal e pode criar ou aceitar grupos com "
             "outras empresas, mantendo o aceite e os membros sob controle."
@@ -231,10 +231,10 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "atualizado_em": "2026-08-22",
         "ciclo_novidade": deepcopy(CICLO_PADRAO),
         "destaque": True,
-        "caminho_ajuda": "/ajuda?aba=central&artigo=grupos-empresas-convites",
+        "caminho_ajuda": "/ajuda?aba=central&artigo=grupos-comerciais-convites",
     },
     {
-        "id": "grupos-empresas-visao-consolidada",
+        "id": "grupos-comerciais-visao-consolidada",
         "titulo": "Visão consolidada do grupo de empresas",
         "resumo": (
             "Compare vendas, estoque e saldos financeiros das empresas do grupo "
@@ -249,10 +249,10 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "atualizado_em": "2026-08-22",
         "ciclo_novidade": deepcopy(CICLO_PADRAO),
         "destaque": True,
-        "caminho_ajuda": "/ajuda?aba=central&artigo=visao-consolidada-grupo-empresas",
+        "caminho_ajuda": "/ajuda?aba=central&artigo=visao-consolidada-grupo-comercial",
     },
     {
-        "id": "grupos-empresas-transferencia-integrada",
+        "id": "grupos-comerciais-transferencia-integrada",
         "titulo": "Transferência integrada entre empresas do grupo",
         "resumo": (
             "A transferência registra a saída na empresa de origem e a entrada na "
@@ -271,7 +271,7 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "caminho_ajuda": "/ajuda?aba=central&artigo=transferencia-integrada-grupo",
     },
     {
-        "id": "grupos-empresas-analises-detalhadas",
+        "id": "grupos-comerciais-analises-detalhadas",
         "titulo": "Pedidos, produtos e contas consolidados por grupo",
         "resumo": (
             "Consulte vendas e pedidos de compra das empresas juntas, pesquise produtos por SKU "
@@ -286,10 +286,10 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "atualizado_em": "2026-08-23",
         "ciclo_novidade": deepcopy(CICLO_PADRAO),
         "destaque": True,
-        "caminho_ajuda": "/ajuda?aba=central&artigo=visao-consolidada-grupo-empresas",
+        "caminho_ajuda": "/ajuda?aba=central&artigo=visao-consolidada-grupo-comercial",
     },
     {
-        "id": "grupos-empresas-planejamento-inteligente",
+        "id": "grupos-comerciais-planejamento-inteligente",
         "titulo": "Reposição e financeiro inteligentes para o grupo",
         "resumo": (
             "Planeje compras usando o estoque de todas as empresas, transfira sobras antes "
@@ -305,7 +305,7 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "atualizado_em": "2026-08-23",
         "ciclo_novidade": deepcopy(CICLO_PADRAO),
         "destaque": True,
-        "caminho_ajuda": "/ajuda?aba=central&artigo=visao-consolidada-grupo-empresas",
+        "caminho_ajuda": "/ajuda?aba=central&artigo=visao-consolidada-grupo-comercial",
     },
     {
         "id": "crediario-vencimento-alertas",

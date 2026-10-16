@@ -79,7 +79,7 @@ def cancelar_venda(
         ContaBancaria,
     )
     from app.audit_log import log_action
-    from app.empresa_grupo_estoque_compartilhado_service import (
+    from app.grupo_comercial_estoque_compartilhado_service import (
         contexto_tenant_estoque,
         resolver_tenant_estoque_item,
     )

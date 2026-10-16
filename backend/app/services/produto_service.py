@@ -183,6 +183,7 @@ class ProdutoService:
 
         # 🔒 ISOLAMENTO MULTI-TENANT: Adicionar tenant_id obrigatório
         dados_limpos["tenant_id"] = tenant_id
+        dados_limpos["origem_tenant_id"] = tenant_id
 
         logger.info(
             f"💾 ProdutoService: Criando produto tipo '{tipo_produto}' com {len(dados_limpos)} campos"
@@ -248,6 +249,10 @@ class ProdutoService:
                 from .kit_custo_service import KitCustoService
 
                 KitCustoService.sincronizar_custo_kit(db, novo_produto.id)
+
+            from .produto_identidade_service import resolver_ou_vincular
+
+            resolver_ou_vincular(novo_produto, db)
 
             if commit:
                 db.commit()

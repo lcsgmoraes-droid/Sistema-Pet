@@ -44,7 +44,7 @@ async def api_conceder_ferias(
         .filter(
             Cliente.id == funcionario_id,
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "funcionario",
+            Cliente.is_funcionario.is_(True),
             Cliente.ativo.is_(True),
         )
         .first()
@@ -98,7 +98,7 @@ async def api_pagar_decimo_terceiro(
         .filter(
             Cliente.id == funcionario_id,
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "funcionario",
+            Cliente.is_funcionario.is_(True),
             Cliente.ativo.is_(True),
         )
         .first()
@@ -147,7 +147,7 @@ async def api_obter_provisoes_funcionario(
         .filter(
             Cliente.id == funcionario_id,
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "funcionario",
+            Cliente.is_funcionario.is_(True),
         )
         .first()
     )

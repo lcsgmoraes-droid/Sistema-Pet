@@ -117,7 +117,9 @@ def upgrade() -> None:
         sa.Column("principal_id", sa.Integer(), nullable=False),
         sa.Column("duplicado_id", sa.Integer(), nullable=False),
         sa.Column("actor_user_id", sa.Integer(), nullable=True),
-        sa.Column("modo", sa.String(length=30), nullable=False, server_default="manual"),
+        sa.Column(
+            "modo", sa.String(length=30), nullable=False, server_default="manual"
+        ),
         sa.Column("motivo", sa.String(length=255), nullable=True),
         sa.Column(
             "status",
@@ -177,11 +179,11 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     if op.get_bind().dialect.name == "postgresql":
-        op.execute(
-            f"DROP POLICY IF EXISTS {MERGE_LOG_POLICY} ON {MERGE_LOG_TABLE}"
-        )
+        op.execute(f"DROP POLICY IF EXISTS {MERGE_LOG_POLICY} ON {MERGE_LOG_TABLE}")
     op.drop_table("pessoa_merge_logs")
-    op.drop_constraint("fk_clientes_merged_into_id_clientes", "clientes", type_="foreignkey")
+    op.drop_constraint(
+        "fk_clientes_merged_into_id_clientes", "clientes", type_="foreignkey"
+    )
     op.drop_constraint("fk_clientes_auth_user_id_users", "clientes", type_="foreignkey")
     op.drop_index("uq_clientes_tenant_auth_user_ativo", table_name="clientes")
     op.drop_index("ix_clientes_merged_into_id", table_name="clientes")

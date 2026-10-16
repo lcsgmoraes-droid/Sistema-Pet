@@ -7,6 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
+from app.auth.auth_multitenant_account_routes import _tenant_payload
 from app.auth.auth_multitenant_schemas import (
     RefreshTokenRequest,
     RefreshTokenResponse,
@@ -26,6 +27,7 @@ from app.config import JWT_SECRET_KEY as SECRET_KEY
 from app.db import get_session
 from app.models import Permission, Role, RolePermission, Tenant, User, UserTenant
 from app.security.jwt_compat import JWTError, jwt
+from app.security.permissions_service import tenant_pertence_ao_grupo
 from app.services.auth_security import register_logout
 from app.services.plan_limits import enforce_simultaneous_session_limit
 from app.services.tenant_login_name_service import (
@@ -110,6 +112,34 @@ def refresh_access_token(
     )
 
     return RefreshTokenResponse(**_auth_payload(access_token, refresh_token))
+
+
+@router.get("/my-tenants")
+def get_my_tenants(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Lista as lojas que o usuario logado tem acesso, a qualquer momento da sessao
+    (nao so na janela de login) - usado pelo seletor de loja no header, que
+    permite trocar de loja sem sair e logar de novo (ver POST /select-tenant).
+    """
+    user_tenants = (
+        db.query(UserTenant)
+        .filter(
+            UserTenant.user_id == current_user.id,
+            UserTenant.is_active.is_(True),
+        )
+        .all()
+    )
+
+    tenants_list = []
+    for ut in user_tenants:
+        tenant = db.query(Tenant).filter(Tenant.id == str(ut.tenant_id)).first()
+        if tenant and str(tenant.status or "").strip().lower() in {"active", "ativo"}:
+            tenants_list.append(_tenant_payload(db, tenant, ut.role_id))
+
+    return {"tenants": tenants_list}
 
 
 @router.post("/select-tenant", response_model=SelectTenantResponse)
@@ -265,6 +295,16 @@ def get_me_multitenant(
         ]
 
     permissions = expand_permissions(permissions)
+
+    # Usuario master do grupo comercial: a tela precisa enxergar o mesmo
+    # acesso total que check_permission ja concede a ele (inclusive
+    # permissoes novas, criadas depois do Role dele ja existir) - sem isso
+    # um botao/menu novo ficaria escondido mesmo o backend liberando a acao.
+    master_grupo_id = getattr(current_user, "master_grupo_id", None)
+    if master_grupo_id is not None and tenant_pertence_ao_grupo(
+        db, tenant_id, master_grupo_id
+    ):
+        permissions = [codigo for (codigo,) in db.query(Permission.code).all()]
 
     return {
         "id": current_user.id,

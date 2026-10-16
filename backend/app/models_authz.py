@@ -54,6 +54,9 @@ class UserTenant(BaseTenantModel):
     """Vínculo User ↔ Tenant ↔ Role"""
 
     __tablename__ = "user_tenants"
+    __table_args__ = (
+        UniqueConstraint("user_id", "tenant_id", name="uq_user_tenants_user_tenant"),
+    )
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)

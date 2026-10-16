@@ -14,6 +14,12 @@ export const styleGuideCatalog = [
         arquivo: "components/v2/InputTexto/InputTexto.jsx",
         descricao: "Base de todos os campos de texto",
       },
+      {
+        nome: "InputTextoLongo",
+        status: "pronto",
+        arquivo: "components/v2/InputTextoLongo/InputTextoLongo.jsx",
+        descricao: "Textarea — mesma aparência do InputTexto, com `linhas` controlando a altura",
+      },
       { nome: "InputSenha", status: "pronto", arquivo: "components/v2/InputSenha/InputSenha.jsx" },
       {
         nome: "InputData / InputDataHora",
@@ -37,7 +43,36 @@ export const styleGuideCatalog = [
         nome: "InputCheck / InputRadio",
         status: "pronto",
         arquivo: "components/v2/InputCheck/, components/v2/InputRadio/",
-        descricao: "Aparência de botão, label centralizada",
+        descricao:
+          "Aparência de botão, label centralizada. InputRadio aceita prop opcional tom (pet/vet/grooming, azul por padrão) para blocos de segmento comercial visualmente distintos — ver proposta comercial em /ops-tenants.",
+      },
+      {
+        nome: "InputCheckbox",
+        status: "pronto",
+        arquivo: "components/v2/InputCheckbox/InputCheckbox.jsx",
+        descricao:
+          "Checkbox quadrado para seleção em tabela/lista (sem label visível, exige rotulo para o leitor de tela). Repassa o evento original no onChange (usado por seleção com Shift). Área de toque de 44px.",
+      },
+      {
+        nome: "LegendaBolinha",
+        status: "pronto",
+        arquivo: "components/v2/LegendaBolinha/LegendaBolinha.jsx",
+        descricao:
+          "Bolinha colorida pequena + rótulo acessível (sr-only) — indicador de origem (ex.: qual segmento de plano concede um módulo). Mesmo vocabulário de tom do InputRadio (pet/vet/grooming), pra reaproveitar a mesma cor entre o radio e a bolinha do mesmo segmento.",
+      },
+      {
+        nome: "InputCheckGroup",
+        status: "pronto",
+        arquivo: "components/v2/InputCheckGroup/InputCheckGroup.jsx",
+        descricao:
+          "Grupo de pills seleção múltipla (não exclusiva) com label/obrigatório/erro compartilhados — mesmo visual do InputRadio, mas várias opções podem ficar marcadas ao mesmo tempo",
+      },
+      {
+        nome: "InputCheckTexto",
+        status: "pronto",
+        arquivo: "components/v2/InputCheckTexto/InputCheckTexto.jsx",
+        descricao:
+          "Checkbox tradicional (não é pill) com rótulo rico — aceita texto com link no meio, ex.: aceite de termos",
       },
       {
         nome: "InputMoeda / InputQuantidade / InputPercentual",
@@ -48,7 +83,8 @@ export const styleGuideCatalog = [
         nome: "InputTelefone / InputCpfCnpj",
         status: "pronto",
         arquivo: "components/v2/InputTelefone/, .../InputCpfCnpj/",
-        descricao: "CNPJ já aceita o formato alfanumérico da Receita Federal (2026)",
+        descricao:
+          "InputTelefone serve celular e fixo via prop tipo (celular/fixo/ambos) e já traz o toggle de WhatsApp embutido; CNPJ já aceita o formato alfanumérico da Receita Federal (2026)",
       },
       {
         nome: "InputCombobox",
@@ -108,6 +144,20 @@ export const styleGuideCatalog = [
         arquivo: "components/v2/BotaoLink/BotaoLink.jsx",
         descricao: 'Link de navegação secundário dentro de um painel (ex.: "Ver produtos")',
       },
+      {
+        nome: "LinkPadrao",
+        status: "pronto",
+        arquivo: "components/v2/LinkPadrao/LinkPadrao.jsx",
+        descricao:
+          "Link de navegação real (rota interna via `to` ou URL via `href`) — cor, peso e ícone padronizados; só o tamanho da fonte é livre. `novaJanela` abre em outra aba com ícone de link externo",
+      },
+      {
+        nome: "BotaoMenuAcoes",
+        status: "pronto",
+        arquivo: "components/v2/BotaoMenuAcoes/BotaoMenuAcoes.jsx",
+        descricao:
+          'Regra geral (29/09/2026): coluna "Ações" de qualquer listagem com 3+ ações nunca mais enfileira ícones soltos (não escala, vira ruído visual) — um único ícone de "mais opções" revela o menu completo (ícone + texto por item), que abre sozinho pra cima ou pra baixo conforme o espaço na tela. Junto vem a diretriz de ícone por ação: mesma ação = mesmo ícone em toda a aplicação (ex.: Editar = Pencil, Excluir = Trash2, Histórico = History, Abrir em nova janela = ExternalLink — ver demo em "Cartões e navegação"). Antes de introduzir um ícone novo para uma ação, checar se um já existente em outra tela já serve.',
+      },
     ],
   },
   {
@@ -133,6 +183,13 @@ export const styleGuideCatalog = [
         arquivo: "components/v2/SeletorOpcoes/SeletorOpcoes.jsx",
         descricao:
           "Grupo de opções únicas em formato de pill para barra de ferramentas (filtro de período, alternância de visão) — não é campo de formulário",
+      },
+      {
+        nome: "AbasNavegacao",
+        status: "pronto",
+        arquivo: "components/v2/AbasNavegacao/AbasNavegacao.jsx",
+        descricao:
+          "Abas horizontais com ícone (estilo GitHub) — cada aba aceita `descricao` (vira dica ao passar o mouse) e `invalida` (mostra ícone de alerta ao lado do rótulo, para sinalizar campo obrigatório pendente naquela aba)",
       },
     ],
   },
@@ -194,12 +251,14 @@ export const styleGuideCatalog = [
   },
   {
     categoria: "Modal",
-    origem: "item 1.7 do roadmap — ainda planejado",
+    origem: "item 1.7 do roadmap",
     itens: [
       {
-        nome: "Modal / Modal.Header / Modal.Body / Modal.Footer",
-        status: "planejado",
-        descricao: "Casca genérica para conteúdo arbitrário (formulário, wizard)",
+        nome: "ModalPadrao",
+        status: "pronto",
+        arquivo: "components/v2/ModalPadrao/ModalPadrao.jsx",
+        descricao:
+          "Casca padrão de modal — título, corpo (children) e rodapé de ações (prop rodape); fechar sempre pelo X no mesmo lugar, nunca clicando fora.",
       },
     ],
   },

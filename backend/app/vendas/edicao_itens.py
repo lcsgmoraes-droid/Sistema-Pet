@@ -5,7 +5,9 @@ from decimal import Decimal
 
 from fastapi import HTTPException
 
-from app.empresa_grupo_estoque_compartilhado_service import resolver_tenant_estoque_item
+from app.grupo_comercial_estoque_compartilhado_service import (
+    resolver_tenant_estoque_item,
+)
 from app.vendas.custo_original import registrar_custo_original_saida
 from app.vendas.racao_previsao import validar_previsao_fim_racao
 from app.vendas_models import VendaItem

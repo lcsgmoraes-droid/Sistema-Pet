@@ -6,6 +6,7 @@ import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import EmptyState from "../../components/ui/EmptyState";
 import Panel from "../../components/ui/Panel";
 import StatusBadge from "../../components/ui/StatusBadge";
+import { getTiposCadastroLabel } from "./lgpdUtils";
 
 export default function LGPDTitularPanel({
   abrirNovoPedidoAcesso,
@@ -93,7 +94,7 @@ export default function LGPDTitularPanel({
                   Telefone: {selectedCustomer.telefone || selectedCustomer.celular || "-"}
                 </span>
                 <span>Codigo: {selectedCustomer.codigo || "-"}</span>
-                <span>Tipo: {selectedCustomer.tipo_cadastro || "-"}</span>
+                <span>Tipo: {getTiposCadastroLabel(selectedCustomer)}</span>
                 <span>ID: {selectedCustomer.id || "-"}</span>
               </div>
               <div className="flex flex-wrap gap-2">

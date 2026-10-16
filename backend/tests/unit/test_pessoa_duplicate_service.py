@@ -19,10 +19,15 @@ from app.clientes.duplicidades_routes import router as duplicidades_router
 
 
 def _pessoa(**kwargs):
+    tipo_cadastro = kwargs.get("tipo_cadastro", "cliente")
     defaults = {
         "id": 1,
         "nome": "Lucas Guerra de Moraes",
-        "tipo_cadastro": "cliente",
+        "tipo_cadastro": tipo_cadastro,
+        "is_cliente": tipo_cadastro == "cliente",
+        "is_fornecedor": tipo_cadastro == "fornecedor",
+        "is_veterinario": tipo_cadastro == "veterinario",
+        "is_funcionario": tipo_cadastro == "funcionario",
         "tipo_pessoa": "PF",
         "cpf": None,
         "cnpj": None,

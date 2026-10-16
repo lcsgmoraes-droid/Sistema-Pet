@@ -17,10 +17,12 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship, validates
 from sqlalchemy.sql import func
 
-from app.base_models import BaseTenantModel
+from app.base_models import BaseTenantModel, TenantScoped
+from app.db import Base
 # ====================
 # CADASTROS
 # ====================
@@ -102,9 +104,21 @@ class Cliente(BaseTenantModel):
     # Tipo de cadastro e pessoa
     # Sem default global: importacoes e registros antigos nao comprovam origem.
     origem_cliente = Column(String(50), nullable=True)
-    tipo_cadastro = Column(
-        String(50), nullable=False, default="cliente", index=True
-    )  # cliente, fornecedor, veterinario
+    origem_tenant_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+
+    @validates("origem_tenant_id")
+    def _origem_imutavel(self, key, valor):
+        atual = self.__dict__.get("origem_tenant_id")
+        if atual is not None and valor != atual:
+            raise ValueError(
+                "A loja de origem do cadastro e definida na criacao e nao pode ser alterada."
+            )
+        return valor
+
+    is_cliente = Column(Boolean, nullable=False, default=False, server_default="0")
+    is_fornecedor = Column(Boolean, nullable=False, default=False, server_default="0")
+    is_veterinario = Column(Boolean, nullable=False, default=False, server_default="0")
+    is_funcionario = Column(Boolean, nullable=False, default=False, server_default="0")
     tipo_pessoa = Column(
         String(2), nullable=False, default="PF", index=True
     )  # PF ou PJ
@@ -120,6 +134,9 @@ class Cliente(BaseTenantModel):
     cpf = Column(String(14), nullable=True, index=True)
     telefone = Column(String(50), nullable=True)
     celular = Column(String(50), nullable=True)
+    celular_whatsapp = Column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
     email = Column(String(255), nullable=True)
     data_nascimento = Column(
         DateTime, nullable=True
@@ -312,6 +329,13 @@ class Especie(BaseTenantModel):
         String(100), nullable=False, index=True
     )  # Cão, Gato, Ave, Réptil, etc
     ativo = Column(Boolean, default=True)
+    # Vínculo opcional com a espécie-mestre do grupo comercial do tenant — ver
+    # app/especie_raca_mestre_models.py. Sem vínculo, funciona exatamente como
+    # hoje; com vínculo, a UI pode oferecer os dados do mestre em vez de pedir
+    # recadastro numa loja adicional do mesmo grupo.
+    especie_mestre_id = Column(
+        Integer, ForeignKey("especie_mestre.id", ondelete="SET NULL"), nullable=True
+    )
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
@@ -336,6 +360,11 @@ class Raca(BaseTenantModel):
     )  # compatibilidade com schema legado
     especie_id = Column(Integer, ForeignKey("especies.id"), nullable=False, index=True)
     ativo = Column(Boolean, default=True)
+    # Vínculo opcional com a raça-mestre do grupo comercial do tenant — mesmo
+    # padrão da espécie acima.
+    raca_mestre_id = Column(
+        Integer, ForeignKey("raca_mestre.id", ondelete="SET NULL"), nullable=True
+    )
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
@@ -391,12 +420,88 @@ class Pet(BaseTenantModel):
     observacoes = Column(Text, nullable=True)
     foto_url = Column(String(500), nullable=True)  # URL da foto do pet
     ativo = Column(Boolean, default=True)
-
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    origem_tenant_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+
+    @validates("origem_tenant_id")
+    def _origem_imutavel(self, key, valor):
+        atual = self.__dict__.get("origem_tenant_id")
+        if atual is not None and valor != atual:
+            raise ValueError(
+                "A loja de origem do pet e definida na criacao e nao pode ser alterada."
+            )
+        return valor
+
     # Relacionamento
     cliente = relationship("Cliente", back_populates="pets")
+
+
+class ClienteHistoricoAlteracao(TenantScoped, Base):
+    __tablename__ = "clientes_historico_alteracoes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cliente_id = Column(
+        Integer,
+        ForeignKey("clientes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    campo = Column(String(100), nullable=False)
+    valor_anterior = Column(Text, nullable=True)
+    valor_novo = Column(Text, nullable=True)
+    alterado_em = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class PetHistoricoAlteracao(TenantScoped, Base):
+    __tablename__ = "pets_historico_alteracoes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    pet_id = Column(
+        Integer, ForeignKey("pets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    campo = Column(String(100), nullable=False)
+    valor_anterior = Column(Text, nullable=True)
+    valor_novo = Column(Text, nullable=True)
+    alterado_em = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class PetRegistroClinico(TenantScoped, Base):
+    """Registro de atendimento do pet (historico clinico ou peso), por loja.
+
+    tenant_id e a loja que registrou. Todas as lojas do grupo leem; so a loja
+    que registrou altera ou apaga.
+    """
+
+    __tablename__ = "pets_registros_clinicos"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    pet_id = Column(
+        Integer, ForeignKey("pets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    tipo = Column(String(20), nullable=False)
+    texto = Column(Text, nullable=True)
+    valor = Column(Float, nullable=True)
+    registrado_em = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    criado_em = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

@@ -27,7 +27,9 @@ def _normalize_name(value: str | None) -> str:
 
 
 def upgrade() -> None:
-    op.add_column("tenants", sa.Column("name_normalized", sa.String(255), nullable=True))
+    op.add_column(
+        "tenants", sa.Column("name_normalized", sa.String(255), nullable=True)
+    )
     op.add_column("tenants", sa.Column("latitude", sa.Float(), nullable=True))
     op.add_column("tenants", sa.Column("longitude", sa.Float(), nullable=True))
 
@@ -51,8 +53,7 @@ def upgrade() -> None:
     if duplicate_names:
         names = ", ".join(sorted(duplicate_names))
         raise RuntimeError(
-            "Existem lojas com nomes duplicados. Corrija antes da migracao: "
-            f"{names}"
+            f"Existem lojas com nomes duplicados. Corrija antes da migracao: {names}"
         )
 
     for tenant_id, normalized_name in normalized_by_id.items():

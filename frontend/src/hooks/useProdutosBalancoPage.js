@@ -66,7 +66,7 @@ export function useProdutosBalancoPage() {
     const [marcasResult, fornecedoresResult] = await Promise.allSettled([
       getMarcas(),
       api.get("/clientes/", {
-        params: { tipo_cadastro: "fornecedor", apenas_ativos: true, page_size: 1000 },
+        params: { is_fornecedor: true, apenas_ativos: true, page_size: 1000 },
       }),
     ]);
 

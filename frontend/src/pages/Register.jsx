@@ -1,18 +1,42 @@
 import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { PawPrint } from "lucide-react";
-import {
-  FiAlertCircle,
-  FiBriefcase,
-  FiEye,
-  FiEyeOff,
-  FiKey,
-  FiLock,
-  FiMail,
-  FiUser,
-} from "react-icons/fi";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { PawPrint, UserPlus } from "lucide-react";
+import { FiAlertCircle } from "react-icons/fi";
 import { useAuth } from "../contexts/AuthContext";
 import { findPublicPlan, planOrganizationTypes } from "../data/publicPlans";
+import InputTexto from "../components/v2/InputTexto/InputTexto";
+import InputSenha from "../components/v2/InputSenha/InputSenha";
+import InputCombobox from "../components/v2/InputCombobox/InputCombobox";
+import InputCheckTexto from "../components/v2/InputCheckTexto/InputCheckTexto";
+import BotaoInteracao from "../components/v2/BotaoInteracao/BotaoInteracao";
+import LinkPadrao from "../components/v2/LinkPadrao/LinkPadrao";
+
+const FORM_ID = "register-form";
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Ordem visual dos campos (topo do formulário até o rodapé fixo) — usada só se o envio for
+// bloqueado por algum caminho que não passe pelo botão (ele já vem desabilitado até tudo válido).
+const CAMPOS_EM_ORDEM = [
+  "nome",
+  "nomeLoja",
+  "nomeAcesso",
+  "email",
+  "password",
+  "confirmPassword",
+  "acceptedTerms",
+  "acceptedPrivacy",
+];
+
+const ID_DO_CAMPO = {
+  nome: "register-nome",
+  nomeLoja: "register-nome-loja",
+  nomeAcesso: "register-nome-acesso",
+  email: "register-email",
+  password: "register-password",
+  confirmPassword: "register-confirm-password",
+  acceptedTerms: "register-accepted-terms",
+  acceptedPrivacy: "register-accepted-privacy",
+};
 
 const Register = () => {
   const [nome, setNome] = useState("");
@@ -23,9 +47,10 @@ const Register = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+  // Um campo só mostra erro depois que o usuário passou por ele (blur/alteração) — evita a tela
+  // inteira nascer vermelha antes de qualquer interação.
+  const [tocados, setTocados] = useState({});
   const [error, setError] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -46,30 +71,70 @@ const Register = () => {
       : selectedPlanData.segment === "grooming"
         ? [{ value: "grooming", label: "Banho e Tosa" }]
         : [{ value: "petshop", label: "Pet Shop" }];
+  // Só existe escolha de verdade quando o segmento tem mais de um tipo (hoje, só o veterinario).
+  // Com uma opcao so, ela e a resposta certa por definicao — nao faz sentido pedir pro usuario
+  // confirmar algo que nao e uma decisao, entao o campo nem aparece e o valor vai direto no envio.
+  const opcaoOrganizacaoUnica =
+    organizationOptions.length === 1 ? organizationOptions[0].value : null;
+  const organizationTypeEfetivo = opcaoOrganizacaoUnica || organizationType;
+
+  // Recalculado a cada render a partir dos valores atuais — nunca fica desatualizado, e é o que
+  // decide se o botão de enviar pode ficar ativo (não depende de nenhum clique prévio).
+  const validar = () => {
+    const novosErros = {};
+
+    if (!nome.trim()) novosErros.nome = "Informe seu nome.";
+    if (!nomeLoja.trim()) novosErros.nomeLoja = "Informe o nome da empresa.";
+
+    if (!nomeAcesso.trim()) {
+      novosErros.nomeAcesso = "Informe o nome de acesso da loja.";
+    } else if (nomeAcesso.trim().length < 3) {
+      novosErros.nomeAcesso = "O nome de acesso da loja deve ter pelo menos 3 caracteres.";
+    }
+
+    if (!email.trim()) {
+      novosErros.email = "Informe seu email.";
+    } else if (!EMAIL_REGEX.test(email.trim())) {
+      novosErros.email = "Informe um email valido.";
+    }
+
+    if (!password) {
+      novosErros.password = "Informe uma senha.";
+    } else if (password.length < 8) {
+      novosErros.password = "A senha deve ter no minimo 8 caracteres.";
+    }
+
+    if (!confirmPassword) {
+      novosErros.confirmPassword = "Repita a senha.";
+    } else if (confirmPassword !== password) {
+      novosErros.confirmPassword = "As senhas nao coincidem.";
+    }
+
+    if (!acceptedTerms) novosErros.acceptedTerms = "E preciso aceitar os Termos de Uso.";
+    if (!acceptedPrivacy) {
+      novosErros.acceptedPrivacy = "E preciso confirmar a leitura da Politica de Privacidade.";
+    }
+
+    return novosErros;
+  };
+
+  const erros = validar();
+  const formValido = Object.keys(erros).length === 0;
+  const erroVisivel = (campo) => (tocados[campo] ? erros[campo] : undefined);
+  const marcarTocado = (campo) => setTocados((atual) => ({ ...atual, [campo]: true }));
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
 
-    if (password !== confirmPassword) {
-      setError("As senhas nao coincidem");
-      return;
-    }
-
-    if (password.length < 8) {
-      setError("A senha deve ter no minimo 8 caracteres");
-      return;
-    }
-
-    if (nomeAcesso.trim().length < 3) {
-      setError("O nome de acesso da loja deve ter pelo menos 3 caracteres");
-      return;
-    }
-
-    if (!acceptedTerms || !acceptedPrivacy) {
-      setError(
-        "Aceite os Termos de Uso e confirme a leitura da Politica de Privacidade para continuar",
-      );
+    // O botão já vem desabilitado enquanto `formValido` for falso — este bloqueio é só uma rede
+    // de segurança (ex.: envio disparado por Enter num navegador que ignore o atributo disabled).
+    if (!formValido) {
+      setTocados(Object.fromEntries(CAMPOS_EM_ORDEM.map((campo) => [campo, true])));
+      const primeiroCampoComErro = CAMPOS_EM_ORDEM.find((campo) => erros[campo]);
+      document
+        .getElementById(ID_DO_CAMPO[primeiroCampoComErro])
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
 
@@ -81,7 +146,7 @@ const Register = () => {
       nome_loja: nomeLoja,
       nome_acesso: nomeAcesso.trim(),
       plan: selectedPlan,
-      organization_type: organizationType,
+      organization_type: organizationTypeEfetivo,
       accepted_terms: acceptedTerms,
       accepted_privacy: acceptedPrivacy,
     });
@@ -98,8 +163,8 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-purple-700 to-purple-900 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 animate-fade-in">
+    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-purple-700 to-purple-900 flex items-center justify-center p-4 py-10">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-6 sm:p-8 animate-fade-in">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-100 rounded-full mb-4">
             <PawPrint className="w-8 h-8 text-purple-600" />
@@ -115,259 +180,173 @@ const Register = () => {
           </div>
         )}
 
-        <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-          <p className="mb-2 font-black">
-            Plano escolhido: {selectedPlanData.name} — R$ {selectedPlanData.price}/mes
-          </p>
-          <p className="font-semibold">Experiência CorePet Completa por 30 dias</p>
-          <p className="mt-1">
-            Durante o período gratuito, sua empresa poderá conhecer todos os módulos do CorePet.
-            Depois, nossa equipe ajuda você a escolher e configurar o plano que faz sentido para a
-            sua operação.
-          </p>
-          <p className="mt-2 text-xs font-semibold">
-            Condição de lançamento com acompanhamento humano para as 20 primeiras empresas.
-          </p>
-          <Link
-            to="/planos"
-            className="mt-3 inline-flex text-xs font-bold text-emerald-800 underline"
-          >
-            Conferir plano e recursos
-          </Link>
-        </div>
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+          <aside className="lg:sticky lg:top-6 lg:self-start">
+            <div className="space-y-4">
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                <p className="mb-2 font-black">
+                  Plano escolhido: {selectedPlanData.name} — R$ {selectedPlanData.price}/mes
+                </p>
+                <p className="font-semibold">Experiência CorePet Completa por 30 dias</p>
+                <p className="mt-1">
+                  Durante o período gratuito, sua empresa poderá conhecer todos os módulos do
+                  CorePet. Depois, nossa equipe ajuda você a escolher e configurar o plano que faz
+                  sentido para a sua operação.
+                </p>
+                <p className="mt-2 text-xs font-semibold">
+                  Condição de lançamento com acompanhamento humano para as 20 primeiras empresas.
+                </p>
+              </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="register-nome" className="block text-sm font-medium text-gray-700 mb-2">
-              Seu nome
-            </label>
-            <div className="relative">
-              <FiUser className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                id="register-nome"
-                name="nome"
-                type="text"
-                value={nome}
-                onChange={(event) => setNome(event.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
-                placeholder="Nome do responsavel"
-                required
-              />
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+                <InputCheckTexto
+                  id="register-accepted-terms"
+                  checked={acceptedTerms}
+                  error={erroVisivel("acceptedTerms")}
+                  onChange={(value) => {
+                    setAcceptedTerms(value);
+                    marcarTocado("acceptedTerms");
+                  }}
+                >
+                  Li e aceito os{" "}
+                  <LinkPadrao to="/termos" novaJanela tamanho="text-sm">
+                    Termos de Uso
+                  </LinkPadrao>
+                  .
+                </InputCheckTexto>
+                <InputCheckTexto
+                  id="register-accepted-privacy"
+                  checked={acceptedPrivacy}
+                  error={erroVisivel("acceptedPrivacy")}
+                  onChange={(value) => {
+                    setAcceptedPrivacy(value);
+                    marcarTocado("acceptedPrivacy");
+                  }}
+                >
+                  Li e confirmo que estou ciente da{" "}
+                  <LinkPadrao to="/privacidade" novaJanela tamanho="text-sm">
+                    Politica de Privacidade
+                  </LinkPadrao>
+                  .
+                </InputCheckTexto>
+              </div>
+
+              <div>
+                <BotaoInteracao
+                  type="submit"
+                  form={FORM_ID}
+                  icon={UserPlus}
+                  disabled={loading || !formValido}
+                  loading={loading}
+                  tamanho="grande"
+                  larguraTotal
+                >
+                  {loading ? "Criando conta..." : "Criar conta"}
+                </BotaoInteracao>
+                {!formValido && !loading ? (
+                  <p className="mt-2 text-center text-xs font-medium text-amber-700">
+                    Preencha os campos obrigatórios e aceite os termos para continuar.
+                  </p>
+                ) : null}
+              </div>
+
+              <p className="text-center text-sm text-gray-600">
+                Ja tem uma conta?{" "}
+                <LinkPadrao to="/login" tamanho="text-sm">
+                  Fazer login
+                </LinkPadrao>
+              </p>
             </div>
-          </div>
+          </aside>
 
-          <div>
-            <label
-              htmlFor="register-nome-loja"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Nome da empresa
-            </label>
-            <div className="relative">
-              <FiBriefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                id="register-nome-loja"
-                name="nome_loja"
-                type="text"
-                value={nomeLoja}
-                onChange={(event) => setNomeLoja(event.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
-                placeholder="Ex: CorePet"
-                required
-              />
-            </div>
-          </div>
+          <form id={FORM_ID} onSubmit={handleSubmit} noValidate className="space-y-3">
+            <InputTexto
+              id="register-nome"
+              label="Seu nome"
+              value={nome}
+              error={erroVisivel("nome")}
+              onChange={setNome}
+              onBlur={() => marcarTocado("nome")}
+              placeholder="Nome do responsavel"
+              required
+            />
 
-          <div>
-            <label
-              htmlFor="register-nome-acesso"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Nome de acesso da loja
-            </label>
-            <div className="relative">
-              <FiKey className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                id="register-nome-acesso"
-                name="nome_acesso"
-                type="text"
-                minLength={3}
-                maxLength={120}
-                value={nomeAcesso}
-                onChange={(event) => setNomeAcesso(event.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
-                placeholder="Ex: Vira Latas"
-                required
-              />
-            </div>
-            <p className="mt-1 text-xs text-gray-500">
-              Deve ser unico no CorePet. Seus colaboradores usarao este nome para entrar.
-            </p>
-          </div>
+            <InputTexto
+              id="register-nome-loja"
+              label="Nome da empresa"
+              value={nomeLoja}
+              error={erroVisivel("nomeLoja")}
+              onChange={setNomeLoja}
+              onBlur={() => marcarTocado("nomeLoja")}
+              placeholder="Ex: CorePet"
+              required
+            />
 
-          <div>
-            <label
-              htmlFor="register-organization-type"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Tipo de empresa
-            </label>
-            <div className="relative">
-              <FiBriefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <select
+            <InputTexto
+              id="register-nome-acesso"
+              label="Nome de acesso da loja"
+              value={nomeAcesso}
+              error={erroVisivel("nomeAcesso")}
+              help={
+                erroVisivel("nomeAcesso")
+                  ? undefined
+                  : "Deve ser unico no CorePet. Seus colaboradores usarao este nome para entrar."
+              }
+              onChange={setNomeAcesso}
+              onBlur={() => marcarTocado("nomeAcesso")}
+              maxLength={120}
+              placeholder="Ex: Vira Latas"
+              required
+            />
+
+            {opcaoOrganizacaoUnica ? null : (
+              <InputCombobox
                 id="register-organization-type"
-                name="organization_type"
+                label="Tipo de empresa"
+                opcoes={organizationOptions}
                 value={organizationType}
-                onChange={(event) => setOrganizationType(event.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition bg-white"
-              >
-                {organizationOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label
-              htmlFor="register-email"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Email
-            </label>
-            <div className="relative">
-              <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                id="register-email"
-                name="email"
-                type="email"
-                value={email}
-                autoComplete="email"
-                onChange={(event) => setEmail(event.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
-                placeholder="seu@email.com"
-                required
+                onChange={(value) => setOrganizationType(value)}
+                permitirLimpar={false}
               />
-            </div>
-          </div>
+            )}
 
-          <div>
-            <label
-              htmlFor="register-password"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Senha
-            </label>
-            <div className="relative">
-              <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                id="register-password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                value={password}
-                autoComplete="new-password"
-                onChange={(event) => setPassword(event.target.value)}
-                className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
-                placeholder="Minimo 8 caracteres"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((value) => !value)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
-                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-              >
-                {showPassword ? <FiEyeOff /> : <FiEye />}
-              </button>
-            </div>
-          </div>
+            <InputTexto
+              id="register-email"
+              label="Email"
+              type="email"
+              value={email}
+              error={erroVisivel("email")}
+              autoComplete="email"
+              onChange={setEmail}
+              onBlur={() => marcarTocado("email")}
+              placeholder="seu@email.com"
+              required
+            />
 
-          <div>
-            <label
-              htmlFor="register-confirm-password"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Confirmar senha
-            </label>
-            <div className="relative">
-              <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                id="register-confirm-password"
-                name="confirm_password"
-                type={showConfirmPassword ? "text" : "password"}
-                value={confirmPassword}
-                autoComplete="new-password"
-                onChange={(event) => setConfirmPassword(event.target.value)}
-                className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
-                placeholder="Repita a senha"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword((value) => !value)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
-                aria-label={showConfirmPassword ? "Ocultar senha" : "Mostrar senha"}
-              >
-                {showConfirmPassword ? <FiEyeOff /> : <FiEye />}
-              </button>
-            </div>
-          </div>
+            <InputSenha
+              id="register-password"
+              label="Senha"
+              value={password}
+              error={erroVisivel("password")}
+              autoComplete="new-password"
+              onChange={setPassword}
+              onBlur={() => marcarTocado("password")}
+              placeholder="Minimo 8 caracteres"
+              required
+            />
 
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3 text-sm text-gray-700">
-            <label className="flex gap-3">
-              <input
-                id="register-accepted-terms"
-                name="accepted_terms"
-                type="checkbox"
-                checked={acceptedTerms}
-                onChange={(event) => setAcceptedTerms(event.target.checked)}
-                className="mt-1"
-              />
-              <span>
-                Li e aceito os{" "}
-                <Link to="/termos" className="text-purple-700 font-semibold">
-                  Termos de Uso
-                </Link>
-                .
-              </span>
-            </label>
-            <label className="flex gap-3">
-              <input
-                id="register-accepted-privacy"
-                name="accepted_privacy"
-                type="checkbox"
-                checked={acceptedPrivacy}
-                onChange={(event) => setAcceptedPrivacy(event.target.checked)}
-                className="mt-1"
-              />
-              <span>
-                Li e confirmo que estou ciente da{" "}
-                <Link to="/privacidade" className="text-purple-700 font-semibold">
-                  Politica de Privacidade
-                </Link>
-                .
-              </span>
-            </label>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? "Criando conta..." : "Criar conta"}
-          </button>
-        </form>
-
-        <div className="mt-6 text-center">
-          <p className="text-gray-600">
-            Ja tem uma conta?{" "}
-            <Link to="/login" className="text-purple-600 hover:text-purple-700 font-semibold">
-              Fazer login
-            </Link>
-          </p>
+            <InputSenha
+              id="register-confirm-password"
+              label="Confirmar senha"
+              value={confirmPassword}
+              error={erroVisivel("confirmPassword")}
+              autoComplete="new-password"
+              onChange={setConfirmPassword}
+              onBlur={() => marcarTocado("confirmPassword")}
+              placeholder="Repita a senha"
+              required
+            />
+          </form>
         </div>
       </div>
     </div>

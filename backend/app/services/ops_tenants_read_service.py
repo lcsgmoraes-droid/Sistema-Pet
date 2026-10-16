@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
 from app.services.base_catalog_import_service import (
@@ -159,6 +159,33 @@ def _base_catalog_status(db: Session, tenant_id: str) -> dict[str, Any]:
     }
 
 
+def _grupo_comercial_info(db: Session, tenant_id: str) -> dict[str, Any] | None:
+    if not _table_exists(db, "grupo_comercial_membros") or not _table_exists(
+        db, "grupos_comerciais"
+    ):
+        return None
+
+    row = (
+        db.execute(
+            text("""
+            SELECT g.id AS grupo_id, g.nome AS grupo_nome
+            FROM grupo_comercial_membros m
+            JOIN grupos_comerciais g ON g.id = m.grupo_id
+            WHERE CAST(m.empresa_id AS TEXT) = :tenant_id
+              AND m.status = 'ativo'
+            ORDER BY (m.papel = 'responsavel') DESC, m.grupo_id ASC
+            LIMIT 1
+            """),
+            {"tenant_id": tenant_id},
+        )
+        .mappings()
+        .first()
+    )
+    if not row:
+        return None
+    return {"id": int(row["grupo_id"]), "nome": row["grupo_nome"]}
+
+
 def _tenant_counts(db: Session, tenant_id: str) -> dict[str, int]:
     counts = {
         label: _count_by_tenant(db, table_name, tenant_id)
@@ -293,6 +320,7 @@ def _pilot_follow_up(
     onboarding_owner_name: str | None,
     onboarding_satisfaction: str | None,
     onboarding_next_contact_on: date | str | None,
+    credencial_email_pendente: bool = False,
 ) -> dict[str, Any]:
     reasons: list[dict[str, Any]] = []
     overdue_milestones: list[str] = []
@@ -311,6 +339,12 @@ def _pilot_follow_up(
         if overdue_milestone:
             overdue_milestones.append(overdue_milestone)
 
+    if credencial_email_pendente:
+        add_reason(
+            "credential_email_failed",
+            "e-mail de definicao de senha do titular nao foi enviado",
+            "critical",
+        )
     if critical_alerts_open:
         add_reason(
             "critical_alert",
@@ -399,7 +433,9 @@ def _pilot_follow_up(
     else:
         attention_level = "healthy"
 
-    if critical_alerts_open:
+    if credencial_email_pendente:
+        next_action = "Repassar usuario/senha ao titular por outro canal (telefone, WhatsApp etc.)."
+    elif critical_alerts_open:
         next_action = "Resolver o alerta critico e validar a jornada afetada."
     elif not access_confirmed:
         next_action = "Confirmar o primeiro acesso do responsavel pela empresa."
@@ -507,6 +543,7 @@ def _tenant_pilot_status(
         onboarding_owner_name=row.get("onboarding_owner_name"),
         onboarding_satisfaction=row.get("onboarding_satisfaction"),
         onboarding_next_contact_on=row.get("onboarding_next_contact_on"),
+        credencial_email_pendente=bool(row.get("onboarding_credencial_email_pendente")),
     )
     return {
         "kind": kind,
@@ -542,6 +579,28 @@ def _is_billing_attention(status: str | None) -> bool:
     }
 
 
+def _valor_cobrado_cents(db: Session, tenant_id: str) -> int | None:
+    """Valor mensal de verdade sendo cobrado dessa loja: o `price_cents` da
+    proposta comercial mais recente que já foi aceita (nunca uma proposta
+    ainda so "ready", que e so um link pronto, ainda nao confirmado pelo
+    cliente) — ver `billing_offer_service.accept_billing_offer`."""
+    if not _table_exists(db, "billing_offers"):
+        return None
+    valor = db.execute(
+        text("""
+            SELECT price_cents
+            FROM billing_offers
+            WHERE tenant_reference = :tenant_id
+              AND status IN ('accepted', 'active', 'past_due', 'blocked')
+              AND revoked = false
+            ORDER BY COALESCE(accepted_at, created_at) DESC
+            LIMIT 1
+            """),
+        {"tenant_id": tenant_id},
+    ).scalar()
+    return int(valor) if valor is not None else None
+
+
 def _tenant_row_to_item(db: Session, row: dict[str, Any]) -> dict[str, Any]:
     tenant_id = str(row["id"])
     counts = _tenant_counts(db, tenant_id)
@@ -551,7 +610,11 @@ def _tenant_row_to_item(db: Session, row: dict[str, Any]) -> dict[str, Any]:
         "name": row["name"],
         "status": row.get("status") or "active",
         "plan": row.get("plan") or "free",
+        "plan_pet": row.get("plan_pet"),
+        "plan_vet": row.get("plan_vet"),
+        "plan_grooming": row.get("plan_grooming"),
         "billing_status": row.get("billing_status") or "active",
+        "valor_cobrado_cents": _valor_cobrado_cents(db, tenant_id),
         "subscription_source": row.get("subscription_source") or "manual",
         "subscription_activated_at": row.get("subscription_activated_at"),
         "organization_type": row.get("organization_type") or "petshop",
@@ -565,9 +628,9 @@ def _tenant_row_to_item(db: Session, row: dict[str, Any]) -> dict[str, Any]:
             "satisfaction": row.get("onboarding_satisfaction") or "not_collected",
             "updated_at": _iso(row.get("onboarding_follow_up_updated_at")),
         },
-        "counts": counts,
         "usage": _tenant_usage(db, tenant_id, counts),
         "base_catalog": _base_catalog_status(db, tenant_id),
+        "grupo_comercial": _grupo_comercial_info(db, tenant_id),
         "pilot": _tenant_pilot_status(
             db,
             tenant_id=tenant_id,
@@ -582,10 +645,12 @@ def _fetch_tenant_item(db: Session, tenant_id: str) -> dict[str, Any]:
     row = (
         db.execute(
             text("""
-            SELECT id, name, status, plan, billing_status, subscription_source,
+            SELECT id, name, status, plan, plan_pet, plan_vet, plan_grooming,
+                   billing_status, subscription_source,
                    subscription_activated_at, organization_type,
                    onboarding_owner_name, onboarding_unblocked_on, onboarding_next_contact_on,
                    onboarding_satisfaction, onboarding_follow_up_updated_at,
+                   onboarding_credencial_email_pendente,
                    created_at, updated_at
             FROM tenants
             WHERE CAST(id AS TEXT) = :tenant_id
@@ -628,10 +693,12 @@ def list_ops_tenants(
     where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     rows = db.execute(
         text(f"""
-            SELECT id, name, status, plan, billing_status, subscription_source,
+            SELECT id, name, status, plan, plan_pet, plan_vet, plan_grooming,
+                   billing_status, subscription_source,
                    subscription_activated_at, organization_type,
                    onboarding_owner_name, onboarding_unblocked_on, onboarding_next_contact_on,
                    onboarding_satisfaction, onboarding_follow_up_updated_at,
+                   onboarding_credencial_email_pendente,
                    created_at, updated_at
             FROM tenants
             {where_sql}
@@ -671,3 +738,165 @@ def list_ops_tenants(
         ),
     }
     return {"items": items, "summary": summary}
+
+
+def _bulk_grupo_comercial_by_tenant(
+    db: Session, tenant_ids: list[str]
+) -> dict[str, dict[str, Any]]:
+    """Mesma resolucao de grupo comercial de ``_grupo_comercial_info``, mas
+    numa unica consulta para varios tenants de uma vez — usado pela
+    paginacao por cliente, que precisa saber o grupo de todo mundo antes de
+    decidir quem entra em cada pagina, sem virar uma consulta por tenant.
+    """
+    if (
+        not tenant_ids
+        or not _table_exists(db, "grupo_comercial_membros")
+        or not _table_exists(db, "grupos_comerciais")
+    ):
+        return {}
+
+    rows = db.execute(
+        text("""
+            SELECT m.empresa_id AS tenant_id, g.id AS grupo_id, g.nome AS grupo_nome,
+                   m.papel AS papel
+            FROM grupo_comercial_membros m
+            JOIN grupos_comerciais g ON g.id = m.grupo_id
+            WHERE m.status = 'ativo'
+              AND CAST(m.empresa_id AS TEXT) IN :tenant_ids
+            """).bindparams(bindparam("tenant_ids", expanding=True)),
+        {"tenant_ids": [str(tenant_id) for tenant_id in tenant_ids]},
+    ).mappings()
+
+    por_tenant: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        tenant_id = str(row["tenant_id"])
+        candidato = {"id": int(row["grupo_id"]), "nome": row["grupo_nome"]}
+        atual = por_tenant.get(tenant_id)
+        if atual is None or row["papel"] == "responsavel":
+            por_tenant[tenant_id] = candidato
+    return por_tenant
+
+
+def list_ops_tenants_grouped(
+    db: Session,
+    *,
+    search: str | None = None,
+    status: str | None = None,
+    page: int = 1,
+    page_size: int = 10,
+) -> dict[str, Any]:
+    """Mesma listagem de ``list_ops_tenants``, mas paginada por cliente
+    (grupo comercial) em vez de por tenant solto: cada pagina traz sempre
+    ``page_size`` clientes inteiros (nunca um grupo partido ao meio entre
+    paginas), ordenados pela loja mais recente de cada um. O enriquecimento
+    caro por tenant (usuario principal, status de piloto etc.) so roda para
+    quem realmente entrou na pagina pedida — e essa e a razao de existir:
+    tornar a aba Tenants rapida mesmo com muitos tenants cadastrados.
+    """
+    if not _table_exists(db, "tenants"):
+        return {
+            "items": [],
+            "page": page,
+            "page_size": page_size,
+            "total_groups": 0,
+            "total_pages": 0,
+        }
+
+    clauses = []
+    params: dict[str, Any] = {}
+    if search:
+        clauses.append(
+            "(lower(name) LIKE lower(:search) OR lower(CAST(id AS TEXT)) LIKE lower(:search))"
+        )
+        params["search"] = f"%{search.strip()}%"
+    if status:
+        clauses.append("lower(status) = lower(:status)")
+        params["status"] = status.strip()
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+    leves = db.execute(
+        text(f"""
+            SELECT id, name, created_at
+            FROM tenants
+            {where_sql}
+            """),
+        params,
+    ).mappings()
+    leves = [dict(row) for row in leves]
+
+    grupo_por_tenant = _bulk_grupo_comercial_by_tenant(db, [row["id"] for row in leves])
+
+    grupos: dict[str, dict[str, Any]] = {}
+    for row in leves:
+        tenant_id = str(row["id"])
+        grupo = grupo_por_tenant.get(tenant_id)
+        chave = f"grupo:{grupo['id']}" if grupo else f"tenant:{tenant_id}"
+        if chave not in grupos:
+            grupos[chave] = {
+                "chave": chave,
+                "tenant_ids": [],
+                "sort_key": None,
+            }
+        grupos[chave]["tenant_ids"].append(tenant_id)
+        criado_em = _parse_datetime(row["created_at"])
+        if criado_em is not None and (
+            grupos[chave]["sort_key"] is None or criado_em > grupos[chave]["sort_key"]
+        ):
+            grupos[chave]["sort_key"] = criado_em
+
+    grupos_ordenados = sorted(
+        grupos.values(),
+        key=lambda grupo: (
+            grupo["sort_key"] or datetime.min.replace(tzinfo=timezone.utc)
+        ),
+        reverse=True,
+    )
+
+    total_groups = len(grupos_ordenados)
+    total_pages = (
+        max((total_groups + page_size - 1) // page_size, 1) if total_groups else 0
+    )
+    pagina_segura = max(page, 1)
+    inicio = (pagina_segura - 1) * page_size
+    pagina_grupos = grupos_ordenados[inicio : inicio + page_size]
+
+    tenant_ids_pagina = [
+        tenant_id for grupo in pagina_grupos for tenant_id in grupo["tenant_ids"]
+    ]
+    if not tenant_ids_pagina:
+        return {
+            "items": [],
+            "page": pagina_segura,
+            "page_size": page_size,
+            "total_groups": total_groups,
+            "total_pages": total_pages,
+        }
+
+    rows = db.execute(
+        text("""
+            SELECT id, name, status, plan, plan_pet, plan_vet, plan_grooming,
+                   billing_status, subscription_source,
+                   subscription_activated_at, organization_type,
+                   onboarding_owner_name, onboarding_unblocked_on, onboarding_next_contact_on,
+                   onboarding_satisfaction, onboarding_follow_up_updated_at,
+                   onboarding_credencial_email_pendente,
+                   created_at, updated_at
+            FROM tenants
+            WHERE CAST(id AS TEXT) IN :tenant_ids
+            """).bindparams(bindparam("tenant_ids", expanding=True)),
+        {"tenant_ids": tenant_ids_pagina},
+    ).mappings()
+    linhas_por_id = {str(row["id"]): dict(row) for row in rows}
+    items = [
+        _tenant_row_to_item(db, linhas_por_id[tenant_id])
+        for tenant_id in tenant_ids_pagina
+        if tenant_id in linhas_por_id
+    ]
+
+    return {
+        "items": items,
+        "page": pagina_segura,
+        "page_size": page_size,
+        "total_groups": total_groups,
+        "total_pages": total_pages,
+    }

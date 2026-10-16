@@ -79,13 +79,9 @@ def upgrade() -> None:
             sa.Column("despesas_administrativas", sa.Float(), server_default="0"),
             sa.Column("despesas_financeiras", sa.Float(), server_default="0"),
             sa.Column("outras_despesas", sa.Float(), server_default="0"),
-            sa.Column(
-                "total_despesas_operacionais", sa.Float(), server_default="0"
-            ),
+            sa.Column("total_despesas_operacionais", sa.Float(), server_default="0"),
             sa.Column("lucro_operacional", sa.Float(), server_default="0"),
-            sa.Column(
-                "margem_operacional_percent", sa.Float(), server_default="0"
-            ),
+            sa.Column("margem_operacional_percent", sa.Float(), server_default="0"),
             sa.Column("impostos", sa.Float(), server_default="0"),
             sa.Column("impostos_detalhamento", sa.Text(), nullable=True),
             sa.Column("aliquota_efetiva_percent", sa.Float(), server_default="0"),
@@ -116,16 +112,12 @@ def upgrade() -> None:
             "regime_tributario": sa.Column(
                 "regime_tributario", sa.String(length=50), nullable=True
             ),
-            "lucro_liquido": sa.Column(
-                "lucro_liquido", sa.Float(), server_default="0"
-            ),
+            "lucro_liquido": sa.Column("lucro_liquido", sa.Float(), server_default="0"),
             "margem_liquida_percent": sa.Column(
                 "margem_liquida_percent", sa.Float(), server_default="0"
             ),
             "status": sa.Column("status", sa.String(length=50), nullable=True),
-            "score_saude": sa.Column(
-                "score_saude", sa.Integer(), server_default="0"
-            ),
+            "score_saude": sa.Column("score_saude", sa.Integer(), server_default="0"),
             "origem": sa.Column("origem", sa.String(length=50), nullable=True),
             "origem_evento": sa.Column(
                 "origem_evento", sa.String(length=50), nullable=True
@@ -163,8 +155,7 @@ def upgrade() -> None:
     unique_name = "uq_dre_detalhe_canais_periodo_canal"
     unique_columns = {"tenant_id", "data_inicio", "data_fim", "canal"}
     has_period_channel_unique = any(
-        index.get("unique")
-        and set(index.get("column_names") or []) == unique_columns
+        index.get("unique") and set(index.get("column_names") or []) == unique_columns
         for index in inspected_indexes
     )
     if unique_name not in existing_indexes and not has_period_channel_unique:

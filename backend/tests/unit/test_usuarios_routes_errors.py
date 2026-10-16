@@ -85,5 +85,5 @@ def test_usuarios_routes_contract_vincula_pessoa_operacional():
 
     assert "pessoa_id: int | None = None" in source
     assert "Cliente.auth_user_id == User.id" in source
-    assert 'tipo_cadastro="funcionario"' in source
+    assert "is_funcionario=True" in source
     assert 'origem_cliente="cadastro_usuario"' in source

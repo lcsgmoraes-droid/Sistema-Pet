@@ -10,15 +10,22 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column("venda_pagamentos", sa.Column("caixa_id", sa.Integer(), nullable=True))
+    op.add_column(
+        "venda_pagamentos", sa.Column("caixa_id", sa.Integer(), nullable=True)
+    )
     op.create_foreign_key(
-        "fk_venda_pagamentos_caixa_id", "venda_pagamentos", "caixas", ["caixa_id"], ["id"]
+        "fk_venda_pagamentos_caixa_id",
+        "venda_pagamentos",
+        "caixas",
+        ["caixa_id"],
+        ["id"],
     )
     op.create_index("ix_venda_pagamentos_caixa_id", "venda_pagamentos", ["caixa_id"])
 
     # Legados: só atribuir quando o intervalo identifica um único caixa da empresa.
     # Em caixas individuais simultâneos, preservar NULL em vez de inventar o recebedor.
-    op.execute(sa.text("""
+    op.execute(
+        sa.text("""
         WITH candidatos AS (
             SELECT p.id AS pagamento_id, MIN(c.id) AS caixa_id
             FROM venda_pagamentos p
@@ -31,10 +38,13 @@ def upgrade():
         )
         UPDATE venda_pagamentos p SET caixa_id = candidatos.caixa_id
         FROM candidatos WHERE p.id = candidatos.pagamento_id
-    """))
+    """)
+    )
 
 
 def downgrade():
     op.drop_index("ix_venda_pagamentos_caixa_id", table_name="venda_pagamentos")
-    op.drop_constraint("fk_venda_pagamentos_caixa_id", "venda_pagamentos", type_="foreignkey")
+    op.drop_constraint(
+        "fk_venda_pagamentos_caixa_id", "venda_pagamentos", type_="foreignkey"
+    )
     op.drop_column("venda_pagamentos", "caixa_id")

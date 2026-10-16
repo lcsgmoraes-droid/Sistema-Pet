@@ -6,13 +6,13 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import func
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.produtos.core import _normalizar_sku_produto
 from app.produtos_models import Categoria, Marca, Produto
-from app.empresa_grupo_estoque_compartilhado_service import (
-    EmpresaGrupoEstoqueCompartilhadoService,
+from app.grupo_comercial_estoque_compartilhado_service import (
+    GrupoComercialEstoqueCompartilhadoService,
 )
 from app.tenancy.context import set_current_tenant
 
@@ -27,8 +27,10 @@ def _resolver_tenant_produto_catalogo(
     db: Session, tenant_solicitante_id, produto_id: int
 ):
     """Valida o acesso ao catalogo e entra no tenant que possui o produto."""
-    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
-        db, tenant_solicitante_id, produto_id
+    acesso_catalogo = (
+        GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
+            db, tenant_solicitante_id, produto_id
+        )
     )
     tenant_origem_id = UUID(str(acesso_catalogo.tenant_origem_id))
     set_current_tenant(tenant_origem_id)
@@ -92,15 +94,22 @@ def _validar_sku_unico(
     sku_normalizado = _normalizar_sku_produto(sku)
     _validar_chaves_aliases(db, [sku_normalizado], tenant_id, produto_id=produto_id)
 
-    query = db.query(Produto).filter(
-        func.lower(func.trim(Produto.codigo)) == sku_normalizado.lower(),
-        Produto.tenant_id == tenant_id,
-    )
+    from app.services.grupo_codigos import tenants_do_grupo
 
-    if produto_id:
-        query = query.filter(Produto.id != produto_id)
+    existe = db.execute(
+        text(
+            "SELECT 1 FROM produtos WHERE tenant_id::text = ANY(:ids) "
+            "AND lower(trim(codigo)) = :codigo AND (CAST(:excluir AS integer) IS NULL OR id <> CAST(:excluir AS integer)) "
+            "LIMIT 1"
+        ),
+        {
+            "ids": list(tenants_do_grupo(db, tenant_id)),
+            "codigo": sku_normalizado.lower(),
+            "excluir": produto_id,
+        },
+    ).first()
 
-    if query.first():
+    if existe:
         raise HTTPException(
             status_code=400,
             detail=f"SKU '{sku}' ja esta em uso",
@@ -113,16 +122,23 @@ def _validar_codigo_barras_unico(
     tenant_id: int,
     produto_id: Optional[int] = None,
 ):
+    from app.services.grupo_codigos import tenants_do_grupo
+
     _validar_chaves_aliases(db, [codigo_barras], tenant_id, produto_id=produto_id)
-    query = db.query(Produto).filter(
-        Produto.codigo_barras == codigo_barras,
-        Produto.tenant_id == tenant_id,
-    )
+    existe = db.execute(
+        text(
+            "SELECT 1 FROM produtos WHERE tenant_id::text = ANY(:ids) "
+            "AND trim(codigo_barras) = :codigo "
+            "AND (CAST(:excluir AS integer) IS NULL OR id <> CAST(:excluir AS integer)) LIMIT 1"
+        ),
+        {
+            "ids": list(tenants_do_grupo(db, tenant_id)),
+            "codigo": codigo_barras.strip(),
+            "excluir": produto_id,
+        },
+    ).first()
 
-    if produto_id:
-        query = query.filter(Produto.id != produto_id)
-
-    if query.first():
+    if existe:
         raise HTTPException(
             status_code=400,
             detail=f"Codigo de barras '{codigo_barras}' ja esta em uso",

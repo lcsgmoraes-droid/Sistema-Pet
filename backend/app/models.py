@@ -52,13 +52,11 @@ from app.models_authz import (
     RolePermission,
     UserTenant,
 )
-from app.empresa_grupo_models import (
-    EmpresaGrupo,
-    EmpresaGrupoCodigo,
-    EmpresaGrupoConvite,
-    EmpresaGrupoEstoqueCompartilhado,
-    EmpresaGrupoMembro,
-    EmpresaGrupoTransferencia,
+from app.grupo_comercial_models import (
+    GrupoComercial,
+    GrupoComercialEstoqueCompartilhado,
+    GrupoComercialMembro,
+    GrupoComercialTransferencia,
 )
 from app.bling_connection_models import BlingCompanyTenantLink, BlingConnection
 from app.models_cadastros import (
@@ -98,6 +96,15 @@ class User(BaseTenantModel):
     hashed_password = Column(String(255), nullable=True)  # Nullable para OAuth
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)  # Superusuário
+
+    # Usuario master do grupo comercial: acesso total e permanente a todas
+    # as lojas do PROPRIO grupo (nunca de outro grupo/cliente). So preenchido
+    # automaticamente na criacao do grupo (GrupoComercialService.criar_grupo)
+    # e nunca aceito em nenhum payload de criacao/edicao de usuario -
+    # protecao por construcao, nao por checagem espalhada pelo codigo.
+    master_grupo_id = Column(
+        Integer, ForeignKey("grupos_comerciais.id"), nullable=True, index=True
+    )
 
     # Perfil
     nome = Column(String(255), nullable=True)
@@ -624,6 +631,13 @@ class Tenant(Base):
     banner_3_url = Column(String(500), nullable=True)
     status = Column(String(50), nullable=False, server_default="active")
     plan = Column(String(50), nullable=False, server_default="free")
+    # Plano contratado por segmento — um tenant pode ter mais de um segmento
+    # ativo ao mesmo tempo (ex. pet-start + vet-start simultaneos). NULL =
+    # segmento nao contratado. Substitui `plan` (campo legado, mantido por
+    # enquanto para nao quebrar leitores ainda nao migrados).
+    plan_pet = Column(String(50), nullable=True)
+    plan_vet = Column(String(50), nullable=True)
+    plan_grooming = Column(String(50), nullable=True)
     billing_status = Column(String(20), nullable=False, server_default="active")
     trial_started_at = Column(DateTime(timezone=True), nullable=True)
     trial_ends_at = Column(DateTime(timezone=True), nullable=True)
@@ -644,6 +658,13 @@ class Tenant(Base):
         String(24), nullable=False, server_default="not_collected"
     )
     onboarding_follow_up_updated_at = Column(DateTime(timezone=True), nullable=True)
+    # Marcado quando o onboarding assistido cria a loja normalmente mas nao
+    # consegue enviar o e-mail de definicao de senha do titular (ex.: SMTP
+    # indisponivel) — a loja nao fica mais bloqueada por isso, mas o time
+    # de ops precisa saber que as credenciais nao chegaram por e-mail.
+    onboarding_credencial_email_pendente = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
 
     # Configurações operacionais
     permite_estoque_negativo = Column(Boolean, nullable=False, server_default="false")

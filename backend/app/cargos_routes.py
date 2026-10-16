@@ -127,7 +127,7 @@ async def listar_cargos(
         .outerjoin(
             Cliente,
             (Cargo.id == Cliente.cargo_id)
-            & (Cliente.tipo_cadastro == "funcionario")
+            & Cliente.is_funcionario.is_(True)
             & Cliente.ativo.is_(True),
         )
         .filter(Cargo.tenant_id == tenant_id)
@@ -175,7 +175,7 @@ async def obter_cargo(
         .filter(
             Cliente.tenant_id == tenant_id,
             Cliente.cargo_id == cargo_id,
-            Cliente.tipo_cadastro == "funcionario",
+            Cliente.is_funcionario.is_(True),
             Cliente.ativo.is_(True),
         )
         .count()
@@ -299,7 +299,7 @@ async def atualizar_cargo(
         .filter(
             Cliente.tenant_id == tenant_id,
             Cliente.cargo_id == cargo_id,
-            Cliente.tipo_cadastro == "funcionario",
+            Cliente.is_funcionario.is_(True),
             Cliente.ativo.is_(True),
         )
         .count()
@@ -363,7 +363,7 @@ async def deletar_cargo(
         .filter(
             Cliente.tenant_id == tenant_id,
             Cliente.cargo_id == cargo_id,
-            Cliente.tipo_cadastro == "funcionario",
+            Cliente.is_funcionario.is_(True),
             Cliente.ativo.is_(True),
         )
         .count()

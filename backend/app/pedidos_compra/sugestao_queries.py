@@ -129,7 +129,7 @@ def _resolver_fornecedores_compra(
         db.query(Cliente.id, Cliente.nome, Cliente.razao_social, Cliente.cnpj)
         .filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "fornecedor",
+            Cliente.is_fornecedor.is_(True),
             or_(Cliente.ativo.is_(True), Cliente.ativo.is_(None)),
             Cliente.fornecedor_grupo_id == grupo.id,
         )
@@ -139,7 +139,7 @@ def _resolver_fornecedores_compra(
         db.query(Cliente.id, Cliente.nome, Cliente.razao_social, Cliente.cnpj)
         .filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "fornecedor",
+            Cliente.is_fornecedor.is_(True),
         )
         .all()
     )

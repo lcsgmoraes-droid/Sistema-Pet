@@ -518,7 +518,7 @@ def buscar_fornecedores_contagem_funcionario(
         db.query(Cliente)
         .filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "fornecedor",
+            Cliente.is_fornecedor.is_(True),
             Cliente.ativo.is_(True),
             or_(
                 Cliente.nome.ilike(like),
@@ -560,7 +560,7 @@ def criar_contagem_funcionario(
             .filter(
                 Cliente.id == payload.fornecedor_id,
                 Cliente.tenant_id == tenant_id,
-                Cliente.tipo_cadastro == "fornecedor",
+                Cliente.is_fornecedor.is_(True),
                 Cliente.ativo.is_(True),
             )
             .first()

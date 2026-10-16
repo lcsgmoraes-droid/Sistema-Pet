@@ -3,13 +3,16 @@
 from datetime import datetime as dt
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.audit_log import log_update
 from app.db import get_session
 from app.models import Cliente
+from app.clientes.common import tipos_cadastro_da_pessoa
 from app.clientes.schemas import ToggleParceiroRequest
+from app.tenancy.filters import pessoa_visivel_no_grupo
 
 router = APIRouter()
 
@@ -22,7 +25,13 @@ def _validar_tenant_e_obter_usuario(user_and_tenant):
 def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
     cliente = (
         db.query(Cliente)
-        .filter(Cliente.id == cliente_id, Cliente.tenant_id == tenant_id)
+        .filter(
+            Cliente.id == cliente_id,
+            or_(
+                Cliente.tenant_id == tenant_id,
+                pessoa_visivel_no_grupo(Cliente, tenant_id),
+            ),
+        )
         .first()
     )
     if not cliente:
@@ -46,7 +55,7 @@ def toggle_parceiro(
     Ativar ou desativar um cliente como parceiro para receber comissões.
 
     Permite que QUALQUER pessoa (cliente, veterinário, funcionário, fornecedor)
-    seja ativada como parceiro, independente do tipo_cadastro.
+    seja ativada como parceiro, independente das flags de tipo.
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
@@ -157,7 +166,7 @@ def toggle_parceiro(
         "data": {
             "id": cliente.id,
             "nome": cliente.nome,
-            "tipo_cadastro": cliente.tipo_cadastro,
+            "tipos_cadastro": tipos_cadastro_da_pessoa(cliente),
             "parceiro_ativo": cliente.parceiro_ativo,
             "parceiro_desde": cliente.parceiro_desde.isoformat()
             if cliente.parceiro_desde
@@ -214,7 +223,7 @@ def atualizar_controla_dre(
         "data": {
             "id": cliente.id,
             "nome": cliente.nome,
-            "tipo_cadastro": cliente.tipo_cadastro,
+            "tipos_cadastro": tipos_cadastro_da_pessoa(cliente),
             "controla_dre": cliente.controla_dre,
         },
     }
@@ -246,7 +255,10 @@ def obter_custo_operacional_entregador(
         db.query(Cliente)
         .filter(
             Cliente.id == entregador_id,
-            Cliente.tenant_id == tenant_id,
+            or_(
+                Cliente.tenant_id == tenant_id,
+                pessoa_visivel_no_grupo(Cliente, tenant_id),
+            ),
             Cliente.is_entregador,
         )
         .first()

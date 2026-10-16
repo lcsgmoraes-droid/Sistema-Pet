@@ -11,7 +11,8 @@ import {
   EntregasConfig,
   EvolucaoCorePet,
   Funcionarios,
-  GruposEmpresas,
+  GrupoComercialMestres,
+  GruposComerciais,
   Integracoes,
   LGPDOperacional,
   ProjecaoCaixa,
@@ -58,18 +59,26 @@ export function createSettingsAdminRoutes() {
         }
       />
       <Route
-        path="configuracoes/grupos-empresas"
+        path="configuracoes/grupos-comerciais"
         element={
           <ProtectedRoute anyOfPermissions={["configuracoes.empresa", "configuracoes.editar"]}>
-            <GruposEmpresas />
+            <GruposComerciais />
           </ProtectedRoute>
         }
       />
       <Route
-        path="configuracoes/grupos-empresas/:grupoId/visao-consolidada"
+        path="configuracoes/grupos-comerciais/:grupoId/visao-consolidada"
         element={
           <ProtectedRoute anyOfPermissions={["relatorios.gerencial", "relatorios.financeiro"]}>
             <VisaoConsolidadaGrupo />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="configuracoes/grupos-comerciais/:grupoId/mestres"
+        element={
+          <ProtectedRoute anyOfPermissions={["configuracoes.empresa", "configuracoes.editar"]}>
+            <GrupoComercialMestres />
           </ProtectedRoute>
         }
       />

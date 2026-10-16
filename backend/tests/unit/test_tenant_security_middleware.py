@@ -90,6 +90,8 @@ async def test_tenant_security_allows_select_tenant_without_tenant():
         "/api/platform-auth/me",
         "/api/admin/tenants",
         "/api/admin/observabilidade/ops-summary",
+        "/api/admin/grupos-comerciais/onboarding",
+        "/api/admin/grupos-comerciais/1/lojas",
     ],
 )
 async def test_tenant_security_allows_platform_admin_only_on_ops_paths(path):

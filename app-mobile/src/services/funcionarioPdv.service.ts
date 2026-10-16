@@ -45,7 +45,7 @@ function normalizarClientePdv(data: any): FuncionarioPdvCliente {
     telefone: data.telefone ?? null,
     celular: data.celular ?? null,
     documento: data.documento ?? null,
-    tipo_cadastro: data.tipo_cadastro ?? null,
+    tipos_cadastro: data.tipos_cadastro ?? null,
     email: data.email ?? null,
     endereco: data.endereco ?? null,
     credito: Number(data.credito ?? 0),

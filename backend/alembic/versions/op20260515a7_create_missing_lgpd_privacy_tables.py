@@ -29,7 +29,9 @@ def _index_names(table_name: str) -> set[str]:
     return {index["name"] for index in inspector.get_indexes(table_name)}
 
 
-def _create_index_if_missing(index_name: str, table_name: str, columns: list[str]) -> None:
+def _create_index_if_missing(
+    index_name: str, table_name: str, columns: list[str]
+) -> None:
     if index_name not in _index_names(table_name):
         op.create_index(index_name, table_name, columns, unique=False)
 
@@ -47,12 +49,27 @@ def upgrade() -> None:
             sa.Column("phone_number", sa.String(length=20), nullable=True),
             sa.Column("email", sa.String(length=255), nullable=True),
             sa.Column("consent_type", sa.String(length=100), nullable=False),
-            sa.Column("consent_given", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+            sa.Column(
+                "consent_given",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.text("false"),
+            ),
             sa.Column("consent_text", sa.Text(), nullable=False, server_default=""),
             sa.Column("ip_address", sa.String(length=45), nullable=True),
             sa.Column("user_agent", sa.Text(), nullable=True),
-            sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")),
-            sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")),
+            sa.Column(
+                "created_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.text("now()"),
+            ),
+            sa.Column(
+                "updated_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.text("now()"),
+            ),
             sa.Column("revoked_at", sa.DateTime(), nullable=True),
             sa.Column("revoke_reason", sa.Text(), nullable=True),
             sa.PrimaryKeyConstraint("id"),
@@ -76,9 +93,16 @@ def upgrade() -> None:
             sa.Column("tenant_id", sa.String(), nullable=False),
             sa.Column("subject_type", sa.String(length=50), nullable=False),
             sa.Column("subject_id", sa.String(length=255), nullable=False),
-            sa.Column("request_date", sa.DateTime(), nullable=False, server_default=sa.text("now()")),
+            sa.Column(
+                "request_date",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.text("now()"),
+            ),
             sa.Column("reason", sa.Text(), nullable=True),
-            sa.Column("status", sa.String(length=50), nullable=False, server_default="pending"),
+            sa.Column(
+                "status", sa.String(length=50), nullable=False, server_default="pending"
+            ),
             sa.Column("processed_by_user_id", sa.Integer(), nullable=True),
             sa.Column("processed_at", sa.DateTime(), nullable=True),
             sa.Column("rejection_reason", sa.Text(), nullable=True),
@@ -105,7 +129,9 @@ def upgrade() -> None:
             sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
             sa.Column("tenant_id", sa.String(), nullable=False),
             sa.Column("event_type", sa.String(length=100), nullable=False),
-            sa.Column("severity", sa.String(length=20), nullable=False, server_default="info"),
+            sa.Column(
+                "severity", sa.String(length=20), nullable=False, server_default="info"
+            ),
             sa.Column("user_id", sa.Integer(), nullable=True),
             sa.Column("ip_address", sa.String(length=45), nullable=True),
             sa.Column("user_agent", sa.Text(), nullable=True),
@@ -114,7 +140,12 @@ def upgrade() -> None:
             sa.Column("action", sa.String(length=100), nullable=True),
             sa.Column("description", sa.Text(), nullable=False),
             sa.Column("extra_data", sa.Text(), nullable=True),
-            sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")),
+            sa.Column(
+                "created_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.text("now()"),
+            ),
             sa.PrimaryKeyConstraint("id"),
         )
 

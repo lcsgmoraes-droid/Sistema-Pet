@@ -1,6 +1,6 @@
 ---
 tipo: dominio-tabela
-atualizado: 2026-09-13
+atualizado: 2026-09-24
 ---
 
 # Tabela — platform_admins
@@ -20,7 +20,8 @@ Super-admin da **plataforma CorePet** — nível de acesso acima de qualquer ten
 
 ## Utilizado por
 - `platform_auth.py` (login/refresh/logout/reset de senha, rotas `/platform-auth/*`).
-- Dependency `require_platform_admin` protege `routes/ops_tenants_routes.py` (`/admin/tenants`) e `routes/error_events_routes.py`. Routers registrados em `main_routers.py:101,178,181,184,256,430`.
+- Dependency `require_platform_admin` protege `routes/ops_tenants_routes.py` (`/admin/tenants`), `routes/ops_grupo_comercial_routes.py` (`/admin/grupos-comerciais`) e `routes/error_events_routes.py`. Registrados via `app.include_router(...)` em `main_routers.py:271-273`.
+- `TenantSecurityMiddleware` (`app/middlewares/tenant_middleware.py`) precisa liberar explicitamente cada prefixo `/admin/...` usado por rotas de platform admin em `PLATFORM_ADMIN_PATH_PREFIXES` — o token de `PlatformAdmin` não tem `tenant_id`, então sem essa liberação a rota é barrada com 401 mesmo com token válido (aconteceu com `/admin/grupos-comerciais`, corrigido em 24/09/2026 — ver [[EmpresaGrupo]]).
 
 ## Não identificado
 - Nada notável — bom exemplo de isolamento de nível de acesso, com reset de senha corretamente hasheado.

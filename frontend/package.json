@@ -8,6 +8,7 @@
     "build": "vite build --mode production",
     "build:dev": "vite build --mode development",
     "audit:dependencies": "node scripts/audit-dependencies.mjs",
+    "test:e2e": "playwright test",
     "lint:core": "eslint \"src/**/*.{js,jsx,ts,tsx,mjs,cjs}\" scripts --max-warnings=0",
     "format:core:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,mjs,cjs,css,md}\" scripts",
     "test:theme-preference": "node scripts/test-theme-preference.mjs",
@@ -122,6 +123,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^6.0.2",

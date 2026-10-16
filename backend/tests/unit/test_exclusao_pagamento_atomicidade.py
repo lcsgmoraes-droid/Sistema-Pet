@@ -38,7 +38,6 @@ def pagamentos(cenario):
         MovimentacaoFinanceira,
         FluxoCaixa,
         VetPartnerLink,
-        ContaPagar,
     ):
         if db.bind.dialect.name == "postgresql":
             with db.bind.begin() as conn:

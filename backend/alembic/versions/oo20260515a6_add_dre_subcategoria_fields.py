@@ -36,9 +36,15 @@ def upgrade() -> None:
 
     columns = _column_names(inspector, "dre_subcategorias")
     if "custo_pe" not in columns:
-        op.add_column("dre_subcategorias", sa.Column("custo_pe", sa.String(length=10), nullable=True))
+        op.add_column(
+            "dre_subcategorias",
+            sa.Column("custo_pe", sa.String(length=10), nullable=True),
+        )
     if "categoria_financeira_id" not in columns:
-        op.add_column("dre_subcategorias", sa.Column("categoria_financeira_id", sa.Integer(), nullable=True))
+        op.add_column(
+            "dre_subcategorias",
+            sa.Column("categoria_financeira_id", sa.Integer(), nullable=True),
+        )
 
     inspector = sa.inspect(bind)
     constraints = _constraint_names(inspector, "dre_subcategorias")
@@ -65,7 +71,11 @@ def downgrade() -> None:
 
     constraints = _constraint_names(inspector, "dre_subcategorias")
     if "fk_dre_subcategorias_categoria_financeira_id" in constraints:
-        op.drop_constraint("fk_dre_subcategorias_categoria_financeira_id", "dre_subcategorias", type_="foreignkey")
+        op.drop_constraint(
+            "fk_dre_subcategorias_categoria_financeira_id",
+            "dre_subcategorias",
+            type_="foreignkey",
+        )
 
     columns = _column_names(inspector, "dre_subcategorias")
     if "categoria_financeira_id" in columns:

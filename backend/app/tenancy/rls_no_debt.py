@@ -25,6 +25,29 @@ INTENTIONALLY_GLOBAL_NO_RLS_TABLES = frozenset(
     }
 )
 
+# Historicos (TenantScoped, nao BaseTenantModel) cuja visibilidade de leitura
+# segue o registro-pai (cliente/pet/produto) no grupo comercial — ver
+# app/tenancy/filters.py::_tenant_scoped_read_filter e _PAI_DO_HISTORICO. Uma
+# politica RLS simples (tenant_id = current) nao consegue expressar "visivel
+# tambem se o pai for visivel para este tenant no grupo", entao a protecao e
+# feita no filtro de leitura automatico da aplicacao, nao no Postgres.
+# produto_identidades_historico_alteracoes segue o mesmo mixin porque rastreia
+# a ProdutoIdentidade, que por natureza e compartilhada entre as lojas do
+# grupo (nao pertence a um unico tenant).
+INTENTIONALLY_TENANT_SCOPED_NO_RLS_TABLES = frozenset(
+    {
+        "clientes_historico_alteracoes",
+        "pets_historico_alteracoes",
+        "pets_registros_clinicos",
+        "produto_identidades_historico_alteracoes",
+        "produtos_historico_alteracoes",
+    }
+)
+
+ALL_INTENTIONAL_NO_RLS_TABLES = frozenset(
+    INTENTIONALLY_GLOBAL_NO_RLS_TABLES | INTENTIONALLY_TENANT_SCOPED_NO_RLS_TABLES
+)
+
 
 TENANT_ID_TABLES_WITHOUT_RLS_SQL = text(
     """
@@ -55,16 +78,17 @@ def tenant_id_tables_without_rls(db: Session) -> list[str]:
 
 def unexpected_tenant_id_tables_without_rls(db: Session) -> list[str]:
     tables = set(tenant_id_tables_without_rls(db))
-    return sorted(tables - INTENTIONALLY_GLOBAL_NO_RLS_TABLES)
+    return sorted(tables - ALL_INTENTIONAL_NO_RLS_TABLES)
 
 
 def assert_no_unexpected_no_rls_tables(db: Session) -> list[str]:
     unexpected = unexpected_tenant_id_tables_without_rls(db)
     if unexpected:
-        allowed = ", ".join(sorted(INTENTIONALLY_GLOBAL_NO_RLS_TABLES))
+        allowed = ", ".join(sorted(ALL_INTENTIONAL_NO_RLS_TABLES))
         found = ", ".join(unexpected)
         raise RuntimeError(
             "Unexpected tenant_id table(s) without PostgreSQL RLS: "
-            f"{found}. Only intentional globals may remain without RLS: {allowed}."
+            f"{found}. Only intentional globals/app-filtered historicos may "
+            f"remain without RLS: {allowed}."
         )
     return unexpected

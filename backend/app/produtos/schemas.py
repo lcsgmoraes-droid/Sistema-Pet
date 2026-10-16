@@ -6,6 +6,7 @@ A ordem das classes preserva o comportamento historico de ProdutoResponse e Lote
 
 from datetime import datetime
 from typing import List, Literal, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -501,6 +502,8 @@ class ProdutoResponse(ProdutoBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    origem_tenant_id: Optional[UUID] = None
+    produto_identidade_id: Optional[int] = None
     estoque_atual: Optional[float] = 0
     controlar_estoque: bool = True
     markup_percentual: Optional[float] = None  # Campo calculado
@@ -640,12 +643,61 @@ class ProdutoResponse(ProdutoBase):
 
 
 # Schema de resposta paginada (Sprint 1)
+class ProdutoPreCadastroGrupoResponse(BaseModel):
+    """Campos inerentes de um produto de outra loja do grupo, pra pre-preencher
+    o formulario de cadastro desta loja (ver INHERENT_FIELDS em
+    app/services/produto_identidade_service.py — mesma lista, nunca inclui
+    preco/estoque/lote)."""
+
+    nome: str
+    codigo_barras: Optional[str] = None
+    codigos_barras_alternativos: Optional[str] = None
+    gtin_ean: Optional[str] = None
+    gtin_ean_tributario: Optional[str] = None
+    peso_liquido: Optional[float] = None
+    peso_bruto: Optional[float] = None
+    largura: Optional[float] = None
+    altura: Optional[float] = None
+    profundidade: Optional[float] = None
+    volume: Optional[float] = None
+    itens_por_caixa: Optional[int] = None
+    descricao_curta: Optional[str] = None
+    descricao_completa: Optional[str] = None
+    tags: Optional[str] = None
+    imagem_principal: Optional[str] = None
+    unidade: Optional[str] = None
+    condicao: Optional[str] = None
+    e_granel: bool = False
+    producao: Optional[str] = None
+    especie_compativel: Optional[str] = None
+    classificacao_racao: Optional[str] = None
+    peso_embalagem: Optional[float] = None
+    categoria_racao: Optional[str] = None
+    especies_indicadas: Optional[str] = None
+    sabor_proteina: Optional[str] = None
+    loja_origem_nome: str
+
+
+class ProdutoOutraLojaResponse(BaseModel):
+    id: int
+    tenant_id: str
+    loja_nome: str
+    nome: str
+    codigo: Optional[str] = None
+    codigo_barras: Optional[str] = None
+    imagem_principal: Optional[str] = None
+    preco_venda: Optional[float] = None
+    estoque_atual: Optional[float] = None
+    produto_identidade_id: Optional[int] = None
+
+
 class ProdutosPaginadosResponse(BaseModel):
     items: List[ProdutoResponse]
     total: int
     page: int
     page_size: int
     pages: int
+    produtos_outras_lojas: List[ProdutoOutraLojaResponse] = []
 
 
 class RelatorioValorizacaoEstoqueItem(BaseModel):

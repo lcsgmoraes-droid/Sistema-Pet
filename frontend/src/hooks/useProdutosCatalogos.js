@@ -77,7 +77,7 @@ export default function useProdutosCatalogos() {
         getMarcas(),
         api.get("/clientes/", {
           params: {
-            tipo_cadastro: "fornecedor",
+            is_fornecedor: true,
             ativo: true,
             limit: 200,
           },

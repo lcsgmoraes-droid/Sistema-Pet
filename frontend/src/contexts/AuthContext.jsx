@@ -198,6 +198,44 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Troca de loja "ao vivo", com a sessao ja em andamento (diferente de
+  // selectTenant/completeTenantSelection acima, que so funcionam na janela
+  // entre o login e a escolha da loja, usando um token temporario). Aqui usa
+  // o token de acesso ATUAL — /auth/select-tenant aceita qualquer token
+  // valido, com ou sem tenant_id (ver app/auth/core.py:get_current_user).
+  const fetchMyTenants = async () => {
+    try {
+      const response = await api.get("/auth/my-tenants");
+      return response.data?.tenants || [];
+    } catch (error) {
+      console.error("Erro ao buscar lojas do usuario:", error);
+      return [];
+    }
+  };
+
+  const switchTenant = async (tenantId) => {
+    try {
+      const response = await api.post("/auth/select-tenant", { tenant_id: tenantId });
+      const { access_token, refresh_token, tenant } = response.data;
+      setAccessToken(access_token);
+      if (refresh_token) {
+        setRefreshToken(refresh_token);
+      }
+      localStorage.setItem("selectedTenant", JSON.stringify(tenant));
+      // Mantem a mesma URL, mas recarrega a pagina inteira: garante que toda
+      // tela busque os dados de novo ja na loja nova, sem risco de misturar
+      // dado da loja anterior que ainda estivesse em memoria.
+      window.location.reload();
+      return { success: true };
+    } catch (error) {
+      console.error("Erro ao trocar de loja:", error);
+      return {
+        success: false,
+        error: error.response?.data?.detail || "Erro ao trocar de loja",
+      };
+    }
+  };
+
   const cancelTenantSelection = async () => {
     const accessToken = getTempToken();
 
@@ -299,6 +337,8 @@ export const AuthProvider = ({ children }) => {
     login,
     selectTenant,
     cancelTenantSelection,
+    fetchMyTenants,
+    switchTenant,
     register,
     logout,
     isAuthenticated: !!user,

@@ -63,7 +63,7 @@ def gerar_provisao_ferias_e_13_mensal(
         .join(Cargo, Cliente.cargo_id == Cargo.id)
         .filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "funcionario",  # Funcionários
+            Cliente.is_funcionario.is_(True),  # Funcionários
             Cliente.ativo.is_(True),
             Cliente.cargo_id.isnot(None),
             Cargo.tenant_id == tenant_id,

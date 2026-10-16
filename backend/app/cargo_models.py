@@ -11,7 +11,7 @@ from app.base_models import BaseTenantModel
 class Cargo(BaseTenantModel):
     """
     Cargo define salário base e encargos trabalhistas.
-    Funcionários (clientes com tipo_cadastro='funcionario') apontam para um cargo.
+    Funcionários (clientes com is_funcionario=True) apontam para um cargo.
 
     Schema baseado em RELATORIO_SCHEMA_TABELAS_ORFAS.md - Fase 5.4
     """

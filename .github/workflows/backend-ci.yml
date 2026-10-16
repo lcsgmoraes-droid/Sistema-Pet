@@ -519,7 +519,7 @@ jobs:
 
       - name: Backend model registry root format (blocking)
         run: |
-          ruff format --check app/controle_processamento_models.py app/duplicatas_ignoradas_models.py app/ecommerce_payment_models.py app/fiscal_catalogo_produtos_models.py app/fiscal_estado_padrao_models.py app/kit_composicao_models.py app/kit_config_fiscal_models.py app/lgpd_models.py app/local_estoque_models.py app/models_configuracao_custo_moto.py app/nf_item_rateio_canal_models.py app/nf_rateio_canal_models.py app/opportunities_models.py app/opportunity_events_models.py app/ops_models.py app/pedido_integrado_item_models.py app/pedido_integrado_models.py app/pedido_models.py app/pendencia_estoque_models.py app/produtos_models.py app/segmentacao_models.py app/simples_nacional_models.py app/stone_models.py app/variacao_config_fiscal_models.py
+          ruff format --check app/controle_processamento_models.py app/duplicatas_ignoradas_models.py app/ecommerce_payment_models.py app/fiscal_catalogo_produtos_models.py app/fiscal_estado_padrao_models.py app/kit_config_fiscal_models.py app/lgpd_models.py app/local_estoque_models.py app/models_configuracao_custo_moto.py app/nf_item_rateio_canal_models.py app/nf_rateio_canal_models.py app/opportunities_models.py app/opportunity_events_models.py app/ops_models.py app/pedido_integrado_item_models.py app/pedido_integrado_models.py app/pedido_models.py app/pendencia_estoque_models.py app/produtos_models.py app/segmentacao_models.py app/simples_nacional_models.py app/stone_models.py app/variacao_config_fiscal_models.py
 
       - name: Backend admin product support root format (blocking)
         run: |

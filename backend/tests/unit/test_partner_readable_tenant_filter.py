@@ -57,17 +57,17 @@ def test_product_filter_requires_explicit_active_group_stock_share():
 
     compiled = _compiled_filter_for(Produto)
 
-    assert "empresa_grupo_estoques_compartilhados" in compiled
-    assert "empresa_grupos" in compiled
-    assert "empresa_grupo_membros" in compiled
+    assert "grupo_comercial_estoques_compartilhados" in compiled
+    assert "grupos_comerciais" in compiled
+    assert "grupo_comercial_membros" in compiled
     assert "produto_origem_id = produtos.id" in compiled
     assert "empresa_consumidora_id" in compiled
     assert (
-        "CAST(empresa_grupo_estoques_compartilhados.empresa_origem_id AS VARCHAR)"
+        "CAST(grupo_comercial_estoques_compartilhados.empresa_origem_id AS VARCHAR)"
         in compiled
     )
     assert (
-        "CAST(empresa_grupo_estoques_compartilhados.empresa_consumidora_id AS VARCHAR)"
+        "CAST(grupo_comercial_estoques_compartilhados.empresa_consumidora_id AS VARCHAR)"
         in compiled
     )
     assert "CAST(produtos.tenant_id AS VARCHAR)" in compiled
@@ -80,9 +80,9 @@ def test_product_image_filter_follows_the_explicit_shared_product_scope():
 
     compiled = _compiled_filter_for(ProdutoImagem)
 
-    assert "empresa_grupo_estoques_compartilhados" in compiled
-    assert "empresa_grupos" in compiled
-    assert "empresa_grupo_membros" in compiled
+    assert "grupo_comercial_estoques_compartilhados" in compiled
+    assert "grupos_comerciais" in compiled
+    assert "grupo_comercial_membros" in compiled
     assert "produto_origem_id = produto_imagens.produto_id" in compiled
     assert "empresa_consumidora_id" in compiled
     assert "CAST(produto_imagens.tenant_id AS VARCHAR)" in compiled

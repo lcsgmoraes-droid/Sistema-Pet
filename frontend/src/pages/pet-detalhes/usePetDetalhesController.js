@@ -41,6 +41,10 @@ export function usePetDetalhesController() {
   const [loadingExames, setLoadingExames] = useState(false);
   const [salvandoExame, setSalvandoExame] = useState(false);
   const [novoExame, setNovoExame] = useState(createNovoExame);
+  const [registrosPeso, setRegistrosPeso] = useState([]);
+  const [registrosHistorico, setRegistrosHistorico] = useState([]);
+  const [loadingRegistrosClinicos, setLoadingRegistrosClinicos] = useState(false);
+  const [salvandoRegistroClinico, setSalvandoRegistroClinico] = useState(false);
 
   useEffect(() => {
     loadPet();
@@ -61,6 +65,7 @@ export function usePetDetalhesController() {
     if (abaAtiva === "vacinas") carregarHistoricoVacinas();
     if (abaAtiva === "consultas") carregarHistoricoConsultas();
     if (abaAtiva === "saude") carregarExames();
+    if (abaAtiva === "saude") carregarRegistrosClinicos();
   }, [abaAtiva, petId]);
 
   useEffect(() => {
@@ -135,6 +140,57 @@ export function usePetDetalhesController() {
       setExames([]);
     } finally {
       setLoadingExames(false);
+    }
+  }
+
+  async function carregarRegistrosClinicos() {
+    try {
+      setLoadingRegistrosClinicos(true);
+      const [resPeso, resHistorico] = await Promise.all([
+        api.get(`/pets/${petId}/registros-clinicos`, { params: { tipo: "peso" } }),
+        api.get(`/pets/${petId}/registros-clinicos`, { params: { tipo: "historico" } }),
+      ]);
+      setRegistrosPeso(normalizeItemsPayload(resPeso.data));
+      setRegistrosHistorico(normalizeItemsPayload(resHistorico.data));
+    } catch (err) {
+      console.error("Erro ao carregar registros clínicos:", err);
+      setRegistrosPeso([]);
+      setRegistrosHistorico([]);
+    } finally {
+      setLoadingRegistrosClinicos(false);
+    }
+  }
+
+  async function adicionarRegistroPeso(valor) {
+    try {
+      setSalvandoRegistroClinico(true);
+      await api.post(`/pets/${petId}/registros-clinicos`, { tipo: "peso", valor });
+      await carregarRegistrosClinicos();
+    } catch (err) {
+      alert(err.response?.data?.detail || "Não foi possível registrar o peso");
+    } finally {
+      setSalvandoRegistroClinico(false);
+    }
+  }
+
+  async function adicionarRegistroHistorico(texto) {
+    try {
+      setSalvandoRegistroClinico(true);
+      await api.post(`/pets/${petId}/registros-clinicos`, { tipo: "historico", texto });
+      await carregarRegistrosClinicos();
+    } catch (err) {
+      alert(err.response?.data?.detail || "Não foi possível registrar a anotação");
+    } finally {
+      setSalvandoRegistroClinico(false);
+    }
+  }
+
+  async function excluirRegistroClinico(registroId) {
+    try {
+      await api.delete(`/pets/${petId}/registros-clinicos/${registroId}`);
+      await carregarRegistrosClinicos();
+    } catch (err) {
+      alert(err.response?.data?.detail || "Não foi possível excluir o registro");
     }
   }
 
@@ -220,11 +276,14 @@ export function usePetDetalhesController() {
     abaAtiva,
     abrirConsulta: (consultaId) => navigate(`/veterinario/consultas/${consultaId}`),
     abrirModuloInternacoes: () => navigate("/veterinario/internacoes"),
+    adicionarRegistroHistorico,
+    adicionarRegistroPeso,
     carregarExames,
     carteirinha,
     consultasFiltradas: filtrarConsultas(historicoConsultas, filtroConsultas),
     editarPet: () => navigate(`/pets/${pet.id}/editar`),
     error,
+    excluirRegistroClinico,
     exames,
     filtroConsultas,
     filtroVacinas,
@@ -239,9 +298,13 @@ export function usePetDetalhesController() {
     loadingVacinas,
     novaConsulta: () => navigate(`/veterinario/consultas/nova?pet_id=${pet.id}`),
     novoExame,
+    loadingRegistrosClinicos,
     pet,
     registrarVacina: () => navigate(`/veterinario/vacinas?pet_id=${pet.id}&acao=novo`),
+    registrosHistorico,
+    registrosPeso,
     salvandoExame,
+    salvandoRegistroClinico,
     salvarNovoExame,
     setAbaAtiva,
     setFiltroConsultas,

@@ -1,3 +1,23 @@
+import {
+  Award,
+  Cake,
+  CalendarCheck,
+  CalendarPlus,
+  CheckCircle2,
+  Circle,
+  Clock,
+  Dna,
+  Droplet,
+  Hash,
+  Hourglass,
+  Palette,
+  PawPrint,
+  Ruler,
+  Scale,
+  ScanLine,
+  Tag,
+  UserRound,
+} from "lucide-react";
 import { formatarIdadeMeses } from "../../helpers/idadeHelper";
 import PetDetalhesInfoField from "./PetDetalhesInfoField";
 import { calcularIdade, formatarData, formatarDataHora } from "./petDetalhesUtils";
@@ -16,6 +36,17 @@ function ResumoClinicoCard({ children, title, tone }) {
   );
 }
 
+function SecaoCampos({ children, titulo }) {
+  return (
+    <div className="p-5">
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+        {titulo}
+      </h3>
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-4">{children}</dl>
+    </div>
+  );
+}
+
 export default function PetDetalhesGeralTab({ pet, ultimaAlta, ultimaVacina }) {
   const idade = pet.idade_meses
     ? formatarIdadeMeses(pet.idade_meses)
@@ -27,7 +58,19 @@ export default function PetDetalhesGeralTab({ pet, ultimaAlta, ultimaVacina }) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-900 mb-4">Informações Gerais</h2>
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1">
+        <h2 className="text-xl font-bold text-gray-900">Informações Gerais</h2>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+          <span className="inline-flex items-center gap-1.5">
+            <CalendarPlus className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" />
+            Cadastrado em {formatarData(pet.created_at)}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" />
+            Atualizado em {formatarData(pet.updated_at)}
+          </span>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <ResumoClinicoCard title="Última vacina" tone="blue">
@@ -68,44 +111,57 @@ export default function PetDetalhesGeralTab({ pet, ultimaAlta, ultimaVacina }) {
         </ResumoClinicoCard>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
-        <PetDetalhesInfoField label="Nome">{pet.nome}</PetDetalhesInfoField>
-        <PetDetalhesInfoField label="Código" mono>
-          {pet.codigo}
-        </PetDetalhesInfoField>
-        <PetDetalhesInfoField label="Espécie">{pet.especie}</PetDetalhesInfoField>
-        <PetDetalhesInfoField label="Raça">{pet.raca}</PetDetalhesInfoField>
-        <PetDetalhesInfoField label="Sexo">{pet.sexo}</PetDetalhesInfoField>
-        <PetDetalhesInfoField label="Castrado">{pet.castrado ? "Sim" : "Não"}</PetDetalhesInfoField>
-        <PetDetalhesInfoField label="Data de Nascimento">
-          {formatarData(pet.data_nascimento)}
-        </PetDetalhesInfoField>
-        <PetDetalhesInfoField label="Idade">{idade}</PetDetalhesInfoField>
-        <PetDetalhesInfoField label="Peso">
-          {pet.peso ? `${pet.peso} kg` : "-"}
-        </PetDetalhesInfoField>
-        <PetDetalhesInfoField label="Porte">{pet.porte}</PetDetalhesInfoField>
-        <PetDetalhesInfoField label="Cor/Pelagem">{pet.cor}</PetDetalhesInfoField>
-        <PetDetalhesInfoField label="Microchip" mono>
-          {pet.microchip}
-        </PetDetalhesInfoField>
-        <PetDetalhesInfoField label="Tipo sanguíneo">{pet.tipo_sanguineo}</PetDetalhesInfoField>
-        <PetDetalhesInfoField label="Pedigree">{pet.pedigree_registro}</PetDetalhesInfoField>
-        <PetDetalhesInfoField label="Data da castração">
-          {formatarData(pet.castrado_data)}
-        </PetDetalhesInfoField>
-      </div>
+      <div className="divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white">
+        <SecaoCampos titulo="Identificação">
+          <PetDetalhesInfoField icon={PawPrint} label="Nome" value={pet.nome} />
+          <PetDetalhesInfoField icon={Hash} label="Código" mono value={pet.codigo} />
+          <PetDetalhesInfoField icon={Tag} label="Espécie" value={pet.especie} />
+          <PetDetalhesInfoField icon={Dna} label="Raça" value={pet.raca} />
+          <PetDetalhesInfoField icon={UserRound} label="Sexo" value={pet.sexo} />
+        </SecaoCampos>
 
-      {pet.observacoes && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
-          <p className="text-gray-900 bg-gray-50 p-3 rounded-lg">{pet.observacoes}</p>
-        </div>
-      )}
+        <SecaoCampos titulo="Características físicas">
+          <PetDetalhesInfoField
+            icon={Cake}
+            label="Data de Nascimento"
+            value={formatarData(pet.data_nascimento)}
+          />
+          <PetDetalhesInfoField icon={Hourglass} label="Idade" value={idade} />
+          <PetDetalhesInfoField
+            icon={Scale}
+            label="Peso"
+            value={pet.peso ? `${pet.peso} kg` : "-"}
+          />
+          <PetDetalhesInfoField icon={Ruler} label="Porte" value={pet.porte} />
+          <PetDetalhesInfoField icon={Palette} label="Cor/Pelagem" value={pet.cor} />
+          <PetDetalhesInfoField
+            icon={pet.castrado ? CheckCircle2 : Circle}
+            label="Castrado"
+            value={pet.castrado ? "Sim" : "Não"}
+          />
+          {pet.castrado && (
+            <PetDetalhesInfoField
+              icon={CalendarCheck}
+              label="Data da castração"
+              value={formatarData(pet.castrado_data)}
+            />
+          )}
+        </SecaoCampos>
 
-      <div className="pt-4 border-t border-gray-200 text-sm text-gray-500">
-        <p>Cadastrado em: {formatarData(pet.created_at)}</p>
-        <p>Última atualização: {formatarData(pet.updated_at)}</p>
+        <SecaoCampos titulo="Outras informações">
+          <PetDetalhesInfoField icon={ScanLine} label="Microchip" mono value={pet.microchip} />
+          <PetDetalhesInfoField icon={Droplet} label="Tipo sanguíneo" value={pet.tipo_sanguineo} />
+          <PetDetalhesInfoField icon={Award} label="Pedigree" value={pet.pedigree_registro} />
+        </SecaoCampos>
+
+        {pet.observacoes && (
+          <div className="p-5">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Observações
+            </h3>
+            <p className="text-sm text-gray-900">{pet.observacoes}</p>
+          </div>
+        )}
       </div>
     </div>
   );

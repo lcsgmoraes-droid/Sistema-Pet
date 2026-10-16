@@ -7,6 +7,7 @@ Revises: o3p4q5r6s7t8
 Create Date: 2026-03-11 00:00:00.000000
 
 """
+
 from typing import Sequence, Union
 
 import sqlalchemy as sa
@@ -25,13 +26,15 @@ def upgrade() -> None:
     #    Para cada grupo (tenant_id, codigo) com mais de um registro,
     #    mantemos o cliente mais antigo (menor id) com o codigo original
     #    e renumeramos os demais com codigos novos alem do maximo atual.
-    resultado = conn.execute(sa.text("""
+    resultado = conn.execute(
+        sa.text("""
         SELECT tenant_id, codigo, array_agg(id ORDER BY id) AS ids
         FROM clientes
         WHERE codigo IS NOT NULL
         GROUP BY tenant_id, codigo
         HAVING count(*) > 1
-    """))
+    """)
+    )
 
     duplicados = resultado.fetchall()
 
@@ -43,25 +46,33 @@ def upgrade() -> None:
 
         for cliente_id in ids_para_renumerar:
             # Buscar o maior codigo numerico atual deste tenant para evitar qualquer conflito
-            max_result = conn.execute(sa.text("""
+            max_result = conn.execute(
+                sa.text("""
                 SELECT MAX(CAST(codigo AS BIGINT))
                 FROM clientes
                 WHERE tenant_id = :tenant_id
                   AND codigo ~ '^[0-9]+$'
-            """), {"tenant_id": tenant_id})
+            """),
+                {"tenant_id": tenant_id},
+            )
 
             max_codigo = max_result.scalar() or 1000
             novo_codigo = str(max_codigo + 1)
 
-            conn.execute(sa.text("""
+            conn.execute(
+                sa.text("""
                 UPDATE clientes SET codigo = :novo_codigo
                 WHERE id = :cliente_id
-            """), {"novo_codigo": novo_codigo, "cliente_id": cliente_id})
+            """),
+                {"novo_codigo": novo_codigo, "cliente_id": cliente_id},
+            )
 
     # 2. Agora que nao ha mais duplicatas, criar o UniqueConstraint (se ainda nao existe)
     bind = op.get_bind()
     inspector = sa.inspect(bind)
-    existing_constraints = [uc["name"] for uc in inspector.get_unique_constraints("clientes")]
+    existing_constraints = [
+        uc["name"] for uc in inspector.get_unique_constraints("clientes")
+    ]
     if "uq_clientes_tenant_codigo" not in existing_constraints:
         op.create_unique_constraint(
             "uq_clientes_tenant_codigo",
@@ -71,4 +82,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint("uq_clientes_tenant_codigo", "clientes", type_="uniqueconstraint")
+    op.drop_constraint(
+        "uq_clientes_tenant_codigo", "clientes", type_="uniqueconstraint"
+    )

@@ -13,6 +13,9 @@ export const TENANT_STATUS_EDIT_OPTIONS = [
   { value: "suspended", label: "Suspenso" },
 ];
 
+// Planos legado (basico/premium/enterprise/free/legacy/completo) saem da
+// lista — nao devem mais existir. Tenants que ainda estao neles sao
+// reatribuidos a um destes 10 planos reais via aditivo comercial.
 export const PLAN_EDIT_OPTIONS = [
   { value: "pet-start", label: "Pet Start" },
   { value: "pet-basico", label: "Pet Basico" },
@@ -24,15 +27,9 @@ export const PLAN_EDIT_OPTIONS = [
   { value: "grooming-start", label: "B&T Start" },
   { value: "grooming-gestao", label: "B&T Gestao" },
   { value: "grooming-completo", label: "B&T Completo" },
-  { value: "basico", label: "Basico" },
-  { value: "premium", label: "Premium" },
-  { value: "enterprise", label: "Enterprise" },
-  { value: "free", label: "Free legado" },
-  { value: "legacy", label: "Legacy" },
-  { value: "completo", label: "Completo" },
 ];
 
-export const BILLING_OFFER_PLAN_OPTIONS = PLAN_EDIT_OPTIONS.slice(0, 10);
+export const BILLING_OFFER_PLAN_OPTIONS = PLAN_EDIT_OPTIONS;
 
 export const BILLING_TYPE_OPTIONS = [
   { value: "UNDEFINED", label: "Cliente escolhe no Asaas" },
@@ -49,16 +46,6 @@ export const BILLING_EDIT_OPTIONS = [
   { value: "blocked", label: "Bloqueado" },
   { value: "canceled", label: "Cancelado" },
   { value: "expired", label: "Expirado" },
-];
-
-export const SOURCE_EDIT_OPTIONS = [
-  { value: "manual", label: "Manual" },
-  { value: "admin", label: "Admin" },
-  { value: "trial", label: "Trial" },
-  { value: "asaas", label: "Asaas" },
-  { value: "stripe", label: "Stripe" },
-  { value: "mercado_pago", label: "Mercado Pago" },
-  { value: "external", label: "Externo" },
 ];
 
 export const ONBOARDING_SATISFACTION_OPTIONS = [

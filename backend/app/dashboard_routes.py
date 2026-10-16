@@ -691,7 +691,7 @@ async def obter_metricas_gerencial(
                 GROUP BY cliente_id
             ) v ON v.cliente_id = c.id
             WHERE c.{tenant_filter}
-              AND c.tipo_cadastro = 'cliente'
+              AND c.is_cliente = true
               AND c.ativo = true
               AND (v.ultima_venda IS NULL OR v.ultima_venda < NOW() - INTERVAL '90 days')
         """,
@@ -738,7 +738,7 @@ async def obter_metricas_gerencial(
             SELECT COUNT(*) AS qtd
             FROM clientes
             WHERE {tenant_filter}
-              AND tipo_cadastro = 'cliente'
+              AND is_cliente = true
               AND ativo = true
               AND (celular IS NULL OR TRIM(celular) = '')
         """,
@@ -752,7 +752,7 @@ async def obter_metricas_gerencial(
             SELECT COUNT(*) AS qtd
             FROM clientes
             WHERE {tenant_filter}
-              AND tipo_cadastro = 'cliente'
+              AND is_cliente = true
               AND ativo = true
         """,
             tenant_id,

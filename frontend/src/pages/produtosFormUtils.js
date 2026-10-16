@@ -196,6 +196,40 @@ export function montarEstadoProdutoClonado(prod = {}) {
   };
 }
 
+// Pre-preenche o formulario a partir de um produto de OUTRA loja do mesmo
+// grupo comercial (fluxo "Cadastrar aqui" da listagem, produto encontrado
+// via busca cross-grupo). Diferente do clone normal (mesma loja): nunca copia
+// categoria_id/marca_id/departamento_id/fornecedor nem nenhum outro ID de
+// taxonomia local — esses IDs pertencem a tabela de CADA loja e nao fazem
+// sentido aplicados aqui. Mantem o codigo de barras/GTIN (ao contrario do
+// clone, que limpa) -- e exatamente o que faz o cadastro novo casar
+// automaticamente com a identidade compartilhada ja existente (ver
+// app/services/produto_identidade_service.py).
+export function montarEstadoProdutoPreCadastroGrupo(prod = {}) {
+  return {
+    codigo: "",
+    sku: "",
+    nome: prod.nome || "",
+    codigo_barras: prod.codigo_barras || "",
+    gtin_ean: prod.gtin_ean || "",
+    gtin_ean_tributario: prod.gtin_ean_tributario || "",
+    codigos_barras_alternativos: prod.codigos_barras_alternativos || "",
+    unidade: prod.unidade || "UN",
+    descricao: prod.descricao_curta || "",
+    e_granel: Boolean(prod.e_granel),
+    especie_compativel: prod.especie_compativel || "both",
+    eh_racao: Boolean(prod.classificacao_racao || prod.categoria_racao),
+    classificacao_racao: prod.classificacao_racao || "",
+    peso_embalagem: prod.peso_embalagem || "",
+    categoria_racao: prod.categoria_racao || "",
+    especies_indicadas: prod.especies_indicadas || "both",
+    ativo: true,
+    situacao: true,
+    controle_lote: true,
+    tipo_produto: "SIMPLES",
+  };
+}
+
 export function montarProdutoComAlteracao(produto, campo) {
   const valorCampo = campo.type === "checkbox" ? campo.checked : campo.value;
   const produtoAtualizado = {

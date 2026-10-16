@@ -17,14 +17,22 @@ depends_on = None
 def upgrade() -> None:
     op.add_column(
         "vendas",
-        sa.Column("nao_gerar_beneficios", sa.Boolean(), server_default=sa.false(), nullable=False),
+        sa.Column(
+            "nao_gerar_beneficios",
+            sa.Boolean(),
+            server_default=sa.false(),
+            nullable=False,
+        ),
     )
     op.add_column("vendas", sa.Column("justificativa_nao_gerar_beneficios", sa.Text()))
     op.add_column("vendas", sa.Column("beneficios_bloqueados_em", sa.DateTime()))
     op.add_column("vendas", sa.Column("beneficios_bloqueados_por_id", sa.Integer()))
     op.create_foreign_key(
         "fk_vendas_beneficios_bloqueados_por_id_users",
-        "vendas", "users", ["beneficios_bloqueados_por_id"], ["id"],
+        "vendas",
+        "users",
+        ["beneficios_bloqueados_por_id"],
+        ["id"],
     )
 
 

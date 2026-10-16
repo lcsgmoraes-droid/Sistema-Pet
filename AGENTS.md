@@ -66,6 +66,101 @@ feita nos momentos certos, sem virar repeticao a cada micro-etapa.
   Nao substituir os binarios/revisoes atuais sem autorizacao especifica para
   uma nova versao nativa.
 
+## Frontend — sempre usar os componentes V2 do styleguide
+
+- Em qualquer tela nova ou alterada, nunca usar elemento de formulario nativo
+  direto (`<input>`, `<select>`, `<textarea>`, `<button>` cru etc.). Usar
+  sempre um componente pronto de `frontend/src/components/v2/` (ex.:
+  `InputTexto`, `InputSenha`, `InputData`, `InputCombobox`, `BotaoSalva`,
+  `BotaoCancelar`, `BotaoInteracao`). O catalogo completo do que ja existe,
+  com status ("pronto"/"planejado") e caminho do arquivo, fica em
+  `frontend/src/pages/styleGuide/styleGuideCatalog.js` (visivel tambem na
+  tela `/style-guide` do proprio sistema) — consultar esse catalogo antes de
+  montar qualquer campo ou botao novo.
+- Se o styleguide V2 ainda nao tiver um componente pronto para o que a tela
+  precisa, nao resolver com HTML cru direto na tela. Primeiro avaliar se
+  aquele elemento e reutilizavel (mais de uma tela provavelmente vai
+  precisar dele): se for, criar um componente novo dentro de
+  `frontend/src/components/v2/` seguindo o mesmo padrao dos componentes
+  existentes (props controladas, `label`/`error`/`help`, suporte a modo
+  escuro) e **adicionar a entrada correspondente em
+  `styleGuideCatalog.js`** (categoria certa, `status: "pronto"`, caminho do
+  arquivo) — sem isso o catalogo fica desatualizado e o proximo assistente
+  não vai saber que aquele componente existe.
+- Objetivo: manter o codigo do frontend organizado e com manutencao facil,
+  sem duplicar a mesma peca de UI de jeitos diferentes em telas diferentes.
+
+## Padronizacao de acoes e icones em listagens (regra geral, 2026-09-29)
+
+- Em qualquer coluna "Acoes" de tabela/listagem com 3 ou mais acoes, nunca
+  enfileirar varios `IconActionButton`/icones soltos lado a lado — nao escala
+  (cada acao nova aperta mais a linha) e vira ruido visual. Usar sempre
+  `frontend/src/components/v2/BotaoMenuAcoes/BotaoMenuAcoes.jsx`: um unico
+  botao com icone de "mais opcoes" que revela um menu com a lista completa
+  (icone + texto por item), abrindo sozinho pra cima ou pra baixo conforme o
+  espaco livre na tela. Ver demo com explicacao em `/style-guide` (secao
+  "Cartões e navegação") e entrada no catalogo (`styleGuideCatalog.js`).
+  Com 1 ou 2 acoes apenas, `IconActionButton`/`BotaoInteracao` direto na
+  linha continua aceitavel (o menu existe pra resolver o excesso de icones,
+  nao e obrigatorio pra toda e qualquer listagem).
+- Mesma acao = sempre o mesmo icone, em qualquer tela do sistema. Antes de
+  usar um icone novo para uma acao (editar, excluir, historico, abrir em
+  nova janela, etc.), checar se alguma tela ja existente usa um icone
+  equivalente para essa mesma acao e reaproveitar — nunca escolher um novo
+  so porque e mais conveniente no momento. Padrao ja estabelecido (ver demo
+  de `BotaoMenuAcoes` em `/style-guide`): Editar = `Pencil`, Excluir =
+  `Trash2`, Historico = `History`, Abrir em nova janela = `ExternalLink`
+  (todos de `lucide-react`, mesma biblioteca usada por todo `components/v2/`).
+  Se surgir uma acao sem icone equivalente ainda estabelecido, escolher um
+  novo com bom senso e deixar documentado (nota no componente que o usa, ou
+  no catalogo) para os proximos reaproveitarem.
+- Objetivo: usuario treina o olho uma vez ("esse icone sempre faz aquilo") e
+  nao precisa reaprender a interface tela por tela.
+
+## Loading unico em telas de edicao (regra geral, 2026-10-13)
+
+Toda tela que carrega dados assincronos antes de exibir um formulario (telas
+de edicao tipo `PetForm.jsx`, `ClientePessoaEditar.jsx`) deve mostrar **um
+unico** loading, do inicio ate os dados finais aparecerem — nunca um
+formulario vazio piscando por um instante, nem o loading reaparecendo depois
+dos dados ja estarem na tela. Dois erros causam isso, ambos encontrados e
+corrigidos em `PetForm.jsx`/`ClientePessoaEditar.jsx`:
+
+1. **Estado de loading comecando `false`**: se o primeiro render acontece
+   antes do efeito de carregamento rodar, a tela mostra o formulario vazio
+   por um instante (parece uma tela de cadastro, nao de edicao). Sempre
+   inicializar `useState(true)` quando a tela depende de dado assincrono
+   pra existir, e so quando *tudo* que a tela precisa (todas as chamadas,
+   nao so a principal) tiver terminado, marcar `false` — um `loading` por
+   tela, nao um por chamada.
+2. **Efeito de carregamento sem protecao contra o `StrictMode`**: em
+   desenvolvimento, o React (`main.jsx` usa `<React.StrictMode>`, nao tirar
+   isso — e uma rede de seguranca valiosa) roda de proposito o
+   `useEffect` de carregamento **duas vezes** ao montar, pra flagar efeitos
+   com side effect mal limpo. Sem protecao, a segunda rodada reacende o
+   loading por um instante mesmo com os dados corretos ja exibidos — esse e
+   o "pisca de novo" que o Lucas reportou. Corrigir sempre com uma flag de
+   cancelamento no efeito (padrao recomendado pela propria documentacao do
+   React para fetch em `useEffect`):
+
+   ```jsx
+   useEffect(() => {
+     let ativo = true;
+     (async () => {
+       setLoading(true);
+       try {
+         await carregarTudo();
+       } finally {
+         if (ativo) setLoading(false);
+       }
+     })();
+     return () => { ativo = false; };
+   }, [id]);
+   ```
+
+   A chamada da API em si roda duas vezes em dev (inofensivo, dado identico)
+   — o que a flag evita e so a transicao visual indevida do loading.
+
 ## Padrao de trabalho
 
 - Fazer mudancas pequenas e focadas.

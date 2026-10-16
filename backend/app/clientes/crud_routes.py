@@ -3,7 +3,7 @@
 from datetime import date, datetime as dt, timedelta
 import json
 import logging
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import Float, Integer, and_, case, cast, func, or_
@@ -12,14 +12,18 @@ from sqlalchemy.orm import Session
 
 from app.audit_log import log_action, log_create, log_delete, log_update
 from app.auth.dependencies import get_current_user_and_tenant
+from app.services.cliente_historico_service import registrar_alteracoes_cliente
 from app.clientes.common import (
     _anexar_metadados_criacao_cliente,
     _obter_cliente_ou_404,
     _somente_digitos_coluna,
+    _validar_flags_tipo_criacao,
+    _validar_flags_tipo_update,
     _validar_numero_endereco_cliente,
     _validar_telefone_cliente_obrigatorio,
     _validar_tenant_e_obter_usuario,
     gerar_codigo_cliente,
+    tipos_cadastro_da_pessoa,
 )
 from app.clientes.contatos import (
     validar_contatos_adicionais,
@@ -32,10 +36,19 @@ from app.clientes.schemas import (
     ClienteUpdate,
 )
 from app.db import get_session
-from app.models import AppAccessProfile, Cliente, ClienteContato, Role, User, UserTenant
+from app.models import (
+    AppAccessProfile,
+    Cliente,
+    ClienteContato,
+    Role,
+    Tenant,
+    User,
+    UserTenant,
+)
 from app.segmentacao_models import ClienteSegmento
 from app.vendas_models import Venda
 from app.partner_utils import get_all_accessible_tenant_ids
+from app.grupo_comercial_contexto import listar_empresas_do_grupo
 from app.security.permissions_decorator import require_permission
 from app.security.permissions_service import check_permission
 from app.security.crediario_override import definir_liberacao_crediario
@@ -89,13 +102,12 @@ def create_cliente(
             tenant_id,
             current_user=current_user,
         )
+    _validar_flags_tipo_criacao(cliente_data)
     _validar_telefone_cliente_obrigatorio(cliente_data)
     _validar_numero_endereco_cliente(cliente_data)
     _validar_documentos_unicos_criacao(db, cliente_data, tenant_id)
 
-    codigo = gerar_codigo_cliente(
-        db, cliente_data.tipo_cadastro, cliente_data.tipo_pessoa, tenant_id
-    )
+    codigo = gerar_codigo_cliente(db, cliente_data.tipo_pessoa, tenant_id)
     dados_payload = cliente_data.model_dump()
     contatos_adicionais = cliente_data.contatos_adicionais
     dados_payload.pop("contatos_adicionais", None)
@@ -174,6 +186,7 @@ def create_cliente(
             auth_user_id=auth_user_id,
         ),
         tenant_id=tenant_id,
+        origem_tenant_id=tenant_id,
         codigo=codigo,
         **dados_cliente,
     )
@@ -306,8 +319,11 @@ def list_clientes(
     search: Optional[str] = None,
     ativo: Optional[bool] = None,
     incluir_inativos: bool = False,
-    tipo_cadastro: Optional[List[str]] = Query(None),
     is_entregador: Optional[bool] = None,
+    is_cliente: Optional[bool] = None,
+    is_fornecedor: Optional[bool] = None,
+    is_veterinario: Optional[bool] = None,
+    is_funcionario: Optional[bool] = None,
     visao_dashboard: Optional[str] = Query(None),
     origem_cliente: Optional[str] = None,
     cadastro_inicio: Optional[date] = None,
@@ -323,8 +339,11 @@ def list_clientes(
         query = _montar_query_listagem_clientes(
             db,
             tenant_id=tenant_id,
-            tipo_cadastro=tipo_cadastro,
             is_entregador=is_entregador,
+            is_cliente=is_cliente,
+            is_fornecedor=is_fornecedor,
+            is_veterinario=is_veterinario,
+            is_funcionario=is_funcionario,
             search=search,
             ativo=ativo,
             incluir_inativos=incluir_inativos,
@@ -341,7 +360,7 @@ def list_clientes(
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         resumo = (
-            resumir_origens(query.filter(Cliente.tipo_cadastro == "cliente"), Cliente)
+            resumir_origens(query.filter(Cliente.is_cliente.is_(True)), Cliente)
             if resumo_por_origem
             else []
         )
@@ -376,6 +395,46 @@ def get_cliente(
     return cliente
 
 
+@detail_router.get("/{cliente_id}/historico-alteracoes")
+def listar_historico_cliente(
+    cliente_id: int,
+    limite: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Alteracoes de campos de uma pessoa: data, usuario, campo, valor anterior e novo."""
+    from app.models_cadastros import ClienteHistoricoAlteracao
+
+    _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    _obter_cliente_ou_404(db, cliente_id, tenant_id)
+    linhas = (
+        db.query(ClienteHistoricoAlteracao, User.nome, User.email)
+        .outerjoin(User, User.id == ClienteHistoricoAlteracao.user_id)
+        .filter(ClienteHistoricoAlteracao.cliente_id == cliente_id)
+        .order_by(
+            ClienteHistoricoAlteracao.alterado_em.desc(),
+            ClienteHistoricoAlteracao.id.desc(),
+        )
+        .limit(limite)
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "campo": registro.campo,
+                "valor_anterior": registro.valor_anterior,
+                "valor_novo": registro.valor_novo,
+                "alterado_em": registro.alterado_em.isoformat()
+                if registro.alterado_em
+                else None,
+                "usuario": nome or email,
+                "tenant_id": str(registro.tenant_id),
+            }
+            for registro, nome, email in linhas
+        ]
+    }
+
+
 @detail_router.put("/{cliente_id}")
 def update_cliente(
     cliente_id: int,
@@ -389,6 +448,7 @@ def update_cliente(
     logger.info("[update_cliente] Dados de configuracao de entrega recebidos")
 
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
+    _validar_flags_tipo_update(cliente_data, cliente)
     _validar_telefone_cliente_obrigatorio(cliente_data, cliente)
     _validar_numero_endereco_cliente(cliente_data, cliente)
     _validar_documentos_unicos_update(db, cliente, cliente_data, cliente_id, tenant_id)
@@ -522,6 +582,14 @@ def update_cliente(
         setattr(cliente, field, value)
     if contatos_adicionais is not None:
         salvar_contatos_adicionais(db, cliente, contatos_adicionais)
+    registrar_alteracoes_cliente(
+        db,
+        cliente_id=cliente.id,
+        tenant_id=tenant_id,
+        user_id=current_user.id,
+        antes=old_data,
+        depois=update_data,
+    )
 
     if auth_user_informado:
         cliente.auth_user_id = _validar_conta_app(
@@ -562,9 +630,7 @@ def update_cliente(
         )
 
     if cliente.ativo and not cliente.codigo:
-        cliente.codigo = gerar_codigo_cliente(
-            db, cliente.tipo_cadastro, cliente.tipo_pessoa, tenant_id
-        )
+        cliente.codigo = gerar_codigo_cliente(db, cliente.tipo_pessoa, tenant_id)
 
     cliente.updated_at = dt.utcnow()
     db.commit()
@@ -640,9 +706,14 @@ def delete_cliente(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Desativar cliente (soft delete)."""
+    """Desativar cliente (soft delete). So a loja de origem pode desativar."""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
+    if str(cliente.origem_tenant_id) != str(tenant_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Somente a loja de origem pode excluir este cadastro.",
+        )
 
     cliente.ativo = False
     cliente.updated_at = dt.utcnow()
@@ -670,7 +741,7 @@ def _validar_documentos_unicos_criacao(
             tenant_id=tenant_id,
             campo=Cliente.cpf,
             valor=cliente_data.cpf,
-            detail=f"Já existe um {cliente_data.tipo_cadastro} cadastrado com este CPF",
+            detail=f"Já existe um {' / '.join(tipos_cadastro_da_pessoa(cliente_data)) or 'cadastro'} com este CPF",
         )
     elif cliente_data.tipo_pessoa == "PJ":
         if not cliente_data.cnpj:
@@ -683,10 +754,10 @@ def _validar_documentos_unicos_criacao(
             tenant_id=tenant_id,
             campo=Cliente.cnpj,
             valor=cliente_data.cnpj,
-            detail=f"Já existe um {cliente_data.tipo_cadastro} cadastrado com este CNPJ",
+            detail=f"Já existe um {' / '.join(tipos_cadastro_da_pessoa(cliente_data)) or 'cadastro'} com este CNPJ",
         )
 
-    if cliente_data.crmv and cliente_data.tipo_cadastro == "veterinario":
+    if cliente_data.crmv and cliente_data.is_veterinario:
         _validar_campo_unico(
             db,
             tenant_id=tenant_id,
@@ -769,14 +840,24 @@ def _validar_campo_unico(
             == valor_normalizado
         )
 
+    # Unicidade de documento e por GRUPO comercial, nao por loja isolada -
+    # pessoa e cadastro compartilhado do grupo (ver listar_empresas_do_grupo).
     query = db.query(Cliente).filter(
-        Cliente.tenant_id == tenant_id,
+        Cliente.tenant_id.in_(listar_empresas_do_grupo(db, tenant_id)),
         expressao,
         Cliente.ativo.is_not(False),
     )
     if cliente_id_excluir is not None:
         query = query.filter(Cliente.id != cliente_id_excluir)
-    if query.first():
+    existente = query.first()
+    if existente:
+        if str(existente.tenant_id) != str(tenant_id):
+            loja_existente = (
+                db.query(Tenant.name)
+                .filter(Tenant.id == str(existente.tenant_id))
+                .scalar()
+            )
+            detail = f"{detail} (já cadastrado na loja {loja_existente or existente.tenant_id} do grupo)"
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
 
 
@@ -850,30 +931,42 @@ def _montar_query_listagem_clientes(
     db: Session,
     *,
     tenant_id: int,
-    tipo_cadastro,
     is_entregador,
     search,
     ativo,
     incluir_inativos,
+    is_cliente=None,
+    is_fornecedor=None,
+    is_veterinario=None,
+    is_funcionario=None,
     visao_dashboard=None,
 ):
-    access_ids = get_all_accessible_tenant_ids(db, tenant_id)
+    # Pessoa e compartilhada por grupo comercial (ver filtro automatico do ORM
+    # em app/tenancy/filters.py::pessoa_visivel_no_grupo); get_all_accessible_tenant_ids
+    # e so o mecanismo de parceria pet shop<->clinica veterinaria, sem relacao
+    # com grupo comercial, entao precisa somar os dois aqui.
+    access_ids = set(get_all_accessible_tenant_ids(db, tenant_id)) | set(
+        listar_empresas_do_grupo(db, tenant_id)
+    )
     query = db.query(Cliente).filter(Cliente.tenant_id.in_(access_ids))
-    if tipo_cadastro:
-        if isinstance(tipo_cadastro, list):
-            query = query.filter(Cliente.tipo_cadastro.in_(tipo_cadastro))
-        else:
-            query = query.filter(Cliente.tipo_cadastro == tipo_cadastro)
     if is_entregador is not None:
         query = query.filter(Cliente.is_entregador == is_entregador)
+    if is_cliente is not None:
+        query = query.filter(Cliente.is_cliente == is_cliente)
+    if is_fornecedor is not None:
+        query = query.filter(Cliente.is_fornecedor == is_fornecedor)
+    if is_veterinario is not None:
+        query = query.filter(Cliente.is_veterinario == is_veterinario)
+    if is_funcionario is not None:
+        query = query.filter(Cliente.is_funcionario == is_funcionario)
 
     query = _aplicar_filtro_busca(query, search)
     if not incluir_inativos:
         query = _aplicar_filtro_ativo(query, ativo)
     if visao_dashboard == "ativos":
         query = query.filter(
-            Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "cliente",
+            Cliente.tenant_id.in_(access_ids),
+            Cliente.is_cliente.is_(True),
         )
     elif visao_dashboard == "vip_em_risco":
         query = query.join(
@@ -883,8 +976,8 @@ def _montar_query_listagem_clientes(
                 ClienteSegmento.tenant_id == Cliente.tenant_id,
             ),
         ).filter(
-            Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "cliente",
+            Cliente.tenant_id.in_(access_ids),
+            Cliente.is_cliente.is_(True),
             ClienteSegmento.segmento == "VIP",
             cast(ClienteSegmento.metricas["ultima_compra_dias"].astext, Integer) > 20,
         )
@@ -901,8 +994,8 @@ def _montar_query_listagem_clientes(
         query = query.outerjoin(
             ultima_venda, ultima_venda.c.cliente_id == Cliente.id
         ).filter(
-            Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "cliente",
+            Cliente.tenant_id.in_(access_ids),
+            Cliente.is_cliente.is_(True),
             or_(
                 ultima_venda.c.ultima_venda.is_(None),
                 ultima_venda.c.ultima_venda < dt.utcnow() - timedelta(days=90),
@@ -916,15 +1009,15 @@ def _montar_query_listagem_clientes(
                 ClienteSegmento.tenant_id == Cliente.tenant_id,
             ),
         ).filter(
-            Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "cliente",
+            Cliente.tenant_id.in_(access_ids),
+            Cliente.is_cliente.is_(True),
             ClienteSegmento.segmento == "Novo",
             cast(ClienteSegmento.metricas["ticket_medio"].astext, Float) > 200,
         )
     elif visao_dashboard == "sem_whatsapp":
         query = query.filter(
-            Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "cliente",
+            Cliente.tenant_id.in_(access_ids),
+            Cliente.is_cliente.is_(True),
             or_(Cliente.celular.is_(None), func.trim(Cliente.celular) == ""),
         )
     return query
@@ -1113,7 +1206,14 @@ def _montar_resposta_update(cliente: Cliente) -> dict:
         "id": cliente.id,
         "codigo": cliente.codigo,
         "nome": cliente.nome,
-        "tipo_cadastro": cliente.tipo_cadastro,
+        "tipos_cadastro": tipos_cadastro_da_pessoa(cliente),
+        "is_cliente": cliente.is_cliente,
+        "is_fornecedor": cliente.is_fornecedor,
+        "is_veterinario": cliente.is_veterinario,
+        "is_funcionario": cliente.is_funcionario,
+        "origem_tenant_id": str(cliente.origem_tenant_id)
+        if cliente.origem_tenant_id
+        else None,
         "tipo_pessoa": cliente.tipo_pessoa,
         "cpf": cliente.cpf,
         "cnpj": cliente.cnpj,

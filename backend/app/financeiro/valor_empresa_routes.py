@@ -110,7 +110,7 @@ def listar_fornecedores_avaliacao(
     )
     query = db.query(Cliente).filter(
         Cliente.tenant_id == tenant_id,
-        or_(Cliente.tipo_cadastro == "fornecedor", Cliente.id.in_(ids_referenciados)),
+        or_(Cliente.is_fornecedor.is_(True), Cliente.id.in_(ids_referenciados)),
     )
     if busca and busca.strip():
         query = query.filter(Cliente.nome.ilike(f"%{busca.strip()}%"))

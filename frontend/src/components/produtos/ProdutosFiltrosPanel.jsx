@@ -1,7 +1,48 @@
 import FilterBar from "../ui/FilterBar";
 import FornecedorSelector from "../fornecedores/FornecedorSelector";
+import InputCheckTexto from "../v2/InputCheckTexto/InputCheckTexto";
+import InputCombobox from "../v2/InputCombobox/InputCombobox";
 import { CategoriaProdutoSelector, MarcaProdutoSelector } from "./CatalogoProdutoSelectors";
 import ProdutoSelector from "./ProdutoSelector";
+
+const OPCOES_ATIVO = [
+  { value: "ativos", label: "Somente Ativos" },
+  { value: "inativos", label: "Somente Inativos" },
+  { value: "todos", label: "Ativos e Inativos" },
+];
+
+const OPCOES_CANAL = [
+  { value: "ecommerce", label: "Canal: e-commerce" },
+  { value: "app", label: "Canal: app" },
+];
+
+const OPCOES_SITUACAO_CATALOGO = [
+  { value: "todos", label: "Todo catálogo online" },
+  { value: "publicado", label: "Publicados no canal" },
+  { value: "nao_publicado", label: "Não publicados no canal" },
+  { value: "bloqueado", label: "Bloqueados" },
+  { value: "esgotado", label: "Esgotados" },
+  { value: "pendencias", label: "Vendáveis com dados faltantes" },
+  { value: "pronto", label: "Completos" },
+];
+
+const OPCOES_ESTOQUE = [
+  { value: "todos", label: "Todo estoque" },
+  { value: "com_estoque", label: "Com estoque" },
+  { value: "sem_estoque", label: "Sem estoque" },
+];
+
+const OPCOES_IMAGEM = [
+  { value: "todas", label: "Todas as fotos" },
+  { value: "com_foto", label: "Com foto" },
+  { value: "sem_foto", label: "Sem foto" },
+];
+
+const OPCOES_ORDENACAO = [
+  { value: "recentes", label: "Últimos cadastrados" },
+  { value: "estoque_desc", label: "Maior estoque" },
+  { value: "estoque_asc", label: "Menor estoque" },
+];
 
 export default function ProdutosFiltrosPanel({
   categorias,
@@ -22,7 +63,7 @@ export default function ProdutosFiltrosPanel({
 
   return (
     <FilterBar id="tour-produtos-filtros" className="mb-4 md:mb-6" onSubmit={handleSubmit}>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-4 md:gap-4 xl:grid-cols-9">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-4 md:gap-4 xl:grid-cols-6">
         <div id="tour-produtos-busca" className="md:col-span-2">
           <ProdutoSelector
             placeholder="Buscar por SKU, nome ou qualquer EAN..."
@@ -77,128 +118,108 @@ export default function ProdutosFiltrosPanel({
         </div>
 
         <div>
-          <select
+          <InputCombobox
+            opcoes={OPCOES_ATIVO}
             value={filtros.ativo}
-            onChange={(event) => handleFiltroChange("ativo", event.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="ativos">Somente Ativos</option>
-            <option value="inativos">Somente Inativos</option>
-            <option value="todos">Ativos e Inativos</option>
-          </select>
+            onChange={(valor) => handleFiltroChange("ativo", valor)}
+            placeholder="Status do produto"
+            permitirLimpar={false}
+          />
         </div>
 
         <div>
-          <select
-            aria-label="Canal do catálogo online"
+          <InputCombobox
+            opcoes={OPCOES_CANAL}
             value={filtros.catalogo_online_canal}
-            onChange={(event) => handleFiltroChange("catalogo_online_canal", event.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="ecommerce">Canal: e-commerce</option>
-            <option value="app">Canal: app</option>
-          </select>
+            onChange={(valor) => handleFiltroChange("catalogo_online_canal", valor)}
+            placeholder="Canal do catálogo online"
+            permitirLimpar={false}
+          />
         </div>
 
-        <div>
-          <select
-            aria-label="Situação no catálogo online"
+        <div className="md:col-span-2">
+          <InputCombobox
+            opcoes={OPCOES_SITUACAO_CATALOGO}
             value={filtros.catalogo_online_situacao}
-            onChange={(event) => handleFiltroChange("catalogo_online_situacao", event.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="todos">Todo catálogo online</option>
-            <option value="publicado">Publicados no canal</option>
-            <option value="nao_publicado">Não publicados no canal</option>
-            <option value="bloqueado">Bloqueados</option>
-            <option value="esgotado">Esgotados</option>
-            <option value="pendencias">Vendáveis com dados faltantes</option>
-            <option value="pronto">Completos</option>
-          </select>
+            onChange={(valor) => handleFiltroChange("catalogo_online_situacao", valor)}
+            placeholder="Situação no catálogo online"
+            permitirLimpar={false}
+          />
         </div>
 
         <div>
-          <select
-            aria-label="Filtrar por estoque"
+          <InputCombobox
+            opcoes={OPCOES_ESTOQUE}
             value={filtros.estoque_situacao}
-            onChange={(event) => handleFiltroChange("estoque_situacao", event.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="todos">Todo estoque</option>
-            <option value="com_estoque">Com estoque</option>
-            <option value="sem_estoque">Sem estoque</option>
-          </select>
+            onChange={(valor) => handleFiltroChange("estoque_situacao", valor)}
+            placeholder="Filtrar por estoque"
+            permitirLimpar={false}
+          />
         </div>
 
         <div>
-          <select
-            aria-label="Filtrar por foto"
+          <InputCombobox
+            opcoes={OPCOES_IMAGEM}
             value={filtros.imagem_situacao}
-            onChange={(event) => handleFiltroChange("imagem_situacao", event.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="todas">Todas as fotos</option>
-            <option value="com_foto">Com foto</option>
-            <option value="sem_foto">Sem foto</option>
-          </select>
+            onChange={(valor) => handleFiltroChange("imagem_situacao", valor)}
+            placeholder="Filtrar por foto"
+            permitirLimpar={false}
+          />
         </div>
 
         <div>
-          <select
-            aria-label="Ordenar produtos"
+          <InputCombobox
+            opcoes={OPCOES_ORDENACAO}
             value={filtros.ordenacao}
-            onChange={(event) => handleFiltroChange("ordenacao", event.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="recentes">Últimos cadastrados</option>
-            <option value="estoque_desc">Maior estoque</option>
-            <option value="estoque_asc">Menor estoque</option>
-          </select>
+            onChange={(valor) => handleFiltroChange("ordenacao", valor)}
+            placeholder="Ordenar produtos"
+            permitirLimpar={false}
+          />
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:col-span-4 md:grid-cols-4 xl:col-span-9">
-          <label className="flex min-h-10 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 cursor-pointer">
-            <input
-              type="checkbox"
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:col-span-4 md:grid-cols-4 xl:col-span-6">
+          <div className="flex min-h-10 items-center rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+            <InputCheckTexto
+              id="produtos-filtro-estoque-baixo"
               checked={filtros.estoque_baixo}
-              onChange={(event) => handleFiltroChange("estoque_baixo", event.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <span className="text-sm text-gray-700">Estoque Baixo</span>
-          </label>
+              onChange={(checked) => handleFiltroChange("estoque_baixo", checked)}
+            >
+              Estoque Baixo
+            </InputCheckTexto>
+          </div>
 
-          <label className="flex min-h-10 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 cursor-pointer">
-            <input
-              type="checkbox"
+          <div className="flex min-h-10 items-center rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+            <InputCheckTexto
+              id="produtos-filtro-em-promocao"
               checked={filtros.em_promocao}
-              onChange={(event) => handleFiltroChange("em_promocao", event.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <span className="text-sm text-gray-700">Em Promocao</span>
-          </label>
+              onChange={(checked) => handleFiltroChange("em_promocao", checked)}
+            >
+              Em Promoção
+            </InputCheckTexto>
+          </div>
 
-          <label className="flex min-h-10 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 cursor-pointer sm:col-span-2 md:col-span-1">
-            <input
-              type="checkbox"
+          <div className="flex min-h-10 items-center rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 sm:col-span-2 md:col-span-1">
+            <InputCheckTexto
+              id="produtos-filtro-pais-variacoes"
               checked={filtros.mostrarPaisVariacoes}
-              onChange={(event) => handleFiltroChange("mostrarPaisVariacoes", event.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <span className="text-sm text-gray-700">Incluir pais, variacoes e kits</span>
-          </label>
+              onChange={(checked) => handleFiltroChange("mostrarPaisVariacoes", checked)}
+            >
+              Incluir pais, variações e kits
+            </InputCheckTexto>
+          </div>
 
-          <label
-            className="flex min-h-10 items-center gap-2 cursor-pointer rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 sm:col-span-2 md:col-span-1"
+          <div
+            className="flex min-h-10 items-center rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 sm:col-span-2 md:col-span-1"
             title="Quando ligado, a busca fica salva ao sair e voltar para a lista"
           >
-            <input
-              type="checkbox"
+            <InputCheckTexto
+              id="produtos-filtro-persistir-busca"
               checked={persistirBusca}
-              onChange={(event) => setPersistirBusca(event.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <span className="text-xs text-gray-700">Persistir filtros</span>
-          </label>
+              onChange={(checked) => setPersistirBusca(checked)}
+            >
+              <span className="text-xs">Persistir filtros</span>
+            </InputCheckTexto>
+          </div>
         </div>
       </div>
     </FilterBar>

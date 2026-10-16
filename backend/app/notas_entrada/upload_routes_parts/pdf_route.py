@@ -105,7 +105,7 @@ def _buscar_fornecedor_pdf(
         .filter(
             Cliente.id == fornecedor_id,
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "fornecedor",
+            Cliente.is_fornecedor.is_(True),
             Cliente.ativo,
         )
         .first()

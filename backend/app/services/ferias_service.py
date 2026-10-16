@@ -75,7 +75,7 @@ def conceder_ferias(
         .filter(
             Cliente.id == funcionario_id,
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "funcionario",
+            Cliente.is_funcionario.is_(True),
             Cliente.ativo.is_(True),
         )
         .first()

@@ -26,6 +26,9 @@ def ops_tenants_session():
             name TEXT NOT NULL,
             status TEXT,
             plan TEXT,
+            plan_pet TEXT,
+            plan_vet TEXT,
+            plan_grooming TEXT,
             billing_status TEXT,
             subscription_source TEXT,
             subscription_activated_at TEXT,
@@ -35,6 +38,7 @@ def ops_tenants_session():
             onboarding_next_contact_on TEXT,
             onboarding_satisfaction TEXT NOT NULL DEFAULT 'not_collected',
             onboarding_follow_up_updated_at TEXT,
+            onboarding_credencial_email_pendente BOOLEAN NOT NULL DEFAULT 0,
             created_at TEXT,
             updated_at TEXT
         )
@@ -192,6 +196,48 @@ def ops_tenants_session():
         session.close()
 
 
+def test_list_ops_tenants_exposes_grupo_comercial_when_tables_exist(
+    ops_tenants_session,
+):
+    from app.services.ops_tenants_service import list_ops_tenants
+
+    ops_tenants_session.execute(
+        text("""
+            CREATE TABLE grupos_comerciais (
+                id INTEGER PRIMARY KEY, nome TEXT NOT NULL
+            )
+            """)
+    )
+    ops_tenants_session.execute(
+        text("""
+            CREATE TABLE grupo_comercial_membros (
+                id INTEGER PRIMARY KEY,
+                grupo_id INTEGER NOT NULL,
+                empresa_id TEXT NOT NULL,
+                papel TEXT NOT NULL,
+                status TEXT NOT NULL
+            )
+            """)
+    )
+    ops_tenants_session.execute(
+        text(
+            "INSERT INTO grupos_comerciais (id, nome) VALUES (1, 'Clinica Sao Jose - Grupo')"
+        )
+    )
+    ops_tenants_session.execute(
+        text("""
+            INSERT INTO grupo_comercial_membros (id, grupo_id, empresa_id, papel, status)
+            VALUES (1, 1, :target, 'responsavel', 'ativo')
+            """),
+        {"target": TARGET_TENANT},
+    )
+
+    result = list_ops_tenants(ops_tenants_session, search="clinica")
+
+    tenant = result["items"][0]
+    assert tenant["grupo_comercial"] == {"id": 1, "nome": "Clinica Sao Jose - Grupo"}
+
+
 def test_list_ops_tenants_returns_counts_and_catalog_status(ops_tenants_session):
     from app.services.ops_tenants_service import list_ops_tenants
 
@@ -205,16 +251,7 @@ def test_list_ops_tenants_returns_counts_and_catalog_status(ops_tenants_session)
     assert tenant["plan"] == "basico"
     assert tenant["billing_status"] == "past_due"
     assert tenant["principal_user"]["email"] == "maiaraalmeidaa42@hotmail.com"
-    assert tenant["counts"] == {
-        "produtos": 3,
-        "clientes": 2,
-        "pets": 4,
-        "vendas": 5,
-        "produto_imagens": 2,
-        "agendamentos_vet": 2,
-        "consultas_vet": 1,
-        "usuarios": 2,
-    }
+    assert "counts" not in tenant
     assert tenant["usage"] == {
         "records_total": 21,
         "image_count": 2,
@@ -226,6 +263,7 @@ def test_list_ops_tenants_returns_counts_and_catalog_status(ops_tenants_session)
     assert result["summary"]["image_bytes"] == 1572864
     assert tenant["base_catalog"]["installed"] is True
     assert tenant["base_catalog"]["status"] == "completed"
+    assert tenant["grupo_comercial"] is None
     assert tenant["pilot"]["kind"] == "veterinario"
     assert tenant["pilot"]["status"] == "active"
     assert tenant["pilot"]["access_confirmed"] is True
@@ -246,20 +284,6 @@ def test_list_ops_tenants_returns_counts_and_catalog_status(ops_tenants_session)
     }
     assert result["summary"]["pilots_active"] == 1
     assert result["summary"]["pilots_blocked"] == 0
-
-
-def test_apply_base_catalog_import_requires_explicit_confirmation(ops_tenants_session):
-    from app.services.ops_tenants_service import (
-        OpsTenantActionError,
-        apply_base_catalog_import,
-    )
-
-    with pytest.raises(OpsTenantActionError, match="confirmacao"):
-        apply_base_catalog_import(
-            ops_tenants_session,
-            tenant_id=TARGET_TENANT,
-            confirm=False,
-        )
 
 
 def test_list_ops_tenants_blocks_pilot_with_critical_alert(ops_tenants_session):
@@ -385,27 +409,27 @@ def test_dissatisfied_pilot_gets_recovery_action(ops_tenants_session):
 def test_update_ops_tenant_commercial_state_changes_safe_fields(ops_tenants_session):
     from app.services.ops_tenants_service import update_ops_tenant_commercial_state
 
+    # Plano e origem da assinatura nao sao mais editaveis por este painel
+    # rapido — qualquer mudanca de plano agora exige um aditivo comercial
+    # (BillingOffer) com aceite do cliente. Só status/billing_status seguem
+    # aqui, para ajuste operacional imediato.
     tenant = update_ops_tenant_commercial_state(
         ops_tenants_session,
         tenant_id=TARGET_TENANT,
         changes={
             "status": "suspended",
-            "plan": "premium",
             "billing_status": "past_due",
-            "subscription_source": "manual",
         },
     )
 
     assert tenant["id"] == TARGET_TENANT
     assert tenant["status"] == "suspended"
-    assert tenant["plan"] == "premium"
     assert tenant["billing_status"] == "past_due"
-    assert tenant["subscription_source"] == "manual"
 
     row = (
         ops_tenants_session.execute(
             text("""
-            SELECT status, plan, billing_status, subscription_source
+            SELECT status, billing_status
             FROM tenants
             WHERE id = :tenant_id
             """),
@@ -416,9 +440,7 @@ def test_update_ops_tenant_commercial_state_changes_safe_fields(ops_tenants_sess
     )
     assert dict(row) == {
         "status": "suspended",
-        "plan": "premium",
         "billing_status": "past_due",
-        "subscription_source": "manual",
     }
 
 
@@ -428,12 +450,34 @@ def test_update_ops_tenant_commercial_state_rejects_invalid_values(ops_tenants_s
         update_ops_tenant_commercial_state,
     )
 
-    with pytest.raises(OpsTenantActionError, match="Plano invalido"):
+    with pytest.raises(OpsTenantActionError, match="Status de cobranca invalido"):
         update_ops_tenant_commercial_state(
             ops_tenants_session,
             tenant_id=TARGET_TENANT,
-            changes={"plan": "plano sem cadastro"},
+            changes={"billing_status": "status sem cadastro"},
         )
+
+
+def test_update_ops_tenant_commercial_state_ignores_plan_and_source_fields(
+    ops_tenants_session,
+):
+    """`plan`/`subscription_source` nao fazem mais parte do painel rapido —
+    se ainda chegarem no payload (ex.: cliente antigo em cache), sao
+    simplesmente ignorados, sem erro e sem alterar o banco."""
+    from app.services.ops_tenants_service import update_ops_tenant_commercial_state
+
+    tenant = update_ops_tenant_commercial_state(
+        ops_tenants_session,
+        tenant_id=TARGET_TENANT,
+        changes={
+            "status": "suspended",
+            "plan": "premium",
+            "subscription_source": "manual",
+        },
+    )
+
+    assert tenant["status"] == "suspended"
+    assert tenant["plan"] == "basico"  # valor original, nao foi tocado
 
 
 def test_update_ops_tenant_onboarding_follow_up_saves_safe_fields(
@@ -564,38 +608,3 @@ def test_onboarding_note_rejects_blank_or_oversized_text(ops_tenants_session):
         create_ops_tenant_onboarding_note(note="   ", **common)
     with pytest.raises(OpsTenantActionError, match="no maximo 1000"):
         create_ops_tenant_onboarding_note(note="x" * 1001, **common)
-
-
-def test_preview_base_catalog_import_uses_lucas_store_as_source(
-    ops_tenants_session, monkeypatch
-):
-    from app.services import ops_tenants_service
-
-    calls = []
-
-    def fake_import_base_catalog(**kwargs):
-        calls.append(kwargs)
-        return {
-            "ok": True,
-            "dry_run": kwargs["dry_run"],
-            "source_tenant_id": kwargs["source_tenant_id"],
-            "target_tenant_id": kwargs["target_tenant_id"],
-            "would_create": {"produtos": 1},
-            "created": {},
-            "skipped": {},
-            "warnings": [],
-            "errors": [],
-        }
-
-    monkeypatch.setattr(
-        ops_tenants_service, "import_base_catalog", fake_import_base_catalog
-    )
-
-    result = ops_tenants_service.preview_base_catalog_import(
-        ops_tenants_session, tenant_id=TARGET_TENANT
-    )
-
-    assert result["dry_run"] is True
-    assert calls[0]["source_tenant_id"] == SOURCE_TENANT
-    assert calls[0]["target_tenant_id"] == TARGET_TENANT
-    assert calls[0]["user_id"] == 10

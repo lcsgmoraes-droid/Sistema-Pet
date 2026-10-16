@@ -1,4 +1,5 @@
 import { useState } from "react";
+import toast from "react-hot-toast";
 import { confirmarCorePet } from "../services/corepetDialog";
 import { aplicarConsultaCepEndereco, resolveCepMunicipio } from "../utils/cepMunicipio";
 
@@ -46,7 +47,7 @@ export function useClientesNovoEnderecos() {
       setEnderecoAtual((prev) => aplicarConsultaCepEndereco(prev, cepConsultado, data));
     } catch (error) {
       console.error("Erro ao buscar CEP:", error);
-      alert(error.message || "Erro ao buscar CEP");
+      toast.error(error.message || "Erro ao buscar CEP.");
     } finally {
       setLoadingCepEndereco(false);
     }
@@ -54,7 +55,7 @@ export function useClientesNovoEnderecos() {
 
   const salvarEndereco = () => {
     if (!enderecoAtual?.cep || !enderecoAtual?.endereco || !enderecoAtual?.cidade) {
-      alert("Preencha pelo menos CEP, Endereco e Cidade");
+      toast.error("Preencha pelo menos CEP, Endereço e Cidade.");
       return;
     }
 
@@ -72,7 +73,7 @@ export function useClientesNovoEnderecos() {
   };
 
   const removerEndereco = async (index) => {
-    if (await confirmarCorePet("Deseja realmente remover este endereco?")) {
+    if (await confirmarCorePet("Deseja realmente remover este endereço?")) {
       setEnderecosAdicionais((prev) => prev.filter((_, i) => i !== index));
     }
   };

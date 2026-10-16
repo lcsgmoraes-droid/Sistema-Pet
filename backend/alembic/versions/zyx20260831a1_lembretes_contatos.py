@@ -84,7 +84,8 @@ def upgrade() -> None:
         "lembretes_contatos",
         ["tenant_id", "canal", "created_at"],
     )
-    op.execute(sa.text("""
+    op.execute(
+        sa.text("""
             INSERT INTO lembretes_contatos (
                 lembrete_id,
                 cliente_id,
@@ -119,7 +120,8 @@ def upgrade() -> None:
             FROM lembretes
             WHERE notificacao_enviada IS TRUE
               AND data_notificacao_enviada IS NOT NULL
-            """))
+            """)
+    )
 
     if op.get_bind().dialect.name == "postgresql":
         op.execute(f"ALTER TABLE {TABLE_NAME} ENABLE ROW LEVEL SECURITY")

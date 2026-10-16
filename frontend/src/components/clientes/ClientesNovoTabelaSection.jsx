@@ -1,10 +1,12 @@
 import { Fragment } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
   DollarSign,
-  Edit2,
+  GitMerge,
   MessageCircle,
   PawPrint,
+  Pencil,
   Trash2,
   UsersRound,
 } from "lucide-react";
@@ -13,7 +15,44 @@ import CopyableValue from "../ui/CopyableValue";
 import IconActionButton from "../ui/IconActionButton";
 import PaginationControls from "../ui/PaginationControls";
 import Panel from "../ui/Panel";
+import BotaoMenuAcoes from "../v2/BotaoMenuAcoes/BotaoMenuAcoes";
+import InputCheckbox from "../v2/InputCheckbox/InputCheckbox";
 import { nomeOrigemCliente } from "../../utils/clienteOrigem";
+
+function montarAcoesPessoa({ cliente, listaUrl, navigate, handleDelete, onIniciarFusao }) {
+  return [
+    cliente.celular
+      ? {
+          icon: MessageCircle,
+          label: "Abrir WhatsApp",
+          onClick: () => {
+            const celular = cliente.celular.replace(/\D/g, "");
+            window.open(`https://wa.me/55${celular}`, "_blank");
+          },
+        }
+      : null,
+    {
+      icon: Pencil,
+      label: "Editar",
+      onClick: () => navigate(`/clientes/${cliente.id}/editar`, { state: { from: listaUrl } }),
+    },
+    onIniciarFusao
+      ? {
+          icon: GitMerge,
+          label: "Fundir com outra pessoa",
+          onClick: () => onIniciarFusao(cliente.id),
+        }
+      : null,
+    !cliente.de_parceiro
+      ? {
+          icon: Trash2,
+          label: "Excluir",
+          tom: "perigo",
+          onClick: () => handleDelete(cliente.id),
+        }
+      : null,
+  ];
+}
 
 function formatarDocumentoPessoa(cliente) {
   if (cliente.tipo_pessoa === "PF") return cliente.cpf || "-";
@@ -28,18 +67,21 @@ function PessoaMobileCard({
   handleDelete,
   handleDeletePet,
   highlightedPetId,
-  openModal,
+  listaUrl,
+  modoFusaoAtivo,
+  onIniciarFusao,
   setExpandedPets,
   setHighlightedPetId,
   togglePessoaFusao,
 }) {
+  const navigate = useNavigate();
   const pets = Array.isArray(cliente.pets) ? cliente.pets : [];
   const petsAberto = Boolean(expandedPets[cliente.id]);
 
   return (
     <article
       id={`cliente-${cliente.id}`}
-      onClick={() => openModal(cliente)}
+      onClick={() => navigate(`/clientes/${cliente.id}/editar`, { state: { from: listaUrl } })}
       className={`rounded-lg border bg-white p-3 shadow-sm transition-colors ${
         clienteSelecionadoFusao
           ? "border-amber-200 bg-amber-50"
@@ -49,14 +91,28 @@ function PessoaMobileCard({
       }`}
     >
       <div className="flex items-start gap-3">
-        <input
-          type="checkbox"
-          checked={clienteSelecionadoFusao}
-          onClick={(event) => event.stopPropagation()}
-          onChange={() => togglePessoaFusao?.(cliente.id)}
-          className="mt-1 h-5 w-5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
-          aria-label={`Selecionar ${cliente.nome} para fusao`}
-        />
+        {modoFusaoAtivo ? (
+          <div onClick={(event) => event.stopPropagation()}>
+            <InputCheckbox
+              checked={clienteSelecionadoFusao}
+              onChange={() => togglePessoaFusao?.(cliente.id)}
+              rotulo={`Selecionar ${cliente.nome} para fusao`}
+            />
+          </div>
+        ) : (
+          <div onClick={(event) => event.stopPropagation()}>
+            <BotaoMenuAcoes
+              rotulo={`Mais ações para ${cliente.nome}`}
+              acoes={montarAcoesPessoa({
+                cliente,
+                listaUrl,
+                navigate,
+                handleDelete,
+                onIniciarFusao,
+              })}
+            />
+          </div>
+        )}
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
@@ -110,9 +166,9 @@ function PessoaMobileCard({
       </div>
 
       <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
-        {cliente.tipo_cadastro === "cliente" && (
+        {cliente.is_cliente && (
           <div>
-            <dt className="text-slate-500">Origem</dt>
+            <dt className="text-slate-500">Canal de origem</dt>
             <dd className="text-slate-700">{nomeOrigemCliente(cliente.origem_cliente)}</dd>
           </div>
         )}
@@ -157,43 +213,6 @@ function PessoaMobileCard({
             />
           ) : null}
         </button>
-
-        <div
-          className="ml-auto flex items-center gap-1.5"
-          onClick={(event) => event.stopPropagation()}
-        >
-          {cliente.celular ? (
-            <IconActionButton
-              onClick={() => {
-                const celular = cliente.celular.replace(/\D/g, "");
-                window.open(`https://wa.me/55${celular}`, "_blank");
-              }}
-              icon={MessageCircle}
-              intent="create"
-              tone="ghost"
-              title="Abrir WhatsApp"
-              aria-label="Abrir WhatsApp"
-            />
-          ) : null}
-          <IconActionButton
-            onClick={() => openModal(cliente)}
-            icon={Edit2}
-            intent="edit"
-            tone="ghost"
-            title="Editar"
-            aria-label="Editar"
-          />
-          {!cliente.de_parceiro ? (
-            <IconActionButton
-              onClick={() => handleDelete(cliente.id)}
-              icon={Trash2}
-              intent="delete"
-              tone="ghost"
-              title="Excluir"
-              aria-label="Excluir"
-            />
-          ) : null}
-        </div>
       </div>
 
       {petsAberto && pets.length > 0 ? (
@@ -225,9 +244,11 @@ function PessoaMobileCard({
                   <IconActionButton
                     onClick={() => {
                       setHighlightedPetId(pet.id);
-                      openModal(cliente, null, pet.id);
+                      navigate(`/clientes/${cliente.id}/editar`, {
+                        state: { abaInicial: "animais", from: listaUrl },
+                      });
                     }}
-                    icon={Edit2}
+                    icon={Pencil}
                     intent="edit"
                     tone="ghost"
                     size="xs"
@@ -262,16 +283,19 @@ const ClientesNovoTabelaSection = ({
   setPaginaAtual,
   filteredClientes,
   highlightedClienteId,
+  listaUrl,
   expandedPets,
   setExpandedPets,
   highlightedPetId,
   setHighlightedPetId,
-  openModal,
   handleDelete,
   handleDeletePet,
+  modoFusaoAtivo = false,
+  onIniciarFusao,
   pessoasSelecionadasFusao = [],
   togglePessoaFusao,
 }) => {
+  const navigate = useNavigate();
   return (
     <>
       <PaginationControls
@@ -302,7 +326,9 @@ const ClientesNovoTabelaSection = ({
                   handleDelete={handleDelete}
                   handleDeletePet={handleDeletePet}
                   highlightedPetId={highlightedPetId}
-                  openModal={openModal}
+                  listaUrl={listaUrl}
+                  modoFusaoAtivo={modoFusaoAtivo}
+                  onIniciarFusao={onIniciarFusao}
                   setExpandedPets={setExpandedPets}
                   setHighlightedPetId={setHighlightedPetId}
                   togglePessoaFusao={togglePessoaFusao}
@@ -314,8 +340,8 @@ const ClientesNovoTabelaSection = ({
               <table className="min-w-full divide-y divide-slate-200">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="w-12 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                      Fusao
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      {modoFusaoAtivo ? "Fusao" : "Acoes"}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                       ID
@@ -333,10 +359,7 @@ const ClientesNovoTabelaSection = ({
                       Pets
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                      Origem
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
-                      Acoes
+                      Canal de origem
                     </th>
                   </tr>
                 </thead>
@@ -349,7 +372,11 @@ const ClientesNovoTabelaSection = ({
                       <Fragment key={cliente.id}>
                         <tr
                           id={`cliente-${cliente.id}`}
-                          onClick={() => openModal(cliente)}
+                          onClick={() =>
+                            navigate(`/clientes/${cliente.id}/editar`, {
+                              state: { from: listaUrl },
+                            })
+                          }
                           className={`cursor-pointer transition-colors ${
                             clienteSelecionadoFusao
                               ? "bg-amber-50 hover:bg-amber-100"
@@ -359,13 +386,24 @@ const ClientesNovoTabelaSection = ({
                           }`}
                         >
                           <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                            <input
-                              type="checkbox"
-                              checked={clienteSelecionadoFusao}
-                              onChange={() => togglePessoaFusao?.(cliente.id)}
-                              className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
-                              aria-label={`Selecionar ${cliente.nome} para fusao`}
-                            />
+                            {modoFusaoAtivo ? (
+                              <InputCheckbox
+                                checked={clienteSelecionadoFusao}
+                                onChange={() => togglePessoaFusao?.(cliente.id)}
+                                rotulo={`Selecionar ${cliente.nome} para fusao`}
+                              />
+                            ) : (
+                              <BotaoMenuAcoes
+                                rotulo={`Mais ações para ${cliente.nome}`}
+                                acoes={montarAcoesPessoa({
+                                  cliente,
+                                  listaUrl,
+                                  navigate,
+                                  handleDelete,
+                                  onIniciarFusao,
+                                })}
+                              />
+                            )}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 font-medium">
                             {cliente.codigo ? (
@@ -452,54 +490,14 @@ const ClientesNovoTabelaSection = ({
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span className="text-xs text-gray-600">
-                              {cliente.tipo_cadastro === "cliente"
-                                ? nomeOrigemCliente(cliente.origem_cliente)
-                                : "-"}
+                              {cliente.is_cliente ? nomeOrigemCliente(cliente.origem_cliente) : "-"}
                             </span>
-                          </td>
-                          <td
-                            className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <div className="flex items-center justify-end gap-2">
-                              {cliente.celular && (
-                                <IconActionButton
-                                  onClick={() => {
-                                    const celular = cliente.celular.replace(/\D/g, "");
-                                    window.open(`https://wa.me/55${celular}`, "_blank");
-                                  }}
-                                  icon={MessageCircle}
-                                  intent="create"
-                                  tone="ghost"
-                                  title="Abrir WhatsApp"
-                                  aria-label="Abrir WhatsApp"
-                                />
-                              )}
-                              <IconActionButton
-                                onClick={() => openModal(cliente)}
-                                icon={Edit2}
-                                intent="edit"
-                                tone="ghost"
-                                title="Editar"
-                                aria-label="Editar"
-                              />
-                              {!cliente.de_parceiro && (
-                                <IconActionButton
-                                  onClick={() => handleDelete(cliente.id)}
-                                  icon={Trash2}
-                                  intent="delete"
-                                  tone="ghost"
-                                  title="Excluir"
-                                  aria-label="Excluir"
-                                />
-                              )}
-                            </div>
                           </td>
                         </tr>
 
                         {expandedPets[cliente.id] && cliente.pets && cliente.pets.length > 0 && (
                           <tr>
-                            <td colSpan="8" className="px-4 py-3 bg-gray-50">
+                            <td colSpan="7" className="px-4 py-3 bg-gray-50">
                               <div className="space-y-2">
                                 <p className="text-xs font-semibold text-gray-700 mb-2">
                                   Pets de {cliente.nome}:
@@ -545,9 +543,11 @@ const ClientesNovoTabelaSection = ({
                                       <IconActionButton
                                         onClick={() => {
                                           setHighlightedPetId(pet.id);
-                                          openModal(cliente, null, pet.id);
+                                          navigate(`/clientes/${cliente.id}/editar`, {
+                                            state: { abaInicial: "animais", from: listaUrl },
+                                          });
                                         }}
-                                        icon={Edit2}
+                                        icon={Pencil}
                                         intent="edit"
                                         tone="ghost"
                                         size="xs"

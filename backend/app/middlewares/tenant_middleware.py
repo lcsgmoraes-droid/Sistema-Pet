@@ -29,6 +29,7 @@ PLATFORM_ADMIN_PATH_PREFIXES = (
     "/platform-auth",
     "/admin/tenants",
     "/admin/observabilidade",
+    "/admin/grupos-comerciais",
 )
 
 

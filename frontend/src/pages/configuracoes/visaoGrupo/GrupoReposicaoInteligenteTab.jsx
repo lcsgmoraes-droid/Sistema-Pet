@@ -9,7 +9,7 @@ import MetricGrid from "../../../components/ui/MetricGrid";
 import Panel from "../../../components/ui/Panel";
 import ProductIdentity from "../../../components/ui/ProductIdentity";
 import StatusBadge from "../../../components/ui/StatusBadge";
-import { obterReposicaoInteligenteGrupo } from "../../../services/gruposEmpresas";
+import { obterReposicaoInteligenteGrupo } from "../../../services/gruposComerciais";
 import { formatMoneyBRL } from "../../../utils/formatters";
 import GrupoAnaliseFiltros from "./GrupoAnaliseFiltros";
 

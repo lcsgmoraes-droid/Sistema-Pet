@@ -1,5 +1,6 @@
 import importlib
 import asyncio
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -14,12 +15,18 @@ from starlette.requests import Request
 
 import app.auth_routes_multitenant as auth_routes
 import app.db as db_package
+import app.services.tenant_provisioning_service as tenant_provisioning_service
 import app.tenancy.filters as tenant_filters
 import app.database.orm_guards as orm_guards
 from app.auth.core import ALGORITHM
 from app.auth.dependencies import get_current_user_and_tenant
+from app.grupo_comercial_models import (
+    GrupoComercial,
+    GrupoComercialMembro,
+)
 from app.models import (
     AuditLog,
+    Cliente,
     Permission,
     Role,
     RolePermission,
@@ -117,6 +124,9 @@ def auth_db_session():
         Role.__table__,
         UserTenant.__table__,
         RolePermission.__table__,
+        GrupoComercial.__table__,
+        GrupoComercialMembro.__table__,
+        Cliente.__table__,
     ):
         table.create(engine, checkfirst=True)
 
@@ -233,6 +243,14 @@ def test_user_select_update_sem_tenant_e_insert_sem_tenant_bloqueado(auth_db_ses
         auth_db_session.flush()
 
 
+@pytest.mark.skipif(
+    os.getenv("DATABASE_URL", "sqlite://").startswith("sqlite"),
+    reason=(
+        "provision_tenant() chama trava_codigos_do_grupo(), que usa "
+        "pg_advisory_xact_lock/hashtext (exclusivo do Postgres, sem "
+        "equivalente no SQLite dos testes unitarios)."
+    ),
+)
 def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(
     monkeypatch, auth_db_session
 ):
@@ -259,7 +277,13 @@ def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(
             "template_source": "test",
         }
 
-    monkeypatch.setattr(auth_routes, "onboard_tenant_defaults", fake_onboard)
+    # onboard_tenant_defaults e chamado de dentro de provision_tenant() desde
+    # o Checkpoint 0 (fundacao do grupo comercial obrigatorio) - o mock
+    # precisa mirar o modulo que efetivamente chama a funcao, nao mais
+    # auth_routes.
+    monkeypatch.setattr(
+        tenant_provisioning_service, "onboard_tenant_defaults", fake_onboard
+    )
     monkeypatch.setattr(auth_routes, "EMAIL_VERIFICATION_REQUIRED", False)
 
     auth_db_session.add_all(
@@ -312,6 +336,23 @@ def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(
         .count()
         == 2
     )
+
+    # Fundacao do grupo comercial (Checkpoint 0): todo tenant novo nasce
+    # automaticamente dentro de um grupo-de-1, responsavel = ele mesmo.
+    grupo_membro = (
+        auth_db_session.query(GrupoComercialMembro)
+        .filter(GrupoComercialMembro.empresa_id == str(tenant_id))
+        .one()
+    )
+    assert grupo_membro.papel == "responsavel"
+    assert grupo_membro.status == "ativo"
+    grupo = (
+        auth_db_session.query(GrupoComercial)
+        .filter(GrupoComercial.id == grupo_membro.grupo_id)
+        .one()
+    )
+    assert grupo.criado_por_empresa_id == str(tenant_id)
+    assert grupo.status == "ativo"
 
     clear_current_tenant()
     login_response = auth_routes.login_multitenant(
@@ -448,7 +489,9 @@ def test_register_fails_closed_when_required_onboarding_fails(
         assert kwargs.get("strict_required") is True
         raise RuntimeError("Onboarding obrigatorio incompleto")
 
-    monkeypatch.setattr(auth_routes, "onboard_tenant_defaults", fail_onboard)
+    monkeypatch.setattr(
+        tenant_provisioning_service, "onboard_tenant_defaults", fail_onboard
+    )
     monkeypatch.setattr(auth_routes, "EMAIL_VERIFICATION_REQUIRED", False)
 
     with pytest.raises(auth_routes.HTTPException) as exc_info:
@@ -476,3 +519,7 @@ def test_register_fails_closed_when_required_onboarding_fails(
     ).scalar_one()
     assert user_count == 0
     assert tenant_count == 0
+    grupo_count = auth_db_session.execute(
+        text("SELECT count(*) FROM grupos_comerciais")
+    ).scalar_one()
+    assert grupo_count == 0

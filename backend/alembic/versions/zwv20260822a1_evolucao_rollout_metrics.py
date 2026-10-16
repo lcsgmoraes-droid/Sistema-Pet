@@ -26,7 +26,9 @@ def upgrade() -> None:
         sa.Column("usos_total", sa.Integer(), server_default="0", nullable=False),
         sa.Column("primeiro_uso_em", sa.DateTime(timezone=True), nullable=True),
         sa.Column("ultimo_uso_em", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("limiar_teste_atingido_em", sa.DateTime(timezone=True), nullable=True),
+        sa.Column(
+            "limiar_teste_atingido_em", sa.DateTime(timezone=True), nullable=True
+        ),
         sa.PrimaryKeyConstraint("item_id"),
     )
 

@@ -7,6 +7,7 @@ from decimal import Decimal
 from datetime import date, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, Column, Integer, String, Numeric, Date, Text, ForeignKey
+from app.clientes.common import tipos_cadastro_da_pessoa
 from app.models import Cliente
 from app.rotas_entrega_models import RotaEntrega
 from typing import Optional, Dict
@@ -155,12 +156,14 @@ def executar_acerto_entregador(db: Session, entregador: Cliente) -> Optional[Dic
     # 4️⃣ Contas a pagar — CUSTO OPERACIONAL
     gerar_cp_custo = False
 
-    # ✅ CORREÇÃO: Usar tipo_cadastro (não tipo_vinculo_entrega)
-    if entregador.tipo_cadastro == "fornecedor":
+    # Pessoa pode ter mais de uma flag ao mesmo tempo (ex. fornecedor e
+    # funcionario) — mantida a mesma prioridade que o if/elif antigo ja
+    # tinha: fornecedor (terceirizado) decide primeiro.
+    if entregador.is_fornecedor:
         # Fornecedor = Terceirizado no nosso sistema
         gerar_cp_custo = True
 
-    elif entregador.tipo_cadastro == "funcionario":
+    elif entregador.is_funcionario:
         # ✅ MATRIZ FINAL implementada
         if not entregador.controla_rh and entregador.gera_conta_pagar_custo_entrega:
             gerar_cp_custo = True
@@ -195,7 +198,7 @@ def executar_acerto_entregador(db: Session, entregador: Cliente) -> Optional[Dic
     return {
         "entregador_id": entregador.id,
         "entregador": entregador.nome,
-        "tipo_cadastro": entregador.tipo_cadastro,
+        "tipos_cadastro": tipos_cadastro_da_pessoa(entregador),
         "controla_rh": entregador.controla_rh,
         "gera_cp_custo": gerar_cp_custo,
         "rotas_processadas": len(rotas),
@@ -270,7 +273,7 @@ def ajustar_media_entregas_mensal(
         .filter(
             and_(
                 Cliente.tenant_id == tenant_id,
-                Cliente.tipo_cadastro == "funcionario",
+                Cliente.is_funcionario.is_(True),
                 Cliente.is_entregador.is_(True),
                 Cliente.controla_rh.is_(True),
                 Cliente.media_entregas_configurada.isnot(None),

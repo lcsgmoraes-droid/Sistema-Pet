@@ -23,10 +23,19 @@ def load_service_module():
 
 
 def cliente(**kwargs):
+    # is_cliente/is_fornecedor/is_veterinario/is_funcionario sao a fonte de
+    # verdade (tipo_cadastro e so legado) — por padrao, a flag correspondente
+    # ao tipo_cadastro passado vem True, do mesmo jeito que o backfill real
+    # preenche. Pode ser sobrescrito explicitamente via kwargs.
+    tipo_cadastro = kwargs.get("tipo_cadastro", "cliente")
     defaults = {
         "id": 10,
         "nome": "Pessoa Teste",
-        "tipo_cadastro": "cliente",
+        "tipo_cadastro": tipo_cadastro,
+        "is_cliente": tipo_cadastro == "cliente",
+        "is_fornecedor": tipo_cadastro == "fornecedor",
+        "is_veterinario": tipo_cadastro == "veterinario",
+        "is_funcionario": tipo_cadastro == "funcionario",
         "ativo": True,
         "is_entregador": False,
         "entregador_ativo": True,
@@ -123,6 +132,27 @@ def test_app_access_service_adds_manually_granted_gestor():
     assert selected["is_funcionario"] is False
     assert selected["is_entregador"] is False
     assert selected["is_veterinario"] is False
+
+
+def test_app_access_service_adds_both_profiles_quando_pessoa_tem_duas_flags():
+    """Regressao do bug corrigido: antes, so a primeira flag True (na ordem
+    cliente > fornecedor > veterinario > funcionario de tipo_cadastro) virava
+    perfil disponivel — um funcionario que tambem e cliente ficava travado
+    fora do app de funcionario. Agora cada flag concede seu proprio perfil,
+    independente das outras."""
+    service = load_service_module()
+    user = SimpleNamespace(id=40, email="duplo@example.com")
+    pessoa = cliente(
+        id=303,
+        nome="Funcionario Cliente",
+        tipo_cadastro="cliente",
+        is_cliente=True,
+        is_funcionario=True,
+    )
+
+    profiles = service.build_available_profiles_for_clientes(user, [pessoa])
+
+    assert [profile["type"] for profile in profiles] == ["cliente", "funcionario"]
 
 
 def test_app_access_service_does_not_add_gestor_without_manual_grant():

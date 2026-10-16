@@ -48,6 +48,7 @@ from app.services.billing_offer_service import (
     BillingOfferError,
     accept_billing_offer,
     find_offer_by_token,
+    offer_combined_plan_code,
     offer_to_public,
 )
 from app.services.billing_payment_proof_service import (
@@ -130,7 +131,9 @@ def get_billing_status(
     if custom_offer:
         result["contract_acceptance"] = acceptance_to_public(
             latest_current_acceptance(
-                db, tenant_id=tenant_id, plan_code=custom_offer.plan_code
+                db,
+                tenant_id=tenant_id,
+                plan_code=offer_combined_plan_code(custom_offer),
             )
         )
     return result

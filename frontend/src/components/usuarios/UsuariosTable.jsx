@@ -1,27 +1,84 @@
-import { KeyRound, LogOut, Trash2, UserCheck, UserX } from "lucide-react";
+import { Building2, KeyRound, LogOut, Mail, Trash2, UserCheck, UserX } from "lucide-react";
+import BotaoMenuAcoes from "../v2/BotaoMenuAcoes/BotaoMenuAcoes";
+import InputCheckbox from "../v2/InputCheckbox/InputCheckbox";
 import DataTable from "../ui/DataTable";
-import IconActionButton from "../ui/IconActionButton";
 import Panel from "../ui/Panel";
 import StatusBadge from "../ui/StatusBadge";
 import { formatBrazilianLoginPhone } from "../../utils/loginPhone";
 
-function formatPessoaTipo(tipoCadastro) {
-  const value = (tipoCadastro || "").trim();
+function formatUmTipo(tipo) {
+  const value = (tipo || "").trim();
   if (!value) return "";
   return value.charAt(0).toUpperCase() + value.slice(1).replaceAll("_", " ");
 }
 
+function formatPessoaTipo(tiposCadastro) {
+  const lista = Array.isArray(tiposCadastro) ? tiposCadastro.filter(Boolean) : [];
+  return lista.map(formatUmTipo).join(" / ");
+}
+
 export default function UsuariosTable({
   loading,
+  onDelete,
   onForcarLogout,
   onManageCredentials,
-  onToggleStatus,
-  onDelete,
+  onRecriarSenha,
   onToggleCrediario,
+  onToggleStatus,
+  onVincularLoja,
+  paginacaoRodape,
   savingLiberacaoId,
   usuarios,
 }) {
   const columns = [
+    {
+      key: "actions",
+      header: "Acoes",
+      align: "left",
+      render: (usuario) => (
+        <BotaoMenuAcoes
+          rotulo={`Mais ações para ${usuario.nome || usuario.login_phone || usuario.email}`}
+          acoes={[
+            {
+              icon: KeyRound,
+              label: "Gerenciar usuário e senha",
+              onClick: () => onManageCredentials(usuario),
+            },
+            {
+              icon: Mail,
+              label: "Recriar senha",
+              disabled: !usuario.email,
+              title: usuario.email
+                ? undefined
+                : "Usuário sem e-mail cadastrado — não é possível enviar recriação de senha",
+              onClick: () => onRecriarSenha(usuario.user_id),
+            },
+            {
+              icon: Building2,
+              label: "Vincular a outra loja do grupo",
+              onClick: () => onVincularLoja(usuario),
+            },
+            {
+              icon: LogOut,
+              label: "Forçar logout",
+              onClick: () => onForcarLogout(usuario.user_id),
+            },
+            {
+              icon: usuario.is_active ? UserX : UserCheck,
+              label: usuario.is_active ? "Desativar acesso" : "Ativar acesso",
+              tom: usuario.is_active ? "perigo" : "neutro",
+              onClick: () => onToggleStatus(usuario.user_id, usuario.is_active),
+            },
+            {
+              icon: Trash2,
+              label: "Excluir acesso definitivamente",
+              tom: "perigo",
+              onClick: () => onDelete(usuario),
+            },
+          ]}
+        />
+      ),
+    },
     {
       key: "login_phone",
       header: "Usuario",
@@ -50,7 +107,7 @@ export default function UsuariosTable({
             <p className="truncate text-xs text-slate-500">
               {[
                 usuario.pessoa_codigo ? `Codigo ${usuario.pessoa_codigo}` : null,
-                formatPessoaTipo(usuario.pessoa_tipo_cadastro),
+                formatPessoaTipo(usuario.pessoa_tipos_cadastro),
               ]
                 .filter(Boolean)
                 .join(" - ")}
@@ -76,17 +133,17 @@ export default function UsuariosTable({
       header: "Pode liberar venda bloqueada",
       align: "center",
       render: (usuario) => (
-        <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-slate-700">
-          <input
-            type="checkbox"
-            aria-label={`Autorizar ${usuario.nome || usuario.email || usuario.user_id} a liberar venda com crediário atrasado`}
+        <div className="inline-flex items-center gap-2 text-xs text-slate-700">
+          <InputCheckbox
+            rotulo={`Autorizar ${usuario.nome || usuario.email || usuario.user_id} a liberar venda com crediário atrasado`}
             checked={Boolean(usuario.pode_liberar_venda_crediario_atrasado)}
             disabled={savingLiberacaoId === usuario.user_id}
             onChange={(event) => onToggleCrediario(usuario, event.target.checked)}
-            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
           />
-          {usuario.pode_liberar_venda_crediario_atrasado ? "Concedida" : "Não concedida"}
-        </label>
+          <span>
+            {usuario.pode_liberar_venda_crediario_atrasado ? "Concedida" : "Não concedida"}
+          </span>
+        </div>
       ),
     },
     {
@@ -98,39 +155,6 @@ export default function UsuariosTable({
           status={usuario.is_active ? "ativo" : "inativo"}
           intent={usuario.is_active ? "success" : "neutral"}
         />
-      ),
-    },
-    {
-      key: "actions",
-      header: "Acoes",
-      align: "center",
-      render: (usuario) => (
-        <div className="flex items-center justify-center gap-2">
-          <IconActionButton
-            icon={KeyRound}
-            intent="edit"
-            onClick={() => onManageCredentials(usuario)}
-            title="Gerenciar usuario e senha"
-          />
-          <IconActionButton
-            icon={LogOut}
-            intent="warning"
-            onClick={() => onForcarLogout(usuario.user_id)}
-            title="Forcar logout"
-          />
-          <IconActionButton
-            icon={usuario.is_active ? UserX : UserCheck}
-            intent={usuario.is_active ? "danger" : "success"}
-            onClick={() => onToggleStatus(usuario.user_id, usuario.is_active)}
-            title={usuario.is_active ? "Desativar acesso" : "Ativar acesso"}
-          />
-          <IconActionButton
-            icon={Trash2}
-            intent="danger"
-            onClick={() => onDelete(usuario)}
-            title="Excluir acesso definitivamente"
-          />
-        </div>
       ),
     },
   ];
@@ -146,6 +170,7 @@ export default function UsuariosTable({
         loadingMessage="Carregando usuarios..."
         tableClassName="min-w-[1060px]"
       />
+      {paginacaoRodape}
     </Panel>
   );
 }

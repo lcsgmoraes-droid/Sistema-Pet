@@ -55,16 +55,11 @@ export default function OpsTenantsUsageTab({ items, summaries, loading }) {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-[1100px] w-full divide-y divide-slate-200 text-left">
+          <table className="min-w-[640px] w-full divide-y divide-slate-200 text-left">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-4 py-3 font-bold">Tenant</th>
                 <th className="px-4 py-3 font-bold">Registros</th>
-                <th className="px-4 py-3 font-bold">Produtos</th>
-                <th className="px-4 py-3 font-bold">Clientes</th>
-                <th className="px-4 py-3 font-bold">Pets</th>
-                <th className="px-4 py-3 font-bold">Vendas</th>
-                <th className="px-4 py-3 font-bold">Usuarios</th>
                 <th className="px-4 py-3 font-bold">Imagens</th>
                 <th className="px-4 py-3 font-bold">Uso imagens</th>
               </tr>
@@ -72,13 +67,12 @@ export default function OpsTenantsUsageTab({ items, summaries, loading }) {
             <tbody className="divide-y divide-slate-100">
               {items.length === 0 && !loading ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center text-sm text-slate-500">
+                  <td colSpan={4} className="px-4 py-10 text-center text-sm text-slate-500">
                     Nenhum tenant encontrado para o filtro atual.
                   </td>
                 </tr>
               ) : (
                 items.map((tenant) => {
-                  const counts = tenant.counts || {};
                   const usage = tenant.usage || {};
                   return (
                     <tr key={tenant.id} className="bg-white hover:bg-slate-50">
@@ -90,21 +84,6 @@ export default function OpsTenantsUsageTab({ items, summaries, loading }) {
                       </td>
                       <td className="px-4 py-3 text-sm font-bold text-slate-900">
                         {formatNumber(usage.records_total)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-700">
-                        {formatNumber(counts.produtos)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-700">
-                        {formatNumber(counts.clientes)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-700">
-                        {formatNumber(counts.pets)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-700">
-                        {formatNumber(counts.vendas)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-700">
-                        {formatNumber(counts.usuarios)}
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-700">
                         {formatNumber(usage.image_count)}

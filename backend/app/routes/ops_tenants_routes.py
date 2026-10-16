@@ -13,6 +13,7 @@ from app.db import get_session
 from app.models import Tenant
 from app.platform_auth import require_platform_admin
 from app.platform_auth_models import PlatformAdmin
+from app.services.onboarding_credencial_service import confirmar_credencial_repassada
 from app.services.billing_payment_proof_service import (
     PaymentProofError,
     proof_to_public,
@@ -31,16 +32,25 @@ from app.services.ops_tenants_service import (
     create_ops_tenant_onboarding_note,
     list_ops_tenant_onboarding_notes,
     list_ops_tenants,
+    list_ops_tenants_grouped,
     preview_base_catalog_import,
     update_ops_tenant_commercial_state,
     update_ops_tenant_onboarding_follow_up,
 )
+from app.services.plan_catalog import PLAN_CATALOG
 
 router = APIRouter(prefix="/admin/tenants", tags=["Admin - Tenants"])
 
 
-class CatalogImportApplyRequest(BaseModel):
-    confirm: bool = False
+@router.get("/planos-catalogo")
+def listar_planos_catalogo(
+    _current_admin: PlatformAdmin = Depends(require_platform_admin),
+) -> dict[str, Any]:
+    """Catalogo completo de planos reais (10, 3 segmentos) com os modulos que
+    cada um libera — usado pela tela de proposta comercial pra montar os 3
+    blocos de segmento e as bolinhas de modulo, sem duplicar essa lista no
+    frontend."""
+    return {"items": [plano.to_public_dict() for plano in PLAN_CATALOG.values()]}
 
 
 class CommercialStateRequest(BaseModel):
@@ -71,7 +81,9 @@ class OnboardingNoteCreateRequest(BaseModel):
 
 class BillingOfferCreateRequest(BaseModel):
     title: str = Field(min_length=3, max_length=160)
-    plan_code: str
+    plan_pet_code: str | None = None
+    plan_vet_code: str | None = None
+    plan_grooming_code: str | None = None
     price_cents: int = Field(ge=100, le=10_000_000)
     first_due_date: date
     billing_type: Literal["UNDEFINED", "PIX", "BOLETO", "CREDIT_CARD"] = "UNDEFINED"
@@ -86,6 +98,10 @@ class BillingOfferCreateRequest(BaseModel):
 class PaymentProofReviewRequest(BaseModel):
     decision: Literal["approve", "reject"]
     note: str | None = Field(default=None, max_length=1000)
+
+
+class CatalogImportApplyRequest(BaseModel):
+    confirm: bool = False
 
 
 @router.get("/{tenant_id}/payment-proofs")
@@ -183,6 +199,20 @@ def listar_tenants_ops(
     return list_ops_tenants(db, search=search, status=status, limit=limit)
 
 
+@router.get("/grouped")
+def listar_tenants_ops_agrupados(
+    search: str | None = Query(None),
+    status: str | None = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=50),
+    _current_admin: PlatformAdmin = Depends(require_platform_admin),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    return list_ops_tenants_grouped(
+        db, search=search, status=status, page=page, page_size=page_size
+    )
+
+
 @router.patch("/{tenant_id}/commercial")
 def atualizar_estado_comercial_tenant(
     tenant_id: str,
@@ -204,6 +234,24 @@ def atualizar_estado_comercial_tenant(
     except Exception:
         db.rollback()
         raise
+
+
+@router.patch("/{tenant_id}/credencial-email/confirmar")
+def confirmar_credencial_email_repassada(
+    tenant_id: str,
+    _current_admin: PlatformAdmin = Depends(require_platform_admin),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    try:
+        confirmar_credencial_repassada(db, tenant_id=tenant_id)
+        db.commit()
+    except LookupError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception:
+        db.rollback()
+        raise
+    return {"tenant_id": tenant_id, "credencial_email_pendente": False}
 
 
 @router.patch("/{tenant_id}/onboarding-follow-up")
@@ -304,7 +352,9 @@ def criar_proposta_cobranca(
             tenant_reference=tenant_id,
             created_by=current_admin,
             title=payload.title,
-            plan_code=payload.plan_code,
+            plan_pet_code=payload.plan_pet_code,
+            plan_vet_code=payload.plan_vet_code,
+            plan_grooming_code=payload.plan_grooming_code,
             price_cents=payload.price_cents,
             first_due_date=payload.first_due_date,
             billing_type=payload.billing_type,
@@ -363,6 +413,3 @@ def aplicar_importacao_catalogo_base(
     except OpsTenantActionError as exc:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception:
-        db.rollback()
-        raise

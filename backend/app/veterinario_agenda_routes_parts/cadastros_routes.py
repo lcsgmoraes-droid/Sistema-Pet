@@ -72,7 +72,7 @@ def listar_veterinarios(
         db.query(Cliente)
         .filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "veterinario",
+            Cliente.is_veterinario.is_(True),
             Cliente.ativo.is_(True),
         )
         .order_by(Cliente.nome)

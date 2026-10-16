@@ -415,7 +415,7 @@ export function FuncionarioPdvContent({
               <View style={{ flex: 1 }}>
                 <Text style={styles.clienteNome}>{cliente.nome}</Text>
                 <Text style={styles.clienteMeta}>
-                  Codigo {cliente.codigo || "-"} | {cliente.tipo_cadastro || "pessoa"}
+                  Codigo {cliente.codigo || "-"} | {(cliente.tipos_cadastro ?? []).join(" / ") || "pessoa"}
                 </Text>
               </View>
               <TouchableOpacity
@@ -512,7 +512,7 @@ export function FuncionarioPdvContent({
                   <Text style={styles.sugestaoNome}>{item.nome}</Text>
                   <Text style={styles.sugestaoMeta}>
                     Codigo {item.codigo || "-"} | {item.celular || item.telefone || "-"}
-                    {item.tipo_cadastro ? ` | ${item.tipo_cadastro}` : ""}
+                    {item.tipos_cadastro?.length ? ` | ${item.tipos_cadastro.join(" / ")}` : ""}
                   </Text>
                 </View>
                 <Ionicons name="person-add-outline" size={20} color={CORES.primario} />

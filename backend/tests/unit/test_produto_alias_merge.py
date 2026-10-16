@@ -10,7 +10,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.duplicatas_ignoradas_models import DuplicataIgnorada
-from app.empresa_grupo_models import EmpresaGrupoEstoqueCompartilhado
+from app.grupo_comercial_models import (
+    GrupoComercialEstoqueCompartilhado,
+    GrupoComercialMembro,
+)
 from app.estoque_reserva_service import EstoqueReservaService
 from app.models import Tenant, User
 from app.pedido_integrado_item_models import PedidoIntegradoItem
@@ -75,7 +78,8 @@ def case():
         PedidoIntegradoItem,
         EstoqueMovimentacao,
         DuplicataIgnorada,
-        EmpresaGrupoEstoqueCompartilhado,
+        GrupoComercialEstoqueCompartilhado,
+        GrupoComercialMembro,
     )
     if pg_url:
         url = make_url(pg_url)
@@ -93,13 +97,12 @@ def case():
             connection.execute(text("CREATE SCHEMA public"))
         tables = {model.__table__ for model in models}
         from app.veterinario_models import VetPartnerLink
-        from app.empresa_grupo_models import EmpresaGrupoMembro
         from app.models import UserTenant
 
         tables.update(
             (
                 VetPartnerLink.__table__,
-                EmpresaGrupoMembro.__table__,
+                GrupoComercialMembro.__table__,
                 UserTenant.__table__,
             )
         )

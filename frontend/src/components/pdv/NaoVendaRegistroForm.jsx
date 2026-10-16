@@ -62,7 +62,7 @@ export default function NaoVendaRegistroForm({ clienteInicial, onSaved }) {
       try {
         const encontrados = await buscarClientes({ search: termo, limit: 8 });
         setClientesSugeridos(
-          (encontrados || []).filter((cliente) => cliente.tipo_cadastro !== "fornecedor"),
+          (encontrados || []).filter((cliente) => cliente.is_cliente || !cliente.is_fornecedor),
         );
         setMostrarClientes(true);
       } catch {

@@ -115,6 +115,8 @@ def downgrade() -> None:
     if LOGIN_PHONE_UNIQUE in unique_names:
         op.drop_constraint(LOGIN_PHONE_UNIQUE, TABLE_NAME, type_="unique")
 
-    columns = {column["name"] for column in sa.inspect(op.get_bind()).get_columns(TABLE_NAME)}
+    columns = {
+        column["name"] for column in sa.inspect(op.get_bind()).get_columns(TABLE_NAME)
+    }
     if "login_phone" in columns:
         op.drop_column(TABLE_NAME, "login_phone")

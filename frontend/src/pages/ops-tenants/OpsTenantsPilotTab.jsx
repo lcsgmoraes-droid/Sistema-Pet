@@ -71,6 +71,7 @@ export default function OpsTenantsPilotTab({
   onSelectTenant,
   onChange,
   onSubmit,
+  onConfirmarCredencial,
   notes,
   notesLoading,
   noteText,
@@ -254,6 +255,7 @@ export default function OpsTenantsPilotTab({
           saving={saving}
           onChange={onChange}
           onSubmit={onSubmit}
+          onConfirmarCredencial={onConfirmarCredencial}
           notes={notes}
           notesLoading={notesLoading}
           noteText={noteText}

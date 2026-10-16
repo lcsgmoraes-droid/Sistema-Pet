@@ -18,7 +18,7 @@ from app.categorias_integridade import normalizar_nome_categoria
 from app.caixa.service import CaixaService
 from app.caixa.escopo import buscar_caixa_acessivel
 from app.db import get_session
-from app.empresa_grupo_estoque_compartilhado_service import (
+from app.grupo_comercial_estoque_compartilhado_service import (
     contexto_tenant_estoque,
     resolver_tenant_estoque_item,
 )

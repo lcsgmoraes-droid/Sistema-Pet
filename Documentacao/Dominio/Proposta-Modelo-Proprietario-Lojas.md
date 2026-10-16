@@ -140,7 +140,7 @@ O consolidado de vendas/clientes entre lojas via relatório (`EmpresaGrupoAnalis
 
 ## 10. Perguntas em aberto para o time decidir
 
-- Nome definitivo do conceito na UI/produto: "Proprietário", "Conta", "Grupo Econômico", manter "Grupo de Empresas"?
+- Nome definitivo do conceito na UI/produto: "Proprietário", "Conta", "Grupo Comercial", manter "Grupo de Empresas"?
 - Quem pode editar o produto-mestre — só o "responsável" do proprietário (papel que já existe em [[EmpresaGrupo]]), ou qualquer loja membro?
 - O plano/preço muda quando lojas entram no mesmo proprietário (desconto por volume), ou cada loja continua pagando o valor de tabela, só consolidado numa fatura?
 - Vale um limite de lojas por proprietário no plano de entrada (hoje não existe nenhum limite, [[EmpresaGrupo]] confirma isso como "não identificado")?

@@ -1,6 +1,6 @@
 import { AlertTriangle, CalendarDays, FlaskConical, Stethoscope, Syringe } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FiFileText, FiMenu } from "react-icons/fi";
+import { FiFileText } from "react-icons/fi";
 import { toast } from "react-hot-toast";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -32,6 +32,7 @@ import {
   toggleMenuFavorite,
   writeMenuFavoritesCache,
 } from "./layout/menuFavorites";
+import GlobalHeader from "./layout/GlobalHeader";
 import LayoutFavoritesBar from "./layout/LayoutFavoritesBar";
 import LayoutSidebar from "./layout/LayoutSidebar";
 import { createLayoutMenuItems } from "./layout/menuConfig";
@@ -170,7 +171,6 @@ const Layout = () => {
 
   // Contagem de lembretes pendentes para badge dinâmico
   const [lembretesCount, setLembretesCount] = useState(0);
-  const [convitesGruposCount, setConvitesGruposCount] = useState(0);
   const [orcamentosGrupoAtivo, setOrcamentosGrupoAtivo] = useState(false);
   const [menuFavorites, setMenuFavorites] = useState([]);
   const lembretesPollingRef = useRef(false);
@@ -452,39 +452,6 @@ const Layout = () => {
   }, [moduloAtivo, modulosAtivos]);
 
   useEffect(() => {
-    const podeConfigurarEmpresa =
-      Boolean(user) &&
-      (hasPermission("configuracoes.empresa") || hasPermission("configuracoes.editar"));
-    if (!podeConfigurarEmpresa) {
-      setConvitesGruposCount(0);
-      return undefined;
-    }
-
-    let ativo = true;
-    const carregarConvites = async () => {
-      try {
-        const response = await api.get("/grupos-empresas/resumo");
-        if (ativo) {
-          setConvitesGruposCount(
-            Array.isArray(response.data?.convites_pendentes)
-              ? response.data.convites_pendentes.length
-              : 0,
-          );
-        }
-      } catch {
-        // Silencioso: o aviso não pode bloquear o restante do ERP.
-      }
-    };
-
-    carregarConvites();
-    const interval = window.setInterval(carregarConvites, 300000);
-    return () => {
-      ativo = false;
-      window.clearInterval(interval);
-    };
-  }, [user]);
-
-  useEffect(() => {
     if (!user) {
       setMenuFavorites([]);
       return undefined;
@@ -546,7 +513,6 @@ const Layout = () => {
 
   const allMenuItems = createLayoutMenuItems({
     lembretesCount,
-    convitesGruposCount,
     orcamentosGrupoAtivo,
   });
 
@@ -713,90 +679,87 @@ const Layout = () => {
   const isActive = (path) => location.pathname === path;
 
   return (
-    <div className="erp-shell flex h-screen min-w-0 bg-gray-50 dark:bg-slate-950">
-      {/* Backdrop para mobile */}
-      {isMobile && sidebarOpen && mostrarSidebar && (
-        <div
-          className="erp-mobile-sidebar-backdrop fixed inset-0 bg-transparent z-40 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
+    <div className="erp-shell flex h-screen min-w-0 flex-col bg-gray-50 dark:bg-slate-950">
+      {/* Barra fixa no topo, 100% da largura — conta do usuário + seletor de loja
+          atuando (ver GlobalHeader.jsx). A sidebar começa abaixo dela, não mais
+          no topo absoluto da tela. */}
       {mostrarSidebar && (
-        <LayoutSidebar
+        <GlobalHeader
           isMobile={isMobile}
           sidebarOpen={sidebarOpen}
-          sidebarWidth={sidebarWidth}
-          setSidebarWidth={setSidebarWidth}
-          setSidebarOpen={setSidebarOpen}
-          menuItems={menuItems}
-          submenusOpen={submenusOpen}
-          currentPath={location.pathname}
-          isActive={isActive}
-          handleToggleSubmenu={handleToggleSubmenu}
-          handleMenuClick={handleMenuClick}
-          favoritePaths={favoritePaths}
-          handleToggleFavorite={handleToggleFavorite}
-          moduloAtivo={moduloAtivo}
+          onToggleSidebar={toggleSidebarMobile}
           user={user}
           logout={logout}
         />
       )}
 
-      {/* Main Content */}
-      <div className="erp-main-column flex min-w-0 flex-1 flex-col overflow-hidden">
-        {/* Header (só existe no mobile, com o hambúrguer; no desktop o controle mora na própria sidebar) */}
-        {isMobile && mostrarSidebar && (
-          <header className="erp-topbar flex shrink-0 items-center gap-2 border-b border-gray-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-950">
-            <button
-              type="button"
-              onClick={toggleSidebarMobile}
-              className="touch-manipulation rounded-lg p-2 hover:bg-gray-100 transition-colors"
-              aria-label="Toggle menu"
-              aria-expanded={sidebarOpen}
-            >
-              <FiMenu className="w-6 h-6 text-gray-700" />
-            </button>
-          </header>
-        )}
-
-        {!isBradescoOrganizerRoute && (
-          <LayoutFavoritesBar
-            favorites={visibleMenuFavorites}
-            isActive={isActive}
-            onShortcutClick={handleFavoriteShortcutClick}
-            onDragStart={markFavoriteDragStarted}
-            onDragEnd={handleFavoriteDragEnd}
-            onDragCancel={markFavoriteDragFinished}
+      <div className="flex min-h-0 flex-1 min-w-0">
+        {/* Backdrop para mobile */}
+        {isMobile && sidebarOpen && mostrarSidebar && (
+          <div
+            className="erp-mobile-sidebar-backdrop fixed inset-0 bg-transparent z-40 md:hidden"
+            onClick={() => setSidebarOpen(false)}
           />
         )}
 
-        {avisoAtraso && (
-          <div
-            role="status"
-            className="flex shrink-0 flex-wrap items-center gap-2 border-b border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
-          >
-            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>
-              {toleranciaAtraso?.em_vigor
-                ? toleranciaAtraso.dias_restantes == null
-                  ? "Pagamento em atraso. O acesso segue liberado enquanto confirmamos o vencimento."
-                  : `Pagamento em atraso. Faltam ${toleranciaAtraso.dias_restantes} ${toleranciaAtraso.dias_restantes === 1 ? "dia" : "dias"} para o bloqueio das funções.`
-                : "O prazo de 15 dias após o vencimento terminou. Regularize o pagamento para liberar as funções."}
-            </span>
-            <Link to="/meu-plano" className="font-semibold underline underline-offset-2">
-              Ver meu plano
-            </Link>
-          </div>
+        {/* Sidebar */}
+        {mostrarSidebar && (
+          <LayoutSidebar
+            isMobile={isMobile}
+            sidebarOpen={sidebarOpen}
+            sidebarWidth={sidebarWidth}
+            setSidebarWidth={setSidebarWidth}
+            menuItems={menuItems}
+            submenusOpen={submenusOpen}
+            currentPath={location.pathname}
+            isActive={isActive}
+            handleToggleSubmenu={handleToggleSubmenu}
+            handleMenuClick={handleMenuClick}
+            favoritePaths={favoritePaths}
+            handleToggleFavorite={handleToggleFavorite}
+            moduloAtivo={moduloAtivo}
+          />
         )}
 
-        {/* Page Content */}
-        <main
-          className={`erp-page-content flex-1 overflow-y-auto ${isBradescoOrganizerRoute ? "p-0" : `p-3 md:p-6 ${exibirAtalhosVetMobile ? "pb-24" : ""}`}`}
-        >
-          <Outlet />
-        </main>
+        {/* Main Content */}
+        <div className="erp-main-column flex min-w-0 flex-1 flex-col overflow-hidden">
+          {!isBradescoOrganizerRoute && (
+            <LayoutFavoritesBar
+              favorites={visibleMenuFavorites}
+              isActive={isActive}
+              onShortcutClick={handleFavoriteShortcutClick}
+              onDragStart={markFavoriteDragStarted}
+              onDragEnd={handleFavoriteDragEnd}
+              onDragCancel={markFavoriteDragFinished}
+            />
+          )}
+
+          {avisoAtraso && (
+            <div
+              role="status"
+              className="flex shrink-0 flex-wrap items-center gap-2 border-b border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+            >
+              <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>
+                {toleranciaAtraso?.em_vigor
+                  ? toleranciaAtraso.dias_restantes == null
+                    ? "Pagamento em atraso. O acesso segue liberado enquanto confirmamos o vencimento."
+                    : `Pagamento em atraso. Faltam ${toleranciaAtraso.dias_restantes} ${toleranciaAtraso.dias_restantes === 1 ? "dia" : "dias"} para o bloqueio das funções.`
+                  : "O prazo de 15 dias após o vencimento terminou. Regularize o pagamento para liberar as funções."}
+              </span>
+              <Link to="/meu-plano" className="font-semibold underline underline-offset-2">
+                Ver meu plano
+              </Link>
+            </div>
+          )}
+
+          {/* Page Content */}
+          <main
+            className={`erp-page-content flex-1 overflow-y-auto ${isBradescoOrganizerRoute ? "p-0" : `p-3 md:p-6 ${exibirAtalhosVetMobile ? "pb-24" : ""}`}`}
+          >
+            <Outlet />
+          </main>
+        </div>
       </div>
 
       {/* Botão flutuante da calculadora */}

@@ -14,9 +14,17 @@ import secrets
 
 from .db import get_session
 from .auth.dependencies import get_current_user_and_tenant
-from .models import Pet, Cliente
+from .models import Cliente, Pet, Tenant
 from .pet_clinical_utils import normalize_clinical_list, normalize_pet_clinical_payload
+from .services import pet_registros_clinicos_service as registros_service
+from .services.pet_historico_service import (
+    CAMPOS_RASTREADOS_PET,
+    registrar_alteracoes_pet,
+)
+from .security.permissions_decorator import require_permission
+from sqlalchemy.orm import object_session
 from app.partner_utils import get_all_accessible_tenant_ids
+from app.grupo_comercial_contexto import listar_empresas_do_grupo
 
 from pydantic import BaseModel, Field
 
@@ -157,7 +165,7 @@ def enriquecer_pet_response(pet: Pet, de_parceiro: bool = False) -> dict:
         "castrado": bool(pet.castrado),
         "data_nascimento": pet.data_nascimento,
         "idade_aproximada": pet.idade_aproximada,
-        "peso": pet.peso,
+        "peso": _ultimo_peso_do_pet(pet),
         "cor": pet.cor,
         "porte": pet.porte,
         "microchip": pet.microchip,
@@ -174,7 +182,7 @@ def enriquecer_pet_response(pet: Pet, de_parceiro: bool = False) -> dict:
         "restricoes_alimentares_lista": normalize_clinical_list(
             pet.restricoes_alimentares_lista
         ),
-        "historico_clinico": pet.historico_clinico,
+        "historico_clinico": _ultimo_historico_do_pet(pet),
         "tipo_sanguineo": pet.tipo_sanguineo,
         "pedigree_registro": pet.pedigree_registro,
         "castrado_data": pet.castrado_data,
@@ -194,6 +202,31 @@ def enriquecer_pet_response(pet: Pet, de_parceiro: bool = False) -> dict:
 # ============================================================
 # ENDPOINTS
 # ============================================================
+
+
+def _ultimo_peso_do_pet(pet):
+    # object_session() so aceita instancia ORM de verdade; pet "legado" vindo de
+    # um fake/SimpleNamespace (ex.: dados de demonstracao) levanta
+    # UnmappedInstanceError em vez de retornar None.
+    try:
+        sessao = object_session(pet)
+    except Exception:
+        sessao = None
+    if sessao is None:
+        return getattr(pet, "peso", None)
+    registro = registros_service.ultimo_registro(sessao, pet.id, "peso")
+    return registro.valor if registro else getattr(pet, "peso", None)
+
+
+def _ultimo_historico_do_pet(pet):
+    try:
+        sessao = object_session(pet)
+    except Exception:
+        sessao = None
+    if sessao is None:
+        return getattr(pet, "historico_clinico", None)
+    registro = registros_service.ultimo_registro(sessao, pet.id, "historico")
+    return registro.texto if registro else getattr(pet, "historico_clinico", None)
 
 
 @router.get("", response_model=List[PetResponse])
@@ -216,9 +249,23 @@ def listar_pets(
 
     # Incluir pets de tenants parceiros (ex.: pet shop parceiro da clínica)
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
+    # Pet e compartilhado por grupo comercial (ver app/tenancy/filters.py::
+    # pessoa_visivel_no_grupo) - soma as lojas do grupo ao escopo. Filtra pelo
+    # tenant_id do PROPRIO Pet (nao do Cliente/tutor): o tutor pode ser visto
+    # por todo o grupo, mas o pet em si tem sua propria origem_tenant_id.
+    empresas_grupo = listar_empresas_do_grupo(db, tenant_id)
 
     # Filtrar por tenant_id (multi-tenant)
-    query = db.query(Pet).join(Cliente).filter(Cliente.tenant_id.in_(access_ids))
+    query = (
+        db.query(Pet)
+        .join(Cliente)
+        .filter(
+            or_(
+                Cliente.tenant_id.in_(access_ids),
+                Pet.tenant_id.in_(empresas_grupo),
+            )
+        )
+    )
     query = query.options(joinedload(Pet.cliente))
 
     # Filtros
@@ -250,11 +297,18 @@ def listar_pets(
     pets = query.offset(skip).limit(limit).all()
 
     tenant_id_str = str(tenant_id)
+    # "Parceiro" so quando a loja do tutor e de fora do proprio grupo
+    # comercial (parceria pet shop<->clinica vet) - pet de uma loja irmã do
+    # mesmo grupo nao e "parceiro", e cadastro compartilhado normal.
+    empresas_grupo_str = {str(e) for e in empresas_grupo}
     return [
         enriquecer_pet_response(
             pet,
             de_parceiro=(
-                str(pet.cliente.tenant_id) != tenant_id_str if pet.cliente else False
+                str(pet.cliente.tenant_id) != tenant_id_str
+                and str(pet.cliente.tenant_id) not in empresas_grupo_str
+                if pet.cliente
+                else False
             ),
         )
         for pet in pets
@@ -273,11 +327,7 @@ def criar_pet(
     current_user, tenant_id = user_and_tenant
 
     # Validar se cliente existe e pertence ao tenant
-    cliente = (
-        db.query(Cliente)
-        .filter(Cliente.id == pet_data.cliente_id, Cliente.tenant_id == tenant_id)
-        .first()
-    )
+    cliente = registros_service.cliente_visivel(db, pet_data.cliente_id, tenant_id)
 
     if not cliente:
         raise HTTPException(
@@ -289,17 +339,37 @@ def criar_pet(
 
     pet_payload = normalize_pet_clinical_payload(pet_data.model_dump())
     pet_payload.pop("cliente_id", None)
+    peso_inicial = pet_payload.pop("peso", None)
+    historico_inicial = pet_payload.pop("historico_clinico", None)
 
     # Criar pet
     novo_pet = Pet(
         user_id=current_user.id,
         tenant_id=tenant_id,
+        origem_tenant_id=tenant_id,
         cliente_id=pet_data.cliente_id,
         codigo=codigo,
         **pet_payload,
     )
 
     db.add(novo_pet)
+    db.flush()
+    registros_service.registrar_se_mudou(
+        db,
+        pet_id=novo_pet.id,
+        tenant_id=tenant_id,
+        user_id=current_user.id,
+        tipo="peso",
+        novo=peso_inicial,
+    )
+    registros_service.registrar_se_mudou(
+        db,
+        pet_id=novo_pet.id,
+        tenant_id=tenant_id,
+        user_id=current_user.id,
+        tipo="historico",
+        novo=historico_inicial,
+    )
     db.commit()
     db.refresh(novo_pet)
 
@@ -326,13 +396,14 @@ def obter_pet(
     """
     current_user, tenant_id = user_and_tenant
 
-    pet = (
-        db.query(Pet)
-        .options(joinedload(Pet.cliente))
-        .join(Cliente)
-        .filter(Pet.id == pet_id, Cliente.tenant_id == tenant_id)
-        .first()
-    )
+    pet = registros_service.pet_visivel(db, pet_id, tenant_id)
+    if pet is not None:
+        pet = (
+            db.query(Pet)
+            .options(joinedload(Pet.cliente))
+            .filter(Pet.id == pet.id)
+            .first()
+        )
 
     if not pet:
         raise HTTPException(
@@ -354,12 +425,7 @@ def atualizar_pet(
     """
     current_user, tenant_id = user_and_tenant
 
-    pet = (
-        db.query(Pet)
-        .join(Cliente)
-        .filter(Pet.id == pet_id, Cliente.tenant_id == tenant_id)
-        .first()
-    )
+    pet = registros_service.pet_visivel(db, pet_id, tenant_id)
 
     if not pet:
         raise HTTPException(
@@ -368,10 +434,8 @@ def atualizar_pet(
 
     # Se mudou o cliente, validar
     if pet_data.cliente_id and pet_data.cliente_id != pet.cliente_id:
-        novo_cliente = (
-            db.query(Cliente)
-            .filter(Cliente.id == pet_data.cliente_id, Cliente.tenant_id == tenant_id)
-            .first()
+        novo_cliente = registros_service.cliente_visivel(
+            db, pet_data.cliente_id, tenant_id
         )
 
         if not novo_cliente:
@@ -380,10 +444,23 @@ def atualizar_pet(
                 detail="Novo cliente não encontrado",
             )
 
+    # Snapshot dos campos diretos rastreados, antes de qualquer alteracao -
+    # pessoa e Pet tem historico de alteracoes (data/usuario/loja/campo),
+    # mesmo padrao de Cliente.
+    dados_antes = {campo: getattr(pet, campo) for campo in CAMPOS_RASTREADOS_PET}
+
     # Atualizar campos fornecidos
     update_data = normalize_pet_clinical_payload(
         pet_data.model_dump(exclude_unset=True)
     )
+    peso_informado = update_data.pop("peso", None) if "peso" in update_data else None
+    historico_informado = (
+        update_data.pop("historico_clinico", None)
+        if "historico_clinico" in update_data
+        else None
+    )
+    registrar_peso = "peso" in pet_data.model_fields_set
+    registrar_historico = "historico_clinico" in pet_data.model_fields_set
 
     # Se idade_aproximada foi fornecida, converter para data_nascimento
     if (
@@ -413,6 +490,34 @@ def atualizar_pet(
 
     pet.updated_at = dt.now()
 
+    registrar_alteracoes_pet(
+        db,
+        pet_id=pet.id,
+        tenant_id=tenant_id,
+        user_id=current_user.id,
+        antes=dados_antes,
+        depois=update_data,
+    )
+
+    if registrar_peso:
+        registros_service.registrar_se_mudou(
+            db,
+            pet_id=pet.id,
+            tenant_id=tenant_id,
+            user_id=current_user.id,
+            tipo="peso",
+            novo=peso_informado,
+        )
+    if registrar_historico:
+        registros_service.registrar_se_mudou(
+            db,
+            pet_id=pet.id,
+            tenant_id=tenant_id,
+            user_id=current_user.id,
+            tipo="historico",
+            novo=historico_informado,
+        )
+
     db.commit()
     db.refresh(pet)
 
@@ -438,12 +543,7 @@ def excluir_pet(
     """
     current_user, tenant_id = user_and_tenant
 
-    pet = (
-        db.query(Pet)
-        .join(Cliente)
-        .filter(Pet.id == pet_id, Cliente.tenant_id == tenant_id)
-        .first()
-    )
+    pet = registros_service.pet_visivel(db, pet_id, tenant_id)
 
     if not pet:
         raise HTTPException(
@@ -474,12 +574,7 @@ def ativar_pet(
     """
     current_user, tenant_id = user_and_tenant
 
-    pet = (
-        db.query(Pet)
-        .join(Cliente)
-        .filter(Pet.id == pet_id, Cliente.tenant_id == tenant_id)
-        .first()
-    )
+    pet = registros_service.pet_visivel(db, pet_id, tenant_id)
 
     if not pet:
         raise HTTPException(
@@ -510,12 +605,9 @@ def listar_pets_por_cliente(
     """
     current_user, tenant_id = user_and_tenant
 
-    # Validar cliente
-    cliente = (
-        db.query(Cliente)
-        .filter(Cliente.id == cliente_id, Cliente.tenant_id == tenant_id)
-        .first()
-    )
+    # Pessoa (tutor) e compartilhada pelo grupo - valida visibilidade via
+    # pessoa_visivel_no_grupo, nao so o proprio tenant.
+    cliente = registros_service.cliente_visivel(db, cliente_id, tenant_id)
 
     if not cliente:
         raise HTTPException(
@@ -525,8 +617,7 @@ def listar_pets_por_cliente(
     query = (
         db.query(Pet)
         .options(joinedload(Pet.cliente))
-        .join(Cliente)
-        .filter(Pet.cliente_id == cliente_id, Cliente.tenant_id == tenant_id)
+        .filter(Pet.cliente_id == cliente_id)
     )
 
     if not incluir_inativos:
@@ -535,3 +626,129 @@ def listar_pets_por_cliente(
     pets = query.order_by(Pet.ativo.desc(), Pet.nome.asc()).all()
 
     return [enriquecer_pet_response(pet) for pet in pets]
+
+
+class RegistroClinicoCreate(BaseModel):
+    tipo: str
+    texto: Optional[str] = None
+    valor: Optional[float] = None
+    registrado_em: Optional[dt] = None
+
+
+class RegistroClinicoUpdate(BaseModel):
+    texto: Optional[str] = None
+    valor: Optional[float] = None
+    registrado_em: Optional[dt] = None
+
+
+def _serializar_registros(db: Session, registros, tenant_id):
+    ids_lojas = {str(r.tenant_id) for r in registros}
+    nomes = (
+        {
+            str(t.id): t.name
+            for t in db.query(Tenant).filter(Tenant.id.in_(ids_lojas)).all()
+        }
+        if ids_lojas
+        else {}
+    )
+    return [
+        {
+            "id": r.id,
+            "tipo": r.tipo,
+            "texto": r.texto,
+            "valor": r.valor,
+            "registrado_em": r.registrado_em.isoformat() if r.registrado_em else None,
+            "loja_id": str(r.tenant_id),
+            "loja_nome": nomes.get(str(r.tenant_id)),
+            "pode_editar": str(r.tenant_id) == str(tenant_id),
+        }
+        for r in registros
+    ]
+
+
+@router.get("/{pet_id}/registros-clinicos")
+def listar_registros_clinicos(
+    pet_id: int,
+    tipo: Optional[str] = Query(None),
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    _current_user, tenant_id = user_and_tenant
+    if registros_service.pet_visivel(db, pet_id, tenant_id) is None:
+        raise HTTPException(status_code=404, detail="Pet não encontrado")
+    registros = registros_service.listar_registros(db, pet_id, tipo)
+    return {"items": _serializar_registros(db, registros, tenant_id)}
+
+
+@router.post("/{pet_id}/registros-clinicos", status_code=status.HTTP_201_CREATED)
+@require_permission("clientes.editar")
+def criar_registro_clinico(
+    pet_id: int,
+    payload: RegistroClinicoCreate,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    current_user, tenant_id = user_and_tenant
+    if registros_service.pet_visivel(db, pet_id, tenant_id) is None:
+        raise HTTPException(status_code=404, detail="Pet não encontrado")
+    registro = registros_service.criar_registro(
+        db,
+        pet_id=pet_id,
+        tenant_id=tenant_id,
+        user_id=current_user.id,
+        tipo=payload.tipo,
+        texto=payload.texto,
+        valor=payload.valor,
+        registrado_em=payload.registrado_em,
+    )
+    db.commit()
+    return _serializar_registros(db, [registro], tenant_id)[0]
+
+
+@router.patch("/{pet_id}/registros-clinicos/{registro_id}")
+@require_permission("clientes.editar")
+def atualizar_registro_clinico(
+    pet_id: int,
+    registro_id: int,
+    payload: RegistroClinicoUpdate,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    _current_user, tenant_id = user_and_tenant
+    try:
+        registro = registros_service.atualizar_registro(
+            db,
+            registro_id=registro_id,
+            pet_id=pet_id,
+            tenant_id=tenant_id,
+            texto=payload.texto,
+            valor=payload.valor,
+            registrado_em=payload.registrado_em,
+        )
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    return _serializar_registros(db, [registro], tenant_id)[0]
+
+
+@router.delete(
+    "/{pet_id}/registros-clinicos/{registro_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+@require_permission("clientes.editar")
+def excluir_registro_clinico(
+    pet_id: int,
+    registro_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    _current_user, tenant_id = user_and_tenant
+    try:
+        registros_service.excluir_registro(
+            db, registro_id=registro_id, pet_id=pet_id, tenant_id=tenant_id
+        )
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    return None

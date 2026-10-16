@@ -12,8 +12,8 @@ from urllib.parse import urljoin, urlparse
 from sqlalchemy import or_, text
 from sqlalchemy.orm import Session, selectinload
 
-from app.empresa_grupo_models import EmpresaGrupoEstoqueCompartilhado
-from app.empresa_grupo_sql import empresa_id_igual
+from app.grupo_comercial_models import GrupoComercialEstoqueCompartilhado
+from app.grupo_comercial_sql import empresa_id_igual
 from app.estoque_reserva_service import EstoqueReservaService
 from app.models import Tenant
 from app.produtos.tipos import tipo_controla_estoque
@@ -351,17 +351,17 @@ class EcommerceAICatalogService:
                 {
                     row[0]
                     for row in self.db.query(
-                        EmpresaGrupoEstoqueCompartilhado.produto_origem_id
+                        GrupoComercialEstoqueCompartilhado.produto_origem_id
                     )
                     .filter(
                         empresa_id_igual(
-                            EmpresaGrupoEstoqueCompartilhado.empresa_origem_id,
+                            GrupoComercialEstoqueCompartilhado.empresa_origem_id,
                             self.tenant_id,
                         ),
-                        EmpresaGrupoEstoqueCompartilhado.produto_origem_id.in_(
+                        GrupoComercialEstoqueCompartilhado.produto_origem_id.in_(
                             product_ids
                         ),
-                        EmpresaGrupoEstoqueCompartilhado.status == "ativo",
+                        GrupoComercialEstoqueCompartilhado.status == "ativo",
                     )
                     .all()
                 }

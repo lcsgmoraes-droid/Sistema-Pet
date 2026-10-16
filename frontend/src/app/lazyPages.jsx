@@ -120,6 +120,7 @@ export const TipoDespesa = lazy(() => import("../pages/Cadastros/TipoDespesa"));
 export const CategoriasFinanceiras = lazy(() => import("../pages/CategoriasFinanceiras"));
 export const EspeciesRacas = lazy(() => import("../pages/EspeciesRacas"));
 export const ClienteFinanceiro = lazy(() => import("../pages/ClienteFinanceiro"));
+export const ClientePessoaEditar = lazy(() => import("../pages/ClientePessoaEditar"));
 export const RankingClientes = lazy(() => import("../pages/RankingClientes"));
 export const UsuariosPage = lazy(() => import("../pages/UsuariosPage.jsx"));
 export const RolesPage = lazy(() => import("../pages/RolesPage.jsx"));
@@ -133,9 +134,12 @@ export const Configuracoes = lazy(() => import("../pages/Configuracoes"));
 export const ConfiguracaoFiscalEmpresa = lazy(
   () => import("../pages/configuracoes/ConfiguracaoFiscalEmpresa"),
 );
-export const GruposEmpresas = lazy(() => import("../pages/configuracoes/GruposEmpresas"));
+export const GruposComerciais = lazy(() => import("../pages/configuracoes/GruposComerciais"));
 export const VisaoConsolidadaGrupo = lazy(
   () => import("../pages/configuracoes/VisaoConsolidadaGrupo"),
+);
+export const GrupoComercialMestres = lazy(
+  () => import("../pages/configuracoes/GrupoComercialMestres"),
 );
 export const EntregasConfig = lazy(() => import("../pages/configuracoes/EntregasConfig"));
 export const CustosMoto = lazy(() => import("../pages/configuracoes/CustosMoto"));

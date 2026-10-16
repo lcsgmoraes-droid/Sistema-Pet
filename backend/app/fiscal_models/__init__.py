@@ -10,19 +10,21 @@ Core models (User, Cliente) are in app/models.py file
 # foi removida; reexportada aqui para os importadores de app.fiscal_models.
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal  # noqa
 
-# FiscalCatalogoProdutos, FiscalEstadoPadrao e KitComposicao foram CONSOLIDADOS nos
-# módulos canônicos top-level (app/fiscal_catalogo_produtos_models.py,
-# app/fiscal_estado_padrao_models.py e app/kit_composicao_models.py), que são os
-# mesmos importados pelos serviços de runtime e têm as FKs reais (ex.
-# ForeignKey("produtos.id")). As cópias divergentes que existiam aqui em
-# fiscal_models/ mapeavam o mesmo __tablename__ no mesmo registry SQLAlchemy — se
-# ambos os módulos fossem importados no mesmo processo, o registro da segunda classe
-# lançava sqlalchemy.exc.InvalidRequestError (Table already defined). Removidas;
+# FiscalCatalogoProdutos e FiscalEstadoPadrao foram CONSOLIDADOS nos módulos
+# canônicos top-level (app/fiscal_catalogo_produtos_models.py,
+# app/fiscal_estado_padrao_models.py), que são os mesmos importados pelos
+# serviços de runtime e têm as FKs reais (ex. ForeignKey("produtos.id")). As
+# cópias divergentes que existiam aqui em fiscal_models/ mapeavam o mesmo
+# __tablename__ no mesmo registry SQLAlchemy — se ambos os módulos fossem
+# importados no mesmo processo, o registro da segunda classe lançava
+# sqlalchemy.exc.InvalidRequestError (Table already defined). Removidas;
 # reexportadas aqui para manter compatibilidade com db/base.py e demais
 # importadores de app.fiscal_models.
+# KitComposicao (app/kit_composicao_models.py) foi removida: classe orfa, sem
+# nenhum uso em rota/servico e sem tabela correspondente em nenhum banco real
+# (nunca criada por migracao). Ver Documentacao/Dominio/kit_composicao.md.
 from app.fiscal_catalogo_produtos_models import FiscalCatalogoProdutos  # noqa
 from app.fiscal_estado_padrao_models import FiscalEstadoPadrao  # noqa
-from app.kit_composicao_models import KitComposicao  # noqa
 
 # KitConfigFiscal e ProdutoConfigFiscal foram CONSOLIDADOS nos módulos canônicos
 # top-level (app/kit_config_fiscal_models.py e app/produto_config_fiscal_models.py),
@@ -35,7 +37,6 @@ __all__ = [
     "EmpresaConfigFiscal",
     "FiscalCatalogoProdutos",
     "FiscalEstadoPadrao",
-    "KitComposicao",
     "KitConfigFiscal",
     "ProdutoConfigFiscal",
 ]

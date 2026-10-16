@@ -37,7 +37,7 @@ atualizado: 2026-09-12
 ## 5. Segurança
 
 - [[Seguranca]] — resumo executivo
-  - [[Autenticacao]] · [[Autorizacao]] · [[API-Security]] · [[Secrets]] · [[Vulnerabilidades]]
+  - [[Autenticacao]] · [[Autorizacao]] · [[API-Security]] · [[Secrets]] · [[Vulnerabilidades]] · [[Terceiros-Dados-LGPD]]
 
 ## 6. Integrações
 

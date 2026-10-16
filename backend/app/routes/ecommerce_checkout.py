@@ -60,8 +60,8 @@ from app.routes.ecommerce_cart import (
     _resolver_preco_unitario_compravel,
     _validar_limite_promocao_validade,
 )
-from app.empresa_grupo_estoque_compartilhado_service import (
-    EmpresaGrupoEstoqueCompartilhadoService,
+from app.grupo_comercial_estoque_compartilhado_service import (
+    GrupoComercialEstoqueCompartilhadoService,
 )
 from app.tenancy.context import (
     clear_current_tenant,
@@ -92,7 +92,7 @@ def _revalidar_itens_checkout(
 ) -> float:
     """Revalida preço e saldo sob lock antes de reservar o pedido pendente."""
     for item in itens:
-        access = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+        access = GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
             db, tenant_id, item.produto_id
         )
         with tenant_context(access.tenant_origem_id) as origin_tenant:

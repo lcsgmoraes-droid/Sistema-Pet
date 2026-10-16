@@ -9,6 +9,7 @@ from app.banho_tosa_schemas import (
     BanhoTosaPessoaApoioResponse,
     BanhoTosaProdutoEstoqueResponse,
 )
+from app.clientes.common import tipos_cadastro_da_pessoa
 from app.db import get_session
 from app.models import Cliente
 from app.produtos_models import Produto
@@ -29,7 +30,7 @@ def listar_funcionarios_apoio(
     query = db.query(Cliente).filter(
         Cliente.tenant_id == tenant_id,
         Cliente.ativo.is_(True),
-        Cliente.tipo_cadastro.in_(["funcionario", "veterinario", "outro"]),
+        or_(Cliente.is_funcionario.is_(True), Cliente.is_veterinario.is_(True)),
     )
 
     if busca:
@@ -43,7 +44,7 @@ def listar_funcionarios_apoio(
         {
             "id": pessoa.id,
             "nome": pessoa.nome,
-            "tipo_cadastro": pessoa.tipo_cadastro,
+            "tipos_cadastro": tipos_cadastro_da_pessoa(pessoa),
         }
         for pessoa in pessoas
     ]

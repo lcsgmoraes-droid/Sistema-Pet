@@ -60,9 +60,7 @@ def upgrade():
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.ForeignKeyConstraint(
-            ["rota_id"], ["rotas_entrega.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["rota_id"], ["rotas_entrega.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("token"),
         sa.UniqueConstraint("rota_id"),
     )

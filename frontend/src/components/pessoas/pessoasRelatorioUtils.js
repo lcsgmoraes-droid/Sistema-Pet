@@ -39,10 +39,18 @@ export const COLUNAS_RELATORIO_PESSOAS = [
   { key: "codigo", label: "Codigo", width: 12, value: (pessoa) => pessoa.codigo || "" },
   { key: "nome", label: "Nome", width: 32, value: (pessoa) => pessoa.nome || "" },
   {
-    key: "tipo_cadastro",
+    key: "tipos_cadastro",
     label: "Tipo de cadastro",
     width: 18,
-    value: (pessoa) => ROTULOS_TIPO_CADASTRO[pessoa.tipo_cadastro] || pessoa.tipo_cadastro || "",
+    value: (pessoa) =>
+      [
+        pessoa.is_cliente && ROTULOS_TIPO_CADASTRO.cliente,
+        pessoa.is_fornecedor && ROTULOS_TIPO_CADASTRO.fornecedor,
+        pessoa.is_veterinario && ROTULOS_TIPO_CADASTRO.veterinario,
+        pessoa.is_funcionario && ROTULOS_TIPO_CADASTRO.funcionario,
+      ]
+        .filter(Boolean)
+        .join(", "),
   },
   {
     key: "tipo_pessoa",

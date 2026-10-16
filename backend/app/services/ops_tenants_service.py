@@ -49,6 +49,7 @@ from app.services.ops_tenants_read_service import (
     _tenant_row_to_item,
     _tenant_usage,
     list_ops_tenants,
+    list_ops_tenants_grouped,
 )
 
 __all__ = [
@@ -87,14 +88,19 @@ __all__ = [
     "create_ops_tenant_onboarding_note",
     "list_ops_tenant_onboarding_notes",
     "list_ops_tenants",
+    "list_ops_tenants_grouped",
     "preview_base_catalog_import",
     "update_ops_tenant_commercial_state",
     "update_ops_tenant_onboarding_follow_up",
 ]
 
+# O plano (por segmento: plan_pet/plan_vet/plan_grooming) e a origem da
+# assinatura (subscription_source) deixaram de ser editaveis por aqui —
+# qualquer mudanca de plano agora exige um aditivo comercial com aceite do
+# cliente (fluxo de BillingOffer). Este painel segue so para ajuste
+# operacional rapido de status/cobranca.
 COMMERCIAL_STATE_OPTIONS = {
     "status": {"active", "trial", "inactive", "suspended"},
-    "plan": {"free", "basico", "basic", "premium", "enterprise", "legacy", "completo"},
     "billing_status": {
         "active",
         "trial",
@@ -109,23 +115,11 @@ COMMERCIAL_STATE_OPTIONS = {
         "canceled",
         "expired",
     },
-    "subscription_source": {
-        "manual",
-        "admin",
-        "trial",
-        "stripe",
-        "asaas",
-        "mercado_pago",
-        "bling",
-        "external",
-    },
 }
 
 COMMERCIAL_STATE_LABELS = {
     "status": "Status",
-    "plan": "Plano",
     "billing_status": "Status de cobranca",
-    "subscription_source": "Origem da assinatura",
 }
 
 ONBOARDING_SATISFACTION_OPTIONS = {

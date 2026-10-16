@@ -51,7 +51,8 @@ def upgrade():
         unique=False,
     )
     if op.get_bind().dialect.name == "postgresql":
-        op.execute(sa.text("""
+        op.execute(
+            sa.text("""
             WITH historico AS (
                 SELECT
                     tenant_id,
@@ -88,7 +89,8 @@ def upgrade():
                 numero_inicial
             FROM series_recentes
             ON CONFLICT (tenant_id, ambiente_codigo, modelo) DO NOTHING
-            """))
+            """)
+        )
         guard = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
         op.execute("ALTER TABLE intnfe_emission_sequences ENABLE ROW LEVEL SECURITY")
         op.execute("ALTER TABLE intnfe_emission_sequences FORCE ROW LEVEL SECURITY")

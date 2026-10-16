@@ -31,8 +31,6 @@ const expectedFiles = [
   "src/pages/ops-tenants/OpsTenantsFilters.jsx",
   "src/pages/ops-tenants/OpsTenantsTabs.jsx",
   "src/pages/ops-tenants/OpsTenantsTable.jsx",
-  "src/pages/ops-tenants/OpsTenantsImportPanel.jsx",
-  "src/pages/ops-tenants/OpsTenantsGuardrailsPanel.jsx",
   "src/pages/ops-tenants/OpsTenantsCommercialEditPanel.jsx",
   "src/pages/ops-tenants/OpsTenantsBillingTab.jsx",
   "src/pages/ops-tenants/OpsTenantsUsageTab.jsx",
@@ -61,12 +59,9 @@ const featureSource = expectedFiles
 
 for (const literal of [
   "/admin/tenants",
-  "/catalog-import/preview",
-  "/catalog-import/apply",
   "/commercial",
   "/onboarding-follow-up",
   "Clientes e catalogo base",
-  "Importacao de catalogo base",
   "Planos e pagamentos",
   "Uso e cadastros",
   "Acompanhamento dos pilotos",
@@ -76,8 +71,6 @@ for (const literal of [
   "Responsavel pelo acompanhamento",
   "Satisfacao inicial",
   "Acompanhamento salvo.",
-  "Guardrails do MVP",
-  "Rode uma simulacao valida antes de aplicar a importacao.",
   "Manutencao salva.",
 ]) {
   assert(featureSource.includes(literal), `Missing ops tenants behavior literal: ${literal}`);

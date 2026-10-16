@@ -14,6 +14,7 @@ Um dos 4 grandes eixos. Ver [[README]]. Análise feita por agente de exploraçã
 - [[API-Security]] — rate limiting, CORS, webhooks, uploads
 - [[Secrets]] — inventário de variáveis sensíveis, busca por hardcode
 - [[Vulnerabilidades]] — lista consolidada de achados por severidade
+- [[Terceiros-Dados-LGPD]] — índice vivo de todo ponto de contato com terceiros que recebe dado potencialmente sensível (backend, frontend, mobile), base para manter a Política de Privacidade atualizada sem revarrer o sistema
 
 ## Resumo executivo
 

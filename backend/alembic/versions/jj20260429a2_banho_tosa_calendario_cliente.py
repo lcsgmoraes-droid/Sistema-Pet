@@ -20,13 +20,20 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.add_column(
         "banho_tosa_configuracoes",
-        sa.Column("mostrar_calendario_cliente", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column(
+            "mostrar_calendario_cliente",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.false(),
+        ),
     )
     op.add_column(
         "banho_tosa_configuracoes",
         sa.Column("whatsapp_agendamento", sa.String(length=30), nullable=True),
     )
-    op.alter_column("banho_tosa_configuracoes", "mostrar_calendario_cliente", server_default=None)
+    op.alter_column(
+        "banho_tosa_configuracoes", "mostrar_calendario_cliente", server_default=None
+    )
 
 
 def downgrade() -> None:

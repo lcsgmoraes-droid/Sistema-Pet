@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import { HeartPulse, PawPrint, Ruler } from "lucide-react";
+import toast from "react-hot-toast";
 import api from "../api";
 import PetFormView from "./petForm/PetFormView";
 import { buildReturnWithNovoPet } from "../utils/petReturnFlow";
-import "./EspeciesRacas.css"; // Para estilos do botão de adicionar rápido
 
 const listToTextarea = (items = [], fallback = "") => {
   if (Array.isArray(items) && items.length > 0) {
@@ -32,13 +33,17 @@ const PetForm = () => {
   const returnTo = searchParams.get("return_to") || "";
   const clienteIdPreSelecionado = clienteIdFromQuery || clienteIdFromState || "";
 
-  const [loading, setLoading] = useState(false);
+  // Comeca true (nao false): evita o formulario renderizar vazio por um instante antes
+  // do primeiro carregamento comecar — ver nota sobre o padrao de loading unico no AGENTS.md.
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [clientes, setClientes] = useState([]);
   const [especies, setEspecies] = useState([]);
   const [racas, setRacas] = useState([]);
+
+  const [abaAtiva, setAbaAtiva] = useState("dados-gerais");
 
   // Estados para modal rápido
   const [showQuickAddModal, setShowQuickAddModal] = useState(false);
@@ -73,15 +78,31 @@ const PetForm = () => {
     (especie) => String(especie.id) === String(formData.especie),
   );
 
+  // Um unico ciclo de loading cobrindo tutores + especies + pet (quando editando), em vez de um
+  // por chamada: evita o formulario "piscar" entre vazio/carregando varias vezes seguidas antes
+  // dos dados finais aparecerem. A flag `ativo` protege contra o StrictMode do React, que em dev
+  // roda este efeito duas vezes de proposito (para flagar efeitos com side effect mal limpos) —
+  // sem ela, a segunda rodada reacende o loading por um instante mesmo com os dados ja na tela.
   useEffect(() => {
+    let ativo = true;
+
     const loadData = async () => {
-      await loadClientes();
-      await loadEspecies();
-      if (isEditing) {
-        await loadPet();
+      setLoading(true);
+      try {
+        await loadClientes();
+        await loadEspecies();
+        if (isEditing) {
+          await loadPet();
+        }
+      } finally {
+        if (ativo) setLoading(false);
       }
     };
     loadData();
+
+    return () => {
+      ativo = false;
+    };
   }, [petId]);
 
   // Carregar raças quando espécie mudar
@@ -152,7 +173,6 @@ const PetForm = () => {
 
   const loadPet = async () => {
     try {
-      setLoading(true);
       const response = await api.get(`/pets/${petId}`);
       const pet = response.data;
 
@@ -190,24 +210,24 @@ const PetForm = () => {
     } catch (err) {
       console.error("Erro ao carregar pet:", err);
       setError("Erro ao carregar informações do pet");
-    } finally {
-      setLoading(false);
     }
   };
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    if (name === "especie") {
-      setFormData((prev) => ({
-        ...prev,
-        especie: value,
-        raca: "",
-      }));
-      return;
-    }
+  const setField = (name) => (value) => {
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleEspecieChange = (value) => {
+    setFormData((prev) => ({ ...prev, especie: value, raca: "" }));
+  };
+
+  // Desmarcar "castrado" limpa a data de castracao escondida — evita submeter uma
+  // data de castracao presa no estado enquanto o pet nao esta mais marcado como castrado.
+  const handleCastradoChange = (castrado) => {
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      castrado,
+      castrado_data: castrado ? prev.castrado_data : "",
     }));
   };
 
@@ -250,28 +270,49 @@ const PetForm = () => {
     }
   };
 
-  const validateForm = () => {
-    if (!formData.nome.trim()) {
-      setError("Nome do pet é obrigatório");
-      return false;
-    }
-    if (!formData.especie) {
-      setError("Espécie é obrigatória");
-      return false;
-    }
-    if (!formData.cliente_id) {
-      setError("Cliente (tutor) é obrigatório");
-      return false;
-    }
-    return true;
-  };
+  const erros = useMemo(() => {
+    const proximosErros = {};
+    if (!formData.nome.trim()) proximosErros.nome = "Informe o nome do pet.";
+    if (!formData.especie) proximosErros.especie = "Selecione a espécie.";
+    if (!formData.cliente_id) proximosErros.cliente_id = "Selecione o tutor.";
+    return proximosErros;
+  }, [formData.nome, formData.especie, formData.cliente_id]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const abas = useMemo(
+    () => [
+      {
+        id: "dados-gerais",
+        label: "Dados gerais",
+        icon: PawPrint,
+        descricao: "Tutor, identificação e observações",
+        invalida: Boolean(erros.nome || erros.especie || erros.cliente_id),
+      },
+      {
+        id: "caracteristicas",
+        label: "Características físicas",
+        icon: Ruler,
+        descricao: "Idade, peso, porte e demais características",
+      },
+      {
+        id: "saude",
+        label: "Saúde",
+        icon: HeartPulse,
+        descricao: "Alergias, doenças, medicamentos e histórico clínico",
+      },
+    ],
+    [erros],
+  );
+
+  const handleSubmit = async () => {
     setError("");
     setSuccess("");
 
-    if (!validateForm()) {
+    if (Object.keys(erros).length > 0) {
+      setAbaAtiva((atual) => {
+        const abaComErro = abas.find((aba) => aba.invalida);
+        return abaComErro ? abaComErro.id : atual;
+      });
+      toast.error("Corrija os campos destacados antes de salvar.");
       return;
     }
 
@@ -286,7 +327,7 @@ const PetForm = () => {
         ...formData,
         especie: especieSelecionada?.nome || formData.especie,
         cliente_id: parseInt(formData.cliente_id),
-        peso: formData.peso ? parseFloat(formData.peso) : null,
+        peso: formData.peso ? parseFloat(String(formData.peso).replace(",", ".")) : null,
         idade_aproximada: formData.idade_aproximada ? parseInt(formData.idade_aproximada) : null,
         data_nascimento: formData.data_nascimento || null,
         alergias_lista: textareaToList(formData.alergias),
@@ -343,7 +384,10 @@ const PetForm = () => {
       clienteIdPreSelecionado={clienteIdPreSelecionado}
       handleSubmit={handleSubmit}
       formData={formData}
-      handleChange={handleChange}
+      erros={erros}
+      setField={setField}
+      handleEspecieChange={handleEspecieChange}
+      handleCastradoChange={handleCastradoChange}
       clientes={clientes}
       abrirQuickAdd={abrirQuickAdd}
       especies={especies}
@@ -351,6 +395,9 @@ const PetForm = () => {
       especieSelecionadaAtual={especieSelecionadaAtual}
       setFormData={setFormData}
       saving={saving}
+      abaAtiva={abaAtiva}
+      setAbaAtiva={setAbaAtiva}
+      abas={abas}
       showQuickAddModal={showQuickAddModal}
       quickAddTipo={quickAddTipo}
       handleQuickAddSuccess={handleQuickAddSuccess}

@@ -3,7 +3,7 @@ from pathlib import Path
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_ops_tenants_routes_are_platform_admin_only_and_expose_import_actions():
+def test_ops_tenants_routes_are_platform_admin_only():
     source = (BACKEND_ROOT / "app/routes/ops_tenants_routes.py").read_text(
         encoding="utf-8"
     )
@@ -19,13 +19,10 @@ def test_ops_tenants_routes_are_platform_admin_only_and_expose_import_actions():
         '@router.post("/{tenant_id}/onboarding-follow-up/notes", status_code=201)'
         in source
     )
-    assert '"/{tenant_id}/catalog-import/preview"' in source
-    assert '"/{tenant_id}/catalog-import/apply"' in source
     assert "CommercialStateRequest" in source
     assert "OnboardingFollowUpRequest" in source
     assert "OnboardingNoteCreateRequest" in source
     assert "platform_admin_id=current_admin.id" in source
-    assert "confirm" in source
 
 
 def test_observability_routes_are_platform_admin_only():

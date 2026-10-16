@@ -1,9 +1,13 @@
-import { useState, useEffect } from "react";
+import { AlertTriangle, Calendar, CheckCircle2, Keyboard } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
   parseIdadeParaMeses,
   formatarIdadeMeses,
   calcularIdadeMeses,
 } from "../helpers/idadeHelper";
+import BotaoInteracao from "./v2/BotaoInteracao/BotaoInteracao";
+import InputData from "./v2/InputData/InputData";
+import InputTexto from "./v2/InputTexto/InputTexto";
 
 /**
  * Campo inteligente para entrada de idade
@@ -22,7 +26,7 @@ export default function CampoIdadeInteligente({
   const [modo, setModo] = useState("texto"); // 'texto' ou 'data'
   const [textoIdade, setTextoIdade] = useState("");
   const [dataNascimento, setDataNascimento] = useState("");
-  const [feedback, setFeedback] = useState("");
+  const [feedback, setFeedback] = useState(null); // { tipo: "sucesso" | "erro", texto }
 
   // Inicializar com valor recebido
   useEffect(() => {
@@ -31,19 +35,18 @@ export default function CampoIdadeInteligente({
     }
   }, [value]);
 
-  const handleTextoChange = (e) => {
-    const texto = e.target.value;
+  const handleTextoChange = (texto) => {
     setTextoIdade(texto);
 
     if (!texto) {
-      setFeedback("");
+      setFeedback(null);
       onChange(null);
     }
   };
 
   const handleTextoBlur = () => {
     if (!textoIdade) {
-      setFeedback("");
+      setFeedback(null);
       onChange(null);
       return;
     }
@@ -54,20 +57,22 @@ export default function CampoIdadeInteligente({
     if (meses !== null) {
       const formatado = formatarIdadeMeses(meses);
       setTextoIdade(formatado);
-      setFeedback(`✓ ${formatado}`);
+      setFeedback({ tipo: "sucesso", texto: formatado });
       onChange(meses);
     } else {
-      setFeedback("⚠️ Formato inválido. Ex: 12 meses, 2 anos, 1.5 anos");
+      setFeedback({
+        tipo: "erro",
+        texto: "Formato inválido. Ex: 12 meses, 2 anos, 1.5 anos",
+      });
       onChange(null);
     }
   };
 
-  const handleDataChange = (e) => {
-    const data = e.target.value;
+  const handleDataChange = (data) => {
     setDataNascimento(data);
 
     if (!data) {
-      setFeedback("");
+      setFeedback(null);
       onChange(null);
       return;
     }
@@ -75,13 +80,30 @@ export default function CampoIdadeInteligente({
     // Calcular idade em meses
     const meses = calcularIdadeMeses(data);
 
-    if (meses !== null) {
-      setFeedback(`✓ ${formatarIdadeMeses(meses)}`);
+    if (meses !== null && meses >= 0) {
+      setFeedback({ tipo: "sucesso", texto: formatarIdadeMeses(meses) });
       onChange(meses);
     } else {
-      setFeedback("⚠️ Data inválida");
+      setFeedback({ tipo: "erro", texto: "Data inválida — não pode ser no futuro" });
       onChange(null);
     }
+  };
+
+  const renderFeedback = () => {
+    if (!feedback) return null;
+    const sucesso = feedback.tipo === "sucesso";
+    const Icone = sucesso ? CheckCircle2 : AlertTriangle;
+    return (
+      <p
+        className={`mt-1 flex items-center gap-1 text-xs ${sucesso ? "text-green-700" : "text-amber-800"}`}
+      >
+        <Icone size={14} aria-hidden="true" />
+        <span>
+          <span className="font-medium">{sucesso ? "Idade reconhecida: " : "Atenção: "}</span>
+          {feedback.texto}
+        </span>
+      </p>
+    );
   };
 
   const toggleModo = () => {
@@ -89,71 +111,54 @@ export default function CampoIdadeInteligente({
     setModo(novoModo);
     setTextoIdade("");
     setDataNascimento("");
-    setFeedback("");
+    setFeedback(null);
     onChange(null);
   };
 
   return (
     <div className={className}>
-      <div className="flex items-center justify-between mb-2">
-        <label className="block text-sm font-medium text-gray-700">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-xs font-medium text-slate-600">
           {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
-        </label>
+          {required ? <span className="ml-0.5 text-red-500">*</span> : null}
+        </span>
 
         {mostrarDataNascimento && (
-          <button
-            type="button"
+          <BotaoInteracao
+            icon={modo === "texto" ? Calendar : Keyboard}
             onClick={toggleModo}
-            className="text-xs text-blue-600 hover:text-blue-800 underline"
+            tamanho="pequeno"
           >
-            {modo === "texto" ? "📅 Usar data de nascimento" : "⌨️ Digitar idade"}
-          </button>
+            {modo === "texto" ? "Usar data de nascimento" : "Digitar idade"}
+          </BotaoInteracao>
         )}
       </div>
 
       {modo === "texto" ? (
         <div>
-          <input
-            type="text"
+          <InputTexto
             name={name}
             value={textoIdade}
             onChange={handleTextoChange}
             onBlur={handleTextoBlur}
             placeholder="Ex: 12 meses, 2 anos, 1.5 anos, 2anos6meses"
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             required={required}
           />
-          {feedback && (
-            <p
-              className={`text-xs mt-1 ${feedback.startsWith("✓") ? "text-green-600" : "text-orange-600"}`}
-            >
-              {feedback}
-            </p>
-          )}
-          <p className="text-xs text-gray-500 mt-1">
+          {renderFeedback()}
+          <p className="mt-1 text-xs text-gray-500">
             Digite a idade e pressione Tab ou clique fora do campo
           </p>
         </div>
       ) : (
         <div>
-          <input
-            type="date"
+          <InputData
             name={name}
             value={dataNascimento}
             onChange={handleDataChange}
-            max={new Date().toISOString().split("T")[0]}
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             required={required}
           />
-          {feedback && (
-            <p
-              className={`text-xs mt-1 ${feedback.startsWith("✓") ? "text-green-600" : "text-orange-600"}`}
-            >
-              {feedback}
-            </p>
-          )}
-          <p className="text-xs text-gray-500 mt-1">Data de nascimento do pet</p>
+          {renderFeedback()}
+          <p className="mt-1 text-xs text-gray-500">Data de nascimento do pet</p>
         </div>
       )}
     </div>

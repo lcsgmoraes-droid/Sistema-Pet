@@ -219,7 +219,12 @@ def test_promocao_reaproveita_ficha_operacional_liberada():
 
 def test_promocao_funde_ficha_cliente_na_ficha_operacional(monkeypatch):
     cliente = SimpleNamespace(
-        id=20, tipo_cadastro="cliente", is_entregador=False, ativo=True
+        id=20,
+        is_cliente=True,
+        is_funcionario=False,
+        is_veterinario=False,
+        is_entregador=False,
+        ativo=True,
     )
     operacional = SimpleNamespace(
         id=10,

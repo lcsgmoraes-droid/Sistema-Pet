@@ -98,7 +98,7 @@ class BanhoTosaRecursoResponse(BaseModel):
 class BanhoTosaPessoaApoioResponse(BaseModel):
     id: int
     nome: str
-    tipo_cadastro: str
+    tipos_cadastro: list[str] = []
 
 
 class BanhoTosaProdutoEstoqueResponse(BaseModel):

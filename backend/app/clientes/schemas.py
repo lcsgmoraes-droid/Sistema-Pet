@@ -5,6 +5,7 @@ import json
 from datetime import date, datetime as dt
 from decimal import Decimal
 from typing import Dict, List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, validator
 
@@ -171,8 +172,10 @@ class ClienteContatoResponse(ClienteContatoInput):
 
 class ClienteCreate(BaseModel):
     origem_cliente: OrigemCliente = "loja_fisica"
-    # Tipo de cadastro
-    tipo_cadastro: str = "cliente"  # cliente, fornecedor, veterinario, funcionario
+    is_cliente: Optional[bool] = False
+    is_fornecedor: Optional[bool] = False
+    is_veterinario: Optional[bool] = False
+    is_funcionario: Optional[bool] = False
     tipo_pessoa: str = "PF"  # PF ou PJ
 
     # Dados comuns
@@ -180,6 +183,7 @@ class ClienteCreate(BaseModel):
     data_nascimento: Optional[date] = None
     telefone: Optional[str] = None
     celular: Optional[str] = None
+    celular_whatsapp: Optional[bool] = False
     contatos_adicionais: List[ClienteContatoInput] = Field(default_factory=list)
     email: Optional[str] = None
     auth_user_id: Optional[int] = None
@@ -300,18 +304,13 @@ class ClienteCreate(BaseModel):
             raise ValueError("tipo_pessoa deve ser PF ou PJ")
         return v
 
-    @validator("tipo_cadastro")
-    def validate_tipo_cadastro(cls, v):
-        if v not in ["cliente", "fornecedor", "veterinario", "funcionario"]:
-            raise ValueError(
-                "tipo_cadastro deve ser cliente, fornecedor, veterinario ou funcionario"
-            )
-        return v
-
 
 class ClienteUpdate(BaseModel):
     origem_cliente: OrigemCliente = None
-    tipo_cadastro: Optional[str] = None
+    is_cliente: Optional[bool] = None
+    is_fornecedor: Optional[bool] = None
+    is_veterinario: Optional[bool] = None
+    is_funcionario: Optional[bool] = None
     tipo_pessoa: Optional[str] = None
     nome: Optional[str] = None
     data_nascimento: Optional[date] = None
@@ -319,6 +318,7 @@ class ClienteUpdate(BaseModel):
     email: Optional[EmailStr] = None
     telefone: Optional[str] = None
     celular: Optional[str] = None
+    celular_whatsapp: Optional[bool] = None
     contatos_adicionais: Optional[List[ClienteContatoInput]] = None
     auth_user_id: Optional[int] = None
     app_login: Optional[AppLoginCreate] = None
@@ -434,9 +434,13 @@ class ClienteUpdate(BaseModel):
 
 class ClienteResponse(BaseModel):
     origem_cliente: Optional[str] = None
+    origem_tenant_id: Optional[UUID] = None
     id: int
     codigo: Optional[str] = None
-    tipo_cadastro: str
+    is_cliente: bool = False
+    is_fornecedor: bool = False
+    is_veterinario: bool = False
+    is_funcionario: bool = False
     tipo_pessoa: str
     fornecedor_grupo_id: Optional[int] = None
     fornecedor_grupo_nome: Optional[str] = None
@@ -446,6 +450,7 @@ class ClienteResponse(BaseModel):
     email: Optional[str] = None
     telefone: Optional[str] = None
     celular: Optional[str] = None
+    celular_whatsapp: bool = False
     contatos_adicionais: List[ClienteContatoResponse] = Field(default_factory=list)
     auth_user_id: Optional[int] = None
     auth_user_nome: Optional[str] = None
@@ -533,6 +538,20 @@ class ClienteResponse(BaseModel):
     @validator("parceiro_ativo", pre=True)
     def ensure_parceiro_ativo(cls, v):
         """Garantir que parceiro_ativo seja sempre bool"""
+        if v is None:
+            return False
+        return bool(v)
+
+    @validator(
+        "is_cliente", "is_fornecedor", "is_veterinario", "is_funcionario", pre=True
+    )
+    def ensure_tipo_flags_bool(cls, v):
+        if v is None:
+            return False
+        return bool(v)
+
+    @validator("celular_whatsapp", pre=True)
+    def ensure_celular_whatsapp_bool(cls, v):
         if v is None:
             return False
         return bool(v)

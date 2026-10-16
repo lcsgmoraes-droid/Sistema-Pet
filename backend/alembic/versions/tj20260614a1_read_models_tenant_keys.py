@@ -46,7 +46,9 @@ READ_MODEL_TABLES = {
             "idx_perf_mes_ranking",
             "read_performance_parceiro_funcionario_id_mes_referencia_key",
         ),
-        "legacy_constraints": ("read_performance_parceiro_funcionario_id_mes_referencia_key",),
+        "legacy_constraints": (
+            "read_performance_parceiro_funcionario_id_mes_referencia_key",
+        ),
         "downgrade_index": "idx_perf_func_mes_unique",
         "downgrade_key": ("funcionario_id", "mes_referencia"),
     },
@@ -100,7 +102,9 @@ def _drop_index(index_name: str) -> None:
     op.execute(f"DROP INDEX IF EXISTS {index_name}")
 
 
-def _create_unique_index(table_name: str, index_name: str, columns: tuple[str, ...]) -> None:
+def _create_unique_index(
+    table_name: str, index_name: str, columns: tuple[str, ...]
+) -> None:
     table_columns = _columns(table_name)
     if not set(columns).issubset(table_columns):
         return

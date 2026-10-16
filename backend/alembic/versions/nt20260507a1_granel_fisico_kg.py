@@ -22,7 +22,9 @@ def upgrade() -> None:
     inspector = inspect(bind)
 
     if inspector.has_table("produtos"):
-        colunas_produtos = {coluna["name"] for coluna in inspector.get_columns("produtos")}
+        colunas_produtos = {
+            coluna["name"] for coluna in inspector.get_columns("produtos")
+        }
         if "e_granel" not in colunas_produtos:
             op.add_column(
                 "produtos",
@@ -65,11 +67,26 @@ def upgrade() -> None:
             sa.Column("estoque_granel_novo", sa.Float(), nullable=True),
             sa.Column("documento", sa.String(length=50), nullable=True),
             sa.Column("observacao", sa.Text(), nullable=True),
-            sa.Column("status", sa.String(length=20), nullable=False, server_default="confirmado"),
+            sa.Column(
+                "status",
+                sa.String(length=20),
+                nullable=False,
+                server_default="confirmado",
+            ),
             sa.Column("user_id", sa.Integer(), nullable=False),
             sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
-            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+            sa.Column(
+                "created_at",
+                sa.DateTime(timezone=True),
+                server_default=sa.func.now(),
+                nullable=False,
+            ),
+            sa.Column(
+                "updated_at",
+                sa.DateTime(timezone=True),
+                server_default=sa.func.now(),
+                nullable=False,
+            ),
             sa.ForeignKeyConstraint(["produto_granel_id"], ["produtos.id"]),
             sa.ForeignKeyConstraint(["produto_origem_id"], ["produtos.id"]),
             sa.ForeignKeyConstraint(["user_id"], ["users.id"]),

@@ -18,7 +18,7 @@ from app.services.billing_contract_service import (
     acceptance_to_public,
     build_contract_acceptance,
 )
-from app.services.plan_catalog import PlanDefinition, get_plan
+from app.services.plan_catalog import PlanDefinition, get_plan, segment_plan_field
 
 
 ASAAS_BASE_URLS = {
@@ -209,13 +209,26 @@ def _ensure_customer(client: AsaasClient, tenant: Tenant, current_user: User) ->
 def _subscription_payment(
     client: AsaasClient, subscription_id: str
 ) -> dict[str, Any] | None:
-    response = client.request(
-        "GET", f"/subscriptions/{subscription_id}/payments", params={"limit": 10}
-    )
-    items = response.get("data")
-    if not isinstance(items, list) or not items:
-        return None
-    return items[0] if isinstance(items[0], dict) else None
+    """Busca a cobranca em aberto (pendente ou vencida) da assinatura.
+
+    A API do Asaas nao documenta nenhuma ordem garantida para
+    `GET /subscriptions/{id}/payments` sem filtro - pegar `items[0]` sem
+    mais nada arriscava devolver um pagamento antigo qualquer (ja pago,
+    estornado etc.) em vez da cobranca atual. Filtra explicitamente por
+    `status` (PENDING primeiro, OVERDUE como fallback) em vez de confiar em
+    ordem implicita - esses dois sao os unicos status onde ainda existe algo
+    "em aberto" pra reemitir/sincronizar.
+    """
+    for status_filtro in ("PENDING", "OVERDUE"):
+        response = client.request(
+            "GET",
+            f"/subscriptions/{subscription_id}/payments",
+            params={"limit": 1, "status": status_filtro},
+        )
+        items = response.get("data")
+        if isinstance(items, list) and items and isinstance(items[0], dict):
+            return items[0]
+    return None
 
 
 def _apply_payment_snapshot(tenant: Tenant, payment: dict[str, Any] | None) -> None:
@@ -228,6 +241,28 @@ def _apply_payment_snapshot(tenant: Tenant, payment: dict[str, Any] | None) -> N
     tenant.billing_checkout_url = (
         str(payment.get("invoiceUrl") or payment.get("bankSlipUrl") or "") or None
     )
+
+
+def refresh_subscription_payment(db: Session, *, tenant: Tenant) -> dict[str, Any]:
+    """Rebusca no Asaas o pagamento atual da assinatura vigente da loja e
+    atualiza o snapshot local (status, tipo, proxima data, link do boleto/
+    fatura). Nao cria nenhuma cobranca nova - so atualiza o que ja existe,
+    util quando o link salvo expirou ou o status mudou fora do webhook."""
+    if not tenant.billing_provider_subscription_id:
+        raise AsaasBillingError(
+            "Esta loja ainda nao tem assinatura ativa no Asaas.", status_code=422
+        )
+    client = AsaasClient()
+    payment = _subscription_payment(client, tenant.billing_provider_subscription_id)
+    if payment is None:
+        raise AsaasBillingError(
+            "Nao ha cobranca pendente ou vencida nesta assinatura no momento.",
+            status_code=404,
+        )
+    _apply_payment_snapshot(tenant, payment)
+    db.commit()
+    db.refresh(tenant)
+    return subscription_status(tenant)
 
 
 def _trial_active(tenant: Tenant) -> bool:
@@ -311,6 +346,9 @@ def create_subscription(
         payment = _subscription_payment(client, subscription_id)
 
     tenant.plan = plan.code
+    campo_segmento = segment_plan_field(plan)
+    if campo_segmento:
+        setattr(tenant, campo_segmento, plan.code)
     tenant.subscription_source = "asaas"
     tenant.billing_provider_environment = client.environment
     tenant.billing_type = normalized_type

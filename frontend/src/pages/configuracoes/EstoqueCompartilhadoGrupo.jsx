@@ -9,7 +9,7 @@ import {
   compartilharEstoqueGrupo,
   listarEstoqueCompartilhadoGrupo,
   removerEstoqueCompartilhadoGrupo,
-} from "../../services/gruposEmpresas";
+} from "../../services/gruposComerciais";
 
 function mensagemErro(error, padrao) {
   return error?.response?.data?.detail || padrao;

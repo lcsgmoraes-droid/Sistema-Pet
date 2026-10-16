@@ -85,7 +85,7 @@ def registrar_vacina(
             .filter(
                 Cliente.id == body.veterinario_id,
                 Cliente.tenant_id == tenant_id,
-                Cliente.tipo_cadastro == "veterinario",
+                Cliente.is_veterinario.is_(True),
                 Cliente.ativo.is_(True),
             )
             .first()

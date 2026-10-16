@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..auth.dependencies import get_current_user_and_tenant
 from ..db import get_session
+from ..grupo_comercial_contexto import listar_empresas_do_grupo
 from ..models import Cliente, Pet
 from ..veterinario_core import _all_accessible_tenant_ids, _get_tenant
 
@@ -29,12 +30,19 @@ def listar_pets_vet(
     """
     user, tenant_id = _get_tenant(current)
     tenant_ids = _all_accessible_tenant_ids(db, tenant_id)
+    empresas_grupo = listar_empresas_do_grupo(db, tenant_id)
 
     q = (
         db.query(Pet)
         .join(Cliente)
         .options(joinedload(Pet.cliente))
-        .filter(Cliente.tenant_id.in_(tenant_ids), Pet.ativo.is_(True))
+        .filter(
+            or_(
+                Cliente.tenant_id.in_(tenant_ids),
+                Pet.tenant_id.in_(empresas_grupo),
+            ),
+            Pet.ativo.is_(True),
+        )
     )
 
     if cliente_id:

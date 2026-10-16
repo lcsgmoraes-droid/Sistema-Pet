@@ -57,7 +57,8 @@ def _criar_banco_inativos():
             text(
                 "CREATE TABLE clientes (id INTEGER PRIMARY KEY, tenant_id CHAR(36), "
                 "codigo VARCHAR, nome VARCHAR, telefone VARCHAR, celular VARCHAR, "
-                "email VARCHAR, tipo_cadastro VARCHAR, merged_into_id INTEGER, ativo BOOLEAN)"
+                "email VARCHAR, tipo_cadastro VARCHAR, is_cliente BOOLEAN, "
+                "merged_into_id INTEGER, ativo BOOLEAN)"
             )
         )
         connection.execute(
@@ -70,11 +71,11 @@ def _criar_banco_inativos():
             text(
                 "INSERT INTO clientes VALUES "
                 "(1, :tenant_id, '100', 'Cliente Inativo', NULL, '18999990000', "
-                "NULL, 'cliente', NULL, 1), "
+                "NULL, 'cliente', 1, NULL, 1), "
                 "(2, :tenant_id, '200', 'Cliente Ativo', NULL, '18999990001', "
-                "NULL, 'cliente', NULL, 1), "
+                "NULL, 'cliente', 1, NULL, 1), "
                 "(3, :outro_tenant_id, '300', 'Outro Tenant', NULL, '18999990002', "
-                "NULL, 'cliente', NULL, 1)"
+                "NULL, 'cliente', 1, NULL, 1)"
             ),
             {
                 "tenant_id": tenant_id.hex,

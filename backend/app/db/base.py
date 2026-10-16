@@ -13,7 +13,6 @@ from app.fiscal_models import (  # noqa
     EmpresaConfigFiscal,
     FiscalCatalogoProdutos,
     FiscalEstadoPadrao,
-    KitComposicao,
     KitConfigFiscal,
     ProdutoConfigFiscal,
 )
@@ -22,9 +21,22 @@ from app.fiscal_models import (  # noqa
 # direto para registrar a tabela no metadata do Alembic.
 from app.variacao_config_fiscal_models import VariacaoConfigFiscal  # noqa
 
+# Espécie/Raça mestre (camada geral do grupo comercial, Checkpoint 1) —
+# módulo próprio, não reexportado por app.models.
+from app.especie_raca_mestre_models import EspecieMestre, RacaMestre  # noqa
+
 # Importando produtos
 from app.produtos_models import Produto, Marca, Categoria  # noqa
 from app.produto_identity_models import ProdutoSkuAlias, ProdutoFusaoLog  # noqa
+
+# Identidade de produto compartilhada entre lojas do grupo comercial (fase D,
+# substitui o ProdutoMestre) — ver app/produto_identidade_models.py.
+from app.produto_identidade_models import (  # noqa
+    ProdutoIdentidade,
+    ProdutoIdentidadeBackfillRun,
+    ProdutoIdentidadeConflito,
+    ProdutoIdentidadeHistoricoAlteracao,
+)
 
 # Importando vendas
 from app.vendas_models import Venda, VendaItem  # noqa

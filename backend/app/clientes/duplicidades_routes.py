@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.models import Cliente, PessoaMergeLog, Role, UserTenant
-from app.clientes.common import _somente_digitos_coluna
+from app.clientes.common import _somente_digitos_coluna, tipos_cadastro_da_pessoa
+from app.grupo_comercial_contexto import listar_empresas_do_grupo
 from app.security.permissions_decorator import require_permission
 from app.services.pessoa_duplicate_service import (
     executar_fusoes_automaticas_pessoas_duplicadas,
@@ -81,6 +82,9 @@ def _igual_normalizado(campo, valor: str):
             )
             == normalizado
         )
+    if campo_nome == "email":
+        normalizado = str(valor or "").strip().casefold()
+        return func.lower(campo) == normalizado
     return campo == valor
 
 
@@ -91,19 +95,22 @@ def verificar_duplicata(
     telefone: Optional[str] = None,
     celular: Optional[str] = None,
     crmv: Optional[str] = None,
+    email: Optional[str] = None,
     cliente_id: Optional[int] = None,
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Verificar se existe cliente com CPF, CNPJ, telefone, celular ou CRMV duplicado"""
+    """Verificar se existe cliente com CPF, CNPJ, telefone, celular, CRMV ou e-mail duplicado"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    # Unicidade de documento e por grupo comercial - pessoa e cadastro compartilhado.
+    access_ids = listar_empresas_do_grupo(db, tenant_id)
 
     resultado = {"duplicado": False, "cliente": None, "campo": None}
 
     # Verificar CPF
     if cpf:
         query = db.query(Cliente).filter(
-            Cliente.tenant_id == tenant_id,
+            Cliente.tenant_id.in_(access_ids),
             _igual_normalizado(Cliente.cpf, cpf),
             Cliente.ativo.is_not(False),
         )
@@ -118,7 +125,7 @@ def verificar_duplicata(
                 "id": cliente.id,
                 "codigo": cliente.codigo,
                 "nome": cliente.nome,
-                "tipo_cadastro": cliente.tipo_cadastro,
+                "tipos_cadastro": tipos_cadastro_da_pessoa(cliente),
                 "tipo_pessoa": cliente.tipo_pessoa,
                 "cpf": cliente.cpf,
                 "telefone": cliente.telefone,
@@ -130,7 +137,7 @@ def verificar_duplicata(
     # Verificar CNPJ
     if cnpj:
         query = db.query(Cliente).filter(
-            Cliente.tenant_id == tenant_id,
+            Cliente.tenant_id.in_(access_ids),
             _igual_normalizado(Cliente.cnpj, cnpj),
             Cliente.ativo.is_not(False),
         )
@@ -145,7 +152,7 @@ def verificar_duplicata(
                 "id": cliente.id,
                 "codigo": cliente.codigo,
                 "nome": cliente.nome,
-                "tipo_cadastro": cliente.tipo_cadastro,
+                "tipos_cadastro": tipos_cadastro_da_pessoa(cliente),
                 "tipo_pessoa": cliente.tipo_pessoa,
                 "cnpj": cliente.cnpj,
                 "razao_social": cliente.razao_social,
@@ -158,7 +165,7 @@ def verificar_duplicata(
     # Verificar celular
     if celular:
         query = db.query(Cliente).filter(
-            Cliente.tenant_id == tenant_id,
+            Cliente.tenant_id.in_(access_ids),
             _igual_normalizado(Cliente.celular, celular),
             Cliente.ativo.is_not(False),
         )
@@ -183,7 +190,7 @@ def verificar_duplicata(
     # Verificar telefone
     if telefone:
         query = db.query(Cliente).filter(
-            Cliente.tenant_id == tenant_id,
+            Cliente.tenant_id.in_(access_ids),
             _igual_normalizado(Cliente.telefone, telefone),
             Cliente.ativo.is_not(False),
         )
@@ -205,10 +212,37 @@ def verificar_duplicata(
             }
             return resultado
 
+    # Verificar e-mail
+    if email:
+        query = db.query(Cliente).filter(
+            Cliente.tenant_id.in_(access_ids),
+            _igual_normalizado(Cliente.email, email),
+            Cliente.ativo.is_not(False),
+        )
+        if cliente_id:
+            query = query.filter(Cliente.id != cliente_id)
+
+        cliente = query.first()
+        if cliente:
+            resultado["duplicado"] = True
+            resultado["campo"] = "email"
+            resultado["cliente"] = {
+                "id": cliente.id,
+                "codigo": cliente.codigo,
+                "nome": cliente.nome,
+                "tipos_cadastro": tipos_cadastro_da_pessoa(cliente),
+                "tipo_pessoa": cliente.tipo_pessoa,
+                "cpf": cliente.cpf,
+                "telefone": cliente.telefone,
+                "celular": cliente.celular,
+                "email": cliente.email,
+            }
+            return resultado
+
     # Verificar CRMV
     if crmv:
         query = db.query(Cliente).filter(
-            Cliente.tenant_id == tenant_id,
+            Cliente.tenant_id.in_(access_ids),
             _igual_normalizado(Cliente.crmv, crmv),
             Cliente.ativo.is_not(False),
         )
@@ -223,7 +257,7 @@ def verificar_duplicata(
                 "id": cliente.id,
                 "codigo": cliente.codigo,
                 "nome": cliente.nome,
-                "tipo_cadastro": cliente.tipo_cadastro,
+                "tipos_cadastro": tipos_cadastro_da_pessoa(cliente),
                 "crmv": cliente.crmv,
                 "telefone": cliente.telefone,
                 "celular": cliente.celular,

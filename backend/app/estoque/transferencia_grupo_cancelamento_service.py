@@ -9,7 +9,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.empresa_grupo_models import EmpresaGrupoTransferencia
+from app.grupo_comercial_models import GrupoComercialTransferencia
 from app.estoque.transferencia_parceiro_entrada_service import (
     MOTIVO_ENTRADA_PARCEIRO,
 )
@@ -101,7 +101,7 @@ def _criar_movimentacao_cancelamento(
     *,
     produto: Produto,
     movimento_original: EstoqueMovimentacao,
-    transferencia: EmpresaGrupoTransferencia,
+    transferencia: GrupoComercialTransferencia,
     tenant_id: str,
     user_id: int,
     tipo: str,
@@ -164,10 +164,10 @@ def cancelar_transferencia_integrada_por_conta(
     empresa_origem_id = str(empresa_origem_id)
     empresa_origem_uuid = UUID(empresa_origem_id)
     transferencia = (
-        db.query(EmpresaGrupoTransferencia)
+        db.query(GrupoComercialTransferencia)
         .filter(
-            EmpresaGrupoTransferencia.empresa_origem_id == empresa_origem_id,
-            EmpresaGrupoTransferencia.conta_receber_origem_id
+            GrupoComercialTransferencia.empresa_origem_id == empresa_origem_id,
+            GrupoComercialTransferencia.conta_receber_origem_id
             == int(conta_receber_origem_id),
         )
         .with_for_update()
@@ -378,7 +378,7 @@ def cancelar_transferencia_integrada_por_conta(
             tenant_id=empresa_origem_id,
             user_id=usuario_origem_id,
             event="transferencia_grupo_cancelada_origem",
-            entity_type="empresa_grupo_transferencia",
+            entity_type="grupo_comercial_transferencia",
             entity_id=transferencia.id,
             metadata={"empresa_destino_id": empresa_destino_id},
             commit=False,
@@ -389,7 +389,7 @@ def cancelar_transferencia_integrada_por_conta(
             tenant_id=empresa_destino_id,
             user_id=usuario_destino_id,
             event="transferencia_grupo_cancelada_destino",
-            entity_type="empresa_grupo_transferencia",
+            entity_type="grupo_comercial_transferencia",
             entity_id=transferencia.id,
             metadata={"empresa_origem_id": empresa_origem_id},
             commit=False,

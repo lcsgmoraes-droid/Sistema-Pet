@@ -122,10 +122,11 @@ function destinoPendenciaGeral(dialogo, gerais, rejeicao, clienteId) {
     )
   ) {
     if (clienteId) {
-      const etapa = /endereço|endereco|cep|ibge|município|municipio/.test(texto) ? 3 : 1;
+      const ehEndereco = /endereço|endereco|cep|ibge|município|municipio/.test(texto);
+      const aba = ehEndereco ? "endereco" : "dados-gerais";
       return {
-        url: `/clientes?editar_cliente=${encodeURIComponent(clienteId)}&etapa=${etapa}`,
-        rotulo: etapa === 3 ? "Corrigir endereço deste cliente" : "Corrigir cadastro deste cliente",
+        url: `/clientes/${encodeURIComponent(clienteId)}/editar?aba=${aba}`,
+        rotulo: ehEndereco ? "Corrigir endereço deste cliente" : "Corrigir cadastro deste cliente",
       };
     }
     return { url: "/clientes", rotulo: "Abrir cadastro de clientes" };

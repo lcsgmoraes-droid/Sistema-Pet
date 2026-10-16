@@ -42,6 +42,14 @@ Ao cadastrar uma nova empresa:
 7. Registrar mapeamento item-a-item em `tenant_template_item_installs`.
 8. Se qualquer etapa obrigatoria falhar, fazer rollback do cadastro.
 
+**Nota (25/09/2026)**: alem do fluxo acima, todo tenant novo criado a partir de
+`GrupoComercialService.criar_grupo`/`adicionar_loja` (cadastro publico, onboarding
+assistido de ops, "adicionar loja") tambem ganha automaticamente um `Cliente` para
+o titular, vinculado a uma `PessoaMestre` do grupo — ver `Documentacao/Dominio/
+EmpresaGrupo.md` e `Documentacao/Dominio/Plano-Camada-Geral.md` (Checkpoint 4).
+Esse passo roda dentro do `GrupoComercialService`, fora do escopo de
+`onboard_tenant_defaults`/copia de template descrito acima.
+
 ## Checks Obrigatorios Antes de Liberar Cadastro Novo
 
 Rodar:
@@ -146,8 +154,13 @@ O contrato operacional esta em `docs/IMPORTACAO_SIMPLESVET_SEGURA.md`.
 
 ## Catalogo Base Administrativo
 
-O catalogo base da loja `admin@mlprohub.com.br` pode ser importado por acao administrativa
-para novos tenants que quiserem iniciar com uma lista pronta de produtos.
+O catalogo base da loja do Lucas (`atacadaopetpp@gmail.com`) pode ser importado para novos
+tenants que quiserem iniciar com uma lista pronta de produtos. Desde 23/09/2026 isso nao tem
+mais gatilho na tela `/ops/tenants` (paineis "Catalogo base"/"Guardrails do MVP" e as rotas
+`/{tenant_id}/catalog-import/preview`/`/apply` foram removidos por estarem sem uso real e sem
+a conta-fonte cadastrada em nenhum ambiente) — a importacao continua existindo como motor
+(`base_catalog_import_service.py`) e pode ser rodada via `backend/app/scripts/run_base_catalog_import.py`
+ou reaproveitada pelo seed de demo/QA (`seed_demo_operacional_db.py`).
 
 Regras obrigatorias:
 

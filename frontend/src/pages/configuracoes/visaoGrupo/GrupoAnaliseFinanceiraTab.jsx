@@ -12,7 +12,7 @@ import MetricCard from "../../../components/ui/MetricCard";
 import MetricGrid from "../../../components/ui/MetricGrid";
 import Panel from "../../../components/ui/Panel";
 import StatusBadge from "../../../components/ui/StatusBadge";
-import { obterAnaliseFinanceiraGrupo } from "../../../services/gruposEmpresas";
+import { obterAnaliseFinanceiraGrupo } from "../../../services/gruposComerciais";
 import { formatMoneyBRL } from "../../../utils/formatters";
 
 function classeSaldo(valor) {

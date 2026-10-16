@@ -27,10 +27,22 @@ def upgrade() -> None:
         sa.Column("numero", sa.String(50), nullable=False),
         sa.Column("numero_digitos", sa.String(20), nullable=False),
         sa.Column("vinculo", sa.String(60), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["cliente_id"], ["clientes.id"], ondelete="CASCADE"),
-        sa.UniqueConstraint("tenant_id", "numero_digitos", name="uq_cliente_contatos_tenant_numero"),
+        sa.UniqueConstraint(
+            "tenant_id", "numero_digitos", name="uq_cliente_contatos_tenant_numero"
+        ),
     )
     op.create_index("ix_cliente_contatos_tenant_id", TABLE, ["tenant_id"])
     op.create_index("ix_cliente_contatos_cliente_id", TABLE, ["cliente_id"])

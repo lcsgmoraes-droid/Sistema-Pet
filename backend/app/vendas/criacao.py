@@ -232,8 +232,8 @@ def criar_venda(
         # ============================================================
 
         from app.produtos_models import Produto
-        from app.empresa_grupo_estoque_compartilhado_service import (
-            EmpresaGrupoEstoqueCompartilhadoService,
+        from app.grupo_comercial_estoque_compartilhado_service import (
+            GrupoComercialEstoqueCompartilhadoService,
             contexto_tenant_estoque,
             resolver_tenant_estoque_item,
         )
@@ -256,7 +256,7 @@ def criar_venda(
             # Todo item ligado ao catalogo e carregado no tenant e normalizado aqui.
             if produto_id:
                 produto_resolvido = (
-                    EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_venda(
+                    GrupoComercialEstoqueCompartilhadoService.resolver_produto_venda(
                         db, payload.get("tenant_id"), produto_id
                     )
                 )

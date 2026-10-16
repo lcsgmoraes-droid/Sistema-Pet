@@ -1,6 +1,7 @@
 """Rotas de cadastro, detalhe e edicao completa de produtos."""
 
 import logging
+from app.services.produto_historico_service import registrar_alteracoes_produto
 from datetime import datetime
 from uuid import UUID
 
@@ -23,10 +24,12 @@ from app.produtos.schemas import (
     ProdutoCompostoPrecoVendaPreviewRequest,
     ProdutoCompostoPrecoVendaPreviewResponse,
     ProdutoCreate,
+    ProdutoPreCadastroGrupoResponse,
     ProdutoResponse,
     ProdutoUpdate,
 )
 from app.produtos.validators import (
+    _validar_codigo_barras_unico,
     _validar_sku_unico,
     _validar_tenant_e_obter_usuario,
     _validar_chaves_aliases,
@@ -48,10 +51,12 @@ from app.services.produto_ai_enrichment import (
     gerar_rascunho_produto_por_ean,
 )
 from app.produtos.tipos import aplicar_regras_servico_dados
-from app.empresa_grupo_estoque_compartilhado_service import (
-    EmpresaGrupoEstoqueCompartilhadoService,
+from app.grupo_comercial_estoque_compartilhado_service import (
+    GrupoComercialEstoqueCompartilhadoService,
 )
-from app.tenancy.context import set_current_tenant
+from app.tenancy.context import set_current_tenant, tenant_context
+from app.services.produto_identidade_service import INHERENT_FIELDS
+from app.grupo_comercial_contexto import listar_empresas_do_grupo
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -87,6 +92,60 @@ def preencher_produto_com_ia(
     )
 
 
+@router.get(
+    "/{produto_id}/pre-cadastro-grupo",
+    response_model=ProdutoPreCadastroGrupoResponse,
+)
+@require_permission("produtos.criar")
+def pre_cadastro_produto_grupo(
+    produto_id: int,
+    tenant_origem: UUID,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Campos inerentes de um produto de OUTRA loja do grupo, pra
+    pre-preencher o formulario de "cadastrar nesta loja" (achado via busca
+    cross-grupo, app/services/produto_busca_grupo_service.py). Nunca retorna
+    preco/estoque/lote — isso e sempre digitado do zero pela loja que esta
+    cadastrando. So permite ler de uma loja que realmente esta no mesmo grupo
+    ativo do solicitante, mesma trava usada em toda leitura cross-tenant
+    deste modulo."""
+    _, tenant_solicitante_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+
+    tenants_do_grupo = {
+        str(t) for t in listar_empresas_do_grupo(db, tenant_solicitante_id)
+    }
+    if str(tenant_origem) not in tenants_do_grupo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Essa loja nao participa do seu grupo comercial.",
+        )
+
+    from app.models import Tenant as TenantModel
+
+    loja = db.query(TenantModel).filter(TenantModel.id == str(tenant_origem)).first()
+
+    with tenant_context(tenant_origem):
+        set_current_tenant(tenant_origem)
+        produto = (
+            db.query(Produto)
+            .filter(Produto.id == produto_id, Produto.tenant_id == tenant_origem)
+            .first()
+        )
+        if not produto:
+            raise HTTPException(status_code=404, detail="Produto não encontrado")
+
+        campos_resposta = (
+            set(ProdutoPreCadastroGrupoResponse.model_fields) & INHERENT_FIELDS
+        )
+        dados = {campo: getattr(produto, campo) for campo in campos_resposta}
+
+    return ProdutoPreCadastroGrupoResponse(
+        **dados,
+        loja_origem_nome=loja.name if loja else "Loja do grupo",
+    )
+
+
 @router.post("/", response_model=ProdutoResponse, status_code=status.HTTP_201_CREATED)
 @require_permission("produtos.criar")
 def criar_produto(
@@ -112,20 +171,7 @@ def criar_produto(
 
     # Verificar se código de barras já existe
     if produto.codigo_barras:
-        existe_barcode = (
-            db.query(Produto)
-            .filter(
-                Produto.codigo_barras == produto.codigo_barras,
-                Produto.tenant_id == tenant_id,
-            )
-            .first()
-        )
-
-        if existe_barcode:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Código de barras '{produto.codigo_barras}' já cadastrado",
-            )
+        _validar_codigo_barras_unico(db, produto.codigo_barras, tenant_id)
 
     # Verificar se categoria existe
     if produto.categoria_id:
@@ -300,8 +346,10 @@ def obter_produto(
     current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
         user_and_tenant
     )
-    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
-        db, tenant_solicitante_id, produto_id
+    acesso_catalogo = (
+        GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
+            db, tenant_solicitante_id, produto_id
+        )
     )
     tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
     set_current_tenant(tenant_id)
@@ -425,8 +473,10 @@ def preview_precos_venda_produtos_compostos(
     """Mostra os precos de venda sugeridos sem alterar nenhum produto."""
 
     _, tenant_solicitante_id = _validar_tenant_e_obter_usuario(user_and_tenant)
-    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
-        db, tenant_solicitante_id, produto_id
+    acesso_catalogo = (
+        GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
+            db, tenant_solicitante_id, produto_id
+        )
     )
     tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
     set_current_tenant(tenant_id)
@@ -470,8 +520,10 @@ def atualizar_produto(
     current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
         user_and_tenant
     )
-    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
-        db, tenant_solicitante_id, produto_id
+    acesso_catalogo = (
+        GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
+            db, tenant_solicitante_id, produto_id
+        )
     )
     tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
     set_current_tenant(tenant_id)
@@ -515,21 +567,9 @@ def atualizar_produto(
         produto_update.codigo_barras
         and produto_update.codigo_barras != produto.codigo_barras
     ):
-        existe_barcode = (
-            db.query(Produto)
-            .filter(
-                Produto.codigo_barras == produto_update.codigo_barras,
-                Produto.tenant_id == tenant_id,
-                Produto.id != produto_id,
-            )
-            .first()
+        _validar_codigo_barras_unico(
+            db, produto_update.codigo_barras, tenant_id, produto_id=produto_id
         )
-
-        if existe_barcode:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Código de barras '{produto_update.codigo_barras}' já cadastrado",
-            )
 
     # Extrair dados
     dados_recebidos = produto_update.model_dump(exclude_unset=True)
@@ -698,8 +738,17 @@ def atualizar_produto(
     custo_componente_alterado = "preco_custo" in dados_recebidos
     preco_venda_componente_anterior = float(getattr(produto, "preco_venda", 0) or 0)
 
+    antes_historico = {key: getattr(produto, key, None) for key in dados_recebidos}
     for key, value in dados_recebidos.items():
         setattr(produto, key, value)
+    registrar_alteracoes_produto(
+        db,
+        produto_id=produto.id,
+        tenant_id=tenant_id,
+        user_id=current_user.id,
+        antes=antes_historico,
+        depois=dados_recebidos,
+    )
 
     if not bool(produto.ativo) or produto.situacao is False:
         produto.anunciar_ecommerce = False
@@ -763,6 +812,12 @@ def atualizar_produto(
                 )
             )
             db.add(produto)
+
+        from app.services.produto_identidade_service import (
+            processar_alteracoes_inerentes,
+        )
+
+        processar_alteracoes_inerentes(produto, dados_recebidos, db, current_user.id)
 
         db.commit()
         db.refresh(produto)

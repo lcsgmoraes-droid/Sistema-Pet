@@ -83,14 +83,11 @@ def build_available_profiles_for_clientes(
         if cliente_id is not None:
             clientes_by_id[int(cliente_id)] = cliente
 
-        tipo_cadastro = (
-            str(getattr(cliente, "tipo_cadastro", "") or "").strip().casefold()
-        )
-        if tipo_cadastro == "cliente":
+        if bool(getattr(cliente, "is_cliente", False)):
             _put_profile(profiles_by_type, "cliente", cliente, source="cadastro")
-        if tipo_cadastro == "funcionario":
+        if bool(getattr(cliente, "is_funcionario", False)):
             _put_profile(profiles_by_type, "funcionario", cliente, source="cadastro")
-        if tipo_cadastro == "veterinario":
+        if bool(getattr(cliente, "is_veterinario", False)):
             _put_profile(profiles_by_type, "veterinario", cliente, source="cadastro")
         if (
             bool(getattr(cliente, "is_entregador", False))

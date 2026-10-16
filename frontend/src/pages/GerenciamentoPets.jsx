@@ -16,14 +16,16 @@ import {
 } from "lucide-react";
 import ActionButton from "../components/ui/ActionButton";
 import CustomerIdentity from "../components/ui/CustomerIdentity";
+import DataTable from "../components/ui/DataTable";
 import EmptyState from "../components/ui/EmptyState";
-import IconActionButton from "../components/ui/IconActionButton";
 import LoadingState from "../components/ui/LoadingState";
 import PageHeader from "../components/ui/PageHeader";
 import Panel from "../components/ui/Panel";
-import EntityCard, { EntityInfoRow } from "../components/ui/EntityCard";
+import PetAvatar from "../components/ui/PetAvatar";
+import StatusBadge from "../components/ui/StatusBadge";
 import FilterBar, { FilterAdvanced, FilterRow } from "../components/ui/FilterBar";
 import PessoaSelector from "../components/clientes/PessoaSelector";
+import BotaoMenuAcoes from "../components/v2/BotaoMenuAcoes/BotaoMenuAcoes";
 import { formatarIdadeMeses } from "../helpers/idadeHelper";
 
 const GerenciamentoPets = () => {
@@ -374,92 +376,98 @@ const GerenciamentoPets = () => {
           }
         />
       ) : !error ? (
-        <div className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {pets.map((pet) => {
-            const infoRows = [
-              { label: "Espécie:", value: pet.especie || "" },
-              { label: "Raça:", value: pet.raca || "" },
-              { label: "Sexo:", value: pet.sexo || "" },
-              { label: "Idade:", value: obterIdadePet(pet) },
-            ];
-
-            return (
-              <EntityCard
-                key={pet.id}
-                title={pet.nome}
-                subtitle={pet.codigo}
-                inactive={!pet.ativo}
-                statusIcon={
-                  pet.ativo ? (
-                    <CheckCircle2 className="text-emerald-500" size={16} />
-                  ) : (
-                    <XCircle className="text-red-500" size={16} />
-                  )
-                }
-                media={
-                  pet.foto_url ? (
-                    <img
-                      src={pet.foto_url}
-                      alt={pet.nome}
-                      loading="lazy"
-                      className="h-20 w-20 rounded-2xl border border-slate-200 object-cover shadow-sm"
-                    />
-                  ) : null
-                }
-                actions={
-                  <>
-                    <ActionButton
-                      onClick={() => navigate(`/pets/${pet.id}`)}
-                      className="flex-1"
-                      intent="edit"
-                      icon={Eye}
-                      size="sm"
-                    >
-                      Ver Detalhes
-                    </ActionButton>
-                    <IconActionButton
-                      onClick={() => navigate(`/pets/${pet.id}/editar`)}
-                      intent="edit"
-                      icon={Pencil}
-                      size="sm"
-                      title="Editar"
-                      aria-label={`Editar ${pet.nome}`}
-                    />
-                    <IconActionButton
-                      onClick={() => toggleAtivacao(pet)}
-                      intent={pet.ativo ? "delete" : "create"}
-                      icon={pet.ativo ? XCircle : CheckCircle2}
-                      size="sm"
-                      title={pet.ativo ? "Desativar" : "Reativar"}
-                      aria-label={pet.ativo ? `Desativar ${pet.nome}` : `Reativar ${pet.nome}`}
-                    />
-                  </>
-                }
-              >
-                <div className="space-y-1.5">
-                  {infoRows.map((row) => (
-                    <EntityInfoRow key={row.label} label={row.label} value={row.value} />
-                  ))}
-                </div>
-                <div className="mt-3 border-t border-slate-100 pt-3">
-                  <EntityInfoRow
-                    label="Tutor:"
-                    value={
-                      <CustomerIdentity
-                        codeLabel="Cod. tutor"
-                        fallback={`Tutor #${pet.cliente_id || "-"}`}
-                        className="w-full max-w-full"
-                        nameClassName="font-medium text-blue-600"
-                        nameWrapperClassName="max-w-full"
-                        record={pet}
-                      />
-                    }
+        <Panel padding="none">
+          <DataTable
+            columns={[
+              {
+                key: "acoes",
+                header: "Ações",
+                render: (pet) => (
+                  <BotaoMenuAcoes
+                    rotulo={`Mais ações para ${pet.nome}`}
+                    acoes={[
+                      {
+                        icon: Eye,
+                        label: "Ver detalhes",
+                        onClick: () => navigate(`/pets/${pet.id}`),
+                      },
+                      {
+                        icon: Pencil,
+                        label: "Editar",
+                        onClick: () => navigate(`/pets/${pet.id}/editar`),
+                      },
+                      {
+                        icon: pet.ativo ? XCircle : CheckCircle2,
+                        label: pet.ativo ? "Desativar" : "Reativar",
+                        tom: pet.ativo ? "perigo" : "neutro",
+                        onClick: () => toggleAtivacao(pet),
+                      },
+                    ]}
                   />
-                </div>
-              </EntityCard>
-            );
-          })}
-        </div>
+                ),
+              },
+              {
+                key: "pet",
+                header: "Pet",
+                render: (pet) => (
+                  <div className="flex items-center gap-3">
+                    <PetAvatar name={pet.nome} url={pet.foto_url} />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-900">{pet.nome}</p>
+                      <p className="truncate text-xs text-slate-500">{pet.codigo || "-"}</p>
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                key: "status",
+                header: "Status",
+                render: (pet) => (
+                  <StatusBadge
+                    status={pet.ativo ? "ativo" : "inativo"}
+                    intent={pet.ativo ? "success" : "neutral"}
+                  />
+                ),
+              },
+              {
+                key: "especie",
+                header: "Espécie",
+                render: (pet) => pet.especie || "-",
+              },
+              {
+                key: "raca",
+                header: "Raça",
+                render: (pet) => pet.raca || "-",
+              },
+              {
+                key: "sexo",
+                header: "Sexo",
+                render: (pet) => pet.sexo || "-",
+              },
+              {
+                key: "idade",
+                header: "Idade",
+                render: (pet) => obterIdadePet(pet) || "-",
+              },
+              {
+                key: "tutor",
+                header: "Tutor",
+                render: (pet) => (
+                  <CustomerIdentity
+                    codeLabel="Cod. tutor"
+                    fallback={`Tutor #${pet.cliente_id || "-"}`}
+                    nameClassName="font-medium text-blue-600"
+                    record={pet}
+                  />
+                ),
+              },
+            ]}
+            data={pets}
+            emptyMessage="Nenhum pet encontrado"
+            getRowKey={(pet) => pet.id}
+            rowClassName={(pet) => (!pet.ativo ? "bg-slate-50/60" : "")}
+          />
+        </Panel>
       ) : null}
 
       {/* Resumo */}

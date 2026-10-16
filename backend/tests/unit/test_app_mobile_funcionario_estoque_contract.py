@@ -24,7 +24,7 @@ def test_mobile_auth_exposes_funcionario_operational_profile():
     assert "is_funcionario" in source
     assert '"funcionario"' in source
     assert "perfil_operacional" in source
-    assert "tipo_cadastro" in source
+    assert "is_funcionario" in source
 
 
 def test_employee_stock_routes_search_erp_products_not_public_app_catalog():

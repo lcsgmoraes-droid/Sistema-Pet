@@ -179,6 +179,17 @@ export const getProduto = (id) => {
 };
 
 /**
+ * Dados inerentes (nome/codigo de barras/GTIN/peso/foto) de um produto de
+ * OUTRA loja do mesmo grupo comercial, pra pre-preencher o cadastro desta
+ * loja. Nunca traz preco/estoque/lote.
+ */
+export const getPreCadastroProdutoGrupo = (produtoId, tenantOrigem) => {
+  return api.get(`/produtos/${produtoId}/pre-cadastro-grupo`, {
+    params: { tenant_origem: tenantOrigem },
+  });
+};
+
+/**
  * Obter variações de um produto PAI
  * Sprint 2: Lazy load de variações
  */

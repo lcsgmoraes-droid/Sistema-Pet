@@ -18,9 +18,11 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import UUID as PgUUID
+from sqlalchemy.orm import relationship, validates
 
-from .base_models import BaseTenantModel
+from .base_models import BaseTenantModel, TenantScoped
+from .db import Base
 from .services.product_image_storage import build_product_thumbnail_url
 
 
@@ -109,6 +111,19 @@ class Produto(BaseTenantModel):
     nome = Column(String(200), nullable=False)
     tipo = Column(String(20), default="produto")  # produto, servico, produto_servico
     situacao = Column(Boolean, default=True)  # ativo/inativo
+    # Vínculo com a identidade compartilhada do grupo comercial (nome, código
+    # de barras/GTIN, peso, dimensões, foto, descrição, classificação de ração
+    # — ver app/produto_identidade_models.py). Nullable: produto sem GTIN
+    # confiável, ou loja fora de qualquer grupo, fica sem vínculo normalmente.
+    # Os campos inerentes continuam também aqui em Produto, como espelho
+    # sincronizado pelo app/services/produto_identidade_service.py — nenhum
+    # consumidor existente de Produto.nome/codigo_barras/etc. precisa mudar.
+    produto_identidade_id = Column(
+        Integer,
+        ForeignKey("produto_identidades.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     @property
     def controlar_estoque(self) -> bool:
@@ -224,6 +239,17 @@ class Produto(BaseTenantModel):
     ncm = Column(String(8), nullable=True)
     cest = Column(String(7), nullable=True)
     gtin_ean = Column(String(20), nullable=True)
+    origem_tenant_id = Column(PgUUID(as_uuid=True), nullable=True, index=True)
+
+    @validates("origem_tenant_id")
+    def _origem_imutavel(self, key, valor):
+        atual = self.__dict__.get("origem_tenant_id")
+        if atual is not None and valor != atual:
+            raise ValueError(
+                "A loja de origem do produto e definida na criacao e nao pode ser alterada."
+            )
+        return valor
+
     gtin_ean_tributario = Column(String(20), nullable=True)
     origem = Column(String(1), nullable=True)  # 0-8
     perfil_tributario = Column(String(50), nullable=True)
@@ -473,6 +499,13 @@ class Produto(BaseTenantModel):
         Index(
             "idx_produtos_variation_signature", "tenant_id", "variation_signature"
         ),  # Sprint 2: Variações        {'extend_existing': True}
+        Index(
+            "ux_produtos_tenant_identidade",
+            "tenant_id",
+            "produto_identidade_id",
+            unique=True,
+            postgresql_where=(produto_identidade_id.isnot(None) & deleted_at.is_(None)),
+        ),
     )
 
     @property
@@ -531,3 +564,24 @@ def _aplicar_invariantes_servico_orm(_mapper, _connection, produto: Produto) -> 
         return
     for campo, valor in dados.items():
         setattr(produto, campo, valor)
+
+
+class ProdutoHistoricoAlteracao(TenantScoped, Base):
+    __tablename__ = "produtos_historico_alteracoes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    produto_id = Column(
+        Integer,
+        ForeignKey("produtos.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    campo = Column(String(100), nullable=False)
+    valor_anterior = Column(Text, nullable=True)
+    valor_novo = Column(Text, nullable=True)
+    alterado_em = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

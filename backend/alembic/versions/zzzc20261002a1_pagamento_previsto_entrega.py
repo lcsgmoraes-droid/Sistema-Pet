@@ -15,7 +15,9 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("vendas", sa.Column("pagamento_entrega_previsto", sa.JSON(), nullable=True))
+    op.add_column(
+        "vendas", sa.Column("pagamento_entrega_previsto", sa.JSON(), nullable=True)
+    )
 
 
 def downgrade() -> None:

@@ -59,7 +59,7 @@ export default function InputData({
       <InputTexto
         disabled={disabled}
         error={error}
-        help={help === undefined ? "dd/mm/aaaa" : help}
+        help={help}
         id={id}
         inputMode="numeric"
         label={label}

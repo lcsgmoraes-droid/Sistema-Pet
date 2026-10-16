@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AlertCircle, UsersRound } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../api";
+import ModalImportacaoPessoas from "../components/ModalImportacaoPessoas";
+import ClientePessoaCriarModal from "../components/clientes/ClientePessoaCriarModal";
 import ClientesNovoActionsBar from "../components/clientes/ClientesNovoActionsBar";
 import ClientesOrigemResumo from "../components/clientes/ClientesOrigemResumo";
-import ClientesNovoCadastroRecenteBanner from "../components/clientes/ClientesNovoCadastroRecenteBanner";
-import ClientesNovoModalsLayer from "../components/clientes/ClientesNovoModalsLayer";
 import ClientesNovoTabelaSection from "../components/clientes/ClientesNovoTabelaSection";
 import ClientesNovoTabsBar from "../components/clientes/ClientesNovoTabsBar";
 import PessoasDuplicidadeBanner from "../components/pessoas/PessoasDuplicidadeBanner";
@@ -20,7 +20,6 @@ import {
   executarFusoesAutomaticasPessoas,
   executarFusoesAssistidasPessoasPorNome,
 } from "../api/clientes";
-import { useClientesNovoCadastro } from "../hooks/useClientesNovoCadastro";
 import { useClientesNovoListagem } from "../hooks/useClientesNovoListagem";
 import { debugLog } from "../utils/debug";
 import {
@@ -31,15 +30,31 @@ import { confirmarCorePet } from "../services/corepetDialog";
 
 const LIMITE_DUPLICIDADES_POR_PAGINA = 25;
 
+function buildListaPessoasUrl({ searchTerm, paginaAtual, tipoFiltro }) {
+  const params = new URLSearchParams();
+  if (searchTerm) params.set("q", searchTerm);
+  if (paginaAtual > 1) params.set("page", String(paginaAtual));
+  if (tipoFiltro !== "todos") params.set("tipo", tipoFiltro);
+  const query = params.toString();
+  return query ? `/clientes?${query}` : "/clientes";
+}
+
 const Pessoas = () => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const visaoDashboard = normalizarVisaoDashboardClientes(searchParams);
   const [error, setError] = useState("");
-  const [tipoFiltro, setTipoFiltro] = useState(visaoDashboard ? "cliente" : "todos");
+  const [tipoFiltro, setTipoFiltro] = useState(() => {
+    if (visaoDashboard) return "cliente";
+    return searchParams.get("tipo") || "todos";
+  });
   const [expandedPets, setExpandedPets] = useState({});
-  const [clienteRecemCriado, setClienteRecemCriado] = useState(null);
-  const [campoCopiadoRecente, setCampoCopiadoRecente] = useState("");
+  const [highlightedPetId, setHighlightedPetId] = useState(null);
+  const [criarModalAberto, setCriarModalAberto] = useState(false);
+  const [tipoParaCriar, setTipoParaCriar] = useState(null);
+  const [showModalImportacao, setShowModalImportacao] = useState(false);
   const [pessoasSelecionadasFusao, setPessoasSelecionadasFusao] = useState([]);
+  const [modoFusaoAtivo, setModoFusaoAtivo] = useState(false);
   const [pessoasSugestaoFusao, setPessoasSugestaoFusao] = useState(null);
   const [modalFusaoAberto, setModalFusaoAberto] = useState(false);
   const [modalRelatorioAberto, setModalRelatorioAberto] = useState(false);
@@ -62,7 +77,6 @@ const Pessoas = () => {
     varreduraInicialExecutada: false,
   });
   const {
-    clientes,
     loading,
     carregamentoInicialConcluido,
     searchTerm,
@@ -78,7 +92,34 @@ const Pessoas = () => {
     filtrosOrigem,
     alterarFiltrosOrigem,
     resumoOrigens,
-  } = useClientesNovoListagem({ tipoFiltro, visaoDashboard, setError });
+  } = useClientesNovoListagem({
+    tipoFiltro,
+    visaoDashboard,
+    setError,
+    initialSearchTerm: searchParams.get("q") || "",
+    initialPaginaAtual: Number(searchParams.get("page")) || 1,
+  });
+
+  // Mantém a busca, a página e o tipo de filtro na própria URL — assim, ao voltar da tela de
+  // edição de uma pessoa (ou usar o botão voltar do navegador), a consulta e o resultado da
+  // lista não se perdem.
+  const listaUrl = buildListaPessoasUrl({ searchTerm, paginaAtual, tipoFiltro });
+
+  useEffect(() => {
+    setSearchParams(
+      (params) => {
+        const proximos = new URLSearchParams(params);
+        if (searchTerm) proximos.set("q", searchTerm);
+        else proximos.delete("q");
+        if (paginaAtual > 1) proximos.set("page", String(paginaAtual));
+        else proximos.delete("page");
+        if (tipoFiltro !== "todos") proximos.set("tipo", tipoFiltro);
+        else proximos.delete("tipo");
+        return proximos;
+      },
+      { replace: true },
+    );
+  }, [searchTerm, paginaAtual, tipoFiltro, setSearchParams]);
 
   const setTipoFiltroComContexto = (proximoTipo) => {
     setTipoFiltro(proximoTipo);
@@ -97,71 +138,15 @@ const Pessoas = () => {
     setPessoasSugestaoFusao(null);
   };
 
-  const handleClienteCriado = async (cliente) => {
-    const termoFiltro = String(cliente?.codigo || cliente?.nome || "").trim();
-
-    setError("");
-    setExpandedPets({});
-    setCampoCopiadoRecente("");
-    setClienteRecemCriado({
-      ...cliente,
-      termoFiltro,
-    });
-
-    if (!termoFiltro) {
-      await loadClientes({ paginaAtual: 1 });
-      return;
-    }
-
-    setPaginaAtual(1);
-    setSearchTerm(termoFiltro);
-    await loadClientes({ searchTerm: termoFiltro, paginaAtual: 1 });
+  const abrirModalCriacao = (tipo = null) => {
+    setTipoParaCriar(tipo);
+    setCriarModalAberto(true);
   };
 
-  const cadastro = useClientesNovoCadastro({
-    tipoFiltro,
-    clientes,
-    loadClientes,
-    onClienteCriado: handleClienteCriado,
-    error,
-    setError,
-  });
-  const edicaoPorUrlEmAndamento = useRef(false);
-  const clienteIdEdicaoPorUrl = searchParams.get("editar_cliente");
-  const etapaEdicaoPorUrl = searchParams.get("etapa");
-
-  useEffect(() => {
-    if (!clienteIdEdicaoPorUrl || edicaoPorUrlEmAndamento.current) return;
-    edicaoPorUrlEmAndamento.current = true;
-    let ativo = true;
-    api
-      .get(`/clientes/${encodeURIComponent(clienteIdEdicaoPorUrl)}`)
-      .then(({ data }) => {
-        if (!ativo) return;
-        cadastro.openModal(data);
-        cadastro.setCurrentStep(etapaEdicaoPorUrl === "3" ? 3 : 1);
-      })
-      .catch(() => {
-        if (ativo) toast.error("Não foi possível abrir o cadastro deste cliente.");
-      })
-      .finally(() => {
-        if (!ativo) return;
-        setSearchParams(
-          (atuais) => {
-            const proximos = new URLSearchParams(atuais);
-            proximos.delete("editar_cliente");
-            proximos.delete("etapa");
-            return proximos;
-          },
-          { replace: true },
-        );
-        edicaoPorUrlEmAndamento.current = false;
-      });
-    return () => {
-      ativo = false;
-      edicaoPorUrlEmAndamento.current = false;
-    };
-  }, [clienteIdEdicaoPorUrl, etapaEdicaoPorUrl, setSearchParams]);
+  const handleClienteCriado = (cliente) => {
+    setCriarModalAberto(false);
+    navigate(`/clientes/${cliente.id}/editar`, { state: { from: listaUrl } });
+  };
 
   const handleDelete = async (id) => {
     if (!(await confirmarCorePet("Tem certeza que deseja excluir este cliente?"))) return;
@@ -189,7 +174,7 @@ const Pessoas = () => {
 
       // Limpar estado de expansão para forçar re-render
       setExpandedPets({});
-      cadastro.setHighlightedPetId(null);
+      setHighlightedPetId(null);
 
       // Atualizar lista de clientes
       await loadClientes();
@@ -214,7 +199,8 @@ const Pessoas = () => {
 
     if (clienteCodigoExato) {
       setPaginaAtual(1);
-      cadastro.openModal(clienteCodigoExato);
+      const from = buildListaPessoasUrl({ searchTerm: termo, paginaAtual: 1, tipoFiltro });
+      navigate(`/clientes/${clienteCodigoExato.id}/editar`, { state: { from } });
     }
   };
 
@@ -226,7 +212,7 @@ const Pessoas = () => {
       }
 
       if (prev.length >= 2) {
-        toast("Selecione no maximo 2 pessoas para fundir.");
+        toast("Selecione no maximo 2 pessoas para fundir.", { id: "fusao-limite-selecao" });
         return prev;
       }
 
@@ -234,9 +220,16 @@ const Pessoas = () => {
     });
   };
 
+  const iniciarFusaoDePessoa = (clienteId) => {
+    setPessoasSugestaoFusao(null);
+    setPessoasSelecionadasFusao([clienteId]);
+    setModoFusaoAtivo(true);
+  };
+
   const limparSelecaoFusao = () => {
     setPessoasSelecionadasFusao([]);
     setPessoasSugestaoFusao(null);
+    setModoFusaoAtivo(false);
   };
 
   const abrirModalFusao = () => {
@@ -282,10 +275,15 @@ const Pessoas = () => {
     await carregarPaginaCentralDuplicidades(0);
   };
 
-  const carregarSugestoesDuplicidade = async () => {
+  // `aindaAtivo` protege a chamada automatica (useEffect de montagem) contra o StrictMode do
+  // React, que roda o efeito duas vezes em dev — sem isso, a banner de duplicidade pisca o
+  // "verificando" uma segunda vez mesmo com o resultado ja exibido. Chamadas manuais (botao
+  // "Verificar") nao passam esse argumento e seguem sempre aplicando o resultado normalmente.
+  const carregarSugestoesDuplicidade = async (aindaAtivo = () => true) => {
     setDuplicidade((prev) => ({ ...prev, verificando: true }));
     try {
       const { data } = await buscarSugestoesDuplicidadePessoas({ limit: 20 });
+      if (!aindaAtivo()) return;
       setDuplicidade((prev) => ({
         ...prev,
         sugestoes: data?.sugestoes || [],
@@ -296,11 +294,13 @@ const Pessoas = () => {
     } catch (err) {
       console.error("Erro ao buscar sugestoes de duplicidade:", err);
     } finally {
-      setDuplicidade((prev) => ({
-        ...prev,
-        verificando: false,
-        varreduraInicialExecutada: true,
-      }));
+      if (aindaAtivo()) {
+        setDuplicidade((prev) => ({
+          ...prev,
+          verificando: false,
+          varreduraInicialExecutada: true,
+        }));
+      }
     }
   };
 
@@ -446,6 +446,7 @@ const Pessoas = () => {
 
   const concluirFusaoPessoa = async () => {
     setPessoasSelecionadasFusao([]);
+    setModoFusaoAtivo(false);
     await loadClientes();
     await carregarSugestoesDuplicidade();
 
@@ -464,47 +465,17 @@ const Pessoas = () => {
     return true;
   };
 
-  const handleCopiarCampoRecente = async (valor, campo) => {
-    if (!valor) return;
-
-    try {
-      await navigator.clipboard.writeText(String(valor));
-      setCampoCopiadoRecente(campo);
-      toast.success(
-        campo === "codigo" ? "Codigo copiado com sucesso!" : "Nome copiado com sucesso!",
-      );
-    } catch (err) {
-      console.error("Erro ao copiar dados do cliente:", err);
-      toast.error("Nao foi possivel copiar os dados do cliente.");
-    }
-  };
-
-  const handleLimparFiltroRecente = async () => {
-    setClienteRecemCriado(null);
-    setCampoCopiadoRecente("");
-    handleSearchTermChange("");
-    await loadClientes({ searchTerm: "", paginaAtual: 1 });
-  };
-
-  useEffect(() => {
-    if (!campoCopiadoRecente) return undefined;
-
-    const timeoutId = window.setTimeout(() => {
-      setCampoCopiadoRecente("");
-    }, 2000);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [campoCopiadoRecente]);
-
   useEffect(() => {
     limparSelecaoFusao();
   }, [tipoFiltro, paginaAtual, registrosPorPagina]);
 
   useEffect(() => {
     if (!carregamentoInicialConcluido || duplicidade.varreduraInicialExecutada) return;
-    carregarSugestoesDuplicidade();
+    let ativo = true;
+    carregarSugestoesDuplicidade(() => ativo);
+    return () => {
+      ativo = false;
+    };
   }, [carregamentoInicialConcluido, duplicidade.varreduraInicialExecutada]);
 
   useEffect(() => {
@@ -514,28 +485,6 @@ const Pessoas = () => {
       return proximaSelecao.length === prev.length ? prev : proximaSelecao;
     });
   }, [filteredClientes]);
-
-  useEffect(() => {
-    if (!clienteRecemCriado?.termoFiltro) return;
-
-    const termoAtual = String(searchTerm || "").trim();
-    if (termoAtual && termoAtual === clienteRecemCriado.termoFiltro) return;
-
-    setClienteRecemCriado(null);
-    setCampoCopiadoRecente("");
-  }, [clienteRecemCriado?.termoFiltro, searchTerm]);
-
-  useEffect(() => {
-    if (!clienteRecemCriado?.id || loading) return;
-
-    const clienteNaLista = filteredClientes.some((cliente) => cliente.id === clienteRecemCriado.id);
-    if (!clienteNaLista) return;
-
-    const elemento = document.getElementById(`cliente-${clienteRecemCriado.id}`);
-    if (!elemento) return;
-
-    elemento.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [clienteRecemCriado?.id, filteredClientes, loading]);
 
   // ============================================================================
   // COMPONENTE: ClienteSegmentoBadgeWrapper (lazy load badge na lista)
@@ -581,19 +530,14 @@ const Pessoas = () => {
         searchTerm={searchTerm}
         setSearchTerm={handleSearchTermChange}
         abrirPessoaPorCodigoNoEnter={abrirPessoaPorCodigoNoEnter}
-        setShowModalImportacao={cadastro.setShowModalImportacao}
-        openModal={cadastro.openModal}
+        setShowModalImportacao={setShowModalImportacao}
+        openModal={abrirModalCriacao}
         tipoFiltro={tipoFiltro}
+        modoFusaoAtivo={modoFusaoAtivo}
         pessoasSelecionadasFusao={pessoasSelecionadasFusao}
         onAbrirFusao={abrirModalFusao}
         onAbrirRelatorio={() => setModalRelatorioAberto(true)}
         onLimparSelecaoFusao={limparSelecaoFusao}
-      />
-      <ClientesNovoCadastroRecenteBanner
-        cliente={clienteRecemCriado}
-        campoCopiado={campoCopiadoRecente}
-        onCopiarCampo={handleCopiarCampoRecente}
-        onLimparFiltro={handleLimparFiltroRecente}
       />
       {tipoFiltro === "cliente" && (
         <ClientesOrigemResumo
@@ -612,7 +556,7 @@ const Pessoas = () => {
         onFundirAutomaticas={() => executarVarreduraDuplicidade({ silencioso: false })}
         onAbrirCentral={abrirCentralDuplicidades}
       />
-      {error && !cadastro.showModal && (
+      {error && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
           <AlertCircle className="h-5 w-5" aria-hidden="true" />
           <span>{error}</span>
@@ -626,19 +570,32 @@ const Pessoas = () => {
         setRegistrosPorPagina={setRegistrosPorPagina}
         setPaginaAtual={setPaginaAtual}
         filteredClientes={filteredClientes}
-        highlightedClienteId={clienteRecemCriado?.id}
+        listaUrl={listaUrl}
         expandedPets={expandedPets}
         setExpandedPets={setExpandedPets}
-        highlightedPetId={cadastro.highlightedPetId}
-        setHighlightedPetId={cadastro.setHighlightedPetId}
-        openModal={cadastro.openModal}
+        highlightedPetId={highlightedPetId}
+        setHighlightedPetId={setHighlightedPetId}
         handleDelete={handleDelete}
         handleDeletePet={handleDeletePet}
+        modoFusaoAtivo={modoFusaoAtivo}
+        onIniciarFusao={iniciarFusaoDePessoa}
         pessoasSelecionadasFusao={pessoasSelecionadasFusao}
         togglePessoaFusao={togglePessoaFusao}
       />
 
-      <ClientesNovoModalsLayer {...cadastro.modalsLayerProps} />
+      <ClientePessoaCriarModal
+        aberto={criarModalAberto}
+        tipoInicial={tipoParaCriar}
+        onCriado={handleClienteCriado}
+        onFechar={() => setCriarModalAberto(false)}
+      />
+      <ModalImportacaoPessoas
+        isOpen={showModalImportacao}
+        onClose={() => {
+          setShowModalImportacao(false);
+          loadClientes();
+        }}
+      />
       <PessoasDuplicidadeCentralModal
         isOpen={centralDuplicidades.aberta}
         sugestoes={centralDuplicidades.sugestoes}
