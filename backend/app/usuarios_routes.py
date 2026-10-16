@@ -19,7 +19,7 @@ from app.auth.auth_multitenant_support import (
     _resolve_frontend_base_url,
 )
 from app.security.permissions_decorator import require_permission
-from app.clientes.common import gerar_codigo_cliente
+from app.clientes.common import gerar_codigo_cliente, tipos_cadastro_da_pessoa
 from app.models import (
     AppAccessProfile,
     Cliente,
@@ -32,7 +32,6 @@ from app.models import (
 from app.routes.ecommerce_auth_cliente import _digits_only, _phone_digits
 from app.routes.ecommerce_auth_profiles import _anonymize_ecommerce_user
 from app.usuario_menu_favoritos_models import UsuarioMenuFavorito
-from app.clientes.common import gerar_codigo_cliente, tipos_cadastro_da_pessoa
 from app.services.app_access_profile_service import sync_cliente_app_access_profiles
 from app.services.business_audit_service import (
     build_user_access_metadata,

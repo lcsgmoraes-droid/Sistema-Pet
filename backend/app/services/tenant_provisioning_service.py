@@ -21,7 +21,6 @@ import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import hash_password
@@ -32,7 +31,6 @@ from app.services.default_roles_service import create_default_roles_for_new_tena
 from app.services.plan_catalog import get_plan, segment_plan_field
 from app.services.tenant_onboarding_service import onboard_tenant_defaults
 from app.services.tenant_login_name_service import (
-    TenantLoginNameError,
     set_primary_tenant_login_name,
 )
 from app.tenancy.context import clear_tenant_context, set_tenant_context

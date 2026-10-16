@@ -2,7 +2,7 @@ import uuid
 
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 import app.services.tenant_provisioning_service as tenant_provisioning_service
 from app.db import Base

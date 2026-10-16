@@ -1,4 +1,3 @@
-from uuid import UUID
 
 import pytest
 from sqlalchemy import create_engine
@@ -11,7 +10,7 @@ from app.services.onboarding_credencial_service import (
     confirmar_credencial_repassada,
     confirmar_credenciais_do_usuario,
 )
-from app.tenancy.context import clear_current_tenant, set_current_tenant, tenant_context
+from app.tenancy.context import clear_current_tenant, set_current_tenant
 
 TENANT_1 = "11111111-1111-1111-1111-111111111111"
 TENANT_2 = "22222222-2222-2222-2222-222222222222"

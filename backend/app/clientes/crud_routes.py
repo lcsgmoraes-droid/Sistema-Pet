@@ -3,7 +3,7 @@
 from datetime import date, datetime as dt, timedelta
 import json
 import logging
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import Float, Integer, and_, case, cast, func, or_

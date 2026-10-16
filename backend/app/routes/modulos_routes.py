@@ -17,7 +17,6 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.models import AssinaturaModulo, Tenant, User
 from app.services.business_audit_service import (
-    build_module_activation_metadata,
     build_plan_activation_metadata,
     log_business_event,
 )

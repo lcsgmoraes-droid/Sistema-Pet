@@ -81,7 +81,10 @@ def test_registra_troca_para_vazio_e_de_vazio_para_valor(db):
 
     assert total == 2
     set_current_tenant(LOJA)
-    pares = {(l.campo, l.valor_anterior, l.valor_novo) for l in db.query(ClienteHistoricoAlteracao)}
+    pares = {
+        (log.campo, log.valor_anterior, log.valor_novo)
+        for log in db.query(ClienteHistoricoAlteracao)
+    }
     clear_current_tenant()
     assert ("email", None, "ana@x.com") in pares
     assert ("celular", "11988887777", None) in pares

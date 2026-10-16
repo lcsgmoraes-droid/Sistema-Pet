@@ -1,6 +1,6 @@
 import pytest
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 from starlette.requests import Request
 
 import app.services.ops_grupo_comercial_onboarding_service as onboarding_module

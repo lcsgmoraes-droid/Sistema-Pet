@@ -5,7 +5,7 @@ from app.services.produto_historico_service import registrar_alteracoes_produto
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, joinedload
 
@@ -43,7 +43,6 @@ from app.produtos_models import (
     ProdutoKitComponente,
     ProdutoProtocoloRecorrencia,
 )
-from app.models import User
 from app.security.permissions_decorator import require_permission
 from app.services.produto_service import ProdutoService
 from app.services.ofertas_estudio_ai import resolver_chave_openai_tenant

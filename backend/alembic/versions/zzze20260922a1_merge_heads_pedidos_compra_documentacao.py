@@ -9,8 +9,6 @@ Revises: zzy20260921a1, zzzd20260920a1
 Create Date: 2026-09-22
 """
 
-from alembic import op
-import sqlalchemy as sa
 
 
 revision = "zzze20260922a1"

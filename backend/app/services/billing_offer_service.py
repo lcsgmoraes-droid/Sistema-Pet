@@ -34,7 +34,7 @@ from app.services.billing_contract_service import (
     build_contract_acceptance,
     contract_manifest,
 )
-from app.services.plan_catalog import PlanDefinition, get_plan, segment_plan_field
+from app.services.plan_catalog import PlanDefinition, get_plan
 from app.tenancy.context import tenant_context
 
 ALLOWED_BILLING_TYPES = frozenset({"UNDEFINED", "PIX", "BOLETO", "CREDIT_CARD"})

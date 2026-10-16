@@ -1,4 +1,3 @@
-from uuid import UUID
 """Schemas Pydantic do modulo de produtos.
 
 Mantem os contratos de request/response fora do arquivo de rotas.
@@ -7,6 +6,7 @@ A ordem das classes preserva o comportamento historico de ProdutoResponse e Lote
 
 from datetime import datetime
 from typing import List, Literal, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 

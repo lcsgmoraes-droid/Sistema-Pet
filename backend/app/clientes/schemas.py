@@ -1,4 +1,3 @@
-from uuid import UUID
 # -*- coding: utf-8 -*-
 """Schemas Pydantic para clientes, fornecedores, parceiros e pets."""
 
@@ -6,6 +5,7 @@ import json
 from datetime import date, datetime as dt
 from decimal import Decimal
 from typing import Dict, List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, validator
 

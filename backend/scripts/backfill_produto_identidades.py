@@ -40,7 +40,6 @@ from app.produto_identidade_models import (
 from app.produtos_catalogo_models import Produto, ProdutoHistoricoAlteracao
 from app.services.produto_identidade_service import (
     INHERENT_FIELDS,
-    normalizar_chave_matching,
 )
 from app.tenancy.context import tenant_context, set_current_tenant
 
