@@ -124,7 +124,13 @@ def test_account_deletion_rejects_wrong_password_before_database_changes():
 def test_account_deletion_anonymizes_user_and_revokes_access(monkeypatch):
     tenant_id = uuid4()
     user = _user(tenant_id)
-    cliente = SimpleNamespace(id=42)
+    cliente = Cliente(
+        id=42,
+        is_cliente=True,
+        is_funcionario=False,
+        is_veterinario=False,
+        is_entregador=False,
+    )
     db = _Db(rows={Cliente: [cliente]})
     calls = []
 
@@ -192,16 +198,24 @@ def test_employee_cannot_delete_erp_account_from_app():
     assert not db.deletes
 
 
-def test_employee_person_with_customer_role_is_managed_by_erp():
+@pytest.mark.parametrize(
+    "perfil_operacional", ["is_funcionario", "is_veterinario", "is_entregador"]
+)
+def test_multitype_operational_person_with_customer_role_is_managed_by_erp(
+    perfil_operacional,
+):
     tenant_id = uuid4()
     user = _user(tenant_id)
-    db = _Db(
-        rows={
-            Cliente: [
-                SimpleNamespace(id=42, tipo_cadastro="funcionario", is_entregador=False)
-            ]
-        }
+    cliente = Cliente(
+        id=42,
+        is_cliente=True,
+        is_fornecedor=True,
+        is_funcionario=False,
+        is_veterinario=False,
+        is_entregador=False,
     )
+    setattr(cliente, perfil_operacional, True)
+    db = _Db(rows={Cliente: [cliente], Role: [SimpleNamespace(name="Cliente")]})
 
     with pytest.raises(HTTPException) as error:
         excluir_conta(
@@ -215,6 +229,10 @@ def test_employee_person_with_customer_role_is_managed_by_erp():
 
     assert error.value.status_code == 403
     assert user.is_active is True
+    assert not db.updates
+    assert not db.deletes
+    assert not db.deleted_rows
+    assert not db.committed
 
 
 def test_account_deletion_removes_local_pet_photo(monkeypatch, tmp_path):

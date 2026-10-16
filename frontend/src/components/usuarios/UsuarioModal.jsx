@@ -126,30 +126,31 @@ export default function UsuarioModal({
   };
 
   const vincularPessoaEncontrada = () => {
-    setNovoUsuario({
-      ...novoUsuario,
+    setNovoUsuario((atual) => ({
+      ...atual,
       nome: duplicata.cliente.nome,
       pessoa_id: duplicata.cliente.id,
-    });
+    }));
     setPessoaVinculada({ id: duplicata.cliente.id, nome: duplicata.cliente.nome });
     setDuplicata(null);
   };
 
   const desvincularPessoa = () => {
-    setNovoUsuario({ ...novoUsuario, pessoa_id: null });
+    setNovoUsuario((atual) => ({ ...atual, pessoa_id: null }));
     setPessoaVinculada(null);
   };
 
   const atualizarCampo = (campo, valor) => {
-    setNovoUsuario({ ...novoUsuario, [campo]: valor });
+    setNovoUsuario((atual) => ({ ...atual, [campo]: valor }));
     limparErroServidor?.(campo);
   };
 
   // Nome/celular/e-mail também identificam a pessoa buscada — mudar qualquer um deles depois de
   // um vínculo encontrado invalida o vínculo (os dados não são mais os da pessoa vinculada).
   const alterarIdentificador = (campo, valor) => {
-    atualizarCampo(campo, valor);
-    if (pessoaVinculada) desvincularPessoa();
+    setNovoUsuario((atual) => ({ ...atual, [campo]: valor, pessoa_id: null }));
+    limparErroServidor?.(campo);
+    setPessoaVinculada(null);
   };
 
   const handleSubmit = (event) => {

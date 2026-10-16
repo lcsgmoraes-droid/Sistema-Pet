@@ -153,16 +153,18 @@ export default function UsuariosPage() {
         usuarios={usuarios}
       />
 
-      <UsuarioModal
-        limparErroServidor={limparErroServidor}
-        novoUsuario={novoUsuario}
-        onClose={onCloseModalUsuario}
-        onSubmit={criarUsuario}
-        roles={rolesUsuariosDiretos}
-        setNovoUsuario={setNovoUsuario}
-        showModal={showModal}
-        usuarioServerErrors={usuarioServerErrors}
-      />
+      {showModal ? (
+        <UsuarioModal
+          limparErroServidor={limparErroServidor}
+          novoUsuario={novoUsuario}
+          onClose={onCloseModalUsuario}
+          onSubmit={criarUsuario}
+          roles={rolesUsuariosDiretos}
+          setNovoUsuario={setNovoUsuario}
+          showModal={showModal}
+          usuarioServerErrors={usuarioServerErrors}
+        />
+      ) : null}
 
       <UsuarioCredenciaisModal
         credenciais={credenciais}

@@ -478,7 +478,8 @@ def excluir_conta(
         .all()
     )
     if any(
-        getattr(cliente, "tipo_cadastro", None) in {"funcionario", "veterinario"}
+        bool(getattr(cliente, "is_funcionario", False))
+        or bool(getattr(cliente, "is_veterinario", False))
         or bool(getattr(cliente, "is_entregador", False))
         for cliente in clientes
     ):

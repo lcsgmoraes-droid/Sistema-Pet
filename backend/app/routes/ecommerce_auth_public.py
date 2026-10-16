@@ -145,7 +145,9 @@ def registrar_cliente(
             ),
         )
     if any(
-        person.tipo_cadastro in {"funcionario", "veterinario"} or person.is_entregador
+        bool(getattr(person, "is_funcionario", False))
+        or bool(getattr(person, "is_veterinario", False))
+        or bool(getattr(person, "is_entregador", False))
         for person in people
     ):
         raise HTTPException(
