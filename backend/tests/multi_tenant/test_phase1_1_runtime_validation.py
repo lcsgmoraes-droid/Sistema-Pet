@@ -1,5 +1,6 @@
 import importlib
 import asyncio
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -25,6 +26,7 @@ from app.grupo_comercial_models import (
 )
 from app.models import (
     AuditLog,
+    Cliente,
     Permission,
     Role,
     RolePermission,
@@ -124,6 +126,7 @@ def auth_db_session():
         RolePermission.__table__,
         GrupoComercial.__table__,
         GrupoComercialMembro.__table__,
+        Cliente.__table__,
     ):
         table.create(engine, checkfirst=True)
 
@@ -240,6 +243,14 @@ def test_user_select_update_sem_tenant_e_insert_sem_tenant_bloqueado(auth_db_ses
         auth_db_session.flush()
 
 
+@pytest.mark.skipif(
+    os.getenv("DATABASE_URL", "sqlite://").startswith("sqlite"),
+    reason=(
+        "provision_tenant() chama trava_codigos_do_grupo(), que usa "
+        "pg_advisory_xact_lock/hashtext (exclusivo do Postgres, sem "
+        "equivalente no SQLite dos testes unitarios)."
+    ),
+)
 def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(
     monkeypatch, auth_db_session
 ):
