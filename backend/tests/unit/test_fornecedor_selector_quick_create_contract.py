@@ -25,7 +25,9 @@ def test_fornecedor_selector_delega_para_a_modal_unica_de_pessoa():
 
 
 def test_pessoa_formulario_permite_pf_pj_e_exige_documento_correto():
-    dados_gerais = _read("frontend/src/components/clientes/ClientePessoaDadosGeraisTab.jsx")
+    dados_gerais = _read(
+        "frontend/src/components/clientes/ClientePessoaDadosGeraisTab.jsx"
+    )
     formulario = _read("frontend/src/components/clientes/PessoaFormulario.jsx")
 
     assert 'tipo_pessoa: "PJ"' not in dados_gerais

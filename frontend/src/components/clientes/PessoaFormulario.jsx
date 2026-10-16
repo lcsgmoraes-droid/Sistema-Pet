@@ -419,10 +419,7 @@ export default function PessoaFormulario({
   // Erros do servidor somam aos locais (um erro que só o backend pegou continua visível
   // até o campo mudar de novo) — campo que o usuário já reeditou localmente não carrega
   // mais o aviso antigo do servidor.
-  const erros = useMemo(
-    () => ({ ...errosServidor, ...errosLocais }),
-    [errosServidor, errosLocais],
-  );
+  const erros = useMemo(() => ({ ...errosServidor, ...errosLocais }), [errosServidor, errosLocais]);
 
   // `erros` alimenta o ícone de pendência nas abas (AbasNavegacao), sempre fiel ao estado
   // real. `errosVisiveis` é o que de fato aparece pintado de vermelho nos campos — só depois
@@ -591,7 +588,9 @@ export default function PessoaFormulario({
         setErrosServidor(errosPorCampo);
         if (primeiraAba) setAbaAtiva(primeiraAba);
         const mensagens = details.map((detalhe) => detalhe.msg).filter(Boolean);
-        toast.error(mensagens.join(" · ") || "Não foi possível salvar — corrija os campos destacados.");
+        toast.error(
+          mensagens.join(" · ") || "Não foi possível salvar — corrija os campos destacados.",
+        );
       } else {
         toast.error(error.response?.data?.detail || "Não foi possível salvar as alterações.");
       }

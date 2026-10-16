@@ -78,7 +78,9 @@ function CardEndereco({ apelido, badge, endereco, erro, onEditar, onExcluir }) {
             <p className="text-sm text-slate-500 dark:text-slate-400">Nenhum endereço cadastrado</p>
           )}
 
-          {erro ? <p className="mt-1.5 text-xs font-medium text-red-700 dark:text-red-400">{erro}</p> : null}
+          {erro ? (
+            <p className="mt-1.5 text-xs font-medium text-red-700 dark:text-red-400">{erro}</p>
+          ) : null}
         </div>
         <div className="flex flex-none gap-1">
           <BotaoInteracao icon={Edit2} tamanho="pequeno" onClick={onEditar}>
