@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
+from app.financeiro.crediario_parcelamento import montar_plano_crediario
 from app.db import get_session
 from app.domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
 from app.financeiro.contas_pagar_classificacao import (
@@ -49,6 +50,17 @@ async def criar_conta_pagar(
     """
     current_user, tenant_id = user_and_tenant
     contas_criadas = []
+    plano = None
+    if conta.eh_parcelado and conta.total_parcelas > 1:
+        try:
+            plano = montar_plano_crediario(
+                valor_total=conta.valor_original,
+                numero_parcelas=conta.total_parcelas,
+                primeira_data=conta.data_vencimento,
+                intervalo="mensal",
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     try:
         conta_pre_classificacao = ContaPagar(
@@ -120,19 +132,10 @@ async def criar_conta_pagar(
             db.flush()
 
             # Criar parcelas
-            valor_parcela = conta.valor_original / conta.total_parcelas
-
-            for i in range(1, conta.total_parcelas + 1):
-                # Vencimento: soma i meses
-                vencimento_parcela = conta.data_vencimento
-                if i > 1:
-                    # Adiciona meses
-                    mes = vencimento_parcela.month + (i - 1)
-                    ano = vencimento_parcela.year
-                    while mes > 12:
-                        mes -= 12
-                        ano += 1
-                    vencimento_parcela = vencimento_parcela.replace(year=ano, month=mes)
+            for item in plano:
+                i = item["numero"]
+                valor_parcela = item["valor"]
+                vencimento_parcela = item["data_vencimento"]
 
                 parcela = ContaPagar(
                     descricao=f"{conta.descricao} - Parcela {i}/{conta.total_parcelas}",

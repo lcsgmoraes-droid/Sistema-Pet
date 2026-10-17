@@ -50,7 +50,7 @@ class SaidaEstoqueRequest(BaseModel):
     """Saída manual de estoque"""
 
     produto_id: int
-    quantidade: float = Field(gt=0)
+    quantidade: float = Field(gt=0, allow_inf_nan=False)
     motivo: str = Field(
         default="perda"
     )  # perda, avaria, roubo, amostra, uso_interno, devolucao_fornecedor, ajuste
@@ -99,6 +99,8 @@ def saida_estoque(
     produto = (
         db.query(Produto)
         .filter(Produto.id == saida.produto_id, Produto.tenant_id == tenant_id)
+        .with_for_update()
+        .populate_existing()
         .first()
     )
     if not produto:

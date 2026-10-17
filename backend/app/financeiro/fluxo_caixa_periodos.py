@@ -178,8 +178,11 @@ def _agrupar_por_periodo(
         saldo_acumulado += p["realizado_entradas"] - p["realizado_saidas"]
 
         # Saldo previsto (realizado + previsto)
-        saldo_previsto_acumulado = (
-            saldo_acumulado + p["previsto_entradas"] - p["previsto_saidas"]
+        saldo_previsto_acumulado += (
+            p["realizado_entradas"]
+            - p["realizado_saidas"]
+            + p["previsto_entradas"]
+            - p["previsto_saidas"]
         )
 
         periodos.append(

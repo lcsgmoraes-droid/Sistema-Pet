@@ -8,8 +8,9 @@ import Panel from "../../../components/ui/Panel";
 import { api } from "../../../services/api";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage } from "../banhoTosaUtils";
+import { formatarDataLocal } from "../../../utils/drePeriodos";
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => formatarDataLocal();
 const initialForm = {
   pacote_id: "",
   pet_id: "",

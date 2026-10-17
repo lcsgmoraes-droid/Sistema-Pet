@@ -316,6 +316,7 @@ class ProdutoCreate(ProdutoBase):
     - Se e_kit_fisico=True, terá estoque próprio controlado manualmente
     """
 
+    preco_custo: Optional[float] = Field(default=0, ge=0, allow_inf_nan=False)
     preco_venda: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
     entrada_inicial: Optional[EntradaInicialProduto] = None
     composicao_kit: Optional[List[KitComponenteCreate]] = Field(default_factory=list)
@@ -342,7 +343,7 @@ class ProdutoUpdate(BaseModel):
     participa_sugestao_compra: Optional[bool] = None
     peso_bruto: Optional[float] = None
     peso_liquido: Optional[float] = None
-    preco_custo: Optional[float] = None
+    preco_custo: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
     preco_venda: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
     preco_promocional: Optional[float] = None
     promocao_inicio: Optional[datetime] = None

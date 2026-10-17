@@ -4,7 +4,9 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.banho_tosa_datetime import normalizar_data_operacional
 
 
 class BanhoTosaAgendamentoServicoInput(BaseModel):
@@ -29,6 +31,11 @@ class BanhoTosaAgendamentoCreate(BaseModel):
     observacoes: Optional[str] = None
     valor_previsto: Optional[Decimal] = Field(default=None, ge=0)
     servicos: List[BanhoTosaAgendamentoServicoInput] = Field(default_factory=list)
+
+    @field_validator("data_hora_inicio", "data_hora_fim_prevista")
+    @classmethod
+    def preservar_horario_agendado(cls, value):
+        return normalizar_data_operacional(value)
 
 
 class BanhoTosaAgendamentoStatusUpdate(BaseModel):
@@ -76,6 +83,11 @@ class BanhoTosaAgendamentoResponse(BaseModel):
     servicos: List[BanhoTosaAgendamentoServicoResponse] = Field(default_factory=list)
 
 
+class BanhoTosaOcupacaoIntervaloResponse(BaseModel):
+    data_hora_inicio: datetime
+    data_hora_fim_prevista: datetime
+
+
 class BanhoTosaCapacidadeRecursoResponse(BaseModel):
     recurso_id: int
     recurso_nome: str
@@ -87,6 +99,9 @@ class BanhoTosaCapacidadeRecursoResponse(BaseModel):
     ocupacao_percentual: float
     pico_simultaneo: int
     capacidade_excedida: bool
+    intervalos_ocupados: List[BanhoTosaOcupacaoIntervaloResponse] = Field(
+        default_factory=list
+    )
 
 
 class BanhoTosaCapacidadeDiaResponse(BaseModel):

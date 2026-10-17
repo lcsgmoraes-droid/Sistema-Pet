@@ -37,6 +37,16 @@ def _aplicar_baixa(
     quitar=False,
     config=None,
 ):
+    if str(conta.status).strip().lower() in {
+        "recebido",
+        "pago",
+        "cancelado",
+        "cancelada",
+    }:
+        raise HTTPException(
+            status_code=400, detail="Conta não está disponível para baixa"
+        )
+
     calculo = calcular_encargos_automaticos(conta, data_recebimento, config)
     if aplicar_automaticos:
         aplicar_encargos_automaticos(conta, calculo, data_recebimento)
@@ -186,6 +196,9 @@ async def registrar_recebimentos_lote(
             ContaReceber.id.in_(lote.conta_ids),
             ContaReceber.tenant_id == tenant_id,
         )
+        .order_by(ContaReceber.id.asc())
+        .with_for_update(of=ContaReceber)
+        .populate_existing()
         .all()
     )
     contas_por_id = {conta.id: conta for conta in contas}
@@ -292,6 +305,8 @@ async def registrar_recebimento(
             ContaReceber.id == conta_id,
             ContaReceber.tenant_id == tenant_id,
         )
+        .with_for_update(of=ContaReceber)
+        .populate_existing()
         .first()
     )
 

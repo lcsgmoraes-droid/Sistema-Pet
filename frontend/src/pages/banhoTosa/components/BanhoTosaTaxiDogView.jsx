@@ -11,8 +11,9 @@ import { buildTaxiDogWindow } from "../taxiDogDateTimeUtils";
 import { formatCurrency, getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
 import BanhoTosaTaxiDogForm from "./BanhoTosaTaxiDogForm";
 import BanhoTosaTaxiDogList from "./BanhoTosaTaxiDogList";
+import { formatarDataLocal } from "../../../utils/drePeriodos";
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => formatarDataLocal();
 
 const initialForm = {
   agendamento_id: "",

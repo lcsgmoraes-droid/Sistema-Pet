@@ -12,6 +12,7 @@ from .db import get_session
 from .domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
 from .dre_plano_contas_models import DRESubcategoria
 from .financeiro_models import ContaReceber, LancamentoManual
+from .financeiro.crediario_parcelamento import montar_plano_crediario
 from .idempotency import idempotent
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,17 @@ async def criar_conta_receber(
     """
     current_user, tenant_id = user_and_tenant
     contas_criadas = []
+    plano = None
+    if conta.eh_parcelado and conta.total_parcelas > 1:
+        try:
+            plano = montar_plano_crediario(
+                valor_total=conta.valor_original,
+                numero_parcelas=conta.total_parcelas,
+                primeira_data=conta.data_vencimento,
+                intervalo="mensal",
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     try:
         # ============================
@@ -81,18 +93,10 @@ async def criar_conta_receber(
             db.flush()
 
             # Criar parcelas
-            valor_parcela = conta.valor_original / conta.total_parcelas
-
-            for i in range(1, conta.total_parcelas + 1):
-                # Vencimento: soma i meses
-                vencimento_parcela = conta.data_vencimento
-                if i > 1:
-                    mes = vencimento_parcela.month + (i - 1)
-                    ano = vencimento_parcela.year
-                    while mes > 12:
-                        mes -= 12
-                        ano += 1
-                    vencimento_parcela = vencimento_parcela.replace(year=ano, month=mes)
+            for item in plano:
+                i = item["numero"]
+                valor_parcela = item["valor"]
+                vencimento_parcela = item["data_vencimento"]
 
                 parcela = ContaReceber(
                     descricao=f"{conta.descricao} - Parcela {i}/{conta.total_parcelas}",
