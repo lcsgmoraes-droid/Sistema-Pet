@@ -73,6 +73,13 @@ MODULOS_TRIAL_COMPLETO = frozenset(MODULOS_PREMIUM - MODULOS_FORA_DA_OFERTA_PUBL
 # esse plano legado liberado para nao cortar fluxo real em uso.
 PLANOS_LEGADO_LIBERADOS = frozenset(["free", "legacy", "legado"])
 PLANOS_TODOS_MODULOS = frozenset(["premium", "enterprise", "full", "completo"])
+# Equivalencia temporaria para tenants legados ainda sem planos por segmento.
+# Os direitos seguem o catalogo atual, sem criar um novo plano premium.
+PLANOS_REFERENCIA_ACESSO_COMPLETO = (
+    "pet-venda-ativa",
+    "vet-completo",
+    "grooming-completo",
+)
 PLANOS_BASICOS = frozenset(["basico", "básico", "base", "basic"])
 TRIAL_DIAS_PADRAO = 30
 ASSINATURA_STATUS_VALIDOS = frozenset(
@@ -305,13 +312,19 @@ def _resolver_recursos_ativos_tenant(
         return []
 
     planos = _planos_segmento_tenant(tenant)
-    # Planos legados ja liberam todos os modulos operacionais. Preservar os
-    # recursos equivalentes evita cortar XML quando termina o trial.
+    # Planos legados ja liberam os modulos operacionais. Enquanto nao forem
+    # reatribuidos comercialmente, usar os direitos dos tres planos completos.
     if any(
         (codigo or "").strip().lower() in PLANOS_LEGADO_LIBERADOS | PLANOS_TODOS_MODULOS
         for codigo in planos
     ):
-        return sorted(ALL_PUBLIC_ENTITLEMENTS)
+        return sorted(
+            {
+                recurso
+                for codigo in PLANOS_REFERENCIA_ACESSO_COMPLETO
+                for recurso in get_plan(codigo).entitlements
+            }
+        )
 
     return sorted(
         {

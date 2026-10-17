@@ -9,12 +9,15 @@ from sqlalchemy import Boolean, Column, DateTime, Integer, String, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from app.routes.modulos_routes import (
+    PLANOS_REFERENCIA_ACESSO_COMPLETO,
     _assinatura_resumo_tenant,
+    _resolver_recursos_ativos_tenant,
     _resolver_modulos_ativos,
 )
 from app.services.billing_access import overdue_grace_state
 from app.security.module_access import _load_active_entitlements
 from app.services import plan_limits
+from app.services.default_roles_service import DEFAULT_TENANT_ROLES
 from app.services.plan_catalog import (
     ALL_PUBLIC_ENTITLEMENTS,
     PLAN_CATALOG,
@@ -108,6 +111,58 @@ def test_blocked_legacy_premium_does_not_bypass_billing():
     )
 
     assert active == []
+
+
+def test_legacy_complete_access_follows_the_three_current_complete_plans():
+    tenant = _tenant("premium")
+    now = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    expected = set().union(
+        *(PLAN_CATALOG[code].entitlements for code in PLANOS_REFERENCIA_ACESSO_COMPLETO)
+    )
+
+    assert PLANOS_REFERENCIA_ACESSO_COMPLETO == (
+        "pet-venda-ativa",
+        "vet-completo",
+        "grooming-completo",
+    )
+    assert set(_resolver_recursos_ativos_tenant(tenant, now)) == expected
+    assert "purchases.invoice_xml" in expected
+
+
+def test_default_user_roles_keep_xml_limited_to_purchase_and_manager_profiles():
+    for role_name in ("Estoque e Compras", "Gerente"):
+        assert "compras.entrada_xml" in DEFAULT_TENANT_ROLES[role_name]
+    for role_name in ("Caixa", "Financeiro", "Cliente"):
+        assert "compras.entrada_xml" not in DEFAULT_TENANT_ROLES[role_name]
+
+
+@pytest.mark.parametrize(
+    ("plan", "overrides", "xml_expected"),
+    [
+        ("pet-start", {}, False),
+        ("pet-basico", {}, True),
+        ("pet-gestao", {}, True),
+        ("vet-gestao", {}, False),
+        ("premium", {}, True),
+        ("enterprise", {}, True),
+        ("free", {}, True),
+        ("premium", {"plan_pet": "pet-start"}, False),
+        ("premium", {"billing_status": "blocked"}, False),
+    ],
+)
+def test_xml_entitlement_is_consistent_for_other_tenant_plans(
+    plan, overrides, xml_expected
+):
+    tenant = _tenant(plan, **overrides)
+    now = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = tenant
+
+    route_entitlements = _load_active_entitlements(db, tenant.id, now)
+    status_entitlements = _resolver_recursos_ativos_tenant(tenant, now)
+
+    assert route_entitlements == status_entitlements
+    assert ("purchases.invoice_xml" in route_entitlements) is xml_expected
 
 
 def test_active_trial_temporarily_releases_every_public_entitlement():
