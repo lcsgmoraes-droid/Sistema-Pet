@@ -54,8 +54,8 @@ export function useClientesNovoEnderecos() {
   };
 
   const salvarEndereco = () => {
-    if (!enderecoAtual?.endereco || !enderecoAtual?.cidade) {
-      toast.error("Preencha pelo menos Endereço e Cidade.");
+    if (!enderecoAtual?.cep || !enderecoAtual?.endereco || !enderecoAtual?.cidade) {
+      toast.error("Preencha pelo menos CEP, Endereço e Cidade.");
       return;
     }
 

@@ -72,7 +72,7 @@ function CardEndereco({ apelido, badge, endereco, erro, onEditar, onExcluir }) {
               <p className="mt-1 text-xs text-slate-500">
                 {endereco.bairro}, {endereco.cidade}/{endereco.estado}
               </p>
-              {endereco.cep && <p className="mt-1 text-xs text-slate-500">CEP: {endereco.cep}</p>}
+              <p className="mt-1 text-xs text-slate-500">CEP: {endereco.cep}</p>
             </>
           ) : (
             <p className="text-sm text-slate-500 dark:text-slate-400">Nenhum endereço cadastrado</p>
