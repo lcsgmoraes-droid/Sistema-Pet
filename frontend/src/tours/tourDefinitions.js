@@ -203,35 +203,6 @@ export const tourPDV = [
   },
 ];
 
-// ─── LEMBRETES ────────────────────────────────────────────────────────────────
-export const tourLembretes = [
-  {
-    popover: {
-      title: "🔔 Lembretes do Sistema",
-      description:
-        "Os lembretes avisam você sobre consultas, vacinas, retornos de clientes e outras tarefas agendadas. Veja como usar!",
-    },
-  },
-  {
-    element: "#tour-lembretes-novo",
-    popover: {
-      title: "➕ Novo Lembrete",
-      description:
-        "Crie um lembrete para uma data específica: retorno de cliente, vacinação do pet, reunião, ou qualquer coisa que você queira ser avisado.",
-      side: "left",
-    },
-  },
-  {
-    element: "#tour-lembretes-lista",
-    popover: {
-      title: "📋 Seus Lembretes",
-      description:
-        "Aqui aparecem todos os lembretes programados. Os atrasados ficam destacados em vermelho para você não perder nenhum.",
-      side: "top",
-    },
-  },
-];
-
 // ─── FINANCEIRO / CAIXA ───────────────────────────────────────────────────────
 export const tourMeusCaixas = [
   {

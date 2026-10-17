@@ -178,6 +178,20 @@ export const styleGuideCatalog = [
         descricao: "Placeholder para painéis sem dado no período (gráfico vazio, lista vazia etc.)",
       },
       {
+        nome: "FaixaAviso",
+        status: "pronto",
+        arquivo: "components/v2/FaixaAviso/FaixaAviso.jsx",
+        descricao:
+          'Faixa de aviso dentro de uma tela (proteção desativada, atenção, informação) — "tom" no mesmo vocabulário de BotaoBase.variante (padrão "atencao"), título/ícone opcionais e espaço "acoes" à direita para o botão v2 da ação',
+      },
+      {
+        nome: "Etiqueta",
+        status: "pronto",
+        arquivo: "components/v2/Etiqueta/Etiqueta.jsx",
+        descricao:
+          'Etiqueta pequena de status/categoria numa linha ou cartão (prazo, tipo, contagem) — "tom" no mesmo vocabulário de BotaoBase.variante, ícone opcional; sempre com texto, nunca só cor',
+      },
+      {
         nome: "SeletorOpcoes",
         status: "pronto",
         arquivo: "components/v2/SeletorOpcoes/SeletorOpcoes.jsx",

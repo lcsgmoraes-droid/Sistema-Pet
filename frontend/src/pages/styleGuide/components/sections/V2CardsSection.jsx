@@ -1,7 +1,9 @@
 import {
+  AlertTriangle,
   BarChart3,
   ExternalLink as ExternalLinkIcon,
   History,
+  Info,
   Pencil,
   ShoppingBag,
   Trash2,
@@ -10,10 +12,13 @@ import {
   WalletCards,
 } from "lucide-react";
 import { useState } from "react";
+import BotaoInteracao from "../../../../components/v2/BotaoInteracao/BotaoInteracao";
 import BotaoLink from "../../../../components/v2/BotaoLink/BotaoLink";
 import BotaoMenuAcoes from "../../../../components/v2/BotaoMenuAcoes/BotaoMenuAcoes";
 import CartaoIndicador from "../../../../components/v2/CartaoIndicador/CartaoIndicador";
 import EstadoVazio from "../../../../components/v2/EstadoVazio/EstadoVazio";
+import Etiqueta from "../../../../components/v2/Etiqueta/Etiqueta";
+import FaixaAviso from "../../../../components/v2/FaixaAviso/FaixaAviso";
 import SeletorOpcoes from "../../../../components/v2/SeletorOpcoes/SeletorOpcoes";
 import StyleGuideExample from "../StyleGuideExample";
 
@@ -97,6 +102,43 @@ export default function V2CardsSection() {
             titulo="Sem produtos vendidos no período"
             descricao="Escolha outro período ou registre novas vendas."
           />
+        </div>
+      </Grupo>
+
+      <Grupo
+        label="FaixaAviso — aviso dentro da tela, com ação opcional à direita"
+        note='"tom" usa o mesmo vocabulário de BotaoBase.variante (padrão "atencao"). A ação é um botão v2 passado em "acoes"; a cor nunca é o único sinal — há sempre título/texto.'
+      >
+        <div className="space-y-2">
+          <FaixaAviso
+            icone={AlertTriangle}
+            titulo="Proteção por validade desativada"
+            acoes={
+              <BotaoInteracao tamanho="pequeno" onClick={() => {}}>
+                Abrir configurações
+              </BotaoInteracao>
+            }
+          >
+            Produtos vencidos continuam disponíveis para venda.
+          </FaixaAviso>
+          <FaixaAviso tom="informativo" icone={Info}>
+            Este cliente já foi contatado hoje.
+          </FaixaAviso>
+        </div>
+      </Grupo>
+
+      <Grupo
+        label="Etiqueta — status ou categoria pequena dentro de uma linha/cartão"
+        note="Mesmo vocabulário de tons; ícone opcional. Sempre leva texto."
+      >
+        <div className="flex flex-wrap gap-2">
+          <Etiqueta>Recompra</Etiqueta>
+          <Etiqueta tom="sucesso">Em dia</Etiqueta>
+          <Etiqueta tom="atencao" icone={AlertTriangle}>
+            Vence em 3 dias
+          </Etiqueta>
+          <Etiqueta tom="perigo">Vencido</Etiqueta>
+          <Etiqueta tom="informativo">Aniversário</Etiqueta>
         </div>
       </Grupo>
 
