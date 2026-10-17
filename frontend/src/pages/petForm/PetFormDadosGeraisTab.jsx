@@ -35,6 +35,11 @@ export default function PetFormDadosGeraisTab({
     label: especie.nome,
   }));
   const opcoesRacas = racas.map((raca) => ({ value: raca.nome, label: raca.nome }));
+  // Cadastros antigos podem ter uma raça que não está mais no catálogo ativo.
+  // O combobox precisa dessa opção para exibir o valor que o pet já possui.
+  if (formData.raca && !opcoesRacas.some((opcao) => opcao.value === formData.raca)) {
+    opcoesRacas.unshift({ value: formData.raca, label: formData.raca });
+  }
 
   return (
     <div className="space-y-5">

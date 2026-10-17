@@ -5,6 +5,7 @@ Escrita: so a loja que registrou pode alterar ou apagar o proprio registro.
 """
 
 from datetime import datetime
+from math import isfinite
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -67,6 +68,16 @@ def listar_registros(
     ).all()
 
 
+def obter_peso_atual(db: Session, pet: Pet) -> float | None:
+    registro = ultimo_registro(db, pet.id, "peso")
+    return registro.valor if registro else pet.peso
+
+
+def _validar_peso(valor: float | None) -> None:
+    if valor is None or not isfinite(valor) or valor <= 0:
+        raise HTTPException(status_code=422, detail="Informe um peso maior que zero.")
+
+
 def _validar_tipo(tipo: str) -> None:
     if tipo not in TIPOS_REGISTRO:
         raise HTTPException(status_code=400, detail="Tipo de registro invalido.")
@@ -84,6 +95,8 @@ def criar_registro(
     registrado_em: datetime | None = None,
 ) -> PetRegistroClinico:
     _validar_tipo(tipo)
+    if tipo == "peso":
+        _validar_peso(valor)
     registro = PetRegistroClinico(
         tenant_id=tenant_id,
         pet_id=pet_id,
@@ -161,6 +174,8 @@ def atualizar_registro(
     registrado_em: datetime | None = None,
 ) -> PetRegistroClinico:
     registro = _obter_registro_da_loja(db, registro_id, pet_id, tenant_id)
+    if registro.tipo == "peso" and valor is not None:
+        _validar_peso(valor)
     if texto is not None:
         registro.texto = texto
     if valor is not None:

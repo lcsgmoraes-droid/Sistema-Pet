@@ -13,7 +13,7 @@ class AgendamentoCreate(BaseModel):
     consultorio_id: Optional[int] = None
     consulta_origem_id: Optional[int] = None
     data_hora: datetime
-    duracao_minutos: int = 30
+    duracao_minutos: int = Field(default=30, gt=0)
     tipo: str = "consulta"
     motivo: Optional[str] = None
     is_emergencia: bool = False
@@ -28,7 +28,7 @@ class AgendamentoUpdate(BaseModel):
     consultorio_id: Optional[int] = None
     consulta_origem_id: Optional[int] = None
     data_hora: Optional[datetime] = None
-    duracao_minutos: Optional[int] = None
+    duracao_minutos: Optional[int] = Field(default=None, gt=0)
     tipo: Optional[str] = None
     motivo: Optional[str] = None
     status: Optional[str] = None

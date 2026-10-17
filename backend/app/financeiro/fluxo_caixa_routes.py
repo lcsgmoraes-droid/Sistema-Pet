@@ -69,6 +69,35 @@ def _mapa_numeros_venda_por_conta(db: Session, tenant_id, conta_ids) -> dict[int
     }
 
 
+def _mapa_numeros_venda_por_lancamento(db, tenant_id, lancamentos) -> dict[int, str]:
+    """Resolve os documentos de venda em lote, incluindo saldo e recebimento."""
+    ids_por_lancamento = {}
+    for lancamento in lancamentos:
+        documento = re.fullmatch(
+            r"VENDA-(\d+)(?:-REALIZADO|-SALDO)?", lancamento.documento or ""
+        )
+        if documento:
+            ids_por_lancamento[lancamento.id] = int(documento.group(1))
+    if not ids_por_lancamento:
+        return {}
+
+    from app.vendas_models import Venda
+
+    numeros = dict(
+        db.query(Venda.id, Venda.numero_venda)
+        .filter(
+            Venda.tenant_id == tenant_id,
+            Venda.id.in_(set(ids_por_lancamento.values())),
+        )
+        .all()
+    )
+    return {
+        lancamento_id: numeros[venda_id]
+        for lancamento_id, venda_id in ids_por_lancamento.items()
+        if venda_id in numeros
+    }
+
+
 @router.get("/fluxo-caixa", response_model=FluxoCaixaResponse)
 def get_fluxo_caixa(
     data_inicio: str,  # formato: YYYY-MM-DD
@@ -270,6 +299,9 @@ def get_fluxo_caixa(
         )
         .all()
     )
+    numeros_venda_por_lancamento = _mapa_numeros_venda_por_lancamento(
+        db, tenant_id, (*lancamentos_realizados, *lancamentos_previstos)
+    )
     valores_entrada_venda = valores_entradas_venda_realizadas(
         db, tenant_id, lancamentos_realizados, dt_fim
     )
@@ -339,6 +371,7 @@ def get_fluxo_caixa(
                 valor=float(valor_entrada),
                 origem_tipo="lancamento_manual",
                 origem_id=lanc.id,
+                numero_venda=numeros_venda_por_lancamento.get(lanc.id),
                 status="realizado",
             )
         )
@@ -595,6 +628,7 @@ def get_fluxo_caixa(
                 valor=float(lanc.valor),
                 origem_tipo="lancamento_manual",
                 origem_id=lanc.id,
+                numero_venda=numeros_venda_por_lancamento.get(lanc.id),
                 status="previsto",
             )
         )
@@ -640,7 +674,7 @@ def get_fluxo_caixa(
     if numero_venda:
         # Buscar IDs das vendas que correspondem ao número
         vendas_filtro = (
-            db.query(Venda.id)
+            db.query(Venda.id, Venda.numero_venda)
             .filter(
                 and_(
                     Venda.tenant_id == tenant_id,
@@ -651,6 +685,7 @@ def get_fluxo_caixa(
         )
 
         vendas_ids = [v[0] for v in vendas_filtro]
+        numeros_vendas = {v[1] for v in vendas_filtro}
 
         if vendas_ids:
             # Filtrar movimentações para apenas as que estão relacionadas a essas vendas
@@ -660,7 +695,7 @@ def get_fluxo_caixa(
                 if mov.origem_tipo == "venda" and mov.origem_id in vendas_ids:
                     movimentacoes_filtradas.append(mov)
                 # Ou se é conta a receber/recebimento de venda
-                elif mov.numero_venda and mov.numero_venda == numero_venda:
+                elif mov.numero_venda and mov.numero_venda in numeros_vendas:
                     movimentacoes_filtradas.append(mov)
                 # Ou se é conta a receber vinculada à venda
                 elif mov.origem_tipo == "conta_receber":
@@ -672,6 +707,8 @@ def get_fluxo_caixa(
                         movimentacoes_filtradas.append(mov)
 
             movimentacoes = movimentacoes_filtradas
+        else:
+            movimentacoes = []
 
     # ========== AGRUPAR POR PERÍODO ==========
     periodos = _agrupar_por_periodo(
