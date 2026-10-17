@@ -60,7 +60,9 @@ def relatorio_margem_produto(
     current_user, tenant_id = user_and_tenant
     logger.warning("[RELATORIO-MARGEM-PRODUTO] Request received")
 
-    query = ITENS_COMISSAO_CTE + """
+    query = (
+        ITENS_COMISSAO_CTE
+        + """
         SELECT 
             p.id as produto_id,
             p.nome as produto_nome,
@@ -80,6 +82,7 @@ def relatorio_margem_produto(
         LEFT JOIN categorias c ON p.categoria_id = c.id AND c.tenant_id = ci.tenant_id
         WHERE 1 = 1
     """
+    )
 
     params_dict = {}
 
@@ -290,7 +293,9 @@ def ranking_produtos(
 
     current_user, tenant_id = user_and_tenant
 
-    query = ITENS_COMISSAO_CTE + """
+    query = (
+        ITENS_COMISSAO_CTE
+        + """
         SELECT 
             p.id as produto_id,
             p.nome as produto_nome,
@@ -305,6 +310,7 @@ def ranking_produtos(
         LEFT JOIN categorias c ON p.categoria_id = c.id AND c.tenant_id = ci.tenant_id
         WHERE 1 = 1
     """
+    )
 
     params_dict = {}
 
@@ -356,7 +362,9 @@ def ranking_categorias(
 
     current_user, tenant_id = user_and_tenant
 
-    query = ITENS_COMISSAO_CTE + """
+    query = (
+        ITENS_COMISSAO_CTE
+        + """
         SELECT 
             c.id as categoria_id,
             c.nome as categoria_nome,
@@ -370,6 +378,7 @@ def ranking_categorias(
         JOIN categorias c ON p.categoria_id = c.id AND c.tenant_id = ci.tenant_id
         WHERE 1 = 1
     """
+    )
 
     params_dict = {}
 
@@ -426,7 +435,9 @@ def visao_dre(
 
     current_user, tenant_id = user_and_tenant
 
-    query = ITENS_COMISSAO_CTE + """
+    query = (
+        ITENS_COMISSAO_CTE
+        + """
         SELECT 
             EXTRACT(MONTH FROM ci.data_venda)::INTEGER as mes,
             SUM(CASE WHEN ci.ordem_item_parcela = 1 THEN
@@ -445,6 +456,7 @@ def visao_dre(
         GROUP BY EXTRACT(MONTH FROM ci.data_venda)
         ORDER BY mes
     """
+    )
 
     result = execute_tenant_safe(
         db,

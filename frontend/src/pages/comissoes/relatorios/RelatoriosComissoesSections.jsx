@@ -34,8 +34,9 @@ export default function RelatoriosComissoesSections({
     return (
       <div className="space-y-6">
         <p className="text-sm text-gray-600">
-          Venda após descontos e custo registrados na geração da comissão, proporcionais às parcelas.
-          Margem exibida = venda − custo − comissões geradas. Preços atuais do cadastro podem ser diferentes.
+          Venda após descontos e custo registrados na geração da comissão, proporcionais às
+          parcelas. Margem exibida = venda − custo − comissões geradas. Preços atuais do cadastro
+          podem ser diferentes.
         </p>
         {/* Cards de Resumo */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

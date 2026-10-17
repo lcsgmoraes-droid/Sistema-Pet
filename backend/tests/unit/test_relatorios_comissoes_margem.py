@@ -33,13 +33,118 @@ def test_margem_usa_venda_real_e_conta_cada_item_parcela_uma_vez(monkeypatch):
     # Mesmo item com duas parcelas e dois funcionários: venda/custo entram uma
     # vez por parcela, mas as quatro comissões são despesas reais.
     rows = [
-        (1, "empresa-1", 10, 101, 1, 1, 7, "2026-10-01", "pendente", 200, 120, 12.5, 50, 0.25),
-        (2, "empresa-1", 10, 101, 1, 1, 8, "2026-10-01", "pendente", 200, 120, 12.5, 50, 0.25),
-        (3, "empresa-1", 10, 101, 2, 1, 7, "2026-10-01", "pendente", 200, 120, 12.5, 50, 0.25),
-        (4, "empresa-1", 10, 101, 2, 1, 8, "2026-10-01", "pendente", 200, 120, 12.5, 50, 0.25),
-        (5, "empresa-1", 11, 102, 1, 2, 7, "2026-10-02", "pendente", 100, 60, 30, None, 1),
-        (6, "empresa-1", 12, 103, 1, 1, 7, "2026-10-03", "estornado", 500, 50, 450, 100, 5),
-        (7, "empresa-2", 13, 104, 1, 1, 7, "2026-10-04", "pendente", 900, 1, 899, 100, 1),
+        (
+            1,
+            "empresa-1",
+            10,
+            101,
+            1,
+            1,
+            7,
+            "2026-10-01",
+            "pendente",
+            200,
+            120,
+            12.5,
+            50,
+            0.25,
+        ),
+        (
+            2,
+            "empresa-1",
+            10,
+            101,
+            1,
+            1,
+            8,
+            "2026-10-01",
+            "pendente",
+            200,
+            120,
+            12.5,
+            50,
+            0.25,
+        ),
+        (
+            3,
+            "empresa-1",
+            10,
+            101,
+            2,
+            1,
+            7,
+            "2026-10-01",
+            "pendente",
+            200,
+            120,
+            12.5,
+            50,
+            0.25,
+        ),
+        (
+            4,
+            "empresa-1",
+            10,
+            101,
+            2,
+            1,
+            8,
+            "2026-10-01",
+            "pendente",
+            200,
+            120,
+            12.5,
+            50,
+            0.25,
+        ),
+        (
+            5,
+            "empresa-1",
+            11,
+            102,
+            1,
+            2,
+            7,
+            "2026-10-02",
+            "pendente",
+            100,
+            60,
+            30,
+            None,
+            1,
+        ),
+        (
+            6,
+            "empresa-1",
+            12,
+            103,
+            1,
+            1,
+            7,
+            "2026-10-03",
+            "estornado",
+            500,
+            50,
+            450,
+            100,
+            5,
+        ),
+        (
+            7,
+            "empresa-2",
+            13,
+            104,
+            1,
+            1,
+            7,
+            "2026-10-04",
+            "pendente",
+            900,
+            1,
+            899,
+            100,
+            1,
+        ),
     ]
     db.executemany(
         "INSERT INTO comissoes_itens VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows
@@ -49,17 +154,23 @@ def test_margem_usa_venda_real_e_conta_cada_item_parcela_uma_vez(monkeypatch):
         sql = sql.replace("{tenant_filter}", "tenant_id = :__tenant_id")
         # SQLite só precisa desta adaptação de sintaxe para exercitar a
         # agregação mensal, escrita para PostgreSQL em produção.
-        sql = sql.replace(
-            "EXTRACT(MONTH FROM ci.data_venda)::INTEGER",
-            "CAST(strftime('%m', ci.data_venda) AS INTEGER)",
-        ).replace(
-            "EXTRACT(MONTH FROM ci.data_venda)",
-            "CAST(strftime('%m', ci.data_venda) AS INTEGER)",
-        ).replace(
-            "EXTRACT(YEAR FROM ci.data_venda)::INTEGER",
-            "CAST(strftime('%Y', ci.data_venda) AS INTEGER)",
+        sql = (
+            sql.replace(
+                "EXTRACT(MONTH FROM ci.data_venda)::INTEGER",
+                "CAST(strftime('%m', ci.data_venda) AS INTEGER)",
+            )
+            .replace(
+                "EXTRACT(MONTH FROM ci.data_venda)",
+                "CAST(strftime('%m', ci.data_venda) AS INTEGER)",
+            )
+            .replace(
+                "EXTRACT(YEAR FROM ci.data_venda)::INTEGER",
+                "CAST(strftime('%Y', ci.data_venda) AS INTEGER)",
+            )
         )
-        return _Resultado(db.execute(sql, {**params, "__tenant_id": tenant_id}).fetchall())
+        return _Resultado(
+            db.execute(sql, {**params, "__tenant_id": tenant_id}).fetchall()
+        )
 
     monkeypatch.setattr(relatorios, "execute_tenant_safe", executar)
     try:
@@ -81,7 +192,9 @@ def test_margem_usa_venda_real_e_conta_cada_item_parcela_uma_vez(monkeypatch):
         ranking = relatorios.ranking_produtos(
             limite=10, db=db, user_and_tenant=(None, "empresa-1")
         )
-        assert {item["produto_nome"]: item["total_venda"] for item in ranking["ranking"]} == {
+        assert {
+            item["produto_nome"]: item["total_venda"] for item in ranking["ranking"]
+        } == {
             "Ração A": 200,
             "Ração B": 100,
         }
@@ -90,8 +203,11 @@ def test_margem_usa_venda_real_e_conta_cada_item_parcela_uma_vez(monkeypatch):
         )
         assert categorias["ranking"][0]["total_venda"] == 300
         dre = relatorios.visao_dre(
-            ano=2026, mes_inicio=10, mes_fim=10,
-            db=db, user_and_tenant=(None, "empresa-1"),
+            ano=2026,
+            mes_inicio=10,
+            mes_fim=10,
+            db=db,
+            user_and_tenant=(None, "empresa-1"),
         )
         assert dre["total_ano"]["receita_bruta"] == 300
         assert dre["total_ano"]["custo_total"] == 180
