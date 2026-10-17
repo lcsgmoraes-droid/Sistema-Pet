@@ -142,7 +142,10 @@ def test_funcionario_pdv_delegates_to_official_sale_flow():
     assert "VendaService.finalizar_venda" in block
     assert "processar_comissoes_venda" in block
     assert "if dados.gerar_comissao:" in block
-    assert '"funcionario_id": funcionario.id if dados.gerar_comissao else None' in payload_block
+    assert (
+        '"funcionario_id": funcionario.id if dados.gerar_comissao else None'
+        in payload_block
+    )
     assert '"vendedor_funcionario_id": funcionario.id' in payload_block
     assert '"vendedor_id": current_user.id' in payload_block
 
@@ -150,7 +153,10 @@ def test_funcionario_pdv_delegates_to_official_sale_flow():
 def test_funcionario_pdv_comissao_opcional_em_salvar_e_finalizar():
     tipos = (
         (FuncionarioPdvSalvarRequest, {}),
-        (FuncionarioPdvFinalizarRequest, {"pagamento": {"forma_pagamento": "pix", "valor": 10}}),
+        (
+            FuncionarioPdvFinalizarRequest,
+            {"pagamento": {"forma_pagamento": "pix", "valor": 10}},
+        ),
     )
     for request_type, extra in tipos:
         for marcado in (False, True):
