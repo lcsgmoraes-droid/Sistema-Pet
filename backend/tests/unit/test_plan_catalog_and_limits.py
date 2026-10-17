@@ -86,6 +86,30 @@ def test_pet_basico_has_xml_but_not_purchase_suggestions():
     assert "purchases.suggestions" not in active
 
 
+def test_active_legacy_premium_keeps_xml_entitlement_after_trial():
+    tenant = _tenant("premium")
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = tenant
+
+    active = _load_active_entitlements(
+        db, tenant.id, datetime(2026, 10, 17, tzinfo=timezone.utc)
+    )
+
+    assert "purchases.invoice_xml" in active
+
+
+def test_blocked_legacy_premium_does_not_bypass_billing():
+    tenant = _tenant("premium", billing_status="blocked")
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = tenant
+
+    active = _load_active_entitlements(
+        db, tenant.id, datetime(2026, 10, 17, tzinfo=timezone.utc)
+    )
+
+    assert active == []
+
+
 def test_active_trial_temporarily_releases_every_public_entitlement():
     now = datetime(2026, 7, 18, tzinfo=timezone.utc)
     tenant = _tenant(

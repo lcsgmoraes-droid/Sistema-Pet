@@ -8,7 +8,7 @@ import {
   PedidosBling,
   PedidosCompra,
 } from "../lazyPages";
-import { ModuleGate } from "./RouteGates";
+import { ModuleGate, ResourceGate } from "./RouteGates";
 
 function comprasPage(children) {
   return (
@@ -30,7 +30,16 @@ export function createPurchasingBlingRoutes() {
   return (
     <>
       <Route path="compras/pedidos" element={comprasPage(<PedidosCompra />)} />
-      <Route path="compras/entrada-xml" element={comprasPage(<EntradaXML />)} />
+      <Route
+        path="compras/entrada-xml"
+        element={
+          <ResourceGate recurso="purchases.invoice_xml">
+            <ProtectedRoute permission="compras.entrada_xml">
+              <EntradaXML />
+            </ProtectedRoute>
+          </ResourceGate>
+        }
+      />
       <Route path="compras/pendencias" element={comprasPage(<ComprasPendencias />)} />
       <Route path="produtos/sinc-bling" element={blingPage(<EstoqueBling />)} />
       <Route path="compras/bling" element={<Navigate to="/produtos/sinc-bling" replace />} />

@@ -16,8 +16,8 @@ from app.models import AssinaturaModulo, Tenant
 from app.routes.modulos_routes import (
     MODULOS_PREMIUM,
     _assinatura_resumo_tenant,
-    _planos_catalogo_segmento,
     _planos_segmento_tenant,
+    _resolver_recursos_ativos_tenant,
     _resolver_modulos_ativos,
     _trial_completo_ativo,
 )
@@ -91,17 +91,7 @@ def _load_active_entitlements(
     if not tenant:
         return []
 
-    assinatura = _assinatura_resumo_tenant(tenant, agora)
-    if assinatura["acesso_completo_durante_trial"]:
-        return sorted(ALL_PUBLIC_ENTITLEMENTS)
-    if not assinatura["acesso_operacional_ativo"]:
-        # Cobranca com problema (fora da tolerancia de 15 dias) bloqueia
-        # entitlements tambem, sem excecao para plano legado — esses tenants
-        # serao reatribuidos a planos reais via o fluxo de aditivo comercial.
-        return []
-
-    planos = _planos_catalogo_segmento(tenant)
-    return sorted({recurso for plano in planos for recurso in plano.entitlements})
+    return _resolver_recursos_ativos_tenant(tenant, agora)
 
 
 def _is_public_bling_webhook(modulo: str, request: Request | None) -> bool:

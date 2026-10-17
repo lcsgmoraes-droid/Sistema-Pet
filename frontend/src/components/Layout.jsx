@@ -44,7 +44,7 @@ const Layout = () => {
   const location = useLocation();
   const isBradescoOrganizerRoute = location.pathname === "/organizador-bradesco";
   const { user, logout } = useAuth();
-  const { assinaturaAtual, modulosAtivos, moduloAtivo } = useModulos();
+  const { assinaturaAtual, modulosAtivos, moduloAtivo, recursoAtivo } = useModulos();
   const toleranciaAtraso = assinaturaAtual?.tolerancia_atraso;
   const avisoAtraso = assinaturaAtual?.status === "past_due";
 
@@ -517,6 +517,7 @@ const Layout = () => {
   });
 
   const itemLiberadoPorModulo = (item) => !item.modulo || moduloAtivo(item.modulo);
+  const itemLiberadoPorRecurso = (item) => !item.recurso || recursoAtivo(item.recurso);
   const itemLiberadoPorPermissao = (item) => {
     if (item.anyOfPermissions) return hasAnyPermission(item.anyOfPermissions);
     if (!item.permission) return true;
@@ -525,14 +526,14 @@ const Layout = () => {
 
   // Filtrar menus baseado nas permissões do usuário e no plano do tenant
   const menuItems = allMenuItems.filter((item) => {
-    if (!itemLiberadoPorModulo(item)) {
+    if (!itemLiberadoPorModulo(item) || !itemLiberadoPorRecurso(item)) {
       return false;
     }
 
     // Se tem submenu, filtrar os itens do submenu por permissão e módulo PRIMEIRO
     if (item.submenu && Array.isArray(item.submenu)) {
       const submenuFiltrado = item.submenu.filter((subitem) => {
-        if (!itemLiberadoPorModulo(subitem)) return false;
+        if (!itemLiberadoPorModulo(subitem) || !itemLiberadoPorRecurso(subitem)) return false;
         // Se subitem não tem permissão, é sempre visível
         if (!subitem.permission) return true;
         // Verifica se usuário tem a permissão
