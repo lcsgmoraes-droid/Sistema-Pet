@@ -1,23 +1,35 @@
+import {
+  AlertTriangle,
+  Clock,
+  Copy,
+  Eye,
+  MessageCircle,
+  RefreshCw,
+  Search,
+  User,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import {
-  FiChevronLeft,
-  FiChevronRight,
-  FiClock,
-  FiCopy,
-  FiMessageCircle,
-  FiRefreshCw,
-  FiSearch,
-  FiUser,
-  FiUsers,
-} from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 
 import api from "../../api";
+import DataTable from "../../components/ui/DataTable";
+import PaginationControls from "../../components/ui/PaginationControls";
+import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
+import BotaoMenuAcoes from "../../components/v2/BotaoMenuAcoes/BotaoMenuAcoes";
+import CartaoIndicador from "../../components/v2/CartaoIndicador/CartaoIndicador";
+import Etiqueta from "../../components/v2/Etiqueta/Etiqueta";
+import FaixaAviso from "../../components/v2/FaixaAviso/FaixaAviso";
+import InputTexto from "../../components/v2/InputTexto/InputTexto";
+import SeletorOpcoes from "../../components/v2/SeletorOpcoes/SeletorOpcoes";
 import { formatMoneyBRL } from "../../utils/formatters";
 import { whatsappUrl } from "./lembretesUtils";
 
-const PRAZOS_INATIVIDADE = [30, 60, 90];
+const POR_PAGINA = 25;
+const OPCOES_INATIVIDADE = [30, 60, 90].map((prazo) => ({
+  valor: prazo,
+  rotulo: `${prazo}+ dias`,
+}));
 
 function dataCurta(valor) {
   if (!valor) return "Sem data";
@@ -49,7 +61,7 @@ export default function LembretesClientesInativos() {
           dias_sem_compra: dias,
           busca: buscaAplicada || undefined,
           pagina,
-          por_pagina: 25,
+          por_pagina: POR_PAGINA,
         },
       });
       setResultado(response.data);
@@ -109,254 +121,171 @@ export default function LembretesClientesInativos() {
     total: 0,
   };
 
+  const colunas = [
+    {
+      key: "acoes",
+      header: "Ações",
+      render: (cliente) => (
+        <BotaoMenuAcoes
+          acoes={[
+            {
+              icon: MessageCircle,
+              label: "Abrir WhatsApp",
+              disabled: !telefoneValido(cliente.telefone),
+              title: telefoneValido(cliente.telefone)
+                ? "Abrir conversa com mensagem pronta"
+                : "Cliente sem telefone válido",
+              onClick: () => abrirWhatsApp(cliente),
+            },
+            {
+              icon: Copy,
+              label: "Copiar mensagem",
+              onClick: () => void copiarMensagem(cliente),
+            },
+            {
+              icon: Eye,
+              label: "Ver cliente",
+              onClick: () => navigate(`/clientes/${cliente.cliente_id}/financeiro`),
+            },
+          ]}
+          rotulo={`Mais ações para ${cliente.nome}`}
+        />
+      ),
+    },
+    {
+      key: "cliente",
+      header: "Cliente",
+      render: (cliente) => (
+        <div>
+          <p className="m-0 font-semibold text-slate-900 dark:text-slate-100">{cliente.nome}</p>
+          <p className="v2-texto-ajuda mt-0.5">
+            {cliente.codigo ? `Código ${cliente.codigo}` : `ID ${cliente.cliente_id}`}
+            {cliente.telefone ? ` · ${cliente.telefone}` : " · Sem telefone"}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "inatividade",
+      header: "Inatividade",
+      align: "center",
+      render: (cliente) => <Etiqueta tom="atencao">{cliente.dias_sem_comprar} dias</Etiqueta>,
+    },
+    {
+      key: "ultima_compra",
+      header: "Última compra",
+      align: "right",
+      render: (cliente) => dataCurta(cliente.ultima_compra),
+    },
+    {
+      key: "compras",
+      header: "Compras",
+      align: "center",
+      render: (cliente) => Number(cliente.total_compras || 0).toLocaleString("pt-BR"),
+    },
+    {
+      key: "total",
+      header: "Total comprado",
+      align: "right",
+      render: (cliente) => (
+        <span className="font-semibold text-slate-900 dark:text-slate-100">
+          {formatMoneyBRL(cliente.total_gasto)}
+        </span>
+      ),
+    },
+  ];
+
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-      <header className="border-b border-slate-200 px-4 py-5 dark:border-slate-700 sm:px-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-teal-200 dark:bg-teal-500/10 dark:text-teal-300 dark:ring-teal-500/30">
-              <FiUsers aria-hidden="true" />
-            </span>
-            <div>
-              <h2 className="m-0 text-base font-semibold text-slate-900 dark:text-slate-100">
-                Clientes inativos
-              </h2>
-              <p className="mt-1 max-w-2xl text-xs text-slate-500 dark:text-slate-400">
-                Clientes que já compraram, mas não voltaram no período escolhido. Nenhuma mensagem é
-                enviada automaticamente.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => void carregar()}
-            disabled={carregando}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-          >
-            <FiRefreshCw className={carregando ? "animate-spin" : ""} aria-hidden="true" />
+    <section className="grid gap-4">
+      <div>
+        <h3 className="m-0 text-base font-semibold text-slate-900 dark:text-slate-100">
+          Clientes inativos
+        </h3>
+        <p className="v2-texto-ajuda mt-1 max-w-2xl">
+          Clientes que já compraram, mas não voltaram no período escolhido. Nenhuma mensagem é
+          enviada automaticamente.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <SeletorOpcoes
+          aoSelecionar={mudarPrazo}
+          opcoes={OPCOES_INATIVIDADE}
+          rotulo="Sem compra há"
+          valorSelecionado={dias}
+        />
+        <form className="flex w-full max-w-xl items-end gap-2" onSubmit={aplicarBusca}>
+          <InputTexto
+            id="clientes-inativos-busca"
+            left={<Search className="h-4 w-4 text-slate-400" aria-hidden="true" />}
+            onChange={setBusca}
+            placeholder="Buscar por nome, código, telefone ou e-mail"
+            type="search"
+            value={busca}
+          />
+          <BotaoInteracao type="submit">Buscar</BotaoInteracao>
+          <BotaoInteracao disabled={carregando} icon={RefreshCw} onClick={() => void carregar()}>
             Atualizar
-          </button>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2" aria-label="Período sem compra">
-          {PRAZOS_INATIVIDADE.map((prazo) => (
-            <button
-              key={prazo}
-              type="button"
-              onClick={() => mudarPrazo(prazo)}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                dias === prazo
-                  ? "bg-teal-600 text-white shadow-sm"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-              }`}
-            >
-              {prazo}+ dias
-            </button>
-          ))}
-        </div>
-
-        <form onSubmit={aplicarBusca} className="mt-4 flex max-w-xl gap-2">
-          <label className="relative min-w-0 flex-1">
-            <FiSearch
-              aria-hidden="true"
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
-            <span className="sr-only">Buscar cliente inativo</span>
-            <input
-              type="search"
-              value={busca}
-              onChange={(event) => setBusca(event.target.value)}
-              placeholder="Buscar por nome, código, telefone ou e-mail"
-              className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-            />
-          </label>
-          <button
-            type="submit"
-            className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-          >
-            Buscar
-          </button>
+          </BotaoInteracao>
         </form>
-      </header>
+      </div>
 
       {!carregando && !erro && (
-        <div className="grid grid-cols-1 gap-3 border-b border-slate-200 p-4 dark:border-slate-700 sm:grid-cols-3 sm:p-5">
-          <ResumoCard
-            icon={FiClock}
-            label={`Sem comprar há ${dias}+ dias`}
-            value={resumo.total_inativos || 0}
-          />
-          <ResumoCard
-            icon={FiMessageCircle}
-            label="Com WhatsApp"
-            tone="green"
-            value={resumo.com_whatsapp || 0}
-          />
-          <ResumoCard
-            icon={FiUser}
-            label="Sem telefone válido"
-            tone="amber"
-            value={resumo.sem_whatsapp || 0}
-          />
-        </div>
-      )}
-
-      {carregando && (
-        <div className="px-5 py-12 text-center text-sm text-slate-500 dark:text-slate-400">
-          Carregando clientes inativos...
-        </div>
-      )}
-
-      {!carregando && erro && (
-        <div className="px-5 py-10 text-center">
-          <p className="text-sm text-red-600 dark:text-red-300">{erro}</p>
-          <button
-            type="button"
-            onClick={() => void carregar()}
-            className="mt-3 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
-          >
-            Tentar novamente
-          </button>
-        </div>
-      )}
-
-      {!carregando && !erro && clientes.length === 0 && (
-        <div className="px-5 py-12 text-center text-sm text-slate-500 dark:text-slate-400">
-          Nenhum cliente inativo encontrado com esses filtros.
-        </div>
-      )}
-
-      {!carregando && !erro && clientes.length > 0 && (
-        <>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[940px] text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950/50 dark:text-slate-400">
-                <tr>
-                  <th className="px-4 py-3 text-left">Cliente</th>
-                  <th className="px-4 py-3 text-center">Inatividade</th>
-                  <th className="px-4 py-3 text-right">Última compra</th>
-                  <th className="px-4 py-3 text-center">Compras</th>
-                  <th className="px-4 py-3 text-right">Total comprado</th>
-                  <th className="px-4 py-3 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {clientes.map((cliente) => {
-                  const podeUsarWhatsApp = telefoneValido(cliente.telefone);
-                  return (
-                    <tr
-                      key={cliente.cliente_id}
-                      className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
-                    >
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-slate-900 dark:text-slate-100">
-                          {cliente.nome}
-                        </p>
-                        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                          {cliente.codigo ? `Código ${cliente.codigo}` : `ID ${cliente.cliente_id}`}
-                          {cliente.telefone ? ` · ${cliente.telefone}` : " · Sem telefone"}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30">
-                          {cliente.dias_sem_comprar} dias
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300">
-                        {dataCurta(cliente.ultima_compra)}
-                      </td>
-                      <td className="px-4 py-3 text-center text-slate-600 dark:text-slate-300">
-                        {Number(cliente.total_compras || 0).toLocaleString("pt-BR")}
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-900 dark:text-slate-100">
-                        {formatMoneyBRL(cliente.total_gasto)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => abrirWhatsApp(cliente)}
-                            disabled={!podeUsarWhatsApp}
-                            title={
-                              podeUsarWhatsApp
-                                ? "Abrir conversa com mensagem pronta"
-                                : "Cliente sem telefone válido"
-                            }
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            <FiMessageCircle aria-hidden="true" /> WhatsApp
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void copiarMensagem(cliente)}
-                            title="Copiar mensagem sugerida"
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                          >
-                            <FiCopy aria-hidden="true" /> Copiar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => navigate(`/clientes/${cliente.cliente_id}/financeiro`)}
-                            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                          >
-                            Ver cliente
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <footer className="flex items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 dark:border-slate-700 sm:px-5">
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Página {paginacao.pagina} de {paginacao.total_paginas} · {paginacao.total} cliente(s)
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <CartaoIndicador icone={Clock} titulo={`Sem comprar há ${dias}+ dias`} tom="neutro">
+            <p className="text-2xl font-bold text-slate-950 dark:text-white">
+              {Number(resumo.total_inativos || 0).toLocaleString("pt-BR")}
             </p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                aria-label="Página anterior"
-                disabled={pagina <= 1}
-                onClick={() => setPagina((atual) => Math.max(1, atual - 1))}
-                className="rounded-lg border border-slate-200 p-2 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
-              >
-                <FiChevronLeft aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                aria-label="Próxima página"
-                disabled={pagina >= paginacao.total_paginas}
-                onClick={() => setPagina((atual) => atual + 1)}
-                className="rounded-lg border border-slate-200 p-2 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
-              >
-                <FiChevronRight aria-hidden="true" />
-              </button>
-            </div>
-          </footer>
-        </>
+          </CartaoIndicador>
+          <CartaoIndicador icone={MessageCircle} titulo="Com WhatsApp" tom="sucesso">
+            <p className="text-2xl font-bold text-slate-950 dark:text-white">
+              {Number(resumo.com_whatsapp || 0).toLocaleString("pt-BR")}
+            </p>
+          </CartaoIndicador>
+          <CartaoIndicador icone={User} titulo="Sem telefone válido" tom="atencao">
+            <p className="text-2xl font-bold text-slate-950 dark:text-white">
+              {Number(resumo.sem_whatsapp || 0).toLocaleString("pt-BR")}
+            </p>
+          </CartaoIndicador>
+        </div>
+      )}
+
+      {erro ? (
+        <FaixaAviso
+          acoes={
+            <BotaoInteracao icon={RefreshCw} onClick={() => void carregar()}>
+              Tentar novamente
+            </BotaoInteracao>
+          }
+          icone={AlertTriangle}
+          titulo="Não foi possível carregar"
+          tom="perigo"
+        >
+          {erro}
+        </FaixaAviso>
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <DataTable
+            columns={colunas}
+            data={clientes}
+            emptyMessage="Nenhum cliente inativo encontrado com esses filtros."
+            getRowKey={(cliente) => cliente.cliente_id}
+            loading={carregando}
+            loadingMessage="Carregando clientes inativos..."
+          />
+          <PaginationControls
+            currentPage={paginacao.pagina}
+            itemName="cliente(s)"
+            itemsPerPage={POR_PAGINA}
+            loading={carregando}
+            onPageChange={setPagina}
+            pageSizeOptions={[POR_PAGINA]}
+            totalItems={paginacao.total}
+            totalPages={paginacao.total_paginas}
+            variant="bottom"
+          />
+        </div>
       )}
     </section>
-  );
-}
-
-function ResumoCard({ icon: Icon, label, tone = "slate", value }) {
-  const tones = {
-    slate:
-      "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200",
-    green:
-      "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200",
-    amber:
-      "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200",
-  };
-
-  return (
-    <div className={`rounded-xl border px-4 py-3 ${tones[tone]}`}>
-      <div className="flex items-center gap-2 text-xs font-medium opacity-80">
-        <Icon aria-hidden="true" /> {label}
-      </div>
-      <p className="mt-1 text-2xl font-bold">{Number(value || 0).toLocaleString("pt-BR")}</p>
-    </div>
   );
 }

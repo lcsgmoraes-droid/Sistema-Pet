@@ -1,5 +1,11 @@
+import { Bell, Gift, MessageCircle, RefreshCw, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { FiBell, FiGift, FiMessageCircle, FiRefreshCw, FiSearch } from "react-icons/fi";
+import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
+import EstadoVazio from "../../components/v2/EstadoVazio/EstadoVazio";
+import Etiqueta from "../../components/v2/Etiqueta/Etiqueta";
+import InputCombobox from "../../components/v2/InputCombobox/InputCombobox";
+import InputTexto from "../../components/v2/InputTexto/InputTexto";
+import SeletorOpcoes from "../../components/v2/SeletorOpcoes/SeletorOpcoes";
 import { formatarDataHora } from "./lembretesFormatters";
 
 const PERIODS = [
@@ -9,10 +15,16 @@ const PERIODS = [
   { id: "30dias", label: "Próximos 30 dias", accepts: (days) => days >= 0 && days <= 30 },
 ];
 
+const OPCOES_TIPO = [
+  { value: "todos", label: "Tutor e pet" },
+  { value: "tutor", label: "Somente tutores" },
+  { value: "pet", label: "Somente pets" },
+];
+
 function normalize(value) {
   return String(value || "")
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .toLowerCase();
 }
 
@@ -41,100 +53,79 @@ export default function LembretesAniversariantes({ controller }) {
     });
   }, [controller.aniversariantes, period, search, type]);
 
-  const counts = useMemo(
+  const opcoesPeriodo = useMemo(
     () =>
-      Object.fromEntries(
-        PERIODS.map((item) => [
-          item.id,
+      PERIODS.map((item) => ({
+        valor: item.id,
+        rotulo: `${item.label} · ${
           controller.aniversariantes.filter((birthday) => item.accepts(birthday.dias_restantes))
-            .length,
-        ]),
-      ),
+            .length
+        }`,
+      })),
     [controller.aniversariantes],
   );
 
   return (
-    <section className="mb-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
       <header className="border-b border-slate-200 p-4 dark:border-slate-700 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-pink-50 text-pink-700 ring-1 ring-pink-200 dark:bg-pink-500/10 dark:text-pink-300 dark:ring-pink-500/30">
-              <FiGift aria-hidden="true" />
-            </span>
-            <div>
-              <h2 className="m-0 text-base font-semibold text-slate-900 dark:text-slate-100">
-                Aniversariantes — tutor e pet
-              </h2>
-              <p className="mt-1 max-w-2xl text-xs text-slate-500 dark:text-slate-400">
-                Prepare uma mensagem individual, abra o WhatsApp ou envie novamente uma notificação
-                pelo app.
-              </p>
-            </div>
+          <div>
+            <h2 className="m-0 text-base font-semibold text-slate-900 dark:text-slate-100">
+              Aniversariantes — tutor e pet
+            </h2>
+            <p className="v2-texto-ajuda mt-1 max-w-2xl">
+              Prepare uma mensagem individual, abra o WhatsApp ou envie novamente uma notificação
+              pelo app.
+            </p>
           </div>
-          <button
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-            disabled={controller.loadingAniversariantes}
+          <BotaoInteracao
+            icon={RefreshCw}
+            loading={controller.loadingAniversariantes}
             onClick={() => void controller.carregarAniversariantes()}
-            type="button"
           >
-            <FiRefreshCw
-              aria-hidden="true"
-              className={controller.loadingAniversariantes ? "animate-spin" : ""}
-            />
             Atualizar
-          </button>
+          </BotaoInteracao>
         </div>
 
-        <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex flex-wrap gap-2" aria-label="Período dos aniversários">
-            {PERIODS.map((item) => (
-              <button
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ring-inset transition ${
-                  period === item.id
-                    ? "bg-pink-600 text-white ring-pink-600"
-                    : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-800"
-                }`}
-                key={item.id}
-                onClick={() => setPeriod(item.id)}
-                type="button"
-              >
-                {item.label} · {counts[item.id] || 0}
-              </button>
-            ))}
-          </div>
+        <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+          <SeletorOpcoes
+            aoSelecionar={setPeriod}
+            opcoes={opcoesPeriodo}
+            rotulo="Período"
+            valorSelecionado={period}
+          />
           <div className="flex flex-col gap-2 sm:flex-row">
-            <label className="relative block sm:w-64">
-              <span className="sr-only">Buscar aniversariante</span>
-              <FiSearch
-                aria-hidden="true"
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-              <input
-                className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-800 outline-none focus:border-pink-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                onChange={(event) => setSearch(event.target.value)}
+            <div className="sm:w-64">
+              <InputTexto
+                id="aniversariantes-busca"
+                left={<Search className="h-4 w-4 text-slate-400" aria-hidden="true" />}
+                onChange={setSearch}
                 placeholder="Tutor ou pet"
                 type="search"
                 value={search}
               />
-            </label>
-            <select
-              aria-label="Tipo de aniversariante"
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-pink-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
-              onChange={(event) => setType(event.target.value)}
-              value={type}
-            >
-              <option value="todos">Tutor e pet</option>
-              <option value="tutor">Somente tutores</option>
-              <option value="pet">Somente pets</option>
-            </select>
+            </div>
+            <div className="sm:w-52">
+              <InputCombobox
+                id="aniversariantes-tipo"
+                onChange={(valor) => setType(valor || "todos")}
+                opcoes={OPCOES_TIPO}
+                permitirLimpar={false}
+                value={type}
+              />
+            </div>
           </div>
         </div>
       </header>
 
       {controller.loadingAniversariantes ? (
-        <Empty text="Carregando aniversariantes..." />
+        <div className="p-5">
+          <EstadoVazio icone={Gift} titulo="Carregando aniversariantes..." />
+        </div>
       ) : filtered.length === 0 ? (
-        <Empty text="Nenhum aniversariante encontrado neste período." />
+        <div className="p-5">
+          <EstadoVazio icone={Gift} titulo="Nenhum aniversariante encontrado neste período." />
+        </div>
       ) : (
         <div className="divide-y divide-slate-100 dark:divide-slate-800">
           {filtered.map((item) => (
@@ -156,13 +147,11 @@ function BirthdayRow({ controller, item }) {
   return (
     <article className="grid gap-4 p-4 transition hover:bg-slate-50/70 dark:hover:bg-slate-800/30 sm:p-5 xl:grid-cols-[145px_minmax(0,1fr)_auto] xl:items-center">
       <div>
-        <span className="inline-flex rounded-full bg-pink-50 px-2.5 py-1 text-xs font-bold text-pink-700 ring-1 ring-inset ring-pink-200 dark:bg-pink-500/10 dark:text-pink-300 dark:ring-pink-500/30">
-          {dateLabel(item)}
-        </span>
+        <Etiqueta tom="informativo">{dateLabel(item)}</Etiqueta>
         <p className="mt-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
           {birthdayDate}
         </p>
-        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+        <p className="v2-texto-ajuda mt-0.5">
           {item.idade > 0 ? `${item.idade} anos` : "Idade não informada"}
         </p>
       </div>
@@ -172,9 +161,7 @@ function BirthdayRow({ controller, item }) {
           <h3 className="m-0 text-base font-semibold text-slate-900 dark:text-slate-100">
             {item.aniversariante_nome}
           </h3>
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-            {item.tipo_aniversario === "pet" ? "Pet" : "Tutor"}
-          </span>
+          <Etiqueta>{item.tipo_aniversario === "pet" ? "Pet" : "Tutor"}</Etiqueta>
         </div>
         {item.tipo_aniversario === "pet" && (
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
@@ -188,44 +175,30 @@ function BirthdayRow({ controller, item }) {
               : "text-slate-500 dark:text-slate-400"
           }`}
         >
-          <FiMessageCircle aria-hidden="true" className="mr-1 inline" />
+          <MessageCircle aria-hidden="true" className="mr-1 inline h-3 w-3" />
           {item.contatos_total || 0} contato(s) neste aniversário
           {lastContact?.criado_em ? ` · último em ${formatarDataHora(lastContact.criado_em)}` : ""}
         </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-        <button
-          className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
-          onClick={() => controller.abrirContato(item)}
-          type="button"
-        >
-          <FiMessageCircle aria-hidden="true" /> Criar mensagem
-        </button>
-        <button
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-          disabled={!item.cliente_tem_app || pushLoading}
+        <BotaoInteracao icon={MessageCircle} onClick={() => controller.abrirContato(item)}>
+          Criar mensagem
+        </BotaoInteracao>
+        <BotaoInteracao
+          disabled={!item.cliente_tem_app}
+          icon={Bell}
+          loading={pushLoading}
           onClick={() => controller.enviarPush(item)}
           title={
             item.cliente_tem_app
               ? "Enviar novamente uma notificação no app"
               : "Push indisponível: cliente sem conta vinculada no app"
           }
-          type="button"
         >
-          <FiBell className={pushLoading ? "animate-pulse" : ""} aria-hidden="true" />
           {pushLoading ? "Enviando..." : "Push"}
-        </button>
+        </BotaoInteracao>
       </div>
     </article>
-  );
-}
-
-function Empty({ text }) {
-  return (
-    <div className="px-5 py-12 text-center text-sm text-slate-500 dark:text-slate-400">
-      <FiGift aria-hidden="true" className="mx-auto mb-3" size={24} />
-      {text}
-    </div>
   );
 }

@@ -16,6 +16,6 @@ test("Lembretes permite processar validade manualmente quando a protecao esta at
 });
 
 test("Lembretes mostra estado claro quando a protecao por validade esta desativada", () => {
-  assert.match(source, /Protecao por validade desativada/);
+  assert.match(source, /Proteção por validade desativada/);
   assert.match(source, /\/configuracoes\/estoque/);
 });

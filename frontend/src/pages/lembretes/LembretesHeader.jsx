@@ -1,51 +1,31 @@
-import { FiAlertCircle, FiBell, FiClock, FiMessageCircle } from "react-icons/fi";
+import { AlertCircle, Bell, Clock, MessageCircle } from "lucide-react";
+import CartaoIndicador from "../../components/v2/CartaoIndicador/CartaoIndicador";
 
 export default function LembretesHeader({ controller }) {
   const contacted = controller.lembretes.filter((item) => item.contatos_total > 0).length;
   const cards = [
     {
-      icon: FiBell,
+      icon: Bell,
       label: "Oportunidades ativas",
       value: controller.lembretes.length,
-      iconTone: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+      tom: "neutro",
     },
+    { icon: AlertCircle, label: "Atrasadas", value: controller.vencidos.length, tom: "perigo" },
     {
-      icon: FiAlertCircle,
-      label: "Atrasadas",
-      value: controller.vencidos.length,
-      iconTone: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300",
-    },
-    {
-      icon: FiClock,
+      icon: Clock,
       label: "Hoje até 7 dias",
       value: controller.proximosEmBreve.length,
-      iconTone: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+      tom: "atencao",
     },
-    {
-      icon: FiMessageCircle,
-      label: "Já contatadas",
-      value: contacted,
-      iconTone: "bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-300",
-    },
+    { icon: MessageCircle, label: "Já contatadas", value: contacted, tom: "sucesso" },
   ];
 
   return (
     <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      {cards.map(({ icon: Icon, iconTone, label, value }) => (
-        <article
-          className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 shadow-sm dark:border-slate-700 dark:bg-slate-900"
-          key={label}
-        >
-          <span
-            className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${iconTone}`}
-          >
-            <Icon aria-hidden="true" />
-          </span>
-          <div>
-            <p className="m-0 text-2xl font-bold text-slate-900 dark:text-slate-100">{value}</p>
-            <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">{label}</p>
-          </div>
-        </article>
+      {cards.map(({ icon, label, tom, value }) => (
+        <CartaoIndicador icone={icon} key={label} titulo={label} tom={tom}>
+          <p className="text-2xl font-bold text-slate-950 dark:text-white">{value}</p>
+        </CartaoIndicador>
       ))}
     </section>
   );

@@ -1,13 +1,12 @@
-import {
-  FiBell,
-  FiCheckCircle,
-  FiChevronDown,
-  FiMessageCircle,
-  FiRefreshCw,
-  FiTrash2,
-} from "react-icons/fi";
+import { Bell, CheckCircle2, MessageCircle, RefreshCw, Trash2 } from "lucide-react";
+import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
+import BotaoMenuAcoes from "../../components/v2/BotaoMenuAcoes/BotaoMenuAcoes";
+import Etiqueta from "../../components/v2/Etiqueta/Etiqueta";
 import { formatarDataHora, formatarMoeda } from "./lembretesFormatters";
 import { TIPOS_LEMBRETE } from "./lembretesUtils";
+
+const PUSH_INDISPONIVEL =
+  "Push indisponível: será habilitado quando o cliente tiver uma conta vinculada no app.";
 
 export default function LembreteCard({ controller, lembrete }) {
   const days = lembrete.dias_restantes;
@@ -15,14 +14,39 @@ export default function LembreteCard({ controller, lembrete }) {
   const lastContact = lembrete.ultimo_contato;
   const pushLoading = controller.acaoContato === `push-${lembrete.id}`;
   const pushUnavailable = !lembrete.cliente_tem_app;
-  const pushHelpId = `lembrete-push-help-${lembrete.id}`;
+
+  const acoes = [
+    {
+      icon: Bell,
+      label: pushLoading ? "Enviando push..." : "Enviar push no app",
+      disabled: pushUnavailable || pushLoading,
+      title: pushUnavailable ? PUSH_INDISPONIVEL : "Enviar notificação no app",
+      onClick: () => controller.enviarPush(lembrete),
+    },
+    {
+      icon: CheckCircle2,
+      label: "Registrar recompra",
+      onClick: () => controller.completarLembrete(lembrete.id),
+    },
+    {
+      icon: RefreshCw,
+      label: "Criar próximo ciclo",
+      onClick: () => controller.renovarLembrete(lembrete.id),
+    },
+    {
+      icon: Trash2,
+      label: "Cancelar lembrete",
+      tom: "perigo",
+      onClick: () => controller.cancelarLembrete(lembrete.id),
+    },
+  ];
 
   return (
     <article className="grid gap-4 p-4 transition hover:bg-slate-50/70 dark:hover:bg-slate-800/30 sm:p-5 xl:grid-cols-[160px_minmax(0,1fr)_auto] xl:items-center">
       <div>
-        <span className={deadlineClass(days)}>{deadlineLabel(days)}</span>
+        <Etiqueta tom={deadlineTom(days)}>{deadlineLabel(days)}</Etiqueta>
         <p className="mt-2 text-sm font-semibold text-slate-800 dark:text-slate-200">{dueDate}</p>
-        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Previsão de retorno</p>
+        <p className="v2-texto-ajuda mt-0.5">Previsão de retorno</p>
       </div>
 
       <div className="min-w-0">
@@ -40,16 +64,14 @@ export default function LembreteCard({ controller, lembrete }) {
           <p className="m-0 text-sm font-medium text-slate-700 dark:text-slate-300">
             {lembrete.produto_nome}
           </p>
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-            {TIPOS_LEMBRETE[lembrete.tipo_lembrete] || "Recorrência"}
-          </span>
+          <Etiqueta>{TIPOS_LEMBRETE[lembrete.tipo_lembrete] || "Recorrência"}</Etiqueta>
           {lembrete.dose_total > 1 && (
-            <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
+            <Etiqueta tom="informativo">
               Dose {lembrete.dose_atual}/{lembrete.dose_total}
-            </span>
+            </Etiqueta>
           )}
         </div>
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+        <div className="v2-texto-ajuda mt-2 flex flex-wrap gap-x-4 gap-y-1">
           {lembrete.intervalo_estimado_dias && (
             <span>Ciclo de {lembrete.intervalo_estimado_dias} dias</span>
           )}
@@ -61,7 +83,7 @@ export default function LembreteCard({ controller, lembrete }) {
               lembrete.contatado_hoje ? "font-semibold text-amber-700 dark:text-amber-300" : ""
             }
           >
-            <FiMessageCircle aria-hidden="true" className="mr-1 inline" />
+            <MessageCircle aria-hidden="true" className="mr-1 inline h-3 w-3" />
             {lembrete.contatos_total || 0} contato(s) neste ciclo
             {lastContact?.criado_em
               ? ` · último em ${formatarDataHora(lastContact.criado_em)}`
@@ -71,83 +93,15 @@ export default function LembreteCard({ controller, lembrete }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-        <button
-          className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
-          onClick={() => controller.abrirContato(lembrete)}
-          type="button"
-        >
-          <FiMessageCircle aria-hidden="true" /> Criar mensagem
-        </button>
-        <span
-          aria-describedby={pushUnavailable ? pushHelpId : undefined}
-          className="group relative inline-flex"
-          tabIndex={pushUnavailable ? 0 : undefined}
-        >
-          <button
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-            disabled={pushUnavailable || pushLoading}
-            onClick={() => controller.enviarPush(lembrete)}
-            title={
-              lembrete.cliente_tem_app
-                ? "Enviar notificação no app"
-                : "Push indisponível: será habilitado quando o cliente tiver uma conta vinculada no app."
-            }
-            type="button"
-          >
-            <FiBell className={pushLoading ? "animate-pulse" : ""} aria-hidden="true" />
-            {pushLoading ? "Enviando..." : "Push"}
-          </button>
-          {pushUnavailable && (
-            <span
-              className="pointer-events-none absolute bottom-full right-0 z-30 mb-2 hidden w-72 rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium leading-relaxed text-white shadow-xl group-focus:block group-hover:block dark:bg-slate-100 dark:text-slate-900"
-              id={pushHelpId}
-              role="tooltip"
-            >
-              Push indisponível. Será habilitado quando o cliente tiver uma conta vinculada no app.
-            </span>
-          )}
-        </span>
-        <details className="relative">
-          <summary className="flex cursor-pointer list-none items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
-            Mais <FiChevronDown aria-hidden="true" />
-          </summary>
-          <div className="absolute right-0 z-20 mt-2 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900">
-            <Action
-              icon={FiCheckCircle}
-              label="Registrar recompra"
-              onClick={() => controller.completarLembrete(lembrete.id)}
-            />
-            <Action
-              icon={FiRefreshCw}
-              label="Criar próximo ciclo"
-              onClick={() => controller.renovarLembrete(lembrete.id)}
-            />
-            <Action
-              danger
-              icon={FiTrash2}
-              label="Cancelar lembrete"
-              onClick={() => controller.cancelarLembrete(lembrete.id)}
-            />
-          </div>
-        </details>
+        <BotaoInteracao icon={MessageCircle} onClick={() => controller.abrirContato(lembrete)}>
+          Criar mensagem
+        </BotaoInteracao>
+        <BotaoMenuAcoes
+          acoes={acoes}
+          rotulo={`Mais ações para ${lembrete.cliente_nome || "o lembrete"}`}
+        />
       </div>
     </article>
-  );
-}
-
-function Action({ danger = false, icon: Icon, label, onClick }) {
-  return (
-    <button
-      className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition ${
-        danger
-          ? "text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
-          : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
-      }`}
-      onClick={onClick}
-      type="button"
-    >
-      <Icon aria-hidden="true" /> {label}
-    </button>
   );
 }
 
@@ -157,13 +111,8 @@ function deadlineLabel(days) {
   return `Faltam ${days} dia(s)`;
 }
 
-function deadlineClass(days) {
-  const base = "inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset";
-  if (days < 0) {
-    return `${base} bg-red-50 text-red-700 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/30`;
-  }
-  if (days <= 7) {
-    return `${base} bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30`;
-  }
-  return `${base} bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700`;
+function deadlineTom(days) {
+  if (days < 0) return "perigo";
+  if (days <= 7) return "atencao";
+  return "neutro";
 }

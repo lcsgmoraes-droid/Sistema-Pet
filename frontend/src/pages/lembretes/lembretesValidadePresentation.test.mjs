@@ -4,16 +4,14 @@ import test from "node:test";
 
 const source = readFileSync(new URL("./LembretesValidadeSection.jsx", import.meta.url), "utf8");
 
-test("validade usa apresentacao clean e acao verde petroleo", () => {
-  assert.match(source, /bg-teal-50/);
-  assert.match(source, /text-teal-700/);
-  assert.match(source, /rounded-full/);
-  assert.match(source, /dark:bg-slate-900/);
-  assert.match(source, /dark:bg-teal-500\/10/);
-  assert.doesNotMatch(source, /className="btn btn-primary"/);
+test("validade usa componentes v2 de aviso e ação", () => {
+  assert.match(source, /FaixaAviso/);
+  assert.match(source, /BotaoInteracao/);
+  assert.match(source, /BotaoExcluir/);
+  assert.doesNotMatch(source, /<button[\s>]/);
 });
 
-test("acoes de validade usam rotulos operacionais claros", () => {
+test("ações de validade usam rótulos operacionais claros", () => {
   assert.match(source, />\s*Descartar\s*</);
   assert.match(source, />\s*Registrar troca\s*</);
   assert.match(source, />\s*Retornar ao estoque\s*</);

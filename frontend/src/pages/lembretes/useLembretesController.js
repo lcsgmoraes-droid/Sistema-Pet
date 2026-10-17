@@ -6,6 +6,7 @@ import { useModulos } from "../../contexts/ModulosContext";
 import { confirmarCorePet } from "../../services/corepetDialog";
 import { contarPorPrazo, filtrarLembretes, whatsappUrl } from "./lembretesUtils";
 
+const initialAutocadastrosBling = { total: 0, items: [] };
 const initialValidityConfig = { carregado: false, ativa: null, dias: 15 };
 
 function errorDetail(error, fallback) {
@@ -44,8 +45,10 @@ export default function useLembretesController() {
   const [carregandoContatos, setCarregandoContatos] = useState(false);
   const [acaoContato, setAcaoContato] = useState("");
   const [relatorio, setRelatorio] = useState(null);
+  const [autocadastrosBling, setAutocadastrosBling] = useState(initialAutocadastrosBling);
 
   const campanhasAtivo = moduloAtivo("campanhas");
+  const blingAtivo = moduloAtivo("bling");
 
   const carregarLembretes = useCallback(async () => {
     setLoading(true);
@@ -79,6 +82,20 @@ export default function useLembretesController() {
       setAniversariantes([]);
     } finally {
       setLoadingAniversariantes(false);
+    }
+  }, []);
+
+  const carregarAutocadastrosBling = useCallback(async () => {
+    try {
+      const response = await api.get("/integracoes/bling/nf/autocadastros-recentes", {
+        params: { horas: 24 },
+      });
+      setAutocadastrosBling({
+        total: Number(response.data?.total || 0),
+        items: Array.isArray(response.data?.items) ? response.data.items : [],
+      });
+    } catch {
+      setAutocadastrosBling(initialAutocadastrosBling);
     }
   }, []);
 
@@ -146,18 +163,23 @@ export default function useLembretesController() {
     void carregarRelatorio();
     if (campanhasAtivo) void carregarAlertasCampanhas();
     else setAlertasCampanhas(null);
+    if (blingAtivo) void carregarAutocadastrosBling();
+    else setAutocadastrosBling(initialAutocadastrosBling);
     void carregarValidadePendencias({ processar: true });
     const interval = setInterval(() => {
       void carregarLembretes();
       void carregarAniversariantes();
       void carregarRelatorio();
+      if (blingAtivo) void carregarAutocadastrosBling();
       void carregarValidadePendencias();
     }, 60000);
     return () => clearInterval(interval);
   }, [
+    blingAtivo,
     campanhasAtivo,
     carregarAlertasCampanhas,
     carregarAniversariantes,
+    carregarAutocadastrosBling,
     carregarLembretes,
     carregarRelatorio,
     carregarValidadePendencias,
@@ -215,7 +237,9 @@ export default function useLembretesController() {
         trocar: "Registrar este lote como trocado com o fornecedor?",
         retornar: "Retornar este lote para o estoque vendável?",
       };
-      if (!endpoints[acao] || !(await confirmarCorePet(mensagens[acao]))) return;
+      // "descartar" já confirma no próprio BotaoExcluir.
+      if (!endpoints[acao]) return;
+      if (acao !== "descartar" && !(await confirmarCorePet(mensagens[acao]))) return;
       try {
         await api.post(`/estoque/validade/${item.id}/${endpoints[acao]}`, {
           observacao: null,
@@ -338,6 +362,8 @@ export default function useLembretesController() {
     aniversariantes,
     abrirContato,
     abrirWhatsApp,
+    autocadastrosBling,
+    blingAtivo,
     busca,
     cancelarLembrete,
     carregandoContatos,

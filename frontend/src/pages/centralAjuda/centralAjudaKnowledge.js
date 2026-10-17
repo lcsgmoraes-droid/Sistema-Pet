@@ -440,7 +440,7 @@ export const BASE_CONHECIMENTO = [
           "Escolha **Data prevista** quando o cliente informar diretamente o dia em que acredita que a ração acabará. A data precisa ser posterior ao dia atual.",
           "Clique em **Salvar aviso**. O carrinho passa a mostrar o prazo ou a data escolhida. Para corrigir, clique novamente; para desistir, use **Remover aviso**.",
           "A previsão fica salva mesmo se a venda for apenas salva ou receber pagamento parcial. O lembrete é criado quando a venda fica totalmente finalizada.",
-          "Depois da finalização, acesse **Produtos / Estoque → Lembretes**. O cartão mostra produto, cliente, telefone e data prevista. O aviso informado na venda tem prioridade sobre a estimativa automática de recompra.",
+          "Depois da finalização, acesse **Lembretes** no menu lateral. O cartão mostra produto, cliente, telefone e data prevista. O aviso informado na venda tem prioridade sobre a estimativa automática de recompra.",
           "O cliente também recebe o aviso de reposição pelo app CorePet conforme a antecedência calculada.",
           "**Conferência:** confirme se o cliente correto está selecionado e se o item do carrinho mostra a data ou o prazo antes de registrar o recebimento.",
         ],
@@ -676,30 +676,53 @@ export const BASE_CONHECIMENTO = [
   // ────────────── LEMBRETES ──────────────
   {
     modulo: "lembretes",
-    label: "Lembretes e Agendamentos",
+    label: "Central de Lembretes",
     icone: FiCalendar,
     cor: "purple",
     artigos: [
       {
-        titulo: "Como criar um lembrete",
-        tags: ["lembrete", "agendamento", "criar", "notificação"],
+        titulo: "O que é a Central de Lembretes",
+        tags: ["lembrete", "recompra", "aniversário", "validade", "relacionamento"],
         conteudo: [
-          "Acesse **Lembretes** no menu lateral.",
-          "Clique em **+ Novo Lembrete**.",
-          "Preencha: título, data, hora, cliente (opcional) e observações.",
-          "Escolha o tipo: Consulta, Banho e Tosa, Vacina, Retorno, Outro.",
-          "Salve. O lembrete aparece no calendário e na lista.",
-          "💡 Lembretes com data chegando ficam destacados na lista.",
+          "Acesse **Lembretes** no menu lateral. Os lembretes são criados sozinhos pelo sistema — não existe botão de novo lembrete.",
+          "As abas ficam em duas partes: à esquerda as de **consulta** (Relatórios, Auto cadastro Bling, Relacionamento) e à direita as que **alteram dados** (Aniversários, Recompras e Validade).",
+          "O número ao lado do nome da aba mostra quantos itens pedem atenção naquela área.",
         ],
       },
       {
-        titulo: "Como ver os lembretes do dia",
-        tags: ["lembrete", "hoje", "dia", "agenda"],
+        titulo: "Como trabalhar a fila de recompras",
+        tags: ["lembrete", "recompra", "whatsapp", "push", "cliente"],
         conteudo: [
-          "Na página de Lembretes, o filtro padrão mostra os lembretes de hoje.",
-          "Use os botões de filtro para ver: Hoje, Esta Semana, Este Mês ou Todos.",
-          "Lembretes vencidos (data passada, não concluídos) aparecem marcados em vermelho.",
-          "Clique em um lembrete para editar, marcar como concluído ou excluir.",
+          "Na aba **Recompras**, cada cartão mostra o cliente, o produto e quantos dias faltam (ou passaram) para o retorno previsto.",
+          "Use os filtros de prazo e de tipo para priorizar quem está atrasado.",
+          "Clique em **Criar mensagem**, revise o texto sugerido e escolha **Abrir WhatsApp**, **Copiar** ou **Enviar push**. O WhatsApp só abre a conversa — a mensagem é enviada por você.",
+          "No menu **⋮** de cada cartão: enviar push no app, **Registrar recompra**, **Criar próximo ciclo** e **Cancelar lembrete**.",
+          "💡 Os lembretes nascem quando a venda é totalmente finalizada. O aviso informado na venda tem prioridade sobre a estimativa automática.",
+        ],
+      },
+      {
+        titulo: "Aniversários, relacionamento e clientes inativos",
+        tags: ["aniversário", "tutor", "pet", "inativos", "campanha"],
+        conteudo: [
+          "**Aniversários**: lista tutores e pets que fazem aniversário nos próximos dias, com mensagem pronta, WhatsApp e push.",
+          "**Relacionamento**: mostra alertas de campanhas (quando o módulo de campanhas está ativo) e os clientes que não compram há 30, 60 ou 90 dias. Nenhuma mensagem é enviada automaticamente.",
+        ],
+      },
+      {
+        titulo: "Controle de validade",
+        tags: ["validade", "lote", "vencimento", "estoque", "descarte"],
+        conteudo: [
+          "Quando a **proteção por validade** está ativa (em Configurações → Estoque), lotes que vencem em poucos dias saem do estoque vendável e aparecem na aba **Validade**.",
+          "Para cada lote, registre a decisão: **Descartar**, **Registrar troca** com o fornecedor ou **Retornar ao estoque**.",
+          "Use **Verificar validade agora** para forçar a busca na hora.",
+        ],
+      },
+      {
+        titulo: "Auto cadastro Bling",
+        tags: ["bling", "sku", "cadastro automático", "produto"],
+        conteudo: [
+          "Quando o módulo Bling está ativo, a aba **Auto cadastro Bling** lista os produtos que o sistema criou sozinho ao encontrar um SKU sem cadastro nas últimas 24 horas.",
+          "Clique no produto para abrir o cadastro e completar as informações.",
         ],
       },
     ],
