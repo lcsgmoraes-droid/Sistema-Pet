@@ -10,9 +10,12 @@ from ..auth.dependencies import get_current_user_and_tenant
 from ..db import get_session
 from ..grupo_comercial_contexto import listar_empresas_do_grupo
 from ..models import Cliente, Pet
+from ..security.permissions_decorator import require_permission_dependency
 from ..veterinario_core import _all_accessible_tenant_ids, _get_tenant
 
-router = APIRouter()
+router = APIRouter(
+    dependencies=[Depends(require_permission_dependency("veterinario.acessar"))]
+)
 
 
 @router.get("/pets")
