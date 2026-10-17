@@ -75,7 +75,9 @@ def _create_schema(session):
             data_venda TEXT,
             tenant_id TEXT NOT NULL,
             entregador_id INTEGER,
-            valor_taxa_entregador NUMERIC
+            valor_taxa_entregador NUMERIC,
+            funcionario_id INTEGER,
+            vendedor_funcionario_id INTEGER
         )
         """,
         """
@@ -206,11 +208,13 @@ def _seed_base_data(session):
             text("""
                 INSERT INTO vendas (
                     id, total, status, desconto_valor, taxa_entrega, tem_entrega,
-                    data_venda, tenant_id, entregador_id, valor_taxa_entregador
+                    data_venda, tenant_id, entregador_id, valor_taxa_entregador,
+                    funcionario_id, vendedor_funcionario_id
                 )
-                VALUES (:id, 100, 'finalizada', 0, 0, 0, '2026-05-12', :tenant_id, NULL, 0)
+                VALUES (:id, 100, 'finalizada', 0, 0, 0, '2026-05-12', :tenant_id, NULL, 0,
+                        :funcionario_id, :funcionario_id)
             """),
-            {"id": VENDA_ID, "tenant_id": tenant_id},
+            {"id": VENDA_ID, "tenant_id": tenant_id, "funcionario_id": FUNCIONARIO_ID},
         )
         session.execute(
             text("""
@@ -340,6 +344,34 @@ def test_geracao_nao_usa_pagamento_de_outro_tenant_com_mesmo_venda_id(db_session
     assert len(rows) == 1
     assert rows[0].tenant_id == TENANT_A
     assert float(rows[0].valor_comissao_gerada) == pytest.approx(10.0)
+
+
+@pytest.mark.parametrize("comissionado_id", [None, FUNCIONARIO_ID + 1])
+def test_vendedor_sem_comissao_marcada_nao_gera_comissao(db_session, comissionado_id):
+    set_current_tenant(TENANT_A)
+    db_session.execute(
+        text("""
+            UPDATE vendas
+            SET funcionario_id = :comissionado_id
+            WHERE id = :venda_id AND tenant_id = :tenant_id
+        """),
+        {
+            "comissionado_id": comissionado_id,
+            "venda_id": VENDA_ID,
+            "tenant_id": TENANT_A,
+        },
+    )
+    db_session.commit()
+
+    result = gerar_comissoes_venda(
+        venda_id=VENDA_ID,
+        funcionario_id=FUNCIONARIO_ID,
+        db=db_session,
+    )
+
+    assert result["success"] is False
+    assert _commission_rows(db_session) == []
+    assert db_session.execute(text("SELECT COUNT(*) FROM contas_pagar")).scalar() == 0
 
 
 def test_provisao_conta_pagar_recebe_tenant_correto(db_session):

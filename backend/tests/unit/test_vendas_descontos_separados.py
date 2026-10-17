@@ -422,6 +422,7 @@ def test_comissao_recebe_liquido_do_proprio_item_sem_ratear_di(
                     None,
                     g,
                     c,
+                    1,
                 )
             )
         if "COUNT(*)" in sql:

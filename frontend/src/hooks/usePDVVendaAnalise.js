@@ -67,7 +67,7 @@ export function usePDVVendaAnalise(vendaAtual) {
         taxa_entrega: venda.entrega?.taxa_entrega_total || 0,
         forma_pagamento_id: venda.forma_pagamento_id || null,
         parcelas: venda.parcelas || 1,
-        vendedor_id: venda.vendedor_id || null,
+        vendedor_id: venda.funcionario_id || null,
       });
 
       setDadosAnalise(response.data);
