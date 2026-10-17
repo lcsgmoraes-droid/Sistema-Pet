@@ -24,23 +24,6 @@ router.dependencies.append(
     Depends(require_permission_dependency("comissoes.relatorios"))
 )
 
-# O snapshot de venda/custo é do item inteiro, enquanto a comissão pode existir
-# para mais de um funcionário e para cada parcela. Contar a receita e o custo
-# uma vez por item/parcela evita duplicá-los sem perder as comissões geradas.
-ITENS_COMISSAO_CTE = """
-    WITH itens_comissao AS (
-        SELECT ci.*,
-               ROW_NUMBER() OVER (
-                   PARTITION BY ci.tenant_id, ci.venda_id,
-                                COALESCE(ci.venda_item_id, -ci.id),
-                                COALESCE(ci.parcela_numero, 1)
-                   ORDER BY ci.id
-               ) AS ordem_item_parcela
-        FROM comissoes_itens ci
-        WHERE ci.{tenant_filter} AND ci.status <> 'estornado'
-    )
-"""
-
 
 @router.get("/margem-produto")
 def relatorio_margem_produto(
@@ -60,25 +43,22 @@ def relatorio_margem_produto(
     current_user, tenant_id = user_and_tenant
     logger.warning("[RELATORIO-MARGEM-PRODUTO] Request received")
 
-    query = ITENS_COMISSAO_CTE + """
+    query = """
         SELECT 
             p.id as produto_id,
             p.nome as produto_nome,
             COALESCE(c.nome, 'Sem categoria') as categoria_nome,
             COUNT(DISTINCT ci.venda_id) as quantidade_vendas,
-            SUM(CASE WHEN ci.ordem_item_parcela = 1 THEN
-                COALESCE(ci.valor_venda, 0) * COALESCE(ci.percentual_aplicado, 100) / 100
-                ELSE 0 END) as total_venda,
+            SUM(ci.valor_base_calculo) as total_venda,
             SUM(
-                CASE WHEN ci.ordem_item_parcela = 1 THEN
-                    COALESCE(ci.valor_custo, 0) * COALESCE(ci.percentual_aplicado, 100) / 100
-                    ELSE 0 END
+                ci.valor_custo * COALESCE(ci.percentual_aplicado, 100) / 100
             ) as total_custo,
             SUM(ci.valor_comissao_gerada) as total_comissao
-        FROM itens_comissao ci
+        FROM comissoes_itens ci
         JOIN produtos p ON ci.produto_id = p.id AND p.tenant_id = ci.tenant_id
         LEFT JOIN categorias c ON p.categoria_id = c.id AND c.tenant_id = ci.tenant_id
-        WHERE 1 = 1
+        WHERE ci.{tenant_filter}
+          AND ci.status <> 'estornado'
     """
 
     params_dict = {}
@@ -290,20 +270,19 @@ def ranking_produtos(
 
     current_user, tenant_id = user_and_tenant
 
-    query = ITENS_COMISSAO_CTE + """
+    query = """
         SELECT 
             p.id as produto_id,
             p.nome as produto_nome,
             COALESCE(c.nome, 'Sem categoria') as categoria_nome,
             SUM(ci.valor_comissao_gerada) as total_comissao,
             COUNT(DISTINCT ci.venda_id) as quantidade_vendas,
-            SUM(CASE WHEN ci.ordem_item_parcela = 1 THEN
-                COALESCE(ci.valor_venda, 0) * COALESCE(ci.percentual_aplicado, 100) / 100
-                ELSE 0 END) as total_venda
-        FROM itens_comissao ci
+            SUM(ci.valor_base_calculo) as total_venda
+        FROM comissoes_itens ci
         JOIN produtos p ON ci.produto_id = p.id AND p.tenant_id = ci.tenant_id
         LEFT JOIN categorias c ON p.categoria_id = c.id AND c.tenant_id = ci.tenant_id
-        WHERE 1 = 1
+        WHERE ci.{tenant_filter}
+          AND ci.status <> 'estornado'
     """
 
     params_dict = {}
@@ -356,19 +335,18 @@ def ranking_categorias(
 
     current_user, tenant_id = user_and_tenant
 
-    query = ITENS_COMISSAO_CTE + """
+    query = """
         SELECT 
             c.id as categoria_id,
             c.nome as categoria_nome,
             SUM(ci.valor_comissao_gerada) as total_comissao,
             COUNT(ci.id) as quantidade_comissoes,
-            SUM(CASE WHEN ci.ordem_item_parcela = 1 THEN
-                COALESCE(ci.valor_venda, 0) * COALESCE(ci.percentual_aplicado, 100) / 100
-                ELSE 0 END) as total_venda
-        FROM itens_comissao ci
+            SUM(ci.valor_base_calculo) as total_venda
+        FROM comissoes_itens ci
         JOIN produtos p ON ci.produto_id = p.id AND p.tenant_id = ci.tenant_id
         JOIN categorias c ON p.categoria_id = c.id AND c.tenant_id = ci.tenant_id
-        WHERE 1 = 1
+        WHERE ci.{tenant_filter}
+          AND ci.status <> 'estornado'
     """
 
     params_dict = {}
@@ -426,22 +404,20 @@ def visao_dre(
 
     current_user, tenant_id = user_and_tenant
 
-    query = ITENS_COMISSAO_CTE + """
+    query = """
         SELECT 
             EXTRACT(MONTH FROM ci.data_venda)::INTEGER as mes,
-            SUM(CASE WHEN ci.ordem_item_parcela = 1 THEN
-                COALESCE(ci.valor_venda, 0) * COALESCE(ci.percentual_aplicado, 100) / 100
-                ELSE 0 END) as receita_bruta,
+            SUM(ci.valor_base_calculo) as receita_bruta,
             SUM(
-                CASE WHEN ci.ordem_item_parcela = 1 THEN
-                    COALESCE(ci.valor_custo, 0) * COALESCE(ci.percentual_aplicado, 100) / 100
-                    ELSE 0 END
+                ci.valor_custo * COALESCE(ci.percentual_aplicado, 100) / 100
             ) as custo_total,
             SUM(ci.valor_comissao_gerada) as despesa_comissao,
             COUNT(ci.id) as quantidade_operacoes
-        FROM itens_comissao ci
-        WHERE EXTRACT(YEAR FROM ci.data_venda)::INTEGER = :ano
+        FROM comissoes_itens ci
+        WHERE ci.{tenant_filter}
+          AND EXTRACT(YEAR FROM ci.data_venda)::INTEGER = :ano
           AND EXTRACT(MONTH FROM ci.data_venda)::INTEGER BETWEEN :mes_inicio AND :mes_fim
+          AND ci.status <> 'estornado'
         GROUP BY EXTRACT(MONTH FROM ci.data_venda)
         ORDER BY mes
     """
