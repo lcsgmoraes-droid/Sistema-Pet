@@ -308,8 +308,7 @@ def _resolver_recursos_ativos_tenant(
     # Planos legados ja liberam todos os modulos operacionais. Preservar os
     # recursos equivalentes evita cortar XML quando termina o trial.
     if any(
-        (codigo or "").strip().lower()
-        in PLANOS_LEGADO_LIBERADOS | PLANOS_TODOS_MODULOS
+        (codigo or "").strip().lower() in PLANOS_LEGADO_LIBERADOS | PLANOS_TODOS_MODULOS
         for codigo in planos
     ):
         return sorted(ALL_PUBLIC_ENTITLEMENTS)
