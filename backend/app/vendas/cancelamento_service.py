@@ -13,6 +13,7 @@ from app.services.venda_rentabilidade_snapshot_service import (
     invalidate_venda_rentabilidade_snapshot,
 )
 from app.produtos.tipos import tipo_controla_estoque
+from app.vendas.status_pagamento import pagamento_valido_para_saldo
 from app.utils.timezone import now_brasilia
 
 logger = logging.getLogger(__name__)
@@ -68,7 +69,7 @@ def cancelar_venda(
         HTTPException(404): Venda não encontrada
         HTTPException(400): Venda já está cancelada
     """
-    from app.vendas_models import Venda, VendaItem
+    from app.vendas_models import Venda, VendaItem, VendaPagamento
     from app.vendas_devolucoes_models import VendaDevolucao
     from app.estoque.service import EstoqueService
     from app.caixa_models import MovimentacaoCaixa
@@ -210,6 +211,24 @@ def cancelar_venda(
             contas_canceladas += 1
 
         logger.info(f"💳 Total de contas canceladas: {contas_canceladas}")
+
+        # O cancelamento desfaz os efeitos financeiros, mas preserva as linhas
+        # de pagamento para auditoria. Sem invalidar seu status, PIX/cartao
+        # continuavam sendo somados como recebimentos ativos pelo caixa.
+        pagamentos_cancelados = 0
+        pagamentos = (
+            db.query(VendaPagamento)
+            .filter_by(venda_id=venda_id, tenant_id=tenant_id)
+            .with_for_update()
+            .all()
+        )
+        for pagamento in pagamentos:
+            if pagamento_valido_para_saldo(pagamento):
+                pagamento.status = "cancelado"
+                pagamentos_cancelados += 1
+        logger.info(
+            "💳 Pagamentos invalidados no cancelamento: %s", pagamentos_cancelados
+        )
 
         # ============================================================
         # ETAPA 4: CANCELAR LANÇAMENTOS MANUAIS

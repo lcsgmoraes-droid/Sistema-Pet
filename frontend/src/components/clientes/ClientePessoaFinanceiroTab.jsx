@@ -37,10 +37,7 @@ export default function ClientePessoaFinanceiroTab({
         <div className="flex items-center justify-between">
           <div>
             <p className="mb-1 text-sm font-medium text-green-800">Saldo de crédito</p>
-            <p className="text-3xl font-bold text-green-600">
-              R${" "}
-              {cliente?.credito ? parseFloat(cliente.credito).toFixed(2).replace(".", ",") : "0,00"}
-            </p>
+            <p className="text-3xl font-bold text-green-600">R$ {formatBRL(cliente?.credito)}</p>
             <p className="mt-1 text-xs text-green-700">Disponível para uso em compras</p>
           </div>
           <div className="flex gap-2">
@@ -99,7 +96,7 @@ export default function ClientePessoaFinanceiroTab({
                 <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
                   <p className="mb-1 text-xs text-gray-600">Total comprado</p>
                   <p className="text-2xl font-bold text-blue-600">
-                    R$ {resumoFinanceiro.total_vendas?.toFixed(2).replace(".", ",") || "0,00"}
+                    R$ {formatBRL(resumoFinanceiro.total_vendas)}
                   </p>
                   <p className="mt-1 text-xs text-gray-500">
                     {resumoFinanceiro.quantidade_vendas || 0} vendas
@@ -125,12 +122,11 @@ export default function ClientePessoaFinanceiroTab({
                           : "text-green-600"
                     }`}
                   >
-                    R$ {resumoFinanceiro.total_em_aberto?.toFixed(2).replace(".", ",") || "0,00"}
+                    R$ {formatBRL(resumoFinanceiro.total_em_aberto)}
                   </p>
                   {resumoFinanceiro.tem_debitos_vencidos ? (
                     <p className="mt-1 text-xs font-semibold text-red-600">
-                      R$ {resumoFinanceiro.total_vencido?.toFixed(2).replace(".", ",") || "0,00"}{" "}
-                      vencido
+                      R$ {formatBRL(resumoFinanceiro.total_vencido)} vencido
                     </p>
                   ) : null}
                 </div>
@@ -138,7 +134,7 @@ export default function ClientePessoaFinanceiroTab({
                 <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
                   <p className="mb-1 text-xs text-gray-600">Ticket médio</p>
                   <p className="text-2xl font-bold text-purple-600">
-                    R$ {resumoFinanceiro.ticket_medio?.toFixed(2).replace(".", ",") || "0,00"}
+                    R$ {formatBRL(resumoFinanceiro.ticket_medio)}
                   </p>
                   <p className="mt-1 text-xs text-gray-500">por compra</p>
                 </div>
@@ -148,9 +144,7 @@ export default function ClientePessoaFinanceiroTab({
                   {resumoFinanceiro.ultima_compra ? (
                     <>
                       <p className="text-2xl font-bold text-gray-700">
-                        R${" "}
-                        {resumoFinanceiro.ultima_compra.valor?.toFixed(2).replace(".", ",") ||
-                          "0,00"}
+                        R$ {formatBRL(resumoFinanceiro.ultima_compra.valor)}
                       </p>
                       <p className="mt-1 text-xs text-gray-500">
                         {new Date(resumoFinanceiro.ultima_compra.data).toLocaleDateString("pt-BR")}{" "}

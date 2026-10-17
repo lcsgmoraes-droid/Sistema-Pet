@@ -37,6 +37,7 @@ from app.banho_tosa_schemas import (
     BanhoTosaAtendimentoResponse,
 )
 from app.db import get_session
+from app.services.pet_registros_clinicos_service import obter_peso_atual
 from app.veterinario_core import _get_tenant
 
 
@@ -183,7 +184,7 @@ def criar_agendamento(
         },
         perfil_comportamental_snapshot={
             "porte": pet.porte,
-            "peso": pet.peso,
+            "peso": obter_peso_atual(db, pet),
             "cor_pelagem": pet.cor_pelagem or pet.cor,
         },
     )

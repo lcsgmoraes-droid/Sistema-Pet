@@ -126,6 +126,13 @@ def listar_pagamentos_venda(
         contas_receber=venda.contas_receber,
         pagamentos=pagamentos,
     )
+    if str(venda.status or "").strip().lower() in {"cancelada", "cancelado"}:
+        resumo_pagamento.update(
+            valor_pago=0,
+            total_recebido=0,
+            valor_restante=0,
+            status_pagamento="cancelado",
+        )
     total_pago = float(resumo_pagamento["valor_pago"])
     valor_restante = float(resumo_pagamento["valor_restante"])
 

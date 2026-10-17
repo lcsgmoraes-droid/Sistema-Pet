@@ -6,13 +6,13 @@ from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
 from app import usuarios_routes
 from app.db import Base
 from app.db import base as _base  # noqa: F401 - registra as FKs no metadata
-from app.grupo_comercial_models import GrupoComercialMembro
+from app.grupo_comercial_models import GrupoComercial, GrupoComercialMembro
 from app.models import (
     AppAccessProfile,
     AuditLog,
@@ -20,9 +20,16 @@ from app.models import (
     Role,
     Tenant,
     User,
+    UserSession,
     UserTenant,
 )
+from app.services.app_access_profile_service import (
+    build_available_profiles_for_clientes,
+    list_explicit_app_access_profiles,
+)
+from app.tenancy import filters as tenant_filters
 from app.tenancy.context import clear_current_tenant, set_current_tenant
+from app.veterinario_models import VetPartnerLink
 
 
 @pytest.fixture()
@@ -310,3 +317,232 @@ def test_master_continua_impedido_de_trocar_perfil_sem_alterar_celular(cenario):
         cenario.db.query(UserTenant).filter(UserTenant.user_id == user.id).one().role_id
         == 20
     )
+
+
+def test_perfil_app_desmarcado_nao_reaparece_ao_reabrir_nem_libera_gestor(cenario):
+    user = _criar(cenario, _payload())
+    db = cenario.db
+    for selecionados in (["funcionario"], [], ["gestor", "funcionario"]):
+        salvo = usuarios_routes.atualizar_perfis_app_usuario.__wrapped__(
+            user_id=user.id,
+            payload=usuarios_routes.PerfisAppUpdate(profiles=selecionados),
+            db=db,
+            user_and_tenant=(cenario.actor, cenario.tenant_id),
+        )
+        db.expire_all()
+        reaberto = usuarios_routes.listar_perfis_app_usuario.__wrapped__(
+            user_id=user.id,
+            db=db,
+            user_and_tenant=(cenario.actor, cenario.tenant_id),
+        )
+        assert set(reaberto["profiles"]) == set(salvo["profiles"]) == set(selecionados)
+        # Desmarcar preserva o historico da concessao, com is_active=False.
+        grants = (
+            db.query(AppAccessProfile).filter(AppAccessProfile.user_id == user.id).all()
+        )
+        assert len(grants) == 2
+        assert {grant.profile_type for grant in grants if grant.is_active} == set(
+            selecionados
+        )
+        pessoas = db.query(Cliente).filter(Cliente.auth_user_id == user.id).all()
+        ativos = list_explicit_app_access_profiles(
+            db,
+            tenant_id=cenario.tenant_id,
+            user_id=user.id,
+            cliente_ids=[pessoa.id for pessoa in pessoas],
+        )
+        disponiveis = build_available_profiles_for_clientes(
+            user, pessoas, explicit_grants=ativos
+        )
+        assert ("gestor" in {perfil["type"] for perfil in disponiveis}) is (
+            "gestor" in selecionados
+        )
+
+
+@pytest.fixture()
+def loja_associada(cenario, monkeypatch):
+    """Mesma regra de identidade global usada pelo PostgreSQL em producao.
+
+    O SQLite normalmente usa um filtro simplificado (so tenant de origem).
+    Habilitamos aqui o predicado real de leitura por UserTenant, mantendo
+    consultas, transacoes e regras da rota sem substituicoes.
+    """
+    user = _usuario_existente(cenario)
+    db = cenario.db
+    Base.metadata.create_all(
+        db.get_bind(),
+        tables=[
+            GrupoComercial.__table__,
+            VetPartnerLink.__table__,
+            UserSession.__table__,
+        ],
+    )
+    destino_id = uuid4()
+    db.execute(
+        Tenant.__table__.insert(),
+        [
+            {
+                "id": str(destino_id),
+                "name": "Loja associada",
+                "name_normalized": "loja associada",
+            }
+        ],
+    )
+    db.execute(
+        Role.__table__.insert(),
+        [
+            {"id": 30, "tenant_id": destino_id, "name": "Administrador"},
+            {"id": 40, "tenant_id": destino_id, "name": "Vendedor"},
+        ],
+    )
+    db.execute(
+        User.__table__.insert(),
+        [
+            {
+                "id": 99,
+                "tenant_id": destino_id,
+                "nome": "Operador associado QA",
+                "email": "associado@example.com",
+            }
+        ],
+    )
+    db.execute(
+        UserTenant.__table__.insert(),
+        [
+            {
+                "user_id": user.id,
+                "tenant_id": destino_id,
+                "role_id": 40,
+                "is_active": True,
+            },
+            {"user_id": 99, "tenant_id": destino_id, "role_id": 30, "is_active": True},
+        ],
+    )
+    db.commit()
+    set_current_tenant(destino_id)
+    monkeypatch.setattr(
+        tenant_filters, "_supports_partner_read_filter", lambda _session: True
+    )
+    actor = db.query(User).filter(User.id == 99).one()
+    return SimpleNamespace(
+        db=db, tenant_id=destino_id, origem_id=cenario.tenant_id, actor=actor, user=user
+    )
+
+
+@pytest.mark.parametrize("alterar", [False, True])
+def test_loja_associada_salva_credenciais_sem_duplicar_pessoa(loja_associada, alterar):
+    cenario = loja_associada
+    user = cenario.user
+    celular = "11999990002" if alterar else user.login_phone
+    role_id = 30 if alterar else 40
+    resultado = usuarios_routes.atualizar_credenciais_usuario.__wrapped__(
+        user_id=user.id,
+        payload=usuarios_routes.UserCredentialsUpdate(
+            login_phone=celular, role_id=role_id
+        ),
+        db=cenario.db,
+        user_and_tenant=(cenario.actor, cenario.tenant_id),
+    )
+    cenario.db.expire_all()
+    atualizado = cenario.db.query(User).filter(User.id == user.id).one()
+    assert atualizado.login_phone == celular
+    assert atualizado.tenant_id == cenario.origem_id
+    assert resultado["role_id"] == role_id
+    assert resultado["role_changed"] is alterar
+    vinculos = cenario.db.execute(
+        select(UserTenant.__table__.c.tenant_id, UserTenant.__table__.c.role_id).where(
+            UserTenant.__table__.c.user_id == user.id
+        )
+    ).all()
+    assert dict(vinculos) == {cenario.origem_id: 20, cenario.tenant_id: role_id}
+    pessoas = cenario.db.execute(
+        select(Cliente.__table__.c.tenant_id, Cliente.__table__.c.auth_user_id)
+    ).all()
+    assert pessoas == [(cenario.origem_id, user.id)]
+
+
+def test_loja_associada_recusa_role_da_origem_e_reverte_celular(loja_associada):
+    cenario = loja_associada
+    with pytest.raises(HTTPException) as erro:
+        usuarios_routes.atualizar_credenciais_usuario.__wrapped__(
+            user_id=cenario.user.id,
+            payload=usuarios_routes.UserCredentialsUpdate(
+                login_phone="11999990002", role_id=20
+            ),
+            db=cenario.db,
+            user_and_tenant=(cenario.actor, cenario.tenant_id),
+        )
+    assert erro.value.status_code == 400
+    cenario.db.expire_all()
+    atualizado = cenario.db.query(User).filter(User.id == cenario.user.id).one()
+    assert atualizado.login_phone == "11999990001"
+    assert (
+        cenario.db.query(UserTenant)
+        .filter(UserTenant.user_id == atualizado.id)
+        .one()
+        .role_id
+        == 40
+    )
+    assert (
+        cenario.db.execute(
+            select(func.count()).select_from(Cliente.__table__)
+        ).scalar_one()
+        == 1
+    )
+
+
+def test_loja_sem_vinculo_nao_altera_credenciais_nem_le_perfis(loja_associada):
+    cenario = loja_associada
+    vinculo = (
+        cenario.db.query(UserTenant).filter(UserTenant.user_id == cenario.user.id).one()
+    )
+    cenario.db.delete(vinculo)
+    cenario.db.commit()
+    with pytest.raises(HTTPException) as erro:
+        usuarios_routes.atualizar_credenciais_usuario.__wrapped__(
+            user_id=cenario.user.id,
+            payload=usuarios_routes.UserCredentialsUpdate(
+                login_phone="11999990002", role_id=40
+            ),
+            db=cenario.db,
+            user_and_tenant=(cenario.actor, cenario.tenant_id),
+        )
+    assert erro.value.status_code == 404
+    with pytest.raises(HTTPException) as erro_perfis:
+        usuarios_routes.listar_perfis_app_usuario.__wrapped__(
+            user_id=cenario.user.id,
+            db=cenario.db,
+            user_and_tenant=(cenario.actor, cenario.tenant_id),
+        )
+    assert erro_perfis.value.status_code == 404
+    celular = cenario.db.execute(
+        select(User.__table__.c.login_phone).where(
+            User.__table__.c.id == cenario.user.id
+        )
+    ).scalar_one()
+    assert celular == "11999990001"
+
+
+def test_administra_credenciais_de_usuario_inativo_sem_reativar(cenario):
+    user = _usuario_existente(cenario)
+    vinculo = cenario.db.query(UserTenant).filter(UserTenant.user_id == user.id).one()
+    vinculo.is_active = False
+    cenario.db.commit()
+    resultado = usuarios_routes.atualizar_credenciais_usuario.__wrapped__(
+        user_id=user.id,
+        payload=usuarios_routes.UserCredentialsUpdate(
+            login_phone=user.login_phone, role_id=20
+        ),
+        db=cenario.db,
+        user_and_tenant=(cenario.actor, cenario.tenant_id),
+    )
+    assert resultado["status"] == "ok"
+    cenario.db.expire_all()
+    assert (
+        cenario.db.query(UserTenant)
+        .filter(UserTenant.user_id == user.id)
+        .one()
+        .is_active
+        is False
+    )
+    assert cenario.db.query(Cliente).count() == 1

@@ -460,18 +460,18 @@ def update_cliente(
         else None
     )
     dados_payload.pop("contatos_adicionais", None)
-    if contatos_adicionais is not None:
+    if contatos_adicionais is not None or {"celular", "telefone"}.intersection(
+        dados_payload
+    ):
         validar_contatos_adicionais(
             db,
             tenant_id,
             cliente_id,
-            contatos_adicionais,
-            cliente_data.celular
-            if cliente_data.celular is not None
-            else cliente.celular,
-            cliente_data.telefone
-            if cliente_data.telefone is not None
-            else cliente.telefone,
+            contatos_adicionais
+            if contatos_adicionais is not None
+            else cliente.contatos_adicionais,
+            dados_payload.get("celular", cliente.celular),
+            dados_payload.get("telefone", cliente.telefone),
         )
     auth_user_informado = "auth_user_id" in dados_payload
     perfis_informados = "app_access_profiles" in dados_payload
@@ -1053,6 +1053,13 @@ def _aplicar_filtro_busca(query, search):
         palavra_digitos = "".join(ch for ch in palavra if ch.isdigit())
         if palavra_digitos:
             like_digitos = f"%{palavra_digitos}%"
+            if not any(ch.isalpha() for ch in palavra):
+                filtros.extend(
+                    [
+                        _somente_digitos_coluna(Cliente.cpf).ilike(like_digitos),
+                        _somente_digitos_coluna(Cliente.cnpj).ilike(like_digitos),
+                    ]
+                )
             filtros.extend(
                 [
                     telefone_digitos.ilike(like_digitos),

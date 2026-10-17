@@ -806,7 +806,6 @@ def atualizar_credenciais_usuario(
         .join(UserTenant, UserTenant.user_id == User.id)
         .filter(
             User.id == user_id,
-            User.tenant_id == tenant_id,
             UserTenant.tenant_id == tenant_id,
         )
         .first()
@@ -815,6 +814,7 @@ def atualizar_credenciais_usuario(
         raise HTTPException(status_code=404, detail="Usuario nao encontrado nesta loja")
 
     target_user, vinculo = row
+    pessoa_da_loja_de_origem = str(target_user.tenant_id) == str(tenant_id)
     username_changed = False
     login_phone_changed = False
     password_changed = False
@@ -840,7 +840,7 @@ def atualizar_credenciais_usuario(
             normalized_username = normalize_username(payload.username)
             if username_exists_in_tenant(
                 db,
-                tenant_id=tenant_id,
+                tenant_id=target_user.tenant_id,
                 username=normalized_username,
                 exclude_user_id=target_user.id,
             ):
@@ -890,12 +890,14 @@ def atualizar_credenciais_usuario(
             role_changed = vinculo.role_id != selected_role.id
             vinculo.role_id = selected_role.id
 
-        if role_changed:
+        if role_changed and pessoa_da_loja_de_origem:
             _fundir_pessoa_de_cliente_com_operacional(
                 db, tenant_id=tenant_id, user=target_user, actor_user_id=actor.id
             )
 
-        if not _usuario_tem_pessoa_vinculada(
+        # O login e global, mas a Pessoa permanece na loja de origem. Salvar
+        # acesso numa loja associada nao deve criar outra ficha para ele.
+        if pessoa_da_loja_de_origem and not _usuario_tem_pessoa_vinculada(
             db,
             tenant_id=tenant_id,
             user_id=target_user.id,
@@ -1080,6 +1082,7 @@ def listar_perfis_app_usuario(
         .filter(
             AppAccessProfile.tenant_id == tenant_id,
             AppAccessProfile.cliente_id == pessoa.id,
+            AppAccessProfile.is_active.is_(True),
         )
         .all()
     )

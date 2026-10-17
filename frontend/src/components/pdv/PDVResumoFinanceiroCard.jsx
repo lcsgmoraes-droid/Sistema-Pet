@@ -224,7 +224,7 @@ export default function PDVResumoFinanceiroCard({
           {totalImpostos > 0 && (
             <div className="flex justify-between text-sm text-blue-600 bg-blue-50 p-2 rounded">
               <span className="font-medium">Total de Impostos:</span>
-              <span className="font-semibold">R$ {totalImpostos}</span>
+              <span className="font-semibold">{formatMoneyBRL(totalImpostos)}</span>
             </div>
           )}
 
