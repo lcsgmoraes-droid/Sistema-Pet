@@ -43,7 +43,7 @@ export default function RelatoriosComissoesDreSection({
       {/* Resumo Anual */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="text-sm text-blue-600 font-medium">Receita Bruta (Ano)</div>
+          <div className="text-sm text-blue-600 font-medium">Vendas após descontos (Ano)</div>
           <div className="text-2xl font-bold text-blue-800">
             {formatarMoeda(dadosDRE.total_ano.receita_bruta)}
           </div>
@@ -85,7 +85,7 @@ export default function RelatoriosComissoesDreSection({
               type="monotone"
               dataKey="receita_bruta"
               stroke="#8884d8"
-              name="Receita Bruta"
+              name="Vendas após descontos"
               strokeWidth={2}
             />
             <Line
@@ -115,7 +115,7 @@ export default function RelatoriosComissoesDreSection({
                 Mês
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                Receita Bruta
+                Vendas após descontos
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                 Custo
