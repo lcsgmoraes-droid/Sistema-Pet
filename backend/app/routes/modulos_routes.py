@@ -25,7 +25,12 @@ from app.services.modulo_activation_service import (
     ModuloActivationError,
     ativar_modulo_manual,
 )
-from app.services.plan_catalog import PLAN_CATALOG, get_plan, segment_plan_field
+from app.services.plan_catalog import (
+    ALL_PUBLIC_ENTITLEMENTS,
+    PLAN_CATALOG,
+    get_plan,
+    segment_plan_field,
+)
 from app.services.plan_limits import active_session_usage, monthly_sales_usage
 from app.tenancy.context import set_current_tenant
 from app.utils.timezone import BRASILIA_TZ
@@ -68,6 +73,13 @@ MODULOS_TRIAL_COMPLETO = frozenset(MODULOS_PREMIUM - MODULOS_FORA_DA_OFERTA_PUBL
 # esse plano legado liberado para nao cortar fluxo real em uso.
 PLANOS_LEGADO_LIBERADOS = frozenset(["free", "legacy", "legado"])
 PLANOS_TODOS_MODULOS = frozenset(["premium", "enterprise", "full", "completo"])
+# Equivalencia temporaria para tenants legados ainda sem planos por segmento.
+# Os direitos seguem o catalogo atual, sem criar um novo plano premium.
+PLANOS_REFERENCIA_ACESSO_COMPLETO = (
+    "pet-venda-ativa",
+    "vet-completo",
+    "grooming-completo",
+)
 PLANOS_BASICOS = frozenset(["basico", "básico", "base", "basic"])
 TRIAL_DIAS_PADRAO = 30
 ASSINATURA_STATUS_VALIDOS = frozenset(
@@ -289,6 +301,40 @@ def _planos_catalogo_segmento(tenant: Tenant) -> list:
     ]
 
 
+def _resolver_recursos_ativos_tenant(
+    tenant: Tenant, agora: datetime, assinatura_resumo: dict | None = None
+) -> list[str]:
+    """Aplica os mesmos direitos comerciais no status e nas rotas protegidas."""
+    assinatura = assinatura_resumo or _assinatura_resumo_tenant(tenant, agora)
+    if assinatura["acesso_completo_durante_trial"]:
+        return sorted(ALL_PUBLIC_ENTITLEMENTS)
+    if not assinatura["acesso_operacional_ativo"]:
+        return []
+
+    planos = _planos_segmento_tenant(tenant)
+    # Planos legados ja liberam os modulos operacionais. Enquanto nao forem
+    # reatribuidos comercialmente, usar os direitos dos tres planos completos.
+    if any(
+        (codigo or "").strip().lower() in PLANOS_LEGADO_LIBERADOS | PLANOS_TODOS_MODULOS
+        for codigo in planos
+    ):
+        return sorted(
+            {
+                recurso
+                for codigo in PLANOS_REFERENCIA_ACESSO_COMPLETO
+                for recurso in get_plan(codigo).entitlements
+            }
+        )
+
+    return sorted(
+        {
+            recurso
+            for plano in _planos_catalogo_segmento(tenant)
+            for recurso in plano.entitlements
+        }
+    )
+
+
 def _atribuir_plano_segmento(tenant: Tenant, plano_catalogo) -> None:
     """Grava o codigo do plano no campo do segmento correspondente
     (plan_pet/plan_vet/plan_grooming), alem do `plan` legado (mantido em
@@ -354,19 +400,7 @@ def get_modulos_status(
     planos_catalogo = _planos_catalogo_segmento(tenant)
     plano_catalogo = planos_catalogo[0] if planos_catalogo else None
     trial_completo = assinatura_resumo["acesso_completo_durante_trial"]
-    plano_ativo = acesso_liberado
-    recursos_trial = sorted(
-        {recurso for plano in PLAN_CATALOG.values() for recurso in plano.entitlements}
-    )
-    recursos_ativos = (
-        recursos_trial
-        if trial_completo
-        else sorted(
-            {recurso for plano in planos_catalogo for recurso in plano.entitlements}
-        )
-        if planos_catalogo and plano_ativo
-        else []
-    )
+    recursos_ativos = _resolver_recursos_ativos_tenant(tenant, agora, assinatura_resumo)
 
     # Planos legados nao possuem limites comerciais no catalogo publico.
     plano_publico_canonico = any(

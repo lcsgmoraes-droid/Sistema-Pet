@@ -365,22 +365,24 @@ export function createLayoutMenuItems({ lembretesCount = 0, orcamentosGrupoAtivo
       icon: FiBox,
       iconKey: "box",
       label: "Compras",
-      modulo: "compras",
-      permission: "compras.gerenciar",
+      anyOfPermissions: ["compras.gerenciar", "compras.pedidos", "compras.entrada_xml"],
       submenu: [
         {
           path: "/compras/pedidos",
           label: "Pedidos de Compra",
+          modulo: "compras",
           permission: "compras.pedidos",
         },
         {
           path: "/compras/entrada-xml",
           label: "Central NF-e Entradas",
+          recurso: "purchases.invoice_xml",
           permission: "compras.entrada_xml",
         },
         {
           path: "/compras/pendencias",
           label: "Pendencias",
+          modulo: "compras",
           permission: "compras.gerenciar",
         },
       ],
