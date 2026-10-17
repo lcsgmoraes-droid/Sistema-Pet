@@ -70,7 +70,7 @@ export default function VendasFinanceiroHeader({
       <div className="mb-4 flex flex-col gap-3 2xl:flex-row 2xl:items-start 2xl:justify-between">
         <h1 className="text-xl font-bold text-gray-800 sm:text-2xl">Consulta de Vendas</h1>
 
-        {podeVerFinanceiroCompleto ? (
+        {podeVerFinanceiroCompleto && abaAtiva !== "vendedores" ? (
           <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center lg:justify-end 2xl:w-auto">
             <div
               className="relative w-full sm:col-span-2 lg:col-span-1 lg:w-auto"
@@ -221,7 +221,7 @@ export default function VendasFinanceiroHeader({
         </div>
       )}
 
-      {podeVerFinanceiroCompleto && (
+      {podeVerFinanceiroCompleto && abaAtiva !== "vendedores" && (
         <FilterBar
           className="mb-4 border-blue-200 bg-blue-50/70"
           onSubmit={(event) => event.preventDefault()}

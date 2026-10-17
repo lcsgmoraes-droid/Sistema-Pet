@@ -7,6 +7,7 @@ import VendasFinanceiroGraficosResumo from "./VendasFinanceiroGraficosResumo";
 import VendasFinanceiroHeader from "./VendasFinanceiroHeader";
 import VendasListaPanel from "./VendasListaPanel";
 import VendasPromocoesResumoPanel from "./VendasPromocoesResumoPanel";
+import VendasPorVendedorPanel from "./VendasPorVendedorPanel";
 import VendasRelatorioPersonalizadoModal from "./VendasRelatorioPersonalizadoModal";
 import VendasResultadoComposicaoPanel from "./VendasResultadoComposicaoPanel";
 import VendasResumoTabelasPanel from "./VendasResumoTabelasPanel";
@@ -273,6 +274,16 @@ export default function VendasFinanceiroView({
             linhasTotal={produtosDetalhados}
           />
         </div>
+      )}
+
+      {/* Relatório por vendedor */}
+      {abaAtiva === "vendedores" && (
+        <VendasPorVendedorPanel
+          vendas={listaVendasVisiveis}
+          dataInicio={dataInicio}
+          dataFim={dataFim}
+          formatarData={formatarData}
+        />
       )}
 
       {/* Aba Lista de Vendas */}
