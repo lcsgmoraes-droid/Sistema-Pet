@@ -378,9 +378,7 @@ function VendasFinanceiroPorVenda() {
 
   const montarParametrosRelatorio = (params) => ({
     ...params,
-    ...(filtroCanalVenda && abaAtiva !== "vendedores"
-      ? { canal_venda: filtroCanalVenda }
-      : {}),
+    ...(filtroCanalVenda && abaAtiva !== "vendedores" ? { canal_venda: filtroCanalVenda } : {}),
   });
 
   const carregarDados = async () => {

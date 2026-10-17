@@ -5,10 +5,7 @@ import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
 import InputCombobox from "../v2/InputCombobox/InputCombobox";
 import { formatMoneyBRL } from "../../utils/formatters";
 import { exportarPlanilhasExcel } from "./vendasFinanceiro/vendasFinanceiroExcel";
-import {
-  agruparVendasPorVendedor,
-  planilhasVendasPorVendedor,
-} from "./vendasPorVendedorRelatorio";
+import { agruparVendasPorVendedor, planilhasVendasPorVendedor } from "./vendasPorVendedorRelatorio";
 
 export default function VendasPorVendedorPanel({ vendas, dataInicio, dataFim, formatarData }) {
   const [vendedorSelecionado, setVendedorSelecionado] = useState("");
@@ -88,7 +85,10 @@ export default function VendasPorVendedorPanel({ vendas, dataInicio, dataFim, fo
         </p>
       ) : (
         gruposVisiveis.map((grupo) => (
-          <div key={grupo.chave} className="overflow-x-auto rounded-lg bg-white shadow dark:bg-slate-900">
+          <div
+            key={grupo.chave}
+            className="overflow-x-auto rounded-lg bg-white shadow dark:bg-slate-900"
+          >
             <div className="flex flex-wrap justify-between gap-2 border-b p-4 dark:border-slate-700">
               <h3 className="font-semibold text-slate-800 dark:text-slate-100">{grupo.vendedor}</h3>
               <span className="text-sm text-slate-700 dark:text-slate-200">
@@ -108,7 +108,9 @@ export default function VendasPorVendedorPanel({ vendas, dataInicio, dataFim, fo
               <tbody className="divide-y dark:divide-slate-700">
                 {grupo.vendas.map((venda) => (
                   <tr key={venda.id} className="text-slate-700 dark:text-slate-200">
-                    <td className="whitespace-nowrap px-4 py-3">{formatarData(venda.data_venda)}</td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      {formatarData(venda.data_venda)}
+                    </td>
                     <td className="px-4 py-3">{venda.numero_venda}</td>
                     <td className="px-4 py-3">{venda.cliente_nome}</td>
                     <td className="px-4 py-3">

@@ -49,5 +49,8 @@ test("exporta vendas e produtos em planilhas separadas sem duplicar total da ven
   assert.equal(planilhas[1].linhas.length, 2);
   assert.equal(planilhas[1].linhas[1][4], 90);
   assert.equal(planilhas[2].linhas.length, 3);
-  assert.deepEqual(planilhas[2].linhas.slice(1).map((linha) => linha[2]), ["Ração", "Areia"]);
+  assert.deepEqual(
+    planilhas[2].linhas.slice(1).map((linha) => linha[2]),
+    ["Ração", "Areia"],
+  );
 });
