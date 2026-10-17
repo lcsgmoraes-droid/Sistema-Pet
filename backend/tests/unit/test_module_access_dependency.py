@@ -116,6 +116,58 @@ def test_modulo_extra_da_proposta_vence_apos_quinze_dias():
     )
 
 
+@pytest.mark.parametrize(
+    "plano_legado", ["premium", "completo", "full", "free", "legado"]
+)
+def test_load_active_entitlements_libera_plano_legado_sem_segmento(plano_legado):
+    """Regressao: tenant com `plan` legado (premium/completo/full/free/legado)
+    e plan_pet/vet/grooming vazios ficava com ZERO entitlements, porque
+    get_plan() nunca resolve esses codigos - mesmo com acesso operacional
+    liberado. Era a causa do erro "recurso nao incluido no plano atual" na
+    Central NF-e Entradas pra esses tenants (ver _entitlements_plano_legado)."""
+    agora = datetime(2026, 7, 18, tzinfo=timezone.utc)
+    tenant = SimpleNamespace(
+        plan=plano_legado,
+        plan_pet=None,
+        plan_vet=None,
+        plan_grooming=None,
+        billing_status="active",
+        trial_ends_at=None,
+        subscription_source="manual",
+        subscription_activated_at=None,
+    )
+
+    entitlements = module_access._load_active_entitlements(
+        _TrialDb(tenant), "tenant-1", agora
+    )
+
+    assert "purchases.invoice_xml" in entitlements
+    assert "finance.management" in entitlements
+
+
+def test_load_active_entitlements_plano_real_do_catalogo_nao_ganha_tudo():
+    """Plano real do catalogo (nao legado) deve continuar restrito aos
+    proprios entitlements - a correcao e so pro fallback de plano legado."""
+    agora = datetime(2026, 7, 18, tzinfo=timezone.utc)
+    tenant = SimpleNamespace(
+        plan="pet-basico",
+        plan_pet="pet-basico",
+        plan_vet=None,
+        plan_grooming=None,
+        billing_status="active",
+        trial_ends_at=None,
+        subscription_source="manual",
+        subscription_activated_at=None,
+    )
+
+    entitlements = module_access._load_active_entitlements(
+        _TrialDb(tenant), "tenant-1", agora
+    )
+
+    assert "purchases.invoice_xml" in entitlements  # pet-basico ja inclui isso
+    assert "finance.management" not in entitlements  # mas nao o bundle inteiro
+
+
 @pytest.mark.asyncio
 async def test_require_active_module_blocks_tenant_without_module(monkeypatch):
     user = _user()

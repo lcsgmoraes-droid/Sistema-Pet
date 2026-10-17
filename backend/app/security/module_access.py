@@ -16,6 +16,7 @@ from app.models import AssinaturaModulo, Tenant
 from app.routes.modulos_routes import (
     MODULOS_PREMIUM,
     _assinatura_resumo_tenant,
+    _entitlements_plano_legado,
     _planos_catalogo_segmento,
     _planos_segmento_tenant,
     _resolver_modulos_ativos,
@@ -101,7 +102,9 @@ def _load_active_entitlements(
         return []
 
     planos = _planos_catalogo_segmento(tenant)
-    return sorted({recurso for plano in planos for recurso in plano.entitlements})
+    entitlements = {recurso for plano in planos for recurso in plano.entitlements}
+    entitlements |= _entitlements_plano_legado(_planos_segmento_tenant(tenant))
+    return sorted(entitlements)
 
 
 def _is_public_bling_webhook(modulo: str, request: Request | None) -> bool:

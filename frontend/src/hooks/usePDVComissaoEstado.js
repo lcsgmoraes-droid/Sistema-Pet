@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../api";
 import { debugLog, debugWarn } from "../utils/debug";
+import { formatarCargoFuncionario } from "../utils/funcionarioCargo";
 
 export function usePDVComissaoEstado({
   setVendaAtual,
@@ -100,7 +101,12 @@ export function usePDVComissaoEstado({
       if (!funcionarioCarregado) {
         try {
           const response = await api.get(`/funcionarios/${funcionarioId}`);
-          funcionarioCarregado = response.data;
+          // Mesmo shape de /funcionarios (cargo como objeto) - normaliza
+          // igual ao merge de carregarFuncionariosComissao.
+          funcionarioCarregado = {
+            ...response.data,
+            cargo: formatarCargoFuncionario(response.data.cargo),
+          };
         } catch {
           // O cadastro pode ser um parceiro antigo indisponível na lista atual.
         }

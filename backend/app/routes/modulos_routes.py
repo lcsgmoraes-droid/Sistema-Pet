@@ -25,7 +25,12 @@ from app.services.modulo_activation_service import (
     ModuloActivationError,
     ativar_modulo_manual,
 )
-from app.services.plan_catalog import PLAN_CATALOG, get_plan, segment_plan_field
+from app.services.plan_catalog import (
+    ALL_PUBLIC_ENTITLEMENTS,
+    PLAN_CATALOG,
+    get_plan,
+    segment_plan_field,
+)
 from app.services.plan_limits import active_session_usage, monthly_sales_usage
 from app.tenancy.context import set_current_tenant
 from app.utils.timezone import BRASILIA_TZ
@@ -289,6 +294,27 @@ def _planos_catalogo_segmento(tenant: Tenant) -> list:
     ]
 
 
+def _entitlements_plano_legado(planos_segmento: tuple[str, ...]) -> frozenset[str]:
+    """Mesmo fallback que _resolver_modulos_ativos ja usa pros modulos
+    (PLANOS_LEGADO_LIBERADOS/PLANOS_TODOS_MODULOS), so que pro lado de
+    entitlements: codigos de plano legado ("premium"/"completo"/"full"/
+    "enterprise"/"free"/"legacy"/"legado") nao existem no catalogo novo, entao
+    get_plan() nunca os resolve e _planos_catalogo_segmento fica vazio pra
+    eles. Sem este fallback, esses tenants ficam com ZERO entitlements mesmo
+    tendo acesso operacional liberado - foi a causa do bug "recurso nao
+    incluido no plano atual" na Central NF-e Entradas pra tenants legados
+    (ver require_active_entitlement em app/security/module_access.py).
+    """
+    for plano in planos_segmento:
+        plano_normalizado = (plano or "").strip().lower()
+        if (
+            plano_normalizado in PLANOS_LEGADO_LIBERADOS
+            or plano_normalizado in PLANOS_TODOS_MODULOS
+        ):
+            return ALL_PUBLIC_ENTITLEMENTS
+    return frozenset()
+
+
 def _atribuir_plano_segmento(tenant: Tenant, plano_catalogo) -> None:
     """Grava o codigo do plano no campo do segmento correspondente
     (plan_pet/plan_vet/plan_grooming), alem do `plan` legado (mantido em
@@ -358,13 +384,15 @@ def get_modulos_status(
     recursos_trial = sorted(
         {recurso for plano in PLAN_CATALOG.values() for recurso in plano.entitlements}
     )
+    entitlements_catalogo = {
+        recurso for plano in planos_catalogo for recurso in plano.entitlements
+    }
+    entitlements_legado = _entitlements_plano_legado(planos_segmento)
     recursos_ativos = (
         recursos_trial
         if trial_completo
-        else sorted(
-            {recurso for plano in planos_catalogo for recurso in plano.entitlements}
-        )
-        if planos_catalogo and plano_ativo
+        else sorted(entitlements_catalogo | entitlements_legado)
+        if plano_ativo
         else []
     )
 
