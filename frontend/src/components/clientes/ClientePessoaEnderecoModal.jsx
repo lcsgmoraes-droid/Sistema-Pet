@@ -129,8 +129,7 @@ function ClientePessoaEnderecoModal({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <InputTexto
             id="endereco-cep"
-            label="CEP"
-            required
+            label="CEP (opcional)"
             value={enderecoAtual.cep}
             onChange={(valorDigitado) => {
               const digitos = valorDigitado.replace(/\D/g, "");
