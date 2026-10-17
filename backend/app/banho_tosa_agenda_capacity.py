@@ -1,6 +1,6 @@
 """Regras de capacidade e ocupacao da agenda de Banho & Tosa."""
 
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from typing import Optional
 
 from fastapi import HTTPException
@@ -13,6 +13,7 @@ from app.banho_tosa_api.utils import (
 )
 from app.banho_tosa_datetime import normalizar_data_operacional
 from app.banho_tosa_models import BanhoTosaAgendamento, BanhoTosaRecurso
+from app.models import Cliente
 
 
 def validar_capacidade_agenda(
@@ -29,6 +30,25 @@ def validar_capacidade_agenda(
     ignorar_agendamento_id: Optional[int] = None,
 ) -> Optional[BanhoTosaRecurso]:
     """Valida conflitos por pet, equipe e capacidade do recurso."""
+    equipe_ids = {
+        item for item in [profissional_principal_id, banhista_id, tosador_id] if item
+    }
+    if equipe_ids:
+        profissionais = (
+            db.query(Cliente.id)
+            .filter(
+                Cliente.id.in_(equipe_ids),
+                Cliente.tenant_id == tenant_id,
+                Cliente.ativo.is_(True),
+            )
+            .all()
+        )
+        if {item[0] for item in profissionais} != equipe_ids:
+            raise HTTPException(
+                status_code=404,
+                detail="Profissional nao encontrado ou inativo nesta loja",
+            )
+
     query = _query_sobreposicao(db, tenant_id, inicio, fim, ignorar_agendamento_id)
 
     conflito_pet = query.filter(BanhoTosaAgendamento.pet_id == pet_id).first()
@@ -37,9 +57,6 @@ def validar_capacidade_agenda(
             status_code=409, detail="Pet ja possui agendamento nesse horario"
         )
 
-    equipe_ids = {
-        item for item in [profissional_principal_id, banhista_id, tosador_id] if item
-    }
     if equipe_ids:
         conflito_equipe = query.filter(
             or_(
@@ -69,9 +86,10 @@ def validar_capacidade_agenda(
     if not recurso:
         raise HTTPException(status_code=404, detail="Recurso nao encontrado ou inativo")
 
-    ocupacao_recurso = query.filter(
+    agendamentos_recurso = query.filter(
         BanhoTosaAgendamento.recurso_id == recurso.id
-    ).count()
+    ).all()
+    ocupacao_recurso = ocupacao_maxima_intervalo(agendamentos_recurso, inicio, fim)
     capacidade = max(int(recurso.capacidade_simultanea or 1), 1)
     if ocupacao_recurso >= capacidade:
         raise HTTPException(
@@ -81,10 +99,26 @@ def validar_capacidade_agenda(
     return recurso
 
 
+def ocupacao_maxima_intervalo(agendamentos, inicio: datetime, fim: datetime) -> int:
+    """Pico simultaneo dentro do intervalo; fronteiras adjacentes nao conflitam."""
+    inicio = normalizar_data_operacional(inicio)
+    fim = normalizar_data_operacional(fim)
+    janelas = []
+    for agendamento in agendamentos:
+        ag_inicio = normalizar_data_operacional(agendamento.data_hora_inicio)
+        ag_fim = (
+            normalizar_data_operacional(agendamento.data_hora_fim_prevista) or ag_inicio
+        )
+        inicio_comum, fim_comum = max(inicio, ag_inicio), min(fim, ag_fim)
+        if inicio_comum < fim_comum:
+            janelas.append((inicio_comum, fim_comum))
+    return _calcular_pico(janelas)
+
+
 def montar_capacidade_dia(db: Session, tenant_id, data_ref: date) -> dict:
     config = obter_ou_criar_configuracao(db, tenant_id)
     inicio_dia = datetime.combine(data_ref, time.min)
-    fim_dia = datetime.combine(data_ref, time.max)
+    fim_dia = inicio_dia + timedelta(days=1)
     janela_inicio, janela_fim, minutos_disponiveis = _janela_operacional(config)
 
     recursos = (
@@ -98,14 +132,8 @@ def montar_capacidade_dia(db: Session, tenant_id, data_ref: date) -> dict:
     )
 
     agendamentos = (
-        db.query(BanhoTosaAgendamento)
+        _query_sobreposicao(db, tenant_id, inicio_dia, fim_dia, None)
         .options(joinedload(BanhoTosaAgendamento.recurso))
-        .filter(
-            BanhoTosaAgendamento.tenant_id == tenant_id,
-            BanhoTosaAgendamento.status.notin_(list(STATUS_AGENDAMENTO_FINAIS)),
-            BanhoTosaAgendamento.data_hora_inicio >= inicio_dia,
-            BanhoTosaAgendamento.data_hora_inicio <= fim_dia,
-        )
         .all()
     )
 
@@ -120,12 +148,19 @@ def montar_capacidade_dia(db: Session, tenant_id, data_ref: date) -> dict:
             sem_recurso += 1
             continue
 
-        inicio = normalizar_data_operacional(agendamento.data_hora_inicio)
-        fim = normalizar_data_operacional(agendamento.data_hora_fim_prevista) or inicio
+        inicio_original = normalizar_data_operacional(agendamento.data_hora_inicio)
+        fim_original = (
+            normalizar_data_operacional(agendamento.data_hora_fim_prevista)
+            or inicio_original
+        )
+        inicio, fim = max(inicio_original, inicio_dia), min(fim_original, fim_dia)
         duracao = _duracao_minutos(inicio, fim)
         item = por_recurso[agendamento.recurso_id]
         item["agendamentos"] += 1
         item["minutos_ocupados"] += duracao
+        item["intervalos_ocupados"].append(
+            {"data_hora_inicio": inicio, "data_hora_fim_prevista": fim}
+        )
         janelas_por_recurso[agendamento.recurso_id].append((inicio, fim))
 
     alertas = []
@@ -212,6 +247,7 @@ def _base_recurso(recurso: BanhoTosaRecurso, minutos_disponiveis: int) -> dict:
         "ocupacao_percentual": 0,
         "pico_simultaneo": 0,
         "capacidade_excedida": False,
+        "intervalos_ocupados": [],
     }
 
 

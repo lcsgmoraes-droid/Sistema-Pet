@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import calendar
 from datetime import date, timedelta
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_DOWN, ROUND_HALF_UP
 
 
 INTERVALOS_CREDIARIO = frozenset({"7_dias", "15_dias", "mensal"})
@@ -33,8 +33,18 @@ def distribuir_valor_parcelas(
         raise ValueError("numero_parcelas deve ser maior que zero")
 
     centavo = Decimal("0.01")
-    total = Decimal(str(valor_total)).quantize(centavo, rounding=ROUND_HALF_UP)
+    try:
+        total = Decimal(str(valor_total))
+        if not total.is_finite() or total <= 0:
+            raise ValueError("Valor total deve ser finito e maior que zero")
+        total = total.quantize(centavo, rounding=ROUND_HALF_UP)
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValueError("Valor total deve ser finito e maior que zero") from exc
+    if total < centavo * numero_parcelas:
+        raise ValueError("Valor total insuficiente para parcelas de pelo menos R$ 0,01")
     valor_base = (total / numero_parcelas).quantize(centavo, rounding=ROUND_HALF_UP)
+    if total - valor_base * (numero_parcelas - 1) < centavo:
+        valor_base = (total / numero_parcelas).quantize(centavo, rounding=ROUND_DOWN)
     parcelas = [valor_base for _ in range(max(numero_parcelas - 1, 0))]
     parcelas.append(
         (total - sum(parcelas, Decimal("0.00"))).quantize(

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
-import { formatMoneyBRL } from "../../utils/formatters";
+import { formatMoneyBRL, formatPercent } from "../../utils/formatters";
 import ActionButton from "../ui/ActionButton";
 import PaginationControls from "../ui/PaginationControls";
 import StatusBadge from "../ui/StatusBadge";
@@ -39,7 +39,7 @@ function CustoCell({ movimentacao }) {
         : "text-slate-900";
   const resumoVariacao = `${variacao.tipo === "aumento" ? "Aumento" : "Reducao"} de ${formatMoney(
     Math.abs(Number(variacao.diferenca_valor || 0)),
-  )} (${Number(variacao.diferenca_percentual || 0).toFixed(1)}%)`;
+  )} (${formatPercent(variacao.diferenca_percentual)})`;
 
   return (
     <div
@@ -306,7 +306,7 @@ export default function MovimentacoesLancamentosTable({
                     <td className="whitespace-nowrap px-4 py-3 text-center text-sm">
                       {movimentacao.tipo === "entrada" ? (
                         <span className="font-semibold text-green-600">
-                          {Number(movimentacao.quantidade || 0).toFixed(2)}
+                          {formatarQuantidade(movimentacao.quantidade)}
                         </span>
                       ) : (
                         "-"
@@ -315,7 +315,7 @@ export default function MovimentacoesLancamentosTable({
                     <td className="whitespace-nowrap px-4 py-3 text-center text-sm">
                       {movimentacao.tipo === "saida" ? (
                         <span className="font-semibold text-red-600">
-                          {Number(movimentacao.quantidade || 0).toFixed(2)}
+                          {formatarQuantidade(movimentacao.quantidade)}
                         </span>
                       ) : (
                         "-"

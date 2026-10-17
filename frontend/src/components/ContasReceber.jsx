@@ -33,6 +33,7 @@ import {
   normalizarListaClientes,
 } from "./contasReceber/contasReceberFilterHelpers";
 import { montarDadosComprovanteRecebimento } from "../utils/comprovanteRecebimento";
+import { deveMostrarParcelaNaDescricao } from "./contasReceber/contasReceberDescricao";
 
 const formatarDataISO = (data) => {
   const ano = data.getFullYear();
@@ -541,7 +542,7 @@ const ContasReceber = () => {
       render: (conta) => (
         <div>
           {conta.descricao}
-          {conta.eh_parcelado && (
+          {deveMostrarParcelaNaDescricao(conta) && (
             <span className="ml-2 px-2 py-1 text-xs rounded bg-gray-100 text-gray-700">
               {conta.numero_parcela}/{conta.total_parcelas}
             </span>

@@ -13,7 +13,8 @@ import { getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
 import BanhoTosaAgendaCriacaoPanel from "./BanhoTosaAgendaCriacaoPanel";
 import BanhoTosaAgendaList from "./BanhoTosaAgendaList";
 import { confirmarCorePet } from "../../../services/corepetDialog";
-const todayIso = () => new Date().toISOString().slice(0, 10);
+import { formatarDataLocal } from "../../../utils/drePeriodos";
+const todayIso = () => formatarDataLocal();
 const criarFormularioInicial = () => ({
   pet_id: "",
   hora: "09:00",
@@ -351,6 +352,7 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
         agendamentos={agendamentos}
         capacidade={capacidade}
         dataRef={dataRef}
+        duracaoMinutos={duracaoSelecionada()}
         form={form}
         isOpen={formOpen}
         loadingAgenda={loadingAgenda}

@@ -137,6 +137,22 @@ def _garantir_sem_conflitos_agendamento(
     if not veterinario_id and not consultorio_id:
         return
 
+    novo_inicio, novo_fim = _agendamento_intervalo(data_hora, duracao_minutos)
+    maior_duracao = (
+        db.query(func.max(AgendamentoVet.duracao_minutos))
+        .filter(
+            AgendamentoVet.tenant_id == tenant_id, AgendamentoVet.status != "cancelado"
+        )
+        .scalar()
+    )
+    # Consultas do dia anterior tambem podem ocupar o horario pretendido.
+    # A maior duracao limita a busca sem descartar reservas que cruzam dias.
+    try:
+        inicio_busca = novo_inicio - timedelta(
+            minutes=max(int(maior_duracao or 30), 30)
+        )
+    except OverflowError:
+        inicio_busca = datetime.min
     consulta = (
         db.query(AgendamentoVet)
         .options(
@@ -145,7 +161,8 @@ def _garantir_sem_conflitos_agendamento(
         )
         .filter(
             AgendamentoVet.tenant_id == tenant_id,
-            func.date(AgendamentoVet.data_hora) == data_hora.date(),
+            AgendamentoVet.data_hora >= inicio_busca,
+            AgendamentoVet.data_hora < novo_fim,
             AgendamentoVet.status != "cancelado",
         )
     )
@@ -165,7 +182,6 @@ def _garantir_sem_conflitos_agendamento(
     else:
         consulta = consulta.filter(AgendamentoVet.consultorio_id == consultorio_id)
 
-    novo_inicio, novo_fim = _agendamento_intervalo(data_hora, duracao_minutos)
     conflito_veterinario = None
     conflito_consultorio = None
 

@@ -10,11 +10,12 @@ import Panel from "../../../components/ui/Panel";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { exportarRelatorioCsv, exportarRelatorioPdf } from "../banhoTosaRelatorioExport";
 import { formatCurrency, formatNumber, getApiErrorMessage } from "../banhoTosaUtils";
+import { formatarDataLocal } from "../../../utils/drePeriodos";
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => formatarDataLocal();
 const monthStartIso = () => {
   const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  return formatarDataLocal(new Date(now.getFullYear(), now.getMonth(), 1));
 };
 
 export default function BanhoTosaRelatoriosView() {

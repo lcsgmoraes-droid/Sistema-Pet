@@ -63,6 +63,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from decimal import Decimal
 from datetime import date, timedelta
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from app.utils.pagamento_vinculos import marcar_pagamento
 
@@ -266,9 +267,12 @@ class ContasReceberService:
             else getattr(pagamento, "valor", 0)
         )
         valor_total = Decimal(str(valor))
-        valores_parcelas = ContasReceberService._distribuir_valor_parcelas(
-            valor_total, numero_parcelas
-        )
+        try:
+            valores_parcelas = ContasReceberService._distribuir_valor_parcelas(
+                valor_total, numero_parcelas
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
         contas_ids = []
         lancamentos_ids = []  # LancamentoManual é gerenciado pelo service.py (não criar aqui)

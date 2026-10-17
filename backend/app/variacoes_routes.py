@@ -46,8 +46,12 @@ class VariationCreateSchema(BaseModel):
     variation_attributes: Dict[str, str] = Field(
         ..., description="Atributos da variação"
     )
-    preco_venda: float = Field(..., description="Preço de venda da variação")
-    preco_custo: Optional[float] = Field(None, description="Preço de custo")
+    preco_venda: float = Field(
+        ..., ge=0, allow_inf_nan=False, description="Preço de venda da variação"
+    )
+    preco_custo: Optional[float] = Field(
+        None, ge=0, allow_inf_nan=False, description="Preço de custo"
+    )
     estoque_atual: Optional[float] = Field(0, description="Estoque inicial")
     codigo_barras: Optional[str] = Field(None, description="Código de barras")
 
@@ -69,8 +73,8 @@ class VariationUpdateSchema(BaseModel):
     """Schema para atualizar variação"""
 
     nome_complemento: Optional[str] = None
-    preco_venda: Optional[float] = None
-    preco_custo: Optional[float] = None
+    preco_venda: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+    preco_custo: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
     estoque_atual: Optional[float] = None
     codigo_barras: Optional[str] = None
     situacao: Optional[bool] = None

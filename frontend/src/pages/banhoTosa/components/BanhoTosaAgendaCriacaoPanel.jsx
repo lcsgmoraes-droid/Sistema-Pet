@@ -9,6 +9,7 @@ export default function BanhoTosaAgendaCriacaoPanel({
   agendamentos,
   capacidade,
   dataRef,
+  duracaoMinutos,
   form,
   isOpen,
   loadingAgenda,
@@ -81,6 +82,7 @@ export default function BanhoTosaAgendaCriacaoPanel({
             agendamentos={agendamentos}
             capacidade={capacidade}
             dataRef={dataRef}
+            duracaoMinutos={duracaoMinutos}
             form={form}
             loadingAgenda={loadingAgenda}
             loadingSugestoes={loadingSugestoes}

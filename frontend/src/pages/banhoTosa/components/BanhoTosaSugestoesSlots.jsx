@@ -3,13 +3,13 @@ import StatusBadge from "../../../components/ui/StatusBadge";
 import PetAvatar from "../../../components/ui/PetAvatar";
 import PetIdentity from "../../../components/ui/PetIdentity";
 import { formatCurrency } from "../banhoTosaUtils";
-
-const SLOT_MINUTOS = 30;
+import { montarSlotsModal } from "./banhoTosaSlotsModal";
 
 export default function BanhoTosaSugestoesSlots({
   agendamentos = [],
   capacidade,
   dataRef,
+  duracaoMinutos,
   form,
   loadingAgenda,
   loadingSugestoes,
@@ -21,6 +21,8 @@ export default function BanhoTosaSugestoesSlots({
   const slots = montarSlotsModal({
     agendamentos,
     capacidade,
+    dataRef,
+    duracaoMinutos,
     form,
     recursos,
     sugestoes,
@@ -116,13 +118,15 @@ function HorarioButton({ selected, slot, onSelect }) {
     >
       <div>{slot.horario}</div>
       <div className="mt-0.5 text-[10px] opacity-80">
-        {slot.livre
-          ? slot.ocupados.length
-            ? `Livre + ${slot.ocupados.length} ocup.`
-            : "Livre"
-          : slot.ocupados.length
-            ? `${slot.ocupados.length} ocupado(s)`
-            : "Sem vaga"}
+        {slot.foraExpediente
+          ? "Fora expediente"
+          : slot.livre
+            ? slot.ocupados.length
+              ? `Livre + ${slot.ocupados.length} ocup.`
+              : "Livre"
+            : slot.ocupados.length
+              ? `${slot.ocupados.length} ocupado(s)`
+              : "Sem vaga"}
       </div>
     </button>
   );
@@ -178,65 +182,6 @@ function CompromissoCard({ agendamento }) {
   );
 }
 
-function montarSlotsModal({ agendamentos, capacidade, form, recursos, sugestoes }) {
-  const inicio = minutos(capacidade?.janela_inicio || "08:00");
-  const fim = minutos(capacidade?.janela_fim || "18:00");
-  const recursosAtivos = recursos.filter((recurso) => recurso.ativo);
-  const recursoSelecionadoId = form.recurso_id ? String(form.recurso_id) : "";
-  const recursosDoSlot = recursoSelecionadoId
-    ? recursosAtivos.filter((recurso) => String(recurso.id) === recursoSelecionadoId)
-    : recursosAtivos;
-  const slots = [];
-
-  for (let cursor = inicio; cursor < fim; cursor += SLOT_MINUTOS) {
-    const horario = labelHora(cursor);
-    const sugestoesSlot = sugestoes.filter((slot) => hora(slot.horario_inicio) === horario);
-    const sugestao = sugestoesSlot[0] || null;
-    const ocupados = agendamentos.filter((agendamento) => {
-      if (recursoSelecionadoId && String(agendamento.recurso_id || "") !== recursoSelecionadoId) {
-        return false;
-      }
-      return sobrepoeSlot(agendamento, cursor, cursor + SLOT_MINUTOS);
-    });
-    const livre =
-      Boolean(sugestao) ||
-      temCapacidadeLivre(recursosDoSlot, agendamentos, cursor, cursor + SLOT_MINUTOS) ||
-      (!recursosAtivos.length && ocupados.length === 0);
-
-    slots.push({
-      descricao: descreverSlot({ livre, ocupados, sugestao }),
-      horario,
-      livre,
-      ocupados,
-      sugestao,
-    });
-  }
-
-  return slots;
-}
-
-function temCapacidadeLivre(recursos, agendamentos, inicioSlot, fimSlot) {
-  return recursos.some((recurso) => {
-    const capacidade = Math.max(
-      Number(recurso.capacidade_simultanea || recurso.capacidade || 1),
-      1,
-    );
-    const ocupacao = agendamentos.filter((agendamento) => {
-      if (String(agendamento.recurso_id || "") !== String(recurso.id)) return false;
-      return sobrepoeSlot(agendamento, inicioSlot, fimSlot);
-    }).length;
-    return ocupacao < capacidade;
-  });
-}
-
-function descreverSlot({ livre, ocupados, sugestao }) {
-  if (livre && sugestao?.recurso_nome) return `Livre em ${sugestao.recurso_nome}`;
-  if (livre) return "Horario livre";
-  if (ocupados.length)
-    return ocupados.map((item) => item.pet_nome || `Pet #${item.pet_id}`).join(", ");
-  return "Sem vaga sugerida para este horario";
-}
-
 function formatarData(dataRef) {
   if (!dataRef) return "Selecione uma data";
   return new Date(`${dataRef}T12:00:00`).toLocaleDateString("pt-BR", {
@@ -247,23 +192,6 @@ function formatarData(dataRef) {
   });
 }
 
-function sobrepoeSlot(agendamento, inicioSlot, fimSlot) {
-  const inicio = minutos(hora(agendamento.data_hora_inicio));
-  const fim = minutos(hora(agendamento.data_hora_fim_prevista)) || inicio;
-  return inicio < fimSlot && fim > inicioSlot;
-}
-
 function hora(valor) {
   return String(valor || "").slice(11, 16);
-}
-
-function minutos(valor) {
-  const [horaValor, minutoValor] = String(valor || "00:00").split(":");
-  return Number(horaValor || 0) * 60 + Number(minutoValor || 0);
-}
-
-function labelHora(totalMinutos) {
-  const horaValor = Math.floor(totalMinutos / 60);
-  const minutoValor = totalMinutos % 60;
-  return `${String(horaValor).padStart(2, "0")}:${String(minutoValor).padStart(2, "0")}`;
 }

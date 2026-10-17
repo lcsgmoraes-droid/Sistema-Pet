@@ -52,8 +52,8 @@ class EntradaEstoqueRequest(BaseModel):
     """Entrada manual de estoque"""
 
     produto_id: int
-    quantidade: float = Field(gt=0)
-    custo_unitario: Optional[float] = None
+    quantidade: float = Field(gt=0, allow_inf_nan=False)
+    custo_unitario: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
     motivo: str = Field(default="compra")  # compra, devolucao, ajuste, transferencia
     documento: Optional[str] = None
     observacao: Optional[str] = None
@@ -208,6 +208,8 @@ def entrada_estoque(
     produto = (
         db.query(Produto)
         .filter(Produto.id == entrada.produto_id, Produto.tenant_id == tenant_id)
+        .with_for_update()
+        .populate_existing()
         .first()
     )
     if not produto:

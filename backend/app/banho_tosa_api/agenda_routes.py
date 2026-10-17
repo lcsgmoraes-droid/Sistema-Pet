@@ -10,6 +10,7 @@ from app.banho_tosa_api.agenda_helpers import (
     buscar_agendamento_completo,
     buscar_atendimento_completo,
 )
+from app.banho_tosa_api.fluxo import STATUS_POR_ETAPA, fluxo_da_config
 from app.banho_tosa_api.utils import (
     STATUS_AGENDAMENTO_FINAIS,
     STATUS_ATENDIMENTO_FINAIS,
@@ -217,15 +218,33 @@ def atualizar_status_agendamento(
     if not agendamento:
         raise HTTPException(status_code=404, detail="Agendamento nao encontrado")
 
+    config = obter_ou_criar_configuracao(db, tenant_id)
+    etapas_configuradas = {
+        str(etapa).strip().lower()
+        for etapa in getattr(config, "fluxo_etapas", None) or []
+    }
+    statuses = {
+        "agendado",
+        "confirmado",
+        "em_atendimento",
+        "entregue",
+        "cancelado",
+        "no_show",
+        *STATUS_POR_ETAPA.values(),
+        *fluxo_da_config(config),
+        *etapas_configuradas,
+    }
+    novo_status = body.status.strip().lower()
+    if novo_status not in statuses:
+        raise HTTPException(status_code=422, detail="Status de agendamento invalido")
     try:
-        agendamento.status = validar_transicao_status(agendamento.status, body.status)
+        agendamento.status = validar_transicao_status(agendamento.status, novo_status)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     if body.observacoes is not None:
         agendamento.observacoes = body.observacoes
 
-    config = obter_ou_criar_configuracao(db, tenant_id)
     sincronizar_lembretes_agendamento_banho_tosa(
         db, tenant_id=tenant_id, agendamento=agendamento, config=config
     )

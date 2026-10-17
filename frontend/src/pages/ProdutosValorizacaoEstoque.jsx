@@ -12,6 +12,7 @@ import {
 import FornecedorIdentity from "../components/ui/FornecedorIdentity";
 import ActionButton from "../components/ui/ActionButton";
 import useProdutosCatalogos from "../hooks/useProdutosCatalogos";
+import { formatPercent } from "../utils/formatters";
 
 const ITENS_POR_PAGINA_INICIAL = 50;
 
@@ -575,7 +576,7 @@ export default function ProdutosValorizacaoEstoque() {
                         <td className="px-4 py-3 text-right">
                           <div className="inline-flex min-w-[76px] flex-col items-end gap-1">
                             <span className="text-sm font-semibold text-slate-800">
-                              {percentualReserva.toFixed(1)}%
+                              {formatPercent(percentualReserva)}
                             </span>
                             <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
                               <div
@@ -741,7 +742,7 @@ export default function ProdutosValorizacaoEstoque() {
                         <td className="px-4 py-3 text-center">
                           <div className="inline-flex min-w-[84px] flex-col items-center gap-1">
                             <span className="text-xs font-semibold text-slate-700">
-                              {percentualReserva.toFixed(1)}% reservado
+                              {formatPercent(percentualReserva)} reservado
                             </span>
                             <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
                               <div

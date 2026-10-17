@@ -1,9 +1,20 @@
 """Schemas Pydantic do modulo veterinario."""
 
 from datetime import date, datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+StatusAgendamento = Literal[
+    "agendado",
+    "confirmado",
+    "aguardando",
+    "em_atendimento",
+    "finalizado",
+    "cancelado",
+    "faltou",
+]
 
 
 class AgendamentoCreate(BaseModel):
@@ -20,6 +31,11 @@ class AgendamentoCreate(BaseModel):
     sintoma_emergencia: Optional[str] = None
     observacoes: Optional[str] = None
 
+    @field_validator("data_hora")
+    @classmethod
+    def preservar_horario_agendado(cls, value):
+        return value.replace(tzinfo=None)
+
 
 class AgendamentoUpdate(BaseModel):
     pet_id: Optional[int] = None
@@ -31,10 +47,15 @@ class AgendamentoUpdate(BaseModel):
     duracao_minutos: Optional[int] = Field(default=None, gt=0)
     tipo: Optional[str] = None
     motivo: Optional[str] = None
-    status: Optional[str] = None
+    status: Optional[StatusAgendamento] = None
     is_emergencia: Optional[bool] = None
     observacoes: Optional[str] = None
     pretriagem: Optional[dict] = None
+
+    @field_validator("data_hora")
+    @classmethod
+    def preservar_horario_agendado(cls, value):
+        return value.replace(tzinfo=None) if value is not None else None
 
 
 class AgendamentoResponse(BaseModel):
