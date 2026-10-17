@@ -65,6 +65,7 @@ def carregar_contexto_relatorio_vendas(*, db: Session, tenant_id, vendas) -> dic
             db, tenant_id
         ),
         "comissoes_map": comissoes_map,
+        "vendedores_map": _carregar_vendedores_map(db, tenant_id, vendas),
         "comissao_total_por_venda": {
             venda_id: round(sum(float(item.valor_comissao or 0) for item in itens), 2)
             for venda_id, itens in comissoes_map.items()
@@ -77,6 +78,22 @@ def carregar_contexto_relatorio_vendas(*, db: Session, tenant_id, vendas) -> dic
             db, tenant_id, venda_ids
         ),
     }
+
+
+def _carregar_vendedores_map(db: Session, tenant_id, vendas) -> dict[int, str]:
+    vendedor_ids = {
+        venda.vendedor_funcionario_id or venda.funcionario_id
+        for venda in vendas
+        if venda.vendedor_funcionario_id or venda.funcionario_id
+    }
+    if not vendedor_ids:
+        return {}
+    vendedores = (
+        db.query(Cliente.id, Cliente.nome)
+        .filter(Cliente.tenant_id == tenant_id, Cliente.id.in_(vendedor_ids))
+        .all()
+    )
+    return {vendedor_id: nome for vendedor_id, nome in vendedores}
 
 
 def montar_agregados_operacionais_relatorio(vendas) -> dict:
