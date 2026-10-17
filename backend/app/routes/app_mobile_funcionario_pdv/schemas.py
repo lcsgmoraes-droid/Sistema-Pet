@@ -79,6 +79,7 @@ class FuncionarioPdvFinalizarRequest(BaseModel):
     cliente_id: Optional[int] = None
     itens: list[FuncionarioPdvItemRequest]
     pagamento: FuncionarioPdvPagamentoRequest
+    gerar_comissao: bool = False
     observacoes: Optional[str] = None
     cupom_codigo: Optional[str] = None
     desconto_cupom: Optional[float] = Field(default=0, ge=0)
@@ -88,6 +89,7 @@ class FuncionarioPdvFinalizarRequest(BaseModel):
 class FuncionarioPdvSalvarRequest(BaseModel):
     cliente_id: Optional[int] = None
     itens: list[FuncionarioPdvItemRequest]
+    gerar_comissao: bool = False
     observacoes: Optional[str] = None
     cupom_codigo: Optional[str] = None
     desconto_cupom: Optional[float] = Field(default=0, ge=0)

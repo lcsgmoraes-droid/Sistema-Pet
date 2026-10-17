@@ -76,6 +76,14 @@ export const funcionarioPdvStyles = StyleSheet.create({
     gap: ESPACO.sm,
     ...SOMBRA,
   },
+  comissaoOpcao: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ESPACO.sm,
+    minHeight: 44,
+  },
+  comissaoTexto: { color: CORES.texto, fontSize: FONTE.normal, fontWeight: "700" },
+  comissaoAjuda: { color: CORES.textoSecundario, fontSize: FONTE.pequena },
   botaoScan: {
     height: 52,
     borderRadius: RAIO.md,
