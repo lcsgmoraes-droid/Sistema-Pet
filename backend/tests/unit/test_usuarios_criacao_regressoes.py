@@ -337,9 +337,13 @@ def test_perfil_app_desmarcado_nao_reaparece_ao_reabrir_nem_libera_gestor(cenari
         )
         assert set(reaberto["profiles"]) == set(salvo["profiles"]) == set(selecionados)
         # Desmarcar preserva o historico da concessao, com is_active=False.
-        grants = db.query(AppAccessProfile).filter(AppAccessProfile.user_id == user.id).all()
+        grants = (
+            db.query(AppAccessProfile).filter(AppAccessProfile.user_id == user.id).all()
+        )
         assert len(grants) == 2
-        assert {grant.profile_type for grant in grants if grant.is_active} == set(selecionados)
+        assert {grant.profile_type for grant in grants if grant.is_active} == set(
+            selecionados
+        )
         pessoas = db.query(Cliente).filter(Cliente.auth_user_id == user.id).all()
         ativos = list_explicit_app_access_profiles(
             db,
@@ -347,7 +351,9 @@ def test_perfil_app_desmarcado_nao_reaparece_ao_reabrir_nem_libera_gestor(cenari
             user_id=user.id,
             cliente_ids=[pessoa.id for pessoa in pessoas],
         )
-        disponiveis = build_available_profiles_for_clientes(user, pessoas, explicit_grants=ativos)
+        disponiveis = build_available_profiles_for_clientes(
+            user, pessoas, explicit_grants=ativos
+        )
         assert ("gestor" in {perfil["type"] for perfil in disponiveis}) is (
             "gestor" in selecionados
         )
@@ -365,12 +371,22 @@ def loja_associada(cenario, monkeypatch):
     db = cenario.db
     Base.metadata.create_all(
         db.get_bind(),
-        tables=[GrupoComercial.__table__, VetPartnerLink.__table__, UserSession.__table__],
+        tables=[
+            GrupoComercial.__table__,
+            VetPartnerLink.__table__,
+            UserSession.__table__,
+        ],
     )
     destino_id = uuid4()
     db.execute(
         Tenant.__table__.insert(),
-        [{"id": str(destino_id), "name": "Loja associada", "name_normalized": "loja associada"}],
+        [
+            {
+                "id": str(destino_id),
+                "name": "Loja associada",
+                "name_normalized": "loja associada",
+            }
+        ],
     )
     db.execute(
         Role.__table__.insert(),
@@ -381,20 +397,36 @@ def loja_associada(cenario, monkeypatch):
     )
     db.execute(
         User.__table__.insert(),
-        [{"id": 99, "tenant_id": destino_id, "nome": "Operador associado QA", "email": "associado@example.com"}],
+        [
+            {
+                "id": 99,
+                "tenant_id": destino_id,
+                "nome": "Operador associado QA",
+                "email": "associado@example.com",
+            }
+        ],
     )
     db.execute(
         UserTenant.__table__.insert(),
         [
-            {"user_id": user.id, "tenant_id": destino_id, "role_id": 40, "is_active": True},
+            {
+                "user_id": user.id,
+                "tenant_id": destino_id,
+                "role_id": 40,
+                "is_active": True,
+            },
             {"user_id": 99, "tenant_id": destino_id, "role_id": 30, "is_active": True},
         ],
     )
     db.commit()
     set_current_tenant(destino_id)
-    monkeypatch.setattr(tenant_filters, "_supports_partner_read_filter", lambda _session: True)
+    monkeypatch.setattr(
+        tenant_filters, "_supports_partner_read_filter", lambda _session: True
+    )
     actor = db.query(User).filter(User.id == 99).one()
-    return SimpleNamespace(db=db, tenant_id=destino_id, origem_id=cenario.tenant_id, actor=actor, user=user)
+    return SimpleNamespace(
+        db=db, tenant_id=destino_id, origem_id=cenario.tenant_id, actor=actor, user=user
+    )
 
 
 @pytest.mark.parametrize("alterar", [False, True])
@@ -405,7 +437,9 @@ def test_loja_associada_salva_credenciais_sem_duplicar_pessoa(loja_associada, al
     role_id = 30 if alterar else 40
     resultado = usuarios_routes.atualizar_credenciais_usuario.__wrapped__(
         user_id=user.id,
-        payload=usuarios_routes.UserCredentialsUpdate(login_phone=celular, role_id=role_id),
+        payload=usuarios_routes.UserCredentialsUpdate(
+            login_phone=celular, role_id=role_id
+        ),
         db=cenario.db,
         user_and_tenant=(cenario.actor, cenario.tenant_id),
     )
@@ -416,8 +450,9 @@ def test_loja_associada_salva_credenciais_sem_duplicar_pessoa(loja_associada, al
     assert resultado["role_id"] == role_id
     assert resultado["role_changed"] is alterar
     vinculos = cenario.db.execute(
-        select(UserTenant.__table__.c.tenant_id, UserTenant.__table__.c.role_id)
-        .where(UserTenant.__table__.c.user_id == user.id)
+        select(UserTenant.__table__.c.tenant_id, UserTenant.__table__.c.role_id).where(
+            UserTenant.__table__.c.user_id == user.id
+        )
     ).all()
     assert dict(vinculos) == {cenario.origem_id: 20, cenario.tenant_id: role_id}
     pessoas = cenario.db.execute(
@@ -431,7 +466,9 @@ def test_loja_associada_recusa_role_da_origem_e_reverte_celular(loja_associada):
     with pytest.raises(HTTPException) as erro:
         usuarios_routes.atualizar_credenciais_usuario.__wrapped__(
             user_id=cenario.user.id,
-            payload=usuarios_routes.UserCredentialsUpdate(login_phone="11999990002", role_id=20),
+            payload=usuarios_routes.UserCredentialsUpdate(
+                login_phone="11999990002", role_id=20
+            ),
             db=cenario.db,
             user_and_tenant=(cenario.actor, cenario.tenant_id),
         )
@@ -439,19 +476,34 @@ def test_loja_associada_recusa_role_da_origem_e_reverte_celular(loja_associada):
     cenario.db.expire_all()
     atualizado = cenario.db.query(User).filter(User.id == cenario.user.id).one()
     assert atualizado.login_phone == "11999990001"
-    assert cenario.db.query(UserTenant).filter(UserTenant.user_id == atualizado.id).one().role_id == 40
-    assert cenario.db.execute(select(func.count()).select_from(Cliente.__table__)).scalar_one() == 1
+    assert (
+        cenario.db.query(UserTenant)
+        .filter(UserTenant.user_id == atualizado.id)
+        .one()
+        .role_id
+        == 40
+    )
+    assert (
+        cenario.db.execute(
+            select(func.count()).select_from(Cliente.__table__)
+        ).scalar_one()
+        == 1
+    )
 
 
 def test_loja_sem_vinculo_nao_altera_credenciais_nem_le_perfis(loja_associada):
     cenario = loja_associada
-    vinculo = cenario.db.query(UserTenant).filter(UserTenant.user_id == cenario.user.id).one()
+    vinculo = (
+        cenario.db.query(UserTenant).filter(UserTenant.user_id == cenario.user.id).one()
+    )
     cenario.db.delete(vinculo)
     cenario.db.commit()
     with pytest.raises(HTTPException) as erro:
         usuarios_routes.atualizar_credenciais_usuario.__wrapped__(
             user_id=cenario.user.id,
-            payload=usuarios_routes.UserCredentialsUpdate(login_phone="11999990002", role_id=40),
+            payload=usuarios_routes.UserCredentialsUpdate(
+                login_phone="11999990002", role_id=40
+            ),
             db=cenario.db,
             user_and_tenant=(cenario.actor, cenario.tenant_id),
         )
@@ -464,7 +516,9 @@ def test_loja_sem_vinculo_nao_altera_credenciais_nem_le_perfis(loja_associada):
         )
     assert erro_perfis.value.status_code == 404
     celular = cenario.db.execute(
-        select(User.__table__.c.login_phone).where(User.__table__.c.id == cenario.user.id)
+        select(User.__table__.c.login_phone).where(
+            User.__table__.c.id == cenario.user.id
+        )
     ).scalar_one()
     assert celular == "11999990001"
 
@@ -476,11 +530,19 @@ def test_administra_credenciais_de_usuario_inativo_sem_reativar(cenario):
     cenario.db.commit()
     resultado = usuarios_routes.atualizar_credenciais_usuario.__wrapped__(
         user_id=user.id,
-        payload=usuarios_routes.UserCredentialsUpdate(login_phone=user.login_phone, role_id=20),
+        payload=usuarios_routes.UserCredentialsUpdate(
+            login_phone=user.login_phone, role_id=20
+        ),
         db=cenario.db,
         user_and_tenant=(cenario.actor, cenario.tenant_id),
     )
     assert resultado["status"] == "ok"
     cenario.db.expire_all()
-    assert cenario.db.query(UserTenant).filter(UserTenant.user_id == user.id).one().is_active is False
+    assert (
+        cenario.db.query(UserTenant)
+        .filter(UserTenant.user_id == user.id)
+        .one()
+        .is_active
+        is False
+    )
     assert cenario.db.query(Cliente).count() == 1
