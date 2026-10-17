@@ -81,6 +81,7 @@ export default function FuncionarioPdvScreen() {
   const [dataVencimentoCrediario, setDataVencimentoCrediario] = useState(vencimentoPadraoBr);
   const [intervaloCrediario, setIntervaloCrediario] = useState<IntervaloCrediario>("mensal");
   const [observacoes, setObservacoes] = useState("");
+  const [gerarComissao, setGerarComissao] = useState(false);
   const [caixa, setCaixa] = useState<FuncionarioPdvCaixa | null>(null);
   const [carregandoCaixa, setCarregandoCaixa] = useState(false);
   const [finalizando, setFinalizando] = useState(false);
@@ -561,6 +562,7 @@ export default function FuncionarioPdvScreen() {
     setClientesSugestoes([]);
     setValorRecebido("");
     setObservacoes("");
+    setGerarComissao(false);
     setCupomCodigo("");
     setUsarCashback(false);
     setCashbackValor("");
@@ -598,6 +600,7 @@ export default function FuncionarioPdvScreen() {
       const resposta = await salvarVendaPdv({
         cliente_id: cliente?.id ?? null,
         itens: itensPayload,
+        gerar_comissao: gerarComissao,
         observacoes: observacoes.trim() || null,
         cupom_codigo: cupomCodigo.trim() || null,
         desconto_cupom: previewAtual.desconto_cupom,
@@ -679,6 +682,7 @@ export default function FuncionarioPdvScreen() {
       const resposta = await finalizarVendaPdv({
         cliente_id: cliente?.id ?? null,
         itens: itensPayload,
+        gerar_comissao: gerarComissao,
         pagamento: {
           forma_pagamento: formaPagamento,
           valor: Number(previewAtual.valor_pagamento.toFixed(2)),
@@ -819,6 +823,8 @@ export default function FuncionarioPdvScreen() {
         numeroParcelas={numeroParcelas}
         observacoes={observacoes}
         setObservacoes={setObservacoes}
+        gerarComissao={gerarComissao}
+        setGerarComissao={setGerarComissao}
         total={total}
         totalBruto={totalBruto}
         finalizando={finalizando}

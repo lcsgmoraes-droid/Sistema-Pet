@@ -65,7 +65,7 @@ def gerar_comissoes_venda(
             db,
             """
             SELECT id, total, status, desconto_valor, taxa_entrega, tem_entrega, data_venda, tenant_id, entregador_id,
-                   desconto_venda_valor, cupom_discount_applied
+                   desconto_venda_valor, cupom_discount_applied, funcionario_id
             FROM vendas
             WHERE id = :venda_id
               AND {tenant_filter}
@@ -92,7 +92,16 @@ def gerar_comissoes_venda(
             "entregador_id": venda_row[8] if len(venda_row) > 8 else None,
             "desconto_venda_valor": venda_row[9] if len(venda_row) > 9 else None,
             "cupom_discount_applied": venda_row[10] if len(venda_row) > 10 else None,
+            "funcionario_id": venda_row[11],
         }
+
+        # O vendedor informado na venda não implica autorização para comissão.
+        # Apenas o campo do comissionado, preenchido pela opção do PDV, permite gerá-la.
+        if venda["funcionario_id"] != funcionario_id:
+            return {
+                "success": False,
+                "error": "Venda sem este funcionário comissionado",
+            }
 
         # Validar status (apenas finalizada ou baixa_parcial podem gerar comissão)
         if venda["status"] not in ["finalizada", "baixa_parcial"]:

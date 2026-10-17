@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from types import SimpleNamespace
 
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
@@ -10,7 +11,14 @@ from app.routes.app_mobile_funcionario_pdv.beneficios import (
     _aplicar_desconto_cupom_nos_itens_funcionario_pdv,
     _normalizar_item_venda_funcionario_pdv,
 )
-from app.routes.app_mobile_funcionario_pdv.schemas import FuncionarioPdvItemRequest
+from app.routes.app_mobile_funcionario_pdv.schemas import (
+    FuncionarioPdvFinalizarRequest,
+    FuncionarioPdvItemRequest,
+    FuncionarioPdvSalvarRequest,
+)
+from app.routes.app_mobile_funcionario_pdv.vendas import (
+    _criar_payload_venda_funcionario_pdv,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PDV_SOURCE = "backend/app/routes/app_mobile_funcionario_pdv_routes.py"
@@ -133,8 +141,46 @@ def test_funcionario_pdv_delegates_to_official_sale_flow():
     assert "VendaService.criar_venda" in block
     assert "VendaService.finalizar_venda" in block
     assert "processar_comissoes_venda" in block
-    assert '"funcionario_id": funcionario.id' in payload_block
+    assert "if dados.gerar_comissao:" in block
+    assert (
+        '"funcionario_id": funcionario.id if dados.gerar_comissao else None'
+        in payload_block
+    )
+    assert '"vendedor_funcionario_id": funcionario.id' in payload_block
     assert '"vendedor_id": current_user.id' in payload_block
+
+
+def test_funcionario_pdv_comissao_opcional_em_salvar_e_finalizar():
+    tipos = (
+        (FuncionarioPdvSalvarRequest, {}),
+        (
+            FuncionarioPdvFinalizarRequest,
+            {"pagamento": {"forma_pagamento": "pix", "valor": 10}},
+        ),
+    )
+    for request_type, extra in tipos:
+        for marcado in (False, True):
+            campos = {"itens": [], **extra}
+            if marcado:
+                campos["gerar_comissao"] = True
+            dados = request_type(**campos)
+            payload = _criar_payload_venda_funcionario_pdv(
+                dados=dados,
+                current_user=SimpleNamespace(id=77),
+                funcionario=SimpleNamespace(id=88),
+                tenant_id="tenant-teste",
+                beneficios={
+                    "itens_payload": [],
+                    "desconto_total": 0,
+                    "subtotal": 10,
+                    "cupom_code": None,
+                    "desconto_cupom": 0,
+                },
+            )
+            assert dados.gerar_comissao is marcado
+            assert payload["funcionario_id"] == (88 if marcado else None)
+            assert payload["vendedor_funcionario_id"] == 88
+            assert payload["vendedor_id"] == 77
 
 
 def test_funcionario_pdv_does_not_manage_cash_register():

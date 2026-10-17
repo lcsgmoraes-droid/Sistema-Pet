@@ -93,6 +93,8 @@ export type FuncionarioPdvContentProps = {
   numeroParcelas: number;
   observacoes: string;
   setObservacoes: Dispatch<SetStateAction<string>>;
+  gerarComissao: boolean;
+  setGerarComissao: Dispatch<SetStateAction<boolean>>;
   total: number;
   totalBruto: number;
   finalizando: boolean;
@@ -167,6 +169,8 @@ export function FuncionarioPdvContent({
   numeroParcelas,
   observacoes,
   setObservacoes,
+  gerarComissao,
+  setGerarComissao,
   total,
   totalBruto,
   finalizando,
@@ -693,6 +697,27 @@ export function FuncionarioPdvContent({
             </View>
           </View>
         ) : null}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.secaoTitulo}>Comissão do vendedor</Text>
+        <TouchableOpacity
+          style={styles.comissaoOpcao}
+          onPress={() => setGerarComissao(!gerarComissao)}
+          accessibilityRole="checkbox"
+          accessibilityLabel="Gerar comissão nesta venda"
+          accessibilityState={{ checked: gerarComissao }}
+        >
+          <Ionicons
+            name={gerarComissao ? "checkbox" : "square-outline"}
+            size={24}
+            color={gerarComissao ? CORES.primario : CORES.textoSecundario}
+          />
+          <Text style={styles.comissaoTexto}>Gerar comissão nesta venda</Text>
+        </TouchableOpacity>
+        <Text style={styles.comissaoAjuda}>
+          Seu nome será registrado como vendedor mesmo com a comissão desmarcada.
+        </Text>
       </View>
 
       <View style={styles.card}>
