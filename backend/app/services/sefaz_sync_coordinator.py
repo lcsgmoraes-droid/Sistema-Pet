@@ -5,12 +5,12 @@ Garante que apenas UMA sincronização por tenant aconteça por vez,
 entre todos os 4 workers uvicorn.
 
 Responsabilidades:
-  - Lock in-process (threading.Lock) — impede 2 threads do mesmo worker
-  - Lock cross-process (fcntl.flock) — impede 2 workers diferentes
+  - Lock in-process — impede operações simultâneas no mesmo worker
+  - Lock cross-process — serializa sync e alterações de config entre workers
   - Executa os lotes via SefazService.sincronizar_nsu
-  - Importa documentos para o banco via importar_docs_sefaz
-  - Aplica backoff adaptativo (sem docs = espera aumenta progressivamente)
-  - Grava config.json atomicamente (via arquivo .tmp + rename)
+  - Persiste todos os documentos recebidos antes de avançar o NSU
+  - Aplica espera mínima após maxNSU/137 e bloqueio após 656
+  - Grava config.json atomicamente
 
 NÃO decide QUANDO sincronizar — isso é do scheduler (main.py)
 e do endpoint manual (sefaz_routes.py).
@@ -22,37 +22,223 @@ import json
 import logging
 import os
 import threading
+import tempfile
+import time
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_LOCK_FILE = "/tmp/sefaz_sync.lock"
+_LOCK_FILE = Path(tempfile.gettempdir()) / "sefaz_sync.lock"
+_EMAIL_LOCK_FILE = Path(tempfile.gettempdir()) / "sefaz_xml_email.lock"
 
-# Intervalos de backoff quando não há documentos novos.
-# Política muito conservadora: mínimo 12h, máximo 24h.
-# Índice 0 = 1ª vez sem documento → aguarda 720 min (12h)
-# Índice 4 = 5ª+ vez sem documento → aguarda 1440 min (24h)
-BACKOFF_MINUTES = [720, 720, 1440, 1440, 1440]
+# Ao atingir maxNSU ou receber cStat 137, aguarda mais que a hora mínima
+# exigida pelo serviço. Quando há backlog, busca só mais um lote no próximo
+# ciclo do scheduler (que roda a cada 10 minutos).
+INTERVALO_SEM_NOVIDADES_MINUTOS = 65
+INTERVALO_BACKLOG_MINUTOS = 10
 PENALIDADE_656_MINUTOS = 300
+
+
+def _nsu_15(valor: Any) -> str | None:
+    texto = str(valor or "").strip()
+    return texto if len(texto) == 15 and texto.isdigit() else None
+
+
+def _data_utc(valor: Any) -> datetime | None:
+    if not valor:
+        return None
+    try:
+        data = datetime.fromisoformat(str(valor))
+    except ValueError:
+        return None
+    return data.replace(tzinfo=timezone.utc) if data.tzinfo is None else data
+
+
+def bloqueio_656_ate(cfg: dict[str, Any]) -> datetime | None:
+    bloqueio = _data_utc(cfg.get("dfe_656_bloqueado_ate"))
+    if cfg.get("_sync_bloqueado_656"):
+        ultimo = _data_utc(cfg.get("ultimo_sync_at"))
+        legado = _data_utc(cfg.get("_proximo_sync_permitido_at"))
+        if ultimo is not None:
+            legado = (
+                max(legado, ultimo + timedelta(minutes=PENALIDADE_656_MINUTOS))
+                if legado is not None
+                else ultimo + timedelta(minutes=PENALIDADE_656_MINUTOS)
+            )
+        if legado is not None:
+            bloqueio = max(bloqueio, legado) if bloqueio is not None else legado
+    return bloqueio
+
+
+def proximo_sync_permitido(cfg: dict[str, Any]) -> datetime | None:
+    """Aplica a espera oficial mesmo a configurações legadas com prazo curto."""
+    proximo = _data_utc(cfg.get("_proximo_sync_permitido_at"))
+    bloqueio = bloqueio_656_ate(cfg)
+    if bloqueio is not None:
+        proximo = max(proximo, bloqueio) if proximo is not None else bloqueio
+    ultimo = _data_utc(cfg.get("ultimo_sync_at"))
+    if ultimo is None:
+        return proximo
+
+    cstat = str(cfg.get("ultimo_sync_cstat") or "")
+    ult_retorno = _nsu_15(cfg.get("ultimo_sync_ult_nsu_retorno"))
+    max_retorno = _nsu_15(cfg.get("ultimo_sync_max_nsu_retorno"))
+    if cstat == "656":
+        minimo = ultimo + timedelta(minutes=PENALIDADE_656_MINUTOS)
+    elif cstat == "137" or (
+        cfg.get("ultimo_sync_status") == "ok"
+        and ult_retorno is not None
+        and ult_retorno == max_retorno
+    ):
+        minimo = ultimo + timedelta(minutes=INTERVALO_SEM_NOVIDADES_MINUTOS)
+    elif proximo is None:
+        minimo = ultimo + timedelta(
+            minutes=max(60, int(cfg.get("importacao_intervalo_min", 60)))
+        )
+    else:
+        return proximo
+    return max(proximo, minimo) if proximo is not None else minimo
+
+
+class SefazLockBusy(Exception):
+    """Outra operação de sync ou configuração SEFAZ detém o lock."""
 
 
 class SefazSyncCoordinator:
     """
     Coordenador singleton de sincronizações SEFAZ.
     Uma instância por worker uvicorn (processos independentes).
-    Coordenação cross-worker via arquivo de lock em /tmp.
+    Coordenação cross-worker via arquivo de lock temporário.
     """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
+        self._operation_lock = threading.Lock()
+        self._email_operation_lock = threading.Lock()
         self._running: set[str] = set()
 
     def is_syncing(self, tenant_id_str: str) -> bool:
         """Retorna True se este worker já está sincronizando o tenant."""
         with self._lock:
             return tenant_id_str in self._running
+
+    @contextmanager
+    def config_guard(self):
+        """Serializa sync e escrita da configuração dentro e entre workers."""
+        with self._operation_guard(self._operation_lock, _LOCK_FILE):
+            yield
+
+    @contextmanager
+    def email_guard(self, wait_seconds: float = 0):
+        """Serializa a fila SMTP sem segurar o lock da consulta SEFAZ."""
+        with self._operation_guard(
+            self._email_operation_lock, _EMAIL_LOCK_FILE, wait_seconds=wait_seconds
+        ):
+            yield
+
+    @contextmanager
+    def email_and_config_guard(self):
+        """Espera envios em curso antes de salvar um novo destino de XML."""
+        with self.email_guard(wait_seconds=15):
+            with self.config_guard():
+                yield
+
+    @staticmethod
+    @contextmanager
+    def _operation_guard(
+        operation_lock: threading.Lock, lock_file: Path, wait_seconds: float = 0
+    ):
+        deadline = time.monotonic() + wait_seconds
+        if not operation_lock.acquire(timeout=max(0, wait_seconds)):
+            raise SefazLockBusy()
+        lock_f = None
+        unlock = None
+        try:
+            lock_f = open(lock_file, "a+b")
+            if os.name == "nt":
+                import msvcrt
+
+                if lock_f.seek(0, os.SEEK_END) == 0:
+                    lock_f.write(b"0")
+                    lock_f.flush()
+                lock_f.seek(0)
+                while True:
+                    try:
+                        msvcrt.locking(lock_f.fileno(), msvcrt.LK_NBLCK, 1)
+                        break
+                    except OSError as exc:
+                        if time.monotonic() >= deadline:
+                            raise SefazLockBusy() from exc
+                        time.sleep(max(0, min(0.05, deadline - time.monotonic())))
+                        lock_f.seek(0)
+
+                def unlock():
+                    msvcrt.locking(lock_f.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                while True:
+                    try:
+                        fcntl.flock(lock_f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        break
+                    except OSError as exc:
+                        if time.monotonic() >= deadline:
+                            raise SefazLockBusy() from exc
+                        time.sleep(max(0, min(0.05, deadline - time.monotonic())))
+
+                def unlock():
+                    fcntl.flock(lock_f, fcntl.LOCK_UN)
+
+            yield
+        finally:
+            try:
+                if unlock is not None:
+                    unlock()
+            finally:
+                if lock_f is not None:
+                    lock_f.close()
+                operation_lock.release()
+
+    def try_reprocess_local(
+        self, tenant_id_str: str, config_path: Path
+    ) -> dict[str, Any]:
+        """Tenta importar XML já salvo, sem consulta ou alteração do NSU."""
+        from app.db import SessionLocal
+        from app.notas_entrada.sefaz_importer import (
+            reprocessar_documentos_sefaz_pendentes,
+        )
+
+        try:
+            with self.config_guard():
+                if not config_path.exists():
+                    return {"status": "disabled"}
+                cfg = json.loads(config_path.read_text(encoding="utf-8"))
+                if not (
+                    cfg.get("enabled")
+                    and cfg.get("modo") == "real"
+                    and cfg.get("importacao_automatica")
+                ):
+                    return {"status": "disabled"}
+                db = SessionLocal()
+                try:
+                    resultado = reprocessar_documentos_sefaz_pendentes(
+                        db, tenant_id_str
+                    )
+                    return {"status": "ok", **resultado}
+                finally:
+                    db.close()
+        except SefazLockBusy:
+            return {"status": "lock_busy"}
+        except Exception as exc:
+            logger.warning(
+                "[SEFAZ] Reprocessamento local falhou para tenant %s: %s",
+                tenant_id_str,
+                exc,
+            )
+            return {"status": "error"}
 
     def try_sync(
         self,
@@ -86,33 +272,58 @@ class SefazSyncCoordinator:
                 }
             self._running.add(tenant_id_str)
 
-        lock_f = None
         try:
-            # 2. Adquirir lock de arquivo — coordenação cross-worker
-            try:
-                import fcntl
-
-                lock_f = open(_LOCK_FILE, "w")
-                try:
-                    fcntl.flock(lock_f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                except OSError:
-                    lock_f.close()
-                    lock_f = None
-                    with self._lock:
-                        self._running.discard(tenant_id_str)
-                    logger.info(
-                        f"[SEFAZ] [{reason}] Sync ignorada (lock_busy) — tenant {tenant_id_str}"
-                    )
+            with self.config_guard():
+                # A configuração recebida pelo scheduler ou rota pode estar velha.
+                # Recarregar só após o lock impede repetir um distNSU já executado.
+                if not config_path.exists():
                     return {
-                        "status": "lock_busy",
-                        "mensagem": "Outro processo já está sincronizando com a SEFAZ. Aguarde instantes.",
+                        "status": "disabled",
+                        "mensagem": "Configuração SEFAZ ausente.",
                     }
-            except ImportError:
-                lock_f = None  # Windows — sem fcntl, aceita sem lock de arquivo
+                from app.services.sefaz_tenant_config_service import (
+                    SefazTenantConfigService,
+                )
 
-            # 3. Executar
-            logger.info(f"[SEFAZ] [{reason}] Iniciando sync — tenant {tenant_id_str}")
-            return self._execute(tenant_id_str, config_path, cfg, reason)
+                cfg_atual = {
+                    **SefazTenantConfigService.build_default_config(None),
+                    **json.loads(config_path.read_text(encoding="utf-8")),
+                }
+                if not cfg_atual.get("enabled") or cfg_atual.get("modo") != "real":
+                    return {"status": "disabled", "mensagem": "SEFAZ não habilitada."}
+                if reason == "scheduler" and not cfg_atual.get("importacao_automatica"):
+                    return {
+                        "status": "disabled",
+                        "mensagem": "Importação automática desativada.",
+                    }
+                if (
+                    not cfg_atual.get("cert_path")
+                    or not Path(cfg_atual["cert_path"]).exists()
+                ):
+                    return {
+                        "status": "disabled",
+                        "mensagem": "Certificado SEFAZ indisponível.",
+                    }
+                proximo = proximo_sync_permitido(cfg_atual)
+                if proximo is not None and proximo > datetime.now(timezone.utc):
+                    return {
+                        "status": "cooldown",
+                        "mensagem": "Aguarde o próximo horário de consulta SEFAZ.",
+                        "proximo_permitido_at": proximo.isoformat(),
+                    }
+                logger.info(
+                    f"[SEFAZ] [{reason}] Iniciando sync — tenant {tenant_id_str}"
+                )
+                return self._execute(tenant_id_str, config_path, cfg_atual, reason)
+
+        except SefazLockBusy:
+            logger.info(
+                f"[SEFAZ] [{reason}] Sync ignorada (lock_busy) — tenant {tenant_id_str}"
+            )
+            return {
+                "status": "lock_busy",
+                "mensagem": "Outro processo já está sincronizando com a SEFAZ. Aguarde instantes.",
+            }
 
         except Exception as exc:
             logger.warning(
@@ -123,11 +334,6 @@ class SefazSyncCoordinator:
         finally:
             with self._lock:
                 self._running.discard(tenant_id_str)
-            if lock_f:
-                try:
-                    lock_f.close()
-                except Exception:
-                    pass
 
     def _execute(
         self,
@@ -137,7 +343,10 @@ class SefazSyncCoordinator:
         reason: str,
     ) -> dict[str, Any]:
         from app.db import SessionLocal
-        from app.notas_entrada_routes import importar_docs_sefaz
+        from app.notas_entrada.sefaz_importer import (
+            importar_documentos_distribuicao,
+            reprocessar_documentos_sefaz_pendentes,
+        )
         from app.services.sefaz_service import SefazConsumoIndevidoError, SefazService
 
         nsu_loop = cfg.get("ultimo_nsu", "000000000000000")
@@ -150,10 +359,39 @@ class SefazSyncCoordinator:
         mensagem_erro_656: str | None = None
         nsu_sugerido_656: str | None = None
         max_nsu_sugerido_656: str | None = None
-        pulou_para_hoje = False
+        ultimo_nsu_retorno: str | None = None
+        max_nsu_retorno: str | None = None
+        total_erros_processamento = 0
         MAX_LOTES = 1  # Uma chamada por ciclo — evita cStat 656 por consumo excessivo
 
-        for lote_idx in range(MAX_LOTES):
+        # Uma flag antiga nao deve mais descartar documentos ou mover o cursor.
+        if cfg.pop("comecar_do_hoje", False):
+            logger.warning(
+                f"[SEFAZ] [{reason}] Pedido antigo de pular NSU ignorado "
+                f"para tenant {tenant_id_str}; checkpoint preservado."
+            )
+
+        # Reprocessamento local vem antes da rede: notas completas já salvas
+        # podem sair da pendência mesmo se a SEFAZ estiver indisponível.
+        db_retry = None
+        try:
+            db_retry = SessionLocal()
+            retry = reprocessar_documentos_sefaz_pendentes(db_retry, tenant_id_str)
+            total_importadas += retry.get("importadas", 0)
+            total_duplicadas += retry.get("duplicadas", 0)
+            total_erros_processamento += retry.get("erros", 0)
+        except Exception as exc:
+            erro_generico = True
+            mensagem_erro_generico = f"Falha ao reprocessar documentos locais: {exc}"
+            logger.warning(
+                f"[SEFAZ] [{reason}] Reprocessamento local falhou "
+                f"(tenant {tenant_id_str}): {exc}"
+            )
+        finally:
+            if db_retry is not None:
+                db_retry.close()
+
+        for lote_idx in range(MAX_LOTES if not erro_generico else 0):
             try:
                 resultado = SefazService.sincronizar_nsu(
                     config=cfg,
@@ -187,36 +425,82 @@ class SefazSyncCoordinator:
             docs = resultado.get("docs_list", [])
             novo_nsu = resultado.get("ultimo_nsu", nsu_loop)
             max_nsu = resultado.get("max_nsu", novo_nsu)
+            ultimo_nsu_retorno = novo_nsu
+            max_nsu_retorno = max_nsu
 
-            # comecar_do_hoje: avança NSU para o ponto atual sem importar docs antigos
-            if cfg.get("comecar_do_hoje"):
-                nsu_loop = max_nsu
-                pulou_para_hoje = True
-                cfg["comecar_do_hoje"] = False
-                logger.info(
-                    f"[SEFAZ] [{reason}] comecar_do_hoje ativo — NSU avançado para {max_nsu} "
-                    f"(tenant {tenant_id_str})"
+            nsu_atual_valido = _nsu_15(nsu_loop)
+            novo_nsu_valido = _nsu_15(novo_nsu)
+            max_nsu_valido = _nsu_15(max_nsu)
+            c_stat_lote = str(resultado.get("c_stat") or "")
+            nsus_docs = [_nsu_15(doc.get("nsu")) for doc in docs]
+            nsus_ordenados = sorted(nsu for nsu in nsus_docs if nsu is not None)
+            if (
+                not nsu_atual_valido
+                or not novo_nsu_valido
+                or not max_nsu_valido
+                or novo_nsu_valido < nsu_atual_valido
+                or novo_nsu_valido > max_nsu_valido
+                or any(
+                    nsu is None or nsu <= nsu_atual_valido or nsu > novo_nsu_valido
+                    for nsu in nsus_docs
+                )
+                or len(set(nsus_docs)) != len(nsus_docs)
+                or any(
+                    int(atual) != int(anterior) + 1
+                    for anterior, atual in zip(nsus_ordenados, nsus_ordenados[1:])
+                )
+                or (
+                    c_stat_lote == "138"
+                    and (not nsus_docs or max(nsus_docs) != novo_nsu_valido)
+                )
+                or (
+                    c_stat_lote == "137"
+                    and (nsus_docs or novo_nsu_valido != nsu_atual_valido)
+                )
+            ):
+                erro_generico = True
+                mensagem_erro_generico = "Resposta SEFAZ com sequência NSU inconsistente; checkpoint preservado"
+                logger.warning(
+                    f"[SEFAZ] [{reason}] NSU inconsistente no lote "
+                    f"(tenant {tenant_id_str}); checkpoint {nsu_loop} preservado."
                 )
                 break
-
-            total_docs += len(docs)
 
             if docs:
                 db = SessionLocal()
                 try:
-                    r = importar_docs_sefaz(docs, tenant_id_str, db)
+                    # O staging grava todos os docZip antes de qualquer avanço
+                    # de NSU. Falhas posteriores de parse ficam para retry local.
+                    r = importar_documentos_distribuicao(db, tenant_id_str, docs)
+                    if not r.get("staging_salvo") or r.get("documentos_salvos") != len(
+                        docs
+                    ):
+                        raise RuntimeError(
+                            "Lote SEFAZ nao foi integralmente salvo no staging"
+                        )
                     total_importadas += r.get("importadas", 0)
                     total_duplicadas += r.get("duplicadas", 0)
-                    if r["importadas"] > 0 or r.get("erros", 0) > 0:
+                    total_erros_processamento += r.get("erros", 0)
+                    if r.get("importadas", 0) > 0 or r.get("erros", 0) > 0:
                         logger.info(
                             f"[SEFAZ] [{reason}] Lote {lote_idx + 1}: "
-                            f"{r['importadas']} salvas, {r['duplicadas']} duplicadas, "
-                            f"{r['erros']} erros, "
+                            f"{r.get('importadas', 0)} salvas, "
+                            f"{r.get('duplicadas', 0)} duplicadas, "
+                            f"{r.get('erros', 0)} erros, "
                             f"{r.get('saidas_descartadas', 0)} saídas. NSU: {novo_nsu}"
                         )
+                except Exception as exc:
+                    erro_generico = True
+                    mensagem_erro_generico = f"Falha ao salvar lote recebido: {exc}"
+                    logger.warning(
+                        f"[SEFAZ] [{reason}] Checkpoint {nsu_loop} preservado "
+                        f"apos falha de staging (tenant {tenant_id_str}): {exc}"
+                    )
+                    break
                 finally:
                     db.close()
 
+            total_docs += len(docs)
             nsu_loop = novo_nsu
 
             if novo_nsu >= max_nsu or not docs:
@@ -225,7 +509,7 @@ class SefazSyncCoordinator:
         now = datetime.now(timezone.utc)
         now_iso = now.isoformat()
 
-        # ── Erro 656 — aplicar cooldown e salvar ultNSU sugerido ────────────
+        # ── Erro 656 — aplicar cooldown sem mover o checkpoint ───────────────
         if erro_656:
             penalidade_min = PENALIDADE_656_MINUTOS
             proximo = now + timedelta(minutes=penalidade_min)
@@ -243,8 +527,6 @@ class SefazSyncCoordinator:
                 .strip()
                 .zfill(15)
             )
-            if nsu_sugerido_656:
-                cfg["ultimo_nsu"] = nsu_ult_retorno
             detalhe_656 = mensagem_erro_656 or "SEFAZ bloqueou por consumo indevido."
             cfg.update(
                 {
@@ -254,7 +536,8 @@ class SefazSyncCoordinator:
                     "ultimo_sync_status": "erro_656",
                     "ultimo_sync_mensagem": (
                         f"{detalhe_656} "
-                        f"ultNSU={nsu_ult_retorno}, maxNSU={nsu_max_retorno}. "
+                        f"Checkpoint preservado em {cfg.get('ultimo_nsu', nsu_loop)}. "
+                        f"SEFAZ informou ultNSU={nsu_ult_retorno}, maxNSU={nsu_max_retorno}. "
                         f"Próxima tentativa em {penalidade_min} min."
                     ),
                     "ultimo_sync_cstat": "656",
@@ -280,7 +563,7 @@ class SefazSyncCoordinator:
 
         # ── Erro genérico — registrar detalhe real e não mascarar como OK ───
         if erro_generico:
-            intervalo_erro_min = max(5, int(cfg.get("importacao_intervalo_min", 15)))
+            intervalo_erro_min = max(60, int(cfg.get("importacao_intervalo_min", 60)))
             proximo_erro = now + timedelta(minutes=intervalo_erro_min)
             detalhe = (
                 mensagem_erro_generico or "Falha desconhecida na sincronização SEFAZ."
@@ -297,10 +580,10 @@ class SefazSyncCoordinator:
                     ),
                     "ultimo_sync_cstat": None,
                     "ultimo_sync_xmotivo": detalhe,
-                    "ultimo_sync_ult_nsu_retorno": str(cfg.get("ultimo_nsu", nsu_loop))
+                    "ultimo_sync_ult_nsu_retorno": str(ultimo_nsu_retorno or nsu_loop)
                     .strip()
                     .zfill(15),
-                    "ultimo_sync_max_nsu_retorno": str(cfg.get("ultimo_nsu", nsu_loop))
+                    "ultimo_sync_max_nsu_retorno": str(max_nsu_retorno or nsu_loop)
                     .strip()
                     .zfill(15),
                     "ultimo_sync_documentos": 0,
@@ -320,30 +603,36 @@ class SefazSyncCoordinator:
                 "proximo_permitido_at": proximo_erro.isoformat(),
             }
 
-        # ── Sucesso — backoff adaptativo ─────────────────────────────────────
-        backoff_index = int(cfg.get("backoff_index", 0))
-        if total_docs > 0 or pulou_para_hoje:
-            backoff_index = 0  # docs encontrados ou pulo intencional: resetar backoff
-        else:
-            if backoff_index < len(BACKOFF_MINUTES) - 1:
-                backoff_index += 1  # sem documentos: avançar backoff
-
-        intervalo_min = BACKOFF_MINUTES[backoff_index]
+        # ── Sucesso — uma hora sem novidades, próximo ciclo se há backlog ──
+        ha_backlog = (
+            total_docs > 0
+            and str(resultado.get("c_stat", "")) != "137"
+            and str(nsu_loop) < str(max_nsu_retorno or nsu_loop)
+        )
+        intervalo_min = (
+            INTERVALO_BACKLOG_MINUTOS if ha_backlog else INTERVALO_SEM_NOVIDADES_MINUTOS
+        )
         proximo = now + timedelta(minutes=intervalo_min)
 
         msg = (
             f"Sincronização concluída. {total_docs} documento(s) recebido(s), "
-            f"{total_importadas} NF-e(s) importada(s)."
+            f"{total_importadas} NF-e(s) importada(s), "
+            f"{total_erros_processamento} pendente(s) de reprocessamento local."
             if total_docs
             else f"Nenhum documento novo. Próxima verificação em {intervalo_min} min."
         )
 
+        max_confirmado = (
+            max_nsu_retorno
+            if _nsu_15(max_nsu_retorno) and int(max_nsu_retorno) > 0
+            else cfg.get("ultimo_max_nsu_confirmado")
+        )
         cfg.update(
             {
                 "ultimo_sync_at": now_iso,
                 "_proximo_sync_permitido_at": proximo.isoformat(),
                 "_sync_bloqueado_656": False,
-                "backoff_index": backoff_index,
+                "backoff_index": 0,
                 "ultimo_sync_status": "ok",
                 "ultimo_nsu": nsu_loop,
                 "ultimo_sync_cstat": str(resultado.get("c_stat", "ok")),
@@ -356,6 +645,7 @@ class SefazSyncCoordinator:
                 "ultimo_sync_max_nsu_retorno": str(resultado.get("max_nsu", nsu_loop))
                 .strip()
                 .zfill(15),
+                "ultimo_max_nsu_confirmado": max_confirmado,
                 "ultimo_sync_documentos": total_docs,
                 "ultimo_sync_mensagem": msg,
             }
@@ -365,7 +655,7 @@ class SefazSyncCoordinator:
             f"[SEFAZ] [{reason}] ✅ Tenant {tenant_id_str}: "
             f"{total_docs} doc(s), {total_importadas} importada(s). "
             f"NSU: {nsu_loop}. "
-            f"Próxima: {intervalo_min}min (backoff_index={backoff_index})"
+            f"Próxima: {intervalo_min}min (backlog={ha_backlog})"
         )
         return {
             "status": "ok",
@@ -373,6 +663,9 @@ class SefazSyncCoordinator:
             "importadas": total_importadas,
             "duplicadas": total_duplicadas,
             "ultimo_nsu": nsu_loop,
+            "max_nsu": max_nsu_retorno or nsu_loop,
+            "c_stat": str(resultado.get("c_stat", "ok")),
+            "x_motivo": str(resultado.get("x_motivo", "")),
             "mensagem": msg,
             "proximo_permitido_at": proximo.isoformat(),
         }
@@ -380,9 +673,11 @@ class SefazSyncCoordinator:
     @staticmethod
     def _atomic_save(path: Path, data: dict[str, Any]) -> None:
         """Gravação atômica: escreve em .tmp e faz rename (os.replace)."""
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        os.replace(str(tmp), str(path))
+        from app.services.sefaz_tenant_config_service import SefazTenantConfigService
+
+        SefazTenantConfigService._secure_write(
+            path, json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+        )
 
 
 # Singleton global — uma instância por worker uvicorn

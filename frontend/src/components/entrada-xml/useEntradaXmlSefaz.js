@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { montarNomeXml } from "./entradaXmlUtils";
+import { normalizarMensagemErroSefaz } from "./sefazConsultaUtils.mjs";
+
+const CONSULTA_SEFAZ_TIMEOUT_MS = 45000;
 
 const CONFIG_SEFAZ_INICIAL = {
   enabled: false,
@@ -9,6 +12,12 @@ const CONFIG_SEFAZ_INICIAL = {
   cnpj: "",
   importacao_automatica: false,
   importacao_intervalo_min: 60,
+  encaminhamento_email_ativo: false,
+  encaminhamento_email_destino: "",
+  ultimo_nsu: "000000000000000",
+  ultimo_sync_max_nsu_retorno: null,
+  ultimo_max_nsu_confirmado: null,
+  ultimo_sync_cstat: null,
   cert_ok: false,
   mensagem: "",
   pendencias: [],
@@ -17,30 +26,6 @@ const CONFIG_SEFAZ_INICIAL = {
   ultimo_sync_at: null,
   ultimo_sync_documentos: 0,
 };
-
-const MENSAGEM_SEFAZ_INDISPONIVEL =
-  "SEFAZ esta temporariamente indisponivel ou retornou uma resposta incompleta; tente novamente em alguns minutos. Se o erro persistir, confira o status do servico SEFAZ.";
-
-const PADROES_ERRO_SEFAZ_INDISPONIVEL = [
-  "Cloudflare",
-  "origin web server",
-  "invalid or incomplete response",
-];
-
-export function normalizarMensagemErroSefaz(err) {
-  const detail = err?.response?.data?.detail;
-  const mensagem = typeof detail === "string" ? detail : err?.message || "";
-  const mensagemNormalizada = mensagem.toLowerCase();
-  const indisponivel = PADROES_ERRO_SEFAZ_INDISPONIVEL.some((padrao) =>
-    mensagemNormalizada.includes(padrao.toLowerCase()),
-  );
-
-  if (indisponivel) {
-    return MENSAGEM_SEFAZ_INDISPONIVEL;
-  }
-
-  return typeof detail === "string" && detail.trim() ? detail : "Erro ao consultar a SEFAZ.";
-}
 
 export default function useEntradaXmlSefaz({ api, abrirDetalhes, carregarDados, toast }) {
   const [mostrarPainelSefaz, setMostrarPainelSefaz] = useState(false);
@@ -70,6 +55,12 @@ export default function useEntradaXmlSefaz({ api, abrirDetalhes, carregarDados, 
         cnpj: data.cnpj || "",
         importacao_automatica: Boolean(data.importacao_automatica),
         importacao_intervalo_min: Number(data.importacao_intervalo_min || 15),
+        encaminhamento_email_ativo: Boolean(data.encaminhamento_email_ativo),
+        encaminhamento_email_destino: data.encaminhamento_email_destino || "",
+        ultimo_nsu: data.ultimo_nsu ?? "000000000000000",
+        ultimo_sync_max_nsu_retorno: data.ultimo_sync_max_nsu_retorno ?? null,
+        ultimo_max_nsu_confirmado: data.ultimo_max_nsu_confirmado ?? null,
+        ultimo_sync_cstat: data.ultimo_sync_cstat ?? null,
         cert_ok: Boolean(data.cert_ok),
         mensagem: data.mensagem || "",
         pendencias: Array.isArray(data.pendencias) ? data.pendencias : [],
@@ -127,7 +118,11 @@ export default function useEntradaXmlSefaz({ api, abrirDetalhes, carregarDados, 
     }
     try {
       setLoadingSefaz(true);
-      const resp = await api.post("/sefaz/consultar", { chave_acesso: chaveSefaz });
+      const resp = await api.post(
+        "/sefaz/consultar",
+        { chave_acesso: chaveSefaz },
+        { timeout: CONSULTA_SEFAZ_TIMEOUT_MS },
+      );
       const novaConsulta = {
         id: `${Date.now()}-${resp.data.chave_acesso}`,
         criadoEm: new Date().toISOString(),
@@ -141,7 +136,7 @@ export default function useEntradaXmlSefaz({ api, abrirDetalhes, carregarDados, 
       if (httpStatus === 501 && msg.toLowerCase().includes("conector")) {
         setAvisoConectorSefaz(msg);
       } else {
-        setErroSefaz(normalizarMensagemErroSefaz(err));
+        setErroSefaz(msg);
       }
     } finally {
       setLoadingSefaz(false);

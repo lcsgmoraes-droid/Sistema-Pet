@@ -5,15 +5,18 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_entrada_xml_sefaz_normaliza_erro_cloudflare_no_frontend():
-    source = (
+    hook_source = (
         REPO_ROOT / "frontend/src/components/entrada-xml/useEntradaXmlSefaz.js"
     ).read_text(encoding="utf-8")
+    source = (
+        REPO_ROOT / "frontend/src/components/entrada-xml/sefazConsultaUtils.mjs"
+    ).read_text(encoding="utf-8")
 
-    assert "normalizarMensagemErroSefaz" in source
+    assert "normalizarMensagemErroSefaz(err)" in hook_source
     assert "origin web server" in source
     assert "Cloudflare" in source
-    assert "SEFAZ esta temporariamente indisponivel" in source
-    assert "setErroSefaz(normalizarMensagemErroSefaz(err))" in source
+    assert "SEFAZ está temporariamente indisponível" in source
+    assert "setErroSefaz(msg)" in hook_source
 
 
 def test_entrada_xml_bloqueia_consulta_e_exibe_pendencias_de_configuracao():

@@ -11,6 +11,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -164,6 +165,57 @@ class PedidoCompraItem(BaseTenantModel):
 # ============================================================================
 # NOTAS DE ENTRADA (NF-e de Fornecedores)
 # ============================================================================
+
+
+class SefazDocumentoDistribuido(BaseTenantModel):
+    """Documento bruto da distribuicao DF-e, retido antes de qualquer importacao."""
+
+    __tablename__ = "sefaz_documentos_distribuidos"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "nsu", name="uq_sefaz_documentos_tenant_nsu"),
+    )
+
+    nsu = Column(String(15), nullable=False)
+    schema = Column(String(100), nullable=False)
+    tipo = Column(String(30), nullable=False)
+    raw_xml = Column(Text, nullable=False)
+    chave_acesso = Column(String(44), nullable=True, index=True)
+    emitente_cnpj = Column(String(14), nullable=True)
+    emitente_nome = Column(String(255), nullable=True)
+    numero_nota = Column(String(20), nullable=True)
+    data_emissao = Column(DateTime(timezone=True), nullable=True)
+    valor_total = Column(Numeric(15, 2), nullable=True)
+    status = Column(String(30), nullable=False, default="outro_documento", index=True)
+    nota_entrada_id = Column(Integer, ForeignKey("notas_entrada.id"), nullable=True)
+    erro_mensagem = Column(Text, nullable=True)
+    processado_em = Column(DateTime(timezone=True), nullable=True)
+
+
+class SefazXmlEncaminhamento(BaseTenantModel):
+    """Registro duravel do envio do XML completo ao escritorio contabil."""
+
+    __tablename__ = "sefaz_xml_encaminhamentos"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "chave_acesso",
+            name="uq_sefaz_xml_encaminhamentos_tenant_chave",
+        ),
+    )
+
+    documento_id = Column(
+        Integer, ForeignKey("sefaz_documentos_distribuidos.id"), nullable=False
+    )
+    chave_acesso = Column(String(44), nullable=False)
+    email_destino = Column(String(320), nullable=False)
+    ativado_em = Column(DateTime(timezone=True), nullable=False)
+    status = Column(String(20), nullable=False, default="pendente", index=True)
+    tentativas = Column(Integer, nullable=False, default=0)
+    proxima_tentativa_em = Column(DateTime(timezone=True), nullable=True)
+    enviado_em = Column(DateTime(timezone=True), nullable=True)
+    ultimo_erro = Column(String(255), nullable=True)
+
+    documento = relationship("SefazDocumentoDistribuido")
 
 
 class NotaEntrada(BaseTenantModel):
