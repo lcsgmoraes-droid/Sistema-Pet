@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { useRef } from "react";
 
 import useRevealFloatingPanel from "../../hooks/useRevealFloatingPanel";
+import { formatarCargoFuncionario } from "../../utils/funcionarioCargo";
 import Panel from "../ui/Panel";
 
 export default function PDVComissaoCard({
@@ -79,7 +80,9 @@ export default function PDVComissaoCard({
                       className="w-full px-4 py-2 text-left hover:bg-gray-50 border-b last:border-b-0"
                     >
                       <div className="font-medium">{func.nome}</div>
-                      <div className="text-xs text-gray-500 capitalize">{func.cargo}</div>
+                      <div className="text-xs text-gray-500 capitalize">
+                        {formatarCargoFuncionario(func.cargo)}
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -94,7 +97,7 @@ export default function PDVComissaoCard({
                 <div>
                   <div className="font-semibold text-green-900">{funcionarioComissao.nome}</div>
                   <div className="text-sm text-green-700 capitalize">
-                    {funcionarioComissao.cargo}
+                    {formatarCargoFuncionario(funcionarioComissao.cargo)}
                   </div>
                 </div>
               </div>
