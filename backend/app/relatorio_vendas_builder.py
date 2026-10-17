@@ -61,6 +61,7 @@ def montar_relatorio_vendas(
     )
     impostos_percentual_global = contexto_relatorio["impostos_percentual_global"]
     comissao_total_por_venda = contexto_relatorio["comissao_total_por_venda"]
+    vendedores_map = contexto_relatorio.get("vendedores_map", {})
     formas_pagamento_map = contexto_relatorio["formas_pagamento_map"]
     cashback_por_venda = contexto_relatorio["cashback_por_venda"]
     cupons_por_venda = contexto_relatorio["cupons_por_venda"]
@@ -386,6 +387,9 @@ def montar_relatorio_vendas(
 
     for venda in vendas:
         valor_recebido_venda = _total_recebido_venda(venda)
+        vendedor_id = getattr(venda, "vendedor_funcionario_id", None) or getattr(
+            venda, "funcionario_id", None
+        )
         valor_recebido_geral += valor_recebido_venda
         cupom_desconto = _valor_cupom_venda(venda, cupons_por_venda)
         custo_campanha_venda = round(
@@ -449,6 +453,9 @@ def montar_relatorio_vendas(
                 "numero_venda": venda.numero_venda,
                 "data_venda": venda.data_venda.isoformat(),
                 "cliente_nome": venda.cliente.nome if venda.cliente else "Sem cliente",
+                "vendedor_funcionario_id": vendedor_id,
+                "vendedor_nome": vendedores_map.get(vendedor_id, "Sem vendedor"),
+                "total_venda": round(float(venda.total or 0), 2),
                 "nf_emitida": _venda_tem_documento_fiscal(venda),
                 "nfe_tipo": venda.nfe_tipo,
                 "nfe_status": venda.nfe_status,

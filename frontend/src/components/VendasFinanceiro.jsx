@@ -137,6 +137,7 @@ function VendasFinanceiroPorVenda() {
       { id: "resumo", label: "Resumo" },
       ...tabsRestritas,
       { id: "produtos", label: "Totais por produto/servico" },
+      { id: "vendedores", label: "Por vendedor" },
       { id: "lista", label: "Lista de Vendas" },
       { id: "comparacao", label: "Comparacao de Periodos" },
       { id: "analise", label: "Analise Inteligente" },
@@ -377,7 +378,7 @@ function VendasFinanceiroPorVenda() {
 
   const montarParametrosRelatorio = (params) => ({
     ...params,
-    ...(filtroCanalVenda ? { canal_venda: filtroCanalVenda } : {}),
+    ...(filtroCanalVenda && abaAtiva !== "vendedores" ? { canal_venda: filtroCanalVenda } : {}),
   });
 
   const carregarDados = async () => {
