@@ -1,5 +1,9 @@
 from decimal import Decimal
 from datetime import datetime
+import os
+from pathlib import Path
+import subprocess
+import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -70,3 +74,23 @@ def test_provisao_orfa_com_periodo_dre_bloqueia_estorno(monkeypatch):
     monkeypatch.setattr(script, "execute_tenant_safe", consulta)
     with pytest.raises(ValueError, match="período DRE"):
         identificar_provisoes_orfas(db, tenant_id="tenant", itens=[item])
+
+
+def test_script_registra_tabelas_de_fk_antes_de_escrever():
+    codigo = (
+        "from app.scripts.estornar_comissoes_pendentes_tenant import "
+        "ComissaoItem, Tenant; "
+        "from app.db import SessionLocal; "
+        "db = SessionLocal(); "
+        "db.query(Tenant); db.query(ComissaoItem); "
+        "assert ComissaoItem.__mapper__._sorted_tables; db.close()"
+    )
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo],
+        capture_output=True,
+        text=True,
+        timeout=20,
+        env={**os.environ, "DATABASE_URL": "postgresql://test:test@localhost/test"},
+        cwd=Path(__file__).resolve().parents[2],
+    )
+    assert resultado.returncode == 0, resultado.stderr

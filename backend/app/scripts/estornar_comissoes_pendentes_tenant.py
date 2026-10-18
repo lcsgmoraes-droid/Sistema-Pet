@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 from app.comissoes_financeiro_service import cancelar_provisoes_comissao_venda
 from app.comissoes_models import ComissaoItem, ComissaoVenda
 from app.db import SessionLocal
+from app.db import base as _model_registry  # noqa: F401 - registra FKs antes do flush
 from app.financeiro_models import ContaPagar
 from app.models import Tenant
 from app.tenancy.context import tenant_context
