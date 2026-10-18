@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from ..auth.dependencies import get_current_user_and_tenant
 from ..db import get_session
 from ..models import User
+from ..security.permissions_decorator import require_permission_dependency
 from ..veterinario_calendar import (
     buscar_agendamentos_para_calendario,
     gerar_calendario_ics,
@@ -17,7 +18,10 @@ from ..veterinario_core import _get_tenant
 router = APIRouter()
 
 
-@router.get("/agenda/calendario")
+@router.get(
+    "/agenda/calendario",
+    dependencies=[Depends(require_permission_dependency("veterinario.acessar"))],
+)
 def obter_calendario_agenda_vet(
     request: Request,
     db: Session = Depends(get_session),
@@ -27,7 +31,10 @@ def obter_calendario_agenda_vet(
     return montar_payload_calendario_vet(db, request, user=user, tenant_id=tenant_id)
 
 
-@router.post("/agenda/calendario/token")
+@router.post(
+    "/agenda/calendario/token",
+    dependencies=[Depends(require_permission_dependency("veterinario.acessar"))],
+)
 def regenerar_token_calendario_agenda_vet(
     request: Request,
     db: Session = Depends(get_session),
@@ -41,7 +48,10 @@ def regenerar_token_calendario_agenda_vet(
     return montar_payload_calendario_vet(db, request, user=user, tenant_id=tenant_id)
 
 
-@router.get("/agenda/calendario.ics")
+@router.get(
+    "/agenda/calendario.ics",
+    dependencies=[Depends(require_permission_dependency("veterinario.acessar"))],
+)
 def baixar_calendario_agenda_vet(
     request: Request,
     db: Session = Depends(get_session),
