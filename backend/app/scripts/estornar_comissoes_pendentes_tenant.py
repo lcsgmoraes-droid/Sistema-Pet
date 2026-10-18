@@ -15,10 +15,9 @@ from app.comissoes_financeiro_service import cancelar_provisoes_comissao_venda
 from app.comissoes_models import ComissaoItem, ComissaoVenda
 from app.db import SessionLocal
 from app.financeiro_models import ContaPagar
-from app.ia.aba7_models import DREPeriodo
 from app.models import Tenant
 from app.tenancy.context import tenant_context
-from app.vendas_models import Venda
+from app.utils.tenant_safe_sql import execute_tenant_safe
 
 
 STATUS_ALVO = ("pendente",)
@@ -63,25 +62,33 @@ def identificar_provisoes_orfas(db, *, tenant_id, itens):
             )
             .first()
         )
-        venda = (
-            db.query(Venda.data_venda)
-            .filter(Venda.tenant_id == tenant_id, Venda.id == item.venda_id)
-            .first()
-        )
+        venda = execute_tenant_safe(
+            db,
+            """
+            SELECT data_venda FROM vendas
+            WHERE id = :venda_id AND {tenant_filter}
+            LIMIT 1
+            """,
+            {"venda_id": item.venda_id},
+            tenant_id=tenant_id,
+        ).first()
         if conta or not venda or not venda[0]:
             raise ValueError(
                 f"Provisão órfã {item.id} tem conta ou venda inconclusiva; revisão manual necessária."
             )
         data_venda = venda[0].date()
-        periodo_dre = (
-            db.query(DREPeriodo.id)
-            .filter(
-                DREPeriodo.tenant_id == tenant_id,
-                DREPeriodo.data_inicio <= data_venda,
-                DREPeriodo.data_fim >= data_venda,
-            )
-            .first()
-        )
+        periodo_dre = execute_tenant_safe(
+            db,
+            """
+            SELECT id FROM dre_periodos
+            WHERE data_inicio <= :data_venda
+              AND data_fim >= :data_venda
+              AND {tenant_filter}
+            LIMIT 1
+            """,
+            {"data_venda": data_venda},
+            tenant_id=tenant_id,
+        ).first()
         if periodo_dre:
             raise ValueError(
                 f"Provisão órfã {item.id} coincide com período DRE; revisão manual necessária."
