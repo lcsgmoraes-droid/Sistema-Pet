@@ -91,6 +91,13 @@ O aceite de Lucas permanece pendente.
 
 Evidências e limites: `docs/homologacoes/2026-10-19-cashback-crm.md`.
 
+Na preparação da publicação, o espelho público ECR recusou três downloads da
+imagem PostgreSQL 16 com `toomanyrequests: Data limit exceeded`, antes de qualquer
+teste. O serviço de testes de migration passou a obter a mesma versão da imagem
+oficial `postgres:16` no Docker Hub. O contrato do workflow acompanha a origem;
+os testes, permissões e exigências do gate continuam os mesmos. Este ajuste
+atua somente na checagem automática, sem alterar imagens ou dados de produção.
+
 ## 7. Publicação e rollback
 
 Entrega web e backend, com migration aplicada antes do backend atualizado.
