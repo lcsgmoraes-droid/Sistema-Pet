@@ -23,6 +23,7 @@ function ClientePessoaEnderecoModal({
   enderecoAtual,
   fecharModalEndereco,
   loadingCepEndereco,
+  salvando = false,
   principalTemDados,
   salvarEndereco,
   buscarCepModal,
@@ -52,10 +53,14 @@ function ClientePessoaEnderecoModal({
         onFechar={fecharModalEndereco}
         rodape={
           <>
-            <BotaoCancelar onClick={() => setMostrandoConfirmacao(false)}>
+            <BotaoCancelar disabled={salvando} onClick={() => setMostrandoConfirmacao(false)}>
               Cancelar e mudar o tipo
             </BotaoCancelar>
-            <BotaoSalva onClick={() => salvarEndereco(tipoAntigoPrincipal)}>
+            <BotaoSalva
+              type="button"
+              loading={salvando}
+              onClick={() => salvarEndereco(tipoAntigoPrincipal)}
+            >
               Confirmar substituição
             </BotaoSalva>
           </>
@@ -77,6 +82,7 @@ function ClientePessoaEnderecoModal({
             id="endereco-tipo-antigo-principal"
             label="Novo tipo do endereço que deixará de ser principal"
             required
+            disabled={salvando}
             opcoes={OPCOES_TIPO_ENDERECO_ANTIGO_PRINCIPAL}
             permitirLimpar={false}
             value={tipoAntigoPrincipal}
@@ -94,12 +100,21 @@ function ClientePessoaEnderecoModal({
       onFechar={fecharModalEndereco}
       rodape={
         <>
-          <BotaoCancelar onClick={fecharModalEndereco}>Cancelar</BotaoCancelar>
-          <BotaoSalva onClick={aoClicarSalvar}>Salvar endereço</BotaoSalva>
+          <BotaoCancelar disabled={salvando} onClick={fecharModalEndereco}>
+            Cancelar
+          </BotaoCancelar>
+          <BotaoSalva
+            type="button"
+            loading={salvando}
+            disabled={loadingCepEndereco}
+            onClick={aoClicarSalvar}
+          >
+            Salvar endereço
+          </BotaoSalva>
         </>
       }
     >
-      <div className="space-y-4">
+      <fieldset disabled={salvando} className="space-y-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <InputCombobox
             id="endereco-tipo"
@@ -206,7 +221,7 @@ function ClientePessoaEnderecoModal({
         </div>
 
         <p className="text-xs text-gray-500">* Campos obrigatórios</p>
-      </div>
+      </fieldset>
     </ModalPadrao>
   );
 }

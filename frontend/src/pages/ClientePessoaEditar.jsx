@@ -146,6 +146,7 @@ export default function ClientePessoaEditar() {
           <PessoaFormulario
             abaInicial={resolverAbaInicial(location)}
             formId={FORM_ID}
+            onEnderecoSalvo={setCliente}
             onSalvandoChange={setSalvando}
             onSalvo={setCliente}
             pessoa={cliente}

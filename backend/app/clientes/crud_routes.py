@@ -52,7 +52,6 @@ from app.grupo_comercial_contexto import listar_empresas_do_grupo
 from app.security.permissions_decorator import require_permission
 from app.security.permissions_service import check_permission
 from app.security.crediario_override import definir_liberacao_crediario
-from app.services.cliente_alertas_pdv import normalizar_alertas_pdv
 from app.services.cliente_origem import (
     filtrar_origem_periodo,
     opcoes_origem_cliente,
@@ -1208,49 +1207,11 @@ def _desativar_comissoes_ativas(
 
 
 def _montar_resposta_update(cliente: Cliente) -> dict:
-    return {
-        "origem_cliente": getattr(cliente, "origem_cliente", None),
-        "id": cliente.id,
-        "codigo": cliente.codigo,
-        "nome": cliente.nome,
-        "tipos_cadastro": tipos_cadastro_da_pessoa(cliente),
-        "is_cliente": cliente.is_cliente,
-        "is_fornecedor": cliente.is_fornecedor,
-        "is_veterinario": cliente.is_veterinario,
-        "is_funcionario": cliente.is_funcionario,
-        "origem_tenant_id": str(cliente.origem_tenant_id)
-        if cliente.origem_tenant_id
-        else None,
-        "tipo_pessoa": cliente.tipo_pessoa,
-        "cpf": cliente.cpf,
-        "cnpj": cliente.cnpj,
-        "email": cliente.email,
-        "telefone": cliente.telefone,
-        "celular": cliente.celular,
-        "contatos_adicionais": [
-            {"id": contato.id, "numero": contato.numero, "vinculo": contato.vinculo}
-            for contato in cliente.contatos_adicionais
-        ],
-        "parceiro_ativo": cliente.parceiro_ativo
-        if hasattr(cliente, "parceiro_ativo")
-        else False,
-        "data_fechamento_comissao": cliente.data_fechamento_comissao,
-        "alertas_pdv": normalizar_alertas_pdv(getattr(cliente, "alertas_pdv", None)),
-        "ativo": cliente.ativo,
-        "created_at": cliente.created_at,
-        "updated_at": cliente.updated_at,
-        "criado_por_id": getattr(cliente, "criado_por_id", None),
-        "criado_por_nome": getattr(cliente, "criado_por_nome", None),
-        "criado_por_email": getattr(cliente, "criado_por_email", None),
-        "auth_user_id": getattr(cliente, "auth_user_id", None),
-        "auth_user_nome": getattr(cliente, "auth_user_nome", None),
-        "auth_user_email": getattr(cliente, "auth_user_email", None),
-        "auth_user_username": getattr(cliente, "auth_user_username", None),
-        "app_access_profiles": getattr(cliente, "app_access_profiles", []),
-        "pode_liberar_venda_crediario_atrasado": getattr(
-            cliente, "pode_liberar_venda_crediario_atrasado", False
-        ),
-    }
+    # O formulario substitui seu estado pela resposta do PUT. Usar o mesmo
+    # contrato do GET evita apagar visualmente campos omitidos apos salvar.
+    response = ClienteResponse.model_validate(cliente).model_dump()
+    response["tipos_cadastro"] = tipos_cadastro_da_pessoa(cliente)
+    return response
 
 
 router.include_router(base_router)
