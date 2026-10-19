@@ -4,11 +4,12 @@
 
 - Data: 2026-10-19, America/Sao_Paulo.
 - Entrega: `docs/entregas/2026-10-19-cashback-crm.md`.
-- Base testada: `c3f4eaf8f`, com as alterações de cashback desta entrega.
+- Código testado: `c80f2a031`, incluindo a instalação local descrita abaixo.
 - Responsável técnico: Codex, com revisão independente.
 - Aceite de negócio: pendente com Lucas.
 - Ambientes: testes SQLite em memória, PostgreSQL 16 descartável local e Chrome
-  no perfil CorePet com prévia isolada em `127.0.0.1:5186`.
+  no perfil CorePet com prévia isolada em `127.0.0.1:5186` e sistema completo
+  de homologação em `127.0.0.1:18080`.
 
 ## Pré-condições
 
@@ -17,7 +18,15 @@ de `.env` e usaram configurações fictícias. O smoke oficial usou os bancos
 `petshop_cashback_crm_smoke_*`, criados exclusivamente para esta validação,
 e removeu esses bancos e a role temporária ao terminar. A prévia visual
 renderizou os componentes reais com respostas de API simuladas em memória;
-não acessou a sessão nem os dados da outra homologação local.
+  não acessou a sessão nem os dados da outra homologação local.
+
+Na validação posterior solicitada por Lucas, o sistema completo de homologação
+foi atualizado pelo script oficial, preservando seus volumes e registros.
+Foram acrescentados somente três clientes fictícios identificados pelos códigos
+`CRM-DEMO-001/002/003`, com R$ 45,00, R$ 128,50 e R$ 22,00 de crédito manual
+de demonstração. Telefones são fictícios, sem assinante válido; não houve
+abertura externa nem envio de mensagem. O seed foi repetido em simulação e
+confirmou zero inserções adicionais.
 
 ## Cenários de aceite
 
@@ -34,6 +43,7 @@ não acessou a sessão nem os dados da outra homologação local.
 | Popup bloqueado, API falhando e link inesperado | Não navega; fecha aba em erro; mantém texto e chave de retry | `cashbackCrmUtils.test.mjs` e `useCashbackCrm.test.mjs` |
 | StrictMode e resposta antiga de filtro | Loading inicial único; resposta cancelada ignorada | `useCashbackCrm.test.mjs` |
 | Interface desktop | Lista, mensagem personalizada e histórico legíveis; status/nota atualizados ao salvar | Chrome, massa fictícia Marina/Rafael/Ana |
+| Sistema local completo | Login preservado; lista real com três clientes e total R$ 195,50; histórico/nota/status persistidos pela API PostgreSQL | Chrome, CorePet Homologacao Local, códigos CRM-DEMO |
 | Migration PostgreSQL | Clean, histórico e tenant UUID chegam ao head; gate RLS aprovado | `scripts/ci_migration_smoke.py` |
 | RLS com role não administrativa | Empresa A só vê A; B só vê B; INSERT/UPDATE cruzado negado; sem tenant não lê | Cinco cenários SQL em banco descartável |
 
@@ -49,6 +59,14 @@ não acessou a sessão nem os dados da outra homologação local.
 - `npm run build`: aprovado. Aviso existente de chunk do PDV acima de 500 kB.
 - `scripts/ci_migration_smoke.py`: três caminhos PostgreSQL aprovados, com uma
   única head `zzzzf20261019a1` e gate RLS sem dívida.
+- `scripts/homologacao_local.ps1 -Acao subir`: imagens frontend/backend
+  reconstruídas; migration `zzzze20261019a1 -> zzzzf20261019a1` aplicada;
+  health frontend/backend aprovados.
+- Chrome em `http://127.0.0.1:18080/campanhas/cashback-crm`, com a sessão
+  existente do Operador Homologacao: listagem e mensagem personalizada
+  verificadas; CRM-DEMO-002 alterado de Aguardando retorno para Interessado;
+  observação de teste salva, segundo evento consultado no histórico e estado
+  atualizado na lista. Nenhum contato externo realizado.
 
 ## Inconsistências preexistentes e limites
 
@@ -58,10 +76,10 @@ não acessou a sessão nem os dados da outra homologação local.
 - O teste antigo de badge de convites em `menuConfig.test.mjs` falha porque a
   base não trata `convitesGruposCount`. A ausência foi confirmada executando o
   `menuConfig.js` inalterado do commit base. Quatro outros testes de menu passaram.
-- A revisão visual usou API simulada. A jornada completa com login real, API e
-  tela juntas, a revisão em viewport mobile e o aceite de negócio ficam para
-  validação posterior. WhatsApp externo foi simulado nos testes; nenhuma mensagem
-  foi enviada e nenhum recebimento/leitura foi presumido.
+- Revisão visual e acompanhamento foram aprovados também no sistema completo
+  local com sessão autenticada, API e PostgreSQL reais. Revisão em viewport mobile
+  e aceite de negócio continuam pendentes. WhatsApp externo foi simulado nos
+  testes; nenhuma mensagem foi enviada e nenhum recebimento/leitura foi presumido.
 - O modelo de mensagem fica na sessão da tela; não é uma configuração compartilhada.
 
 ## Decisão

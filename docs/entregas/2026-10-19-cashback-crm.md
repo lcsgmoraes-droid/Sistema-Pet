@@ -83,7 +83,11 @@ descartáveis. Os três caminhos oficiais de migration e cinco cenários RLS com
 usuário sem privilégios administrativos passaram. O ambiente DEV subiu pelo
 fluxo oficial. A revisão visual no Chrome usou componentes reais e uma API
 simulada isolada, incluindo edição de status, nota e histórico, sem enviar
-mensagens. O aceite de Lucas permanece pendente.
+mensagens. Depois, o sistema completo em `127.0.0.1:18080` foi reconstruído pelo
+script de homologação, preservando dados anteriores e a sessão autenticada.
+Três clientes fictícios CRM-DEMO permitem experimentar a tela; listagem,
+histórico, mudança de status e nota foram aprovados com API/PostgreSQL reais.
+O aceite de Lucas permanece pendente.
 
 Evidências e limites: `docs/homologacoes/2026-10-19-cashback-crm.md`.
 
