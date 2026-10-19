@@ -22,6 +22,7 @@ Uso:
 
 import logging
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy.orm import Session
 
@@ -59,7 +60,7 @@ def _customer_allows_contact(
         latest = (
             db.query(DataPrivacyConsent)
             .filter(
-                DataPrivacyConsent.tenant_id == str(tenant_id),
+                DataPrivacyConsent.tenant_id == UUID(str(tenant_id)),
                 DataPrivacyConsent.subject_type == "customer",
                 DataPrivacyConsent.subject_id == str(customer_id),
                 DataPrivacyConsent.consent_type.in_(consent_types),

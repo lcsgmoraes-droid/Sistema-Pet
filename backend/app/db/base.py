@@ -5,6 +5,7 @@ __all__ = ["Base"]
 # Importar TODOS os models aqui para o Alembic enxergar
 # Importando models principais (do arquivo app/models.py)
 from app.models import User, UserSession, Cliente, UserTenant, Pet, Especie, Raca  # noqa
+from app.campaigns.cashback_crm_models import CashbackContato  # noqa: F401
 
 # Importando models fiscais (do diretório app/fiscal_models/)
 # KitConfigFiscal/ProdutoConfigFiscal são reexportados de app.fiscal_models a partir

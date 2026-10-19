@@ -7,14 +7,15 @@ import {
   Megaphone,
   Repeat2,
   Settings,
-  SlidersHorizontal,
   Sparkles,
   Tags,
   BadgePercent,
   Medal,
   Trophy,
   Wrench,
+  Wallet,
 } from "lucide-react";
+import AbasNavegacao from "../v2/AbasNavegacao/AbasNavegacao";
 
 export const CAMPANHAS_TABS = [
   {
@@ -42,6 +43,12 @@ export const CAMPANHAS_TABS = [
   {
     group: "Operacao",
     items: [
+      {
+        id: "cashback-crm",
+        label: "Cashback e contatos",
+        labelText: "Cashback e contatos",
+        icon: Wallet,
+      },
       { id: "gestor", label: "Gestor", labelText: "Gestor", icon: Wrench },
       { id: "relatorios", label: "Relatorios", labelText: "Relatorios", icon: BarChart3 },
       { id: "unificacao", label: "Unificacao", labelText: "Unificacao", icon: Link2 },
@@ -59,35 +66,13 @@ export const CAMPANHAS_TABS = [
 
 const FLAT_TABS = CAMPANHAS_TABS.flatMap((group) => group.items);
 
-function TabButton({ active, tab, onChange }) {
-  const Icon = tab.icon || SlidersHorizontal;
-
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={active}
-      onClick={() => onChange?.(tab.id)}
-      className={[
-        "flex min-h-[48px] min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold leading-tight transition-colors",
-        active
-          ? "border-cyan-300 bg-cyan-50 text-cyan-800 shadow-sm"
-          : "border-slate-200 bg-white text-gray-600 hover:border-slate-300 hover:bg-slate-50 hover:text-gray-900",
-      ].join(" ")}
-    >
-      <Icon size={17} className="shrink-0" aria-hidden="true" />
-      <span className="min-w-0 break-words">{tab.label}</span>
-    </button>
-  );
-}
-
 export default function CampanhasTabsBar({ aba, onChange }) {
   return (
     <nav
       aria-label="Abas de campanhas"
-      className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm"
+      className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900"
     >
-      <div role="tablist" aria-label="Abas de campanhas" className="space-y-3">
+      <div className="space-y-3">
         {CAMPANHAS_TABS.map((group) => (
           <div key={group.group} className="grid gap-2 md:grid-cols-[150px_1fr] md:items-center">
             <div>
@@ -100,11 +85,13 @@ export default function CampanhasTabsBar({ aba, onChange }) {
                 </p>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {group.items.map((tab) => (
-                <TabButton key={tab.id} active={aba === tab.id} tab={tab} onChange={onChange} />
-              ))}
-            </div>
+            <AbasNavegacao
+              abas={group.items}
+              ativa={aba}
+              onChange={onChange}
+              ariaLabel={group.group}
+              className="flex-wrap border-b-0 pb-0"
+            />
           </div>
         ))}
       </div>
