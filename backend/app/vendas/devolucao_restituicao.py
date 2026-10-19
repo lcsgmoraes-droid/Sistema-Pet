@@ -51,13 +51,27 @@ def forma_normalizada(pagamento):
     return nome.strip().replace(" ", "_").replace("-", "_")
 
 
+def _valor_pagamento(pagamento):
+    valor = getattr(pagamento, "valor", None)
+    if getattr(pagamento, "baixa_lote_id", None) is not None:
+        try:
+            numero = Decimal(str(valor or 0))
+        except (InvalidOperation, TypeError, ValueError):
+            return _moeda(valor)
+        if numero.is_finite() and numero < 0:
+            # A contrapartida faz parte do histórico: reduz o total restituível
+            # sem invalidar uma nova baixa feita depois da correção.
+            return -_moeda(-numero)
+    return _moeda(valor)
+
+
 def pagamentos_validos(venda, tenant_id):
     return [
         p
         for p in (getattr(venda, "pagamentos", []) or [])
         if str(getattr(p, "tenant_id", tenant_id)) == str(tenant_id)
         and pagamento_valido_para_saldo(p)
-        and (getattr(p, "valor", None) is None or _moeda(p.valor) > 0)
+        and (getattr(p, "valor", None) is None or _valor_pagamento(p) != 0)
     ]
 
 
@@ -282,7 +296,7 @@ def cotar_restituicao(
     for pagamento in pagamentos_validos(venda, tenant_id):
         forma = forma_normalizada(pagamento)
         chave = forma if forma in {"cashback", "credito_cliente"} else "valor_restante"
-        totais[chave] += _moeda(getattr(pagamento, "valor", None))
+        totais[chave] += _valor_pagamento(pagamento)
     if sum(totais.values(), ZERO) != _moeda(venda.total):
         _erro(
             "Os pagamentos não correspondem ao total da venda. Confira os pagamentos antes de devolver."

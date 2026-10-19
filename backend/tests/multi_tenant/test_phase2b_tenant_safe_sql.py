@@ -41,7 +41,9 @@ def raw_sql_session():
             venda_id INTEGER NOT NULL,
             forma_pagamento TEXT,
             valor NUMERIC,
-            data_pagamento TEXT
+            data_pagamento TEXT,
+            baixa_lote_id INTEGER,
+            status TEXT
         )
     """)
     )

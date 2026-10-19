@@ -713,6 +713,10 @@ def test_return_does_not_reactivate_manually_voided_loyalty_stamp(
 
 
 def test_new_loyalty_stamps_keep_step_used_at_award(monkeypatch):
+    monkeypatch.setattr(
+        "app.campaigns.loyalty_service.lock_cashback_customer", lambda *a, **k: None
+    )
+
     class _StampQuery(_Query):
         def order_by(self, *args):
             return self
@@ -761,6 +765,10 @@ def test_new_loyalty_stamps_keep_step_used_at_award(monkeypatch):
 
 
 def test_reprocessed_loyalty_sale_uses_its_original_step(monkeypatch):
+    monkeypatch.setattr(
+        "app.campaigns.loyalty_service.lock_cashback_customer", lambda *a, **k: None
+    )
+
     class _StampQuery(_Query):
         def order_by(self, *args):
             return self

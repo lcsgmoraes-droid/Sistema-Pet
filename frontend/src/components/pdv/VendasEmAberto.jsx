@@ -1,9 +1,16 @@
-import { useState, useEffect } from "react";
-import { X, DollarSign, CheckCircle, AlertCircle, Loader } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { DollarSign, CheckCircle, AlertCircle, History, Loader } from "lucide-react";
 import { toast } from "react-hot-toast";
 import api from "../../api";
 import { formatBRL, formatMoneyBRL } from "../../utils/formatters";
-import CurrencyInput from "../CurrencyInput";
+import ClienteBaixasLotePanel from "../clientes/ClienteBaixasLotePanel";
+import BotaoCancelar from "../v2/BotaoCancelar/BotaoCancelar";
+import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
+import InputCheckbox from "../v2/InputCheckbox/InputCheckbox";
+import InputCombobox from "../v2/InputCombobox/InputCombobox";
+import InputMoeda from "../v2/InputMoeda/InputMoeda";
+import InputTexto from "../v2/InputTexto/InputTexto";
+import InputTextoLongo from "../v2/InputTextoLongo/InputTextoLongo";
 import { campaignAllowsSaleChannel } from "../../utils/campaignChannelScope";
 import { useModulos } from "../../contexts/ModulosContext";
 import CustomerIdentity from "../ui/CustomerIdentity";
@@ -27,9 +34,20 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
   const [rankCliente, setRankCliente] = useState("bronze");
   const [loadingCampanhasCompra, setLoadingCampanhasCompra] = useState(false);
   const [campanhasCarregadas, setCampanhasCarregadas] = useState(false);
+  const [mostrarHistoricoBaixas, setMostrarHistoricoBaixas] = useState(false);
+  const requestId = useRef(null);
+  const envioEmAndamento = useRef(false);
 
   useEffect(() => {
-    carregarVendasEmAberto();
+    requestId.current = null;
+  }, [clienteId, vendasSelecionadas, valorPagamento, formaPagamento, numeroTransacao, observacoes]);
+
+  useEffect(() => {
+    let ativo = true;
+    carregarVendasEmAberto(() => ativo);
+    return () => {
+      ativo = false;
+    };
   }, [clienteId]);
 
   useEffect(() => {
@@ -79,17 +97,18 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
     carregarCampanhasCompra();
   }, [clienteId, campanhasCarregadas, moduloCampanhasAtivo, vendasSelecionadas.length]);
 
-  const carregarVendasEmAberto = async () => {
+  const carregarVendasEmAberto = async (estaAtivo = () => true) => {
     try {
       setLoading(true);
       const response = await api.get(`/clientes/${clienteId}/vendas-em-aberto`);
+      if (!estaAtivo()) return;
       setVendas(response.data.vendas || []);
       setResumo(response.data.resumo || { total_vendas: 0, total_em_aberto: 0 });
     } catch (error) {
       console.error("Erro ao carregar vendas em aberto:", error);
-      toast.error("Erro ao carregar vendas em aberto");
+      if (estaAtivo()) toast.error("Erro ao carregar vendas em aberto");
     } finally {
-      setLoading(false);
+      if (estaAtivo()) setLoading(false);
     }
   };
 
@@ -236,6 +255,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
     .filter(Boolean);
 
   const handleBaixarVendas = async () => {
+    if (envioEmAndamento.current) return;
     if (vendasSelecionadas.length === 0) {
       toast.error("Selecione ao menos uma venda");
       return;
@@ -252,7 +272,9 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
     }
 
     try {
+      envioEmAndamento.current = true;
       setProcessando(true);
+      requestId.current ||= globalThis.crypto.randomUUID();
       console.log("Enviando requisição:", {
         vendas_ids: vendasSelecionadas,
         valor_total: valorPagamentoCentavos / 100,
@@ -262,6 +284,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
       });
 
       const response = await api.post(`/clientes/${clienteId}/baixar-vendas-lote`, {
+        request_id: requestId.current,
         vendas_ids: vendasSelecionadas,
         valor_total: valorPagamentoCentavos / 100,
         forma_pagamento: formaPagamento,
@@ -298,6 +321,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
       }
 
       toast.success(mensagem, { duration: 6000 });
+      requestId.current = null;
 
       if (onSucesso) {
         onSucesso();
@@ -313,6 +337,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
       const mensagemErro = error.response?.data?.detail || error.message || "Erro ao baixar vendas";
       toast.error(mensagemErro);
     } finally {
+      envioEmAndamento.current = false;
       setProcessando(false);
     }
   };
@@ -348,9 +373,9 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
                 />
               </div>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-white rounded-lg transition-colors">
-              <X className="w-6 h-6" />
-            </button>
+            <BotaoCancelar onClick={onClose} disabled={processando}>
+              Fechar
+            </BotaoCancelar>
           </div>
 
           {/* Resumo */}
@@ -362,7 +387,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
             <div className="bg-white rounded-lg p-4 shadow-sm">
               <div className="text-sm text-gray-600">Total em Aberto</div>
               <div className="text-2xl font-bold text-red-600">
-                R$ {resumo.total_em_aberto.toFixed(2)}
+                {formatMoneyBRL(resumo.total_em_aberto)}
               </div>
             </div>
           </div>
@@ -370,6 +395,29 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
 
         {/* Conteúdo */}
         <div className="flex-1 overflow-y-auto p-6">
+          <div className="mb-4">
+            <BotaoInteracao
+              icon={History}
+              disabled={processando}
+              onClick={() => setMostrarHistoricoBaixas((anterior) => !anterior)}
+            >
+              {mostrarHistoricoBaixas
+                ? "Ocultar histórico de baixas"
+                : "Histórico de baixas em lote"}
+            </BotaoInteracao>
+          </div>
+          {mostrarHistoricoBaixas ? (
+            <div className="mb-6">
+              <ClienteBaixasLotePanel
+                key={clienteId}
+                clienteId={clienteId}
+                onAtualizado={async () => {
+                  await carregarVendasEmAberto();
+                  onSucesso?.();
+                }}
+              />
+            </div>
+          ) : null}
           {vendas.length === 0 ? (
             <div className="text-center py-12">
               <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
@@ -381,20 +429,22 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
               {/* Controles */}
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <button
+                  <BotaoInteracao
                     onClick={selecionarTodas}
-                    className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+                    disabled={processando}
+                    tamanho="pequeno"
                   >
                     {vendasSelecionadas.length === vendas.length
                       ? "Desmarcar todas"
                       : "Selecionar todas"}
-                  </button>
-                  <button
+                  </BotaoInteracao>
+                  <BotaoInteracao
                     onClick={() => setOrdenacao(ordenacao === "antiga" ? "recente" : "antiga")}
-                    className="text-sm text-gray-600 hover:text-gray-700 flex items-center gap-1 font-medium"
+                    disabled={processando}
+                    tamanho="pequeno"
                   >
                     📅 {ordenacao === "antiga" ? "↑ Mais Antigas" : "↓ Mais Recentes"}
-                  </button>
+                  </BotaoInteracao>
                 </div>
                 <div className="text-sm text-gray-600">
                   {vendasSelecionadas.length} de {vendas.length} selecionada(s)
@@ -407,11 +457,11 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        <input
-                          type="checkbox"
+                        <InputCheckbox
+                          rotulo="Selecionar todas as vendas"
                           checked={vendasSelecionadas.length === vendas.length}
                           onChange={selecionarTodas}
-                          className="rounded border-gray-300"
+                          disabled={processando}
                         />
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -445,11 +495,11 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
                           className={`hover:bg-gray-50 ${vendasSelecionadas.includes(venda.id) ? "bg-blue-50" : ""}`}
                         >
                           <td className="px-4 py-3">
-                            <input
-                              type="checkbox"
+                            <InputCheckbox
+                              rotulo={`Selecionar venda ${venda.numero_venda || venda.id}`}
                               checked={vendasSelecionadas.includes(venda.id)}
                               onChange={(event) => toggleVenda(venda.id, event)}
-                              className="rounded border-gray-300"
+                              disabled={processando}
                             />
                           </td>
                           <td className="px-4 py-3 font-medium text-gray-900">
@@ -503,61 +553,56 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Valor do Pagamento *
-                      </label>
-                      <CurrencyInput
+                      <InputMoeda
+                        label="Valor do pagamento"
+                        required
+                        disabled={processando}
                         value={valorPagamento}
                         onChange={setValorPagamento}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Forma de Pagamento *
-                      </label>
-                      <select
+                      <InputCombobox
+                        label="Forma de pagamento"
+                        required
+                        disabled={processando}
                         value={formaPagamento}
-                        onChange={(e) => setFormaPagamento(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="dinheiro">Dinheiro</option>
-                        <option value="pix">PIX</option>
-                        <option value="debito">Cartão de Débito</option>
-                        <option value="credito">Cartão de Crédito</option>
-                        <option value="transferencia">Transferência</option>
-                      </select>
+                        onChange={setFormaPagamento}
+                        permitirLimpar={false}
+                        opcoes={[
+                          { value: "dinheiro", label: "Dinheiro" },
+                          { value: "pix", label: "PIX" },
+                          { value: "debito", label: "Cartão de débito" },
+                          { value: "credito", label: "Cartão de crédito" },
+                          { value: "transferencia", label: "Transferência" },
+                        ]}
+                      />
                     </div>
 
                     {(formaPagamento === "pix" || formaPagamento === "transferencia") && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Número da Transação
-                        </label>
-                        <input
-                          type="text"
+                        <InputTexto
+                          label="Número da transação"
+                          disabled={processando}
                           value={numeroTransacao}
-                          onChange={(e) => setNumeroTransacao(e.target.value)}
+                          onChange={setNumeroTransacao}
                           placeholder="Código/ID da transação"
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                     )}
                   </div>
 
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Observações
-                    </label>
-                    <textarea
+                    <InputTextoLongo
+                      label="Observações"
+                      disabled={processando}
                       value={observacoes}
-                      onChange={(e) => setObservacoes(e.target.value)}
-                      rows="2"
+                      onChange={setObservacoes}
+                      linhas={2}
                       placeholder="Informações adicionais sobre o pagamento..."
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
 
@@ -632,23 +677,16 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
                     )}
                   </div>
 
-                  <button
+                  <BotaoInteracao
+                    icon={DollarSign}
+                    loading={processando}
                     onClick={handleBaixarVendas}
                     disabled={processando || !valorPagamento || Number(valorPagamento) <= 0}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    larguraTotal
+                    tamanho="grande"
                   >
-                    {processando ? (
-                      <>
-                        <Loader className="w-5 h-5 animate-spin" />
-                        <span>Processando...</span>
-                      </>
-                    ) : (
-                      <>
-                        <DollarSign className="w-5 h-5" />
-                        <span>Baixar Vendas Selecionadas</span>
-                      </>
-                    )}
-                  </button>
+                    {processando ? "Processando..." : "Baixar Vendas Selecionadas"}
+                  </BotaoInteracao>
                 </div>
               )}
             </>

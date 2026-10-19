@@ -11,6 +11,8 @@ TENANT_TABLES = {
     # Vendas
     "vendas",
     "venda_baixas",
+    "vendas_baixas_lotes",
+    "vendas_baixas_lote_itens",
     "venda_itens",
     "venda_pagamentos",
     "vendas_itens",

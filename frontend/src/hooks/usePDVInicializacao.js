@@ -11,7 +11,7 @@ export function usePDVInicializacao({
   carregarVendaEspecifica,
   handleClienteCriadoRapidoHook,
   setMostrarModalCliente,
-  recarregarVendasEmAbertoClienteAtual,
+  recarregarContextoClienteAtual,
   setVendaAtual,
   setMostrarModalAdicionarCredito,
   limparVenda,
@@ -61,7 +61,7 @@ export function usePDVInicializacao({
   };
 
   const handleVendasEmAbertoSucesso = () => {
-    void recarregarVendasEmAbertoClienteAtual();
+    void recarregarContextoClienteAtual();
   };
 
   const handleConfirmarCreditoCliente = (novoSaldo) => {

@@ -46,16 +46,7 @@ export default function ClientePessoaComplementaresTab({ formData, setFormData }
               value={formData.is_entregador ? "sim" : "nao"}
               onChange={(valor) => {
                 const marcado = valor === "sim";
-                setFormData((prev) => {
-                  const perfis = new Set(prev.app_access_profiles || []);
-                  if (marcado) perfis.add("entregador");
-                  else perfis.delete("entregador");
-                  return {
-                    ...prev,
-                    is_entregador: marcado,
-                    app_access_profiles: Array.from(perfis),
-                  };
-                });
+                setFormData((prev) => ({ ...prev, is_entregador: marcado }));
               }}
             />
             <p className="mt-1 text-xs text-slate-500">

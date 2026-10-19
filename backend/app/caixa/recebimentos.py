@@ -1,8 +1,9 @@
 """Escopo do recebimento, independente do caixa de origem da venda."""
 
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, or_
 
 from app.caixa.conferencia import FORMAS_PAGAMENTO_A_PRAZO, moeda
+from app.caixa_models import MovimentacaoCaixa
 from app.vendas_models import Venda, VendaPagamento
 
 
@@ -27,6 +28,22 @@ def filtro_recebimentos_caixa(caixa):
         filtro_pagamentos_caixa(caixa),
         func.lower(func.trim(VendaPagamento.forma_pagamento)).notin_(
             sorted(FORMAS_PAGAMENTO_A_PRAZO)
+        ),
+    )
+
+
+def filtro_recebimentos_dinheiro_caixa(caixa_id, tenant_id):
+    """Entradas da venda e devoluções vinculadas que reduzem o recebido."""
+    return and_(
+        MovimentacaoCaixa.caixa_id == caixa_id,
+        MovimentacaoCaixa.tenant_id == tenant_id,
+        func.lower(func.trim(MovimentacaoCaixa.forma_pagamento)) == "dinheiro",
+        or_(
+            MovimentacaoCaixa.tipo == "venda",
+            and_(
+                MovimentacaoCaixa.tipo == "devolucao",
+                MovimentacaoCaixa.venda_id.isnot(None),
+            ),
         ),
     )
 

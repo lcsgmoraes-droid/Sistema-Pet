@@ -17,6 +17,7 @@ from app.caixa_models import Caixa, MovimentacaoCaixa
 from app.caixa.recebimentos import (
     carregar_pagamentos_vendas,
     filtro_recebimentos_caixa,
+    filtro_recebimentos_dinheiro_caixa,
     resumir_pagamentos_vendas_caixa,
 )
 from app.caixa.auditoria import registrar_evento_caixa, snapshot_caixa
@@ -29,6 +30,7 @@ from app.caixa.conferencia import (
     referencia_fechamento,
     snapshot_abertura,
     totais_dinheiro,
+    valor_recebimento_dinheiro,
 )
 from app.caixa.escopo import (
     aplicar_escopo_caixa,
@@ -633,7 +635,7 @@ def obter_resumo_caixa(
     entradas_dinheiro = [
         mov
         for mov in movimentacoes
-        if mov.tipo == "venda"
+        if (mov.tipo == "venda" or (mov.tipo == "devolucao" and mov.venda_id))
         and str(mov.forma_pagamento or "").strip().casefold() == "dinheiro"
     ]
 
@@ -650,7 +652,7 @@ def obter_resumo_caixa(
             filtro_recebimentos_caixa(caixa),
             Venda.tenant_id == tenant_id,
             VendaPagamento.tenant_id == tenant_id,
-            VendaPagamento.valor > 0,
+            VendaPagamento.valor != 0,
             func.lower(func.trim(VendaPagamento.forma_pagamento)) != "dinheiro",
         )
     )
@@ -687,7 +689,7 @@ def obter_resumo_caixa(
             data_venda.date().isoformat() if data_venda else None,
             "Dinheiro",
             1,
-            mov.valor,
+            valor_recebimento_dinheiro(mov),
             "lançamento",
         )
     for data_venda, forma, quantidade, total in pagamentos_por_data:
@@ -813,10 +815,7 @@ def listar_vendas_caixa(
         movimentos = (
             db.query(MovimentacaoCaixa)
             .filter(
-                MovimentacaoCaixa.caixa_id == caixa_id,
-                MovimentacaoCaixa.tenant_id == tenant_id,
-                MovimentacaoCaixa.tipo == "venda",
-                func.lower(func.trim(MovimentacaoCaixa.forma_pagamento)) == "dinheiro",
+                filtro_recebimentos_dinheiro_caixa(caixa_id, tenant_id),
             )
             .order_by(MovimentacaoCaixa.data_movimento.desc())
             .all()
@@ -830,8 +829,8 @@ def listar_vendas_caixa(
                 "cliente_nome": mov.venda.cliente.nome
                 if mov.venda and mov.venda.cliente
                 else "Consumidor",
-                "total": float(mov.valor),
-                "valor_nesta_forma": float(mov.valor),
+                "total": float(valor_recebimento_dinheiro(mov)),
+                "valor_nesta_forma": float(valor_recebimento_dinheiro(mov)),
                 "hora_venda": mov.data_movimento.strftime("%H:%M")
                 if mov.data_movimento
                 else None,
@@ -864,10 +863,7 @@ def listar_vendas_caixa(
         dinheiro_caixa = (
             db.query(MovimentacaoCaixa)
             .filter(
-                MovimentacaoCaixa.caixa_id == caixa_id,
-                MovimentacaoCaixa.tenant_id == tenant_id,
-                MovimentacaoCaixa.tipo == "venda",
-                func.lower(func.trim(MovimentacaoCaixa.forma_pagamento)) == "dinheiro",
+                filtro_recebimentos_dinheiro_caixa(caixa_id, tenant_id),
             )
             .all()
         )
@@ -891,7 +887,7 @@ def listar_vendas_caixa(
                         "id": movimento.id,
                         "tipo": "movimentacao",
                         "forma_pagamento": "Dinheiro",
-                        "valor": float(moeda(movimento.valor)),
+                        "valor": float(valor_recebimento_dinheiro(movimento)),
                         "data_recebimento": movimento.data_movimento.isoformat(),
                     }
                 )
@@ -965,7 +961,7 @@ def listar_vendas_caixa(
             filtro_recebimentos_caixa(caixa),
             Venda.tenant_id == tenant_id,
             VendaPagamento.tenant_id == tenant_id,
-            VendaPagamento.valor > 0,
+            VendaPagamento.valor != 0,
             VendaPagamento.forma_pagamento == forma_pagamento,
         )
         .order_by(VendaPagamento.data_pagamento.desc())

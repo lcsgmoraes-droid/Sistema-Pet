@@ -552,6 +552,18 @@ export const BASE_CONHECIMENTO = [
           "**Atenção:** vendas canceladas não são deletadas — ficam registradas como 'Cancelada' para auditoria.",
         ],
       },
+      {
+        titulo: "Como consultar e estornar uma baixa em lote",
+        tags: ["baixa", "lote", "estorno", "recebimento", "pagamento errado"],
+        conteudo: [
+          "No financeiro do cadastro do cliente ou no histórico financeiro completo, abra **Baixas em lote**. Cada pagamento aparece uma única vez, mesmo quando foi distribuído entre várias vendas.",
+          "Use **Detalhes** para conferir as vendas e o valor aplicado em cada uma. Para corrigir um recebimento errado, clique em **Estornar**, informe o motivo e confirme.",
+          "Tenha um caixa aberto. O estorno registra a correção no caixa atual, preserva o histórico original e devolve o saldo das vendas para uma nova baixa correta. Os produtos não são devolvidos ao estoque por esse estorno financeiro.",
+          "O lançamento estornado permanece no histórico com data, usuário e motivo. Não exclua os pagamentos de cada venda separadamente: todos pertencem ao mesmo recebimento.",
+          "Se houver conciliação, comissão ou benefício já utilizado que impeça a reversão, o sistema explica o que precisa ser conferido e não altera nenhum valor do lote.",
+          "Baixas antigas, anteriores à identificação única do lote, precisam de conferência para serem vinculadas com segurança.",
+        ],
+      },
     ],
   },
 

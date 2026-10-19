@@ -419,6 +419,12 @@ def excluir_pagamento_atomico(*, db, pagamento_id, tenant_id, current_user):
     pagamento = next((p for p in pagamentos if p.id == pagamento_id), None)
     if not pagamento:
         return _exclusao_anterior(db, tenant_id, pagamento_id)
+    if pagamento.baixa_lote_id:
+        raise HTTPException(
+            409,
+            f"Este pagamento pertence à baixa em lote #{pagamento.baixa_lote_id}. "
+            "Estorne o lançamento completo no histórico de baixas do cliente.",
+        )
     if venda.status == "pago_nf":
         raise HTTPException(400, "Cancele a nota fiscal antes de excluir pagamentos.")
     if venda.status != "aberta":

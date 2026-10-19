@@ -654,6 +654,10 @@ class VendaPagamento(BaseTenantModel):
     )
     # O recebimento pertence ao caixa que recebeu, mesmo em vendas de dias anteriores.
     caixa_id = Column(Integer, ForeignKey("caixas.id"), nullable=True, index=True)
+    # Originais e contrapartidas pertencem ao mesmo recebimento em lote.
+    baixa_lote_id = Column(
+        Integer, ForeignKey("vendas_baixas_lotes.id"), nullable=True, index=True
+    )
 
     # Forma de Pagamento
     forma_pagamento = Column(
@@ -717,6 +721,7 @@ class VendaPagamento(BaseTenantModel):
         return {
             "id": self.id,
             "caixa_id": self.caixa_id,
+            "baixa_lote_id": self.baixa_lote_id,
             "forma_pagamento": self.forma_pagamento,
             "forma_pagamento_id": self.forma_pagamento_id,
             "valor": safe_decimal_to_float(self.valor),
@@ -815,3 +820,75 @@ class VendaBaixa(BaseTenantModel):
 
     def __repr__(self):
         return f"<VendaBaixa {self.tipo} - R$ {self.valor_baixa}>"
+
+
+class VendaBaixaLote(BaseTenantModel):
+    """Um recebimento do cliente, com seus rateios e estorno auditáveis."""
+
+    __tablename__ = "vendas_baixas_lotes"
+    __table_args__ = (
+        Index("ux_baixa_lote_tenant_request", "tenant_id", "request_id", unique=True),
+        Index("ix_baixa_lote_cliente_data", "tenant_id", "cliente_id", "data"),
+    )
+
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False)
+    caixa_id = Column(Integer, ForeignKey("caixas.id"), nullable=False)
+    usuario_id = Column(Integer, nullable=False)
+    usuario_nome = Column(String(200), nullable=False)
+    request_id = Column(String(36), nullable=False)
+    requisicao = Column(JSON, nullable=False)
+    observacoes = Column(Text, nullable=True)
+    resultado = Column(JSON, nullable=True)
+    valor_total = Column(DECIMAL(10, 2), nullable=False)
+    forma_pagamento = Column(String(50), nullable=False)
+    numero_transacao = Column(String(100), nullable=True)
+    data = Column(DateTime, nullable=False)
+    status = Column(String(20), nullable=False, default="confirmado")
+    estornado_em = Column(DateTime, nullable=True)
+    estornado_por_id = Column(Integer, nullable=True)
+    estornado_por_nome = Column(String(200), nullable=True)
+    caixa_estorno_id = Column(Integer, ForeignKey("caixas.id"), nullable=True)
+    motivo_estorno = Column(Text, nullable=True)
+    itens = relationship("VendaBaixaLoteItem", order_by="VendaBaixaLoteItem.id")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "cliente_id": self.cliente_id,
+            "caixa_id": self.caixa_id,
+            "data": safe_datetime_to_iso(self.data),
+            "valor_total": safe_decimal_to_float(self.valor_total),
+            "forma_pagamento": self.forma_pagamento,
+            "numero_transacao": self.numero_transacao,
+            "observacoes": self.observacoes,
+            "usuario_nome": self.usuario_nome,
+            "status": self.status,
+            "estornado_em": safe_datetime_to_iso(self.estornado_em),
+            "estornado_por_nome": self.estornado_por_nome,
+            "motivo_estorno": self.motivo_estorno,
+            "vendas": [
+                {
+                    "venda_id": item.venda_id,
+                    "numero_venda": item.numero_venda,
+                    "valor_baixado": safe_decimal_to_float(item.valor),
+                }
+                for item in self.itens
+            ],
+        }
+
+
+class VendaBaixaLoteItem(BaseTenantModel):
+    """Vínculos explícitos; o snapshot preserva a evidência do lançamento."""
+
+    __tablename__ = "vendas_baixas_lote_itens"
+    __table_args__ = (Index("ux_baixa_lote_pagamento", "pagamento_id", unique=True),)
+
+    lote_id = Column(
+        Integer, ForeignKey("vendas_baixas_lotes.id"), nullable=False, index=True
+    )
+    venda_id = Column(Integer, ForeignKey("vendas.id"), nullable=False, index=True)
+    numero_venda = Column(String(20), nullable=False)
+    valor = Column(DECIMAL(10, 2), nullable=False)
+    pagamento_id = Column(Integer, nullable=False)
+    pagamento_estorno_id = Column(Integer, nullable=True)
+    efeitos = Column(JSON, nullable=False)

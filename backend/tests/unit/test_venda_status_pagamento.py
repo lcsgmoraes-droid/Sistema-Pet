@@ -204,6 +204,38 @@ def test_recebido_em_dinheiro_usa_valor_alocado_sem_somar_troco():
     assert resumo["total_recebido"] == Decimal("60.00")
 
 
+@pytest.mark.parametrize("forma", ["PIX", "Dinheiro", "Crédito"])
+def test_contrapartida_do_estorno_desfaz_recebimento_e_preserva_outro_pagamento(forma):
+    resumo = calcular_resumo_pagamento_venda(
+        total=100,
+        pagamentos=[
+            _pagamento(valor=40, forma_pagamento="Débito", status="confirmado"),
+            _pagamento(valor=60, forma_pagamento=forma, status="confirmado"),
+            _pagamento(valor=-60, forma_pagamento=forma, status="confirmado"),
+        ],
+    )
+
+    assert resumo["total_recebido"] == Decimal("40.00")
+    assert resumo["valor_pago"] == Decimal("40.00")
+    assert resumo["valor_restante"] == Decimal("60.00")
+    assert resumo["status_pagamento"] == "parcial"
+
+
+def test_contrapartida_do_estorno_integral_reabre_saldo_da_venda():
+    resumo = calcular_resumo_pagamento_venda(
+        total=100,
+        pagamentos=[
+            _pagamento(valor=100, forma_pagamento="PIX", status="confirmado"),
+            _pagamento(valor=-100, forma_pagamento="PIX", status="confirmado"),
+        ],
+    )
+
+    assert resumo["total_recebido"] == Decimal("0.00")
+    assert resumo["valor_pago"] == Decimal("0.00")
+    assert resumo["valor_restante"] == Decimal("100.00")
+    assert resumo["status_pagamento"] == "em_aberto"
+
+
 @pytest.mark.parametrize("status", ["estornado", "recusado", "cancelado", "cancelada"])
 def test_pagamento_invalidado_nao_conta_como_recebimento(status):
     resumo = calcular_resumo_pagamento_venda(
