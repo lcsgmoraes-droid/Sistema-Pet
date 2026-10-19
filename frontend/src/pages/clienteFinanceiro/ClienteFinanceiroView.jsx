@@ -24,6 +24,7 @@ import PageHeader from "../../components/ui/PageHeader";
 import Panel from "../../components/ui/Panel";
 import ProductIdentity from "../../components/ui/ProductIdentity";
 import SaleReference from "../../components/ui/SaleReference";
+import ClienteBaixasLotePanel from "../../components/clientes/ClienteBaixasLotePanel";
 
 const formatCurrency = (value) => `R$ ${(Number(value) || 0).toFixed(2).replace(".", ",")}`;
 
@@ -85,6 +86,7 @@ export default function ClienteFinanceiroView({
   loading,
   loadingDetalhes,
   onAplicarFiltros,
+  onFinanceiroAtualizado,
   onExportarPdf,
   onLimparFiltros,
   onMudarPagina,
@@ -184,6 +186,14 @@ export default function ClienteFinanceiroView({
             />
           </MetricGrid>
         )}
+
+        {cliente?.id ? (
+          <ClienteBaixasLotePanel
+            key={cliente.id}
+            clienteId={cliente.id}
+            onAtualizado={onFinanceiroAtualizado}
+          />
+        ) : null}
 
         <Panel
           title="Filtros"

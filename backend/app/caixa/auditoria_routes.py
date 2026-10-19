@@ -68,9 +68,13 @@ def _itens_caixa(db, caixa_id, usuario_e_tenant):
                 "data_movimento": pagamento.data_pagamento.isoformat()
                 if pagamento.data_pagamento
                 else None,
-                "tipo": "recebimento",
-                "descricao": f"Recebimento da venda {pagamento.venda.numero_venda}",
-                "natureza": "entrada",
+                "tipo": "estorno" if pagamento.valor < 0 else "recebimento",
+                "descricao": (
+                    f"Estorno do recebimento da venda {pagamento.venda.numero_venda}"
+                    if pagamento.valor < 0
+                    else f"Recebimento da venda {pagamento.venda.numero_venda}"
+                ),
+                "natureza": "saida" if pagamento.valor < 0 else "entrada",
             }
             for pagamento in pagamentos
         ],

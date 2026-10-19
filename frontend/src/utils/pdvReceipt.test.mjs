@@ -50,6 +50,20 @@ const empresa = {
   email: "contato@exemplo.test",
 };
 
+test("recibo desconta a contrapartida de uma baixa em lote estornada", () => {
+  const recibo = montarCupomVenda({
+    ...vendaBase,
+    pagamentos: [
+      { forma_pagamento: "Pix", valor: 390, baixa_lote_id: 7 },
+      { forma_pagamento: "Pix", valor: -390, baixa_lote_id: 7 },
+      { forma_pagamento: "Dinheiro", valor: 90 },
+    ],
+  });
+
+  assert.match(recibo, /VALOR PAGO:\s+R\$ 90,00/);
+  assert.match(recibo, /VALOR A RECEBER:\s+R\$ 300,00/);
+});
+
 test("recibo do PDV usa cadastro real e textos personalizados da empresa", () => {
   const recibo = montarCupomVenda(
     {

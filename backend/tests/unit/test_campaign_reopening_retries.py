@@ -125,6 +125,10 @@ def pg(monkeypatch, tenant_context):
         monkeypatch.setattr(
             loyalty_service, "sync_loyalty_rewards_for_customer", sync_rewards
         )
+        # Este schema descartavel testa fila/flush e nao cria a tabela clientes.
+        monkeypatch.setattr(
+            loyalty_service, "lock_cashback_customer", lambda *a, **k: None
+        )
         yield SimpleNamespace(engine=engine, tenant_context=tenant_context)
     finally:
         engine.dispose()

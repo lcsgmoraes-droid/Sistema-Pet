@@ -149,7 +149,6 @@ export default function PDV() {
     copiarCampoCliente,
     limparClienteSelecionado,
     handleClienteCriadoRapido: handleClienteCriadoRapidoHook,
-    recarregarVendasEmAbertoClienteAtual,
     recarregarContextoClientePorId,
     recarregarContextoClienteAtual,
   } = usePDVCliente({
@@ -465,7 +464,7 @@ export default function PDV() {
     carregarVendaEspecifica,
     handleClienteCriadoRapidoHook,
     setMostrarModalCliente,
-    recarregarVendasEmAbertoClienteAtual,
+    recarregarContextoClienteAtual,
     setVendaAtual,
     setMostrarModalAdicionarCredito,
     limparVenda,

@@ -528,7 +528,7 @@ export default function PessoaFormulario({
       .get(`/campanhas/clientes/${pessoaAtual.id}/saldo`)
       .then((response) => setSaldoCampanhas(response.data))
       .catch(() => setSaldoCampanhas(null));
-  }, [temPessoaSalva, pessoaAtual?.id, moduloCampanhasAtivo]);
+  }, [temPessoaSalva, pessoaAtual?.id, moduloCampanhasAtivo, refreshKeyCredito]);
 
   useEffect(() => {
     onSalvandoChange?.(salvando);
@@ -655,6 +655,7 @@ export default function PessoaFormulario({
             cliente={pessoaAtual}
             loadingResumo={loadingResumo}
             navigate={navigate}
+            onFinanceiroAtualizado={() => setRefreshKeyCredito((anterior) => anterior + 1)}
             refreshKeyCredito={refreshKeyCredito}
             resumoFinanceiro={resumoFinanceiro}
             saldoCampanhas={saldoCampanhas}

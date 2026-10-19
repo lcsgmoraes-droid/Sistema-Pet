@@ -151,6 +151,7 @@ const ClienteFinanceiro = () => {
       loadingDetalhes={loadingDetalhes}
       onAplicarFiltros={aplicarFiltros}
       onExportarPdf={exportarPdf}
+      onFinanceiroAtualizado={carregarDados}
       onLimparFiltros={limparFiltros}
       onMudarPagina={mudarPagina}
       onNavegarParaVenda={navegarParaVenda}

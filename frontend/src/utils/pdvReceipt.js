@@ -257,7 +257,7 @@ function obterValorPagoCentavos(venda = {}, pagamentos = []) {
   const totalPagamentosCentavos = pagamentos.reduce((total, pagamento) => {
     if (pagamentoEhCrediario(pagamento)) return total;
     if (temValorMonetario(pagamento?.valor)) {
-      return total + Math.max(0, valorEmCentavos(pagamento.valor));
+      return total + valorEmCentavos(pagamento.valor);
     }
 
     const recebidoCentavos = Math.max(0, valorEmCentavos(pagamento?.valor_recebido));
@@ -265,7 +265,7 @@ function obterValorPagoCentavos(venda = {}, pagamentos = []) {
     return total + Math.max(0, recebidoCentavos - trocoCentavos);
   }, 0);
 
-  return Math.min(totalVendaCentavos, totalPagamentosCentavos);
+  return Math.min(totalVendaCentavos, Math.max(0, totalPagamentosCentavos));
 }
 
 export function ehVendaCrediario(venda = {}) {

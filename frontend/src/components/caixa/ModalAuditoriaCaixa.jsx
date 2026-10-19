@@ -337,7 +337,7 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
                           className={`font-semibold ${item.natureza === "saida" ? "text-red-700" : "text-green-700"}`}
                         >
                           {item.natureza === "saida" ? "−" : "+"}
-                          {formatMoneyBRL(item.valor)}
+                          {formatMoneyBRL(Math.abs(Number(item.valor) || 0))}
                         </p>
                         {checkbox(item.tipo_item, item)}
                       </div>

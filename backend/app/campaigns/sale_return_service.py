@@ -76,6 +76,21 @@ def prepare_purchase_event(db: Session, *, tenant_id, payload: dict) -> dict | N
         .with_for_update()
         .first()
     )
+    if payload.get("baixa_lote_id"):
+        # O estorno serializa pela mesma venda. Ler o lote novamente depois
+        # desse lock impede um worker ja iniciado de conceder beneficios apos
+        # o estorno, inclusive quando a venda voltou para baixa_parcial.
+        # Nao travar o lote aqui: o estorno usa ordem lote -> venda.
+        from app.vendas_models import VendaBaixaLote
+
+        lote = (
+            db.query(VendaBaixaLote)
+            .filter_by(id=payload["baixa_lote_id"], tenant_id=tenant_id)
+            .populate_existing()
+            .first()
+        )
+        if lote is None or lote.status != "confirmado":
+            return None
     if (
         venda is None
         or str(venda.status or "").lower() not in _PURCHASE_STATUSES

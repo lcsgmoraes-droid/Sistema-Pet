@@ -26,6 +26,11 @@ def moeda(valor) -> Decimal:
     return Decimal(str(valor or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
+def valor_recebimento_dinheiro(movimentacao) -> Decimal:
+    valor = moeda(movimentacao.valor)
+    return -valor if movimentacao.tipo == "devolucao" else valor
+
+
 def totais_dinheiro(valor_abertura, movimentacoes) -> dict:
     totais = {
         tipo: Decimal("0.00")

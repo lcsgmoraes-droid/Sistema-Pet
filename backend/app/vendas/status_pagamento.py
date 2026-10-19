@@ -107,7 +107,7 @@ def calcular_resumo_pagamento_venda(
     if pagamentos_registrados:
         valor_pagamentos_imediatos = sum(
             (
-                max(_dinheiro(_campo(pagamento, "valor", 0)), Decimal("0.00"))
+                _dinheiro(_campo(pagamento, "valor", 0))
                 for pagamento in pagamentos_lista
                 if not _eh_pagamento_crediario(pagamento)
             ),
@@ -119,10 +119,13 @@ def calcular_resumo_pagamento_venda(
             contas_crediario = _contas_do_crediario(
                 contas, pagamentos_crediario, len(pagamentos_lista)
             )
-            total_crediario = sum(
-                (
-                    max(_dinheiro(_campo(pagamento, "valor", 0)), Decimal("0.00"))
-                    for pagamento in pagamentos_crediario
+            total_crediario = max(
+                sum(
+                    (
+                        _dinheiro(_campo(pagamento, "valor", 0))
+                        for pagamento in pagamentos_crediario
+                    ),
+                    Decimal("0.00"),
                 ),
                 Decimal("0.00"),
             )
@@ -137,6 +140,10 @@ def calcular_resumo_pagamento_venda(
         total_recebido = _valor_recebido_contas(contas)
     else:
         total_recebido = Decimal("0.00")
+
+    # Contrapartidas negativas desfazem o recebimento original. O piso se aplica
+    # ao saldo final, nunca a cada registro, para preservar esse efeito.
+    total_recebido = max(total_recebido, Decimal("0.00"))
 
     # O status continua limitado ao total da venda. Na reabertura, o PDV precisa
     # do recebido real para comparar com o novo total, antes de salvar a edicao.

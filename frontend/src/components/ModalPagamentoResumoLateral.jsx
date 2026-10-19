@@ -1,6 +1,7 @@
 import { Trash2, Wallet, X } from "lucide-react";
 import { formatBRL, formatMoneyBRL } from "../utils/formatters";
 import { resumirDescontosVenda } from "../utils/pdvDescontosUtils";
+import BotaoInteracao from "./v2/BotaoInteracao/BotaoInteracao";
 
 export default function ModalPagamentoResumoLateral({
   venda,
@@ -220,6 +221,13 @@ export default function ModalPagamentoResumoLateral({
                     <div className="text-xs text-gray-400 mt-1">
                       📅 {new Date(pag.data_pagamento).toLocaleString("pt-BR")}
                     </div>
+                    {pag.baixa_lote_id != null ? (
+                      <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                        {Number(pag.valor) < 0
+                          ? `Estorno da baixa em lote #${pag.baixa_lote_id}`
+                          : `Baixa em lote #${pag.baixa_lote_id} — consulte o histórico do cliente`}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="flex items-center space-x-3">
                     <div className="text-right">
@@ -232,14 +240,16 @@ export default function ModalPagamentoResumoLateral({
                         </div>
                       )}
                     </div>
-                    <button
-                      onClick={() => excluirPagamentoExistente(pag.id)}
-                      disabled={loading}
-                      className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors disabled:opacity-50"
-                      title="Excluir pagamento"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {pag.baixa_lote_id == null ? (
+                      <BotaoInteracao
+                        icon={Trash2}
+                        onClick={() => excluirPagamentoExistente(pag.id)}
+                        disabled={loading}
+                        tamanho="pequeno"
+                        aria-label="Excluir pagamento"
+                        title="Excluir pagamento"
+                      />
+                    ) : null}
                   </div>
                 </div>
               ))}

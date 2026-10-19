@@ -9,6 +9,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.campaigns.audit import log_campaign_event
+from app.campaigns.cashback_wallet import lock_cashback_customer
 from app.campaigns.models import (
     Campaign,
     CampaignExecution,
@@ -314,6 +315,10 @@ def sync_loyalty_stamps_for_sale(
     reason: str | None = None,
     stamp_value_override: Any | None = None,
 ) -> dict[str, int]:
+    # A venda ja esta travada pelo chamador. Todas as vendas desse cliente
+    # compartilham o mesmo saldo de carimbos; serializar antes de ler/alterar
+    # permite validar um estorno sem outra compra consumir seu lastro no meio.
+    lock_cashback_customer(db, tenant_id=campaign.tenant_id, customer_id=customer_id)
     params = campaign.params or {}
     existing_auto_stamps = (
         db.query(LoyaltyStamp)

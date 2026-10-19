@@ -1,11 +1,11 @@
 """Rotas de baixa financeira em lote de clientes."""
 
 import logging
-from datetime import datetime as dt, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.clientes.common import _validar_tenant_e_obter_usuario
@@ -15,10 +15,22 @@ from app.utils.timezone import now_brasilia
 from app.services.venda_rentabilidade_snapshot_service import (
     get_or_build_venda_rentabilidade_snapshot,
 )
+from app.clientes.baixas_lote_service import (
+    atualizar_previsao,
+    auditar_lote,
+    buscar_repeticao,
+    normalizar_requisicao,
+    preparar_lote,
+    registrar_item,
+)
+from app.clientes.financeiro_baixa_lote_historico_routes import (
+    router as historico_router,
+)
 
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+router.include_router(historico_router)
 
 __all__ = ["baixar_vendas_lote", "router"]
 
@@ -125,10 +137,20 @@ async def baixar_vendas_lote(
         from app.ia.aba5_models import FluxoCaixa
 
         # Extrair dados do body
-        vendas_ids = dados.get("vendas_ids", [])
-        valor_total = _money(dados.get("valor_total", 0))
-        forma_pagamento = dados.get("forma_pagamento", "")
-        numero_transacao = dados.get("numero_transacao")
+        request_id, requisicao = normalizar_requisicao(dados)
+        vendas_ids = requisicao["vendas_ids"]
+        valor_total = _money(requisicao["valor_total"])
+        forma_pagamento = requisicao["forma_pagamento"]
+        numero_transacao = requisicao["numero_transacao"]
+        repeticao = buscar_repeticao(
+            db,
+            tenant_id=tenant_id,
+            cliente_id=cliente_id,
+            request_id=request_id,
+            requisicao=requisicao,
+        )
+        if repeticao:
+            return repeticao.resultado
         instante_recebimento = now_brasilia()
 
         logger.info(f"Vendas IDs: {vendas_ids}")
@@ -148,6 +170,19 @@ async def baixar_vendas_lote(
                 detail="Não há caixa aberto. Abra o caixa antes de dar baixa nas vendas.",
             )
 
+        lote, repetido = preparar_lote(
+            db,
+            tenant_id=tenant_id,
+            cliente_id=cliente_id,
+            current_user=current_user,
+            caixa=caixa_aberto,
+            request_id=request_id,
+            requisicao=requisicao,
+        )
+        if repetido:
+            return lote.resultado
+        instante_recebimento = lote.data
+
         # Buscar vendas ordenadas da mais antiga para a mais nova
         vendas = (
             db.query(Venda)
@@ -157,7 +192,9 @@ async def baixar_vendas_lote(
                 Venda.tenant_id == tenant_id,
                 Venda.status.in_(["aberta", "baixa_parcial"]),
             )
-            .order_by(Venda.data_venda.asc())
+            .order_by(Venda.id)
+            .populate_existing()
+            .with_for_update()
             .all()
         )  # Ordenar das mais antigas para as mais novas
 
@@ -171,6 +208,8 @@ async def baixar_vendas_lote(
                 status_code=400,
                 detail="Algumas vendas não foram encontradas ou não estão em aberto",
             )
+        # Trava por ID para não inverter locks; aplica da mais antiga para a nova.
+        vendas.sort(key=lambda v: (v.data_venda, v.id))
 
         # Calcular saldo devedor de cada venda
         vendas_com_saldo = []
@@ -219,6 +258,9 @@ async def baixar_vendas_lote(
                 break
 
             valor_aplicar = min(valor_restante, saldo_devedor)
+            status_anterior = venda.status
+            evento = None
+            movimentacao = None
 
             logger.info(f"Aplicando {valor_aplicar} na venda {venda.id}")
 
@@ -233,6 +275,7 @@ async def baixar_vendas_lote(
                 numero_transacao=numero_transacao,
                 status="confirmado",
                 data_pagamento=instante_recebimento,
+                baixa_lote_id=lote.id,
             )
             db.add(pagamento)
 
@@ -245,43 +288,42 @@ async def baixar_vendas_lote(
                 vendas_quitadas.append(
                     {
                         "id": venda.id,
-                        "numero_venda": venda.id,
+                        "numero_venda": venda.numero_venda,
                         "valor_baixado": valor_aplicar,
                         "saldo_anterior": saldo_devedor,
                     }
                 )
                 if venda.cliente_id and not venda.nao_gerar_beneficios:
-                    try:
-                        from app.campaigns.models import (
-                            CampaignEventQueue,
-                            EventOriginEnum,
-                        )
+                    from app.campaigns.models import CampaignEventQueue, EventOriginEnum
+                    from app.campaigns.baixa_lote_reversal import (
+                        snapshot_beneficios_baixa_lote,
+                    )
 
-                        db.add(
-                            CampaignEventQueue(
-                                tenant_id=tenant_id,
-                                event_type="purchase_completed",
-                                event_origin=EventOriginEnum.user_action,
-                                event_depth=0,
-                                payload={
-                                    "customer_id": venda.cliente_id,
-                                    "venda_id": venda.id,
-                                    "venda_total": float(venda.total or 0),
-                                    "canal": venda.canal or "loja_fisica",
-                                },
-                            )
-                        )
-                        eventos_campanha_enfileirados += 1
-                    except Exception as e_camp:
-                        logger.warning(
-                            "[Campanhas] Falha ao enfileirar baixa em lote: %s", e_camp
-                        )
+                    beneficios_anteriores = snapshot_beneficios_baixa_lote(
+                        db, tenant_id, venda.id
+                    )
+                    evento = CampaignEventQueue(
+                        tenant_id=tenant_id,
+                        event_type="purchase_completed",
+                        event_origin=EventOriginEnum.user_action,
+                        event_depth=0,
+                        payload={
+                            "customer_id": venda.cliente_id,
+                            "venda_id": venda.id,
+                            "venda_total": float(venda.total or 0),
+                            "canal": venda.canal or "loja_fisica",
+                            "baixa_lote_id": lote.id,
+                            "baixa_lote_beneficios_anteriores": beneficios_anteriores,
+                        },
+                    )
+                    db.add(evento)
+                    eventos_campanha_enfileirados += 1
             else:  # Baixa parcial
                 venda.status = "baixa_parcial"
                 vendas_parciais.append(
                     {
                         "id": venda.id,
-                        "numero_venda": venda.id,
+                        "numero_venda": venda.numero_venda,
                         "valor_baixado": valor_aplicar,
                         "saldo_restante": novo_saldo,
                         "saldo_anterior": saldo_devedor,
@@ -326,10 +368,26 @@ async def baixar_vendas_lote(
                         ["pendente", "baixa_parcial", "parcial", "vencido", "vencida"]
                     ),
                 )
+                .populate_existing()
+                .with_for_update()
                 .first()
             )
 
             if not conta_receber:
+                outras_contas = (
+                    db.query(ContaReceber.id)
+                    .filter(
+                        ContaReceber.venda_id == venda.id,
+                        ContaReceber.tenant_id == tenant_id,
+                        ContaReceber.status.notin_(["cancelado", "cancelada"]),
+                    )
+                    .first()
+                )
+                if outras_contas:
+                    raise HTTPException(
+                        409,
+                        "O financeiro da venda diverge de seu saldo. Confira as contas a receber antes da baixa.",
+                    )
                 conta_receber = _criar_conta_receber_faltante_baixa_lote(
                     db=db,
                     venda=venda,
@@ -340,6 +398,15 @@ async def baixar_vendas_lote(
                 )
 
             if conta_receber:
+                if (
+                    _money(conta_receber.valor_final)
+                    - _money(conta_receber.valor_recebido)
+                    < valor_aplicar
+                ):
+                    raise HTTPException(
+                        409,
+                        "A venda tem parcelas ou saldo financeiro diferente. Registre o recebimento nas contas a receber para conferir o rateio.",
+                    )
                 valor_ja_recebido = _money(conta_receber.valor_recebido)
                 novo_valor_recebido = valor_ja_recebido + valor_aplicar
 
@@ -376,47 +443,44 @@ async def baixar_vendas_lote(
                     origem_id=conta_receber.id,
                 )
                 db.add(fluxo_realizado)
+                fluxo_realizado.tenant_id = tenant_id
 
                 logger.info(
                     f"✅ Fluxo de caixa REALIZADO criado: R$ {valor_aplicar:.2f}"
                 )
 
-                # 🆕 CRIAR LANÇAMENTO PREVISTO NO FLUXO DE CAIXA (se houver saldo restante)
-                saldo_conta = _money(conta_receber.valor_final) - novo_valor_recebido
-                if saldo_conta > 0:  # Se ainda tem saldo
-                    data_previsao = dt.now() + timedelta(days=30)  # +30 dias
-
-                    fluxo_previsto = FluxoCaixa(
-                        usuario_id=current_user.id,
-                        tipo="entrada",
-                        categoria="Recebimento de Venda",
-                        descricao=f"Saldo previsto venda #{venda.numero_venda} - {venda.cliente.nome if venda.cliente else 'Cliente avulso'}",
-                        valor=saldo_conta,
-                        data_movimentacao=None,
-                        data_prevista=data_previsao,
-                        status="previsto",
-                        origem_tipo="conta_receber",
-                        origem_id=conta_receber.id,
-                    )
-                    db.add(fluxo_previsto)
-
-                    logger.info(
-                        f"✅ Fluxo de caixa PREVISTO criado: R$ {saldo_conta:.2f} para {data_previsao.strftime('%d/%m/%Y')}"
-                    )
+                fluxo_previsto = atualizar_previsao(
+                    db,
+                    tenant_id=tenant_id,
+                    conta=conta_receber,
+                    user_id=current_user.id,
+                    instante=instante_recebimento,
+                )
+                registrar_item(
+                    db,
+                    lote=lote,
+                    venda=venda,
+                    pagamento=pagamento,
+                    conta=conta_receber,
+                    recebimento=recebimento,
+                    movimento=movimentacao,
+                    fluxo=fluxo_realizado,
+                    previsao=fluxo_previsto,
+                    evento=evento,
+                    status_anterior=status_anterior,
+                )
 
             valor_restante -= valor_aplicar
 
-        db.commit()
-
-        logger.info("Commit realizado com sucesso!")
         if eventos_campanha_enfileirados:
             logger.info(
                 "[Campanhas] %d purchase_completed enfileirado(s) pela baixa em lote",
                 eventos_campanha_enfileirados,
             )
 
-        return {
+        resultado = {
             "success": True,
+            "lote_id": lote.id,
             "total_vendas_afetadas": len(vendas_quitadas) + len(vendas_parciais),
             "vendas_quitadas": [
                 {
@@ -436,7 +500,30 @@ async def baixar_vendas_lote(
             "valor_restante": float(valor_restante),
             "message": f"Baixa realizada com sucesso! {len(vendas_quitadas)} vendas quitadas, {len(vendas_parciais)} com baixa parcial.",
         }
+        lote.resultado = resultado
+        auditar_lote(db, lote, current_user, "registrar_baixa_lote")
+        db.commit()
+        return resultado
+    except IntegrityError:
+        db.rollback()
+        # Dois caixas podem reenviar a mesma chave ao mesmo tempo. A restrição
+        # única escolhe o vencedor; o segundo devolve o resultado já confirmado.
+        repeticao = buscar_repeticao(
+            db,
+            tenant_id=tenant_id,
+            cliente_id=cliente_id,
+            request_id=request_id,
+            requisicao=requisicao,
+        )
+        if repeticao and repeticao.resultado:
+            return repeticao.resultado
+        logger.exception("Falha de integridade ao registrar baixa em lote")
+        raise HTTPException(
+            409,
+            "Não foi possível registrar a baixa. Atualize os saldos e tente novamente. Nenhum valor foi alterado.",
+        )
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
         logger.info(f"ERRO NO PROCESSAMENTO: {str(e)}")

@@ -165,6 +165,7 @@ def test_return_also_revokes_refund_from_same_reward_without_touching_other_lots
 
 
 def test_loyalty_stamps_follow_increase_reduction_removal_and_repeat(monkeypatch):
+    monkeypatch.setattr(loyalty_service, "lock_cashback_customer", lambda *a, **k: None)
     stamps = []
     audit = []
     db = SimpleNamespace(

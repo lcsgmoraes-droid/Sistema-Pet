@@ -5,6 +5,7 @@ import { ClienteSegmentos } from "../ClienteSegmentos";
 import ClienteTimeline from "../ClienteTimeline";
 import ExtratoCredito from "../ExtratoCredito";
 import WhatsAppHistorico from "../WhatsAppHistorico";
+import ClienteBaixasLotePanel from "./ClienteBaixasLotePanel";
 import { formatBRL } from "../../utils/formatters";
 
 const RANK_INFO = {
@@ -23,6 +24,7 @@ export default function ClientePessoaFinanceiroTab({
   cliente,
   loadingResumo,
   navigate,
+  onFinanceiroAtualizado,
   refreshKeyCredito,
   resumoFinanceiro,
   saldoCampanhas,
@@ -184,6 +186,14 @@ export default function ClientePessoaFinanceiroTab({
           </>
         )}
       </div>
+
+      {cliente.is_cliente ? (
+        <ClienteBaixasLotePanel
+          key={cliente.id}
+          clienteId={cliente.id}
+          onAtualizado={onFinanceiroAtualizado}
+        />
+      ) : null}
 
       <ClienteSegmentos clienteId={cliente.id} />
 

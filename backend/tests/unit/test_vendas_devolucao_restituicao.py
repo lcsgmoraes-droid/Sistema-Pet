@@ -159,6 +159,36 @@ def test_frete_retido_preserva_parcela_original_dos_pagamentos():
     assert resultado.valor_restante == Decimal("45")
 
 
+def test_restituicao_usa_saldo_liquido_apos_estorno_e_nova_baixa():
+    venda = venda_com_pagamentos(
+        pagamento("credito_cliente", "40"),
+        pagamento("pix", "60", baixa_lote_id=99),
+        pagamento("pix", "-60", baixa_lote_id=99),
+        pagamento("dinheiro", "60", baixa_lote_id=100),
+    )
+
+    resultado = service.cotar_restituicao(
+        MagicMock(),
+        tenant_id=TENANT,
+        venda=venda,
+        cotacao=cotacao("100"),
+        eventos_anteriores=[],
+        devolver_na_origem=True,
+    )
+
+    assert resultado.credito_cliente == Decimal("40")
+    assert resultado.valor_restante == Decimal("60")
+
+
+def test_pagamento_negativo_sem_lote_comprovado_continua_bloqueado():
+    venda = venda_com_pagamentos(pagamento("pix", "-60"))
+
+    with pytest.raises(HTTPException) as erro:
+        service.validar_opcao_restituicao(venda, TENANT)
+
+    assert erro.value.status_code == 409
+
+
 def test_cashback_restituido_guarda_lote_e_validade_original(monkeypatch):
     validade = NOW + timedelta(days=2)
     transacoes = [
