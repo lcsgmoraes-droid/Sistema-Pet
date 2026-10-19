@@ -10,7 +10,7 @@ test.use({ channel: "chrome" });
 test.describe("Pessoa — persistência dos endereços adicionais", () => {
   test.skip(!ambienteLocal, "requer credenciais E2E de uma cópia local do banco");
 
-  test("salva endereço extra no cadastro e permite remover o último na edição", async ({
+  test("salva endereço com um clique e mantém os cards após salvar o cadastro", async ({
     page,
   }) => {
     await login(page, env);
@@ -71,21 +71,71 @@ test.describe("Pessoa — persistência dos endereços adicionais", () => {
       .filter({ has: page.getByText(apelido, { exact: true }) })
       .last();
     await expect(page.getByText(apelido, { exact: true })).toBeVisible();
+    const principalCard = page
+      .locator("div.rounded-lg.border.p-3")
+      .filter({ has: page.getByText("Principal", { exact: true }) });
+    await principalCard.getByRole("button", { name: "Editar", exact: true }).click();
+    await page.locator("#endereco-cep").fill("01001000");
+    await page.locator("#endereco-numero").focus();
+    await expect(page.locator("#endereco-cidade")).toHaveValue("Cidade QA");
+    await page.locator("#endereco-numero").fill("73");
+    const respostaPut = (response) =>
+      new URL(response.url()).pathname === `/api/clientes/${pessoa.id}` &&
+      response.request().method() === "PUT";
+    const enderecoPromise = page.waitForResponse(respostaPut);
+    await page.getByRole("button", { name: "Salvar endereço", exact: true }).click();
+    const respostaEndereco = await enderecoPromise;
+    expect(respostaEndereco.status()).toBe(200);
+    const salvo = await respostaEndereco.json();
+    expect(salvo).toMatchObject({
+      id: pessoa.id,
+      nome,
+      is_fornecedor: true,
+      endereco: "Rua Sintética QA",
+      numero: "73",
+      cidade: "Cidade QA",
+      estado: "SP",
+      codigo_municipio: "3550308",
+      enderecos_adicionais: [expect.objectContaining({ apelido, numero: "42" })],
+    });
+    await expect(principalCard).toContainText("Rua Sintética QA, 73");
+    await expect(page.getByText("Nenhum endereço cadastrado", { exact: true })).toHaveCount(0);
+
+    // Confere persistência com GET independente, sem depender do estado do React.
+    const confirmado = await page.request.get(`/api/clientes/${pessoa.id}`, {
+      headers: { authorization: respostaEndereco.request().headers().authorization },
+    });
+    expect(confirmado.status()).toBe(200);
+    expect(await confirmado.json()).toMatchObject({
+      endereco: "Rua Sintética QA",
+      numero: "73",
+      codigo_municipio: "3550308",
+    });
+    for (let tentativa = 0; tentativa < 2; tentativa += 1) {
+      const geralPromise = page.waitForResponse(respostaPut);
+      await page.getByRole("button", { name: "Salvar", exact: true }).click();
+      const geral = await geralPromise;
+      expect(geral.status()).toBe(200);
+      expect(await geral.json()).toMatchObject({
+        endereco: "Rua Sintética QA",
+        numero: "73",
+        codigo_municipio: "3550308",
+      });
+      await expect(principalCard).toContainText("Rua Sintética QA, 73");
+      await expect(card).toContainText("Rua Sintética QA, 42");
+      await expect(page.getByText("Nenhum endereço cadastrado", { exact: true })).toHaveCount(0);
+    }
+
+    const edicaoPromise = page.waitForResponse(respostaPut);
     await card.getByRole("button", { name: /excluir/i }).click();
     await page.getByRole("button", { name: "Confirmar", exact: true }).click();
-    // O fluxo atual também pede a confirmação específica da remoção do endereço.
-    const confirmacaoEndereco = page.getByRole("button", { name: "Confirmar", exact: true });
-    if (await confirmacaoEndereco.isVisible()) await confirmacaoEndereco.click();
-
-    const edicaoPromise = page.waitForResponse(
-      (response) =>
-        new URL(response.url()).pathname === `/api/clientes/${pessoa.id}` &&
-        response.request().method() === "PUT",
-    );
-    await page.getByRole("button", { name: "Salvar", exact: true }).click();
-    expect((await edicaoPromise).status()).toBe(200);
+    const edicao = await edicaoPromise;
+    expect(edicao.status()).toBe(200);
+    expect((await edicao.json()).enderecos_adicionais).toEqual([]);
+    // O clique da confirmação já persiste: não há um segundo Salvar geral.
     await page.reload({ waitUntil: "networkidle" });
     await page.getByRole("tab", { name: "Endereço", exact: true }).click();
     await expect(page.getByText(apelido, { exact: true })).toHaveCount(0);
+    await expect(principalCard).toContainText("Rua Sintética QA, 73");
   });
 });

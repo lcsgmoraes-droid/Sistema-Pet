@@ -1,4 +1,4 @@
-import { Edit2, MapPin, Plus, Star } from "lucide-react";
+import { Pencil, MapPin, Plus, Star } from "lucide-react";
 import BotaoExcluir from "../v2/BotaoExcluir/BotaoExcluir";
 import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
 
@@ -20,7 +20,7 @@ const COR_TIPO_ENDERECO = {
   trabalho: "bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-200",
 };
 
-function CardEndereco({ apelido, badge, endereco, erro, onEditar, onExcluir }) {
+function CardEndereco({ apelido, badge, endereco, erro, onEditar, onExcluir, salvando }) {
   const temDados = Boolean(endereco.cep || endereco.endereco || endereco.cidade);
 
   return (
@@ -83,7 +83,7 @@ function CardEndereco({ apelido, badge, endereco, erro, onEditar, onExcluir }) {
           ) : null}
         </div>
         <div className="flex flex-none gap-1">
-          <BotaoInteracao icon={Edit2} tamanho="pequeno" onClick={onEditar}>
+          <BotaoInteracao icon={Pencil} tamanho="pequeno" onClick={onEditar} disabled={salvando}>
             Editar
           </BotaoInteracao>
           {temDados && onExcluir ? (
@@ -91,6 +91,7 @@ function CardEndereco({ apelido, badge, endereco, erro, onEditar, onExcluir }) {
               tamanho="pequeno"
               mensagemConfirmacao="Deseja realmente remover este endereço?"
               onClick={onExcluir}
+              disabled={salvando}
             >
               Excluir
             </BotaoExcluir>
@@ -107,6 +108,7 @@ export default function ClientePessoaEnderecoTab({
   erroEnderecoPrincipal,
   formData,
   removerEndereco,
+  salvando = false,
 }) {
   const enderecoPrincipal = {
     tipo: "principal",
@@ -139,6 +141,7 @@ export default function ClientePessoaEnderecoTab({
           icon={Plus}
           className="self-start sm:self-auto"
           onClick={() => abrirModalEndereco()}
+          disabled={salvando}
         >
           Adicionar endereço
         </BotaoInteracao>
@@ -151,6 +154,7 @@ export default function ClientePessoaEnderecoTab({
           erro={erroEnderecoPrincipal}
           onEditar={() => abrirModalEndereco("principal")}
           onExcluir={() => removerEndereco("principal")}
+          salvando={salvando}
         />
 
         {enderecosAdicionais.map((endereco, index) => (
@@ -161,6 +165,7 @@ export default function ClientePessoaEnderecoTab({
             badge={{ principal: false, contador: `+${index + 1}` }}
             onEditar={() => abrirModalEndereco(index)}
             onExcluir={() => removerEndereco(index)}
+            salvando={salvando}
           />
         ))}
       </div>
