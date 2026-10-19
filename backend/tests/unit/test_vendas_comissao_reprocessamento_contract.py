@@ -101,15 +101,21 @@ def test_geracao_rele_pagamentos_sob_lock_apos_commit_de_cada_comissao(monkeypat
         return {"success": True, "total_comissao": "5"}
 
     monkeypatch.setattr(vendas_comissoes, "_bloquear_venda_para_comissao", bloquear)
-    monkeypatch.setattr(vendas_comissoes, "_listar_pagamentos_venda_para_comissao", listar)
-    monkeypatch.setattr(vendas_comissoes, "_parcelas_com_comissao_funcionario", lambda *_args: set())
+    monkeypatch.setattr(
+        vendas_comissoes, "_listar_pagamentos_venda_para_comissao", listar
+    )
+    monkeypatch.setattr(
+        vendas_comissoes, "_parcelas_com_comissao_funcionario", lambda *_args: set()
+    )
     monkeypatch.setitem(
         __import__("sys").modules,
         "app.comissoes_service",
         SimpleNamespace(gerar_comissoes_venda=gerar),
     )
 
-    resultado = vendas_comissoes._gerar_comissoes_pendentes_venda(None, venda, "tenant-a", "test")
+    resultado = vendas_comissoes._gerar_comissoes_pendentes_venda(
+        None, venda, "tenant-a", "test"
+    )
 
     assert ordem == ["lock", "ler", "commit", "lock", "ler"]
     assert [chamada["parcela_numero"] for chamada in chamadas] == [1]
@@ -133,7 +139,9 @@ def test_reprocessamento_nao_gera_comissao_do_lote_estornado_nem_da_contrapartid
 
     liquidos = list(vendas_comissoes._pagamentos_liquidos_para_comissao(pagamentos))
 
-    assert [(parcela, pagamento[0], valor) for parcela, pagamento, valor in liquidos] == [
+    assert [
+        (parcela, pagamento[0], valor) for parcela, pagamento, valor in liquidos
+    ] == [
         (2, 11, Decimal("25")),
         (4, 13, Decimal("50")),
     ]
@@ -150,7 +158,9 @@ def test_compensacao_da_comissao_nao_usa_estorno_de_outro_lote_ou_forma():
 
     liquidos = list(vendas_comissoes._pagamentos_liquidos_para_comissao(pagamentos))
 
-    assert [(parcela, pagamento[0], valor) for parcela, pagamento, valor in liquidos] == [
+    assert [
+        (parcela, pagamento[0], valor) for parcela, pagamento, valor in liquidos
+    ] == [
         (1, 10, Decimal("20")),
         (2, 11, Decimal("20")),
     ]

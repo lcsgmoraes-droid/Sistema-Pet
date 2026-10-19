@@ -269,10 +269,17 @@ def test_contrapartida_eletronica_reduz_caixa_atual_sem_alterar_original(recebim
     caso.db.add(estorno)
     caso.db.flush()
 
-    atual = obter_resumo_caixa(caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth)
-    original = obter_resumo_caixa(caso.original.id, db=caso.db, current_user_and_tenant=caso.auth)
+    atual = obter_resumo_caixa(
+        caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
+    original = obter_resumo_caixa(
+        caso.original.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
     detalhes = listar_vendas_caixa(
-        caso.atual.id, forma_pagamento="PIX", db=caso.db, current_user_and_tenant=caso.auth
+        caso.atual.id,
+        forma_pagamento="PIX",
+        db=caso.db,
+        current_user_and_tenant=caso.auth,
     )
     auditoria = obter_auditoria_caixa(
         caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth
@@ -282,43 +289,56 @@ def test_contrapartida_eletronica_reduz_caixa_atual_sem_alterar_original(recebim
     assert atual["recebimentos_por_forma_pagamento"]["PIX"]["total"] == 10
     assert original["total_recebido"] == 30
     assert [item["valor_nesta_forma"] for item in detalhes] == [-30, 40]
-    item_estorno = next(item for item in auditoria["pagamentos"] if item["id"] == estorno.id)
+    item_estorno = next(
+        item for item in auditoria["pagamentos"] if item["id"] == estorno.id
+    )
     assert item_estorno["valor"] == -30
     assert item_estorno["natureza"] == "saida"
     assert item_estorno["tipo"] == "estorno"
 
 
-def test_devolucao_dinheiro_reduz_recebimento_e_saldo_fisico_uma_unica_vez(recebimentos):
+def test_devolucao_dinheiro_reduz_recebimento_e_saldo_fisico_uma_unica_vez(
+    recebimentos,
+):
     caso = recebimentos
-    caso.db.add_all([
-        VendaPagamento(
-            tenant_id=caso.auth[1],
-            venda_id=caso.venda.id,
-            caixa_id=caso.atual.id,
-            forma_pagamento="Dinheiro",
-            valor=-20,
-            status="confirmado",
-            data_pagamento=datetime(2026, 10, 9, 13),
-        ),
-        MovimentacaoCaixa(
-            tenant_id=caso.auth[1],
-            caixa_id=caso.atual.id,
-            tipo="devolucao",
-            valor=20,
-            forma_pagamento="Dinheiro",
-            venda_id=caso.venda.id,
-            usuario_id=caso.auth[0].id,
-            usuario_nome=caso.auth[0].nome,
-            data_movimento=datetime(2026, 10, 9, 13),
-        ),
-    ])
+    caso.db.add_all(
+        [
+            VendaPagamento(
+                tenant_id=caso.auth[1],
+                venda_id=caso.venda.id,
+                caixa_id=caso.atual.id,
+                forma_pagamento="Dinheiro",
+                valor=-20,
+                status="confirmado",
+                data_pagamento=datetime(2026, 10, 9, 13),
+            ),
+            MovimentacaoCaixa(
+                tenant_id=caso.auth[1],
+                caixa_id=caso.atual.id,
+                tipo="devolucao",
+                valor=20,
+                forma_pagamento="Dinheiro",
+                venda_id=caso.venda.id,
+                usuario_id=caso.auth[0].id,
+                usuario_nome=caso.auth[0].nome,
+                data_movimento=datetime(2026, 10, 9, 13),
+            ),
+        ]
+    )
     caso.db.flush()
 
-    resumo = obter_resumo_caixa(caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth)
-    detalhes = listar_vendas_caixa(
-        caso.atual.id, forma_pagamento="Dinheiro", db=caso.db, current_user_and_tenant=caso.auth
+    resumo = obter_resumo_caixa(
+        caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth
     )
-    vendas = listar_vendas_caixa(caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth)
+    detalhes = listar_vendas_caixa(
+        caso.atual.id,
+        forma_pagamento="Dinheiro",
+        db=caso.db,
+        current_user_and_tenant=caso.auth,
+    )
+    vendas = listar_vendas_caixa(
+        caso.atual.id, db=caso.db, current_user_and_tenant=caso.auth
+    )
 
     assert resumo["total_recebido"] == 40
     assert resumo["recebimentos_por_forma_pagamento"]["Dinheiro"]["total"] == 0
