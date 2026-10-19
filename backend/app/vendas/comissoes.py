@@ -45,7 +45,9 @@ def _pagamentos_liquidos_para_comissao(pagamentos):
             else None
         )
         if chave_lote is not None:
-            saldos_lotes[chave_lote] = saldos_lotes.get(chave_lote, Decimal("0")) + valor
+            saldos_lotes[chave_lote] = (
+                saldos_lotes.get(chave_lote, Decimal("0")) + valor
+            )
         registros.append((parcela, pagamento, valor, chave_lote))
 
     for parcela, pagamento, valor, chave_lote in registros:
@@ -118,7 +120,9 @@ def _gerar_comissoes_pendentes_venda(
         venda = _bloquear_venda_para_comissao(db, venda_id, tenant_id)
         if not venda or not venda.funcionario_id:
             break
-        todos_pagamentos = _listar_pagamentos_venda_para_comissao(db, venda.id, tenant_id)
+        todos_pagamentos = _listar_pagamentos_venda_para_comissao(
+            db, venda.id, tenant_id
+        )
         parcelas_com_comissao = _parcelas_com_comissao_funcionario(
             db, venda.id, venda.funcionario_id, tenant_id
         )

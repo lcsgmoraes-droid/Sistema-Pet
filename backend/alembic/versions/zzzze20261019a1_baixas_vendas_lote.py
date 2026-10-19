@@ -9,6 +9,19 @@ down_revision = "zzzzd20261015a1"
 branch_labels = None
 depends_on = None
 
+TENANT_GUARD = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
+
+
+def _habilitar_rls(tabela):
+    if op.get_bind().dialect.name != "postgresql":
+        return
+    op.execute(f"ALTER TABLE {tabela} ENABLE ROW LEVEL SECURITY")
+    op.execute(f"ALTER TABLE {tabela} FORCE ROW LEVEL SECURITY")
+    op.execute(
+        f"CREATE POLICY {tabela}_tenant_isolation ON {tabela} "
+        f"USING ({TENANT_GUARD}) WITH CHECK ({TENANT_GUARD})"
+    )
+
 
 def _base():
     return [
@@ -94,6 +107,8 @@ def upgrade():
         ["pagamento_id"],
         unique=True,
     )
+    for tabela in ("vendas_baixas_lotes", "vendas_baixas_lote_itens"):
+        _habilitar_rls(tabela)
     op.add_column(
         "venda_pagamentos",
         sa.Column(
