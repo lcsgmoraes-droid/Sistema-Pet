@@ -116,6 +116,10 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
         ["DESCRIÇÃO", "VALOR"],
         ["Abertura do caixa", formatar_moeda(saldo_inicial)],
         ["Total vendido no caixa", formatar_moeda(caixa_data.get("total_vendido"))],
+        [
+            "Vendas no crediário",
+            formatar_moeda(caixa_data.get("total_vendas_crediario")),
+        ],
         ["Total recebido no caixa", formatar_moeda(caixa_data.get("total_recebido"))],
         ["Vendas recebidas em dinheiro", formatar_moeda(totais.get("vendas"))],
         ["Suprimentos (entradas avulsas)", formatar_moeda(totais.get("suprimentos"))],
@@ -153,8 +157,8 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
         ("FONTSIZE", (0, 1), (-1, -1), 10),
         ("ALIGN", (1, 1), (1, -1), "RIGHT"),
         ("ALIGN", (0, 1), (0, -1), "LEFT"),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
-        ("TOPPADDING", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 9),
         ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
         (
             "ROWBACKGROUNDS",

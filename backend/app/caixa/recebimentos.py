@@ -114,6 +114,16 @@ def resumir_pagamentos_vendas_caixa(db, *, caixa_id, tenant_id):
             item["quantidade"] += int(quantidade)
             item["total"] = float(moeda(item["total"]) + moeda(total))
     return {
+        "total_vendas_crediario": float(
+            sum(
+                (
+                    moeda(item["total"])
+                    for forma, item in por_forma.items()
+                    if forma.strip().casefold() in {"crediario", "crediário"}
+                ),
+                moeda(0),
+            )
+        ),
         "pagamentos_vendas_por_forma_pagamento": por_forma,
         "pagamentos_vendas_sem_caixa": sem_caixa,
     }

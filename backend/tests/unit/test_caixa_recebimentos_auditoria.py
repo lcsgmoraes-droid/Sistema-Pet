@@ -176,6 +176,7 @@ def test_venda_antiga_recebida_hoje_aparece_so_no_caixa_recebedor(recebimentos):
 
     assert atual["total_recebido"] == 60
     assert atual["total_vendido"] == 0
+    assert atual["total_vendas_crediario"] == 0
     assert atual["totais"]["saldo_atual"] == 120
     assert atual["recebimentos_por_forma_pagamento"]["PIX"]["total"] == 40
     assert original["total_recebido"] == 30
@@ -796,7 +797,8 @@ def test_composicao_inclui_planos_a_prazo_sem_contar_como_recebimento(recebiment
     caso.db.add(venda)
     caso.db.flush()
     for forma, valor, caixa_id in [
-        ("Crediário", 70, caso.atual.id),
+        ("Crediário", 40, caso.atual.id),
+        (" CREDIARIO ", 30, None),
         ("Boleto", 20, None),
         ("PIX", 30, caso.atual.id),
     ]:
@@ -817,7 +819,7 @@ def test_composicao_inclui_planos_a_prazo_sem_contar_como_recebimento(recebiment
     )
     resumo = auditoria["resumo"]
     item = next(item for item in auditoria["vendas"] if item["id"] == venda.id)
-    assert len(item["pagamentos"]) == 3
+    assert len(item["pagamentos"]) == 4
     assert item["valor_nesta_forma"] == 30
     assert [recebimento["forma_pagamento"] for recebimento in item["recebimentos"]] == [
         "PIX"
@@ -827,13 +829,15 @@ def test_composicao_inclui_planos_a_prazo_sem_contar_como_recebimento(recebiment
     )
     assert set(resumo["pagamentos_vendas_por_forma_pagamento"]) == {
         "Crediário",
+        " CREDIARIO ",
         "Boleto",
         "PIX",
     }
     assert resumo["total_vendido"] == 120
+    assert resumo["total_vendas_crediario"] == 70
     assert resumo["total_recebido"] == 90
     assert set(resumo["recebimentos_por_forma_pagamento"]) == {"Dinheiro", "PIX"}
-    assert resumo["pagamentos_vendas_sem_caixa"]["total"] == 20
+    assert resumo["pagamentos_vendas_sem_caixa"]["total"] == 50
     plano = next(
         pagamento
         for pagamento in item["pagamentos"]

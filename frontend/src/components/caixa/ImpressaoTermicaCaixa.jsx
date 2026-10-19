@@ -25,6 +25,7 @@ export default function ImpressaoTermicaCaixa({ documento, onAfterPrint }) {
     ? [
         ["Abertura", resumo.caixa.valor_abertura],
         ["Total vendido", resumo.total_vendido],
+        ["Vendas no crediário", resumo.total_vendas_crediario ?? 0],
         ["Total recebido", resumo.total_recebido],
         ...Object.entries(resumo.vendas_por_forma_pagamento || {}).map(([forma, dados]) => [
           ["crediario", "crediário", "boleto"].includes(forma.trim().toLocaleLowerCase("pt-BR"))
