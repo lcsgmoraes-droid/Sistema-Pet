@@ -562,6 +562,7 @@ export interface FuncionarioPdvFinalizarPayload {
   cliente_id?: number | null;
   itens: FuncionarioPdvItemPayload[];
   pagamento: FuncionarioPdvPagamentoPayload;
+  gerar_comissao: boolean;
   observacoes?: string | null;
   cupom_codigo?: string | null;
   desconto_cupom?: number | null;
@@ -571,6 +572,7 @@ export interface FuncionarioPdvFinalizarPayload {
 export interface FuncionarioPdvSalvarPayload {
   cliente_id?: number | null;
   itens: FuncionarioPdvItemPayload[];
+  gerar_comissao: boolean;
   observacoes?: string | null;
   cupom_codigo?: string | null;
   desconto_cupom?: number | null;

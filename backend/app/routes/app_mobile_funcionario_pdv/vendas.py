@@ -40,7 +40,8 @@ def _criar_payload_venda_funcionario_pdv(
     return {
         "cliente_id": dados.cliente_id,
         "vendedor_id": current_user.id,
-        "funcionario_id": funcionario.id,
+        "vendedor_funcionario_id": funcionario.id,
+        "funcionario_id": funcionario.id if dados.gerar_comissao else None,
         "itens": beneficios["itens_payload"],
         "desconto_valor": beneficios["desconto_total"],
         "desconto_percentual": (
@@ -261,13 +262,14 @@ def finalizar_venda_funcionario_pdv(
         caixa_id=caixa.id,
         permitir_caixa_tenant=True,
     )
-    processar_comissoes_venda(
-        venda_id=venda_criada["id"],
-        funcionario_id=funcionario.id,
-        valor_pago=beneficios["total_venda"],
-        user_id=current_user.id,
-        db=db,
-    )
+    if dados.gerar_comissao:
+        processar_comissoes_venda(
+            venda_id=venda_criada["id"],
+            funcionario_id=funcionario.id,
+            valor_pago=beneficios["total_venda"],
+            user_id=current_user.id,
+            db=db,
+        )
     venda_resultado = resultado.get("venda", {})
     if eh_crediario:
         registrar_uso_funcionalidade(db, "crediario-vencimento-alertas")
