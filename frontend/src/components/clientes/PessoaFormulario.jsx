@@ -548,7 +548,8 @@ export default function PessoaFormulario({
     setSalvando(true);
     setErrosServidor({});
     try {
-      const { tags: _tags, ...clienteData } = formData;
+      // Tipos de cadastro nao concedem acesso ao app; esse acesso e gerenciado separadamente.
+      const { tags: _tags, app_access_profiles: _appAccessProfiles, ...clienteData } = formData;
       clienteData.alertas_pdv = normalizeClienteAlertasPdv(clienteData.alertas_pdv);
       clienteData.contatos_adicionais = (clienteData.contatos_adicionais || []).filter(
         (contato) => (contato.numero || "").trim() || (contato.vinculo || "").trim(),

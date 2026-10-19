@@ -38,15 +38,7 @@ export default function ClientePessoaDadosGeraisTab({
         is_veterinario: valoresSelecionados.includes("veterinario"),
         is_funcionario: valoresSelecionados.includes("funcionario"),
       };
-      const perfis = new Set(prev.app_access_profiles || []);
-      ["cliente", "funcionario", "veterinario"].forEach((tipo) => {
-        if (novosFlags[FLAG_POR_TIPO[tipo]]) {
-          perfis.add(tipo);
-        } else {
-          perfis.delete(tipo);
-        }
-      });
-      return { ...prev, ...novosFlags, app_access_profiles: Array.from(perfis) };
+      return { ...prev, ...novosFlags };
     });
   };
 
