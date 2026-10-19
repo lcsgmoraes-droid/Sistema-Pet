@@ -57,6 +57,7 @@ from app import opportunity_events_models  # noqa
 from app import ecommerce_analytics_models  # noqa
 from app import dre_plano_contas_models  # noqa
 from app import nfe_cache_models  # noqa
+from app import xml_contabilidade_models  # noqa: F401
 from app import compras_pendencias_models  # noqa
 from app import bling_pedido_webhook_queue_models  # noqa
 from app import catalogo_mestre_models  # noqa

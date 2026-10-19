@@ -31,7 +31,8 @@ export const styleGuideCatalog = [
         nome: "InputPeriodo",
         status: "pronto",
         arquivo: "components/v2/InputPeriodo/InputPeriodo.jsx",
-        descricao: "Um único campo (somente leitura) + calendário duplo para início/fim",
+        descricao:
+          "Um único campo (somente leitura) + calendário duplo para início/fim, empilhado em telas pequenas",
       },
       {
         nome: "CalendarioPainel / CalendarioIntervaloPainel",

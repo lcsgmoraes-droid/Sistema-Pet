@@ -20,6 +20,24 @@ export const BASE_CONHECIMENTO = [
     cor: "emerald",
     artigos: [
       {
+        slug: "xml-notas-contabilidade",
+        titulo: "Como enviar os XMLs das notas de saída ao contador",
+        tags: ["xml", "contador", "contabilidade", "nota fiscal", "zip", "agendamento"],
+        conteudo: [
+          "Acesse **Configurações → XML para contabilidade**. A função exige acesso às configurações e ao módulo fiscal da empresa selecionada.",
+          "Para começar, confira o CNPJ cadastrado da empresa e informe o **E-mail do contador**. Clique em **Salvar configuração**. O serviço de e-mail do sistema precisa estar configurado para enviar; o download funciona sem ele.",
+          "Ative **Enviar um XML a cada emissão** para encaminhar novas NF-e/NFC-e de saída depois da autorização. O envio ocorre em segundo plano, mesmo após fechar a tela. Ativar a opção não dispara todas as notas antigas.",
+          "Em **XMLs por período**, escolha as datas inicial e final e use **Baixar ZIP** para obter as notas emitidas nesse intervalo. As duas datas estão incluídas, no horário de Brasília.",
+          "Use **Enviar agora** para colocar o ZIP do período na fila do contador. Para programar esse mesmo período, informe uma data e hora futuras e clique em **Agendar envio do ZIP**.",
+          "Para uma rotina recorrente, ative **Enviar um ZIP todo mês**, escolha o dia e a hora e salve. O sistema reúne o mês anterior completo; se o dia não existir no mês, usa o último dia.",
+          "Acompanhe o **Histórico de envios**: Na fila, Agendado, Processando, Enviado, Falhou ou Sem notas. Enviado significa aceito pelo servidor de e-mail; confirme o recebimento com o contador e confira a caixa de spam.",
+          "Envios ainda aguardando podem ser cancelados. Falhas permitem **Tentar novamente**, usando o e-mail atual salvo. Se houver aviso de processamento interrompido, confirme o recebimento antes de reenviar para evitar duplicidade.",
+          "O ZIP contém os XMLs originais e um manifesto com a situação das notas. Notas canceladas incluem o evento quando o emissor o disponibiliza; a ausência é indicada no manifesto. XML ausente ou inválido bloqueia o lote inteiro e aparece como falha.",
+          "Cada lote aceita até 366 dias e 1.000 notas, 30 MB de XMLs e 15 MB de ZIP. Divida períodos grandes. Notas de entrada, homologação e emitidas por outro CNPJ ficam fora do lote.",
+          "Para testar, baixe um período conhecido e confira o manifesto e os XMLs com a central de notas. Antes de ativar automatismos, confirme o destinatário. Desativar uma opção cancela os envios pendentes daquela rotina; agendamentos avulsos são cancelados no histórico.",
+        ],
+      },
+      {
         slug: "usar-central-ajuda-guiada",
         titulo: "Como usar a Central de Ajuda guiada do CorePet",
         tags: ["ajuda", "central", "guia", "artigos", "pesquisa", "passo a passo"],

@@ -46,6 +46,8 @@ _campaign_scheduler = None
 # Bling Sync — scheduler APScheduler
 _bling_sync_scheduler = None
 
+_xml_contabilidade_scheduler = None
+
 # Arquivos usados para coordenar renovação entre os múltiplos workers uvicorn
 # File lock para coordenar sincronização SEFAZ entre workers uvicorn
 _SEFAZ_LOCK_FILE = _runtime_file("sefaz_sync.lock")
@@ -730,6 +732,15 @@ def start_background_jobs() -> None:
         logger.info("[JOBS] Este worker e o lider de background jobs.")
 
         try:
+            from app.schedulers.xml_contabilidade_scheduler import XmlContabilidadeScheduler
+
+            global _xml_contabilidade_scheduler
+            _xml_contabilidade_scheduler = XmlContabilidadeScheduler()
+            _xml_contabilidade_scheduler.start()
+        except Exception:
+            logger.exception("[ERROR] Erro ao iniciar envio de XML para contabilidade")
+
+        try:
             from app.campaigns.scheduler import CampaignScheduler
 
             global _campaign_scheduler
@@ -844,6 +855,14 @@ def stop_background_jobs() -> None:
     """Stop schedulers and background threads when this process owns the leader lock."""
     if not _is_background_jobs_leader:
         return
+
+    try:
+        global _xml_contabilidade_scheduler
+        if _xml_contabilidade_scheduler:
+            _xml_contabilidade_scheduler.shutdown()
+            _xml_contabilidade_scheduler = None
+    except Exception:
+        logger.exception("[ERROR] Erro ao parar envio de XML para contabilidade")
 
     try:
         global _campaign_scheduler

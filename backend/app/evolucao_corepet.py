@@ -49,6 +49,25 @@ CANAIS_EVOLUCAO = {
 
 ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
     {
+        "id": "xml-notas-contabilidade",
+        "titulo": "XMLs de saída enviados ao contador",
+        "resumo": (
+            "Em Configurações → XML para contabilidade, cadastre o contador, "
+            "ative o envio após a emissão ou reúna um período em ZIP para baixar, "
+            "enviar ou agendar. A rotina mensal envia o mês anterior e o histórico acompanha falhas."
+        ),
+        "status": "disponivel_teste",
+        "tipo": "novidade",
+        "modulo": "Fiscal",
+        "plataformas": ["ERP"],
+        "canais": ["erp"],
+        "publicado_em": "2026-10-19",
+        "atualizado_em": "2026-10-19",
+        "ciclo_novidade": {**deepcopy(CICLO_PADRAO), "usos_minimos_teste": 0},
+        "destaque": True,
+        "caminho_ajuda": "/ajuda?aba=central&artigo=xml-notas-contabilidade",
+    },
+    {
         "id": "evolucao-corepet",
         "titulo": "Acompanhe a evolução do CorePet",
         "resumo": (

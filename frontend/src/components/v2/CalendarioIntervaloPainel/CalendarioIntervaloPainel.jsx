@@ -13,7 +13,7 @@ const CalendarioIntervaloPainel = forwardRef(function CalendarioIntervaloPainel(
   return (
     <div
       ref={ref}
-      className="absolute z-20 mt-1 flex gap-4 rounded-lg border border-slate-200 bg-white p-3 shadow-lg dark:border-slate-700 dark:bg-slate-900"
+      className="absolute z-20 mt-1 flex max-w-[calc(100vw-5rem)] flex-col gap-4 rounded-lg border border-slate-200 bg-white p-3 shadow-lg sm:max-w-none sm:flex-row dark:border-slate-700 dark:bg-slate-900"
     >
       <MesGrade
         mesVisivel={mesEsquerdo}
@@ -23,7 +23,7 @@ const CalendarioIntervaloPainel = forwardRef(function CalendarioIntervaloPainel(
         selecionados={selecionados}
         intervalo={intervalo}
       />
-      <div className="w-px bg-slate-100 dark:bg-slate-800" />
+      <div className="h-px shrink-0 bg-slate-100 sm:h-auto sm:w-px dark:bg-slate-800" />
       <MesGrade
         mesVisivel={mesDireito}
         mostrarSetaAnterior={false}
