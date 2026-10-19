@@ -7,6 +7,8 @@ com testes e imports internos, enquanto a implementacao fica em modulos menores.
 
 from fastapi import APIRouter
 
+from app.campaigns.cashback_crm_routes import router as cashback_crm_router
+
 from app.campaigns.beneficios_manuais_routes import (
     CashbackManualBody as CashbackManualBody,
     LancarCarimboManualBody as LancarCarimboManualBody,
@@ -115,5 +117,6 @@ router.include_router(campaign_management_router)
 router.include_router(validade_router)
 router.include_router(coupons_router)
 router.include_router(clientes_router)
+router.include_router(cashback_crm_router)
 router.include_router(beneficios_manuais_router)
 router.include_router(engajamento_router)

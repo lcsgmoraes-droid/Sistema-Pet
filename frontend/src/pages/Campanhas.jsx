@@ -54,6 +54,10 @@ export default function Campanhas() {
   } = campanhasConsultas;
 
   useEffect(() => {
+    if (location.pathname.endsWith("/cashback-crm")) {
+      setAba("cashback-crm");
+      return;
+    }
     if (location.pathname.endsWith("/ranking-clientes")) {
       setAba("ranking-clientes");
       return;

@@ -81,6 +81,16 @@ export function createSalesMarketingRoutes() {
         }
       />
       <Route
+        path="campanhas/cashback-crm"
+        element={
+          <ModuleGate modulo="campanhas">
+            <ProtectedRoute permission="clientes.visualizar">
+              <Campanhas />
+            </ProtectedRoute>
+          </ModuleGate>
+        }
+      />
+      <Route
         path="campanhas/ranking-clientes"
         element={
           <ModuleGate modulo="campanhas">

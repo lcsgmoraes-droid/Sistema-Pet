@@ -12,6 +12,8 @@ import CampanhasUnificacaoTab from "./CampanhasUnificacaoTab";
 import CampanhasGestorTab from "./CampanhasGestorTab";
 import CampanhasConfigTab from "./CampanhasConfigTab";
 import CampanhasValidadeTab from "./CampanhasValidadeTab";
+import CashbackCrmTab from "./cashback-crm/CashbackCrmTab";
+import ProtectedRoute from "../ProtectedRoute";
 import RankingClientes from "../../pages/RankingClientes";
 import {
   TIPO_LABELS,
@@ -133,6 +135,11 @@ export default function CampanhasMainContent({
       )}
 
       {aba === "validade" && <CampanhasValidadeTab />}
+      {aba === "cashback-crm" && (
+        <ProtectedRoute permission="clientes.visualizar">
+          <CashbackCrmTab />
+        </ProtectedRoute>
+      )}
 
       {aba === "retencao" && (
         <CampanhasRetencaoTab

@@ -286,6 +286,11 @@ export function createLayoutMenuItems({ lembretesCount = 0, orcamentosGrupoAtivo
           permission: "vendas.criar",
         },
         {
+          path: "/campanhas/cashback-crm",
+          label: "Cashback e contatos",
+          permission: "clientes.visualizar",
+        },
+        {
           path: "/campanhas/ranking-clientes",
           label: "Ranking de clientes",
           permission: "clientes.visualizar",
