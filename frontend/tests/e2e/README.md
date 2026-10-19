@@ -1,9 +1,9 @@
 # Testes e2e (Playwright)
 
 Testes de regressao em navegador real para os fluxos criticos do CorePet:
-login, Pessoas, Produtos e PDV. Validam o comportamento documentado em
-`Documentacao/` rodando contra uma stack de verdade (dev ou ensaio), nao
-mocks.
+login, Pessoas, Produtos e PDV. Os testes integrados rodam contra uma stack
+de verdade (dev ou ensaio). A regressao isolada de enderecos descrita abaixo
+usa API sintetica e nao modifica banco.
 
 ## Como rodar
 
@@ -21,6 +21,23 @@ Sem essas 3 variaveis, os testes sao pulados (skip), nunca falham por falta
 delas - seguro de deixar no CI sem configurar nada.
 
 `E2E_HEADED=1` abre o navegador visivel (default: headless).
+
+### Regressao de endereco sem credenciais
+
+`pessoa-enderecos-regressao.spec.js` abre o frontend atual em navegador real,
+intercepta todas as chamadas `/api` e usa pessoa, usuario e tenant sinteticos.
+Precisa somente do frontend local rodando; nao precisa de backend nem login.
+Recusa URL remota e fica pulado quando `E2E_BASE_URL` nao foi informada.
+
+```powershell
+# Em outro terminal: npm run dev
+$env:E2E_BASE_URL = "http://127.0.0.1:5173"
+node node_modules/@playwright/test/cli.js test tests/e2e/pessoa-enderecos-regressao.spec.js
+```
+
+Cobre salvar principal e adicional com um clique, recarregar, salvar o cadastro
+duas vezes sem esvaziar os cards, preservar outros rascunhos, aguardar resposta,
+recuperar de erro, promover/remover endereco e criar pessoa nova com rascunho.
 
 ## Por que nao tem credenciais no codigo
 

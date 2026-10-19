@@ -17,16 +17,7 @@ import ClientePessoaEnderecoModal from "./ClientePessoaEnderecoModal";
 import ClientePessoaEnderecoTab from "./ClientePessoaEnderecoTab";
 import ClientePessoaFinanceiroTab from "./ClientePessoaFinanceiroTab";
 import ClientePessoaHistoricoPanel from "./ClientePessoaHistoricoPanel";
-
-const CAMPOS_ENDERECO_PRINCIPAL = [
-  "cep",
-  "endereco",
-  "numero",
-  "complemento",
-  "bairro",
-  "cidade",
-  "estado",
-];
+import { enderecoPrincipal, prepararEnderecos } from "./pessoaEnderecos";
 
 // Mapeia o `loc` que o backend devolve num erro de validação (ex.: ["body", "crmv"]) pra
 // aba onde o campo mora — é o que permite trocar pra aba certa automaticamente quando o
@@ -289,6 +280,7 @@ function mapearErrosServidor(details) {
 export default function PessoaFormulario({
   abaInicial = "dados-gerais",
   formId = "pessoa-formulario",
+  onEnderecoSalvo,
   onSalvandoChange,
   onSalvo,
   prefill,
@@ -324,8 +316,6 @@ export default function PessoaFormulario({
     abrirModalEndereco,
     fecharModalEndereco,
     buscarCepModal,
-    salvarEndereco,
-    removerEndereco,
   } = useClientesNovoEnderecos();
 
   useEffect(() => {
@@ -334,13 +324,12 @@ export default function PessoaFormulario({
   }, [pessoa?.id, pessoa?.enderecos_adicionais, setEnderecosAdicionais]);
 
   const abrirEndereco = (alvo) => {
+    if (salvando) return;
     if (alvo === "principal") {
       setEnderecoAtual({
         tipo: "principal",
         apelido: "",
-        ...Object.fromEntries(
-          CAMPOS_ENDERECO_PRINCIPAL.map((campo) => [campo, formData[campo] || ""]),
-        ),
+        ...enderecoPrincipal(formData),
         index: "principal",
       });
       return;
@@ -348,71 +337,80 @@ export default function PessoaFormulario({
     abrirModalEndereco(alvo);
   };
 
-  const principalTemDados = CAMPOS_ENDERECO_PRINCIPAL.some((campo) => formData[campo]);
+  const principalTemDados = Boolean(formData.endereco || formData.cep || formData.cidade);
 
-  const promoverAPrincipal = (entrada, tipoAntigoPrincipal) => {
-    const principalAntigo = {
-      tipo: tipoAntigoPrincipal,
-      apelido: "",
-      ...Object.fromEntries(
-        CAMPOS_ENDERECO_PRINCIPAL.map((campo) => [campo, formData[campo] || ""]),
-      ),
-    };
-
-    setFormData((prev) => ({
-      ...prev,
-      ...Object.fromEntries(
-        CAMPOS_ENDERECO_PRINCIPAL.map((campo) => [campo, entrada[campo] || ""]),
-      ),
-    }));
-
-    setEnderecosAdicionais((prev) => {
-      let proximos =
-        typeof entrada.index === "number" ? prev.filter((_, i) => i !== entrada.index) : [...prev];
-      if (principalTemDados) {
-        proximos = [...proximos, principalAntigo];
+  // Endereço tem seu próprio salvar: não envia nem descarta rascunhos das outras abas.
+  const persistirEnderecos = async (enderecos) => {
+    if (salvando) return false;
+    setSalvando(true);
+    try {
+      let dados = enderecos;
+      if (pessoaAtual?.id) {
+        const payload = Object.fromEntries(
+          Object.entries(enderecos)
+            .filter(
+              ([campo, valor]) =>
+                campo === "enderecos_adicionais" || valor !== (pessoaAtual[campo] || ""),
+            )
+            .map(([campo, valor]) => [campo, valor === "" ? null : valor]),
+        );
+        const { data } = await api.put(`/clientes/${pessoaAtual.id}`, payload);
+        dados = data;
+        setPessoaAtual(data);
+        onEnderecoSalvo?.(data);
       }
-      return proximos;
-    });
-
-    fecharModalEndereco();
-    toast.success("Endereço principal atualizado.");
+      setFormData((prev) => ({ ...prev, ...enderecoPrincipal(dados) }));
+      setEnderecosAdicionais(dados.enderecos_adicionais || []);
+      setErrosServidor((prev) => {
+        const { numero: _numero, codigo_municipio: _municipio, ...restante } = prev;
+        return restante;
+      });
+      toast.success(pessoaAtual?.id ? "Endereço salvo." : "Endereço adicionado ao novo cadastro.");
+      return true;
+    } catch (error) {
+      toast.error(
+        error.response?.data?.detail || "Não foi possível salvar o endereço. Tente novamente.",
+      );
+      return false;
+    } finally {
+      setSalvando(false);
+    }
   };
 
-  const confirmarEndereco = (tipoAntigoPrincipal) => {
-    if (!enderecoAtual?.endereco || !enderecoAtual?.cidade) {
+  const confirmarEndereco = async (tipoAntigoPrincipal) => {
+    if (!enderecoAtual?.endereco?.trim() || !enderecoAtual?.cidade?.trim()) {
       toast.error("Preencha pelo menos Endereço e Cidade.");
       return;
     }
 
-    if (enderecoAtual.index === "principal") {
-      setFormData((prev) => ({
-        ...prev,
-        ...Object.fromEntries(
-          CAMPOS_ENDERECO_PRINCIPAL.map((campo) => [campo, enderecoAtual[campo]]),
-        ),
-      }));
+    if (enderecoAtual.tipo === "principal" && !enderecoAtual.numero?.trim()) {
+      toast.error("Informe o número do endereço. Se não houver, use S/N ou sem número.");
+      return;
+    }
+
+    const enderecos = prepararEnderecos(
+      formData,
+      enderecosAdicionais,
+      enderecoAtual,
+      tipoAntigoPrincipal,
+    );
+    if (await persistirEnderecos(enderecos)) {
       fecharModalEndereco();
-      return;
     }
-
-    if (enderecoAtual.tipo === "principal") {
-      promoverAPrincipal(enderecoAtual, tipoAntigoPrincipal);
-      return;
-    }
-
-    salvarEndereco();
   };
 
-  const excluirEndereco = (alvo) => {
+  const excluirEndereco = async (alvo) => {
     if (alvo === "principal") {
-      setFormData((prev) => ({
-        ...prev,
-        ...Object.fromEntries(CAMPOS_ENDERECO_PRINCIPAL.map((campo) => [campo, ""])),
-      }));
+      await persistirEnderecos({
+        ...enderecoPrincipal({}),
+        enderecos_adicionais: enderecosAdicionais,
+      });
       return;
     }
-    removerEndereco(alvo);
+    await persistirEnderecos({
+      ...enderecoPrincipal(formData),
+      enderecos_adicionais: enderecosAdicionais.filter((_, index) => index !== alvo),
+    });
   };
 
   const errosLocais = useMemo(() => validarFormData(formData), [formData]);
@@ -536,6 +534,7 @@ export default function PessoaFormulario({
 
   async function handleSubmit(event) {
     event?.preventDefault();
+    if (salvando || enderecoAtual) return;
     setTentouSalvar(true);
 
     if (Object.keys(errosLocais).length > 0) {
@@ -578,6 +577,7 @@ export default function PessoaFormulario({
       toast.success(temPessoaSalva ? "Alterações salvas." : "Cadastro criado.");
       setPessoaAtual(pessoaSalva);
       setFormData(buildFormDataFromCliente(pessoaSalva));
+      setEnderecosAdicionais(pessoaSalva.enderecos_adicionais || []);
       onSalvo?.(pessoaSalva);
     } catch (error) {
       const details = error.response?.data?.details;
@@ -644,6 +644,7 @@ export default function PessoaFormulario({
             erroEnderecoPrincipal={errosVisiveis.numero}
             formData={formData}
             removerEndereco={excluirEndereco}
+            salvando={salvando}
           />
         ) : null}
 
@@ -691,8 +692,11 @@ export default function PessoaFormulario({
       {enderecoAtual ? (
         <ClientePessoaEnderecoModal
           enderecoAtual={enderecoAtual}
-          fecharModalEndereco={fecharModalEndereco}
+          fecharModalEndereco={() => {
+            if (!salvando) fecharModalEndereco();
+          }}
           loadingCepEndereco={loadingCepEndereco}
+          salvando={salvando}
           principalTemDados={principalTemDados}
           salvarEndereco={confirmarEndereco}
           buscarCepModal={buscarCepModal}
