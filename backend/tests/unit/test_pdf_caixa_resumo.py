@@ -10,11 +10,13 @@ def test_pdf_fechamento_mostra_vendido_recebido_formas_e_saldo_zerado():
             "status": "fechado",
             "saldo_inicial": 50,
             "total_vendido": 230,
+            "total_vendas_crediario": 35,
             "total_recebido": 180,
             "vendas_por_forma_pagamento": {
                 "Dinheiro": {"total": 80},
                 "PIX": {"total": 100},
-                "Crediário": {"total": 50},
+                "Crediário": {"total": 35},
+                "Boleto": {"total": 15},
             },
             "recebimentos_por_forma_pagamento": {
                 "Dinheiro": {"total": 80},
@@ -45,8 +47,10 @@ def test_pdf_fechamento_mostra_vendido_recebido_formas_e_saldo_zerado():
 
     for trecho in (
         "Total vendido no caixa",
+        "Vendas no crediário",
         "Total recebido no caixa",
         "R$ 230,00",
+        "R$ 35,00",
         "R$ 180,00",
         "PIX",
         "a prazo",
@@ -56,3 +60,5 @@ def test_pdf_fechamento_mostra_vendido_recebido_formas_e_saldo_zerado():
         "Diferença",
     ):
         assert trecho.lower() in texto.lower()
+    assert texto.index("Total vendido no caixa") < texto.index("Vendas no crediário")
+    assert texto.index("Vendas no crediário") < texto.index("Total recebido no caixa")
