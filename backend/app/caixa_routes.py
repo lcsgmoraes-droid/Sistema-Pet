@@ -1028,6 +1028,7 @@ def gerar_pdf_caixa(
         "status": caixa.status,
         "saldo_inicial": float(caixa.valor_abertura),
         "total_vendido": resumo["total_vendido"],
+        "total_vendas_crediario": resumo["total_vendas_crediario"],
         "total_recebido": resumo["total_recebido"],
         "vendas_por_forma_pagamento": resumo["vendas_por_forma_pagamento"],
         "recebimentos_por_forma_pagamento": resumo["recebimentos_por_forma_pagamento"],

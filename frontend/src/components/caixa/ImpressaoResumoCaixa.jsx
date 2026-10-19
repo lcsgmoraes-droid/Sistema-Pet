@@ -25,6 +25,7 @@ export default function ImpressaoResumoCaixa({ resumo, onAfterPrint }) {
 
   const itensResumo = [
     ["Total vendido", resumo.total_vendido],
+    ["Vendas no crediário", resumo.total_vendas_crediario ?? 0],
     ["Total recebido", resumo.total_recebido],
     ["Valor de abertura", resumo.caixa.valor_abertura],
     ["Suprimentos", resumo.totais.suprimentos],
