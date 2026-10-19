@@ -14,22 +14,26 @@
 
 ## 1. Necessidade e aceite
 
-Enviar ao contador os XMLs das notas de saída individualmente após autorização,
-ou reunir um período em ZIP para download, envio imediato ou agendado. Rotina
-mensal opcional envia o mês anterior. Usuário pode combinar opções ou desligar
-automatismos. Emissão/estoque/tributação existentes permanecem preservados.
+Enviar automaticamente ao contador apenas a competência mensal anterior
+completa, do primeiro ao último dia. Usuário escolhe dia/hora da execução ou
+desliga a rotina. Períodos livres ficam exclusivamente no download/envio manual.
+Não há envio individual após emissão nem agendamento avulso. Emissão, estoque
+e tributação existentes permanecem preservados.
 
 Aceite: configuração persiste; período inclui ambas as datas em Brasília;
-notas elegíveis do CNPJ correto; nenhum ZIP parcial silencioso; histórico
+notas elegíveis do CNPJ correto, incluindo canceladas e todos os eventos
+oficiais retornados pelo emissor; nenhum ZIP parcial silencioso; histórico
 informa sucesso/falha e oferece cancelamento/repetição; processamento funciona
 com navegador fechado. NFS-e e alterações de emissão/tributação estão fora do escopo.
 
 ## 2. Regras e dados
 
-Configuração e fila pertencem ao tenant; migration `zzzzh20261019a1` aditiva,
+Configuração e fila pertencem ao tenant; migration `zzzzh20261019a1` aditiva e
+`zzzzi20261019a1` desativa/cancela fluxos legados pendentes por empresa,
 RLS forçado e índices por tenant/estado. Histórico guarda destinatário, período,
 tentativas e resultado; XML/ZIP não são copiados para a fila. Deduplicação
-automática por documento/situação e mensal por competência. Claim persistido
+mensal por competência. Histórico antigo é preservado sem retomar envios
+individuais/agendamentos livres. Claim persistido
 e bloqueio de linhas protegem execuções concorrentes.
 
 ## 3. Arquitetura e integrações

@@ -17,9 +17,19 @@ class XmlContabilidadeConfigRequest(BaseModel):
     def limpar_email(cls, value):
         return str(value).strip() or None if value is not None else None
 
+    @field_validator("envio_automatico")
+    @classmethod
+    def rejeitar_envio_por_emissao(cls, value):
+        if value:
+            raise ValueError(
+                "O envio automático é mensal e sempre reúne o mês anterior completo. "
+                "Ative o envio mensal para configurar o dia."
+            )
+        return value
+
     @model_validator(mode="after")
     def exigir_destinatario(self):
-        if (self.envio_automatico or self.envio_mensal) and not self.email_contador:
+        if self.envio_mensal and not self.email_contador:
             raise ValueError("Informe o e-mail do contador para ativar os envios.")
         return self
 
@@ -42,9 +52,10 @@ class XmlContabilidadeEnvioRequest(XmlContabilidadePeriodoRequest):
 
     @field_validator("agendado_para")
     @classmethod
-    def exigir_fuso(cls, value):
-        if value is not None and value.utcoffset() is None:
+    def rejeitar_agendamento_avulso(cls, value):
+        if value is not None:
             raise ValueError(
-                "Informe o fuso horário no agendamento (horário de Brasília)."
+                "O envio programado é somente mensal, do mês anterior completo. "
+                "Para outro período, envie ou baixe um lote manualmente."
             )
         return value

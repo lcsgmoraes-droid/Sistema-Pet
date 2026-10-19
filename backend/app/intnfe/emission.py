@@ -29,7 +29,6 @@ from app.intnfe.rejection_diagnostics import (
 )
 from app.produtos_estoque_models import EstoqueMovimentacao, ProdutoLote
 from app.services.venda_descontos import ratear_centavos, ratear_descontos_venda
-from app.services.xml_contabilidade_hook import tentar_enfileirar_documento
 
 CENT = Decimal("0.01")
 AUTHORIZED_STATUS = 3
@@ -1461,8 +1460,6 @@ def reconcile(db, venda, api, *, connection=None, token=None):
             except (IntNFeError, UnicodeDecodeError):
                 # A autorização continua válida; o XML pode ser buscado novamente.
                 pass
-    if status_code in {AUTHORIZED_STATUS, 5}:
-        tentar_enfileirar_documento(db, venda.tenant_id, "intnfe", venda.id)
     db.commit()
     return {
         "success": status_code == AUTHORIZED_STATUS,

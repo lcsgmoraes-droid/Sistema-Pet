@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  agendamentoBrasilia,
   erroPeriodo,
   formatarDataContabilidade,
   mensagemErroContabilidade,
@@ -30,14 +29,19 @@ test("período inclui o mesmo dia e rejeita data inexistente ou invertida", () =
   assert.ok(erroPeriodo({ inicio: "2026-10-19", fim: "" }));
 });
 
-test("agendamento preserva horário de Brasília e rejeita passado ou hora inválida", () => {
-  const agora = new Date("2026-10-19T12:00:00Z");
-  assert.equal(agendamentoBrasilia("2026-10-19T10:00", agora), "2026-10-19T10:00:00-03:00");
-  assert.throws(() => agendamentoBrasilia("2026-10-19T09:00", agora), /futuras/);
-  assert.throws(() => agendamentoBrasilia("2026-10-19T24:00", agora), /válidas/);
-  assert.throws(() => agendamentoBrasilia("2026-10-19T10:60", agora), /válidas/);
-  assert.throws(() => agendamentoBrasilia("2026-02-30T10:00", agora), /válidas/);
-  assert.throws(() => agendamentoBrasilia("", agora), /completas/);
+test("mês anterior sempre termina no último dia para meses de 28, 29, 30 e 31 dias", () => {
+  for (const [agora, inicio, fim] of [
+    ["2026-03-01T12:00:00Z", "2026-02-01", "2026-02-28"],
+    ["2024-03-01T12:00:00Z", "2024-02-01", "2024-02-29"],
+    ["2026-05-01T12:00:00Z", "2026-04-01", "2026-04-30"],
+    ["2026-02-01T12:00:00Z", "2026-01-01", "2026-01-31"],
+  ]) {
+    assert.deepEqual(periodoMesAnterior(new Date(agora)), { inicio, fim });
+  }
+  assert.deepEqual(periodoMesAnterior(new Date("2026-05-31T12:00:00Z")), {
+    inicio: "2026-04-01",
+    fim: "2026-04-30",
+  });
 });
 
 test("datas de período não recuam um dia e instantes são apresentados em Brasília", () => {

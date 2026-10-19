@@ -53,8 +53,9 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "titulo": "XMLs de saída enviados ao contador",
         "resumo": (
             "Em Configurações → XML para contabilidade, cadastre o contador, "
-            "ative o envio após a emissão ou reúna um período em ZIP para baixar, "
-            "enviar ou agendar. A rotina mensal envia o mês anterior e o histórico acompanha falhas."
+            "envie automaticamente o mês anterior completo, do primeiro ao último dia, "
+            "ou escolha outro período para baixar/enviar manualmente. O ZIP inclui "
+            "cancelamentos e correções; XMLs faltantes impedem uma entrega incompleta."
         ),
         "status": "disponivel_teste",
         "tipo": "novidade",

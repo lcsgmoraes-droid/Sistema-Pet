@@ -103,17 +103,24 @@ def test_periodos_invalidos_nao_geram_lote(contexto, monkeypatch, inicio, fim):
     gerar.assert_not_called()
 
 
-def test_agendamento_exige_fuso_horario(contexto):
+@pytest.mark.parametrize(
+    "agendado_para", ["2026-11-01T08:00:00", "2026-11-01T08:00:00-03:00"]
+)
+def test_agendamento_avulso_nao_e_aceito(contexto, monkeypatch, agendado_para):
     client, *_ = contexto
+    criar = Mock()
+    monkeypatch.setattr(routes.service, "criar_envio", criar)
     response = client.post(
         "/contabilidade/xml/envios",
         json={
             "data_inicio": "2026-10-01",
             "data_fim": "2026-10-19",
-            "agendado_para": "2026-11-01T08:00:00",
+            "agendado_para": agendado_para,
         },
     )
     assert response.status_code == 422
+    assert "mensal" in response.json()["detail"][0]["msg"]
+    criar.assert_not_called()
 
 
 def test_salvar_config_validacao_email_e_destinatario(contexto, monkeypatch):
@@ -123,6 +130,7 @@ def test_salvar_config_validacao_email_e_destinatario(contexto, monkeypatch):
     for payload in (
         {"email_contador": "invalido"},
         {"envio_automatico": True},
+        {"email_contador": "contador@example.com", "envio_automatico": True},
         {"envio_mensal": True},
     ):
         assert client.put("/contabilidade/xml/config", json=payload).status_code == 422
@@ -131,17 +139,16 @@ def test_salvar_config_validacao_email_e_destinatario(contexto, monkeypatch):
 
 def test_criar_envio_apenas_enfileira_e_repassa_tenant(contexto, monkeypatch):
     client, db, tenant, _ = contexto
-    criar = Mock(return_value={"id": 9, "status": "agendado"})
+    criar = Mock(return_value={"id": 9, "status": "pendente"})
     monkeypatch.setattr(routes.service, "criar_envio", criar)
     response = client.post(
         "/contabilidade/xml/envios",
         json={
             "data_inicio": "2026-10-01",
             "data_fim": "2026-10-19",
-            "agendado_para": "2026-11-01T08:00:00-03:00",
         },
     )
     assert response.status_code == 201
-    assert response.json()["status"] == "agendado"
+    assert response.json()["status"] == "pendente"
     assert criar.call_args.args[:2] == (db, tenant)
-    assert criar.call_args.kwargs["agendado_para"].utcoffset().total_seconds() == -10800
+    assert criar.call_args.kwargs["agendado_para"] is None

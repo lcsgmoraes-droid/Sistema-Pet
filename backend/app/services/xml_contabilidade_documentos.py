@@ -191,7 +191,7 @@ def _xml_bytes(value):
 
 def _obter_xml(db, tenant_id, doc):
     detalhe = {}
-    if doc.venda is not None and doc.venda.nfe_xml:
+    if doc.provider == "intnfe" and doc.venda is not None and doc.venda.nfe_xml:
         return _xml_bytes(doc.venda.nfe_xml), detalhe
     if doc.provider == "intnfe":
         # download_document faz commit no cache e não deve interferir no claim
@@ -271,55 +271,12 @@ def validar_xml_saida(xml, chave, modelo):
     return root, dt.astimezone(BRASILIA).date()
 
 
-def _eventos_xml(root, detalhe, chave):
-    # Os eventos embutidos já estão no XML original, byte a byte. Reserializar
-    # subárvores alteraria namespaces e poderia invalidar a assinatura fiscal.
-    embutidos = root.findall(".//n:procEventoNFe", NS)
-    candidatos = []
-    # Apenas campos oficiais explícitos; nunca segue URLs arbitrárias do payload.
-    from app.nfe.documentos import baixar_link_documento
+def _obter_eventos(db, tenant_id, doc):
+    if doc.provider != "intnfe":
+        return {}
+    from app.services.xml_contabilidade_eventos import obter_eventos_intnfe
 
-    for key in ("xmlCancelamento", "xmlCartaCorrecao", "xmlEvento"):
-        value = detalhe.get(key)
-        if value:
-            candidatos.append(
-                value
-                if str(value).lstrip().startswith("<")
-                else baixar_link_documento(value)
-            )
-    eventos, vistos, cancelamento = [], set(), False
-    for event_root, xml in [(node, None) for node in embutidos] + [
-        (None, _xml_bytes(value)) for value in candidatos
-    ]:
-        if event_root is None:
-            try:
-                event_root = ET.fromstring(xml)
-            except Exception:
-                raise XmlContabilidadeError(
-                    "Um evento fiscal retornou XML inválido.", 409
-                ) from None
-        infos = event_root.findall(".//n:infEvento", NS)
-        for info in infos:
-            if (
-                info.findtext("n:chNFe", namespaces=NS) != chave
-                or info.findtext("n:tpAmb", namespaces=NS) != "1"
-            ):
-                raise XmlContabilidadeError(
-                    "Um evento fiscal não corresponde à nota solicitada.", 409
-                )
-        identity = next((i.get("Id") for i in infos if i.get("Id")), None)
-        if not infos or not identity:
-            raise XmlContabilidadeError(
-                "Um evento fiscal não possui identificação válida.", 409
-            )
-        if identity not in vistos:
-            if xml is not None:
-                eventos.append((re.sub(r"[^a-zA-Z0-9_-]", "", identity) + ".xml", xml))
-            vistos.add(identity)
-            cancelamento |= any(
-                i.findtext("n:tpEvento", namespaces=NS) == "110111" for i in infos
-            )
-    return eventos, len(vistos), cancelamento
+    return {"_eventos_intnfe": obter_eventos_intnfe(db, tenant_id, doc)}
 
 
 def _cnpj_empresa(db, tenant_id):
@@ -362,8 +319,15 @@ def _coletar_arquivos(db, tenant_id, documentos, data_inicio, data_fim):
                 continue
             if not data_inicio <= data_real <= data_fim or doc.chave in chaves:
                 continue
-            eventos, quantidade_eventos, cancelamento_incluido = _eventos_xml(
-                root, detalhe, doc.chave
+            from app.services.xml_contabilidade_eventos import coletar_eventos
+
+            detalhe.update(_obter_eventos(db, tenant_id, doc))
+            eventos, resumo_eventos, cancelamento_incluido = coletar_eventos(
+                root,
+                detalhe,
+                doc.chave,
+                cnpj_empresa,
+                cancelada=doc.status == "cancelada",
             )
         except XmlContabilidadeError:
             raise
@@ -383,17 +347,18 @@ def _coletar_arquivos(db, tenant_id, documentos, data_inicio, data_fim):
         nota = {
             "chave": doc.chave,
             "modelo": doc.modelo,
-            "status": doc.status,
+            "status": "cancelada" if cancelamento_incluido else doc.status,
             "provedor": doc.provider,
             "data_emissao": data_real.isoformat(),
-            "eventos_incluidos": quantidade_eventos,
+            "eventos_incluidos": len(resumo_eventos),
+            "eventos": resumo_eventos,
             "emitente_cnpj": cnpj_emitente,
             "emitente_nome": root.findtext(".//n:infNFe/n:emit/n:xNome", namespaces=NS)
             or cnpj_emitente,
         }
-        if doc.status == "cancelada" and not cancelamento_incluido:
-            nota["aviso"] = (
-                "Nota cancelada. O emissor não disponibilizou o XML do evento de cancelamento; incluído o XML original autorizado."
+        if any(e["data_registro"] > data_fim.isoformat() for e in resumo_eventos):
+            nota["observacao"] = (
+                "Inclui eventos registrados após o período de emissão selecionado."
             )
         notas.append(nota)
     return arquivos, notas
@@ -412,6 +377,7 @@ def _zip(arquivos, notas, data_inicio, data_fim):
             "data_inicio": data_inicio.isoformat(),
             "data_fim": data_fim.isoformat(),
             "fuso_horario": "America/Sao_Paulo",
+            "criterio_periodo": "Data de emissão da nota; inclui todos os eventos registrados dessas notas disponíveis no momento da coleta.",
             "quantidade_notas": len(notas),
             "emitente_cnpj": notas[0]["emitente_cnpj"],
             "emitente_nome": notas[0]["emitente_nome"],

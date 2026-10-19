@@ -26,22 +26,6 @@ export function erroPeriodo({ inicio, fim }) {
   return "";
 }
 
-export function agendamentoBrasilia(valor, agora = new Date()) {
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(valor || "")) {
-    throw new Error("Informe a data e a hora completas do agendamento.");
-  }
-  const [data, hora] = valor.split("T");
-  if (!dataValida(data) || hora > "23:59" || Number(hora.slice(3)) > 59) {
-    throw new Error("Informe uma data e hora válidas.");
-  }
-  // O campo representa o horário de Brasília, independentemente do fuso do computador.
-  const iso = `${valor}:00-03:00`;
-  if (new Date(iso).getTime() <= agora.getTime()) {
-    throw new Error("O agendamento precisa ser para uma data e hora futuras.");
-  }
-  return iso;
-}
-
 export function formatarDataContabilidade(valor, incluirHora = false) {
   if (!valor) return "—";
   const normalizado = /^\d{4}-\d{2}-\d{2}$/.test(valor) ? `${valor}T12:00:00-03:00` : valor;

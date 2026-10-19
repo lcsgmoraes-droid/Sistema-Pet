@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Data | 2026-10-19 |
-| Entrega | Configuração e entrega de XMLs de saída ao contador |
+| Entrega | Envio mensal do mês anterior completo e lotes manuais com eventos fiscais |
 | PR | #1526 |
 | Versão | Alterações desta ficha na branch de tarefa, antes da publicação |
 | Ambiente | Local: SQLite descartável, PostgreSQL DEV e navegador com APIs simuladas |
@@ -22,37 +22,44 @@ criou bancos locais com prefixo exclusivo e removeu-os ao finalizar.
 | ID | Cenário | Resultado |
 |---|---|---|
 | H01 | Configurar destinatário e automatismos; desligar sem SMTP | Aprovado na UI simulada e persistência SQLite |
-| H02 | Individual após autorização; repetição e notas históricas | Aprovado: fila sem SMTP na emissão, deduplicação e corte de ativação |
+| H02 | Somente mensal; emissão e agendamento avulso removidos | Aprovado: API rejeita legados, worker cancela pendências e não retoma históricos |
 | H03 | Período inclusivo, Brasília e XML original | Aprovado: ZIP/manifesto sem alterar conteúdo assinado |
 | H04 | Entrada, homologação, outro CNPJ e XML inválido/ausente | Aprovado: exclusões corretas e bloqueio de lote incompleto |
-| H05 | Notas canceladas e eventos embutidos | Aprovado: assinatura preservada e ausência de evento declarada |
-| H06 | Enviar/agendar, cancelar e repetir falha | Aprovado: UI mockada, contratos HTTP e persistência/retry |
-| H07 | Mensal, dia 31 em mês curto e uma entrega por competência | Aprovado em testes de regra/fila |
+| H05 | Canceladas, substituição NFC-e e CC-e com várias sequências | Aprovado: consulta oficial IntNFe, assinatura preservada e evento faltante bloqueia ZIP |
+| H06 | Enviar manualmente, cancelar e repetir falha | Aprovado: UI mockada, contratos HTTP e persistência/retry |
+| H07 | Mês anterior do dia 1 ao último dia, fevereiro 28/29, meses 30/31 e virada de ano | Aprovado; competência fixa e idempotente, inclusive recuperação após indisponibilidade |
 | H08 | API sem permissão e empresa diferente | Aprovado: bloqueio HTTP e escopo tenant |
 | H09 | RLS PostgreSQL sem bypass | Aprovado: leitura, alteração, exclusão e inserção entre tenants bloqueadas |
-| H10 | Migration/reversão e histórico | Aprovado: smoke oficial em banco limpo, histórico e tenants UUID |
-| H11 | Tela desktop, 390px/320px, fuso Los Angeles | Aprovado: sem overflow da página/calendário, agendamento mantém Brasília |
+| H10 | Migrations/reversão e desativação dos fluxos antigos | Aprovado: smoke limpo/histórico/UUID; RLS preservado e contexto restaurado |
+| H11 | Tela desktop, 390px/320px e mês civil em Brasília | Aprovado: sem overflow e dia/hora visíveis mesmo com SMTP ausente |
 | H12 | Emissão/cache/documentos/e-mail preexistentes | Aprovado na regressão focada |
 
 ## Evidências e comandos
 
-- Backend: **170 testes aprovados** na execução combinada de
-  `test_xml_contabilidade_{service,bling,hooks,reconciliation,routes,migration}`,
-  evolução, documentos, cache, emissão IntNFe, rotas operacionais e e-mail.
+- Backend: **236 testes aprovados** na execução combinada de
+  `test_xml_contabilidade_{service,bling,hooks,reconciliation,routes,migration,mensal_migration,eventos}`,
+  evolução, documentos, cache, cliente/emissão IntNFe, rotas operacionais e e-mail.
 - Registry multiempresa: **4 testes aprovados**; nenhum modelo novo fora da proteção.
-- `test_xml_contabilidade_postgres.py`: **1 teste aprovado** com PostgreSQL real
-  local; migration cria/reverte e RLS é exercitado sob papel sem bypass.
+- `test_xml_contabilidade_postgres.py`: **2 testes aprovados** com PostgreSQL real
+  local; migrations criam/revertem e migram legados sob papel sem bypass,
+  preservando FORCE RLS e restaurando `app.tenant_id`.
 - `scripts/ci_migration_smoke.py`: **clean/history/production_uuid = ok**,
-  head `zzzzh20261019a1`, sem débito de RLS. Log local ignorado:
-  `runtime/xml-contabilidade-qa/migration-smoke.log`.
+  head `zzzzi20261019a1`, sem débito de RLS. Log local ignorado:
+  `runtime/xml-contabilidade-qa/migration-mensal-smoke.log`.
 - Frontend: **5 testes de datas/erros aprovados** e contrato das rotas aprovado.
   ESLint/Ruff dos arquivos novos/alterados aplicáveis aprovados.
 - `npm run build`: aprovado; aviso de tamanho do chunk PDV já existente.
-- Playwright com APIs simuladas: salvar, download, enviar, agendar, cancelar,
-  repetir falha, seleção de período e desligamento sem SMTP aprovados, zero
-  erros de página. Evidências locais ignoradas em
-  `runtime/xml-contabilidade-qa/{desktop.png,mobile-calendario.png,mobile-320-calendario.png,evidencias.json}`.
+- Playwright com APIs simuladas: salvar apenas configuração mensal, selecionar
+  período manual sem alterar a competência mensal, download/envio e erro JSON
+  de pacote bloqueado aprovados; zero erros em React StrictMode, sem overflow
+  em 390/320px. Evidências ignoradas:
+  `runtime/xml-contabilidade-qa/mensal-{desktop,mobile,sem-smtp}.png` e
+  `mensal-evidencias.json`.
 - `git diff --check`: aprovado. Builds, capturas e logs não são versionados.
+- Homologação local reconstruída pelo script oficial, migrations aplicadas e
+  frontend/backend saudáveis. A aba autenticada do Chrome do Lucas foi atualizada
+  e confirmou a tela mensal, dias/horário visíveis e período manual separado.
+  Captura ignorada: `runtime/xml-contabilidade-qa/mensal-dev-aberto.png`.
 
 ## Inconsistências e limites
 
@@ -62,7 +69,11 @@ com o código original confirmou a preexistência; não houve alteração desses
 testes para mascarar resultado.
 
 Não foi comprovada entrega em caixa de entrada real, nem houve chamada a
-IntNFe/Bling de produção. Isso permanece para o primeiro envio autorizado pelo
+IntNFe/Bling de produção. O contrato de eventos foi conferido na documentação
+oficial; chamadas dos testes são simuladas. O OpenAPI público Bling não oferece
+listagem de eventos, então a coleta desse legado depende de XMLs disponíveis
+ou embutidos e não garante descobrir CC-e externas desconhecidas.
+O recebimento permanece para o primeiro envio autorizado pelo
 responsável. Aceite SMTP não significa leitura ou entrega na caixa de entrada.
 
 ## Decisão

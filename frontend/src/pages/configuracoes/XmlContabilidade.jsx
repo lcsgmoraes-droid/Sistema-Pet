@@ -10,7 +10,6 @@ import XmlContabilidadeConfig from "./XmlContabilidadeConfig";
 import XmlContabilidadeLote from "./XmlContabilidadeLote";
 import XmlContabilidadeHistorico from "./XmlContabilidadeHistorico";
 import {
-  agendamentoBrasilia,
   erroPeriodo,
   mensagemErroContabilidade,
   periodoMesAnterior,
@@ -19,7 +18,6 @@ import {
 const BASE = "/contabilidade/xml";
 const CONFIG_INICIAL = {
   email_contador: "",
-  envio_automatico: false,
   envio_mensal: false,
   dia_envio_mensal: 1,
   hora_envio_mensal: "08:00",
@@ -33,7 +31,6 @@ function normalizarConfig(dados) {
 function payloadConfig(config) {
   return {
     email_contador: config.email_contador.trim(),
-    envio_automatico: config.envio_automatico,
     envio_mensal: config.envio_mensal,
     dia_envio_mensal: Number(config.dia_envio_mensal),
     hora_envio_mensal: config.hora_envio_mensal,
@@ -54,7 +51,6 @@ export default function XmlContabilidade() {
   const [erroHistorico, setErroHistorico] = useState("");
   const [periodo, setPeriodo] = useState(() => periodoMesAnterior());
   const [erroDoPeriodo, setErroDoPeriodo] = useState("");
-  const [agendadoPara, setAgendadoPara] = useState("");
   const [operacao, setOperacao] = useState("");
 
   useEffect(() => {
@@ -141,7 +137,7 @@ export default function XmlContabilidade() {
   async function salvar(evento) {
     evento.preventDefault();
     const payload = payloadConfig(config);
-    if ((payload.envio_automatico || payload.envio_mensal) && !payload.email_contador) {
+    if (payload.envio_mensal && !payload.email_contador) {
       toast.error("Informe o e-mail do contador para ativar o envio automático.");
       return;
     }
@@ -195,26 +191,13 @@ export default function XmlContabilidade() {
     }
   }
 
-  async function enviar(agendar = false) {
+  async function enviar() {
     if (!validarPeriodo() || bloqueioEnvio) return;
     const payload = { data_inicio: periodo.inicio, data_fim: periodo.fim };
-    if (agendar) {
-      try {
-        payload.agendado_para = agendamentoBrasilia(agendadoPara);
-      } catch (erro) {
-        toast.error(erro.message);
-        return;
-      }
-    }
-    setOperacao(agendar ? "agendar" : "enviar");
+    setOperacao("enviar");
     try {
       await api.post(`${BASE}/envios`, payload);
-      toast.success(
-        agendar
-          ? "Envio agendado. Acompanhe no histórico."
-          : "Envio colocado na fila. Acompanhe no histórico.",
-      );
-      if (agendar) setAgendadoPara("");
+      toast.success("Envio colocado na fila. Acompanhe no histórico.");
       await atualizarHistorico();
     } catch (erro) {
       toast.error(await mensagemErroContabilidade(erro, "Não foi possível registrar o envio."));
@@ -263,7 +246,7 @@ export default function XmlContabilidade() {
       <PageHeader
         icon={FileArchive}
         title="XML para contabilidade"
-        subtitle="Envie os XMLs das notas de saída ao contador, automaticamente ou por período."
+        subtitle="Envie ao contador o mês anterior completo, todo mês. Escolha outros períodos manualmente."
       />
       <XmlContabilidadeConfig
         config={config}
@@ -279,13 +262,10 @@ export default function XmlContabilidade() {
           setErroDoPeriodo("");
         }}
         erroPeriodo={erroDoPeriodo}
-        agendadoPara={agendadoPara}
-        onAgendamentoChange={setAgendadoPara}
         operacao={operacao}
         bloqueioEnvio={bloqueioEnvio}
         onBaixar={baixar}
-        onEnviar={() => enviar()}
-        onAgendar={() => enviar(true)}
+        onEnviar={enviar}
       />
       <XmlContabilidadeHistorico
         envios={envios}

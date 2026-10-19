@@ -56,8 +56,8 @@ def _exigir_bling_configurado_para_tenant(tenant_id) -> None:
 def _registrar_status_contabil_bling(db, tenant_id, venda, dados_nota):
     """Inclui no cache os status recebidos pelos endpoints legados do Bling.
 
-    O upsert do cache centraliza a fila contábil e sua deduplicação. Uma falha
-    deste registro complementar não pode impedir a atualização fiscal.
+    O cache mantém a situação das notas para a exportação por competência.
+    Uma falha deste registro complementar não pode impedir a atualização fiscal.
     """
     try:
         nfe_routes = _nfe_routes()

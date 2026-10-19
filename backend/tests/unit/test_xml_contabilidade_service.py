@@ -52,6 +52,7 @@ def documento(xml=None, chave=CHAVE, status="autorizada", identificador="1"):
 def xml_context(monkeypatch):
     monkeypatch.setattr(service, "_cnpj_empresa", lambda *_: CNPJ)
     monkeypatch.setattr(documentos, "_cnpj_empresa", lambda *_: CNPJ)
+    monkeypatch.setattr(documentos, "_obter_eventos", lambda *_: {})
     monkeypatch.setattr(service, "_agora", lambda: NOW)
 
 
@@ -156,20 +157,19 @@ def test_xml_ausente_nunca_gera_zip_parcial(xml_context, monkeypatch):
     assert "secret" not in str(exc.value)
 
 
-def test_cancelada_sem_evento_informa_manifesto(xml_context):
-    arquivos, notas = service._coletar_arquivos(
-        Mock(),
-        uuid4(),
-        [documento(status="cancelada")],
-        date(2026, 10, 19),
-        date(2026, 10, 19),
-    )
-    assert arquivos[0][1] == xml_nota()
-    assert "evento de cancelamento" in notas[0]["aviso"]
+def test_cancelada_sem_evento_bloqueia_pacote_incompleto(xml_context):
+    with pytest.raises(service.XmlContabilidadeError, match="cancelamento.*110111"):
+        service._coletar_arquivos(
+            Mock(),
+            uuid4(),
+            [documento(status="cancelada")],
+            date(2026, 10, 19),
+            date(2026, 10, 19),
+        )
 
 
 def test_evento_embutido_preserva_assinatura_sem_reserializar(xml_context):
-    evento = f"""<procEventoNFe><evento><infEvento Id="ID110111{CHAVE}01"><tpAmb>1</tpAmb><chNFe>{CHAVE}</chNFe><tpEvento>110111</tpEvento></infEvento></evento></procEventoNFe>""".encode()
+    evento = f"""<procEventoNFe><evento><infEvento Id="ID110111{CHAVE}01"><tpAmb>1</tpAmb><CNPJ>{CNPJ}</CNPJ><chNFe>{CHAVE}</chNFe><tpEvento>110111</tpEvento><nSeqEvento>1</nSeqEvento></infEvento></evento><retEvento><infEvento><tpAmb>1</tpAmb><chNFe>{CHAVE}</chNFe><tpEvento>110111</tpEvento><nSeqEvento>1</nSeqEvento><cStat>135</cStat><nProt>135260000000001</nProt><dhRegEvento>2026-10-19T13:00:00-03:00</dhRegEvento></infEvento></retEvento></procEventoNFe>""".encode()
     xml = xml_nota().replace(b"</nfeProc>", evento + b"</nfeProc>")
     arquivos, notas = service._coletar_arquivos(
         Mock(),
@@ -198,18 +198,28 @@ def test_mensal_ultimo_dia_do_mes_e_fuso():
     )
 
 
-def test_config_ativa_sem_varrer_historico_e_cancelar_pendentes(fila):
+def test_config_mensal_ativa_sem_varrer_historico_e_desliga_emissao_legada(fila):
     db, tenant = fila
+    config = XmlContabilidadeConfig(
+        tenant_id=tenant,
+        envio_automatico=True,
+        envio_automatico_desde=NOW - timedelta(days=1),
+    )
+    db.add(config)
+    db.commit()
+    assert service.obter_config(db, tenant)["envio_automatico"] is False
     result = service.salvar_config(
         db,
         tenant,
         {
             "email_contador": "contador@example.com",
-            "envio_automatico": True,
             "envio_mensal": True,
         },
     )
-    assert result["envio_automatico"] is True
+    assert result["envio_automatico"] is False
+    assert result["envio_mensal"] is True
+    assert config.envio_automatico is False
+    assert config.envio_automatico_desde is None
     assert service.listar_envios(db, tenant) == []
     auto = XmlContabilidadeEnvio(
         tenant_id=tenant,
@@ -226,30 +236,30 @@ def test_config_ativa_sem_varrer_historico_e_cancelar_pendentes(fila):
     assert auto.status == "cancelado"
 
 
-def test_automatico_deduplica_e_ignora_nota_anterior_a_ativacao(fila, monkeypatch):
+def test_automatico_por_emissao_nao_enfileira_nem_consulta_banco():
+    db = Mock()
+    assert service.enfileirar_documento(db, uuid4(), "intnfe", "1") is None
+    db.query.assert_not_called()
+    db.add.assert_not_called()
+
+
+def test_config_rejeita_ativar_envio_por_emissao(fila):
     db, tenant = fila
-    service.salvar_config(
-        db, tenant, {"email_contador": "contador@example.com", "envio_automatico": True}
-    )
-    doc = documento()
-    doc.data_emissao = datetime(2026, 10, 19, 12, 1)
-    monkeypatch.setattr(service, "_documento", lambda *_: doc)
-    primeiro = service.enfileirar_documento(db, tenant, "intnfe", "1")
-    segundo = service.enfileirar_documento(db, tenant, "intnfe", "1")
-    assert primeiro.id == segundo.id
-    doc.data_emissao -= timedelta(days=1)
-    assert service.enfileirar_documento(db, tenant, "intnfe", "2") is None
-    db.commit()
-    assert len(service.listar_envios(db, tenant)) == 1
+    with pytest.raises(ValueError, match="mensal"):
+        service.salvar_config(
+            db,
+            tenant,
+            {"email_contador": "contador@example.com", "envio_automatico": True},
+        )
+    assert service._config(db, tenant) is None
 
 
-def test_agendamento_cancelamento_e_isolamento(fila):
+def test_manual_cancelamento_e_isolamento(fila):
     db, tenant = fila
     service.salvar_config(db, tenant, {"email_contador": "contador@example.com"})
-    envio = service.criar_envio(
-        db, tenant, date(2026, 10, 1), date(2026, 10, 18), NOW + timedelta(days=1)
-    )
-    assert envio["status"] == "agendado"
+    envio = service.criar_envio(db, tenant, date(2026, 10, 1), date(2026, 10, 18))
+    assert envio["status"] == "pendente"
+    assert envio["origem"] == "manual"
     outro = uuid4()
     with tenant_context(outro):
         assert service.listar_envios(db, outro) == []
@@ -300,19 +310,191 @@ def test_mensal_apenas_um_envio_por_competencia(fila, monkeypatch):
     assert envios[0]["data_fim"] == "2026-09-30"
 
 
-def test_auto_anexa_xml_identifica_empresa_e_nunca_simula(xml_context, monkeypatch):
+@pytest.mark.parametrize(
+    "referencia,inicio,fim",
+    [
+        (
+            datetime(2026, 1, 1, 11, tzinfo=timezone.utc),
+            date(2025, 12, 1),
+            date(2025, 12, 31),
+        ),
+        (
+            datetime(2026, 3, 1, 11, tzinfo=timezone.utc),
+            date(2026, 2, 1),
+            date(2026, 2, 28),
+        ),
+        (
+            datetime(2028, 3, 1, 11, tzinfo=timezone.utc),
+            date(2028, 2, 1),
+            date(2028, 2, 29),
+        ),
+        (
+            datetime(2026, 5, 1, 11, tzinfo=timezone.utc),
+            date(2026, 4, 1),
+            date(2026, 4, 30),
+        ),
+        (
+            datetime(2026, 6, 1, 11, tzinfo=timezone.utc),
+            date(2026, 5, 1),
+            date(2026, 5, 31),
+        ),
+        # 00:30 UTC ainda é 31/03 no horário de Brasília: referência de março.
+        (
+            datetime(2026, 4, 1, 0, 30, tzinfo=timezone.utc),
+            date(2026, 2, 1),
+            date(2026, 2, 28),
+        ),
+    ],
+)
+def test_mensal_cobre_primeiro_ate_ultimo_dia_do_mes_anterior(
+    fila, referencia, inicio, fim
+):
+    db, tenant = fila
+    config = XmlContabilidadeConfig(
+        tenant_id=tenant,
+        email_contador="contador@example.com",
+        envio_mensal=True,
+        dia_envio_mensal=1,
+        hora_envio_mensal="08:00",
+        proximo_envio_mensal=referencia,
+    )
+    db.add(config)
+    db.commit()
+    service._criar_mensal_devido(db, tenant, referencia)
+    envio = service.listar_envios(db, tenant)[0]
+    assert envio["data_inicio"] == inicio.isoformat()
+    assert envio["data_fim"] == fim.isoformat()
+    assert envio["origem"] == "mensal"
+
+
+def test_mensal_servico_offline_recupera_competencias_sem_pular_ou_duplicar(fila):
+    db, tenant = fila
+    config = XmlContabilidadeConfig(
+        tenant_id=tenant,
+        email_contador="contador@example.com",
+        envio_mensal=True,
+        dia_envio_mensal=1,
+        hora_envio_mensal="08:00",
+        proximo_envio_mensal=datetime(2026, 8, 1, 11, tzinfo=timezone.utc),
+    )
+    db.add(config)
+    db.commit()
+    for _ in range(5):
+        service._criar_mensal_devido(db, tenant, NOW)
+    envios = service.listar_envios(db, tenant)
+    assert {(e["data_inicio"], e["data_fim"]) for e in envios} == {
+        ("2026-07-01", "2026-07-31"),
+        ("2026-08-01", "2026-08-31"),
+        ("2026-09-01", "2026-09-30"),
+    }
+    # Mesmo se a referência antiga reaparecer, a competência tem chave única.
+    config.proximo_envio_mensal = datetime(2026, 10, 1, 11, tzinfo=timezone.utc)
+    db.commit()
+    service._criar_mensal_devido(db, tenant, NOW)
+    assert len(service.listar_envios(db, tenant)) == 3
+
+
+def test_agendamento_avulso_rejeitado_no_servico(fila):
+    db, tenant = fila
+    with pytest.raises(service.XmlContabilidadeError, match="mensal"):
+        service.criar_envio(
+            db, tenant, date(2026, 10, 1), date(2026, 10, 18), NOW + timedelta(days=1)
+        )
+    assert service.listar_envios(db, tenant) == []
+
+
+@pytest.mark.parametrize("origem", ["automatico", "agendado"])
+def test_fila_cancela_legados_sem_enviar_e_preserva_historico(
+    fila, monkeypatch, origem
+):
+    db, tenant = fila
+    # Mesmo antes da migração, uma configuração antiga não reativa a emissão.
+    db.add(
+        XmlContabilidadeConfig(
+            tenant_id=tenant,
+            email_contador="contador@example.com",
+            envio_automatico=True,
+            envio_automatico_desde=NOW - timedelta(days=1),
+        )
+    )
+    rows = []
+    for status in ("pendente", "agendado", "enviado", "falhou"):
+        envio = XmlContabilidadeEnvio(
+            tenant_id=tenant,
+            origem=origem,
+            status=status,
+            email_destino="contador@example.com",
+            data_inicio=date(2026, 10, 1),
+            data_fim=date(2026, 10, 18),
+            proxima_tentativa_em=NOW,
+        )
+        rows.append(envio)
+        db.add(envio)
+    db.commit()
+    processar = Mock()
+    monkeypatch.setattr(service, "_processar_envio", processar)
+    assert service.processar_fila_tenant(db, tenant) == 0
+    assert [row.status for row in rows] == [
+        "cancelado",
+        "cancelado",
+        "enviado",
+        "falhou",
+    ]
+    assert len(service.listar_envios(db, tenant)) == 4
+    processar.assert_not_called()
+    with pytest.raises(service.XmlContabilidadeError, match="lote manual"):
+        service.reenviar_envio(db, tenant, rows[-1].id)
+
+
+@pytest.mark.parametrize("origem", ["automatico", "agendado"])
+def test_legado_interrompido_nunca_e_retomado_automaticamente(
+    fila, monkeypatch, origem
+):
+    db, tenant = fila
+    envio = XmlContabilidadeEnvio(
+        tenant_id=tenant,
+        origem=origem,
+        status="processando",
+        email_destino="contador@example.com",
+        data_inicio=date(2026, 10, 1),
+        data_fim=date(2026, 10, 18),
+        proxima_tentativa_em=NOW,
+        processamento_iniciado_em=NOW - timedelta(hours=1),
+    )
+    db.add(envio)
+    db.commit()
+    processar = Mock()
+    monkeypatch.setattr(service, "_processar_envio", processar)
+    assert service.processar_fila_tenant(db, tenant) == 0
+    assert envio.status == "falhou"
+    assert "interrompido" in envio.ultimo_erro
+    assert service.processar_fila_tenant(db, tenant) == 0
+    processar.assert_not_called()
+    with pytest.raises(service.XmlContabilidadeError, match="lote manual"):
+        service.reenviar_envio(db, tenant, envio.id)
+
+
+@pytest.mark.parametrize("origem", ["automatico", "agendado"])
+def test_processamento_direto_legado_nao_chega_ao_smtp(monkeypatch, origem):
+    enviar = Mock()
+    monkeypatch.setattr(service.email_service, "send_email", enviar)
+    with pytest.raises(service.XmlContabilidadeError, match="mensal"):
+        service._processar_envio(Mock(), uuid4(), SimpleNamespace(origem=origem))
+    enviar.assert_not_called()
+
+
+def test_manual_anexa_zip_identifica_empresa_e_nunca_simula(xml_context, monkeypatch):
     db = Mock()
     db.query.return_value.filter.return_value.first.return_value = SimpleNamespace(
         name="Minha loja", razao_social="Minha loja Ltda"
     )
-    monkeypatch.setattr(service, "_documento", lambda *_: documento())
+    gerar = Mock(return_value=(b"PK-xml", "notas.zip", 3))
+    monkeypatch.setattr(service, "gerar_zip_periodo", gerar)
     monkeypatch.setattr(service.email_service, "is_email_configured", lambda: True)
     enviar = Mock(return_value=True)
     monkeypatch.setattr(service.email_service, "send_email", enviar)
     envio = SimpleNamespace(
-        origem="automatico",
-        provider="intnfe",
-        documento_id="1",
+        origem="manual",
         data_inicio=date(2026, 10, 19),
         data_fim=date(2026, 10, 19),
         email_destino="contador@example.com",
@@ -320,8 +502,9 @@ def test_auto_anexa_xml_identifica_empresa_e_nunca_simula(xml_context, monkeypat
     service._processar_envio(db, uuid4(), envio)
     kwargs = enviar.call_args.kwargs
     assert kwargs["simulate_if_unconfigured"] is False
-    assert kwargs["attachments"][0]["filename"].endswith(".xml")
-    assert kwargs["attachments"][0]["content"] == xml_nota()
+    assert kwargs["attachments"][0]["filename"].endswith(".zip")
+    assert kwargs["attachments"][0]["content"] == b"PK-xml"
+    assert envio.quantidade_xml == 3
     assert CNPJ in kwargs["subject"] and "Minha loja Ltda" in kwargs["text_body"]
     assert envio.status == "enviado"
 
@@ -420,8 +603,7 @@ def test_pendente_confirmada_passa_guard_do_periodo(fila, monkeypatch):
 def test_xml_local_e_cache_mesma_chave_so_um_arquivo_e_ultimo_status(xml_context):
     primeira = documento()
     outra = documento(status="cancelada")
-    arquivos, notas = service._coletar_arquivos(
-        Mock(), uuid4(), [primeira, outra], date(2026, 10, 19), date(2026, 10, 19)
-    )
-    assert len(arquivos) == 1
-    assert notas[0]["status"] == "cancelada"
+    with pytest.raises(service.XmlContabilidadeError, match="cancelamento"):
+        service._coletar_arquivos(
+            Mock(), uuid4(), [primeira, outra], date(2026, 10, 19), date(2026, 10, 19)
+        )
