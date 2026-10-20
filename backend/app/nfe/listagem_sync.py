@@ -3,7 +3,7 @@ import sys
 from time import monotonic, sleep
 
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only, noload
 
 from app.bling_integration import BlingAPI
 from app.nfe.listagem_base import (
@@ -38,6 +38,7 @@ from app.services.bling_tenant_guard import tenant_pode_usar_bling_global
 from app.services.nfe_cache_service import obter_estado_cache_notas, upsert_nota_cache
 from app.utils.logger import logger
 from app.vendas_models import Venda
+from app.intnfe.cancellation import campos_cancelamento_com_aliases
 
 
 def _compat_attr(name: str, default):
@@ -130,6 +131,67 @@ def _sincronizar_fontes_locais_nfe_em_cache(
 
 
 def _enriquecer_notas_com_vendas(db: Session, tenant_id, notas: list[dict]) -> None:
+    ids_vendas = {
+        valor
+        for nota in notas
+        if nota.get("provedor") == "intnfe"
+        and (valor := _coerce_int(nota.get("venda_id"), 0)) > 0
+    }
+    correlacoes = {
+        str(nota["id"])
+        for nota in notas
+        if nota.get("provedor") == "intnfe" and nota.get("id")
+    }
+    if ids_vendas or correlacoes:
+        vendas = (
+            db.query(Venda)
+            .options(
+                load_only(
+                    Venda.id,
+                    Venda.status,
+                    Venda.nfe_status,
+                    Venda.nfe_correlation_id,
+                    Venda.nfe_bling_id,
+                    Venda.nfe_data_autorizacao,
+                    Venda.nfe_protocolo,
+                    Venda.nfe_cancelamento_status,
+                    Venda.nfe_cancelamento_codigo,
+                    Venda.nfe_cancelamento_motivo,
+                    Venda.nfe_cancelamento_solicitado_em,
+                ),
+                noload("*"),
+            )
+            .filter(
+                Venda.tenant_id == tenant_id,
+                or_(
+                    Venda.id.in_(ids_vendas), Venda.nfe_correlation_id.in_(correlacoes)
+                ),
+            )
+            .all()
+        )
+        por_id = {venda.id: venda for venda in vendas}
+        por_correlacao = {
+            str(venda.nfe_correlation_id): venda
+            for venda in vendas
+            if venda.nfe_correlation_id
+        }
+        for nota in notas:
+            if nota.get("provedor") != "intnfe":
+                continue
+            venda = por_id.get(
+                _coerce_int(nota.get("venda_id"), 0)
+            ) or por_correlacao.get(str(nota.get("id") or ""))
+            if not venda:
+                continue
+            if nota.get("provedor") == "intnfe" and str(
+                venda.nfe_correlation_id or ""
+            ) != str(nota.get("id") or ""):
+                continue
+            nota["venda_id"] = venda.id
+            nota["venda_status"] = venda.status
+            nota.update(campos_cancelamento_com_aliases(venda))
+            if venda.nfe_status:
+                nota["status"] = venda.nfe_status
     ids_bling = _ids_bling_das_notas(notas)
     if not ids_bling:
         return
@@ -165,6 +227,8 @@ def _vendas_por_bling_id(
 
 def _aplicar_venda_em_nota(nota: dict, venda: Venda) -> None:
     nota["venda_id"] = nota.get("venda_id") or venda.id
+    nota["venda_status"] = venda.status
+    nota.update(campos_cancelamento_com_aliases(venda))
     nota["chave"] = nota.get("chave") or venda.nfe_chave or ""
 
     if not nota.get("valor") and venda.total is not None:

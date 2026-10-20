@@ -93,6 +93,12 @@ async def test_exclusao_limpa_rejeicao_intnfe_para_permitir_nova_tentativa():
         def filter(self, *_args):
             return self
 
+        def populate_existing(self):
+            return self
+
+        def with_for_update(self):
+            return self
+
         def first(self):
             return venda
 

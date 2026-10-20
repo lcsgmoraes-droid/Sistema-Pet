@@ -215,6 +215,8 @@ def _direct_failure(exc):
     }
     if exc.validation:
         detail["validacao"] = exc.validation
+    if exc.cancelamento:
+        detail.update(exc.cancelamento)
     return HTTPException(
         exc.status,
         detail,
@@ -653,7 +655,7 @@ def cancel_intnfe_venda(
         raise HTTPException(404, "Venda não encontrada")
     api = _intnfe_client()
     try:
-        return cancel_intnfe(db, venda, api, body.justificativa)
+        return cancel_intnfe(db, venda, api, body.justificativa, user_id=_user.id)
     except DirectEmissionError as exc:
         raise _direct_failure(exc) from None
     finally:
@@ -688,6 +690,7 @@ async def listar_nfes(
         payload_cache["cache_idade_segundos"] = int(
             max(agora_cache - cache_atual.get("ts_monotonic", 0), 0)
         )
+        _enriquecer_notas_com_vendas(db, tenant_id, payload_cache.get("notas", []))
         return payload_cache
 
     estado_cache = obter_estado_cache_notas(

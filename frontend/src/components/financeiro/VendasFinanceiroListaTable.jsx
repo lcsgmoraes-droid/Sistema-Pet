@@ -18,6 +18,7 @@ import NumberCell from "../ui/NumberCell";
 import SaleReference from "../ui/SaleReference";
 import StatusBadge from "../ui/StatusBadge";
 import ProductIdentity from "../ui/ProductIdentity";
+import { obterPendenciaCancelamentoFiscal } from "../../utils/pdvFiscalStatus";
 import {
   CANAL_APP,
   CANAL_ECOMMERCE,
@@ -169,13 +170,21 @@ function CustoCampanhaCell({ venda }) {
   );
 }
 
-function StatusVendaCell({ getStatusVendaMeta, status }) {
-  const statusMeta = getStatusVendaMeta(status);
+function StatusVendaCell({ getStatusVendaMeta, venda }) {
+  const statusMeta = getStatusVendaMeta(venda.status);
+  const pendenciaFiscal = obterPendenciaCancelamentoFiscal(venda);
 
   return (
-    <StatusBadge intent={statusMeta.intent} size="xs">
-      {statusMeta.label}
-    </StatusBadge>
+    <div className="flex flex-col items-center gap-1">
+      <StatusBadge intent={statusMeta.intent} size="xs">
+        {statusMeta.label}
+      </StatusBadge>
+      {pendenciaFiscal && (
+        <StatusBadge intent={pendenciaFiscal.intent} size="xs" title={pendenciaFiscal.detalhe}>
+          {pendenciaFiscal.label}
+        </StatusBadge>
+      )}
+    </div>
   );
 }
 
@@ -584,9 +593,7 @@ export default function VendasFinanceiroListaTable({
       key: "status",
       header: "Status",
       align: "center",
-      render: (venda) => (
-        <StatusVendaCell getStatusVendaMeta={getStatusVendaMeta} status={venda.status} />
-      ),
+      render: (venda) => <StatusVendaCell getStatusVendaMeta={getStatusVendaMeta} venda={venda} />,
     },
     {
       key: "reprocessar",

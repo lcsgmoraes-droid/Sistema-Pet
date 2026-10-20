@@ -4,11 +4,13 @@ import test from "node:test";
 import {
   extrairCamposFiscaisVenda,
   obterSituacaoFiscalVenda,
-  podeCancelarVendaComNotaCancelada,
+  obterPendenciaCancelamentoFiscal,
+  podeCancelarVenda,
   podeImprimirDocumentoFiscalVenda,
   rotaDanfeFiscalVenda,
   rotaNotaFiscalVenda,
   temDocumentoFiscalVenda,
+  temNotaFiscalAtiva,
 } from "./pdvFiscalStatus.js";
 
 test("não exibe situação fiscal quando a venda nunca teve nota", () => {
@@ -55,12 +57,88 @@ test("distingue NFC-e autorizada e cancelada", () => {
   );
 });
 
-test("libera cancelamento direto da venda somente após confirmação fiscal de cancelamento", () => {
+test("cancelamento comercial é permitido independentemente da situação fiscal da nota", () => {
   const venda = { id: 26, status: "pago_nf", nfe_modelo: 65 };
-  assert.equal(podeCancelarVendaComNotaCancelada({ ...venda, nfe_status: "cancelada" }), true);
-  assert.equal(podeCancelarVendaComNotaCancelada({ ...venda, nfe_status: "Cancelada" }), true);
+  assert.equal(podeCancelarVenda({ ...venda, nfe_status: "cancelada" }), true);
+  assert.equal(podeCancelarVenda({ ...venda, nfe_status: "Cancelada" }), true);
   for (const nfe_status of ["autorizada", "processando", "inconclusiva", "rejeitada", null]) {
-    assert.equal(podeCancelarVendaComNotaCancelada({ ...venda, nfe_status }), false);
+    assert.equal(podeCancelarVenda({ ...venda, nfe_status }), true);
+  }
+});
+
+test("venda cancelada mantém nota autorizada e mostra código e motivo da recusa", () => {
+  const venda = {
+    id: 26,
+    status: "cancelada",
+    nfe_status: "autorizada",
+    nfe_cancelamento_status: "recusado",
+    nfe_cancelamento_codigo: "501",
+    nfe_cancelamento_motivo: { mensagem: "Prazo de cancelamento excedido" },
+  };
+  assert.equal(obterSituacaoFiscalVenda(venda).statusLabel, "Autorizada");
+  const pendencia = obterPendenciaCancelamentoFiscal(venda);
+  assert.equal(pendencia.label, "Nota a cancelar");
+  assert.match(pendencia.detalhe, /Código 501/);
+  assert.match(pendencia.detalhe, /Prazo de cancelamento excedido/);
+  assert.doesNotMatch(pendencia.detalhe, /object Object/);
+});
+
+test("pedido fiscal em andamento só deixa de ser pendência após confirmação da nota cancelada", () => {
+  const venda = {
+    id: 26,
+    status: "cancelada",
+    nfe_status: "autorizada",
+    nfe_cancelamento_status: "solicitado",
+  };
+  assert.equal(obterPendenciaCancelamentoFiscal(venda).label, "Cancelamento da nota em andamento");
+  assert.equal(
+    obterPendenciaCancelamentoFiscal({
+      ...venda,
+      nfe_status: "cancelada",
+      nfe_cancelamento_status: "confirmado",
+    }),
+    null,
+  );
+  assert.equal(
+    obterPendenciaCancelamentoFiscal({
+      id: 27,
+      status: "cancelada",
+      pendencia_fiscal_cancelamento: false,
+    }),
+    null,
+  );
+  assert.equal(temDocumentoFiscalVenda({ id: 27, pendencia_fiscal_cancelamento: false }), false);
+});
+
+test("rejeição após autorização preserva a pendência fiscal informada pelo servidor", () => {
+  const venda = {
+    id: 26,
+    status: "cancelada",
+    nfe_status: "rejeitada",
+    nfe_data_autorizacao: "2026-10-20T12:00:00",
+    pendencia_fiscal_cancelamento: true,
+  };
+  assert.equal(temNotaFiscalAtiva(venda), true);
+  assert.equal(obterPendenciaCancelamentoFiscal(venda).label, "Nota a cancelar");
+  assert.equal(obterSituacaoFiscalVenda(venda).statusLabel, "Rejeitada");
+});
+
+test("rascunho sem autorização anterior não cria pendência para a venda cancelada", () => {
+  const venda = {
+    id: 26,
+    status: "cancelada",
+    nfe_status: "rascunho",
+    nfe_correlation_id: "rascunho-26",
+  };
+  assert.equal(temNotaFiscalAtiva(venda), false);
+  assert.equal(obterPendenciaCancelamentoFiscal(venda), null);
+});
+
+test("nota cancelada confirmada prevalece sobre sinal antigo de pendência", () => {
+  for (const nfe_status of ["cancelada", "cancelado"]) {
+    const venda = { id: 26, status: "cancelada", nfe_status, pendencia_fiscal_cancelamento: true };
+    assert.equal(temNotaFiscalAtiva(venda), false);
+    assert.equal(obterPendenciaCancelamentoFiscal(venda), null);
   }
 });
 
@@ -74,14 +152,11 @@ test("nota cancelada não libera novo cancelamento em venda cancelada ou devolvi
     "devolvida_total",
     "finalizada_devolucao_total",
   ]) {
-    assert.equal(podeCancelarVendaComNotaCancelada({ ...venda, status }), false);
+    assert.equal(podeCancelarVenda({ ...venda, status }), false);
   }
-  assert.equal(
-    podeCancelarVendaComNotaCancelada({ nfe_status: "cancelada", status: "aberta" }),
-    false,
-  );
+  assert.equal(podeCancelarVenda({ nfe_status: "cancelada", status: "aberta" }), false);
   for (const status of ["aberta", "finalizada", "baixa_parcial"]) {
-    assert.equal(podeCancelarVendaComNotaCancelada({ ...venda, status }), true);
+    assert.equal(podeCancelarVenda({ ...venda, status }), true);
   }
 });
 

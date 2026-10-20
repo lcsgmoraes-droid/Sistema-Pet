@@ -24,6 +24,7 @@ import {
   rejeicaoResponsavelTecnico,
 } from "../utils/fiscalRejectionGuidance.mjs";
 import NFSaidaCompartilharModal from "./centralNFSaida/NFSaidaCompartilharModal";
+import { resumirCancelamentoNota } from "../utils/nfeCancelamentoFeedback";
 import {
   atalhoDiretoCorePet,
   carregarNotaDiretaCorePet,
@@ -483,16 +484,30 @@ export default function CentralNFSaida() {
           ? `/nfe/vendas/${modalCancelar.venda_id}/cancelar`
           : `/nfe/${modalCancelar.id}/cancelar`;
       const response = await api.post(endpoint, { justificativa });
-      alert(
-        response.data?.cancelamento_solicitado
-          ? "Solicitação de cancelamento enviada. A nota só estará cancelada quando a situação mudar para Cancelada; atualize a lista para acompanhar a confirmação da SEFAZ."
-          : "Nota fiscal cancelada com sucesso!",
-      );
-      setModalCancelar(null);
-      setJustificativa("");
+      const feedback = resumirCancelamentoNota(response.data);
+      alert(feedback.mensagem);
+      if (feedback.confirmado || feedback.solicitado) {
+        setModalCancelar(null);
+        setJustificativa("");
+      } else {
+        setModalCancelar((nota) => ({
+          ...nota,
+          nfe_cancelamento_status: feedback.status,
+          nfe_cancelamento_codigo: feedback.codigo,
+          nfe_cancelamento_motivo: feedback.motivo,
+        }));
+      }
       carregarNotas(true);
     } catch (error) {
-      alert(error.response?.data?.detail || "Erro ao cancelar nota fiscal");
+      const feedback = resumirCancelamentoNota(error.response?.data || { mensagem: error.message });
+      alert(feedback.mensagem);
+      setModalCancelar((nota) => ({
+        ...nota,
+        nfe_cancelamento_status: feedback.status,
+        nfe_cancelamento_codigo: feedback.codigo,
+        nfe_cancelamento_motivo: feedback.motivo,
+      }));
+      carregarNotas(true);
     } finally {
       setCancelando(false);
     }

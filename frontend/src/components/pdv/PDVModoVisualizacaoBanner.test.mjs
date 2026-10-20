@@ -63,13 +63,13 @@ test("nota cancelada exibe cancelamento direto, preservando o fluxo de confirma�
   assert.equal(botaoCancelar(harness).props.disabled, true);
 });
 
-test("somente a confirmação do cancelamento fiscal habilita Cancelar venda", async () => {
+test("venda ativa permite cancelar mesmo com nota autorizada ou em processamento", async () => {
   const vendaAtual = { id: 26, status: "pago_nf", nfe_modelo: 65, nfe_status: "autorizada" };
   const harness = montarBanner(vendaAtual);
-  assert.equal(botaoCancelar(harness), undefined);
+  assert.ok(botaoCancelar(harness));
 
   await harness.update({ vendaAtual: { ...vendaAtual, nfe_status: "processando" } });
-  assert.equal(botaoCancelar(harness), undefined);
+  assert.ok(botaoCancelar(harness));
 
   await harness.update({
     vendaAtual: { ...vendaAtual, status: "finalizada", nfe_status: "cancelada" },

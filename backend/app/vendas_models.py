@@ -175,6 +175,10 @@ class Venda(BaseTenantModel):
     nfe_status = Column(
         String(20), nullable=True
     )  # emitindo, autorizada, cancelada, denegada
+    nfe_cancelamento_status = Column(String(20), nullable=True)
+    nfe_cancelamento_codigo = Column(String(80), nullable=True)
+    nfe_cancelamento_motivo = Column(String(500), nullable=True)
+    nfe_cancelamento_solicitado_em = Column(DateTime(timezone=True), nullable=True)
     nfe_xml = Column(Text, nullable=True)  # XML da NF-e/NFC-e
     nfe_data_emissao = Column(DateTime, nullable=True)
     nfe_data_autorizacao = Column(DateTime, nullable=True)
@@ -225,6 +229,7 @@ class Venda(BaseTenantModel):
 
     def to_dict(self):
         from app.vendas.status_pagamento import calcular_resumo_pagamento_venda
+        from app.intnfe.cancellation import campos_cancelamento_com_aliases
 
         resumo_pagamento = calcular_resumo_pagamento_venda(
             total=self.total,
@@ -380,6 +385,7 @@ class Venda(BaseTenantModel):
             "nfe_serie": self.nfe_serie,
             "nfe_chave": self.nfe_chave,
             "nfe_status": self.nfe_status,
+            **campos_cancelamento_com_aliases(self),
             "nfe_provider": self.nfe_provider,
             "nfe_correlation_id": self.nfe_correlation_id,
             "nfe_protocolo": self.nfe_protocolo,

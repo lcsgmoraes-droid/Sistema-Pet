@@ -20,6 +20,7 @@ class IntNFeError(Exception):
         correlation=None,
         uncertain=False,
         validation_errors=None,
+        provider_message=None,
     ):
         super().__init__(code)
         self.code = code
@@ -31,6 +32,8 @@ class IntNFeError(Exception):
         )
         self.uncertain = uncertain
         self.validation_errors = list(validation_errors or [])
+        mensagens = _safe_validation_errors({"erros": [provider_message]})
+        self.provider_message = mensagens[0] if mensagens else None
 
 
 def _safe_validation_errors(payload):
@@ -152,6 +155,10 @@ class IntNFeClient:
                     r"[A-Za-z][A-Za-z0-9_-]{1,79}", remote_code
                 ):
                     code = remote_code
+                if path.endswith("/cancelar") and isinstance(error, dict):
+                    cancellation_code = str(error.get("codigoRetorno") or "")
+                    if re.fullmatch(r"\d{1,5}", cancellation_code):
+                        code = cancellation_code
             raise IntNFeError(
                 code,
                 status=response.status_code,
@@ -165,6 +172,11 @@ class IntNFeClient:
                 validation_errors=(
                     _safe_validation_errors(error)
                     if path.startswith(("/nfe", "/nfce"))
+                    else None
+                ),
+                provider_message=(
+                    error.get("motivoRetorno") or error.get("mensagem")
+                    if isinstance(error, dict) and path.endswith("/cancelar")
                     else None
                 ),
             )
@@ -463,7 +475,16 @@ class IntNFeClient:
         result = self._request(
             "GET", self._document_path(document_type, correlation_id), token=token
         )
-        if not isinstance(result, dict):
+        if not isinstance(result, dict) or str(result.get("status")) not in {
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+        }:
             raise IntNFeError("RespostaInvalida")
         return result
 
