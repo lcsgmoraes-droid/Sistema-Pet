@@ -1,4 +1,4 @@
-"""XMLs fiscais por empresa, lotes manuais e envio mensal do mês anterior completo.
+"""XMLs por documento/evento, lotes manuais e envio mensal do mês anterior.
 
 Datas do usuário são dias civis em São Paulo. O XML oficial confirma ambiente,
 direção, autorização, chave e data; o cache apenas localiza os documentos.
@@ -11,7 +11,7 @@ import logging
 from datetime import date, datetime, timedelta
 from html import escape
 
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 
 from app.services import email_service
 from app.tenancy.context import tenant_context
@@ -32,15 +32,17 @@ from app.services.xml_contabilidade_common import (
 from app.services.xml_contabilidade_documentos import (
     Documento as Documento,
     _cnpj_empresa,
+    _coletar_arquivos as _coletar_arquivos,
     gerar_zip_periodo as gerar_zip_periodo,
+    gerar_anexos_periodo,
 )
 
 logger = logging.getLogger(__name__)
-ORIGENS_LEGADAS = ("automatico", "agendado")
-ORIGENS_ATIVAS = ("manual", "mensal")
+ORIGENS_LEGADAS = ("agendado",)
+ORIGENS_ATIVAS = ("manual", "mensal", "automatico")
 AVISO_FLUXO_LEGADO = (
-    "O envio automático agora é somente mensal, do mês anterior completo. "
-    "Para outro período, crie um lote manual."
+    "Este fluxo antigo foi desativado. Use o envio mensal do mês anterior "
+    "completo ou prepare um lote manual."
 )
 
 
@@ -82,8 +84,7 @@ def obter_config(db, tenant_id):
     config = _config(db, tenant_id)
     return {
         "email_contador": config.email_contador if config else None,
-        # Campo legado preservado por compatibilidade, nunca volta a ativar emissão.
-        "envio_automatico": False,
+        "envio_automatico": bool(config and config.envio_automatico),
         "envio_mensal": bool(config and config.envio_mensal),
         "dia_envio_mensal": config.dia_envio_mensal if config else 1,
         "hora_envio_mensal": config.hora_envio_mensal if config else "08:00",
@@ -103,14 +104,20 @@ def salvar_config(db, tenant_id, dados):
     if not config:
         config = XmlContabilidadeConfig(tenant_id=_tenant(tenant_id))
         db.add(config)
+    anterior_automatico = bool(config.envio_automatico)
     mensal_alterado = (
         not config.envio_mensal
         or config.dia_envio_mensal != dados.dia_envio_mensal
         or config.hora_envio_mensal != dados.hora_envio_mensal
     )
     config.email_contador = str(dados.email_contador) if dados.email_contador else None
-    config.envio_automatico = False
-    config.envio_automatico_desde = None
+    config.envio_automatico = dados.envio_automatico
+    if dados.envio_automatico and not anterior_automatico:
+        # Só fatos novos a partir daqui: os eventos têm data oficial própria,
+        # mesmo se a nota original tiver sido emitida antes da ativação.
+        config.envio_automatico_desde = _agora()
+    elif not dados.envio_automatico:
+        config.envio_automatico_desde = None
     config.envio_mensal = dados.envio_mensal
     config.dia_envio_mensal = dados.dia_envio_mensal
     config.hora_envio_mensal = dados.hora_envio_mensal
@@ -121,6 +128,8 @@ def salvar_config(db, tenant_id, dados):
             dados.dia_envio_mensal, dados.hora_envio_mensal
         )
     origens_desativadas = list(ORIGENS_LEGADAS)
+    if not dados.envio_automatico:
+        origens_desativadas.append("automatico")
     if not dados.envio_mensal:
         origens_desativadas.append("mensal")
     if origens_desativadas:
@@ -244,7 +253,10 @@ def cancelar_envio(db, tenant_id, envio_id):
 
 def reenviar_envio(db, tenant_id, envio_id):
     envio = _buscar_envio_bloqueado(db, tenant_id, envio_id)
-    if envio.origem in ORIGENS_LEGADAS:
+    if envio.origem in ORIGENS_LEGADAS or (
+        envio.origem == "automatico"
+        and not (envio.idempotency_key or "").startswith(("nota:", "evento:"))
+    ):
         raise XmlContabilidadeError(AVISO_FLUXO_LEGADO, 409)
     if envio.status != "falhou":
         raise XmlContabilidadeError(
@@ -259,8 +271,10 @@ def reenviar_envio(db, tenant_id, envio_id):
 
 
 def enfileirar_documento(db, tenant_id, provider, documento_id):
-    """Compatibilidade com chamadores antigos; emissão não agenda contabilidade."""
-    return None
+    """Chamado sob savepoint; emissão não aguarda consulta externa nem e-mail."""
+    from app.services.xml_contabilidade_individual import enfileirar_nota
+
+    return enfileirar_nota(db, tenant_id, provider, documento_id, _agora())
 
 
 def _criar_mensal_devido(db, tenant_id, agora):
@@ -315,7 +329,12 @@ def _criar_mensal_devido(db, tenant_id, agora):
 
 
 def _processar_envio(db, tenant_id, envio):
-    if envio.origem not in ORIGENS_ATIVAS:
+    if envio.origem not in ORIGENS_ATIVAS or (
+        envio.origem == "automatico"
+        and not (getattr(envio, "idempotency_key", None) or "").startswith(
+            ("nota:", "evento:")
+        )
+    ):
         raise XmlContabilidadeError(AVISO_FLUXO_LEGADO, 409)
     if not email_service.is_email_configured():
         raise XmlContabilidadeError(
@@ -330,12 +349,18 @@ def _processar_envio(db, tenant_id, envio):
         if empresa
         else ""
     )
-    content, nome, quantidade = gerar_zip_periodo(
-        db, tenant_id, envio.data_inicio, envio.data_fim
-    )
-    anexos = [{"filename": nome, "content": content, "mime_subtype": "zip"}]
-    assunto = f"XMLs fiscais de saída — {envio.data_inicio:%d/%m/%Y} a {envio.data_fim:%d/%m/%Y}"
-    texto = f"Seguem {quantidade} notas fiscais de saída no período de {envio.data_inicio:%d/%m/%Y} a {envio.data_fim:%d/%m/%Y}. O ZIP inclui manifesto com a situação das notas e disponibilidade dos eventos fiscais."
+    if envio.origem == "automatico":
+        from app.services.xml_contabilidade_individual import preparar_anexos_individual
+
+        anexos, nome, quantidade = preparar_anexos_individual(db, tenant_id, envio)
+        assunto = "XML fiscal de saída — nota ou evento registrado"
+        texto = "Segue o XML oficial da nota fiscal ou do evento registrado. Cada nota e cada novo evento são enviados separadamente, sem alterar o XML original."
+    else:
+        anexos, nome, quantidade = gerar_anexos_periodo(
+            db, tenant_id, envio.data_inicio, envio.data_fim
+        )
+        assunto = f"XMLs fiscais de saída — {envio.data_inicio:%d/%m/%Y} a {envio.data_fim:%d/%m/%Y}"
+        texto = f"Seguem os XMLs de {quantidade} notas fiscais de saída e seus eventos no período de {envio.data_inicio:%d/%m/%Y} a {envio.data_fim:%d/%m/%Y}. Cada tipo de documento está organizado em seu próprio ZIP, com manifesto para conferência."
     assunto = f"{identificacao} | {assunto}"
     texto = f"Empresa emitente: {identificacao}\n\n{texto}"
     if not email_service.send_email(
@@ -356,13 +381,24 @@ def _processar_envio(db, tenant_id, envio):
 
 def processar_fila_tenant(db, tenant_id, limite=5):
     agora = _agora()
-    # Defesa adicional para bancos ainda não migrados: fluxos antigos nunca
-    # chegam ao SMTP; seu histórico permanece disponível para conferência.
+    # Agendamentos de período avulso continuam desativados.
     legados = (
         db.query(XmlContabilidadeEnvio)
         .filter(
             XmlContabilidadeEnvio.tenant_id == _tenant(tenant_id),
-            XmlContabilidadeEnvio.origem.in_(ORIGENS_LEGADAS),
+            or_(
+                XmlContabilidadeEnvio.origem.in_(ORIGENS_LEGADAS),
+                and_(
+                    XmlContabilidadeEnvio.origem == "automatico",
+                    or_(
+                        XmlContabilidadeEnvio.idempotency_key.is_(None),
+                        and_(
+                            ~XmlContabilidadeEnvio.idempotency_key.like("nota:%"),
+                            ~XmlContabilidadeEnvio.idempotency_key.like("evento:%"),
+                        ),
+                    ),
+                ),
+            ),
             XmlContabilidadeEnvio.status.in_(("pendente", "agendado")),
         )
         .with_for_update(skip_locked=True)
@@ -373,6 +409,11 @@ def processar_fila_tenant(db, tenant_id, limite=5):
         envio.ultimo_erro = AVISO_FLUXO_LEGADO
     db.commit()
     _criar_mensal_devido(db, tenant_id, agora)
+    config = _config(db, tenant_id)
+    if config and config.envio_automatico and config.envio_automatico_desde:
+        from app.services.xml_contabilidade_individual import capturar_novos_eventos
+
+        capturar_novos_eventos(db, tenant_id, agora)
     # Recuperação conservadora: após queda durante SMTP não se pode afirmar se o
     # destinatário recebeu. Mantém histórico e exige tentativa manual explícita.
     interrompidos = (

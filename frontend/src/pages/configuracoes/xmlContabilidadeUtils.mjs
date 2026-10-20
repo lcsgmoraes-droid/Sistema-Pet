@@ -1,5 +1,32 @@
 const FUSO = "America/Sao_Paulo";
 
+export const CONFIG_CONTABILIDADE_INICIAL = {
+  email_contador: "",
+  envio_automatico: false,
+  envio_mensal: false,
+  dia_envio_mensal: 1,
+  hora_envio_mensal: "08:00",
+  smtp_configurado: false,
+};
+
+export function normalizarConfigContabilidade(dados) {
+  return {
+    ...CONFIG_CONTABILIDADE_INICIAL,
+    ...dados,
+    email_contador: dados?.email_contador || "",
+  };
+}
+
+export function payloadConfigContabilidade(config) {
+  return {
+    email_contador: config.email_contador.trim(),
+    envio_automatico: config.envio_automatico,
+    envio_mensal: config.envio_mensal,
+    dia_envio_mensal: Number(config.dia_envio_mensal),
+    hora_envio_mensal: config.hora_envio_mensal,
+  };
+}
+
 export function periodoMesAnterior(agora = new Date()) {
   const partes = new Intl.DateTimeFormat("en-CA", {
     timeZone: FUSO,

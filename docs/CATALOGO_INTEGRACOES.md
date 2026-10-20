@@ -323,6 +323,10 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
 - **Retry:** o fluxo de XML para contabilidade possui fila durável própria,
   três tentativas e histórico por empresa. Os demais chamadores SMTP ainda não
   têm fila central de entrega.
+- **XML para contabilidade:** envio individual de cada nota/evento e mensal do
+  mês anterior completo são opções independentes. Lotes usam uma mensagem com
+  ZIPs por tipo; eventos registrados no período de notas antigas também entram.
+  Monitoramento e comprovantes são persistidos por empresa para deduplicação.
 - **Idempotência:** `message_id` e correlação ajudam a rastrear, mas não formam
   garantia de envio único entre novas tentativas.
 - **Fallback:** alguns chamadores podem simular envio quando não configurado;

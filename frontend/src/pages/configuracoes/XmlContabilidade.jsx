@@ -10,32 +10,15 @@ import XmlContabilidadeConfig from "./XmlContabilidadeConfig";
 import XmlContabilidadeLote from "./XmlContabilidadeLote";
 import XmlContabilidadeHistorico from "./XmlContabilidadeHistorico";
 import {
+  CONFIG_CONTABILIDADE_INICIAL,
   erroPeriodo,
   mensagemErroContabilidade,
+  normalizarConfigContabilidade,
+  payloadConfigContabilidade,
   periodoMesAnterior,
 } from "./xmlContabilidadeUtils.mjs";
 
 const BASE = "/contabilidade/xml";
-const CONFIG_INICIAL = {
-  email_contador: "",
-  envio_mensal: false,
-  dia_envio_mensal: 1,
-  hora_envio_mensal: "08:00",
-  smtp_configurado: false,
-};
-
-function normalizarConfig(dados) {
-  return { ...CONFIG_INICIAL, ...dados, email_contador: dados?.email_contador || "" };
-}
-
-function payloadConfig(config) {
-  return {
-    email_contador: config.email_contador.trim(),
-    envio_mensal: config.envio_mensal,
-    dia_envio_mensal: Number(config.dia_envio_mensal),
-    hora_envio_mensal: config.hora_envio_mensal,
-  };
-}
 
 const listaEnvios = (dados) => (Array.isArray(dados) ? dados : dados?.items || []);
 
@@ -43,8 +26,8 @@ export default function XmlContabilidade() {
   const [loading, setLoading] = useState(true);
   const [erroInicial, setErroInicial] = useState("");
   const [versao, setVersao] = useState(0);
-  const [config, setConfig] = useState(CONFIG_INICIAL);
-  const [configSalva, setConfigSalva] = useState(CONFIG_INICIAL);
+  const [config, setConfig] = useState(CONFIG_CONTABILIDADE_INICIAL);
+  const [configSalva, setConfigSalva] = useState(CONFIG_CONTABILIDADE_INICIAL);
   const [salvando, setSalvando] = useState(false);
   const [envios, setEnvios] = useState([]);
   const [atualizando, setAtualizando] = useState(false);
@@ -64,7 +47,7 @@ export default function XmlContabilidade() {
           api.get(`${BASE}/envios`),
         ]);
         if (!ativo) return;
-        const carregada = normalizarConfig(resConfig.data);
+        const carregada = normalizarConfigContabilidade(resConfig.data);
         setConfig(carregada);
         setConfigSalva(carregada);
         setEnvios(listaEnvios(resEnvios.data));
@@ -110,7 +93,8 @@ export default function XmlContabilidade() {
   }, [temEnvioEmAndamento, loading]);
 
   const alterado =
-    JSON.stringify(payloadConfig(config)) !== JSON.stringify(payloadConfig(configSalva));
+    JSON.stringify(payloadConfigContabilidade(config)) !==
+    JSON.stringify(payloadConfigContabilidade(configSalva));
   const bloqueioEnvio = !configSalva.smtp_configurado
     ? "O serviço de e-mail precisa estar configurado para enviar."
     : !configSalva.email_contador
@@ -136,15 +120,15 @@ export default function XmlContabilidade() {
 
   async function salvar(evento) {
     evento.preventDefault();
-    const payload = payloadConfig(config);
-    if (payload.envio_mensal && !payload.email_contador) {
+    const payload = payloadConfigContabilidade(config);
+    if ((payload.envio_automatico || payload.envio_mensal) && !payload.email_contador) {
       toast.error("Informe o e-mail do contador para ativar o envio automático.");
       return;
     }
     setSalvando(true);
     try {
       const { data } = await api.put(`${BASE}/config`, payload);
-      const salva = normalizarConfig(data);
+      const salva = normalizarConfigContabilidade(data);
       setConfig(salva);
       setConfigSalva(salva);
       toast.success("Configuração salva.");
@@ -246,7 +230,7 @@ export default function XmlContabilidade() {
       <PageHeader
         icon={FileArchive}
         title="XML para contabilidade"
-        subtitle="Envie ao contador o mês anterior completo, todo mês. Escolha outros períodos manualmente."
+        subtitle="Envie cada nota e seus eventos ao contador, programe o mês anterior completo ou escolha um período manualmente."
       />
       <XmlContabilidadeConfig
         config={config}

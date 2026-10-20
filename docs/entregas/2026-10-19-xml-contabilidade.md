@@ -14,15 +14,17 @@
 
 ## 1. Necessidade e aceite
 
-Enviar automaticamente ao contador apenas a competência mensal anterior
-completa, do primeiro ao último dia. Usuário escolhe dia/hora da execução ou
-desliga a rotina. Períodos livres ficam exclusivamente no download/envio manual.
-Não há envio individual após emissão nem agendamento avulso. Emissão, estoque
-e tributação existentes permanecem preservados.
+Enviar cada XML de nota autorizada ou evento registrado individualmente, como
+opção independente do envio mensal da competência anterior completa. Usuário
+escolhe dia/hora da execução mensal; períodos livres ficam exclusivamente no
+download/envio manual. Lotes separam ZIPs por tipo: notas, cancelamentos,
+cartas de correção e demais eventos. Emissão, estoque e tributação existentes
+permanecem preservados.
 
 Aceite: configuração persiste; período inclui ambas as datas em Brasília;
 notas elegíveis do CNPJ correto, incluindo canceladas e todos os eventos
-oficiais retornados pelo emissor; nenhum ZIP parcial silencioso; histórico
+oficiais retornados pelo emissor, inclusive evento do período em nota antiga;
+nenhum ZIP parcial silencioso; histórico
 informa sucesso/falha e oferece cancelamento/repetição; processamento funciona
 com navegador fechado. NFS-e e alterações de emissão/tributação estão fora do escopo.
 
@@ -32,8 +34,10 @@ Configuração e fila pertencem ao tenant; migration `zzzzh20261019a1` aditiva e
 `zzzzi20261019a1` desativa/cancela fluxos legados pendentes por empresa,
 RLS forçado e índices por tenant/estado. Histórico guarda destinatário, período,
 tentativas e resultado; XML/ZIP não são copiados para a fila. Deduplicação
-mensal por competência. Histórico antigo é preservado sem retomar envios
-individuais/agendamentos livres. Claim persistido
+mensal por competência e individual por nota/identidade de evento. Histórico
+antigo é preservado sem disparar retroativos na ativação. Não há agendamentos
+de períodos livres. Monitoramento e comprovantes de eventos são persistidos
+com RLS forçado e varredura periódica. Claim persistido
 e bloqueio de linhas protegem execuções concorrentes.
 
 ## 3. Arquitetura e integrações

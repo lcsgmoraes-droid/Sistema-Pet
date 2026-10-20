@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     Index,
     Integer,
+    LargeBinary,
     String,
     UniqueConstraint,
 )
@@ -66,3 +67,51 @@ class XmlContabilidadeEnvio(BaseTenantModel):
     provider = Column(String(20), nullable=True)
     documento_id = Column(String(128), nullable=True)
     documento_status = Column(String(20), nullable=True)
+
+
+class XmlContabilidadeMonitor(BaseTenantModel):
+    """Cursor durável: também consulta eventos de notas emitidas anteriormente."""
+
+    __tablename__ = "xml_contabilidade_documentos_monitor"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "provider",
+            "documento_id",
+            name="uq_xml_contabilidade_monitor_documento",
+        ),
+        Index(
+            "ix_xml_contabilidade_monitor_consulta", "tenant_id", "proxima_consulta_em"
+        ),
+    )
+
+    provider = Column(String(20), nullable=False)
+    documento_id = Column(String(128), nullable=False)
+    ultima_consulta_em = Column(DateTime(timezone=True), nullable=True)
+    proxima_consulta_em = Column(DateTime(timezone=True), nullable=False)
+
+
+class XmlContabilidadeEvento(BaseTenantModel):
+    """Somente comprovantes fiscais oficiais já validados; XML original intacto."""
+
+    __tablename__ = "xml_contabilidade_eventos_recebidos"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "identidade",
+            "protocolo",
+            name="uq_xml_contabilidade_evento_protocolo",
+        ),
+        Index("ix_xml_contabilidade_eventos_registro", "tenant_id", "registrado_em"),
+    )
+
+    provider = Column(String(20), nullable=False)
+    documento_id = Column(String(128), nullable=False)
+    chave = Column(String(44), nullable=False)
+    identidade = Column(String(54), nullable=False)
+    tipo = Column(String(6), nullable=False)
+    sequencia = Column(Integer, nullable=False)
+    protocolo = Column(String(15), nullable=False)
+    registrado_em = Column(DateTime(timezone=True), nullable=False)
+    nome_arquivo = Column(String(100), nullable=False)
+    xml = Column(LargeBinary, nullable=False)

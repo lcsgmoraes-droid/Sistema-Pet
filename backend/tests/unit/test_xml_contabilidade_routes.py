@@ -130,7 +130,6 @@ def test_salvar_config_validacao_email_e_destinatario(contexto, monkeypatch):
     for payload in (
         {"email_contador": "invalido"},
         {"envio_automatico": True},
-        {"email_contador": "contador@example.com", "envio_automatico": True},
         {"envio_mensal": True},
     ):
         assert client.put("/contabilidade/xml/config", json=payload).status_code == 422

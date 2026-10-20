@@ -25,6 +25,7 @@ class EventoFiscal:
     protocolo: str
     data: str
     xml: bytes | None
+    registrado_em: datetime
 
 
 def _xml_bytes(value):
@@ -111,6 +112,7 @@ def _validar_evento(root, xml, chave, cnpj, metadados=None):
         protocolo,
         data.astimezone(BRASILIA).date().isoformat(),
         xml,
+        data,
     )
 
 
@@ -137,13 +139,16 @@ def obter_eventos_intnfe(db, tenant_id, doc):
             api.close()
 
 
-def coletar_eventos(root, detalhe, chave, cnpj, *, cancelada=False):
+def coletar_eventos(root, detalhe, chave, cnpj, *, cancelada=False, xml_original=None):
     """Inclui todos os eventos confirmados e rejeita comprovantes ausentes."""
     from app.nfe.documentos import baixar_link_documento
 
     eventos, faltantes = {}, []
     for node in root.findall(".//n:procEventoNFe", NS):
         evento = _validar_evento(node, None, chave, cnpj)
+        # Sem XML avulso oficial, conserva o arquivo fonte inteiro: extrair e
+        # reserializar o nó mudaria namespaces e poderia invalidar assinatura.
+        evento.xml = xml_original
         eventos[evento.identidade] = evento
     candidatos = []
     for key in ("xmlCancelamento", "xmlCartaCorrecao", "xmlEvento"):
@@ -155,13 +160,18 @@ def coletar_eventos(root, detalhe, chave, cnpj, *, cancelada=False):
             for item in values:
                 candidatos.append(
                     (
-                        item
-                        if isinstance(item, bytes) or str(item).lstrip().startswith("<")
-                        else baixar_link_documento(item),
+                        (
+                            item
+                            if isinstance(item, bytes)
+                            or str(item).lstrip().startswith("<")
+                            else baixar_link_documento(item)
+                        ),
                         None,
                     )
                 )
-    for row in detalhe.get("_eventos_intnfe", []):
+    for row in detalhe.get("_eventos_persistidos", []) + detalhe.get(
+        "_eventos_intnfe", []
+    ):
         if row.get("autorizado") is not True:
             # Tentativa rejeitada não é evento registrado pela SEFAZ.
             if row.get("autorizado") is False:
@@ -187,8 +197,31 @@ def coletar_eventos(root, detalhe, chave, cnpj, *, cancelada=False):
             raise XmlContabilidadeError(
                 "Um evento fiscal retornou XML inválido.", 409
             ) from None
+        if (
+            metadados
+            and metadados.get("_persistido")
+            and event_root.tag != f"{{{NS['n']}}}procEventoNFe"
+        ):
+            # Um comprovante embutido foi armazenado como arquivo fonte inteiro
+            # para manter assinatura/namespaces. Valida novamente o nó do evento
+            # correspondente, mantendo como anexo os bytes do arquivo original.
+            event_root = next(
+                (
+                    node
+                    for node in event_root.findall(".//n:procEventoNFe", NS)
+                    if node.find("n:evento/n:infEvento", NS) is not None
+                    and node.find("n:evento/n:infEvento", NS).get("Id")
+                    == metadados.get("identidade")
+                ),
+                event_root,
+            )
         evento = _validar_evento(event_root, xml, chave, cnpj, metadados)
-        eventos.setdefault(evento.identidade, evento)
+        # Preferir o comprovante avulso oficial ao documento fonte que contém
+        # um evento embutido, preservando seus bytes originais em ambos casos.
+        if not (
+            metadados and metadados.get("_persistido") and evento.identidade in eventos
+        ):
+            eventos[evento.identidade] = evento
     cancelamento = any(e.tipo in TIPOS_CANCELAMENTO for e in eventos.values())
     if cancelada and not cancelamento:
         faltantes.append("cancelamento (evento 110111)")
@@ -214,6 +247,9 @@ def coletar_eventos(root, detalhe, chave, cnpj, *, cancelada=False):
             "sequencia": e.sequencia,
             "protocolo": e.protocolo,
             "data_registro": e.data,
+            "data_hora_registro": e.registrado_em.isoformat(),
+            "identidade": e.identidade,
+            "nome_arquivo": f"{e.identidade}.xml",
         }
         for e in eventos.values()
     ]

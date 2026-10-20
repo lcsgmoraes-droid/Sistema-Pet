@@ -85,6 +85,34 @@ def _documento(db, tenant_id, provider, documento_id):
         .order_by(BlingNotaFiscalCache.id.desc())
         .first()
     )
+    if cache is None:
+        # Vendas antigas do Bling podem existir antes da criação do cache.
+        # O monitor inclui essas referências; buscá-las aqui evita descartar
+        # silenciosamente a nota e seus eventos por faltar apenas o cache.
+        venda = (
+            db.query(Venda)
+            .options(noload("*"))
+            .filter(
+                Venda.tenant_id == _tenant(tenant_id),
+                Venda.nfe_bling_id == int(documento_id),
+                or_(Venda.nfe_provider.is_(None), Venda.nfe_provider == "bling"),
+                func.lower(Venda.nfe_status).in_(STATUS_VALIDOS),
+                Venda.nfe_data_emissao.isnot(None),
+            )
+            .order_by(Venda.id.desc())
+            .first()
+        )
+        if not venda:
+            return None
+        return Documento(
+            "bling",
+            str(venda.nfe_bling_id),
+            str(venda.nfe_chave or ""),
+            int(venda.nfe_modelo or 0),
+            _status(venda.nfe_status),
+            venda.nfe_data_emissao,
+            venda=venda,
+        )
     if (
         not cache
         or _status(cache.status) not in STATUS_VALIDOS
@@ -272,11 +300,37 @@ def validar_xml_saida(xml, chave, modelo):
 
 
 def _obter_eventos(db, tenant_id, doc):
-    if doc.provider != "intnfe":
-        return {}
     from app.services.xml_contabilidade_eventos import obter_eventos_intnfe
+    from app.xml_contabilidade_models import XmlContabilidadeEvento
 
-    return {"_eventos_intnfe": obter_eventos_intnfe(db, tenant_id, doc)}
+    # Uma falha remota continua bloqueando a coleta completa. Só após a
+    # confirmação atual acrescentamos comprovantes já recebidos, para que
+    # retenção/omissão do provedor não elimine eventos fiscais do arquivo.
+    detalhe = (
+        {"_eventos_intnfe": obter_eventos_intnfe(db, tenant_id, doc)}
+        if doc.provider == "intnfe"
+        else {}
+    )
+    persistidos = (
+        db.query(XmlContabilidadeEvento)
+        .filter(
+            XmlContabilidadeEvento.tenant_id == _tenant(tenant_id),
+            XmlContabilidadeEvento.chave == doc.chave,
+        )
+        .all()
+    )
+    detalhe["_eventos_persistidos"] = [
+        {
+            "autorizado": True,
+            "tipoEventoCodigo": e.tipo,
+            "protocolo": e.protocolo,
+            "identidade": e.identidade,
+            "xmlEvento": e.xml,
+            "_persistido": True,
+        }
+        for e in persistidos
+    ]
+    return detalhe
 
 
 def _cnpj_empresa(db, tenant_id):
@@ -328,6 +382,7 @@ def _coletar_arquivos(db, tenant_id, documentos, data_inicio, data_fim):
                 doc.chave,
                 cnpj_empresa,
                 cancelada=doc.status == "cancelada",
+                xml_original=xml,
             )
         except XmlContabilidadeError:
             raise
@@ -430,7 +485,7 @@ def _confirmar_emissoes_periodo(db, tenant_id, data_inicio, data_fim):
             )
 
 
-def gerar_zip_periodo(db, tenant_id, data_inicio, data_fim):
+def _preparar_periodo(db, tenant_id, data_inicio, data_fim):
     _validar_periodo(data_inicio, data_fim)
     _confirmar_emissoes_periodo(db, tenant_id, data_inicio, data_fim)
     from app.services.xml_contabilidade_bling import sincronizar_periodo_bling
@@ -438,4 +493,28 @@ def gerar_zip_periodo(db, tenant_id, data_inicio, data_fim):
     sincronizar_periodo_bling(db, tenant_id, data_inicio, data_fim)
     docs = _listar_documentos(db, tenant_id, data_inicio, data_fim)
     arquivos, notas = _coletar_arquivos(db, tenant_id, docs, data_inicio, data_fim)
-    return _zip(arquivos, notas, data_inicio, data_fim)
+    # Um cancelamento/CC-e registrado no mês também pertence à contabilidade
+    # desse mês quando a nota foi emitida em uma competência anterior.
+    from app.services.xml_contabilidade_individual import coletar_eventos_periodo
+    from app.services.xml_contabilidade_pacotes import mesclar_coletas
+
+    extras, notas_eventos = coletar_eventos_periodo(
+        db, tenant_id, data_inicio, data_fim
+    )
+    return mesclar_coletas(arquivos, notas, extras, notas_eventos)
+
+
+def gerar_anexos_periodo(db, tenant_id, data_inicio, data_fim):
+    from app.services.xml_contabilidade_pacotes import criar_anexos_por_tipo
+
+    arquivos, notas = _preparar_periodo(db, tenant_id, data_inicio, data_fim)
+    return criar_anexos_por_tipo(arquivos, notas, data_inicio, data_fim)
+
+
+def gerar_zip_periodo(db, tenant_id, data_inicio, data_fim):
+    from app.services.xml_contabilidade_pacotes import agrupar_download
+
+    anexos, nome, quantidade = gerar_anexos_periodo(
+        db, tenant_id, data_inicio, data_fim
+    )
+    return agrupar_download(anexos, nome), nome, quantidade

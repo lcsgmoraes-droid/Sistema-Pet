@@ -16,7 +16,12 @@ from app.services import xml_contabilidade_service as service
 from app.services import xml_contabilidade_documentos as documentos
 from app.tenancy.context import tenant_context
 from app.vendas_models import Venda
-from app.xml_contabilidade_models import XmlContabilidadeConfig, XmlContabilidadeEnvio
+from app.xml_contabilidade_models import (
+    XmlContabilidadeConfig,
+    XmlContabilidadeEnvio,
+    XmlContabilidadeEvento,
+    XmlContabilidadeMonitor,
+)
 
 CHAVE = "35261033590794000140650030000000441241595909"
 CNPJ = "33590794000140"
@@ -62,6 +67,8 @@ def fila(monkeypatch):
     engine = create_engine("sqlite://")
     XmlContabilidadeConfig.__table__.create(engine)
     XmlContabilidadeEnvio.__table__.create(engine)
+    XmlContabilidadeEvento.__table__.create(engine)
+    XmlContabilidadeMonitor.__table__.create(engine)
     Venda.__table__.create(engine)
     BlingNotaFiscalCache.__table__.create(engine)
     monkeypatch.setattr(service, "_agora", lambda: NOW)
@@ -178,7 +185,7 @@ def test_evento_embutido_preserva_assinatura_sem_reserializar(xml_context):
         date(2026, 10, 19),
         date(2026, 10, 19),
     )
-    assert arquivos == [(f"{CHAVE}-nfe.xml", xml)]
+    assert arquivos == [(f"{CHAVE}-nfe.xml", xml), (f"ID110111{CHAVE}01.xml", xml)]
     assert notas[0]["eventos_incluidos"] == 1
     assert "aviso" not in notas[0]
 
@@ -198,7 +205,7 @@ def test_mensal_ultimo_dia_do_mes_e_fuso():
     )
 
 
-def test_config_mensal_ativa_sem_varrer_historico_e_desliga_emissao_legada(fila):
+def test_config_mensal_e_individual_sao_opcoes_independentes_sem_varrer_historico(fila):
     db, tenant = fila
     config = XmlContabilidadeConfig(
         tenant_id=tenant,
@@ -207,7 +214,7 @@ def test_config_mensal_ativa_sem_varrer_historico_e_desliga_emissao_legada(fila)
     )
     db.add(config)
     db.commit()
-    assert service.obter_config(db, tenant)["envio_automatico"] is False
+    assert service.obter_config(db, tenant)["envio_automatico"] is True
     result = service.salvar_config(
         db,
         tenant,
@@ -236,22 +243,29 @@ def test_config_mensal_ativa_sem_varrer_historico_e_desliga_emissao_legada(fila)
     assert auto.status == "cancelado"
 
 
-def test_automatico_por_emissao_nao_enfileira_nem_consulta_banco():
+def test_automatico_desativado_nao_enfileira_nem_consulta_documentos():
     db = Mock()
+    db.query.return_value.filter.return_value.first.return_value = None
     assert service.enfileirar_documento(db, uuid4(), "intnfe", "1") is None
-    db.query.assert_not_called()
+    db.query.assert_called_once_with(XmlContabilidadeConfig)
     db.add.assert_not_called()
 
 
-def test_config_rejeita_ativar_envio_por_emissao(fila):
+def test_config_individual_ativa_a_partir_de_agora_e_exige_email(fila):
     db, tenant = fila
-    with pytest.raises(ValueError, match="mensal"):
+    with pytest.raises(ValueError, match="e-mail"):
         service.salvar_config(
             db,
             tenant,
-            {"email_contador": "contador@example.com", "envio_automatico": True},
+            {"envio_automatico": True},
         )
     assert service._config(db, tenant) is None
+    result = service.salvar_config(
+        db, tenant, {"email_contador": "contador@example.com", "envio_automatico": True}
+    )
+    assert result["envio_automatico"] and not result["envio_mensal"]
+    assert service._utc(service._config(db, tenant).envio_automatico_desde) == NOW
+    assert service.listar_envios(db, tenant) == []
 
 
 def test_manual_cancelamento_e_isolamento(fila):
@@ -488,8 +502,14 @@ def test_manual_anexa_zip_identifica_empresa_e_nunca_simula(xml_context, monkeyp
     db.query.return_value.filter.return_value.first.return_value = SimpleNamespace(
         name="Minha loja", razao_social="Minha loja Ltda"
     )
-    gerar = Mock(return_value=(b"PK-xml", "notas.zip", 3))
-    monkeypatch.setattr(service, "gerar_zip_periodo", gerar)
+    gerar = Mock(
+        return_value=(
+            [{"filename": "notas.zip", "content": b"PK-xml", "mime_subtype": "zip"}],
+            "notas.zip",
+            3,
+        )
+    )
+    monkeypatch.setattr(service, "gerar_anexos_periodo", gerar)
     monkeypatch.setattr(service.email_service, "is_email_configured", lambda: True)
     enviar = Mock(return_value=True)
     monkeypatch.setattr(service.email_service, "send_email", enviar)

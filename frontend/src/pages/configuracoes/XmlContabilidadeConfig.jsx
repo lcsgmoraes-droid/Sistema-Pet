@@ -13,8 +13,8 @@ export default function XmlContabilidadeConfig({ config, onChange, onSalvar, sal
   const mudar = (campo, valor) => onChange({ ...config, [campo]: valor });
   return (
     <Panel
-      title="1. Destinatário e envio mensal automático"
-      subtitle="O envio automático sempre reúne o mês anterior completo, do primeiro ao último dia."
+      title="1. Destinatário e envios automáticos"
+      subtitle="Ative o envio individual, o envio mensal ou os dois, conforme sua rotina com a contabilidade."
     >
       <form onSubmit={onSalvar} className="space-y-5">
         <div className="max-w-xl">
@@ -27,7 +27,7 @@ export default function XmlContabilidadeConfig({ config, onChange, onSalvar, sal
             placeholder="contador@escritorio.com.br"
             value={config.email_contador}
             onChange={(valor) => mudar("email_contador", valor)}
-            required={config.envio_mensal}
+            required={config.envio_automatico || config.envio_mensal}
             disabled={salvando}
             help="Os envios usam o destinatário salvo nesta configuração."
           />
@@ -42,6 +42,19 @@ export default function XmlContabilidadeConfig({ config, onChange, onSalvar, sal
           </p>
         ) : null}
         <InputCheckTexto
+          id="xml-por-xml"
+          checked={config.envio_automatico}
+          disabled={salvando || (!config.smtp_configurado && !config.envio_automatico)}
+          onChange={(valor) => mudar("envio_automatico", valor)}
+        >
+          <strong>Enviar XML por XML: cada nota e seus eventos</strong>
+          <span className="mt-1 block text-slate-500 dark:text-slate-400">
+            Envia cada XML separadamente: a nota após a autorização e os novos eventos quando
+            registrados, como cancelamentos e cartas de correção. Funciona mesmo com o envio mensal
+            desativado.
+          </span>
+        </InputCheckTexto>
+        <InputCheckTexto
           id="xml-mensal"
           checked={config.envio_mensal}
           disabled={salvando || (!config.smtp_configurado && !config.envio_mensal)}
@@ -49,10 +62,17 @@ export default function XmlContabilidadeConfig({ config, onChange, onSalvar, sal
         >
           <strong>Enviar automaticamente o mês anterior completo</strong>
           <span className="mt-1 block text-slate-500 dark:text-slate-400">
-            Todo mês, no dia e horário escolhidos, o sistema envia um ZIP ao contador, mesmo com
-            esta tela fechada. O período termina no último dia do mês anterior: 28, 29, 30 ou 31.
+            Todo mês, no dia e horário escolhidos, o sistema envia os XMLs ao contador, mesmo com
+            esta tela fechada. O período termina no último dia do mês anterior: 28, 29, 30 ou 31. Os
+            anexos ficam separados por tipo: um ZIP de notas, outro de cancelamentos, outro de
+            cartas de correção e outros para os demais eventos encontrados.
           </span>
         </InputCheckTexto>
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          O envio mensal reúne as notas emitidas e os eventos registrados no mês anterior, inclusive
+          cancelamentos e correções de notas mais antigas. As duas opções são independentes e podem
+          ficar ativadas juntas.
+        </p>
         <div className="grid max-w-xl gap-4 sm:grid-cols-2">
           <InputCombobox
             id="xml-dia-mensal"

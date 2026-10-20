@@ -50,7 +50,7 @@ const cards = [
   },
   {
     title: "XML para contabilidade",
-    description: "Envio ao contador, ZIP por periodo e agendamentos",
+    description: "XML por XML, envio mensal e ZIPs por tipo para o contador",
     icon: FiMail,
     link: "/configuracoes/xml-contabilidade",
     color: "blue",

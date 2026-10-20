@@ -1,4 +1,4 @@
-"""Emissões e cache fiscal não disparam mais envios individuais ao contador."""
+"""Emissões e eventos priorizam a fila local sem bloquear o fluxo fiscal."""
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock
@@ -8,14 +8,19 @@ import pytest
 import app.financeiro_models  # noqa: F401 - relacionamentos da Venda usada nas rotas
 from app.intnfe import emission
 from app.nfe import operacional_routes
-from app.services import email_service, nfe_cache_service, xml_contabilidade_service
+from app.services import (
+    email_service,
+    nfe_cache_service,
+    xml_contabilidade_service,
+    xml_contabilidade_hook,
+)
 
 
 @pytest.mark.parametrize("status", [3, 5, 7, 4])
-def test_intnfe_nao_dispara_envio_individual(monkeypatch, status):
+def test_intnfe_autorizada_e_cancelada_priorizam_fila_sem_smtp(monkeypatch, status):
     fila = Mock()
     smtp = Mock()
-    monkeypatch.setattr(xml_contabilidade_service, "enfileirar_documento", fila)
+    monkeypatch.setattr(emission, "tentar_enfileirar_documento", fila)
     monkeypatch.setattr(email_service, "send_email", smtp)
     monkeypatch.setattr(emission, "_remember_sequence_start", lambda *_args: None)
     venda = SimpleNamespace(
@@ -35,7 +40,9 @@ def test_intnfe_nao_dispara_envio_individual(monkeypatch, status):
 
     emission.reconcile(db, venda, api, connection=object(), token="test-token")
 
-    fila.assert_not_called()
+    assert fila.call_count == int(status in {3, 5})
+    if status in {3, 5}:
+        fila.assert_called_once_with(db, "empresa-a", "intnfe", 87)
     smtp.assert_not_called()
     db.commit.assert_called_once()
 
@@ -49,10 +56,10 @@ def test_intnfe_nao_dispara_envio_individual(monkeypatch, status):
         ("intnfe", "autorizada"),
     ],
 )
-def test_cache_nao_dispara_envio_individual(monkeypatch, provider, status):
+def test_cache_bling_prioriza_fila_sem_smtp(monkeypatch, provider, status):
     fila = Mock()
     smtp = Mock()
-    monkeypatch.setattr(xml_contabilidade_service, "enfileirar_documento", fila)
+    monkeypatch.setattr(nfe_cache_service, "tentar_enfileirar_documento", fila)
     monkeypatch.setattr(email_service, "send_email", smtp)
     consulta = SimpleNamespace(filter=lambda *_args: consulta, first=lambda: None)
     db = SimpleNamespace(new=set(), query=lambda *_args: consulta)
@@ -65,7 +72,9 @@ def test_cache_nao_dispara_envio_individual(monkeypatch, provider, status):
         source="bling_api",
     )
 
-    fila.assert_not_called()
+    assert fila.call_count == int(
+        provider != "intnfe" and status.lower() in {"autorizada", "cancelada"}
+    )
     smtp.assert_not_called()
 
 
@@ -106,3 +115,23 @@ def test_falha_cache_contabil_nao_bloqueia_status_legado_bling(monkeypatch):
     operacional_routes._registrar_status_contabil_bling(
         MagicMock(), "empresa-a", SimpleNamespace(nfe_bling_id=1234), {"situacao": 5}
     )
+
+
+def test_hook_savepoint_preserva_transacao_fiscal_se_fila_falha(monkeypatch):
+    enfileirar = Mock(side_effect=RuntimeError("token-nao-expor"))
+    monkeypatch.setattr(xml_contabilidade_service, "enfileirar_documento", enfileirar)
+    db = MagicMock()
+    xml_contabilidade_hook.tentar_enfileirar_documento(db, "empresa-a", "intnfe", 87)
+    db.begin_nested.assert_called_once()
+    db.rollback.assert_not_called()
+    db.commit.assert_not_called()
+
+
+def test_hook_enfileira_e_flush_sem_commit_ou_smtp(monkeypatch):
+    enfileirar = Mock()
+    monkeypatch.setattr(xml_contabilidade_service, "enfileirar_documento", enfileirar)
+    db = MagicMock()
+    xml_contabilidade_hook.tentar_enfileirar_documento(db, "empresa-a", "intnfe", 87)
+    enfileirar.assert_called_once_with(db, "empresa-a", "intnfe", 87)
+    db.flush.assert_called_once()
+    db.commit.assert_not_called()

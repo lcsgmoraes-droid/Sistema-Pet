@@ -4,8 +4,43 @@ import {
   erroPeriodo,
   formatarDataContabilidade,
   mensagemErroContabilidade,
+  normalizarConfigContabilidade,
+  payloadConfigContabilidade,
   periodoMesAnterior,
 } from "./xmlContabilidadeUtils.mjs";
+
+test("opções individual e mensal permanecem independentes ao carregar e salvar", () => {
+  for (const envio_automatico of [false, true]) {
+    for (const envio_mensal of [false, true]) {
+      const carregada = normalizarConfigContabilidade({
+        email_contador: " contador@escritorio.com.br ",
+        envio_automatico,
+        envio_mensal,
+        dia_envio_mensal: "31",
+        hora_envio_mensal: "09:30",
+        smtp_configurado: true,
+        proximo_envio_mensal: "2026-10-31T12:30:00Z",
+      });
+      assert.deepEqual(payloadConfigContabilidade(carregada), {
+        email_contador: "contador@escritorio.com.br",
+        envio_automatico,
+        envio_mensal,
+        dia_envio_mensal: 31,
+        hora_envio_mensal: "09:30",
+      });
+    }
+  }
+});
+
+test("configuração sem dados mantém os dois envios automáticos desativados", () => {
+  assert.deepEqual(payloadConfigContabilidade(normalizarConfigContabilidade()), {
+    email_contador: "",
+    envio_automatico: false,
+    envio_mensal: false,
+    dia_envio_mensal: 1,
+    hora_envio_mensal: "08:00",
+  });
+});
 
 test("mês anterior respeita Brasília durante a virada UTC e anos bissextos", () => {
   assert.deepEqual(periodoMesAnterior(new Date("2026-03-01T01:30:00Z")), {

@@ -17,19 +17,9 @@ class XmlContabilidadeConfigRequest(BaseModel):
     def limpar_email(cls, value):
         return str(value).strip() or None if value is not None else None
 
-    @field_validator("envio_automatico")
-    @classmethod
-    def rejeitar_envio_por_emissao(cls, value):
-        if value:
-            raise ValueError(
-                "O envio automático é mensal e sempre reúne o mês anterior completo. "
-                "Ative o envio mensal para configurar o dia."
-            )
-        return value
-
     @model_validator(mode="after")
     def exigir_destinatario(self):
-        if self.envio_mensal and not self.email_contador:
+        if (self.envio_mensal or self.envio_automatico) and not self.email_contador:
             raise ValueError("Informe o e-mail do contador para ativar os envios.")
         return self
 

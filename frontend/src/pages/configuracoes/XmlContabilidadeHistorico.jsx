@@ -18,7 +18,7 @@ const STATUS = {
 };
 
 const ORIGENS = {
-  automatico: "Envio antigo",
+  automatico: "Individual — nota e eventos",
   manual: "Manual",
   agendado: "Envio antigo",
   mensal: "Mensal — mês anterior completo",
@@ -58,7 +58,7 @@ export default function XmlContabilidadeHistorico({
         <EstadoVazio
           icone={History}
           titulo="Nenhum envio registrado"
-          descricao="Os envios manuais e os envios mensais automáticos aparecerão aqui."
+          descricao="Os envios individuais, mensais e manuais aparecerão aqui."
         />
       ) : (
         <div className="overflow-x-auto">
