@@ -68,3 +68,11 @@ Cada etapa: documentação em `.claude/skills/notificacoes/SKILL.md`, testes, en
 - Branch criada a partir da `main` atualizada; `git status` limpo.
 - Documento de diagnóstico revisado com o Lucas antes de iniciar a Fase 2.
 - Fase 2 em artefato publicado privado para validação visual; nada tocará o backend.
+
+## Decisões da segunda conversa (19/10/2026)
+
+1. **Modelos prontos na Meta, com variáveis.** A mensagem proativa usa modelo aprovado pela Meta; as partes que mudam (ex.: dias restantes) são variáveis do modelo preenchidas pelo sistema. A loja não edita a frase; edita, no máximo, o que o modelo permitir.
+2. **Sem disparo ativo pelas lojas nesta fase.** Só processos específicos do sistema disparam. Mesmo assim, haverá limite de envio (rate) por loja e por destinatário como proteção.
+3. **LGPD/consentimento entra já nesta fase.** Registro de consentimento com prova (quem, quando, como), confirmação pelo próprio WhatsApp ("quero continuar recebendo") e opt-out.
+4. **Fuso fica na atividade de padronização de datas.** Por ora os processos que disparam chamam a notificação de forma síncrona, no próprio método, com envio imediato (falha registrada e reprocessada pelo worker, sem quebrar o fluxo de negócio).
+5. **E-mail segue pelo Gmail no MVP.** Provedor transacional + SPF/DKIM/DMARC fica como pendência importante, tratada no final.
