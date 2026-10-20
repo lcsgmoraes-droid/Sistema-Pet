@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { AlertCircle, FileText, Pencil, RotateCcw, X } from "lucide-react";
+import { AlertCircle, FileText, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { useModulos } from "../../contexts/ModulosContext";
 import ImprimirCupom from "../ImprimirCupom";
 import ActionButton from "../ui/ActionButton";
+import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
 import {
   getTextoDevolucaoVendaPDV,
   podeAbrirDevolucaoVenda,
@@ -11,6 +12,10 @@ import ImprimirDocumentoFiscalButton from "./ImprimirDocumentoFiscalButton";
 import ModalSelecaoDocumentoFiscal from "./ModalSelecaoDocumentoFiscal";
 import ModalDadosVendaFinalizada from "./ModalDadosVendaFinalizada";
 import { mensagemCaixaIndisponivel } from "../../utils/caixaAbertoMonitor";
+import {
+  obterSituacaoFiscalVenda,
+  podeCancelarVendaComNotaCancelada,
+} from "../../utils/pdvFiscalStatus";
 
 export default function PDVModoVisualizacaoBanner({
   ativo,
@@ -23,6 +28,8 @@ export default function PDVModoVisualizacaoBanner({
   mudarStatusParaAberta,
   habilitarEdicao,
   onRecarregarVenda,
+  onCancelarVenda,
+  loading = false,
 }) {
   const { moduloAtivo, erroCarregamento, carregandoModulos, carregarModulos } = useModulos();
   const moduloFiscalAtivo = moduloAtivo("fiscal");
@@ -35,27 +42,38 @@ export default function PDVModoVisualizacaoBanner({
 
   const podeAbrirDevolucao = podeAbrirDevolucaoVenda(vendaAtual);
   const textoDevolucao = getTextoDevolucaoVendaPDV(vendaAtual);
+  const notaCancelada = obterSituacaoFiscalVenda(vendaAtual)?.status === "cancelada";
+  const vendaCancelada = ["cancelada", "cancelado"].includes(vendaAtual.status);
+  const podeCancelarVenda = podeCancelarVendaComNotaCancelada(vendaAtual);
   const notaRejeitada =
     vendaAtual.status === "pago_nf" &&
     String(vendaAtual.nfe_status || "").toLowerCase() === "rejeitada";
   const situacaoVenda =
     textoDevolucao?.situacao ||
-    (vendaAtual.status === "finalizada"
-      ? "Finalizada"
-      : vendaAtual.status === "baixa_parcial"
-        ? "com Baixa Parcial"
-        : notaRejeitada
-          ? "com NF rejeitada"
-          : vendaAtual.status === "pago_nf"
-            ? "com NF emitida"
-            : "Aberta");
+    (vendaCancelada
+      ? "Cancelada"
+      : notaCancelada
+        ? "com NF cancelada"
+        : vendaAtual.status === "finalizada"
+          ? "Finalizada"
+          : vendaAtual.status === "baixa_parcial"
+            ? "com Baixa Parcial"
+            : notaRejeitada
+              ? "com NF rejeitada"
+              : vendaAtual.status === "pago_nf"
+                ? "com NF emitida"
+                : "Aberta");
   const orientacao =
     textoDevolucao?.orientacao ||
-    (notaRejeitada
-      ? "Clique em Corrigir erro no aviso da nota para revisar os dados fiscais."
-      : vendaAtual.status === "aberta"
-        ? "Clique em Editar para modificar."
-        : "Reabra a venda para modificar.");
+    (vendaCancelada
+      ? "Cancelamento registrado no histórico."
+      : podeCancelarVenda
+        ? "A nota foi cancelada. Use Cancelar venda para desfazer a venda."
+        : notaRejeitada
+          ? "Clique em Corrigir erro no aviso da nota para revisar os dados fiscais."
+          : vendaAtual.status === "aberta"
+            ? "Clique em Editar para modificar."
+            : "Reabra a venda para modificar.");
 
   return (
     <>
@@ -69,6 +87,17 @@ export default function PDVModoVisualizacaoBanner({
           <div className="flex flex-wrap items-center justify-end gap-2">
             <ImprimirCupom venda={vendaAtual} size="md" className="min-w-[132px]" />
             <ImprimirDocumentoFiscalButton venda={vendaAtual} size="md" className="min-w-[132px]" />
+
+            {podeCancelarVenda && (
+              <BotaoInteracao
+                onClick={onCancelarVenda}
+                disabled={loading}
+                icon={Trash2}
+                title="Cancelar a venda e devolver os itens ao estoque"
+              >
+                Cancelar venda
+              </BotaoInteracao>
+            )}
 
             {podeAbrirDevolucao && (
               <ActionButton
@@ -122,7 +151,9 @@ export default function PDVModoVisualizacaoBanner({
                 </ActionButton>
               )}
 
-            {(vendaAtual.status === "finalizada" || vendaAtual.status === "baixa_parcial") && (
+            {(vendaAtual.status === "finalizada" ||
+              vendaAtual.status === "baixa_parcial" ||
+              (notaCancelada && vendaAtual.status === "pago_nf")) && (
               <ActionButton
                 onClick={mudarStatusParaAberta}
                 icon={AlertCircle}
@@ -158,14 +189,13 @@ export default function PDVModoVisualizacaoBanner({
               Não foi possível confirmar o acesso fiscal desta empresa. A emissão de NF está
               temporariamente indisponível.
             </span>
-            <button
-              type="button"
+            <BotaoInteracao
               onClick={carregarModulos}
               disabled={carregandoModulos}
-              className="rounded-md border border-amber-500 px-3 py-1 font-semibold hover:bg-amber-100 disabled:opacity-50"
+              tamanho="pequeno"
             >
               {carregandoModulos ? "Verificando..." : "Tentar novamente"}
-            </button>
+            </BotaoInteracao>
           </div>
         </div>
       )}

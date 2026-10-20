@@ -327,6 +327,7 @@ export default function PDV() {
     reabrirVenda,
   } = usePDVVendaAtual({
     vendaAtual,
+    modoVisualizacao,
     setVendaAtual,
     searchVendaQuery,
     setSearchVendaQuery,

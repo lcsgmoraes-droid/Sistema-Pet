@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   extrairCamposFiscaisVenda,
   obterSituacaoFiscalVenda,
+  podeCancelarVendaComNotaCancelada,
   podeImprimirDocumentoFiscalVenda,
   rotaDanfeFiscalVenda,
   rotaNotaFiscalVenda,
@@ -52,6 +53,36 @@ test("distingue NFC-e autorizada e cancelada", () => {
     obterSituacaoFiscalVenda({ nfe_tipo: "nfce", nfe_status: "cancelada" }).intent,
     "danger",
   );
+});
+
+test("libera cancelamento direto da venda somente após confirmação fiscal de cancelamento", () => {
+  const venda = { id: 26, status: "pago_nf", nfe_modelo: 65 };
+  assert.equal(podeCancelarVendaComNotaCancelada({ ...venda, nfe_status: "cancelada" }), true);
+  assert.equal(podeCancelarVendaComNotaCancelada({ ...venda, nfe_status: "Cancelada" }), true);
+  for (const nfe_status of ["autorizada", "processando", "inconclusiva", "rejeitada", null]) {
+    assert.equal(podeCancelarVendaComNotaCancelada({ ...venda, nfe_status }), false);
+  }
+});
+
+test("nota cancelada não libera novo cancelamento em venda cancelada ou devolvida", () => {
+  const venda = { id: 26, nfe_status: "cancelada" };
+  for (const status of [
+    "cancelada",
+    "cancelado",
+    "finalizada_devolucao",
+    "finalizada_devolucao_parcial",
+    "devolvida_total",
+    "finalizada_devolucao_total",
+  ]) {
+    assert.equal(podeCancelarVendaComNotaCancelada({ ...venda, status }), false);
+  }
+  assert.equal(
+    podeCancelarVendaComNotaCancelada({ nfe_status: "cancelada", status: "aberta" }),
+    false,
+  );
+  for (const status of ["aberta", "finalizada", "baixa_parcial"]) {
+    assert.equal(podeCancelarVendaComNotaCancelada({ ...venda, status }), true);
+  }
 });
 
 test("preserva todos os campos fiscais ao abrir a venda no PDV", () => {

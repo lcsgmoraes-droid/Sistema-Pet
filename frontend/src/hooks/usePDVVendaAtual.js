@@ -1,8 +1,10 @@
 import { usePDVVendaAcoes } from "./usePDVVendaAcoes";
 import { usePDVVendaCarregamento } from "./usePDVVendaCarregamento";
+import { usePDVSituacaoFiscal } from "./usePDVSituacaoFiscal";
 
 export function usePDVVendaAtual({
   vendaAtual,
+  modoVisualizacao,
   setVendaAtual,
   searchVendaQuery,
   setSearchVendaQuery,
@@ -18,6 +20,7 @@ export function usePDVVendaAtual({
   sincronizarEntregadorDaVenda,
   recarregarContextoClientePorId,
 }) {
+  usePDVSituacaoFiscal({ vendaAtual, modoVisualizacao, setVendaAtual });
   const { carregarVendaEspecifica, handleBuscarVenda, reabrirVenda } = usePDVVendaCarregamento({
     setVendaAtual,
     searchVendaQuery,

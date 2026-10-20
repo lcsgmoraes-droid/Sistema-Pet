@@ -1,6 +1,7 @@
 """Cancelamento atomico de vendas."""
 
 import logging
+from decimal import Decimal
 from typing import Any, Dict
 from uuid import UUID
 
@@ -14,6 +15,10 @@ from app.services.venda_rentabilidade_snapshot_service import (
 )
 from app.produtos.tipos import tipo_controla_estoque
 from app.vendas.status_pagamento import pagamento_valido_para_saldo
+from app.vendas.fiscal_status import (
+    nota_fiscal_cancelada,
+    validar_cancelamento_fiscal_venda,
+)
 from app.utils.timezone import now_brasilia
 
 logger = logging.getLogger(__name__)
@@ -112,6 +117,8 @@ def cancelar_venda(
         if venda.status == "cancelada":
             raise HTTPException(status_code=400, detail="Venda já está cancelada")
 
+        validar_cancelamento_fiscal_venda(venda)
+
         if str(venda.status or "").lower() in {
             "finalizada_devolucao",
             "finalizada_devolucao_parcial",
@@ -148,6 +155,7 @@ def cancelar_venda(
 
         itens = db.query(VendaItem).filter_by(venda_id=venda_id).all()
         itens_estornados = 0
+        estornos_fiscais_legados = {}
 
         for item in itens:
             if item.produto_id and tipo_controla_estoque(item.tipo):
@@ -158,9 +166,51 @@ def cancelar_venda(
                     with contexto_tenant_estoque(
                         tenant_estoque, tenant_id
                     ) as tenant_estoque_uuid:
+                        quantidade_estorno = item.quantidade
+                        if nota_fiscal_cancelada(venda) and isinstance(
+                            getattr(venda, "nfe_bling_id", None), (str, int)
+                        ):
+                            # O webhook fiscal antigo devolvia estoque e marcava
+                            # a própria saída venda_bling como cancelada. Consumir
+                            # esse saldo uma única vez, inclusive em itens repetidos.
+                            from app.produtos_estoque_models import EstoqueMovimentacao
+
+                            chave = (str(tenant_estoque_uuid), item.produto_id)
+                            if chave not in estornos_fiscais_legados:
+                                movimentos = (
+                                    db.query(EstoqueMovimentacao)
+                                    .filter_by(
+                                        tenant_id=tenant_estoque_uuid,
+                                        referencia_id=venda_id,
+                                        referencia_tipo="venda_bling",
+                                        produto_id=item.produto_id,
+                                        tipo="saida",
+                                        status="cancelado",
+                                    )
+                                    .with_for_update()
+                                    .all()
+                                )
+                                estornos_fiscais_legados[chave] = sum(
+                                    (
+                                        Decimal(str(mov.quantidade or 0))
+                                        for mov in movimentos
+                                    ),
+                                    Decimal("0"),
+                                )
+                            ja_estornado = min(
+                                Decimal(str(item.quantidade)),
+                                max(estornos_fiscais_legados[chave], Decimal("0")),
+                            )
+                            estornos_fiscais_legados[chave] -= ja_estornado
+                            quantidade_estorno = (
+                                Decimal(str(item.quantidade)) - ja_estornado
+                            )
+                            if quantidade_estorno <= 0:
+                                continue
+
                         resultado = EstoqueService.estornar_estoque(
                             produto_id=item.produto_id,
-                            quantidade=item.quantidade,
+                            quantidade=quantidade_estorno,
                             motivo="cancelamento_venda",
                             referencia_id=venda_id,
                             referencia_tipo="venda",
@@ -177,7 +227,7 @@ def cancelar_venda(
                     itens_estornados += 1
                     logger.info(
                         f"  ✅ Estoque estornado: {resultado['produto_nome']} "
-                        f"+{item.quantidade} ({resultado['estoque_anterior']} → {resultado['estoque_novo']})"
+                        f"+{quantidade_estorno} ({resultado['estoque_anterior']} → {resultado['estoque_novo']})"
                     )
                 except Exception as e:
                     logger.error(f"  ❌ Erro ao estornar estoque: {e}")

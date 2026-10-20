@@ -4,6 +4,7 @@
 
 import api from "../api";
 import { obterContextoRevisaoCaixa } from "../utils/caixaRevisao";
+import { atualizarSituacaoFiscalVenda } from "../utils/pdvFiscalRefresh";
 
 /**
  * Listar vendas com filtros
@@ -20,6 +21,13 @@ export const buscarVenda = async (vendaId) => {
   const response = await api.get(`/vendas/${vendaId}`);
   return response.data;
 };
+
+export const buscarVendaComSituacaoFiscal = async (vendaId) =>
+  atualizarSituacaoFiscalVenda(await buscarVenda(vendaId), {
+    consultarIntNFe: (id) => api.get(`/nfe/vendas/${id}/status`),
+    sincronizarBling: (id) => api.post(`/nfe/${id}/sincronizar-status`),
+    buscarVenda,
+  });
 
 /**
  * Criar nova venda

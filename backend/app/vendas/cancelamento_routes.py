@@ -17,6 +17,7 @@ from app.vendas.routes_common import (
 )
 from app.vendas.schemas import CancelarVendaRequest, ExcluirVendaRequest
 from app.vendas_models import Venda
+from app.vendas.fiscal_status import validar_cancelamento_fiscal_venda
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -111,11 +112,7 @@ def excluir_venda(
     if not venda:
         raise HTTPException(status_code=404, detail="Venda nao encontrada")
 
-    if venda.status == "pago_nf":
-        raise HTTPException(
-            status_code=400,
-            detail="Nao e possivel cancelar/excluir uma venda com NF-e emitida. Cancele a nota fiscal primeiro.",
-        )
+    validar_cancelamento_fiscal_venda(venda)
 
     rota_vinculada = db.query(RotaEntrega).filter_by(venda_id=venda_id).first()
     if rota_vinculada:

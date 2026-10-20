@@ -15,7 +15,7 @@ from app.nfe.documentos import (
     obter_xml_documento,
     validar_link_documento,
 )
-from app.produtos_models import EstoqueMovimentacao, Produto
+from app.produtos_models import EstoqueMovimentacao
 from app.services.bling_sync_service import BlingSyncService
 from app.services.bling_tenant_guard import (
     bling_tenant_id_configurado,
@@ -27,6 +27,7 @@ from app.services.nfe_authorized_reconciliation_service import (
 from app.tenancy.rls import sync_rls_tenant
 from app.utils.logger import logger
 from app.vendas_models import Venda
+from app.vendas.fiscal_status import sincronizar_venda_apos_cancelamento_fiscal
 
 router = APIRouter()
 
@@ -50,6 +51,36 @@ def _exigir_bling_configurado_para_tenant(tenant_id) -> None:
         raise HTTPException(
             status_code=403,
             detail="A integração Bling não está configurada para esta empresa",
+        )
+
+
+def _registrar_status_contabil_bling(db, tenant_id, venda, dados_nota):
+    """Inclui no cache os status recebidos pelos endpoints legados do Bling.
+
+    O cache mantém a situação das notas para a exportação por competência.
+    Uma falha deste registro complementar não pode impedir a atualização fiscal.
+    """
+    try:
+        nfe_routes = _nfe_routes()
+        if str(nfe_routes._status_nota_bling(dados_nota)).strip().lower() not in {
+            "autorizada",
+            "cancelada",
+            "cancelado",
+        }:
+            return
+        with db.begin_nested():
+            modelo = 65 if nfe_routes._venda_usa_nfce(venda) else 55
+            nota = nfe_routes._normalizar_nota_bling(
+                {**dados_nota, "id": venda.nfe_bling_id}, modelo=modelo
+            )
+            nfe_routes.upsert_nota_cache(
+                db, tenant_id, nota, source="runtime", resumo_payload=dados_nota
+            )
+            db.flush()
+    except Exception as exc:
+        logger.warning(
+            "xml_contabilidade_cache",
+            f"Falha ao registrar status contábil Bling; erro={type(exc).__name__}",
         )
 
 
@@ -195,22 +226,47 @@ async def cancelar_nfe(
         bling = BlingAPI()
         resultado = bling.cancelar_nfe(nfe_id, request.justificativa)
 
-        # Atualizar status na venda
+        # A solicitação aceita não significa que o emissor já confirmou o
+        # cancelamento. Consultar a situação antes de liberar a venda.
         venda = (
             db.query(Venda)
             .filter(Venda.nfe_bling_id == nfe_id, Venda.tenant_id == tenant_id)
             .first()
         )
-        if venda:
-            venda.nfe_status = "cancelada"
-            venda.nfe_motivo_rejeicao = request.justificativa
-            # Voltar status para 'finalizada' quando NF for cancelada
-            venda.status = "finalizada"
-            db.commit()
+        confirmado = False
+        try:
+            nfe_routes = _nfe_routes()
+            consulta = (
+                bling.consultar_nfce(nfe_id)
+                if venda and nfe_routes._venda_usa_nfce(venda)
+                else bling.consultar_nfe(nfe_id)
+            )
+            dados_nota = (
+                consulta.get("data", consulta) if isinstance(consulta, dict) else {}
+            )
+            confirmado = nfe_routes._nota_cancelada_bling(dados_nota)
+            if venda:
+                venda.nfe_status = nfe_routes._status_nota_bling(dados_nota)
+                sincronizar_venda_apos_cancelamento_fiscal(db, venda)
+                _registrar_status_contabil_bling(db, tenant_id, venda, dados_nota)
+                db.commit()
+        except Exception as exc:
+            db.rollback()
+            confirmado = False
+            logger.warning(
+                "cancelar_nfe",
+                f"Cancelamento solicitado; confirmação pendente; erro={type(exc).__name__}",
+            )
 
         return {
-            "success": True,
-            "message": "NF-e cancelada com sucesso",
+            "success": confirmado,
+            "processando": not confirmado,
+            "cancelamento_solicitado": True,
+            "message": (
+                "NF-e cancelada com sucesso"
+                if confirmado
+                else "Cancelamento solicitado. Aguarde a confirmação do emissor."
+            ),
             "data": resultado,
         }
     except ValueError as e:
@@ -377,6 +433,7 @@ async def webhook_bling(request: Request, db: Session = Depends(get_session)):
 
         # Atualizar venda
         venda.nfe_status = novo_status
+        sincronizar_venda_apos_cancelamento_fiscal(db, venda)
         venda.nfe_chave = dados_nota.get("chaveAcesso") or venda.nfe_chave
 
         # ✅ Se NF foi AUTORIZADA, confirmar o estoque reservado e sincronizar o saldo final.
@@ -417,54 +474,15 @@ async def webhook_bling(request: Request, db: Session = Depends(get_session)):
                         f"  ⚠️ Erro ao enfileirar sync do produto {mov.produto_id}: {e}",
                     )
 
-        # Se NF foi CANCELADA, revert estoque
+        # Cancelar a nota apenas remove a trava fiscal. O estoque permanece
+        # baixado até a decisão de cancelar a venda, evitando estorno duplicado.
         elif nfe_routes._nota_cancelada_bling(dados_nota):
-            logger.warning(
+            logger.info(
                 "webhook_bling",
-                f"⚠️ NF CANCELADA - Revertendo estoque da Venda #{venda.id}",
+                f"NF cancelada da Venda #{venda.id}; aguardando decisão sobre a venda",
             )
 
-            movimentacoes = (
-                db.query(EstoqueMovimentacao)
-                .filter(
-                    EstoqueMovimentacao.referencia_id == venda.id,
-                    EstoqueMovimentacao.referencia_tipo == "venda_bling",
-                )
-                .all()
-            )
-
-            for mov in movimentacoes:
-                if mov.status != "cancelado":
-                    produto = (
-                        db.query(Produto)
-                        .filter(
-                            Produto.id == mov.produto_id,
-                            Produto.tenant_id == tenant_id,
-                        )
-                        .first()
-                    )
-                    if produto:
-                        produto.estoque_atual = (
-                            produto.estoque_atual or 0
-                        ) + mov.quantidade
-                        mov.status = "cancelado"
-                        logger.info(
-                            "webhook_bling", f"  ↩️ Estoque revertido: {produto.codigo}"
-                        )
-                        try:
-                            BlingSyncService.queue_product_sync(
-                                db,
-                                produto_id=produto.id,
-                                motivo="nf_cancelada",
-                                origem="webhook_nf",
-                                force=True,
-                            )
-                        except Exception as e:
-                            logger.warning(
-                                "webhook_bling",
-                                f"  ⚠️ Erro ao enfileirar estorno do produto {produto.id}: {e}",
-                            )
-
+        _registrar_status_contabil_bling(db, tenant_id, venda, dados_nota)
         db.commit()
 
         logger.info(
@@ -527,8 +545,10 @@ async def sincronizar_status_nota(
 
         # Atualizar venda
         venda.nfe_status = novo_status
+        sincronizar_venda_apos_cancelamento_fiscal(db, venda)
         venda.nfe_chave = dados_nota.get("chaveAcesso") or venda.nfe_chave
 
+        _registrar_status_contabil_bling(db, tenant_id, venda, dados_nota)
         db.commit()
         db.refresh(venda)
 
@@ -589,6 +609,8 @@ async def sincronizar_todos_status(
                     venda.nfe_status = novo_status
                     venda.nfe_chave = dados_nota.get("chaveAcesso") or venda.nfe_chave
                     atualizados += 1
+                sincronizar_venda_apos_cancelamento_fiscal(db, venda)
+                _registrar_status_contabil_bling(db, tenant_id, venda, dados_nota)
 
             except Exception as e:
                 logger.error(

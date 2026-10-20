@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   DEFAULT_CATALOG_LIMIT,
   DEFAULT_CATALOG_ORDER,
@@ -9,6 +9,9 @@ import {
 export default function useEcommerceCatalog() {
   const [products, setProducts] = useState([]);
   const [productCache, setProductCache] = useState({});
+  const cacheProduct = useCallback((product) => {
+    setProductCache((current) => ({ ...current, [product.id]: product }));
+  }, []);
   const [catalogMeta, setCatalogMeta] = useState({
     total: 0,
     offset: 0,
@@ -88,6 +91,7 @@ export default function useEcommerceCatalog() {
     categorias,
     filteredProducts: products,
     productMap,
+    cacheProduct,
     clearCatalogFilters,
   };
 }
