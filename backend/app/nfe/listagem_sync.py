@@ -158,6 +158,10 @@ def _enriquecer_notas_com_vendas(db: Session, tenant_id, notas: list[dict]) -> N
                     Venda.nfe_cancelamento_codigo,
                     Venda.nfe_cancelamento_motivo,
                     Venda.nfe_cancelamento_solicitado_em,
+                    Venda.nfe_estorno_status,
+                    Venda.nfe_estorno_numero,
+                    Venda.nfe_estorno_serie,
+                    Venda.nfe_estorno_protocolo,
                 ),
                 noload("*"),
             )

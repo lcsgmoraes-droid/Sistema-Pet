@@ -179,6 +179,11 @@ class Venda(BaseTenantModel):
     nfe_cancelamento_codigo = Column(String(80), nullable=True)
     nfe_cancelamento_motivo = Column(String(500), nullable=True)
     nfe_cancelamento_solicitado_em = Column(DateTime(timezone=True), nullable=True)
+    # Projeção do documento de estorno; a nota original conserva sua situação.
+    nfe_estorno_status = Column(String(20), nullable=True)
+    nfe_estorno_numero = Column(Integer, nullable=True)
+    nfe_estorno_serie = Column(Integer, nullable=True)
+    nfe_estorno_protocolo = Column(String(50), nullable=True)
     nfe_xml = Column(Text, nullable=True)  # XML da NF-e/NFC-e
     nfe_data_emissao = Column(DateTime, nullable=True)
     nfe_data_autorizacao = Column(DateTime, nullable=True)

@@ -56,6 +56,7 @@ from app.lancamentos_routes import router as lancamentos_router
 from app.categorias_routes import router as categorias_router
 from app.bling_routes import router as bling_router
 from app.intnfe.routes import router as intnfe_router
+from app.intnfe.estorno_routes import router as estorno_router
 from app.bling_oauth_routes import public_router as bling_oauth_public_router
 from app.bling_oauth_routes import router as bling_oauth_router
 from app.integracao_bling_pedido_routes import router as bling_pedido_router
@@ -487,6 +488,7 @@ def register_routers(app: FastAPI) -> None:
     )
     app.include_router(bling_oauth_public_router, tags=["Bling OAuth"])
     app.include_router(intnfe_router, dependencies=_module_dependencies("fiscal"))
+    app.include_router(estorno_router, dependencies=_module_dependencies("fiscal"))
     app.include_router(
         bling_pedido_router,
         tags=["Integração Bling - Pedido"],

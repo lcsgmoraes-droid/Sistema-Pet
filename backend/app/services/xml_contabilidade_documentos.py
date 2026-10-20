@@ -1,17 +1,19 @@
-"""Coleta documentos oficiais de saída, valida a empresa e produz ZIP íntegro."""
+"""Coleta saídas e estornos próprios validados, preservando os XMLs oficiais."""
 
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
 from io import BytesIO
 import json
 import re
+from types import SimpleNamespace
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from defusedxml import ElementTree as ET
-from sqlalchemy import func, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import noload
 
 from app.vendas_models import Venda
+from app.intnfe.estorno_models import IntNFeEstorno
 from app.services.xml_contabilidade_common import (
     BRASILIA,
     MAX_DOCUMENTOS,
@@ -37,10 +39,81 @@ class Documento:
     data_emissao: datetime
     venda: object = None
     cache: object = None
+    estorno: object = None
+
+
+def _estornos_elegiveis(db, tenant_id):
+    """A tabela própria é a origem; um XML de entrada avulso não é elegível."""
+    return (
+        db.query(IntNFeEstorno)
+        .join(
+            Venda,
+            and_(
+                Venda.id == IntNFeEstorno.venda_id,
+                Venda.tenant_id == IntNFeEstorno.tenant_id,
+            ),
+        )
+        .filter(
+            IntNFeEstorno.tenant_id == _tenant(tenant_id),
+            IntNFeEstorno.ambiente_codigo == 1,
+            IntNFeEstorno.status.in_(("autorizado", "cancelado")),
+            IntNFeEstorno.xml_validado.is_(True),
+            IntNFeEstorno.autorizado_em.isnot(None),
+            Venda.nfe_provider == "intnfe",
+            Venda.nfe_ambiente == 1,
+            Venda.nfe_modelo == "65",
+            Venda.nfe_chave == IntNFeEstorno.original_chave,
+        )
+    )
+
+
+def _documento_estorno(estorno):
+    referencia = f"estorno:{estorno.id}"
+    situacao = "cancelada" if estorno.status == "cancelado" else "autorizada"
+    # Compatibilidade com os consumidores fiscais legados. O id tem namespace
+    # próprio e nunca representa outra venda nem substitui seu documento fiscal.
+    origem = SimpleNamespace(
+        id=referencia,
+        venda_id=estorno.venda_id,
+        estorno_id=estorno.id,
+        original_chave=estorno.original_chave,
+        nfe_tipo="nfe",
+        nfe_modelo="55",
+        nfe_correlation_id=estorno.correlation_id,
+        nfe_ambiente=1,
+        nfe_xml=estorno.xml,
+        nfe_chave=estorno.chave,
+        nfe_numero=estorno.numero,
+        nfe_status=situacao,
+        nfe_data_emissao=estorno.autorizado_em,
+    )
+    return Documento(
+        "intnfe",
+        referencia,
+        str(estorno.chave or ""),
+        55,
+        situacao,
+        estorno.autorizado_em,
+        venda=origem,
+        estorno=estorno,
+    )
 
 
 def _documento(db, tenant_id, provider, documento_id):
-    if provider != "intnfe" or not str(documento_id).isdigit():
+    if provider != "intnfe":
+        return None
+    referencia = str(documento_id)
+    if referencia.startswith("estorno:"):
+        match = re.fullmatch(r"estorno:([1-9][0-9]*)", referencia)
+        if not match:
+            return None
+        registro = (
+            _estornos_elegiveis(db, tenant_id)
+            .filter(IntNFeEstorno.id == int(match[1]))
+            .first()
+        )
+        return _documento_estorno(registro) if registro else None
+    if not referencia.isdigit():
         return None
     venda = (
         db.query(Venda)
@@ -122,6 +195,17 @@ def _listar_documentos(db, tenant_id, data_inicio, data_fim):
         )
         for v in vendas
     ]
+    estornos = (
+        _estornos_elegiveis(db, tenant_id)
+        .filter(
+            IntNFeEstorno.autorizado_em >= inicio.replace(tzinfo=BRASILIA),
+            IntNFeEstorno.autorizado_em < fim.replace(tzinfo=BRASILIA),
+        )
+        .order_by(IntNFeEstorno.autorizado_em, IntNFeEstorno.id)
+        .limit(MAX_DOCUMENTOS + 1)
+        .all()
+    )
+    docs.extend(_documento_estorno(estorno) for estorno in estornos)
     if len(docs) > MAX_DOCUMENTOS:
         raise XmlContabilidadeError(
             f"O período excede {MAX_DOCUMENTOS} notas. Divida-o em períodos menores."
@@ -148,6 +232,10 @@ def _obter_xml(db, tenant_id, doc):
         raise XmlContabilidadeError(
             "Somente notas emitidas no CorePet em produção podem ser enviadas.", 409
         )
+    if getattr(doc, "estorno", None) is not None:
+        # Só é exportável o XML que o serviço de estorno já validou e guardou.
+        # Baixar outro XML aqui não pode trocar silenciosamente essa evidência.
+        return _xml_bytes(doc.estorno.xml), {}
     if doc.venda.nfe_xml:
         return _xml_bytes(doc.venda.nfe_xml), {}
     # A consulta usa a emissão CorePet já vinculada, sem commit intermediário.
@@ -202,9 +290,13 @@ def validar_xml_saida(xml, chave, modelo):
         raise XmlContabilidadeError(
             "Uma nota não possui XML com protocolo de autorização válido.", 409
         )
-    raw_date = info.findtext("n:ide/n:dhEmi", namespaces=NS) or info.findtext(
-        "n:ide/n:dEmi", namespaces=NS
-    )
+    return root, _data_xml(root)
+
+
+def _data_xml(root):
+    raw_date = root.findtext(
+        ".//n:infNFe/n:ide/n:dhEmi", namespaces=NS
+    ) or root.findtext(".//n:infNFe/n:ide/n:dEmi", namespaces=NS)
     try:
         dt = datetime.fromisoformat(str(raw_date).replace("Z", "+00:00"))
         dt = dt.replace(tzinfo=BRASILIA) if dt.tzinfo is None else dt
@@ -212,7 +304,55 @@ def validar_xml_saida(xml, chave, modelo):
         raise XmlContabilidadeError(
             "O XML de uma nota não possui data de emissão válida.", 409
         ) from None
-    return root, dt.astimezone(BRASILIA).date()
+    return dt.astimezone(BRASILIA).date()
+
+
+def validar_xml_documento(xml, doc, tenant_id, cnpj_empresa):
+    """Exceção restrita ao estorno próprio; a validação geral segue só saída."""
+    registro = getattr(doc, "estorno", None)
+    if registro is None:
+        return validar_xml_saida(xml, doc.chave, doc.modelo)
+    from app.intnfe.estorno_builder import EstornoError
+    from app.intnfe.estorno_xml import validate_xml
+
+    snapshot = registro.snapshot
+    if (
+        doc.provider != "intnfe"
+        or doc.documento_id != f"estorno:{registro.id}"
+        or registro.tenant_id != _tenant(tenant_id)
+        or registro.ambiente_codigo != 1
+        or registro.status not in {"autorizado", "cancelado"}
+        or registro.xml_validado is not True
+        or not isinstance(snapshot, dict)
+        or snapshot.get("ambiente_codigo") != 1
+        or snapshot.get("emitente_cnpj") != cnpj_empresa
+        or snapshot.get("original_chave") != registro.original_chave
+        or not re.fullmatch(r"[0-9]{44}", doc.chave)
+        or doc.chave[6:20] != cnpj_empresa
+        or doc.modelo != 55
+    ):
+        raise XmlContabilidadeError(
+            "O estorno não possui origem fiscal própria validada.", 409
+        )
+    raw = _xml_bytes(xml)
+    try:
+        autorizado = validate_xml(raw, snapshot)
+    except (EstornoError, KeyError, TypeError, ValueError):
+        raise XmlContabilidadeError(
+            "O XML do estorno não corresponde ao documento fiscal autorizado.", 409
+        ) from None
+    if (
+        any(
+            autorizado[campo] != getattr(registro, campo)
+            for campo in ("chave", "numero", "serie", "protocolo")
+        )
+        or autorizado["chave"] != doc.chave
+    ):
+        raise XmlContabilidadeError(
+            "O XML do estorno diverge da identificação registrada.", 409
+        )
+    root = ET.fromstring(raw)
+    return root, _data_xml(root)
 
 
 def _obter_eventos(db, tenant_id, doc):
@@ -288,7 +428,7 @@ def _coletar_arquivos(db, tenant_id, documentos, data_inicio, data_fim):
     for doc in unicos.values():
         try:
             xml, detalhe = _obter_xml(db, tenant_id, doc)
-            validacao = validar_xml_saida(xml, doc.chave, doc.modelo)
+            validacao = validar_xml_documento(xml, doc, tenant_id, cnpj_empresa)
             if validacao is None:
                 if relatorio:
                     relatorio.excluir(
@@ -351,6 +491,12 @@ def _coletar_arquivos(db, tenant_id, documentos, data_inicio, data_fim):
             "emitente_nome": root.findtext(".//n:infNFe/n:emit/n:xNome", namespaces=NS)
             or cnpj_emitente,
         }
+        if getattr(doc, "estorno", None) is not None:
+            nota.update(
+                tipo_documento="estorno",
+                venda_id=doc.estorno.venda_id,
+                chave_original=doc.estorno.original_chave,
+            )
         if any(e["data_registro"] > data_fim.isoformat() for e in resumo_eventos):
             nota["observacao"] = (
                 "Inclui eventos registrados após o período de emissão selecionado."

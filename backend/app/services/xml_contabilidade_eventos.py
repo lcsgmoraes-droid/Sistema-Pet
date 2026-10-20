@@ -126,7 +126,19 @@ def obter_eventos_intnfe(db, tenant_id, doc):
     from app.intnfe.client import IntNFeClient
     from app.intnfe.emission import _access_token, _connection
 
-    correlation_id = getattr(doc.venda, "nfe_correlation_id", None)
+    estorno = getattr(doc, "estorno", None)
+    correlation_id = (
+        estorno.correlation_id
+        if estorno is not None
+        else getattr(doc.venda, "nfe_correlation_id", None)
+    )
+    if estorno is not None and (
+        str(estorno.tenant_id) != str(tenant_id)
+        or doc.documento_id != f"estorno:{estorno.id}"
+        or estorno.ambiente_codigo != 1
+        or estorno.xml_validado is not True
+    ):
+        raise XmlContabilidadeError("A referência fiscal do estorno é inválida.", 409)
     if not isinstance(correlation_id, str) or not re.fullmatch(
         r"[A-Za-z0-9_-]{1,128}", correlation_id
     ):
@@ -140,7 +152,7 @@ def obter_eventos_intnfe(db, tenant_id, doc):
         connection = _connection(db, tenant_id, require_enabled=False)
         token = _access_token(api, connection, 1)
         return api.document_events(
-            token, doc.venda.nfe_tipo, doc.venda.nfe_correlation_id
+            token, "nfe" if estorno is not None else doc.venda.nfe_tipo, correlation_id
         )
     except Exception:
         raise XmlContabilidadeError(

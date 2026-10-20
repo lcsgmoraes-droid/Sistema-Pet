@@ -62,6 +62,7 @@ export default function CentralNFSaidaView({
   baixarDanfe,
   baixarXml,
   abrirDetalhes,
+  abrirEstorno,
   notaSelecionada,
   detalheNota,
   carregandoDetalhe,
@@ -149,6 +150,7 @@ export default function CentralNFSaidaView({
         baixarDanfe={baixarDanfe}
         baixarXml={baixarXml}
         abrirDetalhes={abrirDetalhes}
+        abrirEstorno={abrirEstorno}
       />
 
       <NFSaidaDetalhesModal

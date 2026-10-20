@@ -1,6 +1,7 @@
 """Emissões e eventos priorizam a fila local sem bloquear o fluxo fiscal."""
 
 from types import SimpleNamespace
+from contextlib import nullcontext
 from unittest.mock import MagicMock, Mock
 
 import pytest
@@ -25,6 +26,8 @@ def test_intnfe_autorizada_e_cancelada_priorizam_fila_sem_smtp(monkeypatch, stat
     venda = SimpleNamespace(
         id=87,
         tenant_id="empresa-a",
+        status="cancelada",
+        nfe_status=None,
         nfe_correlation_id="correlation-87",
         nfe_tipo="nfce",
         nfe_numero=None,
@@ -34,8 +37,11 @@ def test_intnfe_autorizada_e_cancelada_priorizam_fila_sem_smtp(monkeypatch, stat
         nfe_xml="<xml />",
         nfe_ambiente=1,
     )
-    db = SimpleNamespace(commit=Mock())
-    api = SimpleNamespace(document_status=Mock(return_value={"status": status}))
+    db = SimpleNamespace(commit=Mock(), no_autoflush=nullcontext(), refresh=Mock())
+    api = SimpleNamespace(
+        document_status=Mock(return_value={"status": status}),
+        document_events=Mock(return_value=[]),
+    )
 
     emission.reconcile(db, venda, api, connection=object(), token="test-token")
 
@@ -43,6 +49,7 @@ def test_intnfe_autorizada_e_cancelada_priorizam_fila_sem_smtp(monkeypatch, stat
     if status in {3, 5}:
         fila.assert_called_once_with(db, "empresa-a", "intnfe", 87)
     smtp.assert_not_called()
+    assert venda.status == "cancelada"
     db.commit.assert_called_once()
 
 

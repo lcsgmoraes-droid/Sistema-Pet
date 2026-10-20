@@ -76,6 +76,28 @@ def test_bad_request_is_reported_as_invalid_data(api):
     assert not error.value.uncertain
 
 
+def test_problem_details_preserves_required_field_without_exposing_customer_data(api):
+    api.session.request.return_value = response(
+        400,
+        {
+            "title": "One or more validation errors occurred.",
+            "errors": {
+                "Emitente.NomeFantasia": ["The NomeFantasia field is required."],
+                "Destinatario.Cpf": ["CPF 52998224725 inválido; cliente@example.com"],
+            },
+            "accessToken": "nao-expor",
+        },
+    )
+    with pytest.raises(IntNFeError) as error:
+        api.issue_document("token", "nfe", {}, "estorno-teste-400")
+    assert error.value.validation_errors == [
+        "Emitente.NomeFantasia: The NomeFantasia field is required.",
+        "Destinatario.Cpf: CPF [dado oculto] inválido; [e-mail oculto]",
+    ]
+    assert not error.value.uncertain
+    assert api.session.request.call_count == 1
+
+
 def test_nfce_validation_errors_are_available_without_exposing_personal_data(api):
     api.session.request.return_value = response(
         422,

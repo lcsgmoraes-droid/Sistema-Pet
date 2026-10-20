@@ -9,6 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.db import base as _registry  # noqa: F401
+from app.intnfe.estorno_models import IntNFeEstorno
 from app.models import Tenant
 from app.nfe_cache_models import BlingNotaFiscalCache
 from app.services import xml_contabilidade_documentos as documentos
@@ -25,7 +26,7 @@ DIA = date(2026, 9, 3)
 def banco():
     tenant = uuid4()
     engine = create_engine("sqlite://")
-    for model in (Tenant, Venda, BlingNotaFiscalCache):
+    for model in (Tenant, Venda, BlingNotaFiscalCache, IntNFeEstorno):
         model.__table__.create(engine)
     with tenant_context(tenant), Session(engine, expire_on_commit=False) as db:
         db.add(

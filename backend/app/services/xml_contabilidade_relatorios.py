@@ -102,6 +102,20 @@ class RelatorioTentativa:
             self._inventario(db, envio)
 
     def _inventario(self, db, envio):
+        from app.services import xml_contabilidade_documentos as documentos
+
+        if envio.origem == "automatico" and str(envio.documento_id).startswith(
+            "estorno:"
+        ):
+            doc = documentos._documento(
+                db, self.tenant_id, envio.provider, envio.documento_id
+            )
+            if doc is not None:
+                self._venda(
+                    doc.venda,
+                    considerar_nota=not self.chave_envio.startswith("evento:"),
+                )
+            return
         query = (
             db.query(Venda)
             .options(
@@ -141,18 +155,34 @@ class RelatorioTentativa:
             self._venda(
                 venda, considerar_nota=not self.chave_envio.startswith("evento:")
             )
+        if envio.origem != "automatico":
+            from app.intnfe.estorno_models import IntNFeEstorno
+
+            estornos = documentos._estornos_elegiveis(db, self.tenant_id).filter(
+                IntNFeEstorno.autorizado_em
+                >= datetime.combine(self.inicio, time.min, tzinfo=BRASILIA),
+                IntNFeEstorno.autorizado_em
+                < datetime.combine(
+                    self.fim + timedelta(days=1), time.min, tzinfo=BRASILIA
+                ),
+            )
+            for estorno in estornos.order_by(IntNFeEstorno.id).limit(10001).all():
+                self._venda(documentos._documento_estorno(estorno).venda)
 
     def _venda(self, venda, *, considerar_nota=True):
         ref = str(venda.id)
         doc = self.documentos.get(ref)
         if doc is None:
             numero, chave = _texto(venda.nfe_numero), _texto(venda.nfe_chave, 44)
-            parametros = {"venda_id": venda.id, "abrir": "1"}
+            venda_id = getattr(venda, "venda_id", venda.id)
+            parametros = {"venda_id": venda_id, "abrir": "1"}
+            if getattr(venda, "estorno_id", None) is not None:
+                parametros["estorno_id"] = venda.estorno_id
             if numero or chave:
                 parametros["busca"] = numero or chave
             doc = {
                 "documento_id": ref,
-                "venda_id": venda.id,
+                "venda_id": venda_id,
                 "provider": "intnfe",
                 "numero": numero,
                 "chave": chave,
@@ -171,6 +201,10 @@ class RelatorioTentativa:
                 "_considerar_nota": considerar_nota,
                 "_preparada": False,
             }
+            if getattr(venda, "estorno_id", None) is not None:
+                doc.update(
+                    tipo_documento="estorno", chave_original=venda.original_chave
+                )
             self.documentos[ref] = doc
         doc["status_fiscal"] = _texto(venda.nfe_status, 30)
         if doc["status_fiscal"] in STATUS_PENDENTES:
