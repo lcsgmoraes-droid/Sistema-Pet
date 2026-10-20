@@ -119,8 +119,10 @@ def _eligibility_errors(
         errors.append("Produto inativo no CorePet.")
     if getattr(product, "deleted_at", None) is not None:
         errors.append("Produto excluido no CorePet.")
-    if bool(getattr(product, "is_parent", False)) or not bool(
-        getattr(product, "is_sellable", True)
+    if (
+        getattr(product, "tipo_produto", None) == "PAI"
+        or bool(getattr(product, "is_parent", False))
+        or not bool(getattr(product, "is_sellable", True))
     ):
         errors.append("Produto agrupador ou nao vendavel.")
     if str(getattr(product, "tipo", "produto") or "").strip().lower() == "servico":
@@ -203,9 +205,16 @@ def build_catalog_item(
         promo_price = prices["effective_price"] if prices["promotion_active"] else None
         errors.extend(message for _, message, _ in prices["promotion_errors"])
     else:
-        base_raw, promo_raw, promo_active = _channel_prices(product, source=source, now=current_time)
+        base_raw, promo_raw, promo_active = _channel_prices(
+            product, source=source, now=current_time
+        )
         base_price = _money(base_raw, markup_percent)
-        promo_price, promo_warnings = _promotion_price(promo_active=promo_active, promo_raw=promo_raw, base_price=base_price, markup_percent=markup_percent)
+        promo_price, promo_warnings = _promotion_price(
+            promo_active=promo_active,
+            promo_raw=promo_raw,
+            base_price=base_price,
+            markup_percent=markup_percent,
+        )
         warnings.extend(promo_warnings)
     if base_price <= 0:
         errors.append("Preco de venda deve ser maior que zero.")

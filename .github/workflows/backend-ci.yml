@@ -623,6 +623,14 @@ jobs:
           mypy app/ --ignore-missing-imports || echo "Type warnings found"
         continue-on-error: true
 
+      - name: iFood catalog and operation safety contracts
+        run: >-
+          python -m pytest tests/unit/test_ifood_management.py
+          tests/unit/test_ifood_catalog_contract.py
+          tests/unit/test_ifood_routes_contract.py
+          tests/unit/test_ifood_orders_contract.py
+          tests/unit/test_ifood_client_contract.py -q
+
       - name: Multitenant hardening suite
         run: |
           pytest tests/multi_tenant -q --cov=app --cov-report=term --cov-report=xml

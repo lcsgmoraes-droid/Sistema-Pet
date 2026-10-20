@@ -30,7 +30,7 @@ from app.integrations.ifood.management import (
     build_management_item,
     product_identifier,
 )
-from app.integrations.ifood.pricing import aware, utc_timestamp
+from app.integrations.ifood.pricing import MAX_IFOOD_MONEY, aware, utc_timestamp
 from app.security.permissions_decorator import (
     require_permission,
     require_any_permission,
@@ -107,7 +107,7 @@ class IfoodPriceSimulationPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     product_id: int = Field(gt=0)
-    preco_ifood: float | None = Field(ge=0, allow_inf_nan=False)
+    preco_ifood: float | None = Field(ge=0, le=MAX_IFOOD_MONEY, allow_inf_nan=False)
 
 
 def _utcnow() -> datetime:

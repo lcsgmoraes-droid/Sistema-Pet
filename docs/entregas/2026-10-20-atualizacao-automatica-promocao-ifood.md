@@ -99,3 +99,16 @@ foram gravados. As duas abas ficaram abertas para o aceite do Lucas.
 Migração de convergência aplicada apenas no DEV, com produto e imagem intactos.
 Nenhum deploy de produção ou envio ao iFood executado. A promoção de teste ficou
 encerrada e armazenada para revisão, sem novas gravações automáticas.
+
+## 11. Preparação adicional de release
+
+Na revisão ampliada foram corrigidas quatro bordas comprovadas: promoção com
+fração de centavo, overflow de valores monetários/datas e divergência de produto
+PAI legado entre central e catálogo. Inputs iFood têm faixa monetária interna;
+valores inválidos retornam validação ou pendência, mantendo a edição comum do ERP.
+As baterias backend/frontend iFood entram no CI e no gate oficial de release.
+
+O patch de segurança follow-redirects1.16.1 atualiza somente os dois locks JS.
+Não há mudança nativa ou release mobile. Testes gerais, conexão perdida/recuperada,
+nova jornada integrada e evidências estão na
+[homologação de release](../homologacoes/2026-10-20-ifood-prontidao-release.md).

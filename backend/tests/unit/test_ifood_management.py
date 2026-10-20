@@ -906,3 +906,220 @@ def test_canonical_update_persists_ifood_and_shared_update_cannot_change_origin_
     assert (
         saved.estoque_minimo == 4 and saved.preco_ifood == 123 and saved.ifood_pausado
     )
+
+
+@pytest.mark.parametrize(
+    "regular,promo,expected_price,expected_error",
+    [
+        (1, 0.004, 1, "promo_preco"),
+        (1, 0.005, 0.01, None),
+        (1, 0.954, 0.95, None),
+        (1, 0.955, 1, "promo_desconto"),
+        (1, 0.999, 1, "promo_preco"),
+    ],
+)
+def test_promotion_validates_the_actual_rounded_money_sent_to_catalog(
+    regular, promo, expected_price, expected_error
+):
+    p = product(preco_ifood=regular, preco_ifood_promo=promo, ifood_available_stock=4)
+    item = build_management_item(p, config(), available_stock=4)
+    catalog = build_catalog_item(p, source="ifood")
+    assert item["effective_price"] == expected_price
+    assert item["promotion_active"] is (expected_error is None)
+    assert item["eligible"] is (expected_error is None)
+    assert catalog.eligible is item["eligible"]
+    if expected_error:
+        assert expected_error in {issue["code"] for issue in item["pending"]}
+        assert catalog.payload is None
+    else:
+        assert catalog.payload["prices"]["promotionPrice"] == expected_price
+
+
+@pytest.mark.parametrize("value", ["NaN", "Infinity", "-Infinity", -1, 1e30, 1e300])
+def test_simulation_rejects_nonfinite_and_negative_prices_without_writes(api, value):
+    response = api.client.post(
+        "/integracoes/ifood/catalogo/produto/simular-preco",
+        json={"product_id": api.first.id, "preco_ifood": value},
+    )
+    assert response.status_code == 422, response.text
+    api.db.expire_all()
+    assert api.first.preco_ifood is None
+    assert api.first.preco_venda == 100 and api.first.preco_custo == 60
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("commission_ifood_percent", -1),
+        ("commission_merchant_percent", 100.01),
+        ("payment_fee_percent", "NaN"),
+        ("tax_percent", "Infinity"),
+        ("additional_unit_cost", -0.01),
+        ("target_margin_percent", 100),
+        ("stock_safety", -1),
+        ("default_markup_percent", 301),
+    ],
+)
+def test_invalid_catalog_premises_do_not_create_or_modify_configuration(
+    api, field, value
+):
+    response = api.client.put(
+        "/integracoes/ifood/catalogo/configuracao", json={field: value}
+    )
+    assert response.status_code == 422, response.text
+    assert api.db.query(IfoodMerchantConfig).count() == 0
+
+
+def test_local_previews_and_blocked_sync_never_instantiate_provider_client(
+    api, monkeypatch
+):
+    from app.config import settings
+    from app.routes import ifood_integration_routes as routes
+
+    def forbidden_client():
+        pytest.fail("Nenhuma operacao local pode abrir o cliente externo iFood")
+
+    monkeypatch.setattr(routes, "_client", forbidden_client)
+    monkeypatch.setattr(settings, "IFOOD_CATALOG_WRITE_ENABLED", False)
+    for method, path, payload in (
+        ("get", "/catalogo/gestao", None),
+        ("get", "/catalogo/preview", None),
+        ("post", "/catalogo/produto/preview", {"produto": {"id": api.first.id}}),
+        (
+            "post",
+            "/catalogo/produto/simular-preco",
+            {"product_id": api.first.id, "preco_ifood": 150},
+        ),
+        ("post", "/catalogo/sincronizar", {"product_ids": [api.first.id]}),
+    ):
+        request = getattr(api.client, method)
+        response = request(
+            "/integracoes/ifood" + path, **({"json": payload} if payload else {})
+        )
+        assert response.status_code == 200, response.text
+    response = api.client.post(
+        "/integracoes/ifood/catalogo/sincronizar",
+        json={"dry_run": False, "confirm_send": True, "product_ids": [api.first.id]},
+    )
+    assert response.status_code == 409
+    assert "bloqueados" in response.json()["detail"]
+    api.db.expire_all()
+    assert api.first.preco_ifood is None
+    assert api.db.query(IfoodMerchantConfig).count() == 0
+    api.state["admin"] = False
+    assert (
+        api.client.post("/integracoes/ifood/catalogo/sincronizar", json={}).status_code
+        == 403
+    )
+
+
+@pytest.mark.parametrize("field", ["preco_ifood", "preco_ifood_promo"])
+@pytest.mark.parametrize("value", ["NaN", "Infinity", "-Infinity", 1e30, 1e300])
+def test_product_preview_rejects_unrepresentable_prices(api, field, value):
+    response = api.client.post(
+        "/integracoes/ifood/catalogo/produto/preview",
+        json={"produto": {"id": api.first.id, field: value}},
+    )
+    assert response.status_code == 422, response.text
+    api.db.expire_all()
+    assert api.first.preco_ifood is None and api.first.preco_ifood_promo is None
+
+
+def test_large_legacy_erp_inputs_report_pending_instead_of_crashing(api):
+    api.db.add(IfoodMerchantConfig(tenant_id=api.tenant, **vars(config())))
+    api.db.commit()
+    for field in ("preco_venda", "preco_custo", "preco_ifood", "preco_ifood_promo"):
+        response = api.client.post(
+            "/integracoes/ifood/catalogo/produto/preview",
+            json={"produto": {"id": api.first.id, field: 1e30}},
+        )
+        if field in ("preco_ifood", "preco_ifood_promo"):
+            assert response.status_code == 422
+            continue
+        assert response.status_code == 200, response.text
+        item = response.json()
+        assert not item["margins"]["MERCHANT"]["calculated"]
+        assert any(issue["code"] == "margem_incompleta" for issue in item["pending"])
+    # Dados legados fora da faixa nao devem herdar o preco ERP silenciosamente.
+    bad = build_management_item(product(preco_ifood=1e30), config(), available_stock=1)
+    assert bad["regular_price"] is None and not bad["eligible"]
+    bad_promo = build_management_item(
+        product(preco_ifood_promo=1e30), config(), available_stock=1
+    )
+    assert not bad_promo["eligible"] and not bad_promo["promotion_active"]
+
+
+def test_maximum_representable_promotion_end_does_not_overflow_refresh_schedule():
+    item = build_management_item(
+        product(
+            preco_ifood=100,
+            preco_ifood_promo=90,
+            preco_ifood_promo_fim=datetime.max.replace(tzinfo=timezone.utc),
+        ),
+        config(),
+        available_stock=1,
+        now=datetime(2026, 10, 20, tzinfo=timezone.utc),
+    )
+    assert item["promotion_active"] and item["effective_price"] == 90
+    assert item["next_price_change_at"] is None
+
+
+def test_timezone_conversion_overflow_is_a_validation_error(api):
+    response = api.client.post(
+        "/integracoes/ifood/catalogo/produto/preview",
+        json={
+            "produto": {
+                "id": api.first.id,
+                "preco_ifood_promo_fim": "9999-12-31T23:59:59-03:00",
+            }
+        },
+    )
+    assert response.status_code == 422, response.text
+
+
+def test_parent_type_is_blocked_even_if_legacy_boolean_flags_are_inconsistent():
+    p = product(tipo_produto="PAI", is_parent=False, ifood_available_stock=4)
+    item = build_management_item(p, config(), available_stock=4)
+    catalog = build_catalog_item(p, source="ifood")
+    assert not item["eligible"] and not catalog.eligible
+    assert catalog.payload is None
+
+
+def test_product_preview_permission_accepts_create_or_edit_and_denies_neither(api):
+    path = "/integracoes/ifood/catalogo/produto/preview"
+    payload = {"produto": {"nome": "Novo produto", "codigo": "NEW"}}
+    for denied in ({"produtos.editar"}, {"produtos.criar"}):
+        api.state["denied_permissions"] = denied
+        response = api.client.post(path, json=payload)
+        assert response.status_code == 200, response.text
+        assert response.json()["product_id"] is None
+    api.state["denied_permissions"] = {"produtos.criar", "produtos.editar"}
+    assert api.client.post(path, json=payload).status_code == 403
+    assert api.db.query(IfoodMerchantConfig).count() == 0
+
+
+def test_maximum_currency_and_datetime_remain_valid_http_inputs(api):
+    from app.integrations.ifood.pricing import MAX_IFOOD_MONEY
+
+    response = api.client.post(
+        "/integracoes/ifood/catalogo/produto/simular-preco",
+        json={"product_id": api.first.id, "preco_ifood": MAX_IFOOD_MONEY},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["regular_price"] == MAX_IFOOD_MONEY
+    response = api.client.post(
+        "/integracoes/ifood/catalogo/produto/preview",
+        json={
+            "produto": {
+                "id": api.first.id,
+                "preco_ifood": 100,
+                "preco_ifood_promo": 90,
+                "preco_ifood_promo_fim": "9999-12-31T23:59:59.999999Z",
+            }
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["promotion_active"]
+    assert response.json()["next_price_change_at"] is None
+    api.db.expire_all()
+    assert api.first.preco_ifood is None and api.first.preco_ifood_promo is None

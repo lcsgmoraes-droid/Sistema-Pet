@@ -393,8 +393,11 @@ def obter_produto(
     # O acesso ao estoque compartilhado nao cria configuracao local de canal.
     if acesso_catalogo.compartilhado:
         response_data.update(
-            anunciar_ifood=False, ifood_pausado=False, preco_ifood=None,
-            preco_ifood_promo=None, preco_ifood_promo_inicio=None,
+            anunciar_ifood=False,
+            ifood_pausado=False,
+            preco_ifood=None,
+            preco_ifood_promo=None,
+            preco_ifood_promo_inicio=None,
             preco_ifood_promo_fim=None,
         )
 
@@ -534,10 +537,18 @@ def atualizar_produto(
         )
     )
     tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
-    if acesso_catalogo.compartilhado and {
-        "anunciar_ifood", "ifood_pausado", "preco_ifood", "preco_ifood_promo",
-        "preco_ifood_promo_inicio", "preco_ifood_promo_fim",
-    } & produto_update.model_fields_set:
+    if (
+        acesso_catalogo.compartilhado
+        and {
+            "anunciar_ifood",
+            "ifood_pausado",
+            "preco_ifood",
+            "preco_ifood_promo",
+            "preco_ifood_promo_inicio",
+            "preco_ifood_promo_fim",
+        }
+        & produto_update.model_fields_set
+    ):
         raise HTTPException(
             status_code=403,
             detail="O canal iFood pertence à loja de origem. Cadastre o produto nesta loja para configurar sua própria oferta.",

@@ -5,6 +5,8 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any
 from app.utils.timezone import BRASILIA_TZ
 
+MAX_IFOOD_MONEY = 999_999_999.99
+
 
 def decimal_value(value: Any) -> Decimal | None:
     if value is None or value == "":
@@ -18,6 +20,15 @@ def decimal_value(value: Any) -> Decimal | None:
 
 def money(value: Decimal) -> float:
     return float(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def monetary_value(value: Any) -> Decimal | None:
+    number = decimal_value(value)
+    return (
+        number
+        if number is not None and abs(number) <= Decimal(str(MAX_IFOOD_MONEY))
+        else None
+    )
 
 
 def aware(value: Any) -> datetime | None:
@@ -34,19 +45,33 @@ def utc_timestamp(value: datetime) -> str:
 
 def resolve_ifood_prices(product: Any, markup_percent=0, now=None) -> dict:
     current = aware(now) or datetime.now(timezone.utc)
-    specific = decimal_value(getattr(product, "preco_ifood", None))
-    base = decimal_value(getattr(product, "preco_venda", None))
+    specific_raw = getattr(product, "preco_ifood", None)
+    specific = monetary_value(specific_raw)
+    base = monetary_value(getattr(product, "preco_venda", None))
     markup = decimal_value(markup_percent) or Decimal(0)
     regular = (
         specific
-        if specific is not None
+        if specific_raw is not None
         else (base * (1 + markup / 100) if base is not None else None)
     )
+    regular = monetary_value(regular)
     regular = Decimal(str(money(regular))) if regular is not None else None
-    promo = decimal_value(getattr(product, "preco_ifood_promo", None))
+    promo_raw = getattr(product, "preco_ifood_promo", None)
+    promo = monetary_value(promo_raw)
+    # Validar o valor monetario que sera exibido/enviado: uma fracao positiva
+    # de centavo pode arredondar a zero, ou alterar o desconto de 5%.
+    promo = Decimal(str(money(promo))) if promo is not None else None
     start = aware(getattr(product, "preco_ifood_promo_inicio", None))
     end = aware(getattr(product, "preco_ifood_promo_fim", None))
     errors = []
+    if promo_raw is not None and promo is None:
+        errors.append(
+            (
+                "promo_preco",
+                "Informe um preço promocional iFood dentro da faixa monetária suportada.",
+                "preco_ifood_promo",
+            )
+        )
     if promo is None and (start or end):
         errors.append(
             (
@@ -93,7 +118,11 @@ def resolve_ifood_prices(product: Any, markup_percent=0, now=None) -> dict:
         if start and current < start:
             next_change = start
         elif end and current <= end:
-            next_change = end + timedelta(milliseconds=1)
+            try:
+                next_change = end + timedelta(milliseconds=1)
+            except OverflowError:
+                # Nao ha instante representavel depois de datetime.max.
+                next_change = None
     return {
         "evaluated_at": utc_timestamp(current),
         "next_price_change_at": utc_timestamp(next_change) if next_change else None,

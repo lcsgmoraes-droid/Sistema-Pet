@@ -76,3 +76,7 @@ jobs:
       - name: Frontend production build
         working-directory: frontend
         run: npm run build
+
+      - name: iFood and product regression tests
+        working-directory: frontend
+        run: npm run test:ifood

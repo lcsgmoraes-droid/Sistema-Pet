@@ -3,7 +3,12 @@
 from decimal import Decimal
 from typing import Any
 
-from app.integrations.ifood.pricing import decimal_value, money, resolve_ifood_prices
+from app.integrations.ifood.pricing import (
+    decimal_value,
+    monetary_value,
+    money,
+    resolve_ifood_prices,
+)
 
 MARGIN_CONFIG_FIELDS = (
     "commission_merchant_percent",
@@ -24,9 +29,9 @@ def calculate_margin(
         else "commission_merchant_percent"
     )
     inputs = {
-        "price": (decimal_value(price), "Preço de venda válido"),
+        "price": (monetary_value(price), "Preço de venda válido"),
         "cost": (
-            decimal_value(getattr(product, "preco_custo", None)),
+            monetary_value(getattr(product, "preco_custo", None)),
             "Custo do produto",
         ),
         "commission": (
@@ -44,7 +49,7 @@ def calculate_margin(
             "Tributos estimados",
         ),
         "additional_cost": (
-            decimal_value(getattr(config, "additional_unit_cost", None)),
+            monetary_value(getattr(config, "additional_unit_cost", None)),
             "Despesa adicional por unidade",
         ),
     }
@@ -52,7 +57,10 @@ def calculate_margin(
     missing = [
         label
         for key, (value, label) in inputs.items()
-        if value is None or value < 0 or (key in ("price", "cost") and value <= 0)
+        if value is None
+        or value < 0
+        or (key in ("price", "cost") and value <= 0)
+        or (key in ("commission", "payment_fee", "tax") and value > 100)
     ]
     target = decimal_value(getattr(config, "target_margin_percent", None))
     result = {

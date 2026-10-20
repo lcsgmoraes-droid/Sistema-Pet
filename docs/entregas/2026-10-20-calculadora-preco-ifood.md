@@ -64,7 +64,7 @@ oficial fora do Git. Escrita/operação/polling iFood permanecem desativados.
 ## 7. Publicação e rollback
 
 Frontend/backend e migration de convergência. A revisão `zzzzg20261019a1`
-permanece imutável; `zzzzl20261020a1` une essa linha à evolução XML já presente na
+permanece imutável; `zzzzm20261020a1` une essa linha à evolução fiscal já presente na
 main. Há uma única head. A validação local parte do banco que já tinha g, sem
 reaplicar a inclusão das colunas. Rollback preferencial: código/imagens anteriores,
 preservando colunas; downgrade exige avaliação da perda dos campos iFood.

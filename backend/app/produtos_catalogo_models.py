@@ -206,8 +206,12 @@ class Produto(BaseTenantModel):
     anunciar_ecommerce = Column(Boolean, nullable=False, default=True)
     anunciar_app = Column(Boolean, nullable=False, default=True)
     # O canal iFood e local a loja, independente de App/e-commerce e identidade.
-    anunciar_ifood = Column(Boolean, nullable=False, default=False, server_default="false")
-    ifood_pausado = Column(Boolean, nullable=False, default=False, server_default="false")
+    anunciar_ifood = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    ifood_pausado = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     preco_ifood = Column(Float, nullable=True)
     preco_ifood_promo = Column(Float, nullable=True)
     preco_ifood_promo_inicio = Column(DateTime(timezone=True), nullable=True)
