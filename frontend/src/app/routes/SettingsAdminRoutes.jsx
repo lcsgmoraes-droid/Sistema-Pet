@@ -20,6 +20,7 @@ import {
   SimulacaoContratacao,
   UsuariosPage,
   VisaoConsolidadaGrupo,
+  XmlContabilidade,
 } from "../lazyPages";
 import { ModuleGate } from "./RouteGates";
 
@@ -55,6 +56,14 @@ export function createSettingsAdminRoutes() {
         element={
           <ProtectedRoute permission="configuracoes.editar">
             <ConfiguracaoGeralNegocio />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="configuracoes/xml-contabilidade"
+        element={
+          <ProtectedRoute permission="configuracoes.editar">
+            <XmlContabilidade />
           </ProtectedRoute>
         }
       />

@@ -12,6 +12,7 @@ from app.vendas_routes import router as vendas_router
 from app.caixa_routes import router as caixa_router
 from app.alertas_gestor_routes import router as alertas_gestor_router
 from app.nfe_routes import router as nfe_router
+from app.xml_contabilidade_routes import router as xml_contabilidade_router
 from app.estoque_routes import router as estoque_router
 from app.estoque_movimentacoes_manuais_routes import (
     router as estoque_movimentacoes_manuais_router,
@@ -582,6 +583,9 @@ def register_routers(app: FastAPI) -> None:
         dependencies=_module_dependencies("rh"),
     )
     app.include_router(empresa_config_router, tags=["Empresa - Configuração Geral"])
+    app.include_router(
+        xml_contabilidade_router, dependencies=_module_dependencies("fiscal")
+    )
     app.include_router(pdv_indicadores_router, tags=["PDV - Indicadores e Margens"])
     app.include_router(empresa_router, tags=["Empresa - Configurações"])
     app.include_router(grupo_comercial_router)

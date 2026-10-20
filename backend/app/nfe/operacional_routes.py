@@ -53,6 +53,36 @@ def _exigir_bling_configurado_para_tenant(tenant_id) -> None:
         )
 
 
+def _registrar_status_contabil_bling(db, tenant_id, venda, dados_nota):
+    """Inclui no cache os status recebidos pelos endpoints legados do Bling.
+
+    O cache mantém a situação das notas para a exportação por competência.
+    Uma falha deste registro complementar não pode impedir a atualização fiscal.
+    """
+    try:
+        nfe_routes = _nfe_routes()
+        if str(nfe_routes._status_nota_bling(dados_nota)).strip().lower() not in {
+            "autorizada",
+            "cancelada",
+            "cancelado",
+        }:
+            return
+        with db.begin_nested():
+            modelo = 65 if nfe_routes._venda_usa_nfce(venda) else 55
+            nota = nfe_routes._normalizar_nota_bling(
+                {**dados_nota, "id": venda.nfe_bling_id}, modelo=modelo
+            )
+            nfe_routes.upsert_nota_cache(
+                db, tenant_id, nota, source="runtime", resumo_payload=dados_nota
+            )
+            db.flush()
+    except Exception as exc:
+        logger.warning(
+            "xml_contabilidade_cache",
+            f"Falha ao registrar status contábil Bling; erro={type(exc).__name__}",
+        )
+
+
 @router.post("/{nfe_id}/reconciliar-fluxo")
 async def reconciliar_fluxo_nfe(
     nfe_id: str,
@@ -206,6 +236,22 @@ async def cancelar_nfe(
             venda.nfe_motivo_rejeicao = request.justificativa
             # Voltar status para 'finalizada' quando NF for cancelada
             venda.status = "finalizada"
+            _registrar_status_contabil_bling(
+                db,
+                tenant_id,
+                venda,
+                {
+                    "id": nfe_id,
+                    "situacao": 4,
+                    "numero": venda.nfe_numero,
+                    "dataEmissao": (
+                        venda.nfe_data_emissao.isoformat()
+                        if venda.nfe_data_emissao
+                        else None
+                    ),
+                    "chaveAcesso": venda.nfe_chave,
+                },
+            )
             db.commit()
 
         return {
@@ -465,6 +511,7 @@ async def webhook_bling(request: Request, db: Session = Depends(get_session)):
                                 f"  ⚠️ Erro ao enfileirar estorno do produto {produto.id}: {e}",
                             )
 
+        _registrar_status_contabil_bling(db, tenant_id, venda, dados_nota)
         db.commit()
 
         logger.info(
@@ -529,6 +576,7 @@ async def sincronizar_status_nota(
         venda.nfe_status = novo_status
         venda.nfe_chave = dados_nota.get("chaveAcesso") or venda.nfe_chave
 
+        _registrar_status_contabil_bling(db, tenant_id, venda, dados_nota)
         db.commit()
         db.refresh(venda)
 
@@ -589,6 +637,7 @@ async def sincronizar_todos_status(
                     venda.nfe_status = novo_status
                     venda.nfe_chave = dados_nota.get("chaveAcesso") or venda.nfe_chave
                     atualizados += 1
+                _registrar_status_contabil_bling(db, tenant_id, venda, dados_nota)
 
             except Exception as e:
                 logger.error(

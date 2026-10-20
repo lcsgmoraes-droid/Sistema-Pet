@@ -105,6 +105,7 @@ Guia mestre:
 | SLOs e indicadores por jornada | `docs/SLOS_INDICADORES_JORNADAS.md` |
 | Dados criticos e LGPD | `docs/CATALOGO_DADOS_CRITICOS_LGPD.md` |
 | Integracoes externas | `docs/CATALOGO_INTEGRACOES.md` |
+| XMLs para contabilidade | `docs/GUIA_XML_CONTABILIDADE.md` |
 | Requisitos e entrega | `docs/templates/FICHA_ENTREGA.md` |
 | Homologacao | `docs/templates/REGISTRO_HOMOLOGACAO.md` |
 | Incidentes e sustentacao | `docs/GESTAO_INCIDENTES_SUSTENTACAO.md` |

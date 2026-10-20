@@ -21,7 +21,7 @@ export default function MesGrade({
   const hoje = isoHoje();
 
   return (
-    <div className="w-64">
+    <div className="w-64 max-w-full shrink-0">
       <div className="mb-2 flex items-center justify-between">
         {mostrarSetaAnterior ? (
           <button

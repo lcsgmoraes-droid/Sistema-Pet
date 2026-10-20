@@ -131,6 +131,7 @@ export const OpsTenants = lazy(() => import("../pages/OpsTenants.jsx"));
 export const Observabilidade = lazy(() => import("../pages/Observabilidade.jsx"));
 export const StyleGuide = lazy(() => import("../pages/styleGuide/StyleGuide.jsx"));
 export const Configuracoes = lazy(() => import("../pages/Configuracoes"));
+export const XmlContabilidade = lazy(() => import("../pages/configuracoes/XmlContabilidade"));
 export const ConfiguracaoFiscalEmpresa = lazy(
   () => import("../pages/configuracoes/ConfiguracaoFiscalEmpresa"),
 );

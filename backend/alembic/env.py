@@ -68,6 +68,7 @@ import app.veterinario_models
 import app.ecommerce_payment_models
 import app.billing_models
 import app.intnfe.models
+import app.xml_contabilidade_models
 import app.catalogo_mestre_models
 import app.orcamentos_grupo_models
 

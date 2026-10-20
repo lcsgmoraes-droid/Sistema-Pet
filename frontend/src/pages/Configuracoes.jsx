@@ -1,6 +1,7 @@
 import {
   FiCreditCard,
   FiLink,
+  FiMail,
   FiPackage,
   FiSettings,
   FiShield,
@@ -45,6 +46,14 @@ const cards = [
     icon: FiSettings,
     link: "/configuracoes/geral",
     color: "orange",
+    permission: "configuracoes.editar",
+  },
+  {
+    title: "XML para contabilidade",
+    description: "XML por XML, envio mensal e ZIPs por tipo para o contador",
+    icon: FiMail,
+    link: "/configuracoes/xml-contabilidade",
+    color: "blue",
     permission: "configuracoes.editar",
   },
   {
