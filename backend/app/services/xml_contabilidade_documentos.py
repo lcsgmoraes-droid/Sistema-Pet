@@ -269,6 +269,23 @@ def _obter_xml(db, tenant_id, doc):
             "O modelo do documento não corresponde ao cache fiscal.", 409
         )
     doc.chave = doc.chave or str(detalhe.get("chaveAcesso") or "")
+    if modelo == 55:
+        from app.services.xml_contabilidade_bling_documentos import (
+            obter_documentos_nfe,
+        )
+
+        xml, eventos = obter_documentos_nfe(
+            tenant_id, doc.chave, _cnpj_empresa(db, tenant_id)
+        )
+        # Lista completa do recurso oficial, inclusive eventos desconhecidos
+        # anteriormente. Nunca substituir por um link que só retorna a nota.
+        anteriores = detalhe.get("xmlEvento")
+        anteriores = anteriores if isinstance(anteriores, list) else [anteriores]
+        detalhe = {
+            **detalhe,
+            "xmlEvento": [evento for evento in anteriores if evento] + eventos,
+        }
+        return xml, detalhe
     return _xml_bytes(obter_xml_documento(detalhe, modelo)), detalhe
 
 

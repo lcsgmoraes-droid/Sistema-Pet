@@ -105,6 +105,24 @@ responsável. Aceite SMTP não significa leitura ou entrega na caixa de entrada.
   a mesma nota retornada nas duas consultas sem consumir duas posições do limite
   e o bloqueio pelo coletor real quando falta o XML oficial do cancelamento.
 
-Validação técnica local aprovada. Aceite funcional do Lucas e publicação em
-produção pendentes. Próximo passo: revisar a tela e conferir destinatário/SMTP
-antes de autorizar a publicação e ativar qualquer rotina na operação real.
+## Documentos completos NF-e Bling após o teste real
+
+O diagnóstico autorizado encontrou uma NF-e modelo 55 cujo recurso oficial
+`/nfe/documento/{chaveAcesso}?formato=xml` fornece dois arquivos distintos:
+original autorizado e cancelamento. O caminho anterior utilizava somente o link
+de XML do detalhe e não descobria esse evento. A coleta NF-e agora sempre usa a
+lista oficial, decodifica GZIP/base64 com limites e classifica cada documento pelo
+XML, preservando seus bytes. Respostas inválidas/incompletas continuam bloqueadas.
+
+Validação local da correção: **225 testes XML aprovados**, incluindo **70 casos**
+do decoder/coletor oficial, além de Ruff, formatação e `git diff --check` aprovados.
+
+O recurso não aceita NFC-e modelo 65 na consulta real. Duas notas antigas desse
+modelo retornaram XML sem protocolo de autorização e sem eventos; o bloqueio
+desse lote foi correto e permanece. Não foram inventadas rotas, protocolos ou
+eventos para concluir a demonstração.
+
+A publicação exclusiva autorizada foi concluída pelo PR #1530, no commit
+`dd1c0d5b`. O envio individual real chegou ao Gmail indicado e o SHA-256 do anexo
+recebido correspondeu ao enviado. A correção posterior da fonte NF-e modelo 55
+aguarda os gates e um novo teste de entrega dos ZIPs e eventos reais.

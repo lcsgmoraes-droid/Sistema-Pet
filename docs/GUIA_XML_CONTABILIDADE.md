@@ -60,10 +60,13 @@ envio; tentar novamente uma falha usa o e-mail atual salvo na configuração.
   completo, sem recortar ou regravar a assinatura; o manifesto explica isso.
 - IntNFe: consulta a lista oficial de eventos mesmo quando o XML da nota já está
   salvo, incluindo cancelamento, substituição de NFC-e, CC-e e demais registros
-  autorizados. Bling legado: a API pública atual não documenta listagem de todos
-  os eventos/CC-e; são usados os comprovantes retornados ou embutidos no XML.
-  Cancelamento conhecido sem comprovante bloqueia o pacote. Não há garantia de
-  descobrir CC-e externas desconhecidas nesse legado. Para eventos em notas
+  autorizados. Bling NF-e (modelo 55): consulta sempre o recurso oficial
+  `/nfe/documento/{chaveAcesso}?formato=xml`, que retorna a nota e seus documentos
+  disponíveis em uma lista GZIP/base64. Cada arquivo é validado pelo conteúdo e
+  preservado; cancelamentos e todas as sequências de CC-e são separados da nota.
+  NFC-e Bling (modelo 65): mantém os comprovantes retornados ou embutidos no XML;
+  não há recurso equivalente documentado para descobrir CC-e/eventos externos.
+  Cancelamento conhecido sem comprovante bloqueia o pacote. Para eventos em notas
   antigas do Bling, o lote utiliza os comprovantes já recebidos pelo monitor;
   não repete consultas a todo o histórico desse provedor em cada exportação.
 - Limites por lote: 366 dias, 10.000 notas, 10 MB por XML, 30 MB de XMLs e 15 MB
@@ -71,6 +74,9 @@ envio; tentar novamente uma falha usa o e-mail atual salvo na configuração.
   A confirmação de eventos em notas antigas consulta o histórico fiscal;
   históricos acima de 10.000 documentos exigem suporte, sem truncar o lote.
   As notas do período são consultadas uma única vez por exportação.
+  A lista de documentos de uma NF-e Bling admite até 1.000 arquivos, com limites
+  de 10 MB por arquivo e 30 MB no conjunto, antes e depois da expansão GZIP.
+  Resposta incompleta, desconhecida ou inválida impede a entrega.
 
 No histórico, **Enviado** significa que o servidor SMTP aceitou a mensagem,
 sem confirmação de leitura ou de entrega na caixa de entrada. Confira com o
