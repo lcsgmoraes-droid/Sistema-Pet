@@ -31,28 +31,54 @@ export function toLocalIsoDate(value: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+export function toBrasiliaIsoDate(value: Date): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const part = (type: string) =>
+    parts.find((item) => item.type === type)?.value;
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
 export function resolveGestorPeriod(
   key: Exclude<GestorPeriodKey, "personalizado">,
   now = new Date(),
 ): GestorPeriod {
-  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const end = new Date(`${toBrasiliaIsoDate(now)}T12:00:00Z`);
   const start = new Date(end);
 
   if (key === "ontem") {
-    start.setDate(start.getDate() - 1);
-    end.setDate(end.getDate() - 1);
+    start.setUTCDate(start.getUTCDate() - 1);
+    end.setUTCDate(end.getUTCDate() - 1);
   } else if (key === "sete_dias") {
-    start.setDate(start.getDate() - 6);
+    start.setUTCDate(start.getUTCDate() - 6);
   } else if (key === "este_mes") {
-    start.setDate(1);
+    start.setUTCDate(1);
   } else if (key === "mes_anterior") {
-    start.setMonth(start.getMonth() - 1, 1);
-    end.setDate(0);
+    start.setUTCMonth(start.getUTCMonth() - 1, 1);
+    end.setUTCDate(0);
   }
 
   const label =
     GESTOR_QUICK_PERIODS.find((item) => item.key === key)?.label ?? key;
-  return { key, label, start: toLocalIsoDate(start), end: toLocalIsoDate(end) };
+  return {
+    key,
+    label,
+    start: start.toISOString().slice(0, 10),
+    end: end.toISOString().slice(0, 10),
+  };
+}
+
+export function refreshGestorPeriod(
+  period: GestorPeriod,
+  now = new Date(),
+): GestorPeriod {
+  return period.key === "personalizado"
+    ? period
+    : resolveGestorPeriod(period.key, now);
 }
 
 export function formatIsoDateBR(value: string): string {

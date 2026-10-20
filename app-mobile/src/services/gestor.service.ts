@@ -1,5 +1,44 @@
 import api from "./api";
 
+export interface GestorPagamentoDetalhe {
+  id: number | string | null;
+  origem?: "pagamento" | "recebimento" | "conta_legada" | "venda_legada";
+  forma_pagamento: string;
+  valor: number;
+  data_pagamento: string | null;
+  tipo: "pagamento" | "crediario" | "beneficio";
+}
+
+export interface GestorValoresVenda {
+  faturamento_bruto: number;
+  descontos: number;
+  devolucoes: number;
+  faturamento_liquido: number;
+  taxa_entrega: number;
+  total_vendas: number;
+  valor_pago: number;
+  creditos_utilizados: number;
+  crediario_receber: number;
+  em_aberto: number;
+}
+
+export interface GestorVendaDetalhe extends GestorValoresVenda {
+  venda_id: number;
+  numero_venda: string;
+  data_venda: string;
+  status: string;
+  pagamentos?: GestorPagamentoDetalhe[];
+}
+
+export interface GestorComposicaoVendas extends GestorValoresVenda {
+  data_inicio: string;
+  data_fim: string;
+  escopo: "empresa";
+  quantidade: number;
+  detalhes: GestorVendaDetalhe[];
+  avisos?: string[];
+}
+
 export interface GestorVendasResumo {
   faturamento_bruto: number;
   faturamento_liquido: number;
@@ -9,6 +48,7 @@ export interface GestorVendasResumo {
   unidades_vendidas: number;
   produtos_distintos: number;
   ticket_medio: number;
+  composicao?: GestorComposicaoVendas;
 }
 
 export interface GestorContaResumo {

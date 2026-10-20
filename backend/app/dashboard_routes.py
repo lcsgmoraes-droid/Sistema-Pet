@@ -27,6 +27,11 @@ from .relatorio_vendas_common import (
 )
 from .utils.serialization import safe_decimal_to_float_zero
 from .utils.timezone import now_brasilia
+from .services.faturamento_service import (
+    montar_composicao_vendas,
+    opcoes_composicao_vendas,
+)
+from .caixa.conferencia import moeda
 from .utils.tenant_safe_sql import execute_tenant_safe
 from .dashboard.ponto_equilibrio_routes import (
     router as ponto_equilibrio_router,
@@ -227,7 +232,7 @@ async def obter_resumo_dashboard(
         # ========================================
         vendas_periodo = (
             db.query(Venda)
-            .options(selectinload(Venda.pagamentos), selectinload(Venda.itens))
+            .options(*opcoes_composicao_vendas())
             .filter(
                 and_(
                     Venda.tenant_id == tenant_id,
@@ -239,15 +244,17 @@ async def obter_resumo_dashboard(
             .all()
         )
 
-        total_vendas_periodo = sum(float(venda.total or 0) for venda in vendas_periodo)
-        quantidade_vendas_periodo = len(vendas_periodo)
-        faturamento_bruto_periodo = sum(
-            _valores_operacionais_venda(venda)["valor_bruto"]
-            for venda in vendas_periodo
+        composicao_vendas = montar_composicao_vendas(
+            db,
+            tenant_id,
+            vendas_periodo,
+            inicio_periodo.date(),
+            (fim_periodo - timedelta(days=1)).date(),
         )
-        valor_recebido_periodo = sum(
-            _total_recebido_venda(venda) for venda in vendas_periodo
-        )
+        total_vendas_periodo = composicao_vendas["total_vendas"]
+        quantidade_vendas_periodo = composicao_vendas["quantidade"]
+        faturamento_bruto_periodo = composicao_vendas["faturamento_bruto"]
+        valor_recebido_periodo = composicao_vendas["valor_pago"]
         unidades_vendidas_periodo = sum(
             safe_decimal_to_float_zero(getattr(item, "quantidade", 0))
             for venda in vendas_periodo
@@ -289,7 +296,7 @@ async def obter_resumo_dashboard(
         # 7. TICKET MÉDIO
         # ========================================
         ticket_medio = (
-            (faturamento_bruto_periodo / quantidade_vendas_periodo)
+            (composicao_vendas["faturamento_liquido"] / quantidade_vendas_periodo)
             if quantidade_vendas_periodo > 0
             else 0
         )
@@ -312,6 +319,7 @@ async def obter_resumo_dashboard(
         # RETORNO
         # ========================================
         return {
+            "composicao_vendas": composicao_vendas,
             "visao_comercial": visao_comercial,
             "indicador_comercial": indicador_comercial,
             "saldo_atual": round(saldo_atual, 2),
@@ -330,6 +338,7 @@ async def obter_resumo_dashboard(
                 "unidades": round(unidades_vendidas_periodo, 3),
                 "valor_total": round(total_vendas_periodo, 2),
                 "faturamento_bruto": round(float(faturamento_bruto_periodo), 2),
+                "faturamento_liquido": composicao_vendas["faturamento_liquido"],
                 "valor_recebido": round(valor_recebido_periodo, 2),
                 "lucro": round(lucro_vendas_periodo, 2),
                 "finalizadas": int(vendas_finalizadas),
@@ -364,7 +373,7 @@ async def obter_entradas_saidas_por_dia(
         # Buscar vendas por dia
         vendas = (
             db.query(Venda)
-            .options(selectinload(Venda.pagamentos))
+            .options(*opcoes_composicao_vendas())
             .filter(
                 and_(
                     Venda.tenant_id == tenant_id,
@@ -401,12 +410,6 @@ async def obter_entradas_saidas_por_dia(
             data = (inicio_periodo + timedelta(days=i)).strftime("%Y-%m-%d")
             dados_por_dia[data] = {"data": data, "entradas": 0, "saidas": 0}
 
-        # Preencher com vendas
-        for venda in vendas:
-            data_str = venda.data_venda.strftime("%Y-%m-%d")
-            if data_str in dados_por_dia:
-                dados_por_dia[data_str]["entradas"] += _total_recebido_venda(venda)
-
         # Preencher com pagamentos
         for pagamento in pagamentos:
             data_obj = pagamento[0] if isinstance(pagamento, tuple) else pagamento.data
@@ -429,6 +432,21 @@ async def obter_entradas_saidas_por_dia(
                 if dia["data"] in dados_por_dia:
                     dados_por_dia[dia["data"]]["entradas"] = dia["entradas"]
                     dados_por_dia[dia["data"]]["saidas"] += dia["devolucoes"]
+        else:
+            composicao = montar_composicao_vendas(
+                db,
+                tenant_id,
+                vendas,
+                inicio_periodo.date(),
+                (fim_periodo - timedelta(days=1)).date(),
+            )
+            for venda in composicao["detalhes"]:
+                data_str = (venda["data_venda"] or "")[:10]
+                if data_str in dados_por_dia:
+                    dia = dados_por_dia[data_str]
+                    dia["entradas"] = float(
+                        moeda(dia["entradas"]) + moeda(venda["valor_pago"])
+                    )
 
         # Converter para lista ordenada
         resultado = sorted(dados_por_dia.values(), key=lambda x: x["data"])

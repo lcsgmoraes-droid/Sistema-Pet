@@ -32,6 +32,9 @@ import BotaoLink from "../../components/v2/BotaoLink/BotaoLink";
 import CartaoIndicador from "../../components/v2/CartaoIndicador/CartaoIndicador";
 import EstadoVazio from "../../components/v2/EstadoVazio/EstadoVazio";
 import SeletorOpcoes from "../../components/v2/SeletorOpcoes/SeletorOpcoes";
+import ResumoFaturamento, {
+  DetalhesFaturamento,
+} from "../../components/v2/ResumoFaturamento/ResumoFaturamento";
 import { TONS_BADGE } from "../../components/v2/utils/tons";
 import { useTour } from "../../hooks/useTour";
 import { useTheme } from "../../theme/ThemeContext";
@@ -98,6 +101,7 @@ export default function DashboardFinanceiro() {
   const [overdueAccounts, setOverdueAccounts] = useState({ contas_receber: [], contas_pagar: [] });
   const [topProducts, setTopProducts] = useState([]);
   const [bankBalance, setBankBalance] = useState(null);
+  const [faturamentoExpandido, setFaturamentoExpandido] = useState(false);
 
   const loadDashboard = useCallback(async () => {
     const requestId = ++requestIdRef.current;
@@ -162,9 +166,8 @@ export default function DashboardFinanceiro() {
   const statusIcon = executiveStatus.tone === "sucesso" ? CheckCircle2 : AlertCircle;
   const StatusIcon = statusIcon;
   const periodLabel = getPeriodLabel(periodDays);
-  const grossSales = Number(summary?.vendas_periodo?.faturamento_bruto || 0);
   const porRecebimento = summary?.visao_comercial === "recebimento";
-  const commercialValue = summary?.indicador_comercial ?? grossSales;
+  const composicaoVendas = summary?.composicao_vendas;
   const cashResult = Number(summary?.fluxo_periodo?.lucro || 0);
   const salesCount = Number(summary?.vendas_periodo?.quantidade || 0);
   const unitsSold = Number(summary?.vendas_periodo?.unidades || 0);
@@ -256,17 +259,14 @@ export default function DashboardFinanceiro() {
           </div>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <CartaoIndicador
-            icone={TrendingUp}
-            tom="informativo"
-            titulo={porRecebimento ? "Recebimentos de vendas" : "Faturamento"}
-            detalhe={periodLabel}
-            aoClicar={() => navigate(getDashboardDetailPath("sales", periodDays))}
-          >
-            <p className="text-2xl font-bold leading-tight text-slate-950 dark:text-white">
-              {formatMoneyBRL(commercialValue)}
-            </p>
-          </CartaoIndicador>
+          <ResumoFaturamento
+            composicao={composicaoVendas}
+            periodo={periodLabel}
+            expandido={faturamentoExpandido}
+            aoAlternarDetalhes={() => setFaturamentoExpandido((atual) => !atual)}
+            detalhesFora
+            detalhesId="dashboard-detalhes-faturamento"
+          />
           <CartaoIndicador
             icone={ShoppingBag}
             tom="neutro"
@@ -292,6 +292,14 @@ export default function DashboardFinanceiro() {
             </p>
           </CartaoIndicador>
         </div>
+        {faturamentoExpandido && (
+          <DetalhesFaturamento
+            key={`${composicaoVendas?.data_inicio}-${composicaoVendas?.data_fim}`}
+            composicao={composicaoVendas}
+            id="dashboard-detalhes-faturamento"
+            aoAbrirRelatorio={() => navigate(getDashboardDetailPath("sales", periodDays))}
+          />
+        )}
       </section>
 
       <section id="tour-financeiro" className="space-y-4">
@@ -333,7 +341,11 @@ export default function DashboardFinanceiro() {
               aoClicar={() => navigate(getDashboardDetailPath("sales", periodDays))}
             >
               <p className="text-lg font-bold leading-tight text-slate-950 dark:text-white">
-                {formatMoneyBRL(summary?.vendas_periodo?.ticket_medio || 0)}
+                {formatMoneyBRL(
+                  composicaoVendas?.quantidade
+                    ? composicaoVendas.faturamento_liquido / composicaoVendas.quantidade
+                    : summary?.vendas_periodo?.ticket_medio || 0,
+                )}
               </p>
             </CartaoIndicador>
             <CartaoIndicador

@@ -95,8 +95,8 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
     elements.append(info_table)
     elements.append(Spacer(1, 1 * cm))
 
-    # ===== RESUMO FINANCEIRO =====
-    elements.append(Paragraph("RESUMO FINANCEIRO", style_heading))
+    # ===== VENDAS, RECEBIMENTOS E SALDO FÍSICO =====
+    elements.append(Paragraph("VENDAS E RECEBIMENTOS", style_heading))
 
     saldo_inicial = float(caixa_data.get("saldo_inicial", 0))
     totais = caixa_data.get("totais", {})
@@ -112,29 +112,99 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
         else None
     )
 
-    resumo_data = [
-        ["DESCRIÇÃO", "VALOR"],
-        ["Abertura do caixa", formatar_moeda(saldo_inicial)],
-        ["Total vendido no caixa", formatar_moeda(caixa_data.get("total_vendido"))],
+    vendas = caixa_data.get("vendas_periodo")
+    recebimentos = caixa_data.get("composicao_recebimentos")
+    resumo_data = [["DESCRIÇÃO", "VALOR"]]
+    secoes = []
+
+    def adicionar_secao(titulo):
+        secoes.append(len(resumo_data))
+        resumo_data.append([titulo, ""])
+
+    if vendas:
+        adicionar_secao(f"Vendas de {formatar_periodo(vendas)} - empresa inteira")
+        resumo_data.extend(
+            [rotulo, formatar_moeda(vendas.get(chave))]
+            for rotulo, chave in (
+                ("Faturamento bruto", "faturamento_bruto"),
+                ("Descontos", "descontos"),
+                ("Devoluções das vendas", "devolucoes"),
+                (
+                    "Faturamento líquido (vendas - descontos - devoluções)",
+                    "faturamento_liquido",
+                ),
+                ("Entrega", "taxa_entrega"),
+                ("Total das vendas com entrega", "total_vendas"),
+                ("Valor pago das vendas", "valor_pago"),
+                ("Créditos e benefícios utilizados", "creditos_utilizados"),
+                ("Crediário a receber", "crediario_receber"),
+                ("Em aberto sem crediário", "em_aberto"),
+            )
+        )
+    else:
+        adicionar_secao("Vendas vinculadas ao caixa - dados legados")
+        resumo_data.extend(
+            [
+                [
+                    "Vendas vinculadas ao caixa",
+                    formatar_moeda(caixa_data.get("total_vendido")),
+                ],
+                [
+                    "Crediário das vendas vinculadas",
+                    formatar_moeda(caixa_data.get("total_vendas_crediario")),
+                ],
+            ]
+        )
+
+    adicionar_secao(
+        f"Recebimentos neste caixa - {formatar_periodo(recebimentos)}"
+        if recebimentos
+        else "Quitações registradas no caixa - dados legados"
+    )
+    if recebimentos:
+        resumo_data.extend(
+            [rotulo, formatar_moeda(recebimentos.get(chave))]
+            for rotulo, chave in (
+                ("De vendas do período", "vendas_periodo"),
+                ("De vendas anteriores", "vendas_anteriores"),
+                ("(-) Devoluções e estornos no caixa", "devolucoes"),
+                ("Recebimentos neste caixa", "total_recebido"),
+                (
+                    "Créditos e benefícios usados no caixa (separados)",
+                    "creditos_utilizados",
+                ),
+            )
+        )
+    else:
+        resumo_data.append(
+            [
+                "Quitações registradas no caixa (legado)",
+                formatar_moeda(caixa_data.get("total_recebido")),
+            ]
+        )
+
+    adicionar_secao("Saldo físico do caixa")
+    resumo_data.extend(
         [
-            "Vendas no crediário",
-            formatar_moeda(caixa_data.get("total_vendas_crediario")),
-        ],
-        ["Total recebido no caixa", formatar_moeda(caixa_data.get("total_recebido"))],
-        ["Vendas recebidas em dinheiro", formatar_moeda(totais.get("vendas"))],
-        ["Suprimentos (entradas avulsas)", formatar_moeda(totais.get("suprimentos"))],
-        [
-            "Total de entradas em dinheiro",
-            formatar_moeda(
-                float(totais.get("vendas", 0)) + float(totais.get("suprimentos", 0))
-            ),
-        ],
-        ["Sangrias", formatar_moeda(totais.get("sangrias"))],
-        ["Despesas", formatar_moeda(totais.get("despesas"))],
-        ["Devoluções", formatar_moeda(totais.get("devolucoes"))],
-        ["Transferências", formatar_moeda(totais.get("transferencias"))],
-        ["Saldo esperado em dinheiro", formatar_moeda(saldo_final)],
-    ]
+            ["Abertura do caixa", formatar_moeda(saldo_inicial)],
+            ["Vendas recebidas em dinheiro", formatar_moeda(totais.get("vendas"))],
+            [
+                "Suprimentos (entradas avulsas)",
+                formatar_moeda(totais.get("suprimentos")),
+            ],
+            [
+                "Total de entradas em dinheiro",
+                formatar_moeda(
+                    float(totais.get("vendas", 0)) + float(totais.get("suprimentos", 0))
+                ),
+            ],
+            ["Sangrias", formatar_moeda(totais.get("sangrias"))],
+            ["Despesas", formatar_moeda(totais.get("despesas"))],
+            ["Devoluções", formatar_moeda(totais.get("devolucoes"))],
+            ["Transferências", formatar_moeda(totais.get("transferencias"))],
+            ["Saldo esperado em dinheiro", formatar_moeda(saldo_final)],
+        ]
+    )
     saldo_row = len(resumo_data) - 1
 
     if saldo_declarado is not None:
@@ -145,7 +215,7 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
     if diferenca is not None:
         resumo_data.append(["Diferença", formatar_moeda(diferenca)])
 
-    resumo_table = Table(resumo_data, colWidths=[12 * cm, 5 * cm])
+    resumo_table = Table(resumo_data, colWidths=[12 * cm, 5 * cm], repeatRows=1)
 
     table_style = [
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e40af")),
@@ -157,8 +227,8 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
         ("FONTSIZE", (0, 1), (-1, -1), 10),
         ("ALIGN", (1, 1), (1, -1), "RIGHT"),
         ("ALIGN", (0, 1), (0, -1), "LEFT"),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
-        ("TOPPADDING", (0, 0), (-1, -1), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
         ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
         (
             "ROWBACKGROUNDS",
@@ -167,6 +237,15 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
             [colors.white, colors.HexColor("#f3f4f6")],
         ),
     ]
+
+    for linha in secoes:
+        table_style.extend(
+            [
+                ("SPAN", (0, linha), (-1, linha)),
+                ("FONTNAME", (0, linha), (-1, linha), "Helvetica-Bold"),
+                ("BACKGROUND", (0, linha), (-1, linha), colors.HexColor("#e2e8f0")),
+            ]
+        )
 
     # Destacar saldo esperado
     table_style.append(
@@ -211,11 +290,20 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
     elements.append(resumo_table)
     elements.append(Spacer(1, 1 * cm))
 
-    elements.append(Paragraph("PAGAMENTOS POR FORMA", style_heading))
+    elements.append(
+        Paragraph(
+            "FORMAS DE RECEBIMENTO" if recebimentos else "FORMAS DE QUITAÇÃO (LEGADO)",
+            style_heading,
+        )
+    )
     formas_data = [["FORMA", "VALOR"]]
-    for forma, dados in sorted(
-        caixa_data.get("vendas_por_forma_pagamento", {}).items()
-    ):
+    formas = (
+        recebimentos.get("por_forma_pagamento", {})
+        if recebimentos
+        else caixa_data.get("recebimentos_por_forma_pagamento")
+        or caixa_data.get("vendas_por_forma_pagamento", {})
+    )
+    for forma, dados in sorted(formas.items()):
         prazo = forma.strip().casefold() in {"crediario", "crediário", "boleto"}
         formas_data.append(
             [
@@ -225,7 +313,14 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
         )
     if len(formas_data) == 1:
         formas_data.append(["Nenhum recebimento", formatar_moeda(0)])
-    formas_table = Table(formas_data, colWidths=[12 * cm, 5 * cm])
+    if recebimentos:
+        formas_data.append(
+            [
+                "Total das formas de recebimento",
+                formatar_moeda(recebimentos.get("total_recebido")),
+            ]
+        )
+    formas_table = Table(formas_data, colWidths=[12 * cm, 5 * cm], repeatRows=1)
     formas_table.setStyle(
         TableStyle(
             [
@@ -243,7 +338,7 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
     elements.append(Spacer(1, 0.5 * cm))
     elements.append(
         Paragraph(
-            "Vendido e recebido são indicadores separados. Formas a prazo não entram no recebido. Suprimentos e abertura não são vendas.",
+            "Vendas e recebimentos têm períodos e escopos próprios. Crediário a receber e créditos utilizados ficam separados dos recebimentos. Apenas dinheiro afeta o saldo físico. Suprimentos e abertura não são vendas.",
             style_normal,
         )
     )
@@ -383,6 +478,14 @@ def formatar_datetime(dt) -> str:
         except ValueError:
             return dt
     return dt.strftime("%d/%m/%Y %H:%M")
+
+
+def formatar_periodo(bloco: dict) -> str:
+    inicio = str(bloco.get("data_inicio") or "")[:10]
+    fim = str(bloco.get("data_fim") or "")[:10]
+    inicio = "/".join(reversed(inicio.split("-")))
+    fim = "/".join(reversed(fim.split("-")))
+    return inicio if inicio == fim else f"{inicio} a {fim}"
 
 
 def formatar_moeda(valor) -> str:
