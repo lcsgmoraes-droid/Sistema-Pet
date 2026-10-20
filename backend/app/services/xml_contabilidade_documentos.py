@@ -8,10 +8,9 @@ import re
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from defusedxml import ElementTree as ET
-from sqlalchemy import and_, func, or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import noload
 
-from app.nfe_cache_models import BlingNotaFiscalCache
 from app.vendas_models import Venda
 from app.services.xml_contabilidade_common import (
     BRASILIA,
@@ -41,92 +40,33 @@ class Documento:
 
 
 def _documento(db, tenant_id, provider, documento_id):
-    if provider == "intnfe":
-        if not str(documento_id).isdigit():
-            return None
-        venda = (
-            db.query(Venda)
-            .options(noload("*"))
-            .filter(
-                Venda.tenant_id == _tenant(tenant_id),
-                Venda.id == int(documento_id),
-                Venda.nfe_provider == "intnfe",
-            )
-            .first()
-        )
-        if (
-            not venda
-            or _status(venda.nfe_status) not in STATUS_VALIDOS
-            or venda.nfe_ambiente != 1
-            or not venda.nfe_data_emissao
-        ):
-            return None
-        return Documento(
-            "intnfe",
-            str(venda.id),
-            str(venda.nfe_chave or ""),
-            int(venda.nfe_modelo or 0),
-            _status(venda.nfe_status),
-            venda.nfe_data_emissao,
-            venda=venda,
-        )
-    if provider != "bling" or not str(documento_id).isdigit() or int(documento_id) <= 0:
+    if provider != "intnfe" or not str(documento_id).isdigit():
         return None
-    cache = (
-        db.query(BlingNotaFiscalCache)
+    venda = (
+        db.query(Venda)
+        .options(noload("*"))
         .filter(
-            BlingNotaFiscalCache.tenant_id == _tenant(tenant_id),
-            BlingNotaFiscalCache.bling_id == str(documento_id),
-            or_(
-                BlingNotaFiscalCache.provider.is_(None),
-                BlingNotaFiscalCache.provider == "bling",
-            ),
+            Venda.tenant_id == _tenant(tenant_id),
+            Venda.id == int(documento_id),
+            Venda.nfe_provider == "intnfe",
+            Venda.nfe_ambiente == 1,
         )
-        .order_by(BlingNotaFiscalCache.id.desc())
         .first()
     )
-    if cache is None:
-        # Vendas antigas do Bling podem existir antes da criação do cache.
-        # O monitor inclui essas referências; buscá-las aqui evita descartar
-        # silenciosamente a nota e seus eventos por faltar apenas o cache.
-        venda = (
-            db.query(Venda)
-            .options(noload("*"))
-            .filter(
-                Venda.tenant_id == _tenant(tenant_id),
-                Venda.nfe_bling_id == int(documento_id),
-                or_(Venda.nfe_provider.is_(None), Venda.nfe_provider == "bling"),
-                func.lower(Venda.nfe_status).in_(STATUS_VALIDOS),
-                Venda.nfe_data_emissao.isnot(None),
-            )
-            .order_by(Venda.id.desc())
-            .first()
-        )
-        if not venda:
-            return None
-        return Documento(
-            "bling",
-            str(venda.nfe_bling_id),
-            str(venda.nfe_chave or ""),
-            int(venda.nfe_modelo or 0),
-            _status(venda.nfe_status),
-            venda.nfe_data_emissao,
-            venda=venda,
-        )
     if (
-        not cache
-        or _status(cache.status) not in STATUS_VALIDOS
-        or not cache.data_emissao
+        not venda
+        or _status(venda.nfe_status) not in STATUS_VALIDOS
+        or not venda.nfe_data_emissao
     ):
         return None
     return Documento(
-        "bling",
-        str(cache.bling_id),
-        str(cache.chave or ""),
-        int(cache.modelo),
-        _status(cache.status),
-        cache.data_emissao,
-        cache=cache,
+        "intnfe",
+        str(venda.id),
+        str(venda.nfe_chave or ""),
+        int(venda.nfe_modelo or 0),
+        _status(venda.nfe_status),
+        venda.nfe_data_emissao,
+        venda=venda,
     )
 
 
@@ -160,13 +100,8 @@ def _listar_documentos(db, tenant_id, data_inicio, data_fim):
         .filter(
             Venda.tenant_id == _tenant(tenant_id),
             _chave_da_empresa_ou_desconhecida(Venda.nfe_chave, cnpj),
-            or_(
-                and_(Venda.nfe_provider == "intnfe", Venda.nfe_ambiente == 1),
-                and_(
-                    Venda.nfe_bling_id > 0,
-                    or_(Venda.nfe_provider.is_(None), Venda.nfe_provider == "bling"),
-                ),
-            ),
+            Venda.nfe_provider == "intnfe",
+            Venda.nfe_ambiente == 1,
             func.lower(Venda.nfe_status).in_(STATUS_VALIDOS),
             Venda.nfe_data_emissao >= inicio,
             Venda.nfe_data_emissao < fim,
@@ -175,27 +110,10 @@ def _listar_documentos(db, tenant_id, data_inicio, data_fim):
         .limit(MAX_DOCUMENTOS + 1)
         .all()
     )
-    notas = (
-        db.query(BlingNotaFiscalCache)
-        .filter(
-            BlingNotaFiscalCache.tenant_id == _tenant(tenant_id),
-            _chave_da_empresa_ou_desconhecida(BlingNotaFiscalCache.chave, cnpj),
-            or_(
-                BlingNotaFiscalCache.provider.is_(None),
-                BlingNotaFiscalCache.provider == "bling",
-            ),
-            func.lower(BlingNotaFiscalCache.status).in_(STATUS_VALIDOS),
-            BlingNotaFiscalCache.data_emissao >= inicio,
-            BlingNotaFiscalCache.data_emissao < fim,
-        )
-        .order_by(BlingNotaFiscalCache.data_emissao, BlingNotaFiscalCache.id)
-        .limit(MAX_DOCUMENTOS + 1)
-        .all()
-    )
     docs = [
         Documento(
-            "intnfe" if v.nfe_provider == "intnfe" else "bling",
-            str(v.id if v.nfe_provider == "intnfe" else v.nfe_bling_id),
+            "intnfe",
+            str(v.id),
             str(v.nfe_chave or ""),
             int(v.nfe_modelo or 0),
             _status(v.nfe_status),
@@ -204,19 +122,6 @@ def _listar_documentos(db, tenant_id, data_inicio, data_fim):
         )
         for v in vendas
     ]
-    docs.extend(
-        Documento(
-            "bling",
-            str(n.bling_id),
-            str(n.chave or ""),
-            int(n.modelo),
-            _status(n.status),
-            n.data_emissao,
-            cache=n,
-        )
-        for n in notas
-        if str(n.bling_id).isdigit() and int(n.bling_id) > 0
-    )
     if len(docs) > MAX_DOCUMENTOS:
         raise XmlContabilidadeError(
             f"O período excede {MAX_DOCUMENTOS} notas. Divida-o em períodos menores."
@@ -239,37 +144,27 @@ def _xml_bytes(value):
 
 
 def _obter_xml(db, tenant_id, doc):
-    detalhe = {}
-    if doc.provider == "intnfe" and doc.venda is not None and doc.venda.nfe_xml:
-        return _xml_bytes(doc.venda.nfe_xml), detalhe
-    if doc.provider == "intnfe":
-        # download_document faz commit no cache e não deve interferir no claim
-        # da fila. Usa-se o mesmo cliente/autenticação, sem commit intermediário.
-        from app.intnfe.client import IntNFeClient
-        from app.intnfe.emission import _access_token, _connection
-
-        api = IntNFeClient()
-        try:
-            connection = _connection(db, tenant_id, require_enabled=False)
-            token = _access_token(api, connection, doc.venda.nfe_ambiente)
-            xml = _xml_bytes(
-                api.document_xml(
-                    token, doc.venda.nfe_tipo, doc.venda.nfe_correlation_id
-                )
-            )
-        finally:
-            api.close()
-        doc.venda.nfe_xml = xml.decode("utf-8-sig")
-        return xml, detalhe
-    from app.nfe.documentos import obter_nota_documento, obter_xml_documento
-
-    detalhe, modelo, _ = obter_nota_documento(db, tenant_id, int(doc.documento_id))
-    if doc.modelo != modelo:
+    if doc.provider != "intnfe" or doc.venda is None:
         raise XmlContabilidadeError(
-            "O modelo do documento não corresponde ao cache fiscal.", 409
+            "Somente notas emitidas no CorePet em produção podem ser enviadas.", 409
         )
-    doc.chave = doc.chave or str(detalhe.get("chaveAcesso") or "")
-    return _xml_bytes(obter_xml_documento(detalhe, modelo)), detalhe
+    if doc.venda.nfe_xml:
+        return _xml_bytes(doc.venda.nfe_xml), {}
+    # A consulta usa a emissão CorePet já vinculada, sem commit intermediário.
+    from app.intnfe.client import IntNFeClient
+    from app.intnfe.emission import _access_token, _connection
+
+    api = IntNFeClient()
+    try:
+        connection = _connection(db, tenant_id, require_enabled=False)
+        token = _access_token(api, connection, doc.venda.nfe_ambiente)
+        xml = _xml_bytes(
+            api.document_xml(token, doc.venda.nfe_tipo, doc.venda.nfe_correlation_id)
+        )
+    finally:
+        api.close()
+    doc.venda.nfe_xml = xml.decode("utf-8-sig")
+    return xml, {}
 
 
 def validar_xml_saida(xml, chave, modelo):
@@ -324,18 +219,25 @@ def _obter_eventos(db, tenant_id, doc):
     from app.services.xml_contabilidade_eventos import obter_eventos_intnfe
     from app.xml_contabilidade_models import XmlContabilidadeEvento
 
+    if (
+        doc.provider != "intnfe"
+        or doc.venda is None
+        or not str(doc.venda.nfe_correlation_id or "").strip()
+    ):
+        raise XmlContabilidadeError(
+            "Uma nota emitida no CorePet não possui referência fiscal válida para confirmar todos os eventos. Nenhum lote parcial foi preparado.",
+            409,
+        )
     # Uma falha remota continua bloqueando a coleta completa. Só após a
     # confirmação atual acrescentamos comprovantes já recebidos, para que
     # retenção/omissão do provedor não elimine eventos fiscais do arquivo.
-    detalhe = (
-        {"_eventos_intnfe": obter_eventos_intnfe(db, tenant_id, doc)}
-        if doc.provider == "intnfe"
-        else {}
-    )
+    detalhe = {"_eventos_intnfe": obter_eventos_intnfe(db, tenant_id, doc)}
     persistidos = (
         db.query(XmlContabilidadeEvento)
         .filter(
             XmlContabilidadeEvento.tenant_id == _tenant(tenant_id),
+            XmlContabilidadeEvento.provider == "intnfe",
+            XmlContabilidadeEvento.documento_id == doc.documento_id,
             XmlContabilidadeEvento.chave == doc.chave,
         )
         .all()
@@ -389,8 +291,7 @@ def _coletar_arquivos(db, tenant_id, documentos, data_inicio, data_fim):
             root, data_real = validacao
             cnpj_emitente = root.findtext(".//n:infNFe/n:emit/n:CNPJ", namespaces=NS)
             if cnpj_emitente != cnpj_empresa:
-                # XML de fornecedor importado no Bling também tem tpNF=1.
-                # Apenas o CNPJ emitente da própria empresa pertence ao lote.
+                # Apenas o XML emitido pelo CNPJ da própria empresa pertence ao lote.
                 continue
             if not data_inicio <= data_real <= data_fim or doc.chave in chaves:
                 continue
@@ -510,9 +411,6 @@ def _confirmar_emissoes_periodo(db, tenant_id, data_inicio, data_fim):
 def _preparar_periodo(db, tenant_id, data_inicio, data_fim):
     _validar_periodo(data_inicio, data_fim)
     _confirmar_emissoes_periodo(db, tenant_id, data_inicio, data_fim)
-    from app.services.xml_contabilidade_bling import sincronizar_periodo_bling
-
-    sincronizar_periodo_bling(db, tenant_id, data_inicio, data_fim)
     docs = _listar_documentos(db, tenant_id, data_inicio, data_fim)
     arquivos, notas = _coletar_arquivos(db, tenant_id, docs, data_inicio, data_fim)
     # Um cancelamento/CC-e registrado no mês também pertence à contabilidade

@@ -230,7 +230,7 @@ export default function XmlContabilidade() {
       <PageHeader
         icon={FileArchive}
         title="XML para contabilidade"
-        subtitle="Envie cada nota e seus eventos ao contador, programe o mês anterior completo ou escolha um período manualmente."
+        subtitle="Envie as notas emitidas no CorePet e seus eventos ao contador, programe o mês anterior completo ou escolha um período manualmente."
       />
       <XmlContabilidadeConfig
         config={config}

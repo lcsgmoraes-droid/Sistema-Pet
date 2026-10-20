@@ -14,7 +14,8 @@
 
 ## 1. Necessidade e aceite
 
-Enviar cada XML de nota autorizada ou evento registrado individualmente, como
+Enviar cada XML de nota emitida no CorePet pela IntNFe em produção ou de seu
+evento registrado individualmente, como
 opção independente do envio mensal da competência anterior completa. Usuário
 escolhe dia/hora da execução mensal; períodos livres ficam exclusivamente no
 download/envio manual. Lotes separam ZIPs por tipo: notas, cancelamentos,
@@ -22,11 +23,12 @@ cartas de correção e demais eventos. Emissão, estoque e tributação existent
 permanecem preservados.
 
 Aceite: configuração persiste; período inclui ambas as datas em Brasília;
-notas elegíveis do CNPJ correto, incluindo canceladas e todos os eventos
+notas CorePet elegíveis do CNPJ correto, incluindo canceladas e todos os eventos
 oficiais retornados pelo emissor, inclusive evento do período em nota antiga;
 nenhum ZIP parcial silencioso; histórico
 informa sucesso/falha e oferece cancelamento/repetição; processamento funciona
-com navegador fechado. NFS-e e alterações de emissão/tributação estão fora do escopo.
+com navegador fechado. Notas emitidas no Bling ou importadas de marketplaces,
+NFS-e e alterações de emissão/tributação estão fora do escopo.
 
 ## 2. Regras e dados
 
@@ -43,7 +45,9 @@ e bloqueio de linhas protegem execuções concorrentes.
 ## 3. Arquitetura e integrações
 
 Rotas `/contabilidade/xml`, schemas dedicados, serviços de coleta/envio e
-scheduler do backend líder. Reutiliza clientes IntNFe/Bling e serviço SMTP.
+scheduler do backend líder. Reutiliza o cliente IntNFe e o serviço SMTP.
+A origem é a venda com `nfe_provider=intnfe` e `nfe_ambiente=1`; o cache de notas
+importadas não participa da seleção, do monitor ou de trabalhos individuais antigos.
 Fila própria permite conservar datas/estado e gerar anexos em memória, sem
 introduzir outro processo ou depender da memória do navegador. O caminho
 síncrono SMTP na emissão foi descartado porque atrasaria/vincularia a emissão
@@ -54,7 +58,7 @@ repetição exige conferência humana para reduzir duplicidade.
 
 Autenticação, módulo fiscal e `configuracoes.editar` obrigatórios. RLS e filtro
 ORM, CNPJ emitente, chave/modelo/protocolo/direção/ambiente validados. Downloads
-remotos reaproveitam allowlist HTTPS e limites existentes. Logs sem XML/segredos;
+remotos usam o cliente autenticado IntNFe e limites existentes. Logs sem XML/segredos;
 auditoria registra ator e metadados de ações. SMTP usa configuração secreta
 existente. Finalidade: entrega fiscal solicitada pela empresa; retenção segue
 política do domínio fiscal/auditoria, sem descarte novo de XML nesta entrega.
@@ -72,9 +76,10 @@ regressão focada. Registro de resultados: documento de homologação abaixo.
 
 Somente validação local, SQLite descartável e PostgreSQL do container DEV,
 com schema/papel exclusivos e rollback. UI Playwright usa APIs simuladas e
-dados fictícios, incluindo navegador em outro fuso. SMTP/IntNFe/Bling simulados:
-nenhum e-mail real ou emissão fiscal foi disparado. Aceite de negócio do Lucas
-e conferência com destinatário real ficam pendentes da publicação autorizada.
+dados fictícios, incluindo navegador em outro fuso. SMTP e IntNFe são simulados
+nesses testes. Após a publicação exclusiva autorizada do PR #1530, um XML
+individual real chegou ao Gmail indicado, com SHA-256 recebido conferido.
+O ajuste de origem exclusiva CorePet será validado e publicado no PR #1531.
 
 ## 7. Publicação e rollback
 
@@ -103,5 +108,6 @@ horário de Brasília, cancelamento e significado do aceite SMTP antes de ativar
 ## 10. Fechamento
 
 Implementação e validação técnica local registradas em
-`docs/homologacoes/2026-10-19-xml-contabilidade.md`. Publicação em produção e
-aceite funcional do responsável pelo negócio pendentes. Esta ficha não autoriza deploy.
+`docs/homologacoes/2026-10-19-xml-contabilidade.md`. O PR #1530 foi publicado
+com autorização do Lucas. O PR #1531 restringe a origem às notas CorePet e
+aguarda os gates e a conferência dos envios reais. Esta ficha não autoriza deploy.

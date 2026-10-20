@@ -3,7 +3,8 @@
 Atualizado em: 2026-10-19.
 
 Acesse **Configurações → XML para contabilidade**. Também há um atalho na
-central de notas de saída. É necessário ter o módulo fiscal e a permissão
+central de notas de saída. Este fluxo reúne exclusivamente notas emitidas no
+CorePet pela IntNFe, em produção, e seus eventos oficiais. É necessário ter o módulo fiscal e a permissão
 `configuracoes.editar` na empresa selecionada.
 
 ## Como usar
@@ -46,8 +47,10 @@ envio; tentar novamente uma falha usa o e-mail atual salvo na configuração.
   não geram anexos. Cada ZIP tem `manifesto.json` com empresa, período e documentos.
 - Download manual: um ZIP principal contém os mesmos ZIPs por tipo, para baixar
   tudo de uma vez e manter a organização.
-- Somente NF-e/NFC-e de saída em produção, emitidas pelo CNPJ da empresa.
-  Notas de entrada e homologação são excluídas.
+- Somente NF-e/NFC-e de saída emitidas no CorePet pela IntNFe em produção,
+  vinculadas à venda e ao CNPJ da empresa selecionada. Notas de marketplaces
+  importadas pelo Bling, outros documentos importados, entradas e homologação
+  não compõem este fluxo, mesmo quando têm o mesmo CNPJ emitente.
 - Inclui notas autorizadas e canceladas, junto com cancelamentos, todas as
   sequências de cartas de correção e outros eventos oficiais retornados pelo
   emissor. A seleção reúne notas emitidas no período com seus eventos disponíveis,
@@ -58,14 +61,11 @@ envio; tentar novamente uma falha usa o e-mail atual salvo na configuração.
 - Os XMLs assinados são preservados byte a byte. Quando o provedor só retorna
   evento embutido na nota, o arquivo do evento contém o documento original
   completo, sem recortar ou regravar a assinatura; o manifesto explica isso.
-- IntNFe: consulta a lista oficial de eventos mesmo quando o XML da nota já está
-  salvo, incluindo cancelamento, substituição de NFC-e, CC-e e demais registros
-  autorizados. Bling legado: a API pública atual não documenta listagem de todos
-  os eventos/CC-e; são usados os comprovantes retornados ou embutidos no XML.
-  Cancelamento conhecido sem comprovante bloqueia o pacote. Não há garantia de
-  descobrir CC-e externas desconhecidas nesse legado. Para eventos em notas
-  antigas do Bling, o lote utiliza os comprovantes já recebidos pelo monitor;
-  não repete consultas a todo o histórico desse provedor em cada exportação.
+- Consulta a lista oficial de eventos da IntNFe mesmo quando o XML da nota já
+  está salvo, incluindo cancelamento, substituição de NFC-e, CC-e e demais
+  registros autorizados. Um evento de nota antiga emitida no CorePet é incluído
+  pelo seu próprio período de registro. Referência fiscal ausente ou inválida
+  impede a confirmação do lote, sem esconder a nota CorePet como "sem notas".
 - Limites por lote: 366 dias, 10.000 notas, 10 MB por XML, 30 MB de XMLs e 15 MB
   de ZIP. Use períodos menores quando ultrapassar os limites.
   A confirmação de eventos em notas antigas consulta o histórico fiscal;
@@ -97,7 +97,7 @@ SMTP é erro real, sem simulação de sucesso. Após interrupção de um process
 por mais de 30 minutos, o histórico exige conferir com o contador antes de
 repetir: uma queda depois da aceitação SMTP pode deixar o resultado incerto.
 
-Os XMLs oficiais continuam nas fontes fiscais existentes. Os comprovantes de
+Os XMLs oficiais continuam vinculados às emissões CorePet pela IntNFe. Os comprovantes de
 eventos consultados ficam registrados por empresa para acompanhamento e
 deduplicação. ZIPs/anexos são gerados em memória; a fila guarda metadados,
 destinatário e resultado.

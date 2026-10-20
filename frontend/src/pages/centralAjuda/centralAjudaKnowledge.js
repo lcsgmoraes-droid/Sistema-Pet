@@ -24,7 +24,7 @@ export const BASE_CONHECIMENTO = [
         titulo: "Como enviar os XMLs das notas de saída ao contador",
         tags: ["xml", "contador", "contabilidade", "nota fiscal", "zip", "mensal", "eventos"],
         conteudo: [
-          "Acesse **Configurações → XML para contabilidade**. A função exige acesso às configurações e ao módulo fiscal da empresa selecionada.",
+          "Acesse **Configurações → XML para contabilidade**. A rotina reúne as notas emitidas no CorePet e seus eventos. A função exige acesso às configurações e ao módulo fiscal da empresa selecionada.",
           "Para começar, confira o CNPJ cadastrado da empresa e informe o **E-mail do contador**. Clique em **Salvar configuração**. O serviço de e-mail do sistema precisa estar configurado para enviar; o download funciona sem ele.",
           "Para enviar cada documento separadamente, ative **Enviar XML por XML: cada nota e seus eventos** e salve. O sistema envia o XML da nota após a autorização e os XMLs dos novos eventos após o registro, incluindo cancelamentos e cartas de correção. Essa opção funciona sem o envio mensal.",
           "Para a rotina mensal, ative **Enviar automaticamente o mês anterior completo**, escolha o dia e a hora e salve. Todo mês, o sistema reúne o primeiro ao último dia do mês anterior, mesmo com a tela fechada. As duas opções automáticas são independentes e podem ficar ativadas juntas. Não há agendamento avulso de período.",

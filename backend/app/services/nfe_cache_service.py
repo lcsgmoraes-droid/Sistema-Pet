@@ -8,7 +8,6 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.nfe_cache_models import BlingNotaFiscalCache
-from app.services.xml_contabilidade_hook import tentar_enfileirar_documento
 
 
 _SOURCE_PRIORITY = {
@@ -430,10 +429,4 @@ def upsert_nota_cache(
 
     registro.last_synced_at = datetime.utcnow()
     db.add(registro)
-    if registro.provider != "intnfe" and str(registro.status or "").strip().lower() in {
-        "autorizada",
-        "cancelada",
-        "cancelado",
-    }:
-        tentar_enfileirar_documento(db, tenant_id, "bling", registro.bling_id)
     return registro
