@@ -80,6 +80,25 @@ responsável. Aceite SMTP não significa leitura ou entrega na caixa de entrada.
 
 ## Decisão
 
+## Ajustes para publicação exclusiva (#1530)
+
+- Autorização do Lucas nesta tarefa: publicar somente XML para contabilidade e
+  testar o envio para o destinatário indicado. O iFood do #1526 ficou separado.
+- **297 testes focados aprovados**, incluindo mês com 1.201 notas sem truncar,
+  consulta explícita de canceladas no Bling, filtro de emitente antes dos limites,
+  reaproveitamento da coleta do período e eventos antigos já recebidos.
+- O limite de documentos passou a 10.000; os limites de bytes e anexos continuam
+  protegendo a entrega SMTP. A preparação não repete HTTP de todo o legado Bling.
+- O gate completo de release passou na branch exclusiva; a formatação detectada
+  no CI foi corrigida. O namespace fiscal HTTP apontado pelo Sonar é um
+  identificador oficial sem conexão de rede, anotado especificamente como falso
+  positivo. O IIFE da tela explicita o descarte da promessa com `void`.
+- A consulta de produção foi somente leitura e auditada: SMTP configurado; uma
+  emissão de setembro ainda tem situação oficial de processamento. Isso deve
+  bloquear o lote desse mês, sem omitir a nota nem apresentar sucesso parcial.
+- Nenhuma emissão, cancelamento ou alteração manual de situação fiscal foi feita
+  para gerar massa de teste. Resultados de envio real serão registrados após deploy.
+
 Validação técnica local aprovada. Aceite funcional do Lucas e publicação em
 produção pendentes. Próximo passo: revisar a tela e conferir destinatário/SMTP
 antes de autorizar a publicação e ativar qualquer rotina na operação real.

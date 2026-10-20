@@ -130,16 +130,36 @@ def _documento(db, tenant_id, provider, documento_id):
     )
 
 
+def _chave_da_empresa_ou_desconhecida(coluna, cnpj):
+    """Descarta fornecedores conhecidos antes de limites/HTTP; XML ainda valida.
+
+    Chaves ausentes ou corrompidas continuam candidatas: a consulta oficial
+    precisa resolvê-las ou bloquear o lote, nunca escondê-las como fornecedor.
+    ``replace``/``substr`` são compatíveis com PostgreSQL e SQLite.
+    """
+    nao_numericos = coluna
+    for digito in "0123456789":
+        nao_numericos = func.replace(nao_numericos, digito, "")
+    return or_(
+        coluna.is_(None),
+        func.length(coluna) != 44,
+        nao_numericos != "",
+        func.substr(coluna, 7, 14) == cnpj,
+    )
+
+
 def _listar_documentos(db, tenant_id, data_inicio, data_fim):
     # As colunas legadas não preservam o fuso; ampliar a busca evita perder uma
     # emissão na virada do dia. O dhEmi do XML aplica o filtro definitivo.
     inicio = datetime.combine(data_inicio - timedelta(days=1), time.min)
     fim = datetime.combine(data_fim + timedelta(days=2), time.min)
+    cnpj = _cnpj_empresa(db, tenant_id)
     vendas = (
         db.query(Venda)
         .options(noload("*"))
         .filter(
             Venda.tenant_id == _tenant(tenant_id),
+            _chave_da_empresa_ou_desconhecida(Venda.nfe_chave, cnpj),
             or_(
                 and_(Venda.nfe_provider == "intnfe", Venda.nfe_ambiente == 1),
                 and_(
@@ -159,6 +179,7 @@ def _listar_documentos(db, tenant_id, data_inicio, data_fim):
         db.query(BlingNotaFiscalCache)
         .filter(
             BlingNotaFiscalCache.tenant_id == _tenant(tenant_id),
+            _chave_da_empresa_ou_desconhecida(BlingNotaFiscalCache.chave, cnpj),
             or_(
                 BlingNotaFiscalCache.provider.is_(None),
                 BlingNotaFiscalCache.provider == "bling",
@@ -401,6 +422,7 @@ def _coletar_arquivos(db, tenant_id, documentos, data_inicio, data_fim):
             )
         nota = {
             "chave": doc.chave,
+            "documento_id": doc.documento_id,
             "modelo": doc.modelo,
             "status": "cancelada" if cancelamento_incluido else doc.status,
             "provedor": doc.provider,
@@ -499,7 +521,7 @@ def _preparar_periodo(db, tenant_id, data_inicio, data_fim):
     from app.services.xml_contabilidade_pacotes import mesclar_coletas
 
     extras, notas_eventos = coletar_eventos_periodo(
-        db, tenant_id, data_inicio, data_fim
+        db, tenant_id, data_inicio, data_fim, coleta_pronta=(arquivos, notas)
     )
     return mesclar_coletas(arquivos, notas, extras, notas_eventos)
 

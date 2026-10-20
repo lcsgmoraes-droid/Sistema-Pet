@@ -40,7 +40,7 @@ export default function XmlContabilidade() {
     let ativo = true;
     setLoading(true);
     setErroInicial("");
-    (async () => {
+    void (async () => {
       try {
         const [resConfig, resEnvios] = await Promise.all([
           api.get(`${BASE}/config`),

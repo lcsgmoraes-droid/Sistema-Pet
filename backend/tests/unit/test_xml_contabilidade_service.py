@@ -419,7 +419,7 @@ def test_agendamento_avulso_rejeitado_no_servico(fila):
 
 @pytest.mark.parametrize("origem", ["automatico", "agendado"])
 def test_fila_cancela_legados_sem_enviar_e_preserva_historico(
-    fila, monkeypatch, origem
+    fila, monkeypatch, origem, xml_context
 ):
     db, tenant = fila
     # Mesmo antes da migração, uma configuração antiga não reativa a emissão.
@@ -546,7 +546,7 @@ def _venda(tenant, numero="V1", **kwargs):
     )
 
 
-def test_busca_documentos_aplica_tenant_status_e_ambiente(fila):
+def test_busca_documentos_aplica_tenant_status_e_ambiente(fila, xml_context):
     db, tenant = fila
     db.add(
         _venda(tenant, nfe_provider="intnfe", nfe_ambiente=1, nfe_status="autorizada")

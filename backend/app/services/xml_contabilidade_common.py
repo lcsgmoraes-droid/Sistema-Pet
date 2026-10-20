@@ -10,10 +10,11 @@ BRASILIA = ZoneInfo("America/Sao_Paulo")
 UTC = timezone.utc
 
 
-NS = {"n": "http://www.portalfiscal.inf.br/nfe"}
+# Identificador do namespace oficial da NF-e (MOC), sem conexão HTTP.
+NS = {"n": "http://www.portalfiscal.inf.br/nfe"}  # NOSONAR
 
 
-MAX_DOCUMENTOS = 1000
+MAX_DOCUMENTOS = 10000
 
 
 MAX_XML_BYTES = 10 * 1024 * 1024

@@ -35,7 +35,7 @@ export const BASE_CONHECIMENTO = [
           "Acompanhe o **Histórico de envios**: Na fila, Agendado, Processando, Enviado, Falhou ou Sem notas. Enviado significa aceito pelo servidor de e-mail; confirme o recebimento com o contador e confira a caixa de spam.",
           "Envios ainda aguardando podem ser cancelados. Falhas permitem **Tentar novamente**, usando o e-mail atual salvo. Se houver aviso de processamento interrompido, confirme o recebimento antes de reenviar para evitar duplicidade.",
           "Os arquivos contêm os XMLs originais das NF-e/NFC-e de saída, inclusive as canceladas, seus eventos fiscais e um manifesto com a situação dos documentos. XML obrigatório ausente ou inválido bloqueia o lote inteiro; o sistema informa a falha em vez de enviar uma contabilidade incompleta.",
-          "Cada lote aceita até 366 dias e 1.000 notas, 30 MB de XMLs e 15 MB de ZIP. Divida períodos grandes. Notas de entrada, homologação e emitidas por outro CNPJ ficam fora do lote.",
+          "Cada lote aceita até 366 dias e 10.000 notas, 30 MB de XMLs e 15 MB de ZIPs. Divida períodos grandes. Notas de entrada, homologação e emitidas por outro CNPJ ficam fora do lote.",
           "Para testar, baixe um período conhecido e confira o manifesto e os XMLs com a central de notas. Antes de ativar qualquer envio automático, confirme o destinatário. Desativar uma opção interrompe sua rotina e cancela os respectivos envios pendentes; a outra opção continua independente. O histórico mantém os registros.",
         ],
       },
