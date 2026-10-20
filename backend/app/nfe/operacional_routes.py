@@ -63,7 +63,9 @@ def _registrar_status_contabil_bling(db, tenant_id, venda, dados_nota):
     try:
         nfe_routes = _nfe_routes()
         if str(nfe_routes._status_nota_bling(dados_nota)).strip().lower() not in {
-            "autorizada", "cancelada", "cancelado"
+            "autorizada",
+            "cancelada",
+            "cancelado",
         }:
             return
         with db.begin_nested():
@@ -239,7 +241,9 @@ async def cancelar_nfe(
                 if venda and nfe_routes._venda_usa_nfce(venda)
                 else bling.consultar_nfe(nfe_id)
             )
-            dados_nota = consulta.get("data", consulta) if isinstance(consulta, dict) else {}
+            dados_nota = (
+                consulta.get("data", consulta) if isinstance(consulta, dict) else {}
+            )
             confirmado = nfe_routes._nota_cancelada_bling(dados_nota)
             if venda:
                 venda.nfe_status = nfe_routes._status_nota_bling(dados_nota)

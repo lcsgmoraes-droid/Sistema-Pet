@@ -191,7 +191,10 @@ def cancelar_venda(
                                     .all()
                                 )
                                 estornos_fiscais_legados[chave] = sum(
-                                    (Decimal(str(mov.quantidade or 0)) for mov in movimentos),
+                                    (
+                                        Decimal(str(mov.quantidade or 0))
+                                        for mov in movimentos
+                                    ),
                                     Decimal("0"),
                                 )
                             ja_estornado = min(
@@ -199,7 +202,9 @@ def cancelar_venda(
                                 max(estornos_fiscais_legados[chave], Decimal("0")),
                             )
                             estornos_fiscais_legados[chave] -= ja_estornado
-                            quantidade_estorno = Decimal(str(item.quantidade)) - ja_estornado
+                            quantidade_estorno = (
+                                Decimal(str(item.quantidade)) - ja_estornado
+                            )
                             if quantidade_estorno <= 0:
                                 continue
 
