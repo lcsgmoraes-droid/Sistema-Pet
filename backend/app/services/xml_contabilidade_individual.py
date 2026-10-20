@@ -449,6 +449,10 @@ def preparar_anexos_individual(db, tenant_id, envio):
             raise XmlContabilidadeError(
                 "O comprovante do evento fiscal não está disponível para envio.", 409
             )
+        from app.services.xml_contabilidade_relatorios import atual
+
+        if atual():
+            atual().evento_individual(doc, evento)
         return (
             [
                 {
@@ -478,4 +482,16 @@ def preparar_anexos_individual(db, tenant_id, envio):
             "O documento não é uma nota de saída em produção desta empresa.", 409
         )
     nome = f"{doc.chave}-nfe.xml"
+    from app.services.xml_contabilidade_relatorios import atual
+
+    if atual():
+        atual().nota_validada(doc, validacao[0], validacao[1])
+        atual().coleta(
+            doc,
+            {
+                "data_emissao": validacao[1].isoformat(),
+                "status": doc.status,
+                "eventos": [],
+            },
+        )
     return [{"filename": nome, "content": xml, "mime_subtype": "xml"}], nome, 1

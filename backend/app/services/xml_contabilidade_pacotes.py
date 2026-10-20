@@ -99,7 +99,7 @@ def _manifesto(notas, inicio, fim, grupo, tipos):
     }
 
 
-def criar_anexos_por_tipo(arquivos, notas, data_inicio, data_fim):
+def criar_anexos_por_tipo(arquivos, notas, data_inicio, data_fim, *, pendencias=None):
     arquivos, notas = mesclar_coletas(arquivos, notas, [], [])
     if not arquivos or not notas:
         raise XmlContabilidadeError(
@@ -140,6 +140,22 @@ def criar_anexos_por_tipo(arquivos, notas, data_inicio, data_fim):
                     indent=2,
                 ).encode("utf-8"),
             )
+            if pendencias:
+                zipped.writestr(
+                    "relatorio.json",
+                    json.dumps(
+                        {
+                            "data_inicio": data_inicio.isoformat(),
+                            "data_fim": data_fim.isoformat(),
+                            "etapa": "preparacao",
+                            "aviso": "Há emissões pendentes de confirmação que não foram incluídas nos XMLs. Este relatório não confirma envio de e-mail.",
+                            "notas_pendentes": len(pendencias),
+                            "pendencias": pendencias,
+                        },
+                        ensure_ascii=False,
+                        indent=2,
+                    ).encode("utf-8"),
+                )
         anexos.append(
             {
                 "filename": f"{grupo}-{data_inicio:%Y%m%d}-{data_fim:%Y%m%d}.zip",

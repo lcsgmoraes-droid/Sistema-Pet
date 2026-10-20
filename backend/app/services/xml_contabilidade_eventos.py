@@ -105,7 +105,7 @@ def _validar_evento(root, xml, chave, cnpj, metadados=None):
         raise XmlContabilidadeError(
             "Um evento fiscal não possui data de registro válida.", 409
         ) from None
-    return EventoFiscal(
+    evento = EventoFiscal(
         identidade,
         tipo,
         int(seq),
@@ -114,6 +114,11 @@ def _validar_evento(root, xml, chave, cnpj, metadados=None):
         xml,
         data,
     )
+    from app.services.xml_contabilidade_relatorios import atual
+
+    if atual():
+        atual().evento_encontrado(chave, evento)
+    return evento
 
 
 def obter_eventos_intnfe(db, tenant_id, doc):

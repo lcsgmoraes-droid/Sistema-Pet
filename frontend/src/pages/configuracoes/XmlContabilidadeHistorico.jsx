@@ -9,7 +9,15 @@ const STATUS = {
   agendado: ["Agendado", "bg-violet-50 text-violet-800 dark:bg-violet-950 dark:text-violet-200"],
   processando: ["Processando", "bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200"],
   enviado: ["Enviado", "bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"],
+  enviado_com_pendencias: [
+    "Enviado com pendências",
+    "bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200",
+  ],
   falhou: ["Falhou", "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"],
+  pendencias: [
+    "Pendências — nenhum XML enviado",
+    "bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200",
+  ],
   cancelado: ["Cancelado", "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"],
   sem_notas: [
     "Sem notas no período",
@@ -32,6 +40,7 @@ export default function XmlContabilidadeHistorico({
   onAcao,
   operacao,
   bloqueioEnvio,
+  onRelatorio,
 }) {
   return (
     <Panel
@@ -54,6 +63,11 @@ export default function XmlContabilidadeHistorico({
           {erro}
         </p>
       ) : null}
+      <p className="mb-4 text-sm text-slate-600 dark:text-slate-300">
+        Os envios são preparados em segundo plano. Você pode continuar usando o sistema e acompanhar
+        aqui o resultado. Abra o relatório para conferir cada tentativa, os documentos enviados e as
+        pendências.
+      </p>
       {envios.length === 0 ? (
         <EstadoVazio
           icone={History}
@@ -78,7 +92,7 @@ export default function XmlContabilidadeHistorico({
                   Situação
                 </th>
                 <th scope="col" className="p-3">
-                  Notas no lote
+                  Notas e pendências
                 </th>
                 <th scope="col" className="p-3">
                   Data
@@ -87,7 +101,11 @@ export default function XmlContabilidadeHistorico({
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {envios.map((envio) => {
-                const [rotulo, cor] = STATUS[envio.status] || [
+                const statusVisivel =
+                  envio.ultimo_relatorio?.resultado === "enviado_com_pendencias"
+                    ? "enviado_com_pendencias"
+                    : envio.status;
+                const [rotulo, cor] = STATUS[statusVisivel] || [
                   envio.status,
                   "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
                 ];
@@ -95,30 +113,37 @@ export default function XmlContabilidadeHistorico({
                 return (
                   <tr key={envio.id} className="align-top text-slate-700 dark:text-slate-300">
                     <td className="p-3">
-                      {envio.status === "falhou" ? (
+                      <div className="flex flex-wrap gap-2">
                         <BotaoInteracao
-                          icon={RefreshCw}
+                          icon={History}
                           tamanho="pequeno"
-                          onClick={() => onAcao(envio.id, "reenviar")}
-                          loading={operacao === `reenviar-${envio.id}`}
-                          disabled={Boolean(operacao) || Boolean(bloqueioEnvio)}
-                          title={bloqueioEnvio || undefined}
+                          onClick={() => onRelatorio(envio)}
                         >
-                          Tentar novamente
+                          Relatório
                         </BotaoInteracao>
-                      ) : podeCancelar ? (
-                        <BotaoInteracao
-                          icon={XCircle}
-                          tamanho="pequeno"
-                          onClick={() => onAcao(envio.id, "cancelar")}
-                          loading={operacao === `cancelar-${envio.id}`}
-                          disabled={Boolean(operacao)}
-                        >
-                          Cancelar
-                        </BotaoInteracao>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
+                        {["falhou", "pendencias"].includes(envio.status) ? (
+                          <BotaoInteracao
+                            icon={RefreshCw}
+                            tamanho="pequeno"
+                            onClick={() => onAcao(envio.id, "reenviar")}
+                            loading={operacao === `reenviar-${envio.id}`}
+                            disabled={Boolean(operacao) || Boolean(bloqueioEnvio)}
+                            title={bloqueioEnvio || undefined}
+                          >
+                            Tentar novamente
+                          </BotaoInteracao>
+                        ) : podeCancelar ? (
+                          <BotaoInteracao
+                            icon={XCircle}
+                            tamanho="pequeno"
+                            onClick={() => onAcao(envio.id, "cancelar")}
+                            loading={operacao === `cancelar-${envio.id}`}
+                            disabled={Boolean(operacao)}
+                          >
+                            Cancelar
+                          </BotaoInteracao>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="whitespace-nowrap p-3">
                       <p>
@@ -143,9 +168,29 @@ export default function XmlContabilidadeHistorico({
                       ) : null}
                     </td>
                     <td className="p-3">
-                      {envio.quantidade_xml == null
-                        ? "—"
-                        : Number(envio.quantidade_xml).toLocaleString("pt-BR")}
+                      {envio.ultimo_relatorio?.contagens ? (
+                        <>
+                          <p>
+                            {envio.ultimo_relatorio.contagens.notas_enviadas ?? "—"} enviadas de{" "}
+                            {envio.ultimo_relatorio.contagens.notas_encontradas ?? "—"} encontradas
+                          </p>
+                          {envio.ultimo_relatorio.contagens.notas_pendentes > 0 ? (
+                            <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">
+                              {envio.ultimo_relatorio.contagens.notas_pendentes} pendentes não
+                              enviadas
+                            </p>
+                          ) : null}
+                        </>
+                      ) : (
+                        <>
+                          {envio.quantidade_xml != null ? (
+                            <p>{Number(envio.quantidade_xml).toLocaleString("pt-BR")} no lote</p>
+                          ) : null}
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            Sem relatório detalhado
+                          </p>
+                        </>
+                      )}
                     </td>
                     <td className="whitespace-nowrap p-3">
                       {formatarDataContabilidade(
