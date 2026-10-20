@@ -14,6 +14,7 @@ import CartaoIndicador from "../../v2/CartaoIndicador/CartaoIndicador";
 import InputCombobox from "../../v2/InputCombobox/InputCombobox";
 import InputTexto from "../../v2/InputTexto/InputTexto";
 import InputTextoLongo from "../../v2/InputTextoLongo/InputTextoLongo";
+import SeletorOpcoes from "../../v2/SeletorOpcoes/SeletorOpcoes";
 import { formatMoneyBRL } from "../../../utils/formatters";
 import CashbackCrmContatoModal from "./CashbackCrmContatoModal";
 import CashbackCrmPaginacao from "./CashbackCrmPaginacao";
@@ -147,16 +148,41 @@ export default function CashbackCrmTab() {
         </BotaoInteracao>
       </header>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <SeletorOpcoes
+          rotulo="Modelo de mensagem"
+          valorSelecionado={c.tipoModelo}
+          aoSelecionar={c.selecionarModelo}
+          opcoes={[
+            { valor: "padrao", rotulo: "Mensagem padrão" },
+            { valor: "minha", rotulo: "Minha mensagem" },
+          ]}
+        />
         <InputTextoLongo
           id="cashback-modelo"
-          label="Modelo de mensagem"
+          label={c.tipoModelo === "minha" ? "Edite sua mensagem" : "Mensagem sugerida"}
           value={c.modelo}
           onChange={c.setModelo}
+          disabled={c.tipoModelo === "padrao"}
           linhas={3}
           maxLength={2000}
-          help="Use {nome} e {saldo} para personalizar. O modelo vale nesta sessão; cada mensagem também pode ser editada antes da conversa."
+          help={
+            c.tipoModelo === "minha"
+              ? "Use {nome} e {saldo} para personalizar. Cada conversa ainda pode ser editada antes de abrir o WhatsApp."
+              : 'Escolha "Minha mensagem" para criar seu modelo sem perder esta sugestão.'
+          }
         />
+        <p
+          role={c.erroModelo ? "alert" : "status"}
+          className={
+            c.erroModelo
+              ? "text-xs text-amber-700 dark:text-amber-300"
+              : "text-xs text-slate-500 dark:text-slate-400"
+          }
+        >
+          {c.erroModelo ||
+            "As alterações e a última opção escolhida são salvas automaticamente neste navegador, para seu usuário nesta empresa."}
+        </p>
       </div>
 
       <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:grid-cols-3">

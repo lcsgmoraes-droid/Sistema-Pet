@@ -3,7 +3,8 @@ import toast from "react-hot-toast";
 import api from "../../../api";
 import { useAuth } from "../../../contexts/AuthContext";
 import { isAdminRole } from "../../../auth/userRole";
-import { mensagemCashback, MODELO_CASHBACK, registrarEAbrirWhatsApp } from "./cashbackCrmUtils";
+import { mensagemCashback, registrarEAbrirWhatsApp } from "./cashbackCrmUtils";
+import useCashbackModelo from "./useCashbackModelo";
 
 const BASE = "/campanhas/cashback/clientes";
 const PAGINACAO_INICIAL = { pagina: 1, paginas: 1, total: 0, por_pagina: 25 };
@@ -16,6 +17,8 @@ function mensagemErro(error, padrao) {
 
 export default function useCashbackCrm() {
   const { user } = useAuth();
+  const modeloSalvo = useCashbackModelo(user);
+  const { modelo } = modeloSalvo;
   const podeEditar = isAdminRole(user) || Boolean(user?.permissions?.includes("clientes.editar"));
   const travaAcao = useRef(false);
   const tentativa = useRef(null);
@@ -30,7 +33,6 @@ export default function useCashbackCrm() {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [revisao, setRevisao] = useState(0);
-  const [modelo, setModelo] = useState(MODELO_CASHBACK);
   const [selecionado, setSelecionado] = useState(null);
   const [mensagem, setMensagem] = useState("");
   const [form, setForm] = useState({
@@ -244,8 +246,7 @@ export default function useCashbackCrm() {
     loading,
     erro,
     recarregar: () => setRevisao((atual) => atual + 1),
-    modelo,
-    setModelo,
+    ...modeloSalvo,
     selecionado,
     abrirCliente,
     fecharCliente: () => {
