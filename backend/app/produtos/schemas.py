@@ -4,7 +4,7 @@ Mantem os contratos de request/response fora do arquivo de rotas.
 A ordem das classes preserva o comportamento historico de ProdutoResponse e LoteResponse.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Literal, Optional
 from uuid import UUID
 
@@ -12,6 +12,13 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.produtos.tipos import normalizar_tipo_catalogo
 from app.produtos.entrada_inicial import EntradaInicialProduto
+from app.utils.timezone import BRASILIA_TZ
+
+
+def _data_ifood_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    return (value if value.tzinfo else value.replace(tzinfo=BRASILIA_TZ)).astimezone(timezone.utc)
 
 
 # ==========================================
@@ -226,6 +233,7 @@ class ProdutoProtocoloRecorrenciaSchema(BaseModel):
 
 
 class ProdutoBase(BaseModel):
+    _ifood_datas = field_validator("preco_ifood_promo_inicio", "preco_ifood_promo_fim", check_fields=False)(_data_ifood_utc)
     codigo: str  # SKU
     nome: str
     tipo: str = "produto"
@@ -259,6 +267,12 @@ class ProdutoBase(BaseModel):
     preco_app_promo_fim: Optional[datetime] = None
     anunciar_ecommerce: Optional[bool] = True
     anunciar_app: Optional[bool] = True
+    anunciar_ifood: bool = False
+    ifood_pausado: bool = False
+    preco_ifood: Optional[float] = Field(default=None, allow_inf_nan=False)
+    preco_ifood_promo: Optional[float] = Field(default=None, allow_inf_nan=False)
+    preco_ifood_promo_inicio: Optional[datetime] = None
+    preco_ifood_promo_fim: Optional[datetime] = None
     controle_lote: Optional[bool] = False
     estoque_minimo: Optional[float] = 0
     estoque_maximo: Optional[float] = None
@@ -326,6 +340,7 @@ class ProdutoCreate(ProdutoBase):
 
 
 class ProdutoUpdate(BaseModel):
+    _ifood_datas = field_validator("preco_ifood_promo_inicio", "preco_ifood_promo_fim", check_fields=False)(_data_ifood_utc)
     codigo: Optional[str] = None
     nome: Optional[str] = None
     tipo: Optional[str] = None
@@ -359,6 +374,12 @@ class ProdutoUpdate(BaseModel):
     preco_app_promo_fim: Optional[datetime] = None
     anunciar_ecommerce: Optional[bool] = None
     anunciar_app: Optional[bool] = None
+    anunciar_ifood: Optional[bool] = None
+    ifood_pausado: Optional[bool] = None
+    preco_ifood: Optional[float] = Field(default=None, allow_inf_nan=False)
+    preco_ifood_promo: Optional[float] = Field(default=None, allow_inf_nan=False)
+    preco_ifood_promo_inicio: Optional[datetime] = None
+    preco_ifood_promo_fim: Optional[datetime] = None
     controle_lote: Optional[bool] = None
     estoque_minimo: Optional[float] = None
     estoque_maximo: Optional[float] = None

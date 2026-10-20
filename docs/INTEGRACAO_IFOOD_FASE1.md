@@ -10,9 +10,58 @@ Esta fase entrega configuração por empresa, diagnóstico do catálogo, simula�
 de publicação e a base técnica da iFood Merchant API. O envio real permanece
 bloqueado até a aprovação e a homologação do aplicativo CorePet no iFood.
 
-## Como o catálogo é montado
+## Cadastro e central operacional (2026-10-19)
 
-A empresa pode escolher uma destas fontes:
+A preparação local agora usa uma seleção **própria do iFood**, dentro do mesmo
+componente de cadastro/edição de produtos do CorePet. A central fica em
+**Vendas e relacionamento > iFood** (`/ifood`) e abre esse cadastro para editar.
+Não existe um segundo cadastro de anúncios.
+
+- `anunciar_ifood` controla a intenção de venda da loja; começa desmarcado.
+- `preco_ifood` informado prevalece exatamente; vazio usa o preço normal do ERP
+  com o acréscimo da loja. Promoções de app/ecommerce/ERP não são herdadas.
+- Promoção exclusiva do iFood tem preço e período próprios, opcionais.
+- A margem exibida é contribuição estimada por unidade, com custo, comissão por
+  modalidade, taxa de pagamento, tributos estimados e despesas unitárias.
+  Premissa desconhecida fica sem valor e impede o cálculo; zero é explícito.
+- Estoque é derivado do ERP, descontando reservas e segurança; kits virtuais
+  usam a capacidade dos componentes. Pausa manual permanece após reposição.
+- Pendências de canal não impedem salvar um produto válido no ERP. Foto e
+  descrição são recomendações; serviços, agrupadores e granel ficam impedidos.
+- Seleção, pausa e preços pertencem à loja. Produtos de outra loja compartilhados
+  pelo grupo precisam ser cadastrados localmente antes de configurar o canal.
+
+O diagnóstico de integração passou a respeitar essa seleção e o preço iFood.
+Os campos históricos `catalog_source` são preservados para compatibilidade,
+mas não autorizam selecionar automaticamente produtos de outro canal.
+`pronto_para_envio` significa apenas cadastro local apto; não confirma anúncio
+publicado. Fila, vínculo remoto, confirmação de publicação e pedidos no PDV
+continuam nas próximas etapas.
+
+Veja a [ficha da entrega](entregas/2026-10-19-cadastro-central-ifood.md) e o
+[registro de validação local](homologacoes/2026-10-19-cadastro-central-ifood.md).
+
+## Calculadora de preço na central (2026-10-20)
+
+Na central, a ação **Simular preço e margem** abre a calculadora do produto.
+O usuário pode testar um preço específico ou a regra da loja e alternar os
+cenários de entrega. A estimativa e as pendências são recalculadas pela mesma
+regra usada no cadastro, com custo, estoque, taxas e promoção vigentes.
+
+A simulação não grava nada. **Aplicar preço ao produto** altera somente o preço
+específico iFood no cadastro canônico, para quem tem permissão de editar o
+produto. Não altera o preço ERP, os outros canais, custos, seleção ou pausa.
+Se houver promoção iFood vigente, ela continua determinando o preço efetivo;
+alterar o preço regular não remove a promoção.
+
+Endpoint somente de consulta: `POST /integracoes/ifood/catalogo/produto/simular-preco`,
+com `product_id` e `preco_ifood` (nulo segue a regra da loja). A gravação usa o
+`PUT /produtos/{id}` existente. Confira a
+[entrega da calculadora](entregas/2026-10-20-calculadora-preco-ifood.md).
+
+## Fontes históricas do diagnóstico
+
+Antes da seleção própria por produto, o diagnóstico oferecia estas fontes:
 
 - **E-commerce:** somente produtos marcados para anunciar no e-commerce. Usa o
   preço específico do e-commerce e, quando ele não existe, o preço de venda do

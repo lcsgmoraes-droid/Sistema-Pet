@@ -11,6 +11,7 @@ import {
   EcommerceDivulgacao,
   EcommercePreview,
   EstudioOfertas,
+  IfoodCentral,
   MeusCaixas,
   AlertasGestor,
   NFEntrada,
@@ -35,6 +36,14 @@ export function createSalesMarketingRoutes() {
         element={
           <ProtectedRoute permission="vendas.criar">
             <PDV />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="ifood"
+        element={
+          <ProtectedRoute permission="produtos.visualizar">
+            <IfoodCentral />
           </ProtectedRoute>
         }
       />

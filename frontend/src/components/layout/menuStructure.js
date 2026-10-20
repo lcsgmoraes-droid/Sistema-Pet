@@ -9,7 +9,15 @@ export const LAYOUT_MENU_GROUPS = [
   },
   {
     label: "Vendas e relacionamento",
-    paths: ["/pdv", "/orcamentos-grupo", "/ecommerce", "/campanhas", "/vendas/bling", "/entregas"],
+    paths: [
+      "/pdv",
+      "/orcamentos-grupo",
+      "/ecommerce",
+      "/ifood",
+      "/campanhas",
+      "/vendas/bling",
+      "/entregas",
+    ],
   },
   {
     label: "Estoque e suprimentos",

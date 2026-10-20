@@ -43,6 +43,32 @@ class KitEstoqueService:
     """
 
     @staticmethod
+    def calcular_estoques_virtuais_em_lote(
+        db: Session, produtos, *, tenant_id, reservas_por_produto=None
+    ) -> Dict[int, int]:
+        """Mesma regra de gargalo/reservas sem uma consulta por kit ou componente."""
+        kits = {
+            int(produto.id): produto for produto in produtos
+            if produto.tipo_produto in ("KIT", "VARIACAO") and produto.tipo_kit == "VIRTUAL"
+            and str(produto.tenant_id) == str(tenant_id)
+        }
+        if not kits:
+            return {}
+        reservas = KitEstoqueService._obter_reservas_componentes(db, tenant_id, reservas_por_produto)
+        linhas = (
+            db.query(ProdutoKitComponente, Produto)
+            .join(Produto, Produto.id == ProdutoKitComponente.produto_componente_id)
+            .filter(ProdutoKitComponente.kit_id.in_(list(kits)), ProdutoKitComponente.tenant_id == tenant_id, Produto.tenant_id == tenant_id)
+            .all()
+        )
+        capacidades: Dict[int, List[int]] = {kit_id: [] for kit_id in kits}
+        for relacao, componente in linhas:
+            livre = max(float(componente.estoque_atual or 0) - float(reservas.get(componente.id, 0) or 0), 0)
+            quantidade = float(relacao.quantidade or 1)
+            capacidades[relacao.kit_id].append(int(livre // quantidade) if quantidade > 0 else 0)
+        return {kit_id: min(valores) if valores else 0 for kit_id, valores in capacidades.items()}
+
+    @staticmethod
     def _obter_reservas_componentes(
         db: Session,
         tenant_id=None,
