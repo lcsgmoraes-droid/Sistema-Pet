@@ -125,12 +125,21 @@ def test_evento_confirmado_sem_xml_e_cce_com_sequencia_faltante_bloqueiam():
         coleta([row(xml_evento("110110", 3), tipo="110110")])
 
 
-def test_bling_eventos_disponiveis_validados_e_cancelamento_ausente_bloqueia():
-    xml = xml_evento("110110")
-    arquivos, resumo, _ = coleta([], detalhe={"xmlCartaCorrecao": xml.decode()})
-    assert arquivos[0][1] == xml and resumo[0]["tipo"] == "110110"
+@pytest.mark.parametrize("campo", ["xmlCartaCorrecao", "xmlCancelamento", "xmlEvento"])
+def test_campos_legados_importados_nao_incluem_eventos_nem_consultam_links(
+    monkeypatch, campo
+):
+    from app.nfe import documentos as documentos_api
+
+    baixar = Mock(side_effect=AssertionError("Não consultar documentos importados"))
+    monkeypatch.setattr(documentos_api, "baixar_link_documento", baixar)
+    detalhe = {
+        campo: [xml_evento().decode(), "https://exemplo.invalid/documento-privado"]
+    }
+    assert coleta([], detalhe=detalhe) == ([], [], False)
     with pytest.raises(XmlContabilidadeError, match="cancelamento"):
-        coleta([], cancelada=True)
+        coleta([], cancelada=True, detalhe=detalhe)
+    baixar.assert_not_called()
 
 
 def test_tentativa_rejeitada_nao_e_incluida_como_evento_fiscal():

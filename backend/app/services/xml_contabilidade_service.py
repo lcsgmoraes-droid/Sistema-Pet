@@ -44,6 +44,9 @@ AVISO_FLUXO_LEGADO = (
     "Este fluxo antigo foi desativado. Use o envio mensal do mês anterior "
     "completo ou prepare um lote manual."
 )
+AVISO_ORIGEM_COREPET = (
+    "Somente notas e eventos emitidos no CorePet em produção podem ser enviados."
+)
 
 
 def _agora():
@@ -253,6 +256,8 @@ def cancelar_envio(db, tenant_id, envio_id):
 
 def reenviar_envio(db, tenant_id, envio_id):
     envio = _buscar_envio_bloqueado(db, tenant_id, envio_id)
+    if envio.origem == "automatico" and envio.provider != "intnfe":
+        raise XmlContabilidadeError(AVISO_ORIGEM_COREPET, 409)
     if envio.origem in ORIGENS_LEGADAS or (
         envio.origem == "automatico"
         and not (envio.idempotency_key or "").startswith(("nota:", "evento:"))
@@ -272,6 +277,8 @@ def reenviar_envio(db, tenant_id, envio_id):
 
 def enfileirar_documento(db, tenant_id, provider, documento_id):
     """Chamado sob savepoint; emissão não aguarda consulta externa nem e-mail."""
+    if provider != "intnfe":
+        return None
     from app.services.xml_contabilidade_individual import enfileirar_nota
 
     return enfileirar_nota(db, tenant_id, provider, documento_id, _agora())
@@ -329,6 +336,8 @@ def _criar_mensal_devido(db, tenant_id, agora):
 
 
 def _processar_envio(db, tenant_id, envio):
+    if envio.origem == "automatico" and envio.provider != "intnfe":
+        raise XmlContabilidadeError(AVISO_ORIGEM_COREPET, 409)
     if envio.origem not in ORIGENS_ATIVAS or (
         envio.origem == "automatico"
         and not (getattr(envio, "idempotency_key", None) or "").startswith(
@@ -391,6 +400,8 @@ def processar_fila_tenant(db, tenant_id, limite=5):
                 and_(
                     XmlContabilidadeEnvio.origem == "automatico",
                     or_(
+                        XmlContabilidadeEnvio.provider.is_(None),
+                        XmlContabilidadeEnvio.provider != "intnfe",
                         XmlContabilidadeEnvio.idempotency_key.is_(None),
                         and_(
                             ~XmlContabilidadeEnvio.idempotency_key.like("nota:%"),
@@ -406,7 +417,11 @@ def processar_fila_tenant(db, tenant_id, limite=5):
     )
     for envio in legados:
         envio.status = "cancelado"
-        envio.ultimo_erro = AVISO_FLUXO_LEGADO
+        envio.ultimo_erro = (
+            AVISO_ORIGEM_COREPET
+            if envio.origem == "automatico" and envio.provider != "intnfe"
+            else AVISO_FLUXO_LEGADO
+        )
     db.commit()
     _criar_mensal_devido(db, tenant_id, agora)
     config = _config(db, tenant_id)

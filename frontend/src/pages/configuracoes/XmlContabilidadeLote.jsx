@@ -48,10 +48,10 @@ export default function XmlContabilidadeLote({
         </div>
       </div>
       <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">
-        O lote reúne NF-e e NFC-e de saída emitidas no período, inclusive canceladas, e os eventos
-        registrados nesse intervalo, mesmo quando a nota foi emitida antes. Inclui cancelamentos,
-        cartas de correção e demais eventos. Se faltar algum XML obrigatório, o lote será bloqueado
-        para evitar enviar uma contabilidade incompleta.
+        O lote reúne NF-e e NFC-e de saída emitidas no CorePet no período, inclusive canceladas, e
+        os eventos registrados nesse intervalo, mesmo quando a nota foi emitida antes. Inclui
+        cancelamentos, cartas de correção e demais eventos. Se faltar algum XML obrigatório, o lote
+        será bloqueado para evitar enviar uma contabilidade incompleta.
       </p>
       <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
         No e-mail, cada tipo tem seu ZIP: notas, cancelamentos, cartas de correção e demais eventos.
