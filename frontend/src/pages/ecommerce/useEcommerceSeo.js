@@ -12,7 +12,12 @@ function ensureMeta(selector, attributes) {
   return element;
 }
 
-export default function useEcommerceSeo({ tenantContext, storeDisplayName, selectedProduct }) {
+export default function useEcommerceSeo({
+  tenantContext,
+  storeDisplayName,
+  selectedProduct,
+  canonicalUrl,
+}) {
   useEffect(() => {
     if (!tenantContext) return undefined;
 
@@ -28,8 +33,6 @@ export default function useEcommerceSeo({ tenantContext, storeDisplayName, selec
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 160);
-    const canonicalUrl = `${window.location.origin}${window.location.pathname}`;
-
     document.title = title;
     ensureMeta('meta[name="description"]', { name: "description", content: description });
     ensureMeta('meta[property="og:title"]', { property: "og:title", content: title });
@@ -48,5 +51,5 @@ export default function useEcommerceSeo({ tenantContext, storeDisplayName, selec
     return () => {
       document.title = previousTitle;
     };
-  }, [selectedProduct, storeDisplayName, tenantContext]);
+  }, [canonicalUrl, selectedProduct, storeDisplayName, tenantContext]);
 }
