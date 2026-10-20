@@ -136,7 +136,10 @@ def _bloquear_seed_concorrente(db, tenant_id) -> None:
 
 def seed_campaigns_for_tenant(db, tenant_id) -> int:
     """
-    Cria campanhas padrão para o tenant se ele ainda não as tiver.
+    Cria campanhas padrão pausadas para o tenant se ele ainda não as tiver.
+
+    A loja deve revisar os parâmetros e ativar cada campanha conscientemente.
+    Isso evita conceder benefícios com valores genéricos antes da configuração.
     Idempotente: não duplica campanhas já existentes (verifica por campaign_type).
     Retorna o número de campanhas criadas.
     """
@@ -160,7 +163,7 @@ def seed_campaigns_for_tenant(db, tenant_id) -> int:
             tenant_id=tenant_id,
             name=spec["name"],
             campaign_type=CampaignTypeEnum(spec["campaign_type"]),
-            status=CampaignStatusEnum.active,
+            status=CampaignStatusEnum.paused,
             priority=spec["priority"],
             params=spec["params"],
         )
