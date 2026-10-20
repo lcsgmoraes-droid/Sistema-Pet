@@ -143,6 +143,23 @@ O iFood também pode expurgar itens inativos ou com preço inválido que permane
 sem atualização por determinado período. Esse monitoramento deverá entrar na
 rotina de catálogo antes da liberação geral.
 
+## Atualização automática da promoção (20/10/2026)
+
+Cadastro, central e calculadora consultam novamente preço vigente, contribuição
+e pendências no início e no fim da promoção. A próxima virada usa o relógio do
+servidor. Retomar uma aba suspensa também recupera a leitura; não há polling
+contínuo nem gravação automática. Campos não salvos e preço simulado são
+preservados. A oferta salva da calculadora é consultada separadamente do rascunho.
+
+O catálogo agenda mudanças em todos os produtos da loja, inclusive fora da busca
+ou página atual. Falhas mantêm os dados anteriores com aviso e tentativas
+limitadas. Essa preparação continua local, com o envio remoto desativado.
+
+Detalhes e aceite: [ficha](entregas/2026-10-20-atualizacao-automatica-promocao-ifood.md)
+e [homologação](homologacoes/2026-10-20-atualizacao-automatica-promocao-ifood.md).
+A convergência Alembic atual é m, após a revisão fiscal l, sem alterar a fiscal
+da main; o reparo da antiga prévia é descrito na ficha.
+
 ## Próximas fases recomendadas
 
 1. **Homologação e catálogo piloto:** vínculo por produto, histórico de envio,

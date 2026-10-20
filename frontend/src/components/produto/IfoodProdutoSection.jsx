@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AlertCircle, CheckCircle2, RefreshCw } from "lucide-react";
 import { previewIfoodProduto } from "../../api/ifood";
+import useIfoodPromotionRefresh from "../../hooks/useIfoodPromotionRefresh";
 import { formatBRL, formatMoneyBRL, formatPercent } from "../../utils/formatters";
 import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
 import BotaoLink from "../v2/BotaoLink/BotaoLink";
@@ -33,6 +34,7 @@ const numeroOpcional = (value) =>
 export default function IfoodProdutoSection({ formData, handleChange, imagens = [], onCorrigir }) {
   const [modalidade, setModalidade] = useState("MERCHANT");
   const [resultado, setResultado] = useState(null);
+  const [payloadCalculado, setPayloadCalculado] = useState(null);
   const [calculando, setCalculando] = useState(true);
   const [erro, setErro] = useState("");
   const [tentativa, setTentativa] = useState(0);
@@ -86,6 +88,13 @@ export default function IfoodProdutoSection({ formData, handleChange, imagens = 
     },
   });
 
+  // A virada consulta o rascunho atual, sem carregar outro cadastro nem salvar
+  // campos. O escopo cancela o agendamento quando o usuario altera o formulario.
+  useIfoodPromotionRefresh(resultado, () => setTentativa((atual) => atual + 1), {
+    enabled: selecionado && !compartilhado && !calculando && payloadCalculado === payload,
+    scopeKey: payload,
+  });
+
   useEffect(() => {
     if (compartilhado) {
       setCalculando(false);
@@ -100,12 +109,14 @@ export default function IfoodProdutoSection({ formData, handleChange, imagens = 
         const { data } = await previewIfoodProduto(JSON.parse(payload), {
           signal: controller.signal,
         });
-        if (ativo) setResultado(data);
+        if (ativo) {
+          setResultado(data);
+          setPayloadCalculado(payload);
+        }
       } catch (error) {
         if (ativo && error.code !== "ERR_CANCELED") {
-          setResultado(null);
           setErro(
-            "Não foi possível atualizar a estimativa e as pendências. Você pode salvar o produto e tentar novamente.",
+            "Não foi possível atualizar a estimativa e as pendências. Os últimos valores consultados podem estar desatualizados. Tente novamente.",
           );
         }
       } finally {
@@ -279,9 +290,9 @@ export default function IfoodProdutoSection({ formData, handleChange, imagens = 
         </BotaoInteracao>
       ) : null}
 
-      {!calculando && resultado && selecionado ? (
+      {resultado && payloadCalculado === payload && selecionado ? (
         <>
-          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <dl aria-busy={calculando} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-lg bg-white p-3 dark:bg-slate-900">
               <dt className="v2-texto-ajuda">
                 Preço efetivo {resultado.promotion_active ? "em promoção" : "estimado"}

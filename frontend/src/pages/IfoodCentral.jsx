@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   Calculator,
@@ -19,6 +19,7 @@ import { getIfoodCatalogo } from "../api/ifood";
 import { updateProduto } from "../api/produtos";
 import { useAuth } from "../contexts/AuthContext";
 import { isAdminRole } from "../auth/userRole";
+import useIfoodPromotionRefresh from "../hooks/useIfoodPromotionRefresh";
 import DataTable from "../components/ui/DataTable";
 import AbasNavegacao from "../components/v2/AbasNavegacao/AbasNavegacao";
 import BotaoInteracao from "../components/v2/BotaoInteracao/BotaoInteracao";
@@ -71,6 +72,15 @@ export default function IfoodCentral() {
   const [revisao, setRevisao] = useState(0);
   const [ocupado, setOcupado] = useState(null);
   const [detalhe, setDetalhe] = useState(null);
+  const [salvandoPreco, setSalvandoPreco] = useState(false);
+  const [tempoCatalogo, setTempoCatalogo] = useState(null);
+  const inicializadoRef = useRef(false);
+  const consultaChave = `${buscaAplicada}:${filtro}:${pagina}`;
+
+  useIfoodPromotionRefresh(tempoCatalogo, () => setRevisao((atual) => atual + 1), {
+    enabled: !ocupado && !salvandoPreco && !carregando,
+    scopeKey: consultaChave,
+  });
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -81,6 +91,12 @@ export default function IfoodCentral() {
   }, [busca]);
 
   useEffect(() => {
+    // Uma leitura iniciada antes do PUT nao pode substituir a selecao/preco
+    // recem-salvos. Ao liberar a escrita, esta consulta e retomada.
+    if (ocupado || salvandoPreco) {
+      setCarregando(false);
+      return undefined;
+    }
     let ativo = true;
     const abort = new AbortController();
     setCarregando(true);
@@ -103,20 +119,32 @@ export default function IfoodCentral() {
           return;
         }
         setItems(response.data.items || []);
+        setTempoCatalogo({
+          evaluated_at: response.data.evaluated_at,
+          next_price_change_at: response.data.next_price_change_at,
+        });
+        setDetalhe((atual) =>
+          atual
+            ? response.data.items?.find((produto) => produto.product_id === atual.product_id) ||
+              atual
+            : null,
+        );
         setResumo(response.data.summary || SEM_RESUMO);
         setTotal(response.data.total || 0);
         setConfig(response.data.config || null);
         setPodeConfigurar(Boolean(response.data.can_configure));
       } catch (error) {
         if (ativo) {
-          setItems([]);
-          setTotal(0);
-          setErro(mensagemErroIfood(error, "Não foi possível carregar a central do iFood."));
+          setErro(
+            mensagemErroIfood(error, "Não foi possível atualizar a central do iFood.") +
+              (inicializadoRef.current ? " Os últimos dados exibidos foram mantidos." : ""),
+          );
         }
       } finally {
         if (ativo) {
           setCarregando(false);
           setInicializado(true);
+          inicializadoRef.current = true;
         }
       }
     })();
@@ -124,7 +152,7 @@ export default function IfoodCentral() {
       ativo = false;
       abort.abort();
     };
-  }, [buscaAplicada, filtro, pagina, revisao]);
+  }, [buscaAplicada, filtro, pagina, revisao, ocupado, salvandoPreco]);
 
   function filtrar(valor) {
     setFiltro(valor);
@@ -419,10 +447,15 @@ export default function IfoodCentral() {
             columns={columns}
             data={items}
             getRowKey={(item) => item.product_id}
-            loading={carregando}
+            loading={carregando && !inicializado}
             loadingMessage="Consultando o catálogo…"
             emptyMessage="Nenhum produto encontrado com estes filtros."
           />
+          {carregando && inicializado ? (
+            <p role="status" className="v2-texto-ajuda">
+              Atualizando preço, margem e pendências…
+            </p>
+          ) : null}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="v2-texto-ajuda">
               {total.toLocaleString("pt-BR")} produto(s) · página {pagina} de {paginas}
@@ -458,6 +491,7 @@ export default function IfoodCentral() {
           onEditar={() => editar(detalhe)}
           podeEditar={podeEditar}
           podeConfigurar={podeConfigurar}
+          onSalvandoPreco={setSalvandoPreco}
           onPrecoAplicado={(atualizado) => {
             setDetalhe(atualizado);
             setItems((atuais) =>

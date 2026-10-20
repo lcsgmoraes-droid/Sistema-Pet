@@ -154,6 +154,89 @@ def test_promotion_updates_contribution_only_inside_its_own_window():
     assert not invalid["eligible"]
 
 
+@pytest.mark.parametrize(
+    "offset,active,price,expected_next",
+    [
+        (timedelta(milliseconds=-1), False, 150, "2026-10-20T18:00:00Z"),
+        (timedelta(0), True, 120, "2026-10-20T18:02:00.001000Z"),
+        (timedelta(minutes=1), True, 120, "2026-10-20T18:02:00.001000Z"),
+        (timedelta(minutes=2), True, 120, "2026-10-20T18:02:00.001000Z"),
+        (timedelta(minutes=2, microseconds=1), False, 150, None),
+    ],
+)
+def test_promotion_refresh_metadata_matches_server_clock_and_margin(
+    offset, active, price, expected_next
+):
+    start = datetime(2026, 10, 20, 18, tzinfo=timezone.utc)
+    now = start + offset
+    item = build_management_item(
+        product(
+            preco_ifood=150,
+            preco_ifood_promo=120,
+            preco_ifood_promo_inicio=start,
+            preco_ifood_promo_fim=start + timedelta(minutes=2),
+        ),
+        config(),
+        available_stock=4,
+        now=now,
+    )
+    assert item["evaluated_at"] == now.isoformat().replace("+00:00", "Z")
+    assert item["next_price_change_at"] == expected_next
+    assert item["promotion_active"] is active and item["effective_price"] == price
+    assert item["margins"]["MERCHANT"]["contribution"] == (36.6 if active else 61.5)
+    assert item["margins"]["IFOOD"]["contribution"] == (24.6 if active else 46.5)
+    assert any(p["code"] == "margem_abaixo_meta" for p in item["pending"]) is active
+    assert item["sync_status"] == "nao_enviado"
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"preco_ifood_promo": None},
+        {"preco_ifood_promo": 0},
+        {"preco_ifood_promo": 150},
+        {"preco_ifood_promo": 145},
+        {"preco_ifood_promo_fim": "2026-10-20T17:00:00Z"},
+    ],
+)
+def test_invalid_promotion_does_not_schedule_automatic_price_refresh(overrides):
+    fields = dict(
+        preco_ifood=150,
+        preco_ifood_promo=120,
+        preco_ifood_promo_inicio="2026-10-20T18:00:00Z",
+        preco_ifood_promo_fim="2026-10-20T19:00:00Z",
+    )
+    item = build_management_item(
+        product(**(fields | overrides)),
+        config(),
+        available_stock=4,
+        now=datetime(2026, 10, 20, 17, tzinfo=timezone.utc),
+    )
+    assert item["next_price_change_at"] is None
+    assert item["effective_price"] == 150 and not item["promotion_active"]
+
+
+def test_refresh_metadata_normalizes_naive_brasilia_and_open_ended_promotion():
+    start = datetime(2026, 10, 20, 15)
+    p = product(preco_ifood=150, preco_ifood_promo=120, preco_ifood_promo_inicio=start)
+    before = build_management_item(
+        p,
+        config(),
+        available_stock=4,
+        now=datetime(2026, 10, 20, 17, tzinfo=timezone.utc),
+    )
+    assert before["next_price_change_at"] == "2026-10-20T18:00:00Z"
+    active = build_management_item(
+        p,
+        config(),
+        available_stock=4,
+        now=datetime(2026, 10, 20, 18, tzinfo=timezone.utc),
+    )
+    assert active["promotion_active"] and active["next_price_change_at"] is None
+    none = build_management_item(product(), config(), available_stock=4)
+    assert none["next_price_change_at"] is None
+
+
 def test_pause_survives_restock_and_unready_cost_is_not_publication_blocker():
     paused = build_management_item(
         product(ifood_pausado=True), config(), available_stock=100
@@ -328,6 +411,107 @@ def test_catalog_preview_and_permission_are_tenant_scoped_without_persistence(ap
     assert client.post(path, json={"produto": {"id": api.first.id}}).status_code == 403
 
 
+def test_catalog_clock_covers_hidden_products_filters_pages_and_exact_tenant_item(
+    api, monkeypatch
+):
+    from app.integrations.ifood import pricing
+    from app.routes import ifood_integration_routes as routes
+
+    start = datetime(2026, 10, 20, 18, tzinfo=timezone.utc)
+    end = start + timedelta(minutes=2)
+
+    class ServerClock(datetime):
+        current = start - timedelta(minutes=1)
+
+        @classmethod
+        def now(cls, tz=None):
+            return (
+                cls.current.astimezone(tz) if tz else cls.current.replace(tzinfo=None)
+            )
+
+    monkeypatch.setattr(routes, "datetime", ServerClock)
+    monkeypatch.setattr(pricing, "datetime", ServerClock)
+    api.first.preco_ifood = 150
+    api.first.preco_ifood_promo = 120
+    # SQLite nao preserva timezone; nesta fixture gravamos a forma legada
+    # naive Brasilia, que o resolvedor normaliza (Postgres preserva o offset).
+    brasilia = timezone(timedelta(hours=-3))
+    api.first.preco_ifood_promo_inicio = start.astimezone(brasilia).replace(tzinfo=None)
+    api.first.preco_ifood_promo_fim = end.astimezone(brasilia).replace(tzinfo=None)
+    api.first.imagem_principal = "/foto.jpg"
+    api.first.descricao_curta = "Alimento completo"
+    api.db.add(IfoodMerchantConfig(tenant_id=api.tenant, **vars(config())))
+    api.db.commit()
+    # Outra empresa tem uma mudanca anterior, que nao pode vazar no agendamento.
+    with tenant_context(api.foreign):
+        api.other.preco_ifood = 150
+        api.other.preco_ifood_promo = 120
+        api.other.preco_ifood_promo_inicio = (
+            (start - timedelta(seconds=30)).astimezone(brasilia).replace(tzinfo=None)
+        )
+        api.other.preco_ifood_promo_fim = end.astimezone(brasilia).replace(tzinfo=None)
+        api.db.commit()
+    path = "/integracoes/ifood/catalogo/gestao"
+    hidden = api.client.get(
+        path, params={"q": "sem correspondencia", "filtro": "pendencias", "offset": 30}
+    ).json()
+    assert hidden["items"] == [] and hidden["total"] == 0
+    assert hidden["summary"]["total"] == 1 and hidden["summary"]["issues"] == 0
+    assert hidden["evaluated_at"] == "2026-10-20T17:59:00Z"
+    assert hidden["next_price_change_at"] == "2026-10-20T18:00:00Z"
+    outside_page = api.client.get(path, params={"offset": 1, "limit": 1}).json()
+    assert outside_page["items"] == [] and outside_page["total"] == 1
+    assert outside_page["next_price_change_at"] == hidden["next_price_change_at"]
+    before = api.client.get(path, params={"filtro": "pendencias"}).json()
+    assert before["items"] == [] and before["next_price_change_at"]
+
+    ServerClock.current = start
+    during = api.client.get(path, params={"filtro": "pendencias"}).json()
+    item = during["items"][0]
+    assert during["summary"]["issues"] == during["total"] == 1
+    assert item["product_id"] == api.first.id and item["effective_price"] == 120
+    assert item["evaluated_at"] == during["evaluated_at"] == "2026-10-20T18:00:00Z"
+    assert item["next_price_change_at"] == during["next_price_change_at"]
+    assert during["next_price_change_at"] == "2026-10-20T18:02:00.001000Z"
+    exact = api.client.get(path, params={"product_id": api.first.id, "limit": 1}).json()
+    assert exact["items"][0]["product_id"] == api.first.id
+    foreign = api.client.get(path, params={"product_id": api.other.id}).json()
+    assert foreign["items"] == [] and foreign["total"] == 0
+    assert foreign["summary"] == during["summary"]
+    assert api.client.get(path, params={"product_id": 0}).status_code == 422
+
+    # As duas previews recebem o mesmo contrato temporal, sem gravar preco ou datas.
+    for preview_path, payload in (
+        (
+            "/integracoes/ifood/catalogo/produto/preview",
+            {"produto": {"id": api.first.id}},
+        ),
+        (
+            "/integracoes/ifood/catalogo/produto/simular-preco",
+            {"product_id": api.first.id, "preco_ifood": 160},
+        ),
+    ):
+        response = api.client.post(preview_path, json=payload)
+        assert response.status_code == 200, response.text
+        preview = response.json()
+        assert preview["effective_price"] == 120
+        assert preview["evaluated_at"] == during["evaluated_at"]
+        assert preview["next_price_change_at"] == during["next_price_change_at"]
+    api.db.expire_all()
+    assert api.first.preco_ifood == 150 and api.first.preco_ifood_promo == 120
+    assert pricing.aware(api.first.preco_ifood_promo_inicio) == start
+    assert pricing.aware(api.first.preco_ifood_promo_fim) == end
+
+    ServerClock.current = end + timedelta(milliseconds=1)
+    after = api.client.get(path, params={"filtro": "pendencias"}).json()
+    assert after["items"] == [] and after["summary"]["issues"] == 0
+    assert after["next_price_change_at"] is None
+    saved = api.client.get(path, params={"product_id": api.first.id}).json()["items"][0]
+    assert saved["regular_price"] == saved["saved_specific_price"] == 150
+    assert saved["effective_price"] == 150 and not saved["promotion_active"]
+    assert saved["sync_status"] == "nao_enviado"
+
+
 def test_config_partial_update_keeps_connection_fields_and_other_tenant(api):
     merchant = str(uuid4())
     with tenant_context(api.tenant):
@@ -491,8 +675,13 @@ def test_ifood_existing_revision_merges_with_current_main_without_reapplying_it(
     alembic_config = Config(str(backend / "alembic.ini"))
     alembic_config.set_main_option("script_location", str(backend / "alembic"))
     script = ScriptDirectory.from_config(alembic_config)
-    assert script.get_heads() == ["zzzzl20261020a1"]
+    assert script.get_heads() == ["zzzzm20261020a1"]
     assert script.get_revision("zzzzg20261019a1").down_revision == "zzzzf20261019a1"
+    assert script.get_revision("zzzzl20261020a1").down_revision == "zzzzk20261020a1"
+    assert script.get_revision("zzzzm20261020a1").down_revision == (
+        "zzzzg20261019a1",
+        "zzzzl20261020a1",
+    )
     steps = script._upgrade_revs("head", "zzzzg20261019a1")
     revisions = {step.revision.revision for step in steps}
     assert revisions == {
@@ -501,7 +690,28 @@ def test_ifood_existing_revision_merges_with_current_main_without_reapplying_it(
         "zzzzj20261019a1",
         "zzzzk20261020a1",
         "zzzzl20261020a1",
+        "zzzzm20261020a1",
     }
+    # A head sozinha nao detecta dois arquivos com o mesmo revision: Alembic
+    # pode sobrescrever um deles no mapa e pular DDL ao aplicar a migration.
+    import ast
+
+    revisions_on_disk = []
+    for path in (backend / "alembic" / "versions").glob("*.py"):
+        module = ast.parse(path.read_text(encoding="utf-8-sig"))
+        for node in module.body:
+            if isinstance(node, ast.Assign) and any(
+                isinstance(target, ast.Name) and target.id == "revision"
+                for target in node.targets
+            ):
+                revisions_on_disk.append(ast.literal_eval(node.value))
+    assert len(revisions_on_disk) == len(set(revisions_on_disk))
+    # Um banco com g+k ja aplicados ainda precisa do DDL fiscal l, uma vez.
+    steps = script._upgrade_revs("head", ("zzzzg20261019a1", "zzzzk20261020a1"))
+    assert [step.revision.revision for step in steps] == [
+        "zzzzl20261020a1",
+        "zzzzm20261020a1",
+    ]
 
 
 def test_catalog_settings_permission_uses_tenant_role_and_cannot_activate_provider(api):

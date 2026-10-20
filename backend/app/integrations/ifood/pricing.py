@@ -1,6 +1,6 @@
 """Preco independente do iFood; nenhuma operacao de rede ou escrita."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any
 from app.utils.timezone import BRASILIA_TZ
@@ -26,6 +26,10 @@ def aware(value: Any) -> datetime | None:
     if isinstance(value, str):
         value = datetime.fromisoformat(value.replace("Z", "+00:00"))
     return value if value.tzinfo else value.replace(tzinfo=BRASILIA_TZ)
+
+
+def utc_timestamp(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def resolve_ifood_prices(product: Any, markup_percent=0, now=None) -> dict:
@@ -82,7 +86,17 @@ def resolve_ifood_prices(product: Any, markup_percent=0, now=None) -> dict:
         and (not start or current >= start)
         and (not end or current <= end)
     )
+    # O cliente agenda apenas a proxima leitura local; o servidor continua
+    # decidindo preco, margem e pendencias em cada consulta. O fim e inclusivo.
+    next_change = None
+    if promo is not None and not errors:
+        if start and current < start:
+            next_change = start
+        elif end and current <= end:
+            next_change = end + timedelta(milliseconds=1)
     return {
+        "evaluated_at": utc_timestamp(current),
+        "next_price_change_at": utc_timestamp(next_change) if next_change else None,
         "price_source": "especifico"
         if getattr(product, "preco_ifood", None) is not None
         else "regra_loja",

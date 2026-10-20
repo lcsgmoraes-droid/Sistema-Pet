@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   ChevronDown,
@@ -44,10 +44,15 @@ export default function IfoodProdutoDetalhes({
   onEditar,
   onConfigurar,
   onPrecoAplicado,
+  onSalvandoPreco,
   podeEditar,
   podeConfigurar,
 }) {
   const c = useIfoodSimulacaoPreco(item, { podeEditar, onAplicado: onPrecoAplicado });
+  useEffect(() => {
+    onSalvandoPreco?.(c.salvando);
+    return () => onSalvandoPreco?.(false);
+  }, [c.salvando, onSalvandoPreco]);
   const [memoriaAberta, setMemoriaAberta] = useState(false);
   useEscapeToClose({ onClose: onFechar, disabled: c.salvando });
   const margem = c.resultado?.margins?.[modalidade];
@@ -108,6 +113,14 @@ export default function IfoodProdutoDetalhes({
                   <p className="v2-texto mt-1">{moedaIfood(c.salvo.regular_price)}</p>
                 </div>
               </div>
+              {c.erroOferta ? (
+                <div role="alert" className="mt-3 space-y-2 text-sm text-red-700 dark:text-red-300">
+                  <p>{c.erroOferta}</p>
+                  <BotaoInteracao icon={RefreshCw} tamanho="pequeno" onClick={c.repetir}>
+                    Tentar novamente
+                  </BotaoInteracao>
+                </div>
+              ) : null}
             </section>
 
             <section className="space-y-4 rounded-xl border border-blue-200 p-4 dark:border-blue-500/30">
@@ -179,9 +192,25 @@ export default function IfoodProdutoDetalhes({
           <div
             className="min-w-0 space-y-4"
             aria-live="polite"
-            aria-busy={!c.pronta && !c.erroSimulacao}
+            aria-busy={!c.pronta && !c.erroSimulacao && !c.erroOferta}
           >
-            {!c.pronta ? (
+            {c.resultado && !c.pronta && !c.erroOferta ? (
+              <div
+                role={c.erroSimulacao ? "alert" : "status"}
+                className="space-y-2 text-sm text-slate-600 dark:text-slate-300"
+              >
+                <p>
+                  {c.erroSimulacao ||
+                    (c.salvando ? "Salvando preço…" : "Atualizando preço, margem e pendências…")}
+                </p>
+                {c.erroSimulacao ? (
+                  <BotaoInteracao icon={RefreshCw} tamanho="pequeno" onClick={c.repetir}>
+                    Tentar novamente
+                  </BotaoInteracao>
+                ) : null}
+              </div>
+            ) : null}
+            {!c.resultado ? (
               c.erroSimulacao ? (
                 <div
                   role="alert"

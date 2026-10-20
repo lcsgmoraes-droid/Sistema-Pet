@@ -30,6 +30,7 @@ from app.integrations.ifood.management import (
     build_management_item,
     product_identifier,
 )
+from app.integrations.ifood.pricing import aware, utc_timestamp
 from app.security.permissions_decorator import (
     require_permission,
     require_any_permission,
@@ -262,6 +263,7 @@ def _management_items(
     *,
     product_ids: list[int] | None = None,
     price_overrides: dict[int, float | None] | None = None,
+    now: datetime | None = None,
 ) -> list[dict]:
     from app.services.kit_custo_service import KitCustoService
 
@@ -274,6 +276,7 @@ def _management_items(
         if product.anunciar_ifood
     )
     safety = float(config.stock_safety or 0) if config else 0
+    evaluated_at = now or datetime.now(timezone.utc)
     items = []
     for product in products:
         snapshot = SimpleNamespace(
@@ -295,6 +298,7 @@ def _management_items(
                 available_stock=max(0, stock - safety) if stock is not None else None,
                 duplicate_identifier=identifiers[product_identifier(product).casefold()]
                 > 1,
+                now=evaluated_at,
             )
         )
     return items
@@ -447,12 +451,21 @@ def get_ifood_management_catalog(
     ] = "todos",
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    product_id: int | None = Query(default=None, ge=1),
     user_and_tenant=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session),
 ):
     current_user, tenant_id = user_and_tenant
     config = _get_config(db, tenant_id)
-    items = _management_items(db, tenant_id, config)
+    evaluated_at = datetime.now(timezone.utc)
+    items = _management_items(db, tenant_id, config, now=evaluated_at)
+    # Calcular antes de busca, filtro e paginacao: uma promocao pode fazer um
+    # produto entrar/sair da lista e alterar os indicadores da loja.
+    next_changes = [
+        item["next_price_change_at"]
+        for item in items
+        if item["next_price_change_at"] is not None
+    ]
 
     def has_issues(item):
         return item["selected"] and any(
@@ -483,13 +496,16 @@ def get_ifood_management_catalog(
     filtered = [
         item
         for item in items
-        if filters[filtro](item)
+        if (product_id is None or item["product_id"] == product_id)
+        and filters[filtro](item)
         and all(
             term in f"{item['name']} {item['sku']} {item['identifier']}".casefold()
             for term in terms
         )
     ]
     return {
+        "evaluated_at": utc_timestamp(evaluated_at),
+        "next_price_change_at": min(next_changes, key=aware) if next_changes else None,
         "items": filtered[offset : offset + limit],
         "total": len(filtered),
         "summary": summary,
