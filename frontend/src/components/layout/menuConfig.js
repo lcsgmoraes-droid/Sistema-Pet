@@ -705,6 +705,11 @@ export function createLayoutMenuItems({ lembretesCount = 0, orcamentosGrupoAtivo
           permission: "configuracoes.editar",
         },
         {
+          path: "/configuracoes/xml-contabilidade",
+          label: "XML para contabilidade",
+          permission: "configuracoes.editar",
+        },
+        {
           path: "/configuracoes/grupos-comerciais",
           label: "Grupos Comerciais",
           permission: "configuracoes.empresa",

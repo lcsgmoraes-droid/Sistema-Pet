@@ -475,6 +475,21 @@ class IntNFeClient:
             accept="application/xml, text/xml",
         )
 
+    def document_events(self, token, document_type, correlation_id):
+        # Contrato oficial: https://intnfe.com.br/api/doc#ep-eventos
+        # O mesmo recurso existe para NF-e e NFC-e. Cada item contém o
+        # procEventoNFe original, inclusive todas as sequências de CC-e.
+        result = self._request(
+            "GET",
+            self._document_path(document_type, correlation_id, "eventos"),
+            token=token,
+        )
+        if not isinstance(result, list) or not all(
+            isinstance(event, dict) for event in result
+        ):
+            raise IntNFeError("RespostaInvalida")
+        return result
+
     def document_danfe(self, token, document_type, correlation_id):
         path = self._document_path(document_type, correlation_id, "danfe")
         # A IntNFe oferece PDF somente para NF-e (modelo 55). Para NFC-e,
