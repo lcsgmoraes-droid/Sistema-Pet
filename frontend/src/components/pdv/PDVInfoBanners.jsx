@@ -3,6 +3,7 @@ import SaleReference from "../ui/SaleReference";
 import { obterSituacaoFiscalVenda, rotaNotaFiscalVenda } from "../../utils/pdvFiscalStatus";
 import { buildValidadePdvMessage } from "./pdvValidadeAlertUtils";
 import { mensagemCaixaIndisponivel } from "../../utils/caixaAbertoMonitor";
+import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
 
 const ESTILOS_FISCAIS = {
   success: "border-emerald-200 bg-emerald-50 text-emerald-800",
@@ -33,6 +34,8 @@ export default function PDVInfoBanners({
   onAtualizarCaixa,
   modoVisualizacao,
   vendaAtual,
+  onRecarregarVenda,
+  loading = false,
   validadeAlertas = [],
 }) {
   const mensagemValidade = buildValidadePdvMessage(validadeAlertas);
@@ -123,22 +126,40 @@ export default function PDVInfoBanners({
                 {situacaoFiscal.detalhe && (
                   <div className="mt-0.5 text-xs">{situacaoFiscal.detalhe}</div>
                 )}
+                {vendaAtual.nfe_atualizacao_falhou && (
+                  <div role="alert" className="mt-1 text-xs font-semibold">
+                    Não foi possível consultar o emissor. Esta é a última situação registrada;
+                    atualize para confirmar o cancelamento da nota.
+                  </div>
+                )}
               </div>
             </div>
-            {rotaNotaFiscal && (
-              <a
-                className="inline-flex items-center gap-1 rounded-md border border-current bg-white/70 px-2 py-1 text-xs font-semibold transition-colors hover:bg-white"
-                href={rotaNotaFiscal}
-                rel="noopener noreferrer"
-                target="_blank"
-                title="Abrir esta nota fiscal em uma nova aba"
-              >
-                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-                {situacaoFiscal.status === "rejeitada"
-                  ? "Corrigir erro"
-                  : `Abrir ${situacaoFiscal.documento}`}
-              </a>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {onRecarregarVenda && (
+                <BotaoInteracao
+                  icon={RefreshCw}
+                  tamanho="pequeno"
+                  loading={loading}
+                  onClick={() => onRecarregarVenda(vendaAtual.id)}
+                >
+                  Atualizar situação
+                </BotaoInteracao>
+              )}
+              {rotaNotaFiscal && (
+                <a
+                  className="inline-flex items-center gap-1 rounded-md border border-current bg-white/70 px-2 py-1 text-xs font-semibold transition-colors hover:bg-white"
+                  href={rotaNotaFiscal}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                  title="Abrir esta nota fiscal em uma nova aba"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                  {situacaoFiscal.status === "rejeitada"
+                    ? "Corrigir erro"
+                    : `Abrir ${situacaoFiscal.documento}`}
+                </a>
+              )}
+            </div>
           </div>
         </div>
       )}

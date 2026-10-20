@@ -30,6 +30,7 @@ from app.intnfe.rejection_diagnostics import (
 from app.produtos_estoque_models import EstoqueMovimentacao, ProdutoLote
 from app.services.venda_descontos import ratear_centavos, ratear_descontos_venda
 from app.services.xml_contabilidade_hook import tentar_enfileirar_documento
+from app.vendas.fiscal_status import sincronizar_venda_apos_cancelamento_fiscal
 
 CENT = Decimal("0.01")
 AUTHORIZED_STATUS = 3
@@ -1442,6 +1443,7 @@ def reconcile(db, venda, api, *, connection=None, token=None):
         ) from None
     status_code = int(result.get("status") or 0)
     venda.nfe_status = STATUS_NAMES.get(status_code, "processando")
+    sincronizar_venda_apos_cancelamento_fiscal(db, venda)
     venda.nfe_numero = result.get("numero") or venda.nfe_numero
     if result.get("serie") is not None:
         venda.nfe_serie = int(result["serie"])

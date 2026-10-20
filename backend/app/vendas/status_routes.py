@@ -24,6 +24,7 @@ from app.vendas.routes_common import (
     _validar_tenant_e_obter_usuario,
 )
 from app.vendas_models import Venda
+from app.vendas.fiscal_status import nota_fiscal_cancelada
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -50,14 +51,17 @@ def reabrir_venda(
         raise HTTPException(status_code=404, detail="Venda não encontrada")
 
     # Impedir reabertura de vendas com NF emitida
-    if venda.status == "pago_nf":
+    cancelamento_fiscal_confirmado = nota_fiscal_cancelada(venda)
+    if venda.status == "pago_nf" and not cancelamento_fiscal_confirmado:
         raise HTTPException(
             status_code=400,
             detail="Não é possível reabrir uma venda com NF-e emitida. Cancele a nota fiscal primeiro.",
         )
 
     # Permitir reabrir vendas finalizadas ou parcialmente pagas
-    if venda.status not in ["finalizada", "baixa_parcial"]:
+    if venda.status not in ["finalizada", "baixa_parcial"] and not (
+        venda.status == "pago_nf" and cancelamento_fiscal_confirmado
+    ):
         raise HTTPException(
             status_code=400,
             detail="Apenas vendas finalizadas ou com baixa parcial podem ser reabertas",

@@ -215,6 +215,8 @@ export default function PDVMainArea(props) {
         modoVisualizacao={modoVisualizacao}
         vendaAtual={vendaAtual}
         validadeAlertas={validadeAlertas}
+        onRecarregarVenda={onRecarregarVenda}
+        loading={loading}
       />
 
       <PDVModoVisualizacaoBanner
@@ -225,6 +227,8 @@ export default function PDVMainArea(props) {
         mudarStatusParaAberta={mudarStatusParaAberta}
         habilitarEdicao={habilitarEdicao}
         onRecarregarVenda={onRecarregarVenda}
+        onCancelarVenda={onExcluirVenda}
+        loading={loading}
         temCaixaAberto={temCaixaAberto}
         statusConsultaCaixa={statusConsultaCaixa}
         onAbrirDevolucao={onAbrirDevolucaoVendaAtual}

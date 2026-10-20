@@ -107,6 +107,15 @@ export function obterSituacaoFiscalVenda(venda = {}) {
   };
 }
 
+export function podeCancelarVendaComNotaCancelada(venda = {}) {
+  const statusVenda = normalizar(venda.status);
+  return Boolean(
+    venda.id &&
+    normalizar(venda.nfe_status) === "cancelada" &&
+    ["aberta", "finalizada", "baixa_parcial", "pago_nf"].includes(statusVenda),
+  );
+}
+
 export function rotaNotaFiscalVenda(venda = {}) {
   if (!temDocumentoFiscalVenda(venda)) return null;
 

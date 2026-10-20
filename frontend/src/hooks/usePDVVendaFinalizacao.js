@@ -15,6 +15,7 @@ import { confirmarCorePet, perguntarCorePet } from "../services/corepetDialog";
 import { obterTotalRecebidoExistente } from "../components/modalPagamentoUtils";
 import { normalizarDescontosVenda } from "../utils/pdvDescontosUtils";
 import { cancelarEdicaoVenda } from "../utils/pdvCancelarEdicaoVenda";
+import { extrairCamposFiscaisVenda } from "../utils/pdvFiscalStatus";
 
 async function carregarPagamentosDaVenda(vendaId) {
   try {
@@ -67,6 +68,7 @@ function montarMensagemErroExclusao(errorData) {
 
 function montarVendaReaberta(vendaAtualizada, clienteCompleto, { pagamentos, totalPago }) {
   return {
+    ...extrairCamposFiscaisVenda(vendaAtualizada),
     id: vendaAtualizada.id,
     numero_venda: vendaAtualizada.numero_venda,
     data_venda: vendaAtualizada.data_venda,
