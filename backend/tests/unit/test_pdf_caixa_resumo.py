@@ -117,7 +117,7 @@ def test_pdf_separa_faturamento_liquido_recebimentos_anteriores_e_beneficios():
         "Faturamento líquido (vendas - descontos - devoluções)",
         "R$ 185,00",
         "R$ 10,00",
-        "De vendas anteriores",
+        "De outras datas ou sem data",
         "R$ 60,00",
         "R$ 5,00",
         "Crediário a receber",

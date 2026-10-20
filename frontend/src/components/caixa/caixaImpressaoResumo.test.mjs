@@ -33,6 +33,7 @@ test("impressões usam a composição nova e formas que correspondem ao recebido
   assert.equal(resumo.periodoRecebimentos, "09/10/2026");
   assert.equal(new Map(resumo.linhasVendas).get("Faturamento líquido"), 185);
   assert.equal(new Map(resumo.linhasRecebimentos).get("Recebimentos neste caixa"), 185);
+  assert.equal(new Map(resumo.linhasRecebimentos).get("De outras datas ou sem data"), 60);
   assert.equal(
     Math.round(resumo.formas.reduce((total, [, forma]) => total + forma.total, 0) * 100),
     18500,

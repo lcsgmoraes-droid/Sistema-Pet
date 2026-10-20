@@ -59,8 +59,9 @@ export default function RecebimentosCaixaPanel({ composicao }) {
         </BotaoInteracao>
       </div>
       <p className="text-xs text-slate-600 dark:text-slate-300">
-        Pagamentos das vendas do período e de vendas anteriores, incluindo parcelas de crediário
-        pagas. Crédito do cliente e cashback ficam separados.
+        Pagamentos das vendas do período e de outras datas, incluindo vendas anteriores, parcelas de
+        crediário pagas e registros sem data da venda. Crédito do cliente e cashback ficam
+        separados.
       </p>
       <div>
         <h5 className="mb-2 text-sm font-bold text-slate-900 dark:text-white">
@@ -153,7 +154,7 @@ export default function RecebimentosCaixaPanel({ composicao }) {
               </dd>
             </div>
             <div className="flex justify-between gap-3">
-              <dt>Vendas anteriores</dt>
+              <dt>Vendas de outras datas ou sem data</dt>
               <dd className="font-semibold tabular-nums">
                 {formatMoneyBRL(composicao.vendas_anteriores)}
               </dd>

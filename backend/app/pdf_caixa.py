@@ -166,7 +166,7 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
             [rotulo, formatar_moeda(recebimentos.get(chave))]
             for rotulo, chave in (
                 ("De vendas do período", "vendas_periodo"),
-                ("De vendas anteriores", "vendas_anteriores"),
+                ("De outras datas ou sem data", "vendas_anteriores"),
                 ("(-) Devoluções e estornos no caixa", "devolucoes"),
                 ("Recebimentos neste caixa", "total_recebido"),
                 (

@@ -30,7 +30,7 @@ export function criarResumoImpressaoCaixa(resumo) {
   const linhasRecebimentos = recebimentos
     ? [
         ["De vendas do período", recebimentos.vendas_periodo],
-        ["De vendas anteriores", recebimentos.vendas_anteriores],
+        ["De outras datas ou sem data", recebimentos.vendas_anteriores],
         ["(-) Devoluções e estornos no caixa", recebimentos.devolucoes],
         ["Recebimentos neste caixa", recebimentos.total_recebido],
         ["Créditos e benefícios usados no caixa", recebimentos.creditos_utilizados],
