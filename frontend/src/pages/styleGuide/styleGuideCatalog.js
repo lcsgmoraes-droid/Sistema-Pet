@@ -173,6 +173,13 @@ export const styleGuideCatalog = [
           'Substitui MetricCard/CompactMetricCard/PriorityCard do dashboard financeiro — tom (mesmo vocabulário de BotaoBase.variante) colore o ícone, "aoClicar" decide se vira botão ou div estática',
       },
       {
+        nome: "ResumoFaturamento",
+        status: "pronto",
+        arquivo: "components/v2/ResumoFaturamento/ResumoFaturamento.jsx",
+        descricao:
+          "Faturamento líquido compartilhado entre dashboard e PDV: vendas menos descontos/devoluções, entrega separada e detalhes expansíveis de quitação e vendas. Aceita expansão controlada e suporte a modo escuro. Recebe a composição do backend sem recalcular métricas na tela.",
+      },
+      {
         nome: "EstadoVazio",
         status: "pronto",
         arquivo: "components/v2/EstadoVazio/EstadoVazio.jsx",

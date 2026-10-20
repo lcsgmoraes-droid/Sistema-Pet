@@ -41,6 +41,7 @@ from app.caixa.escopo import (
 from app.financeiro_models import ContaPagar, TipoDespesa
 from app.domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
 from app.pdf_caixa import gerar_pdf_fechamento_caixa
+from app.services.faturamento_service import montar_composicoes_caixa
 
 router = APIRouter(prefix="/caixas", tags=["caixas"])
 router.include_router(auditoria_router)
@@ -705,6 +706,9 @@ def obter_resumo_caixa(
         .scalar()
     )
     indicadores = indicadores_vendas_recebimentos(total_vendido, vendas_por_forma)
+    composicoes = montar_composicoes_caixa(
+        db, caixa=caixa, tenant_id=tenant_id, movimentacoes=movimentacoes
+    )
 
     return {
         "caixa": _serializar_caixa(caixa, compartilhado=compartilhado, compact=compact),
@@ -713,6 +717,7 @@ def obter_resumo_caixa(
         "recebimentos_por_data_venda": recebimentos_por_data_venda,
         **resumir_pagamentos_vendas_caixa(db, caixa_id=caixa_id, tenant_id=tenant_id),
         **indicadores,
+        **composicoes,
     }
 
 
@@ -1033,6 +1038,8 @@ def gerar_pdf_caixa(
         "vendas_por_forma_pagamento": resumo["vendas_por_forma_pagamento"],
         "recebimentos_por_forma_pagamento": resumo["recebimentos_por_forma_pagamento"],
         "totais": resumo["totais"],
+        "vendas_periodo": resumo["vendas_periodo"],
+        "composicao_recebimentos": resumo["composicao_recebimentos"],
         "saldo_fechamento": float(caixa.valor_informado)
         if caixa.valor_informado is not None
         else None,

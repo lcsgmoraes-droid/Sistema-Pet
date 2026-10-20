@@ -27,7 +27,7 @@ test("dashboard diferencia resultado de caixa e cobertura de despesas", () => {
   assert.equal(indicators.dueTodayReceivable, 90);
   assert.equal(indicators.cashMargin, (500 / 1500) * 100);
   assert.equal(indicators.expenseCoverage, 150);
-  assert.equal(getExecutiveStatus(summary).tone, "positive");
+  assert.equal(getExecutiveStatus(summary).tone, "sucesso");
 });
 
 test("dashboard prioriza caixa negativo com contas vencidas", () => {
@@ -37,7 +37,7 @@ test("dashboard prioriza caixa negativo com contas vencidas", () => {
 
   const status = getExecutiveStatus(summary);
 
-  assert.equal(status.tone, "critical");
+  assert.equal(status.tone, "perigo");
   assert.match(status.description, /contas vencidas/i);
 });
 
@@ -47,7 +47,7 @@ test("dashboard não chama ausência de dados de operação saudável", () => {
   assert.equal(empty.contas_receber.vence_hoje, 0);
   assert.equal(empty.vendas_periodo.unidades, 0);
   assert.equal(empty.vendas_periodo.lucro, 0);
-  assert.equal(getExecutiveStatus(empty).tone, "neutral");
+  assert.equal(getExecutiveStatus(empty).tone, "neutro");
   assert.equal(getPeriodLabel(1), "Hoje");
   assert.equal(getPeriodLabel(30), "Últimos 30 dias");
 });

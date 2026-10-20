@@ -623,6 +623,10 @@ jobs:
           mypy app/ --ignore-missing-imports || echo "Type warnings found"
         continue-on-error: true
 
+      - name: Faturamento reconciliation regression
+        run: |
+          pytest tests/unit/test_faturamento_composicao.py tests/unit/test_faturamento_superficies.py tests/unit/test_pdf_caixa_resumo.py -q
+
       - name: Multitenant hardening suite
         run: |
           pytest tests/multi_tenant -q --cov=app --cov-report=term --cov-report=xml

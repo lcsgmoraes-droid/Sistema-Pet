@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, case, func, or_
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.dre_canais.base import CANAIS_CONFIG
@@ -17,10 +17,6 @@ from app.dre_canais.routes import gerar_dre_por_canais
 from app.financeiro.fluxo_caixa_routes import get_fluxo_caixa
 from app.financeiro_models import ContaPagar, ContaReceber
 from app.models import User
-from app.relatorio_vendas_common import (
-    _total_recebido_venda,
-    _valores_operacionais_venda,
-)
 from app.routes.ecommerce_auth import (
     _activate_user_tenant_context,
     _get_current_ecommerce_user,
@@ -29,6 +25,11 @@ from app.services.app_access_profile_service import resolve_user_app_profiles
 from app.utils.serialization import safe_decimal_to_float_zero
 from app.utils.timezone import now_brasilia
 from app.vendas_models import Venda
+from app.services.faturamento_composicao import compor_vendas
+from app.services.faturamento_service import (
+    montar_composicao_vendas,
+    opcoes_composicao_vendas,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/gestor", tags=["App Mobile - Gestor"])
@@ -51,6 +52,7 @@ class GestorVendasResumo(BaseModel):
     unidades_vendidas: float = 0
     produtos_distintos: int = 0
     ticket_medio: float = 0
+    composicao: dict[str, Any] | None = None
 
 
 class GestorContaResumo(BaseModel):
@@ -139,36 +141,31 @@ def _date_bounds(data_inicio: date, data_fim: date) -> tuple[datetime, datetime]
     )
 
 
-def _resumir_vendas(vendas: list[Venda]) -> GestorVendasResumo:
-    bruto = 0.0
-    liquido = 0.0
-    recebido = 0.0
-    descontos = 0.0
+def _resumir_vendas(vendas: list[Venda], composicao=None) -> GestorVendasResumo:
     unidades = 0.0
     produtos_ids: set[int] = set()
 
     for venda in vendas:
-        valores = _valores_operacionais_venda(venda)
-        bruto += valores["valor_bruto"]
-        liquido += valores["valor_liquido"]
-        recebido += _total_recebido_venda(venda)
-        descontos += valores["desconto"]
         for item in list(getattr(venda, "itens", []) or []):
             unidades += safe_decimal_to_float_zero(getattr(item, "quantidade", 0))
             produto_id = getattr(item, "produto_id", None)
             if produto_id is not None:
                 produtos_ids.add(int(produto_id))
 
-    quantidade = len(vendas)
+    composicao = composicao or compor_vendas(vendas, data_inicio="", data_fim="")
+    quantidade = composicao["quantidade"]
     return GestorVendasResumo(
-        faturamento_bruto=round(bruto, 2),
-        faturamento_liquido=round(liquido, 2),
-        recebido=round(recebido, 2),
-        descontos=round(descontos, 2),
+        faturamento_bruto=composicao["faturamento_bruto"],
+        faturamento_liquido=composicao["faturamento_liquido"],
+        recebido=composicao["valor_pago"],
+        descontos=composicao["descontos"],
         quantidade_vendas=quantidade,
         unidades_vendidas=round(unidades, 3),
         produtos_distintos=len(produtos_ids),
-        ticket_medio=round(liquido / quantidade, 2) if quantidade else 0,
+        ticket_medio=round(composicao["faturamento_liquido"] / quantidade, 2)
+        if quantidade
+        else 0,
+        composicao=composicao,
     )
 
 
@@ -350,7 +347,7 @@ def obter_resumo_gestor_mobile(
     inicio, fim_exclusivo = _date_bounds(data_inicio, data_fim)
     vendas = (
         db.query(Venda)
-        .options(selectinload(Venda.pagamentos), selectinload(Venda.itens))
+        .options(*opcoes_composicao_vendas())
         .filter(
             and_(
                 Venda.tenant_id == tenant_id,
@@ -386,7 +383,10 @@ def obter_resumo_gestor_mobile(
         data_inicio=data_inicio,
         data_fim=data_fim,
         atualizado_em=now_brasilia(),
-        vendas=_resumir_vendas(vendas),
+        vendas=_resumir_vendas(
+            vendas,
+            montar_composicao_vendas(db, tenant_id, vendas, data_inicio, data_fim),
+        ),
         fluxo_hoje=fluxo_hoje,
         contas_pagar=_resumir_contas(
             db,

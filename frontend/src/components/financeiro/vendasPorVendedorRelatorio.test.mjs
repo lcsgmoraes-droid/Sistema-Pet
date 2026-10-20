@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   agruparVendasPorVendedor,
+  opcoesProdutosVendas,
   planilhasVendasPorVendedor,
 } from "./vendasPorVendedorRelatorio.js";
 
@@ -21,6 +22,198 @@ test("agrupa pelo vendedor indicado, mesmo com operador diferente e nomes iguais
       { chave: "11", quantidade: 1, total: 50 },
       { chave: "sem-vendedor", quantidade: 1, total: 10 },
     ],
+  );
+});
+
+test("opções distinguem produtos com nome igual e ignoram itens sem identificação", () => {
+  const opcoes = opcoesProdutosVendas([
+    {
+      itens: [
+        { produto_id: 2, produto_nome: "Ração" },
+        { produto_id: "2", produto_nome: "Ração" },
+        { produto_id: 3, produto_nome: "Ração" },
+        { produto_id: 1, produto_nome: "Areia" },
+        { produto_nome: "Sem identificação" },
+        { produto_id: null, produto_nome: "Sem identificação" },
+        { produto_id: "", produto_nome: "Sem identificação" },
+      ],
+    },
+    {},
+  ]);
+
+  assert.deepEqual(opcoes, [
+    { value: "1", label: "Areia (#1)" },
+    { value: "2", label: "Ração (#2)" },
+    { value: "3", label: "Ração (#3)" },
+  ]);
+});
+
+function vendasMistas() {
+  return [
+    {
+      id: 1,
+      vendedor_funcionario_id: 10,
+      vendedor_nome: "Ana",
+      numero_venda: "VEN-1",
+      data_venda: "2026-10-17",
+      cliente_nome: "Cliente",
+      total_venda: 190,
+      itens: [
+        {
+          produto_id: 2,
+          produto_nome: "Ração",
+          quantidade: 0.125,
+          preco_unitario: 20,
+          venda_bruta: 2.5,
+        },
+        {
+          produto_id: "2",
+          produto_nome: "Ração",
+          quantidade: 0.375,
+          preco_unitario: 20,
+          venda_bruta: 7.5,
+        },
+        {
+          produto_id: 3,
+          produto_nome: "Areia",
+          quantidade: 2,
+          preco_unitario: 100,
+          venda_bruta: 200,
+        },
+      ],
+    },
+    {
+      id: 2,
+      vendedor_funcionario_id: 11,
+      vendedor_nome: "Ana",
+      numero_venda: "VEN-2",
+      total_venda: 40,
+      itens: [
+        {
+          produto_id: 2,
+          produto_nome: "Ração",
+          quantidade: 0.001,
+          preco_unitario: 20,
+          venda_bruta: 0.02,
+        },
+      ],
+    },
+    {
+      id: 3,
+      vendedor_funcionario_id: 10,
+      vendedor_nome: "Ana",
+      total_venda: 50,
+      itens: [{ produto_id: 3, produto_nome: "Areia", quantidade: 1, venda_bruta: 50 }],
+    },
+    { id: 4, total_venda: 100 },
+  ];
+}
+
+test("produto em venda mista soma só seus itens e conta a venda uma vez, preservando três decimais", () => {
+  const grupos = agruparVendasPorVendedor(vendasMistas(), "2");
+
+  assert.deepEqual(
+    grupos.map(({ chave, quantidade, quantidadeProdutos, total }) => ({
+      chave,
+      quantidade,
+      quantidadeProdutos,
+      total,
+    })),
+    [
+      { chave: "10", quantidade: 1, quantidadeProdutos: 0.5, total: 10 },
+      { chave: "11", quantidade: 1, quantidadeProdutos: 0.001, total: 0.02 },
+    ],
+  );
+  assert.equal(grupos[0].vendas[0].total_venda, 190);
+  assert.equal(grupos[0].vendas[0].total_relatorio, 10);
+  assert.equal(grupos[0].vendas[0].itens.length, 2);
+});
+
+test("bruto zero é respeitado, ausência usa preço vezes quantidade e ausência de vendedor fica visível", () => {
+  const grupos = agruparVendasPorVendedor(
+    [
+      {
+        total_venda: 100,
+        itens: [
+          { produto_id: 2, quantidade: 1, preco_unitario: 50, venda_bruta: 0 },
+          { produto_id: 2, quantidade: 0.125, preco_unitario: 20, venda_bruta: null },
+          { produto_id: 2, quantidade: 0.25, preco_unitario: 20 },
+        ],
+      },
+    ],
+    2,
+  );
+
+  assert.equal(grupos[0].chave, "sem-vendedor");
+  assert.equal(grupos[0].vendedor, "Sem vendedor");
+  assert.equal(grupos[0].total, 7.5);
+  assert.equal(grupos[0].quantidadeProdutos, 1.375);
+});
+
+test("filtro sem correspondência não atribui vendas de outros produtos", () => {
+  assert.deepEqual(agruparVendasPorVendedor(vendasMistas(), "999"), []);
+  assert.deepEqual(agruparVendasPorVendedor([], "2"), []);
+  assert.deepEqual(opcoesProdutosVendas(), []);
+});
+
+test("agrupamento não altera venda, itens nem valores originais", () => {
+  const vendas = vendasMistas();
+  const originais = structuredClone(vendas);
+  for (const venda of vendas) {
+    for (const item of venda.itens || []) Object.freeze(item);
+    if (venda.itens) Object.freeze(venda.itens);
+    Object.freeze(venda);
+  }
+  Object.freeze(vendas);
+
+  const filtrados = agruparVendasPorVendedor(vendas, "2");
+  const todos = agruparVendasPorVendedor(vendas);
+  assert.equal(filtrados[0].vendas[0].total_relatorio, 10);
+  assert.equal(todos[0].vendas[0].total_relatorio, 190);
+  assert.equal(todos[0].vendas[0].itens.length, 3);
+  assert.deepEqual(vendas, originais);
+});
+
+test("Excel do produto traz quantidade e bruto do produto em resumo e vendas, com período e identificação", () => {
+  const grupos = agruparVendasPorVendedor(vendasMistas(), "2");
+  const planilhas = planilhasVendasPorVendedor(
+    grupos,
+    { inicio: "2026-10-01", fim: "2026-10-17" },
+    { value: "2", label: "Ração (#2)" },
+  );
+
+  assert.deepEqual(planilhas[0].linhas[0], [
+    "Vendedor",
+    "Quantidade de vendas",
+    "Quantidade do produto",
+    "Valor bruto do produto",
+    "Produto",
+    "Período inicial",
+    "Período final",
+  ]);
+  assert.deepEqual(planilhas[0].linhas[1], [
+    "Ana",
+    1,
+    0.5,
+    10,
+    "Ração (#2)",
+    "2026-10-01",
+    "2026-10-17",
+  ]);
+  assert.deepEqual(planilhas[1].linhas[0], [
+    "Vendedor",
+    "Data",
+    "Número da venda",
+    "Cliente",
+    "Quantidade do produto",
+    "Valor bruto do produto",
+  ]);
+  assert.deepEqual(planilhas[1].linhas[1], ["Ana", "2026-10-17", "VEN-1", "Cliente", 0.5, 10]);
+  assert.equal(planilhas[2].linhas.length, 4);
+  assert.ok(planilhas[2].linhas.slice(1).every((linha) => linha[2] === "Ração"));
+  assert.equal(
+    planilhas[2].linhas.slice(1).reduce((total, linha) => total + linha[5], 0),
+    10.02,
   );
 });
 
