@@ -82,6 +82,12 @@ def baixar_lote(
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
             "X-Quantidade-Notas": str(quantidade),
+            "X-Notas-Pendentes": str(
+                len(db.info.get("xml_contabilidade_pendencias", []))
+            )
+            if isinstance(db.info, dict)
+            else "0",
+            "Access-Control-Expose-Headers": "Content-Disposition, X-Quantidade-Notas, X-Notas-Pendentes",
             "Cache-Control": "no-store",
         },
     )
@@ -127,6 +133,31 @@ def cancelar_envio(
     resultado = service.cancelar_envio(db, user_and_tenant[1], envio_id)
     _auditar(db, user_and_tenant, "envio_cancelado", envio_id)
     return resultado
+
+
+@router.get("/envios/{envio_id}/relatorios")
+def listar_relatorios(
+    envio_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    from app.services import xml_contabilidade_relatorios
+
+    return xml_contabilidade_relatorios.listar(db, user_and_tenant[1], envio_id)
+
+
+@router.get("/envios/{envio_id}/relatorios/{relatorio_id}")
+def obter_relatorio(
+    envio_id: int,
+    relatorio_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    from app.services import xml_contabilidade_relatorios
+
+    return xml_contabilidade_relatorios.obter(
+        db, user_and_tenant[1], envio_id, relatorio_id
+    )
 
 
 @router.post("/envios/{envio_id}/reenviar")

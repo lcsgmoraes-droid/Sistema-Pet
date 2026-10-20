@@ -98,10 +98,16 @@ pendentes; não se afirma homologação no tenant de produção.
 
 ## 7. Publicação e rollback
 
-Entrega web/backend sem mudança mobile ou migration. Publicação depende de revisão
-do PR, checks, merge e autorização explícita de Lucas pelo fluxo oficial. Não há
-autorização de produção neste registro. O rollback de código preserva documentos
-e histórico; conferir estoque antes de repetir qualquer operação comercial.
+Entrega web/backend sem mudança mobile ou migration. Lucas autorizou em
+20/10/2026 resolver o PR #1526 e publicar cancelamento da venda e compartilhamento
+do produto, mantendo DRE e catálogo iFood separados. Os conflitos foram resolvidos
+preservando integralmente a main fora das duas correções. Publicação somente após
+release-check, checks e merge pelo fluxo oficial. O rollback de código preserva
+documentos e histórico; conferir estoque antes de repetir operação comercial.
+
+Estado anterior verificado: produção no commit `8b555faca`, Alembic
+`zzzzk20261020a1`, todos os serviços saudáveis, health `ok` e watchdog `healthy`.
+O grafo de migrations e os arquivos DRE/XML/iFood permanecem iguais à main.
 
 ## 8. Observabilidade e sustentação
 
@@ -118,6 +124,7 @@ mostrar a ação direta; uma venda cancelada não deve reabrir por consulta fisc
 - Callbacks de comissão/entregador/contexto já iniciados não suportam aborto;
   as respostas de carregamento não podem trocar a venda selecionada ou encerrar
   o loading de uma consulta mais nova.
-- A branch/PR existente já apresenta conflitos com a main no trabalho anterior
-  de XML/iFood. A integração dessas frentes requer conciliar também o histórico
-  de migrations antes da publicação; não foi misturada a esta correção do PDV.
+- O código pontual de DRE foi preservado em
+  `codex/dre-sistema-antigo-preservado` (`e0406f86d`); o catálogo iFood e a versão
+  anterior da branch em `codex/pr1526-ifood-preservado` (`f5dce530e`). Nenhum deles
+  integra esta publicação. Os ajustes já realizados nos dados DRE são preservados.

@@ -145,6 +145,23 @@ def test_lote_sem_notas_ou_eventos_nao_envia_anexos_vazios():
     assert erro.value.status_code == 404
 
 
+def test_mes_com_mais_de_mil_notas_nao_trunca_o_zip():
+    chaves = [f"{CHAVE[:25]}{n:09d}{CHAVE[34:]}" for n in range(1201)]
+    assert all(len(chave) == 44 for chave in chaves)
+    arquivos = [
+        (f"{chave}-nfe.xml", f"XML original {chave}".encode()) for chave in chaves
+    ]
+    anexos, _, quantidade = pacotes.criar_anexos_por_tipo(
+        arquivos, [nota(chave) for chave in chaves], INICIO, FIM
+    )
+    assert quantidade == 1201 and len(anexos) == 1
+    with ZipFile(BytesIO(anexos[0]["content"])) as zipped:
+        assert len(zipped.namelist()) == 1202
+        manifesto = json.loads(zipped.read("manifesto.json"))
+        assert manifesto["quantidade_notas"] == 1201
+        assert {n["chave"] for n in manifesto["notas"]} == set(chaves)
+
+
 @pytest.mark.parametrize("origem", ["mensal", "manual"])
 def test_envio_anexa_zips_separados_na_mesma_mensagem(origem, monkeypatch):
     from app.services import xml_contabilidade_documentos as documentos

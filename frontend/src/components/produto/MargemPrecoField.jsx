@@ -1,15 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Settings } from "lucide-react";
+import { ChevronDown, Settings, X } from "lucide-react";
 import api from "../../api";
 import { formatPercent } from "../../utils/formatters";
-import BotaoCancelar from "../v2/BotaoCancelar/BotaoCancelar";
-import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
-import BotaoLink from "../v2/BotaoLink/BotaoLink";
-import BotaoSalva from "../v2/BotaoSalva/BotaoSalva";
-import InputTexto from "../v2/InputTexto/InputTexto";
-import InputPercentual from "../v2/InputPercentual/InputPercentual";
-import ModalPadrao from "../v2/ModalPadrao/ModalPadrao";
 import {
   MARGENS_PRECO_PADRAO,
   formatarDivisorMargem,
@@ -26,32 +19,62 @@ export default function MargemPrecoField({
 }) {
   const [margensSugeridas, setMargensSugeridas] = useState(MARGENS_PRECO_PADRAO);
   const [editorAberto, setEditorAberto] = useState(false);
-  const [margensEmEdicao, setMargensEmEdicao] = useState(MARGENS_PRECO_PADRAO);
+  const [sugestoesAbertas, setSugestoesAbertas] = useState(false);
+  const [margensEmEdicao, setMargensEmEdicao] = useState(MARGENS_PRECO_PADRAO.map(String));
   const [salvando, setSalvando] = useState(false);
+  const sugestoesRef = useRef(null);
 
   useEffect(() => {
     let ativo = true;
+
     api
       .get("/empresa/config/margens-preco")
       .then(({ data }) => {
         if (ativo) setMargensSugeridas(normalizarMargensPreco(data));
       })
-      .catch((error) => console.error("Erro ao carregar margens sugeridas:", error));
+      .catch((error) => {
+        console.error("Erro ao carregar margens sugeridas:", error);
+      });
+
     return () => {
       ativo = false;
     };
   }, []);
 
+  useEffect(() => {
+    if (!sugestoesAbertas) return undefined;
+
+    const fecharAoClicarFora = (event) => {
+      if (!sugestoesRef.current?.contains(event.target)) {
+        setSugestoesAbertas(false);
+      }
+    };
+
+    document.addEventListener("mousedown", fecharAoClicarFora);
+    return () => document.removeEventListener("mousedown", fecharAoClicarFora);
+  }, [sugestoesAbertas]);
+
+  const abrirEditor = () => {
+    setMargensEmEdicao(margensSugeridas.map((margem) => String(margem).replace(".", ",")));
+    setEditorAberto(true);
+  };
+
   const salvarMargensSugeridas = async () => {
     const novasMargens = margensEmEdicao.map(converterMargem);
-    if (novasMargens.some((margem) => !Number.isFinite(margem) || margem < 0 || margem >= 100)) {
+    const margensInvalidas = novasMargens.some(
+      (margem) => !Number.isFinite(margem) || margem < 0 || margem >= 100,
+    );
+
+    if (margensInvalidas) {
       toast.error("Informe duas margens entre 0% e 99,99%.");
       return;
     }
+
     if (novasMargens[0] === novasMargens[1]) {
       toast.error("As duas sugestões precisam ser diferentes.");
       return;
     }
+
     try {
       setSalvando(true);
       const { data } = await api.put("/empresa/config/margens-preco", {
@@ -62,6 +85,7 @@ export default function MargemPrecoField({
       setEditorAberto(false);
       toast.success("Sugestões de margem atualizadas.");
     } catch (error) {
+      console.error("Erro ao salvar margens sugeridas:", error);
       toast.error(error?.response?.data?.detail || "Não foi possível salvar as sugestões.");
     } finally {
       setSalvando(false);
@@ -75,91 +99,161 @@ export default function MargemPrecoField({
       handleChange("margem", "");
       return;
     }
+
     const margem = converterMargem(margemTexto);
+
     if (!Number.isFinite(margem) || margem >= 100) {
       toast.error("A margem precisa ser menor que 100%.");
       handleChange("margem", "");
       return;
     }
+
     handleChange("margem", margem.toFixed(2));
   };
 
   return (
     <div>
-      <div className="flex items-end gap-2">
-        <InputTexto
-          id="produto-margem"
-          label="Margem sobre a venda"
+      <label className="block text-sm font-medium text-gray-700 mb-1">Margem sobre a venda</label>
+      <div className="flex gap-2">
+        <input
+          type="text"
           inputMode="decimal"
           value={camposEmEdicao.margem ? formData.margem || "" : formatPercent(formData.margem)}
-          onChange={(value) =>
-            handleChange("margem", value.replace(/[^\d.,-]/g, "").replace(",", "."))
-          }
-          onFocus={(event) => {
+          onChange={(e) => {
+            const value = e.target.value.replace(/[^\d.,-]/g, "").replace(",", ".");
+            handleChange("margem", value);
+          }}
+          onFocus={(e) => {
             setCamposEmEdicao((prev) => ({ ...prev, margem: true }));
-            event.target.select();
+            e.target.select();
           }}
-          onBlur={(event) => finalizarEdicaoMargem(event.target.value)}
+          onBlur={(e) => finalizarEdicaoMargem(e.target.value)}
+          className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
           placeholder="0,00%"
+          aria-label="Margem sobre o preço de venda"
         />
-        <BotaoInteracao
-          icon={Settings}
-          aria-label="Editar as duas margens sugeridas"
-          title="Editar as duas margens sugeridas"
-          onClick={() => {
-            setMargensEmEdicao([...margensSugeridas]);
-            setEditorAberto(true);
-          }}
-        />
-      </div>
-      <p className="v2-texto-ajuda mt-1">Preço = custo ÷ (1 − margem).</p>
-      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
-        {margensSugeridas.map((margem, indice) => (
-          <BotaoLink
-            key={`${margem}-${indice}`}
-            title={`Aplicar margem; divisor ${formatarDivisorMargem(margem)}`}
-            onClick={() => handleChange("margem", Number(margem).toFixed(2))}
+
+        <div ref={sugestoesRef} className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => setSugestoesAbertas((aberto) => !aberto)}
+            className="inline-flex h-[42px] w-[42px] items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            title="Abrir margens sugeridas"
+            aria-label="Abrir margens sugeridas"
+            aria-expanded={sugestoesAbertas}
           >
-            Usar {formatPercent(margem)}
-          </BotaoLink>
-        ))}
-      </div>
-      {editorAberto ? (
-        <ModalPadrao
-          titulo="Margens sugeridas"
-          tamanho="pequena"
-          onFechar={() => {
-            if (!salvando) setEditorAberto(false);
-          }}
-          rodape={
-            <>
-              <BotaoCancelar onClick={() => setEditorAberto(false)} disabled={salvando} />
-              <BotaoSalva type="button" onClick={salvarMargensSugeridas} loading={salvando}>
-                Salvar sugestões
-              </BotaoSalva>
-            </>
-          }
+            <ChevronDown size={18} />
+          </button>
+
+          {sugestoesAbertas && (
+            <div className="absolute right-0 z-20 mt-2 w-52 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+              {margensSugeridas.map((margem, indice) => (
+                <button
+                  key={`${margem}-${indice}`}
+                  type="button"
+                  onClick={() => {
+                    handleChange("margem", Number(margem).toFixed(2));
+                    setSugestoesAbertas(false);
+                  }}
+                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700"
+                >
+                  <span>{formatPercent(margem)}</span>
+                  <span className="text-xs text-gray-500">
+                    divisor {formatarDivisorMargem(margem)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={abrirEditor}
+          className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          title="Editar as duas margens sugeridas"
+          aria-label="Editar as duas margens sugeridas"
         >
-          <p className="v2-texto-ajuda mb-4">
-            Estas opções ficam disponíveis no cadastro de produtos da empresa.
-          </p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {margensEmEdicao.map((margem, indice) => (
-              <InputPercentual
-                key={indice}
-                label={`Sugestão ${indice + 1}`}
-                value={margem}
-                maxValue={99.99}
-                onChange={(value) =>
-                  setMargensEmEdicao((atuais) =>
-                    atuais.map((atual, index) => (index === indice ? value : atual)),
-                  )
-                }
-              />
-            ))}
+          <Settings size={18} />
+        </button>
+      </div>
+      <p className="mt-1 text-xs text-gray-500">Preço = custo ÷ (1 − margem).</p>
+
+      {editorAberto && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="titulo-margens-sugeridas"
+        >
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 id="titulo-margens-sugeridas" className="text-lg font-semibold text-gray-900">
+                  Margens sugeridas
+                </h2>
+                <p className="mt-1 text-sm text-gray-600">
+                  Estas opções ficarão disponíveis no cadastro de produtos da empresa.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditorAberto(false)}
+                className="rounded-lg p-1 text-gray-500 hover:bg-gray-100"
+                aria-label="Fechar edição de margens"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {margensEmEdicao.map((margem, indice) => (
+                <div key={indice}>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Sugestão {indice + 1} (%)
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={margem}
+                    onChange={(e) => {
+                      const atualizadas = [...margensEmEdicao];
+                      atualizadas[indice] = e.target.value.replace(/[^\d,.]/g, "");
+                      setMargensEmEdicao(atualizadas);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        salvarMargensSugeridas();
+                      }
+                    }}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setEditorAberto(false)}
+                disabled={salvando}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={salvarMargensSugeridas}
+                disabled={salvando}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {salvando ? "Salvando..." : "Salvar sugestões"}
+              </button>
+            </div>
           </div>
-        </ModalPadrao>
-      ) : null}
+        </div>
+      )}
     </div>
   );
 }

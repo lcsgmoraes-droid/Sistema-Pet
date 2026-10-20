@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Iterable
 from urllib.parse import urljoin, urlparse
-from .pricing import resolve_ifood_prices
 
 _MONEY = Decimal("0.01")
 
@@ -129,17 +128,6 @@ def _eligibility_errors(
         getattr(product, "anunciar_ecommerce", False)
     ):
         errors.append("Produto nao esta marcado para anunciar no e-commerce.")
-    if source == "ifood":
-        if not bool(getattr(product, "anunciar_ifood", False)):
-            errors.append("Produto nao esta selecionado para o iFood.")
-        if bool(getattr(product, "ifood_pausado", False)):
-            errors.append("Produto pausado manualmente no iFood.")
-        if bool(getattr(product, "e_granel", False)):
-            errors.append("Publicacao automatica de granel ainda nao habilitada.")
-        if not str(getattr(product, "unidade", "") or "").strip():
-            errors.append("Unidade da apresentacao ausente.")
-        if getattr(product, "ifood_available_stock", None) is None:
-            errors.append("Estoque disponivel nao confirmado.")
     if not name:
         errors.append("Nome do produto ausente.")
     if not barcode:
@@ -197,18 +185,20 @@ def build_catalog_item(
             "Produto sem EAN; o SKU sera usado como codigo interno no iFood."
         )
 
-    if source == "ifood":
-        prices = resolve_ifood_prices(product, markup_percent, current_time)
-        base_price = prices["regular_price"] or 0
-        promo_price = prices["effective_price"] if prices["promotion_active"] else None
-        errors.extend(message for _, message, _ in prices["promotion_errors"])
-    else:
-        base_raw, promo_raw, promo_active = _channel_prices(product, source=source, now=current_time)
-        base_price = _money(base_raw, markup_percent)
-        promo_price, promo_warnings = _promotion_price(promo_active=promo_active, promo_raw=promo_raw, base_price=base_price, markup_percent=markup_percent)
-        warnings.extend(promo_warnings)
+    base_raw, promo_raw, promo_active = _channel_prices(
+        product, source=source, now=current_time
+    )
+    base_price = _money(base_raw, markup_percent)
     if base_price <= 0:
         errors.append("Preco de venda deve ser maior que zero.")
+
+    promo_price, promo_warnings = _promotion_price(
+        promo_active=promo_active,
+        promo_raw=promo_raw,
+        base_price=base_price,
+        markup_percent=markup_percent,
+    )
+    warnings.extend(promo_warnings)
 
     if errors:
         return IfoodCatalogItem(
@@ -221,8 +211,7 @@ def build_catalog_item(
             warnings=tuple(warnings),
         )
 
-    stock_field = "ifood_available_stock" if source == "ifood" else "estoque_atual"
-    stock = max(0.0, _number(getattr(product, stock_field, 0)) - stock_safety)
+    stock = max(0.0, _number(getattr(product, "estoque_atual", 0)) - stock_safety)
     description = str(
         getattr(product, "descricao_completa", None)
         or getattr(product, "descricao_curta", None)

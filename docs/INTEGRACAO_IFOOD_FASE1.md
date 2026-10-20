@@ -10,40 +10,9 @@ Esta fase entrega configuração por empresa, diagnóstico do catálogo, simula�
 de publicação e a base técnica da iFood Merchant API. O envio real permanece
 bloqueado até a aprovação e a homologação do aplicativo CorePet no iFood.
 
-## Cadastro e central operacional (2026-10-19)
+## Como o catálogo é montado
 
-A preparação local agora usa uma seleção **própria do iFood**, dentro do mesmo
-componente de cadastro/edição de produtos do CorePet. A central fica em
-**Vendas e relacionamento > iFood** (`/ifood`) e abre esse cadastro para editar.
-Não existe um segundo cadastro de anúncios.
-
-- `anunciar_ifood` controla a intenção de venda da loja; começa desmarcado.
-- `preco_ifood` informado prevalece exatamente; vazio usa o preço normal do ERP
-  com o acréscimo da loja. Promoções de app/ecommerce/ERP não são herdadas.
-- Promoção exclusiva do iFood tem preço e período próprios, opcionais.
-- A margem exibida é contribuição estimada por unidade, com custo, comissão por
-  modalidade, taxa de pagamento, tributos estimados e despesas unitárias.
-  Premissa desconhecida fica sem valor e impede o cálculo; zero é explícito.
-- Estoque é derivado do ERP, descontando reservas e segurança; kits virtuais
-  usam a capacidade dos componentes. Pausa manual permanece após reposição.
-- Pendências de canal não impedem salvar um produto válido no ERP. Foto e
-  descrição são recomendações; serviços, agrupadores e granel ficam impedidos.
-- Seleção, pausa e preços pertencem à loja. Produtos de outra loja compartilhados
-  pelo grupo precisam ser cadastrados localmente antes de configurar o canal.
-
-O diagnóstico de integração passou a respeitar essa seleção e o preço iFood.
-Os campos históricos `catalog_source` são preservados para compatibilidade,
-mas não autorizam selecionar automaticamente produtos de outro canal.
-`pronto_para_envio` significa apenas cadastro local apto; não confirma anúncio
-publicado. Fila, vínculo remoto, confirmação de publicação e pedidos no PDV
-continuam nas próximas etapas.
-
-Veja a [ficha da entrega](entregas/2026-10-19-cadastro-central-ifood.md) e o
-[registro de validação local](homologacoes/2026-10-19-cadastro-central-ifood.md).
-
-## Fontes históricas do diagnóstico
-
-Antes da seleção própria por produto, o diagnóstico oferecia estas fontes:
+A empresa pode escolher uma destas fontes:
 
 - **E-commerce:** somente produtos marcados para anunciar no e-commerce. Usa o
   preço específico do e-commerce e, quando ele não existe, o preço de venda do

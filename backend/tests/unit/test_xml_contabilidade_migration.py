@@ -15,7 +15,7 @@ def test_migration_cria_esquema_compativel_com_modelos_e_reverte():
         / "alembic/versions/zzzzh20261019a1_xml_contabilidade.py"
     )
     migration = runpy.run_path(str(path))
-    assert migration["down_revision"] == "zzzzg20261019a1"
+    assert migration["down_revision"] == "zzzzf20261019a1"
     engine = create_engine("sqlite://")
     with engine.begin() as conn:
         with Operations.context(MigrationContext.configure(conn)):

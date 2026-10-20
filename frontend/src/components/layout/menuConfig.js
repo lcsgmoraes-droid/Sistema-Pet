@@ -298,13 +298,6 @@ export function createLayoutMenuItems({ lembretesCount = 0, orcamentosGrupoAtivo
       ],
     },
     {
-      path: "/ifood",
-      icon: FiShoppingBag,
-      iconKey: "shopping-bag",
-      label: "iFood",
-      permission: "produtos.visualizar",
-    },
-    {
       path: "/ecommerce",
       icon: FiGlobe,
       iconKey: "globe",

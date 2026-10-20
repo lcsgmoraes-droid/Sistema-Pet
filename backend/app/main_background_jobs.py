@@ -732,7 +732,9 @@ def start_background_jobs() -> None:
         logger.info("[JOBS] Este worker e o lider de background jobs.")
 
         try:
-            from app.schedulers.xml_contabilidade_scheduler import XmlContabilidadeScheduler
+            from app.schedulers.xml_contabilidade_scheduler import (
+                XmlContabilidadeScheduler,
+            )
 
             global _xml_contabilidade_scheduler
             _xml_contabilidade_scheduler = XmlContabilidadeScheduler()

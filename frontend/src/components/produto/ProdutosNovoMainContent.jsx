@@ -39,7 +39,7 @@ export default function ProdutosNovoMainContent({
       <ProdutosNovoStatusBanners {...statusBannersProps} />
 
       <form onSubmit={handleSubmit}>
-        <div id="produto-formulario-abas" className="bg-white rounded-lg shadow-sm p-6">
+        <div className="bg-white rounded-lg shadow-sm p-6">
           {tabsProps.abaAtiva === 1 && (
             <ProdutosNovoCaracteristicasTab {...caracteristicasTabProps} />
           )}

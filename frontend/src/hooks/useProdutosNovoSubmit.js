@@ -4,7 +4,6 @@ import { createProduto, previewPrecosVendaProdutosCompostos, updateProduto } fro
 import { normalizarCodigosBarrasAlternativosPayload } from "../pages/produtosFormUtils";
 import { debugLog } from "../utils/debug";
 import { normalizeMarkdownContent } from "../utils/safeMarkdown";
-import { serializarDataHoraIfood } from "../components/produto/ifoodProdutoDates";
 import {
   montarProtocolosRecorrenciaPayload,
   validarProtocolosRecorrencia,
@@ -171,25 +170,6 @@ export default function useProdutosNovoSubmit({
         formData.tipo_produto === "KIT" ||
         (formData.tipo_produto === "VARIACAO" && formData.tipo_kit);
 
-      // O cadastro compartilhado pertence a outra loja: os campos do canal
-      // nunca devem substituir a seleção e os preços da empresa de origem.
-      const camposIfood = formData.estoque_compartilhado
-        ? {}
-        : {
-            anunciar_ifood: Boolean(formData.anunciar_ifood),
-            ifood_pausado: Boolean(formData.ifood_pausado),
-            preco_ifood:
-              formData.preco_ifood === "" || formData.preco_ifood == null
-                ? null
-                : Number(formData.preco_ifood),
-            preco_ifood_promo:
-              formData.preco_ifood_promo === "" || formData.preco_ifood_promo == null
-                ? null
-                : Number(formData.preco_ifood_promo),
-            preco_ifood_promo_inicio: serializarDataHoraIfood(formData.preco_ifood_promo_inicio),
-            preco_ifood_promo_fim: serializarDataHoraIfood(formData.preco_ifood_promo_fim),
-          };
-
       const dados = {
         codigo: skuNormalizado,
         nome: formData.nome,
@@ -221,7 +201,6 @@ export default function useProdutosNovoSubmit({
         preco_app_promo_fim: formData.preco_app_promo_fim || null,
         anunciar_ecommerce: lojaFisicaAtiva ? Boolean(formData.anunciar_ecommerce) : false,
         anunciar_app: lojaFisicaAtiva ? Boolean(formData.anunciar_app) : false,
-        ...camposIfood,
         controle_lote: produtoEhServico ? false : formData.controle_lote || false,
         estoque_minimo:
           !produtoEhServico && formData.estoque_minimo ? parseInt(formData.estoque_minimo) : 0,

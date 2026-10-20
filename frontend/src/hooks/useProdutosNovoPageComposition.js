@@ -153,7 +153,6 @@ export default function useProdutosNovoPageComposition({
     categoriasHierarquicas,
     departamentos,
     formData,
-    imagens,
     handleBuscaPredecessorChange,
     handleChange,
     handleGerarCodigoBarras,

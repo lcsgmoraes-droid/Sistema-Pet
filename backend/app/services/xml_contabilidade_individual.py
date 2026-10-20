@@ -8,9 +8,8 @@ o envio não reenvia o histórico: o instante oficial do registro decide a entre
 from datetime import date, datetime, timedelta
 import logging
 
-from sqlalchemy import and_, func, or_
+from sqlalchemy import func
 
-from app.nfe_cache_models import BlingNotaFiscalCache
 from app.services.xml_contabilidade_common import (
     BRASILIA,
     NS,
@@ -44,58 +43,31 @@ def _config(db, tenant_id):
 
 
 def _referencias(db, tenant_id):
+    cnpj = documentos._cnpj_empresa(db, tenant_id)
     vendas = (
-        db.query(Venda.id, Venda.nfe_provider, Venda.nfe_bling_id)
+        db.query(Venda.id)
         .filter(
             Venda.tenant_id == _tenant(tenant_id),
+            Venda.nfe_provider == "intnfe",
+            Venda.nfe_ambiente == 1,
+            documentos._chave_da_empresa_ou_desconhecida(Venda.nfe_chave, cnpj),
             func.lower(Venda.nfe_status).in_(STATUS_VALIDOS),
             Venda.nfe_data_emissao.isnot(None),
-            or_(
-                and_(Venda.nfe_provider == "intnfe", Venda.nfe_ambiente == 1),
-                and_(
-                    Venda.nfe_bling_id > 0,
-                    or_(Venda.nfe_provider.is_(None), Venda.nfe_provider == "bling"),
-                ),
-            ),
         )
         .order_by(Venda.id)
         .limit(MAX_MONITOR_DOCUMENTOS + 1)
         .all()
     )
-    caches = (
-        db.query(BlingNotaFiscalCache.bling_id)
-        .filter(
-            BlingNotaFiscalCache.tenant_id == _tenant(tenant_id),
-            func.lower(BlingNotaFiscalCache.status).in_(STATUS_VALIDOS),
-            BlingNotaFiscalCache.data_emissao.isnot(None),
-            or_(
-                BlingNotaFiscalCache.provider.is_(None),
-                BlingNotaFiscalCache.provider == "bling",
-            ),
-        )
-        .order_by(BlingNotaFiscalCache.id)
-        .limit(MAX_MONITOR_DOCUMENTOS + 1)
-        .all()
-    )
-    refs = {
-        ("intnfe", str(row[0])) if row[1] == "intnfe" else ("bling", str(row[2]))
-        for row in vendas
-    }
-    refs.update(("bling", str(row[0])) for row in caches if str(row[0]).isdigit())
-    if (
-        len(refs) > MAX_MONITOR_DOCUMENTOS
-        or len(vendas) > MAX_MONITOR_DOCUMENTOS
-        or len(caches) > MAX_MONITOR_DOCUMENTOS
-    ):
+    if len(vendas) > MAX_MONITOR_DOCUMENTOS:
         raise XmlContabilidadeError(
             "O histórico excede o limite de consulta de eventos fiscais. Contate o suporte; nenhum lote parcial foi preparado.",
             409,
         )
-    return sorted(refs)
+    return [("intnfe", str(row[0])) for row in vendas]
 
 
 def priorizar_documento(db, tenant_id, provider, documento_id, agora):
-    if provider not in {"intnfe", "bling"} or not str(documento_id).isdigit():
+    if provider != "intnfe" or not str(documento_id).isdigit():
         return None
     monitor = (
         db.query(XmlContabilidadeMonitor)
@@ -159,11 +131,21 @@ def _ativo(config):
 
 def enfileirar_nota(db, tenant_id, provider, documento_id, agora):
     """Hook sem rede/commit; evento posterior é capturado no worker."""
+    if provider != "intnfe":
+        return None
     config = _config(db, tenant_id)
     if not _ativo(config):
         return None
     doc = documentos._documento(db, tenant_id, provider, documento_id)
     if not doc:
+        return None
+    if (
+        len(doc.chave) == 44
+        and doc.chave.isascii()
+        and doc.chave.isdigit()
+        and doc.chave[6:20] != documentos._cnpj_empresa(db, tenant_id)
+    ):
+        # Não criar cursor de outra empresa antes da validação do XML.
         return None
     priorizar_documento(db, tenant_id, provider, documento_id, agora)
     # A coluna legada não informa o fuso. O instante oficial do XML decide o
@@ -179,8 +161,8 @@ def enfileirar_nota(db, tenant_id, provider, documento_id, agora):
     emissao = _emissao_oficial(validacao[0])
     if emissao < _utc(config.envio_automatico_desde):
         return None
-    # A chave fiscal independe da origem do cache: importar a mesma nota não
-    # gera outro e-mail. Emitente/produção já foram confirmados no XML.
+    # A identidade fiscal deduplica a entrega. Origem CorePet, emitente e
+    # produção já foram confirmados antes do enfileiramento.
     if not doc.chave:
         return None
     return _enfileirar(
@@ -203,13 +185,17 @@ def _emissao_oficial(root):
     return _utc(value.replace(tzinfo=BRASILIA) if value.tzinfo is None else value)
 
 
-def consultar_documento(db, tenant_id, provider, documento_id, agora, config=None):
+def consultar_documento(
+    db, tenant_id, provider, documento_id, agora, config=None, *, coleta_pronta=None
+):
     """Coleta oficial validada, registra eventos e agenda somente fatos novos."""
     doc = documentos._documento(db, tenant_id, provider, documento_id)
     if not doc:
         return [], []
-    arquivos, notas = documentos._coletar_arquivos(
-        db, tenant_id, [doc], date.min, date.max
+    arquivos, notas = (
+        coleta_pronta
+        if coleta_pronta is not None
+        else documentos._coletar_arquivos(db, tenant_id, [doc], date.min, date.max)
     )
     if not notas:
         return [], []
@@ -217,6 +203,10 @@ def consultar_documento(db, tenant_id, provider, documento_id, agora, config=Non
     config = config if config is not None else _config(db, tenant_id)
     ativo = _ativo(config)
     nota = notas[0]
+    if coleta_pronta is not None:
+        if len(notas) != 1 or (doc.chave and doc.chave != nota["chave"]):
+            raise XmlContabilidadeError("A coleta fiscal não corresponde à nota.", 409)
+        doc.chave = nota["chave"]
     desde = _utc(config.envio_automatico_desde) if ativo else None
     if ativo:
         # A coluna legada pode guardar UTC sem fuso; o XML decide o instante.
@@ -298,7 +288,10 @@ def capturar_novos_eventos(db, tenant_id, agora, limite=LIMITE_CONSULTAS_CICLO):
         for row in db.query(
             XmlContabilidadeMonitor.provider, XmlContabilidadeMonitor.documento_id
         )
-        .filter(XmlContabilidadeMonitor.tenant_id == _tenant(tenant_id))
+        .filter(
+            XmlContabilidadeMonitor.tenant_id == _tenant(tenant_id),
+            XmlContabilidadeMonitor.provider == "intnfe",
+        )
         .all()
     }
     for provider, documento_id in _referencias(db, tenant_id):
@@ -309,10 +302,12 @@ def capturar_novos_eventos(db, tenant_id, agora, limite=LIMITE_CONSULTAS_CICLO):
         db.query(XmlContabilidadeMonitor)
         .filter(
             XmlContabilidadeMonitor.tenant_id == _tenant(tenant_id),
+            XmlContabilidadeMonitor.provider == "intnfe",
             XmlContabilidadeMonitor.proxima_consulta_em <= agora,
         )
         .order_by(
-            XmlContabilidadeMonitor.proxima_consulta_em, XmlContabilidadeMonitor.id
+            XmlContabilidadeMonitor.proxima_consulta_em,
+            XmlContabilidadeMonitor.id,
         )
         .limit(min(max(limite, 1), 50))
         .all()
@@ -349,37 +344,71 @@ def capturar_novos_eventos(db, tenant_id, agora, limite=LIMITE_CONSULTAS_CICLO):
     return total
 
 
-def coletar_eventos_periodo(db, tenant_id, inicio, fim):
-    """Eventos registrados no período, inclusive de notas emitidas anteriormente."""
+def _coletas_prontas(coleta_pronta):
+    if coleta_pronta is None:
+        return {}
+    arquivos, notas = coleta_pronta
+    por_nome = dict(arquivos)
+    prontas = {}
+    for nota in notas:
+        if nota.get("provedor") != "intnfe":
+            continue
+        ref = (nota["provedor"], str(nota["documento_id"]))
+        nomes = {f"{nota['chave']}-nfe.xml"}
+        nomes.update(e["nome_arquivo"] for e in nota.get("eventos", []))
+        prontas[ref] = ([(n, por_nome[n]) for n in nomes if n in por_nome], [nota])
+    return prontas
+
+
+def _acrescentar_eventos_periodo(
+    arquivos, notas, coletados, documentos_coletados, inicio, fim
+):
+    por_nome = dict(coletados)
+    for nota in documentos_coletados:
+        eventos = [
+            e
+            for e in nota.get("eventos", [])
+            if inicio.isoformat() <= e["data_registro"] <= fim.isoformat()
+        ]
+        if not eventos:
+            continue
+        for evento in eventos:
+            nome = evento["nome_arquivo"]
+            arquivos[nome] = por_nome[nome]
+        notas.append(
+            {
+                **nota,
+                "eventos": eventos,
+                "eventos_incluidos": len(eventos),
+                "somente_eventos_periodo": True,
+            }
+        )
+
+
+def coletar_eventos_periodo(db, tenant_id, inicio, fim, *, coleta_pronta=None):
+    """Eventos oficiais das notas emitidas no CorePet, incluindo notas antigas."""
     from app.services.xml_contabilidade_service import _agora
 
     arquivos, notas = {}, []
     config = _config(db, tenant_id)
-    for provider, documento_id in _referencias(db, tenant_id):
+    prontas = _coletas_prontas(coleta_pronta)
+    referencias = set(_referencias(db, tenant_id)) | set(prontas)
+    for provider, documento_id in sorted(
+        referencias, key=lambda ref: (ref[0] != "intnfe", *ref)
+    ):
         try:
             coletados, documentos_coletados = consultar_documento(
-                db, tenant_id, provider, documento_id, _agora(), config
+                db,
+                tenant_id,
+                provider,
+                documento_id,
+                _agora(),
+                config,
+                coleta_pronta=prontas.get((provider, documento_id)),
             )
-            for nota in documentos_coletados:
-                eventos = [
-                    e
-                    for e in nota.get("eventos", [])
-                    if inicio.isoformat() <= e["data_registro"] <= fim.isoformat()
-                ]
-                if not eventos:
-                    continue
-                por_nome = dict(coletados)
-                for evento in eventos:
-                    nome = evento["nome_arquivo"]
-                    arquivos[nome] = por_nome[nome]
-                notas.append(
-                    {
-                        **nota,
-                        "eventos": eventos,
-                        "eventos_incluidos": len(eventos),
-                        "somente_eventos_periodo": True,
-                    }
-                )
+            _acrescentar_eventos_periodo(
+                arquivos, notas, coletados, documentos_coletados, inicio, fim
+            )
             db.commit()
         except XmlContabilidadeError:
             db.rollback()
@@ -395,6 +424,12 @@ def coletar_eventos_periodo(db, tenant_id, inicio, fim):
 
 def preparar_anexos_individual(db, tenant_id, envio):
     """Um único XML oficial por envio; os eventos têm identidade própria."""
+    doc = documentos._documento(db, tenant_id, envio.provider, envio.documento_id)
+    if not doc:
+        raise XmlContabilidadeError(
+            "Somente notas e eventos emitidos no CorePet em produção podem ser enviados.",
+            409,
+        )
     key = envio.idempotency_key or ""
     if key.startswith("evento:"):
         _, identidade, protocolo = key.split(":", 2)
@@ -402,6 +437,9 @@ def preparar_anexos_individual(db, tenant_id, envio):
             db.query(XmlContabilidadeEvento)
             .filter(
                 XmlContabilidadeEvento.tenant_id == _tenant(tenant_id),
+                XmlContabilidadeEvento.provider == "intnfe",
+                XmlContabilidadeEvento.documento_id == doc.documento_id,
+                XmlContabilidadeEvento.chave == doc.chave,
                 XmlContabilidadeEvento.identidade == identidade,
                 XmlContabilidadeEvento.protocolo == protocolo,
             )
@@ -411,6 +449,10 @@ def preparar_anexos_individual(db, tenant_id, envio):
             raise XmlContabilidadeError(
                 "O comprovante do evento fiscal não está disponível para envio.", 409
             )
+        from app.services.xml_contabilidade_relatorios import atual
+
+        if atual():
+            atual().evento_individual(doc, evento)
         return (
             [
                 {
@@ -427,13 +469,6 @@ def preparar_anexos_individual(db, tenant_id, envio):
             "Este envio individual antigo não pode ser retomado. Prepare um lote manual.",
             409,
         )
-    doc = documentos._documento(db, tenant_id, envio.provider, envio.documento_id)
-    if not doc:
-        raise XmlContabilidadeError(
-            "A nota fiscal não está disponível para envio.", 409
-        )
-    # No legado Bling o cache pode não ter chave. A consulta oficial preenche
-    # doc.chave e só depois permite confirmar a identidade persistida na fila.
     xml, _ = documentos._obter_xml(db, tenant_id, doc)
     if key != f"nota:{doc.chave}":
         raise XmlContabilidadeError(
@@ -447,4 +482,16 @@ def preparar_anexos_individual(db, tenant_id, envio):
             "O documento não é uma nota de saída em produção desta empresa.", 409
         )
     nome = f"{doc.chave}-nfe.xml"
+    from app.services.xml_contabilidade_relatorios import atual
+
+    if atual():
+        atual().nota_validada(doc, validacao[0], validacao[1])
+        atual().coleta(
+            doc,
+            {
+                "data_emissao": validacao[1].isoformat(),
+                "status": doc.status,
+                "eventos": [],
+            },
+        )
     return [{"filename": nome, "content": xml, "mime_subtype": "xml"}], nome, 1

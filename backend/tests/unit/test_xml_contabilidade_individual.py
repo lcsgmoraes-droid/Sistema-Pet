@@ -20,6 +20,7 @@ from app.xml_contabilidade_models import (
     XmlContabilidadeEnvio,
     XmlContabilidadeEvento,
     XmlContabilidadeMonitor,
+    XmlContabilidadeTentativa,
 )
 
 CHAVE = "35261033590794000140650030000000441241595909"
@@ -50,6 +51,7 @@ def contexto(monkeypatch):
     for model in (
         XmlContabilidadeConfig,
         XmlContabilidadeEnvio,
+        XmlContabilidadeTentativa,
         XmlContabilidadeEvento,
         XmlContabilidadeMonitor,
         Venda,
@@ -266,8 +268,77 @@ def test_evento_de_outra_empresa_nao_pode_ser_enviado(contexto):
     db.commit()
     envio = db.query(XmlContabilidadeEnvio).one()
     with tenant_context(uuid4()):
-        with pytest.raises(service.XmlContabilidadeError, match="não está disponível"):
+        with pytest.raises(
+            service.XmlContabilidadeError, match="CorePet|não está disponível"
+        ):
             individual.preparar_anexos_individual(db, uuid4(), envio)
+
+
+@pytest.mark.parametrize(
+    "origem_invalida",
+    ["evento_bling", "evento_orfao", "chave_divergente", "venda_bling", "envio_bling"],
+)
+def test_evento_individual_exige_origem_e_vinculo_com_emissao_corepet(
+    contexto, origem_invalida
+):
+    db, tenant, _ = contexto
+    obj = venda(db, tenant)
+    dado = xml_evento()
+    identidade = f"ID110110{CHAVE}01"
+    if origem_invalida == "venda_bling":
+        obj.nfe_provider = "bling"
+    evento = XmlContabilidadeEvento(
+        tenant_id=tenant,
+        provider="bling" if origem_invalida == "evento_bling" else "intnfe",
+        documento_id="999999" if origem_invalida == "evento_orfao" else str(obj.id),
+        chave="9" * 44 if origem_invalida == "chave_divergente" else CHAVE,
+        identidade=identidade,
+        tipo="110110",
+        sequencia=1,
+        protocolo=dado["protocolo"],
+        registrado_em=NOW,
+        nome_arquivo=f"{identidade}.xml",
+        xml=dado["xmlEvento"].encode(),
+    )
+    db.add(evento)
+    db.commit()
+    envio = SimpleNamespace(
+        provider="bling" if origem_invalida == "envio_bling" else "intnfe",
+        documento_id=str(obj.id),
+        idempotency_key=f"evento:{identidade}:{dado['protocolo']}",
+    )
+    with pytest.raises(service.XmlContabilidadeError):
+        individual.preparar_anexos_individual(db, tenant, envio)
+
+
+def test_evento_importado_com_mesma_chave_corepet_nao_entra_no_lote(
+    contexto, monkeypatch
+):
+    db, tenant, _ = contexto
+    obj = venda(db, tenant)
+    dado = xml_evento()
+    identidade = f"ID110110{CHAVE}01"
+    db.add(
+        XmlContabilidadeEvento(
+            tenant_id=tenant,
+            provider="bling",
+            documento_id=str(obj.id),
+            chave=CHAVE,
+            identidade=identidade,
+            tipo="110110",
+            sequencia=1,
+            protocolo=dado["protocolo"],
+            registrado_em=NOW,
+            nome_arquivo=f"{identidade}.xml",
+            xml=dado["xmlEvento"].encode(),
+        )
+    )
+    db.commit()
+    monkeypatch.setattr(documentos, "_obter_eventos", OBTER_EVENTOS_REAL)
+    monkeypatch.setattr(eventos_service, "obter_eventos_intnfe", lambda *_: [])
+    assert individual.coletar_eventos_periodo(
+        db, tenant, date(2026, 10, 1), date(2026, 10, 31)
+    ) == ([], [])
 
 
 def test_evento_ja_recebido_permanece_no_lote_se_lista_remota_agora_omite(
@@ -353,6 +424,7 @@ def test_individual_anexa_xml_sem_zip_e_sem_simular_smtp(monkeypatch):
     )
     envio = SimpleNamespace(
         origem="automatico",
+        provider="intnfe",
         idempotency_key="evento:ID:135260000000001",
         email_destino="contador@example.com",
     )

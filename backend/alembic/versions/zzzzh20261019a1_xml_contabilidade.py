@@ -8,7 +8,7 @@ from app.tenant_rls_migration import apply_tenant_rls
 
 
 revision = "zzzzh20261019a1"
-down_revision = "zzzzg20261019a1"
+down_revision = "zzzzf20261019a1"
 branch_labels = None
 depends_on = None
 

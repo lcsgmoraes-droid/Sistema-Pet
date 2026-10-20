@@ -11,12 +11,16 @@ import logging
 from datetime import date, datetime, timedelta
 from html import escape
 
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, func, or_, select
 
 from app.services import email_service
 from app.tenancy.context import tenant_context
 from app.tenancy.rls import sync_rls_tenant
-from app.xml_contabilidade_models import XmlContabilidadeConfig, XmlContabilidadeEnvio
+from app.xml_contabilidade_models import (
+    XmlContabilidadeConfig,
+    XmlContabilidadeEnvio,
+    XmlContabilidadeTentativa,
+)
 from app.xml_contabilidade_schemas import XmlContabilidadeConfigRequest
 
 from app.services.xml_contabilidade_common import (
@@ -44,6 +48,19 @@ AVISO_FLUXO_LEGADO = (
     "Este fluxo antigo foi desativado. Use o envio mensal do mês anterior "
     "completo ou prepare um lote manual."
 )
+AVISO_ORIGEM_COREPET = (
+    "Somente notas e eventos emitidos no CorePet em produção podem ser enviados."
+)
+
+
+class EntregaIndeterminadaError(XmlContabilidadeError):
+    """Impede retry automático quando o SMTP já aceitou a mensagem."""
+
+    def __init__(self):
+        super().__init__(
+            "O SMTP aceitou a mensagem, mas o histórico não foi concluído. Confira com o contador se recebeu antes de tentar novamente manualmente.",
+            409,
+        )
 
 
 def _agora():
@@ -177,7 +194,37 @@ def listar_envios(db, tenant_id, limite=100):
         .limit(min(max(limite, 1), 200))
         .all()
     )
-    return [serializar_envio(row) for row in rows]
+    ids = [row.id for row in rows]
+    ultimos = {}
+    if ids:
+        recentes = (
+            select(func.max(XmlContabilidadeTentativa.id))
+            .where(
+                XmlContabilidadeTentativa.tenant_id == _tenant(tenant_id),
+                XmlContabilidadeTentativa.envio_id.in_(ids),
+            )
+            .group_by(XmlContabilidadeTentativa.envio_id)
+        )
+        for row in db.execute(
+            select(
+                XmlContabilidadeTentativa.id,
+                XmlContabilidadeTentativa.envio_id,
+                XmlContabilidadeTentativa.numero_tentativa,
+                XmlContabilidadeTentativa.resumo,
+            ).where(
+                XmlContabilidadeTentativa.tenant_id == _tenant(tenant_id),
+                XmlContabilidadeTentativa.id.in_(recentes),
+            )
+        ).all():
+            ultimos[row.envio_id] = {
+                **row.resumo,
+                "id": row.id,
+                "numero_tentativa": row.numero_tentativa,
+            }
+    return [
+        {**serializar_envio(row), "ultimo_relatorio": ultimos.get(row.id)}
+        for row in rows
+    ]
 
 
 def _exigir_email(db, tenant_id):
@@ -253,12 +300,14 @@ def cancelar_envio(db, tenant_id, envio_id):
 
 def reenviar_envio(db, tenant_id, envio_id):
     envio = _buscar_envio_bloqueado(db, tenant_id, envio_id)
+    if envio.origem == "automatico" and envio.provider != "intnfe":
+        raise XmlContabilidadeError(AVISO_ORIGEM_COREPET, 409)
     if envio.origem in ORIGENS_LEGADAS or (
         envio.origem == "automatico"
         and not (envio.idempotency_key or "").startswith(("nota:", "evento:"))
     ):
         raise XmlContabilidadeError(AVISO_FLUXO_LEGADO, 409)
-    if envio.status != "falhou":
+    if envio.status not in {"falhou", "pendencias"}:
         raise XmlContabilidadeError(
             "Somente um envio com falha pode ser tentado novamente.", 409
         )
@@ -272,6 +321,8 @@ def reenviar_envio(db, tenant_id, envio_id):
 
 def enfileirar_documento(db, tenant_id, provider, documento_id):
     """Chamado sob savepoint; emissão não aguarda consulta externa nem e-mail."""
+    if provider != "intnfe":
+        return None
     from app.services.xml_contabilidade_individual import enfileirar_nota
 
     return enfileirar_nota(db, tenant_id, provider, documento_id, _agora())
@@ -329,6 +380,76 @@ def _criar_mensal_devido(db, tenant_id, agora):
 
 
 def _processar_envio(db, tenant_id, envio):
+    from app.services import xml_contabilidade_relatorios as relatorios
+
+    # Operações sem registro persistido não possuem histórico de tentativas.
+    if not isinstance(getattr(envio, "id", None), int):
+        return _executar_envio(db, tenant_id, envio)
+    relatorio = relatorios.RelatorioTentativa(db, tenant_id, envio)
+    token = relatorios.ativar(relatorio)
+    try:
+        _executar_envio(db, tenant_id, envio)
+        relatorios.persistir(db, relatorio, "enviado")
+        db.commit()
+    except Exception as exc:
+        if relatorio.smtp_aceitou:
+            try:
+                db.rollback()
+                sync_rls_tenant(db, tenant_id)
+                relatorios.persistir(
+                    db,
+                    relatorio,
+                    "interrompido",
+                    "O SMTP aceitou a mensagem, mas o histórico não foi concluído. Confira com o contador antes de repetir manualmente.",
+                )
+                db.commit()
+            except Exception:
+                # O claim já foi persistido antes do SMTP. Se o banco também
+                # estiver indisponível, a recuperação continua conservadora.
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
+            raise EntregaIndeterminadaError() from None
+        db.rollback()
+        sync_rls_tenant(db, tenant_id)
+        if relatorio.smtp_iniciado:
+            resultado, motivo = (
+                "falha_smtp",
+                "O servidor SMTP não confirmou a aceitação da mensagem. Nenhum envio foi confirmado nesta tentativa.",
+            )
+        elif isinstance(exc, XmlContabilidadeError) and str(exc).startswith(
+            "Há notas pendentes"
+        ):
+            resultado, motivo = (
+                "pendencias",
+                "Há emissões pendentes de confirmação e nenhum documento pronto para envio.",
+            )
+        elif isinstance(exc, XmlContabilidadeError) and exc.status_code == 404:
+            resultado, motivo = (
+                "sem_notas",
+                "Nenhuma nota ou evento CorePet elegível foi encontrado no período.",
+            )
+        else:
+            resultado, motivo = (
+                ("bloqueado" if isinstance(exc, XmlContabilidadeError) else "falhou"),
+                "Não foi possível preparar ou enviar todos os documentos. Confira as informações das notas e tente novamente após resolver.",
+            )
+        if isinstance(exc, XmlContabilidadeError) and resultado not in {
+            "pendencias",
+            "sem_notas",
+        }:
+            motivo = relatorios.motivo_seguro(exc)
+        relatorios.persistir(db, relatorio, resultado, motivo)
+        db.commit()  # O rollback do chamador não apaga esta evidência.
+        raise
+    finally:
+        relatorios.desativar(token)
+
+
+def _executar_envio(db, tenant_id, envio):
+    if envio.origem == "automatico" and envio.provider != "intnfe":
+        raise XmlContabilidadeError(AVISO_ORIGEM_COREPET, 409)
     if envio.origem not in ORIGENS_ATIVAS or (
         envio.origem == "automatico"
         and not (getattr(envio, "idempotency_key", None) or "").startswith(
@@ -363,14 +484,33 @@ def _processar_envio(db, tenant_id, envio):
         texto = f"Seguem os XMLs de {quantidade} notas fiscais de saída e seus eventos no período de {envio.data_inicio:%d/%m/%Y} a {envio.data_fim:%d/%m/%Y}. Cada tipo de documento está organizado em seu próprio ZIP, com manifesto para conferência."
     assunto = f"{identificacao} | {assunto}"
     texto = f"Empresa emitente: {identificacao}\n\n{texto}"
-    if not email_service.send_email(
+    from app.services.xml_contabilidade_relatorios import atual
+
+    relatorio = atual()
+    if relatorio:
+        relatorio.anexos_prontos(anexos)
+        resumo_preparacao = relatorio.snapshot("preparacao")["contagens"]
+        texto = (
+            f"Empresa emitente: {identificacao}\n\n"
+            f"Este lote contém {resumo_preparacao['notas_preparadas']} XML(s) de notas e "
+            f"{resumo_preparacao['eventos_preparados']} evento(s) oficiais preparados. "
+            f"{resumo_preparacao['notas_pendentes']} nota(s) pendente(s) de confirmação não foram incluídas. "
+            "Cada tipo de documento está organizado em seu próprio anexo."
+        )
+        if resumo_preparacao["notas_pendentes"]:
+            texto += " Consulte as pendências em relatorio.json nos ZIPs."
+        relatorio.smtp_iniciado = True
+    confirmado = email_service.send_email(
         to=envio.email_destino,
         subject=assunto,
         html_body=f"<p>{escape(texto).replace(chr(10), '<br>')}</p>",
         text_body=texto,
         attachments=anexos,
         simulate_if_unconfigured=False,
-    ):
+    )
+    if relatorio:
+        relatorio.smtp_aceitou = bool(confirmado)
+    if not confirmado:
         raise XmlContabilidadeError(
             "O servidor de e-mail não confirmou o envio. Verifique a configuração e tente novamente.",
             503,
@@ -391,6 +531,8 @@ def processar_fila_tenant(db, tenant_id, limite=5):
                 and_(
                     XmlContabilidadeEnvio.origem == "automatico",
                     or_(
+                        XmlContabilidadeEnvio.provider.is_(None),
+                        XmlContabilidadeEnvio.provider != "intnfe",
                         XmlContabilidadeEnvio.idempotency_key.is_(None),
                         and_(
                             ~XmlContabilidadeEnvio.idempotency_key.like("nota:%"),
@@ -406,7 +548,11 @@ def processar_fila_tenant(db, tenant_id, limite=5):
     )
     for envio in legados:
         envio.status = "cancelado"
-        envio.ultimo_erro = AVISO_FLUXO_LEGADO
+        envio.ultimo_erro = (
+            AVISO_ORIGEM_COREPET
+            if envio.origem == "automatico" and envio.provider != "intnfe"
+            else AVISO_FLUXO_LEGADO
+        )
     db.commit()
     _criar_mensal_devido(db, tenant_id, agora)
     config = _config(db, tenant_id)
@@ -430,6 +576,14 @@ def processar_fila_tenant(db, tenant_id, limite=5):
     for envio in interrompidos:
         envio.status = "falhou"
         envio.ultimo_erro = "O processamento foi interrompido. Confira com o contador se recebeu antes de tentar novamente."
+        from app.services import xml_contabilidade_relatorios as relatorios
+
+        relatorios.persistir(
+            db,
+            relatorios.RelatorioTentativa(db, tenant_id, envio, inventariar=False),
+            "interrompido",
+            "Processamento interrompido; o resultado SMTP é indeterminado. Confira o destinatário antes de repetir.",
+        )
     db.commit()
     total = 0
     for _ in range(min(max(limite, 1), 20)):
@@ -465,7 +619,13 @@ def processar_fila_tenant(db, tenant_id, limite=5):
                 else "Não foi possível preparar ou enviar os XMLs. Tente novamente."
             )
             envio.ultimo_erro = mensagem[:500]
-            if isinstance(exc, XmlContabilidadeError) and exc.status_code == 404:
+            if isinstance(exc, EntregaIndeterminadaError):
+                envio.status = "falhou"
+            elif isinstance(exc, XmlContabilidadeError) and str(exc).startswith(
+                "Há notas pendentes"
+            ):
+                envio.status, envio.quantidade_xml = "pendencias", 0
+            elif isinstance(exc, XmlContabilidadeError) and exc.status_code == 404:
                 envio.status, envio.quantidade_xml = "sem_notas", 0
             elif envio.tentativas >= MAX_TENTATIVAS:
                 envio.status = "falhou"
