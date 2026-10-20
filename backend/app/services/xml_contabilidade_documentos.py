@@ -269,6 +269,9 @@ def _cnpj_empresa(db, tenant_id):
 
 
 def _coletar_arquivos(db, tenant_id, documentos, data_inicio, data_fim):
+    from app.services.xml_contabilidade_relatorios import atual
+
+    relatorio = atual()
     cnpj_empresa = _cnpj_empresa(db, tenant_id)
     arquivos, notas, chaves, total = [], [], set(), 0
     unicos = {}
@@ -287,12 +290,22 @@ def _coletar_arquivos(db, tenant_id, documentos, data_inicio, data_fim):
             xml, detalhe = _obter_xml(db, tenant_id, doc)
             validacao = validar_xml_saida(xml, doc.chave, doc.modelo)
             if validacao is None:
+                if relatorio:
+                    relatorio.excluir(
+                        doc, "XML de entrada ou homologação, fora do envio contábil."
+                    )
                 continue
             root, data_real = validacao
             cnpj_emitente = root.findtext(".//n:infNFe/n:emit/n:CNPJ", namespaces=NS)
             if cnpj_emitente != cnpj_empresa:
                 # Apenas o XML emitido pelo CNPJ da própria empresa pertence ao lote.
+                if relatorio:
+                    relatorio.excluir(
+                        doc, "O CNPJ emitente do XML não corresponde à empresa."
+                    )
                 continue
+            if relatorio:
+                relatorio.nota_validada(doc, root, data_real)
             if not data_inicio <= data_real <= data_fim or doc.chave in chaves:
                 continue
             from app.services.xml_contabilidade_eventos import coletar_eventos
@@ -306,9 +319,13 @@ def _coletar_arquivos(db, tenant_id, documentos, data_inicio, data_fim):
                 cancelada=doc.status == "cancelada",
                 xml_original=xml,
             )
-        except XmlContabilidadeError:
+        except XmlContabilidadeError as exc:
+            if relatorio:
+                relatorio.falha_documento(doc, exc)
             raise
-        except Exception:
+        except Exception as exc:
+            if relatorio:
+                relatorio.falha_documento(doc, exc)
             raise XmlContabilidadeError(
                 f"Não foi possível obter o XML da nota {doc.documento_id} ({doc.provider}). Nenhum arquivo parcial foi gerado.",
                 409,
@@ -339,6 +356,8 @@ def _coletar_arquivos(db, tenant_id, documentos, data_inicio, data_fim):
                 "Inclui eventos registrados após o período de emissão selecionado."
             )
         notas.append(nota)
+        if relatorio:
+            relatorio.coleta(doc, nota)
     return arquivos, notas
 
 
@@ -387,7 +406,8 @@ def _confirmar_emissoes_periodo(db, tenant_id, data_inicio, data_fim):
 
     def pendentes():
         return (
-            db.query(Venda.id)
+            db.query(Venda)
+            .options(noload("*"))
             .filter(
                 Venda.tenant_id == _tenant(tenant_id),
                 Venda.nfe_provider == "intnfe",
@@ -396,16 +416,43 @@ def _confirmar_emissoes_periodo(db, tenant_id, data_inicio, data_fim):
                 Venda.nfe_data_emissao >= inicio,
                 Venda.nfe_data_emissao < fim,
             )
-            .first()
+            .all()
         )
 
-    if pendentes():
+    restantes = pendentes()
+    consultadas = [v.id for v in restantes]
+    if restantes:
         reconciliar_pendentes(db, tenant_id, inicio.replace(tzinfo=BRASILIA))
-        if pendentes():
-            raise XmlContabilidadeError(
-                "Há notas em processamento ou sem confirmação nesse período. Aguarde a confirmação fiscal antes de preparar o lote; nenhum ZIP parcial foi gerado.",
-                409,
-            )
+        restantes = pendentes()
+    from app.services.xml_contabilidade_relatorios import atual, ACOES_PENDENTES
+
+    relatorio = atual()
+    if relatorio:
+        if consultadas:
+            for venda in (
+                db.query(Venda)
+                .options(noload("*"))
+                .filter(
+                    Venda.tenant_id == _tenant(tenant_id), Venda.id.in_(consultadas)
+                )
+                .populate_existing()
+                .all()
+            ):
+                relatorio._venda(venda)
+        relatorio.pendentes(restantes)
+    if isinstance(db.info, dict):
+        db.info["xml_contabilidade_pendencias"] = [
+            {
+                "documento_id": str(v.id),
+                "venda_id": v.id,
+                "numero": v.nfe_numero,
+                "status_fiscal": v.nfe_status,
+                "motivo": "Emissão sem confirmação fiscal; não incluída nos anexos.",
+                "acao_recomendada": ACOES_PENDENTES,
+            }
+            for v in restantes
+        ]
+    return restantes
 
 
 def _preparar_periodo(db, tenant_id, data_inicio, data_fim):
@@ -428,7 +475,19 @@ def gerar_anexos_periodo(db, tenant_id, data_inicio, data_fim):
     from app.services.xml_contabilidade_pacotes import criar_anexos_por_tipo
 
     arquivos, notas = _preparar_periodo(db, tenant_id, data_inicio, data_fim)
-    return criar_anexos_por_tipo(arquivos, notas, data_inicio, data_fim)
+    pendencias = (
+        db.info.get("xml_contabilidade_pendencias", [])
+        if isinstance(db.info, dict)
+        else []
+    )
+    if not notas and pendencias:
+        raise XmlContabilidadeError(
+            "Há notas pendentes de confirmação e nenhum documento pronto para enviar. Consulte a situação fiscal e solicite um novo lote após regularizar.",
+            409,
+        )
+    return criar_anexos_por_tipo(
+        arquivos, notas, data_inicio, data_fim, pendencias=pendencias
+    )
 
 
 def gerar_zip_periodo(db, tenant_id, data_inicio, data_fim):

@@ -21,6 +21,7 @@ from app.xml_contabilidade_models import (
     XmlContabilidadeEnvio,
     XmlContabilidadeEvento,
     XmlContabilidadeMonitor,
+    XmlContabilidadeTentativa,
 )
 
 CHAVE = "35261033590794000140650030000000441241595909"
@@ -67,6 +68,7 @@ def fila(monkeypatch):
     engine = create_engine("sqlite://")
     XmlContabilidadeConfig.__table__.create(engine)
     XmlContabilidadeEnvio.__table__.create(engine)
+    XmlContabilidadeTentativa.__table__.create(engine)
     XmlContabilidadeEvento.__table__.create(engine)
     XmlContabilidadeMonitor.__table__.create(engine)
     Venda.__table__.create(engine)
@@ -628,7 +630,7 @@ def test_busca_documentos_aplica_tenant_status_e_ambiente(fila, xml_context):
     assert {doc.status for doc in docs} == {"autorizada"}
 
 
-def test_nota_processando_impede_zip_incompleto(fila, monkeypatch):
+def test_nota_processando_e_informada_sem_bloquear_as_autorizadas(fila, monkeypatch):
     from app.services import xml_contabilidade_reconciliation as reconciliacao
 
     db, tenant = fila
@@ -638,10 +640,11 @@ def test_nota_processando_impede_zip_incompleto(fila, monkeypatch):
     db.commit()
     consultar = Mock()
     monkeypatch.setattr(reconciliacao, "reconciliar_pendentes", consultar)
-    with pytest.raises(service.XmlContabilidadeError, match="sem confirmação"):
-        documentos._confirmar_emissoes_periodo(
-            db, tenant, date(2026, 10, 1), date(2026, 10, 19)
-        )
+    restantes = documentos._confirmar_emissoes_periodo(
+        db, tenant, date(2026, 10, 1), date(2026, 10, 19)
+    )
+    assert len(restantes) == 1
+    assert db.info["xml_contabilidade_pendencias"][0]["status_fiscal"] == "processando"
     consultar.assert_called_once()
 
 

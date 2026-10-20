@@ -24,6 +24,10 @@ import {
   rejeicaoResponsavelTecnico,
 } from "../utils/fiscalRejectionGuidance.mjs";
 import NFSaidaCompartilharModal from "./centralNFSaida/NFSaidaCompartilharModal";
+import {
+  atalhoDiretoCorePet,
+  carregarNotaDiretaCorePet,
+} from "./centralNFSaida/notaDiretaCorePet.mjs";
 
 function salvarArquivo(blob, nome) {
   const url = URL.createObjectURL(blob);
@@ -53,6 +57,7 @@ export default function CentralNFSaida() {
   const buscaInicial = searchParams.get("busca") || "";
   const vendaIdInicial = searchParams.get("venda_id") || "";
   const abrirNotaInicial = searchParams.get("abrir") === "1";
+  const abrirCorePetDireto = atalhoDiretoCorePet(vendaIdInicial, abrirNotaInicial);
   const corrigirNotaInicial = searchParams.get("corrigir") === "1";
   const [notas, setNotas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -124,7 +129,7 @@ export default function CentralNFSaida() {
   }, [busca]);
 
   useEffect(() => {
-    atualizarLista(false);
+    if (!abrirCorePetDireto) atualizarLista(false);
   }, []);
 
   useEffect(() => {
@@ -140,10 +145,35 @@ export default function CentralNFSaida() {
 
   async function abrirNotaDiretaSeSolicitada(notasRecebidas) {
     if (!abrirNotaInicial || notaDiretaAbertaRef.current) return;
+    if (abrirCorePetDireto) {
+      notaDiretaAbertaRef.current = true;
+      try {
+        const nota = await carregarNotaDiretaCorePet(api, vendaIdInicial);
+        if (corrigirNotaInicial && nota.status?.toLowerCase() === "rejeitada") {
+          await abrirCorrecao(nota);
+          return;
+        }
+        setNotaSelecionada(nota);
+        setDetalheNota(nota);
+        setCarregandoDetalhe(true);
+        const resultado = await carregarDetalheIntNFe(api, nota);
+        setNotaSelecionada(resultado.nota);
+        setDetalheNota(resultado.detalhe);
+        setErroDetalhe(resultado.aviso);
+      } catch (error_) {
+        setErro(
+          error_.response?.data?.detail ||
+            error_.message ||
+            "Não foi possível abrir a nota solicitada.",
+        );
+      } finally {
+        setCarregandoDetalhe(false);
+      }
+      return;
+    }
+    if (vendaIdInicial) return;
     const notaDireta = notasRecebidas.find(
-      (nota) =>
-        (vendaIdInicial && String(nota.venda_id || "") === vendaIdInicial) ||
-        (buscaInicial && String(nota.numero || "") === buscaInicial),
+      (nota) => buscaInicial && String(nota.numero || "") === buscaInicial,
     );
     if (!notaDireta) return;
     notaDiretaAbertaRef.current = true;
@@ -181,7 +211,6 @@ export default function CentralNFSaida() {
       if (requisicao === requisicaoListaRef.current) setLoading(false);
     }
   }
-
   async function atualizarLista(forceRefresh) {
     if (atualizacaoEmCursoRef.current) return;
     atualizacaoEmCursoRef.current = true;
@@ -202,7 +231,6 @@ export default function CentralNFSaida() {
       setAtualizandoNotas(false);
     }
   }
-
   async function baixarDanfe(nota) {
     const documentoId = identificadorDocumentoFiscal(nota);
     const endpoint = rotaDocumentoFiscal(nota, "danfe");

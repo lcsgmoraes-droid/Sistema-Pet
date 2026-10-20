@@ -20,6 +20,7 @@ from app.xml_contabilidade_models import (
     XmlContabilidadeEnvio,
     XmlContabilidadeEvento,
     XmlContabilidadeMonitor,
+    XmlContabilidadeTentativa,
 )
 
 CHAVE = "35261033590794000140650030000000441241595909"
@@ -50,6 +51,7 @@ def contexto(monkeypatch):
     for model in (
         XmlContabilidadeConfig,
         XmlContabilidadeEnvio,
+        XmlContabilidadeTentativa,
         XmlContabilidadeEvento,
         XmlContabilidadeMonitor,
         Venda,

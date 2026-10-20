@@ -50,15 +50,18 @@ export default function XmlContabilidadeLote({
       <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">
         O lote reúne NF-e e NFC-e de saída emitidas no CorePet no período, inclusive canceladas, e
         os eventos registrados nesse intervalo, mesmo quando a nota foi emitida antes. Inclui
-        cancelamentos, cartas de correção e demais eventos. Se faltar algum XML obrigatório, o lote
-        será bloqueado para evitar enviar uma contabilidade incompleta.
+        cancelamentos, cartas de correção e demais eventos. Notas ainda sem confirmação fiscal ficam
+        fora, com o motivo no relatório. As autorizadas com XML válido seguem normalmente. A falta
+        do XML de uma nota autorizada ou de um evento obrigatório bloqueia o lote.
       </p>
       <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
         No e-mail, cada tipo tem seu ZIP: notas, cancelamentos, cartas de correção e demais eventos.
         O download reúne esses ZIPs em um único arquivo para facilitar o recebimento.
       </p>
       <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
-        O envio é processado pelo sistema. Acompanhe o resultado no histórico abaixo.
+        O envio por e-mail é preparado em segundo plano. Você pode continuar usando o sistema ou
+        fechar esta tela e consultar o histórico depois. Para baixar, aguarde a preparação do
+        arquivo; o ZIP inclui um relatório das pendências que ficaram de fora.
         {bloqueioEnvio ? ` ${bloqueioEnvio}` : ""}
       </p>
     </Panel>

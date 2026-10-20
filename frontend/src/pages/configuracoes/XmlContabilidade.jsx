@@ -9,6 +9,7 @@ import LinkPadrao from "../../components/v2/LinkPadrao/LinkPadrao";
 import XmlContabilidadeConfig from "./XmlContabilidadeConfig";
 import XmlContabilidadeLote from "./XmlContabilidadeLote";
 import XmlContabilidadeHistorico from "./XmlContabilidadeHistorico";
+import XmlContabilidadeRelatorio from "./XmlContabilidadeRelatorio";
 import {
   CONFIG_CONTABILIDADE_INICIAL,
   erroPeriodo,
@@ -35,6 +36,7 @@ export default function XmlContabilidade() {
   const [periodo, setPeriodo] = useState(() => periodoMesAnterior());
   const [erroDoPeriodo, setErroDoPeriodo] = useState("");
   const [operacao, setOperacao] = useState("");
+  const [envioRelatorio, setEnvioRelatorio] = useState(null);
 
   useEffect(() => {
     let ativo = true;
@@ -149,7 +151,7 @@ export default function XmlContabilidade() {
     if (!validarPeriodo()) return;
     setOperacao("baixar");
     try {
-      const { data } = await api.post(
+      const { data, headers } = await api.post(
         `${BASE}/lotes/download`,
         {
           data_inicio: periodo.inicio,
@@ -165,7 +167,13 @@ export default function XmlContabilidade() {
       link.click();
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      toast.success("Download do ZIP iniciado.");
+      const pendentes = Number(headers?.["x-notas-pendentes"]);
+      if (Number.isFinite(pendentes) && pendentes > 0) {
+        toast(
+          `Download iniciado. ${pendentes} nota(s) pendente(s) não foram incluídas. Confira o relatório anexo no ZIP.`,
+          { duration: 8000, icon: "⚠️" },
+        );
+      } else toast.success("Download do ZIP iniciado.");
     } catch (erro) {
       toast.error(
         await mensagemErroContabilidade(erro, "Não foi possível baixar os XMLs do período."),
@@ -181,7 +189,7 @@ export default function XmlContabilidade() {
     setOperacao("enviar");
     try {
       await api.post(`${BASE}/envios`, payload);
-      toast.success("Envio colocado na fila. Acompanhe no histórico.");
+      toast.success("Envio solicitado em segundo plano. Você pode continuar usando o sistema.");
       await atualizarHistorico();
     } catch (erro) {
       toast.error(await mensagemErroContabilidade(erro, "Não foi possível registrar o envio."));
@@ -259,7 +267,15 @@ export default function XmlContabilidade() {
         onAcao={acaoEnvio}
         operacao={operacao}
         bloqueioEnvio={bloqueioEnvio}
+        onRelatorio={setEnvioRelatorio}
       />
+      {envioRelatorio ? (
+        <XmlContabilidadeRelatorio
+          key={envioRelatorio.id}
+          envio={envioRelatorio}
+          onFechar={() => setEnvioRelatorio(null)}
+        />
+      ) : null}
     </div>
   );
 }

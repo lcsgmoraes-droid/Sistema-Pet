@@ -23,6 +23,7 @@ from app.xml_contabilidade_models import (
     XmlContabilidadeEnvio,
     XmlContabilidadeEvento,
     XmlContabilidadeMonitor,
+    XmlContabilidadeTentativa,
 )
 
 CNPJ = "33590794000140"
@@ -39,6 +40,7 @@ def banco(monkeypatch):
         BlingNotaFiscalCache,
         XmlContabilidadeConfig,
         XmlContabilidadeEnvio,
+        XmlContabilidadeTentativa,
         XmlContabilidadeEvento,
         XmlContabilidadeMonitor,
     ):
