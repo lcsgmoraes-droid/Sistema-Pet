@@ -3,7 +3,7 @@ import {
   rejeicaoResponsavelTecnico,
 } from "./fiscalRejectionGuidance.mjs";
 
-const CAMPOS_FISCAIS_VENDA = [
+const CAMPOS_DOCUMENTO_FISCAL = [
   "nfe_tipo",
   "nfe_modelo",
   "nfe_numero",
@@ -19,6 +19,14 @@ const CAMPOS_FISCAIS_VENDA = [
   "nfe_data_autorizacao",
   "nfe_motivo_rejeicao",
   "nfe_bling_id",
+];
+const CAMPOS_FISCAIS_VENDA = [
+  ...CAMPOS_DOCUMENTO_FISCAL,
+  "nfe_cancelamento_status",
+  "nfe_cancelamento_codigo",
+  "nfe_cancelamento_motivo",
+  "nfe_cancelamento_solicitado_em",
+  "pendencia_fiscal_cancelamento",
 ];
 
 const STATUS_FISCAL = {
@@ -65,7 +73,7 @@ export function tipoDocumentoFiscalVenda(venda = {}) {
 }
 
 export function temDocumentoFiscalVenda(venda = {}) {
-  return CAMPOS_FISCAIS_VENDA.some((campo) => {
+  return CAMPOS_DOCUMENTO_FISCAL.some((campo) => {
     const valor = venda[campo];
     return valor !== null && valor !== undefined && String(valor).trim() !== "";
   });
@@ -107,13 +115,86 @@ export function obterSituacaoFiscalVenda(venda = {}) {
   };
 }
 
-export function podeCancelarVendaComNotaCancelada(venda = {}) {
+export function podeCancelarVenda(venda = {}) {
   const statusVenda = normalizar(venda.status);
   return Boolean(
-    venda.id &&
-    normalizar(venda.nfe_status) === "cancelada" &&
-    ["aberta", "finalizada", "baixa_parcial", "pago_nf"].includes(statusVenda),
+    venda.id && ["aberta", "finalizada", "baixa_parcial", "pago_nf"].includes(statusVenda),
   );
+}
+
+export function temNotaFiscalAtiva(venda = {}) {
+  const situacao = normalizar(venda.nfe_status);
+  if (["cancelada", "cancelado"].includes(situacao)) return false;
+  if (venda.pendencia_fiscal_cancelamento === true) return true;
+  if (
+    ["rejeitada", "rascunho", "denegada", "inutilizada"].includes(situacao) &&
+    !venda.nfe_data_autorizacao
+  )
+    return false;
+  if (
+    normalizar(venda.status) === "pago_nf" ||
+    [
+      "autorizada",
+      "emitida",
+      "emitida_danfe",
+      "aguardando",
+      "pendente",
+      "enviando",
+      "processando",
+      "inconclusiva",
+      "contingencia",
+    ].includes(situacao)
+  )
+    return true;
+  return Boolean(
+    venda.nfe_data_autorizacao ||
+    venda.nfe_correlation_id ||
+    venda.nfe_bling_id ||
+    venda.nfe_protocolo,
+  );
+}
+
+export function obterPendenciaCancelamentoFiscal(venda = {}) {
+  if (!temNotaFiscalAtiva(venda)) return null;
+  const status = normalizar(venda.nfe_cancelamento_status || venda.cancelamento_status);
+  if (
+    !["cancelada", "cancelado"].includes(normalizar(venda.status)) &&
+    !venda.pendencia_fiscal_cancelamento &&
+    !["pendente", "solicitado", "recusado"].includes(status)
+  )
+    return null;
+  const codigo = textoRespostaFiscal(venda.nfe_cancelamento_codigo || venda.cancelamento_codigo);
+  const motivo = textoRespostaFiscal(venda.nfe_cancelamento_motivo || venda.cancelamento_motivo);
+  return {
+    status: status || "pendente",
+    label: status === "solicitado" ? "Cancelamento da nota em andamento" : "Nota a cancelar",
+    intent: status === "recusado" ? "danger" : "warning",
+    codigo,
+    motivo,
+    detalhe: [codigo ? `Código ${codigo}` : "", motivo].filter(Boolean).join(" — "),
+  };
+}
+
+export function textoRespostaFiscal(valor) {
+  if (valor === null || valor === undefined) return "";
+  if (typeof valor === "string" || typeof valor === "number") return String(valor);
+  if (Array.isArray(valor)) return valor.map(textoRespostaFiscal).filter(Boolean).join("; ");
+  if (typeof valor === "object") {
+    const partes = [
+      "motivo",
+      "mensagem",
+      "message",
+      "detail",
+      "erro",
+      "error",
+      "xMotivo",
+      "descricao",
+    ]
+      .map((campo) => textoRespostaFiscal(valor[campo]))
+      .filter(Boolean);
+    return [...new Set(partes)].join(" — ");
+  }
+  return "";
 }
 
 export function rotaNotaFiscalVenda(venda = {}) {

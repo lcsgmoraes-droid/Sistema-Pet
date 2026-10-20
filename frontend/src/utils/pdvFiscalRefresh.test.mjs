@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { atualizarSituacaoFiscalVenda, mesclarSituacaoFiscalVenda } from "./pdvFiscalRefresh.js";
-import { podeCancelarVendaComNotaCancelada } from "./pdvFiscalStatus.js";
+import { podeCancelarVenda } from "./pdvFiscalStatus.js";
 
 const vendaEmitida = {
   id: 12,
@@ -30,7 +30,7 @@ test("abrir venda atualiza nota autorizada antiga para cancelada confirmada pelo
   ]);
   assert.equal(venda.nfe_status, "cancelada");
   assert.equal(venda.status, "finalizada");
-  assert.equal(podeCancelarVendaComNotaCancelada(venda), true);
+  assert.equal(podeCancelarVenda(venda), true);
 });
 
 test("nota Bling usa sincronização de status e recarrega a venda", async () => {
@@ -52,17 +52,17 @@ test("nota Bling usa sincronização de status e recarrega a venda", async () =>
       return { ...inicial, nfe_status: "Cancelada", status: "finalizada" };
     },
   });
-  assert.equal(podeCancelarVendaComNotaCancelada(venda), true);
+  assert.equal(podeCancelarVenda(venda), true);
 });
 
-test("solicitação de cancelamento ainda pendente não libera cancelar a venda", async () => {
+test("solicitação pendente preserva nota autorizada sem impedir cancelamento comercial", async () => {
   const venda = await atualizarSituacaoFiscalVenda(vendaEmitida, {
     consultarIntNFe: async () => ({ cancelamento_solicitado: true, processando: true }),
     sincronizarBling: indevido,
     buscarVenda: async () => vendaEmitida,
   });
   assert.equal(venda.nfe_status, "autorizada");
-  assert.equal(podeCancelarVendaComNotaCancelada(venda), false);
+  assert.equal(podeCancelarVenda(venda), true);
 });
 
 test("falha do emissor mantém a última situação e sinaliza consulta indisponível", async () => {
@@ -75,7 +75,7 @@ test("falha do emissor mantém a última situação e sinaliza consulta indispon
   });
   assert.equal(venda.nfe_status, "autorizada");
   assert.equal(venda.nfe_atualizacao_falhou, true);
-  assert.equal(podeCancelarVendaComNotaCancelada(venda), false);
+  assert.equal(podeCancelarVenda(venda), true);
 });
 
 test("não faz consulta fiscal para venda sem nota ou com cancelamento já confirmado", async () => {
@@ -121,4 +121,23 @@ test("resposta atrasada não regride cancelamento confirmado da mesma nota", () 
   assert.equal(mesclarSituacaoFiscalVenda(cancelada, vendaEmitida), cancelada);
   const novaNota = { ...vendaEmitida, nfe_correlation_id: "nova-emissao" };
   assert.equal(mesclarSituacaoFiscalVenda(cancelada, novaNota).nfe_status, "autorizada");
+});
+
+test("venda cancelada recebe confirmação fiscal e limpa a pendência sem reabrir a venda", () => {
+  const atual = {
+    ...vendaEmitida,
+    status: "cancelada",
+    nfe_cancelamento_status: "solicitado",
+    pendencia_fiscal_cancelamento: true,
+  };
+  const venda = mesclarSituacaoFiscalVenda(atual, {
+    ...atual,
+    nfe_status: "cancelada",
+    nfe_cancelamento_status: "confirmado",
+    pendencia_fiscal_cancelamento: false,
+  });
+  assert.equal(venda.status, "cancelada");
+  assert.equal(venda.nfe_status, "cancelada");
+  assert.equal(venda.nfe_cancelamento_status, "confirmado");
+  assert.equal(venda.pendencia_fiscal_cancelamento, false);
 });

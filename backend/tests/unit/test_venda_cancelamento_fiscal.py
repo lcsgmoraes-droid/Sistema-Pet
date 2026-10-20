@@ -32,6 +32,10 @@ def _venda(status="pago_nf", nfe_status="autorizada"):
         nfe_xml="<xml />",
         nfe_codigo_erro=None,
         nfe_motivo_rejeicao=None,
+        nfe_cancelamento_status=None,
+        nfe_cancelamento_codigo=None,
+        nfe_cancelamento_motivo=None,
+        nfe_cancelamento_solicitado_em=None,
     )
 
 
@@ -40,7 +44,7 @@ def _venda(status="pago_nf", nfe_status="autorizada"):
     [
         (5, "cancelada", "finalizada"),
         (3, "autorizada", "pago_nf"),
-        (2, "processando", "pago_nf"),
+        (2, "autorizada", "pago_nf"),
     ],
 )
 def test_solicitacao_so_libera_venda_quando_emissor_confirma_cancelamento(
@@ -49,7 +53,9 @@ def test_solicitacao_so_libera_venda_quando_emissor_confirma_cancelamento(
     venda = _venda()
     db = MagicMock()
     api = MagicMock()
+    api.cancel_document.return_value = {"success": True}
     api.document_status.return_value = {"status": codigo_emissor}
+    api.document_events.return_value = []
     monkeypatch.setattr(emission, "_connection", lambda *_args, **_kwargs: object())
     monkeypatch.setattr(emission, "_access_token", lambda *_args: "token-teste")
     monkeypatch.setattr(emission, "_remember_sequence_start", lambda *_args: None)
@@ -57,7 +63,7 @@ def test_solicitacao_so_libera_venda_quando_emissor_confirma_cancelamento(
 
     resultado = emission.cancel(db, venda, api, "Cancelamento solicitado pelo cliente")
 
-    assert resultado["cancelamento_solicitado"] is True
+    assert resultado["cancelamento_solicitado"] is (codigo_emissor != 5)
     assert resultado["situacao"] == situacao
     assert venda.nfe_status == situacao
     assert venda.status == status_venda
@@ -65,7 +71,7 @@ def test_solicitacao_so_libera_venda_quando_emissor_confirma_cancelamento(
     api.document_status.assert_called_once_with(
         "token-teste", "nfce", venda.nfe_correlation_id
     )
-    db.commit.assert_called_once()
+    assert db.commit.call_count == 2
     # A nota cancelada apenas destrava a venda; o estoque/financeiro continuam
     # sendo responsabilidade do cancelamento explícito da venda.
     db.query.assert_not_called()
@@ -81,6 +87,7 @@ def test_consulta_fiscal_nao_ressuscita_venda_cancelada_ou_devolvida(
     venda = _venda(status=status_venda)
     api = MagicMock()
     api.document_status.return_value = {"status": 5}
+    api.document_events.return_value = []
     monkeypatch.setattr(emission, "tentar_enfileirar_documento", lambda *_args: None)
 
     emission.reconcile(
@@ -97,7 +104,7 @@ def test_consulta_fiscal_nao_ressuscita_venda_cancelada_ou_devolvida(
 def test_reconciliacao_rele_status_comercial_alterado_enquanto_aguarda_emissor(
     monkeypatch, tmp_path, status_concorrente
 ):
-    from sqlalchemy import Column, Integer, String, Uuid, create_engine
+    from sqlalchemy import Column, DateTime, Integer, String, Uuid, create_engine
     from sqlalchemy.orm import declarative_base, sessionmaker
 
     # Duas sessões reais: a consulta fiscal carrega pago_nf, enquanto outra
@@ -111,6 +118,10 @@ def test_reconciliacao_rele_status_comercial_alterado_enquanto_aguarda_emissor(
         tenant_id = Column(Uuid, nullable=False)
         status = Column(String, nullable=False)
         nfe_status = Column(String, nullable=False)
+        nfe_cancelamento_status = Column(String, nullable=True)
+        nfe_cancelamento_codigo = Column(String, nullable=True)
+        nfe_cancelamento_motivo = Column(String, nullable=True)
+        nfe_cancelamento_solicitado_em = Column(DateTime(timezone=True), nullable=True)
 
     engine = create_engine(f"sqlite:///{(tmp_path / 'concorrencia.db').as_posix()}")
     Base.metadata.create_all(engine)
@@ -143,7 +154,9 @@ def test_reconciliacao_rele_status_comercial_alterado_enquanto_aguarda_emissor(
             assert venda.status == "pago_nf"
             return {"status": 5}
 
-        api = SimpleNamespace(document_status=resposta_emissor)
+        api = SimpleNamespace(
+            document_status=resposta_emissor, document_events=lambda *_args: []
+        )
         emission.reconcile(
             consulta_fiscal, venda, api, connection=object(), token="token-teste"
         )
@@ -161,39 +174,31 @@ def test_reconciliacao_rele_status_comercial_alterado_enquanto_aguarda_emissor(
     engine.dispose()
 
 
-@pytest.mark.parametrize(
-    ("status_venda", "status_nota"),
-    [
-        ("pago_nf", "autorizada"),
-        ("finalizada", "Autorizada"),
-        ("pago_nf", "processando"),
-        ("pago_nf", None),
-    ],
-)
-def test_cancelamento_venda_com_nota_vigente_bloqueia_antes_de_estornos(
-    monkeypatch, status_venda, status_nota
+def test_cancelamento_tenant_incorreto_nao_encontra_venda_nem_executa_estornos(
+    monkeypatch,
 ):
-    venda = _venda(status=status_venda, nfe_status=status_nota)
+    venda = _venda()
+    outro_tenant = uuid4()
     db = MagicMock()
     consulta = db.query.return_value
     consulta.filter_by.return_value = consulta
     consulta.with_for_update.return_value = consulta
-    consulta.first.return_value = venda
+    consulta.first.return_value = None
     monkeypatch.setattr("app.tenancy.context.set_tenant_context", lambda *_args: None)
 
-    with pytest.raises(HTTPException, match="confirmação do emissor") as erro:
+    with pytest.raises(HTTPException, match="não encontrada") as erro:
         cancelamento_service.cancelar_venda(
-            venda.id, "Cliente pediu cancelamento", 7, venda.tenant_id, db
+            venda.id, "Cliente pediu cancelamento", 7, outro_tenant, db
         )
 
-    assert erro.value.status_code == 400
+    assert erro.value.status_code == 404
     db.query.assert_called_once_with(Venda)
-    consulta.filter_by.assert_called_once_with(id=venda.id, tenant_id=venda.tenant_id)
+    consulta.filter_by.assert_called_once_with(id=venda.id, tenant_id=outro_tenant)
     db.delete.assert_not_called()
     db.add.assert_not_called()
     db.commit.assert_not_called()
     db.rollback.assert_called_once()
-    assert venda.status == status_venda
+    assert venda.status == "pago_nf"
 
 
 @pytest.mark.parametrize(
@@ -335,7 +340,7 @@ async def test_bling_so_libera_venda_apos_consultar_cancelamento_confirmado(
     )
 
     assert resultado["processando"] is not confirmado
-    assert resultado["cancelamento_solicitado"] is True
+    assert resultado["cancelamento_solicitado"] is not confirmado
     assert venda.status == ("finalizada" if confirmado else "pago_nf")
     assert venda.nfe_status.lower() == ("cancelada" if confirmado else "autorizada")
     api.consultar_nfce.assert_called_once_with(987)

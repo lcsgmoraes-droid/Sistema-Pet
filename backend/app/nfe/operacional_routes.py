@@ -1,4 +1,5 @@
 import traceback
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
@@ -27,7 +28,10 @@ from app.services.nfe_authorized_reconciliation_service import (
 from app.tenancy.rls import sync_rls_tenant
 from app.utils.logger import logger
 from app.vendas_models import Venda
-from app.vendas.fiscal_status import sincronizar_venda_apos_cancelamento_fiscal
+from app.vendas.fiscal_status import (
+    nota_fiscal_requer_regularizacao,
+    sincronizar_venda_apos_cancelamento_fiscal,
+)
 
 router = APIRouter()
 
@@ -227,12 +231,18 @@ async def cancelar_nfe(
         resultado = bling.cancelar_nfe(nfe_id, request.justificativa)
 
         # A solicitação aceita não significa que o emissor já confirmou o
-        # cancelamento. Consultar a situação antes de liberar a venda.
+        # cancelamento. O estado comercial da venda é independente.
         venda = (
             db.query(Venda)
             .filter(Venda.nfe_bling_id == nfe_id, Venda.tenant_id == tenant_id)
             .first()
         )
+        if venda:
+            venda.nfe_cancelamento_status = "solicitado"
+            venda.nfe_cancelamento_codigo = None
+            venda.nfe_cancelamento_motivo = None
+            venda.nfe_cancelamento_solicitado_em = datetime.now(timezone.utc)
+            db.commit()
         confirmado = False
         try:
             nfe_routes = _nfe_routes()
@@ -261,7 +271,10 @@ async def cancelar_nfe(
         return {
             "success": confirmado,
             "processando": not confirmado,
-            "cancelamento_solicitado": True,
+            "cancelamento_solicitado": not confirmado,
+            "cancelamento_status": "confirmado" if confirmado else "solicitado",
+            "cancelamento_codigo": None,
+            "cancelamento_motivo": None,
             "message": (
                 "NF-e cancelada com sucesso"
                 if confirmado
@@ -313,6 +326,8 @@ async def excluir_nota(
         venda = (
             db.query(Venda)
             .filter(Venda.id == venda_id, Venda.tenant_id == tenant_id)
+            .populate_existing()
+            .with_for_update()
             .first()
         )
 
@@ -325,6 +340,14 @@ async def excluir_nota(
         # Validar status - só permite excluir notas que não foram autorizadas
         status_normalizado = str(venda.nfe_status or "").strip().casefold()
         status_permitidos = {"", "pendente", "erro", "rejeitada"}
+        if venda.status == "cancelada" and nota_fiscal_requer_regularizacao(venda):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "A venda está cancelada e possui pendência fiscal. "
+                    "Confirme a situação da nota no emissor antes de remover seus dados."
+                ),
+            )
         if status_normalizado not in status_permitidos:
             raise HTTPException(
                 status_code=400,
@@ -350,9 +373,14 @@ async def excluir_nota(
         venda.nfe_data_emissao = None
         venda.nfe_data_autorizacao = None
         venda.nfe_motivo_rejeicao = None
+        venda.nfe_cancelamento_status = None
+        venda.nfe_cancelamento_codigo = None
+        venda.nfe_cancelamento_motivo = None
+        venda.nfe_cancelamento_solicitado_em = None
 
-        # Voltar status para finalizada
-        venda.status = "finalizada"
+        # Remover uma tentativa fiscal não reativa uma venda já cancelada.
+        if venda.status == "pago_nf":
+            venda.status = "finalizada"
 
         db.commit()
 

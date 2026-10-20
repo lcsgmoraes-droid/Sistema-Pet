@@ -27,6 +27,7 @@ from app.nfe.listagem_base import (
     _venda_usa_nfce,
 )
 from app.vendas_models import Venda
+from app.intnfe.cancellation import campos_cancelamento_com_aliases
 
 
 def _normalizar_resumo_canal(item: dict, venda: Venda | None = None) -> dict:
@@ -670,6 +671,8 @@ def _normalizar_nota_venda_local(venda: Venda) -> dict:
     return {
         "id": str(venda.nfe_correlation_id or venda.nfe_bling_id),
         "venda_id": venda.id,
+        "venda_status": getattr(venda, "status", None),
+        **campos_cancelamento_com_aliases(venda),
         "numero": venda.nfe_numero,
         "serie": venda.nfe_serie,
         "tipo": "nfce" if _venda_usa_nfce(venda) else "nfe",

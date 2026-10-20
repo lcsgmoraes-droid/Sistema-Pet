@@ -245,11 +245,13 @@ def atualizar_status_venda(
 
     status_anterior = venda.status
     status_cashback_ativos = {"finalizada", "baixa_parcial", "pago_nf"}
-    if status_anterior == "cancelada" and novo_status in status_cashback_ativos:
+    if status_anterior == "cancelada" and novo_status != "cancelada":
         raise HTTPException(
             status_code=400,
-            detail="Venda cancelada não pode ser reativada como paga.",
+            detail="Venda cancelada não pode ser reativada.",
         )
+    if status_anterior == "cancelada":
+        return {"success": True, "status": "cancelada"}
 
     if novo_status == "finalizada":
         # Compatibilidade com clientes que restauram uma venda reaberta via

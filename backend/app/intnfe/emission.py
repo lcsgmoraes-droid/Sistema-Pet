@@ -6,7 +6,7 @@ import re
 import unicodedata
 import hashlib
 import json
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID, uuid4
 from types import SimpleNamespace
@@ -19,6 +19,15 @@ from app.bling_integration_fiscal import (
 )
 from app.financeiro.crediario_parcelamento import montar_plano_crediario
 from app.intnfe.client import IntNFeError
+from app.intnfe.cancellation import (
+    aplicar_resultado_cancelamento,
+    campos_cancelamento,
+    campos_cancelamento_com_aliases,
+    resultado_cancelamento,
+    ultimo_cancelamento,
+    data_evento,
+)
+from app.audit_log import log_action
 from app.intnfe.delivery_address import DeliveryAddressError, resolver_endereco_entrega
 from app.intnfe.fiscal_profile import local_profile
 from app.intnfe.models import IntNFeConnection, IntNFeEmissionSequence
@@ -31,6 +40,7 @@ from app.produtos_estoque_models import EstoqueMovimentacao, ProdutoLote
 from app.services.venda_descontos import ratear_centavos, ratear_descontos_venda
 from app.services.xml_contabilidade_hook import tentar_enfileirar_documento
 from app.vendas.fiscal_status import sincronizar_venda_apos_cancelamento_fiscal
+from app.utils.timezone import as_brasilia_naive
 
 CENT = Decimal("0.01")
 AUTHORIZED_STATUS = 3
@@ -58,13 +68,21 @@ MARKETPLACE_CHANNELS = {
 
 class DirectEmissionError(Exception):
     def __init__(
-        self, message, *, status=422, code=None, correlation=None, validation=None
+        self,
+        message,
+        *,
+        status=422,
+        code=None,
+        correlation=None,
+        validation=None,
+        cancelamento=None,
     ):
         super().__init__(message)
         self.status = status
         self.code = code
         self.correlation = correlation
         self.validation = validation
+        self.cancelamento = cancelamento
 
 
 def _digits(value):
@@ -1207,6 +1225,8 @@ def local_document_details(db, tenant, venda):
         "tipo": venda.nfe_tipo or "nfe",
         "chave": venda.nfe_chave,
         "status": venda.nfe_status,
+        "venda_status": getattr(venda, "status", None),
+        **campos_cancelamento_com_aliases(venda),
         "provedor": "intnfe",
         "codigo_erro": venda.nfe_codigo_erro,
         "motivo_rejeicao": venda.nfe_motivo_rejeicao,
@@ -1348,6 +1368,10 @@ def issue(db, tenant, venda, document_type, api):
     db.refresh(venda, with_for_update=True)
     if venda.nfe_correlation_id:
         return reconcile(db, venda, api, connection=connection)
+    if venda.status == "cancelada":
+        raise DirectEmissionError(
+            "Uma venda cancelada não pode emitir uma nova nota fiscal.", status=409
+        )
     payload = build_payload(db, tenant, connection, venda, document_type)
     payload_hash = hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -1420,12 +1444,25 @@ def issue(db, tenant, venda, document_type, api):
         ) from None
     venda.nfe_correlation_id = result["correlationId"]
     venda.nfe_status = "processando"
-    venda.status = "pago_nf"
+    with db.no_autoflush:
+        db.refresh(venda, attribute_names=["status"], with_for_update=True)
+        if venda.status != "cancelada":
+            venda.status = "pago_nf"
     db.commit()
     return reconcile(db, venda, api, connection=connection, token=token)
 
 
-def reconcile(db, venda, api, *, connection=None, token=None):
+def reconcile(
+    db,
+    venda,
+    api,
+    *,
+    connection=None,
+    token=None,
+    commit=True,
+    cancel_result=None,
+    cancel_result_tentativa=None,
+):
     if not venda.nfe_correlation_id:
         raise DirectEmissionError(
             "Esta venda ainda não possui identificador de emissão.", status=409
@@ -1442,7 +1479,71 @@ def reconcile(db, venda, api, *, connection=None, token=None):
             correlation=exc.correlation,
         ) from None
     status_code = int(result.get("status") or 0)
+    tentativa_observada = data_evento(cancel_result_tentativa) or data_evento(
+        getattr(venda, "nfe_cancelamento_solicitado_em", None)
+    )
+    eventos = None
+    xml_autorizado = None
+    if status_code in {AUTHORIZED_STATUS, 5} or getattr(
+        venda, "nfe_cancelamento_status", None
+    ):
+        try:
+            eventos = api.document_events(
+                token, venda.nfe_tipo, venda.nfe_correlation_id
+            )
+            if not isinstance(eventos, list):
+                raise IntNFeError("RespostaInvalida")
+        except IntNFeError:
+            # A situação autorizada permanece válida. A ausência de consulta
+            # não transforma uma tentativa em cancelamento confirmado.
+            eventos = None
+    if status_code == AUTHORIZED_STATUS and not venda.nfe_xml:
+        try:
+            xml_autorizado = api.document_xml(
+                token, venda.nfe_tipo, venda.nfe_correlation_id
+            ).decode("utf-8-sig")
+        except (IntNFeError, UnicodeDecodeError):
+            pass
+    # Nenhum lock é mantido enquanto aguardamos o emissor. A operação comercial
+    # ou uma tentativa mais nova pode ter terminado durante essas consultas.
+    with db.no_autoflush:
+        db.refresh(
+            venda,
+            attribute_names=[
+                "status",
+                "nfe_status",
+                "nfe_cancelamento_status",
+                "nfe_cancelamento_codigo",
+                "nfe_cancelamento_motivo",
+                "nfe_cancelamento_solicitado_em",
+            ],
+            with_for_update=True,
+        )
+    antes = str(venda.nfe_status or "").lower()
+    if antes in {"cancelada", "cancelado"}:
+        status_code = 5
+    elif antes == "autorizada" and status_code in {0, 1, 2, 7}:
+        status_code = AUTHORIZED_STATUS
+    atual = data_evento(getattr(venda, "nfe_cancelamento_solicitado_em", None))
+    if isinstance(cancel_result, dict) and atual == tentativa_observada:
+        aplicar_resultado_cancelamento(
+            venda,
+            resultado_cancelamento(cancel_result)
+            or {
+                "status": "solicitado",
+                "codigo": None,
+                "motivo": None,
+            },
+        )
+    if eventos is not None:
+        aplicar_resultado_cancelamento(
+            venda, ultimo_cancelamento(eventos, solicitado_em=atual)
+        )
+    if getattr(venda, "nfe_cancelamento_status", None) == "confirmado":
+        status_code = 5
     venda.nfe_status = STATUS_NAMES.get(status_code, "processando")
+    if status_code == 5:
+        venda.nfe_cancelamento_status = "confirmado"
     sincronizar_venda_apos_cancelamento_fiscal(db, venda)
     venda.nfe_numero = result.get("numero") or venda.nfe_numero
     if result.get("serie") is not None:
@@ -1453,19 +1554,18 @@ def reconcile(db, venda, api, *, connection=None, token=None):
     venda.nfe_codigo_erro = error_code[:20] if error_code else None
     venda.nfe_motivo_rejeicao = _text(result.get("motivoRejeicao"))
     if status_code == AUTHORIZED_STATUS:
-        venda.nfe_data_autorizacao = datetime.now()
+        autorizada_em = data_evento(result.get("autorizadoEm"))
+        if autorizada_em is not None:
+            venda.nfe_data_autorizacao = as_brasilia_naive(autorizada_em)
+        elif not getattr(venda, "nfe_data_autorizacao", None):
+            venda.nfe_data_autorizacao = as_brasilia_naive(datetime.now(timezone.utc))
         _remember_sequence_start(db, venda)
         if not venda.nfe_xml:
-            try:
-                venda.nfe_xml = api.document_xml(
-                    token, venda.nfe_tipo, venda.nfe_correlation_id
-                ).decode("utf-8-sig")
-            except (IntNFeError, UnicodeDecodeError):
-                # A autorização continua válida; o XML pode ser buscado novamente.
-                pass
+            venda.nfe_xml = xml_autorizado
     if status_code in {AUTHORIZED_STATUS, 5}:
         tentar_enfileirar_documento(db, venda.tenant_id, "intnfe", venda.id)
-    db.commit()
+    if commit:
+        db.commit()
     return {
         "success": status_code == AUTHORIZED_STATUS,
         "processando": status_code not in FINAL_STATUSES,
@@ -1480,6 +1580,7 @@ def reconcile(db, venda, api, *, connection=None, token=None):
         "codigo_erro": venda.nfe_codigo_erro,
         "motivo_rejeicao": venda.nfe_motivo_rejeicao,
         "ambiente_codigo": venda.nfe_ambiente,
+        **campos_cancelamento(venda),
     }
 
 
@@ -1544,7 +1645,21 @@ def download_document(db, venda, api, kind):
         ) from None
 
 
-def cancel(db, venda, api, justification):
+def _auditar_cancelamento(db, venda, user_id, etapa):
+    log_action(
+        db,
+        user_id=user_id,
+        tenant_id=venda.tenant_id,
+        action=f"nfe_cancelamento_{etapa}",
+        entity_type="vendas",
+        entity_id=venda.id,
+        new_value={"nfe_status": venda.nfe_status, **campos_cancelamento(venda)},
+        details=f"Cancelamento fiscal da nota {venda.nfe_numero}: {etapa}",
+        commit=False,
+    )
+
+
+def cancel(db, venda, api, justification, *, user_id=None):
     if len(str(justification or "").strip()) < 15:
         raise DirectEmissionError("A justificativa deve ter pelo menos 15 caracteres.")
     if venda.nfe_provider != "intnfe" or not venda.nfe_correlation_id:
@@ -1557,17 +1672,152 @@ def cancel(db, venda, api, justification):
         )
     connection = _connection(db, venda.tenant_id, require_enabled=False)
     token = _access_token(api, connection, venda.nfe_ambiente)
+    with db.no_autoflush:
+        db.refresh(
+            venda,
+            attribute_names=[
+                "status",
+                "nfe_status",
+                "nfe_cancelamento_status",
+                "nfe_cancelamento_codigo",
+                "nfe_cancelamento_motivo",
+                "nfe_cancelamento_solicitado_em",
+            ],
+            with_for_update=True,
+        )
+    if venda.nfe_status != "autorizada":
+        raise DirectEmissionError(
+            "A situação fiscal mudou durante a consulta. Atualize a nota antes de cancelar.",
+            status=409,
+        )
+    iniciada = data_evento(getattr(venda, "nfe_cancelamento_solicitado_em", None))
+    estado = getattr(venda, "nfe_cancelamento_status", None)
+    if estado == "solicitado" or (
+        estado == "pendente"
+        and iniciada is not None
+        and datetime.now(timezone.utc) - iniciada < timedelta(minutes=2)
+    ):
+        raise DirectEmissionError(
+            "Já existe um pedido de cancelamento em andamento. Atualize a situação antes de tentar novamente.",
+            status=409,
+            cancelamento=campos_cancelamento(venda),
+        )
+    venda.nfe_cancelamento_status = "pendente"
+    venda.nfe_cancelamento_codigo = None
+    venda.nfe_cancelamento_motivo = None
+    tentativa = datetime.now(timezone.utc)
+    venda.nfe_cancelamento_solicitado_em = tentativa
+    _auditar_cancelamento(db, venda, user_id, "tentativa")
+    db.commit()
     try:
-        api.cancel_document(
+        resposta = api.cancel_document(
             token, venda.nfe_tipo, venda.nfe_correlation_id, justification.strip()
         )
     except IntNFeError as exc:
+        with db.no_autoflush:
+            db.refresh(
+                venda,
+                attribute_names=[
+                    "status",
+                    "nfe_status",
+                    "nfe_cancelamento_status",
+                    "nfe_cancelamento_codigo",
+                    "nfe_cancelamento_motivo",
+                    "nfe_cancelamento_solicitado_em",
+                ],
+                with_for_update=True,
+            )
+        if (
+            venda.nfe_cancelamento_status == "confirmado"
+            or venda.nfe_status == "cancelada"
+        ):
+            venda.nfe_status = "cancelada"
+            sincronizar_venda_apos_cancelamento_fiscal(db, venda)
+            _auditar_cancelamento(db, venda, user_id, "resultado")
+            db.commit()
+            return {
+                "success": True,
+                "processando": False,
+                "situacao": "cancelada",
+                **campos_cancelamento(venda),
+            }
+        mensagem = exc.provider_message or (
+            "Não foi possível confirmar o recebimento do cancelamento pelo emissor. Consulte a situação antes de tentar novamente."
+            if exc.uncertain
+            else "O emissor recusou a solicitação de cancelamento."
+        )
+        if data_evento(venda.nfe_cancelamento_solicitado_em) == tentativa:
+            venda.nfe_cancelamento_status = "pendente" if exc.uncertain else "recusado"
+            venda.nfe_cancelamento_codigo = exc.code
+            venda.nfe_cancelamento_motivo = mensagem
+        _auditar_cancelamento(db, venda, user_id, "resultado")
+        db.commit()
         raise DirectEmissionError(
-            "O cancelamento não foi confirmado pela IntNFe.",
+            mensagem,
             status=503 if exc.uncertain else 422,
             code=exc.code,
             correlation=exc.correlation,
+            cancelamento=campos_cancelamento(venda),
         ) from None
-    result = reconcile(db, venda, api, connection=connection, token=token)
-    result["cancelamento_solicitado"] = True
+    try:
+        result = reconcile(
+            db,
+            venda,
+            api,
+            connection=connection,
+            token=token,
+            commit=False,
+            cancel_result=resposta,
+            cancel_result_tentativa=tentativa,
+        )
+    except DirectEmissionError as exc:
+        with db.no_autoflush:
+            db.refresh(
+                venda,
+                attribute_names=[
+                    "status",
+                    "nfe_status",
+                    "nfe_cancelamento_status",
+                    "nfe_cancelamento_codigo",
+                    "nfe_cancelamento_motivo",
+                    "nfe_cancelamento_solicitado_em",
+                ],
+                with_for_update=True,
+            )
+        if (
+            data_evento(venda.nfe_cancelamento_solicitado_em) == tentativa
+            and venda.nfe_cancelamento_status != "confirmado"
+        ):
+            aplicar_resultado_cancelamento(
+                venda,
+                resultado_cancelamento(resposta)
+                or {
+                    "status": "solicitado",
+                    "codigo": None,
+                    "motivo": None,
+                },
+            )
+        if venda.nfe_cancelamento_status == "confirmado":
+            venda.nfe_status = "cancelada"
+            sincronizar_venda_apos_cancelamento_fiscal(db, venda)
+        _auditar_cancelamento(db, venda, user_id, "resultado")
+        db.commit()
+        if venda.nfe_cancelamento_status in {"confirmado", "recusado"}:
+            return {
+                "success": venda.nfe_cancelamento_status == "confirmado",
+                "processando": False,
+                "situacao": venda.nfe_status,
+                **campos_cancelamento(venda),
+            }
+        raise DirectEmissionError(
+            "A solicitação foi enviada, mas não foi possível consultar o resultado fiscal. Atualize a situação antes de repetir.",
+            status=503,
+            code=exc.code,
+            correlation=exc.correlation,
+            cancelamento=campos_cancelamento(venda),
+        ) from None
+    _auditar_cancelamento(db, venda, user_id, "resultado")
+    db.commit()
+    result["success"] = result["cancelamento_status"] == "confirmado"
+    result["processando"] = result["cancelamento_status"] in {"pendente", "solicitado"}
     return result

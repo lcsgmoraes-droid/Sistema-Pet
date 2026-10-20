@@ -210,7 +210,7 @@ export default function PDVHeaderBar({
                 size="lg"
                 className="w-full sm:w-auto sm:min-w-[96px]"
               >
-                <span>Excluir</span>
+                <span>Cancelar venda</span>
               </ActionButton>
             </>
           )}
