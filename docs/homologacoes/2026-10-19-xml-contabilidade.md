@@ -98,6 +98,12 @@ responsável. Aceite SMTP não significa leitura ou entrega na caixa de entrada.
   bloquear o lote desse mês, sem omitir a nota nem apresentar sucesso parcial.
 - Nenhuma emissão, cancelamento ou alteração manual de situação fiscal foi feita
   para gerar massa de teste. Resultados de envio real serão registrados após deploy.
+- A revisão final identificou que o normalizador legado interpreta o código 2
+  com chave como autorização. A consulta oficial específica de canceladas agora
+  preserva o payload bruto e marca o status efetivo como cancelado, exigindo seu
+  comprovante fiscal. Testes com o normalizador real cobrem NF-e e NFC-e, inclusive
+  a mesma nota retornada nas duas consultas sem consumir duas posições do limite
+  e o bloqueio pelo coletor real quando falta o XML oficial do cancelamento.
 
 Validação técnica local aprovada. Aceite funcional do Lucas e publicação em
 produção pendentes. Próximo passo: revisar a tela e conferir destinatário/SMTP

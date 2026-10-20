@@ -1,10 +1,11 @@
-from datetime import date
+from datetime import date, datetime
 from unittest.mock import Mock
 from uuid import uuid4
 
 import pytest
 
 from app.services import xml_contabilidade_bling as bling
+from app.services import xml_contabilidade_documentos as documentos
 from app.services.xml_contabilidade_service import XmlContabilidadeError
 
 CNPJ = "33590794000140"
@@ -89,7 +90,57 @@ def test_cancelada_presente_nas_duas_consultas_nao_duplica_nem_estoura_limite(
     # consulta padrão e situacao=2 do mesmo modelo é a mesma nota.
     monkeypatch.setattr("app.services.xml_contabilidade_service.MAX_DOCUMENTOS", 2)
     bling.sincronizar_periodo_bling(db, tenant, date(2026, 10, 1), date(2026, 10, 19))
+    # A consulta explícita reaplica o status cancelado mesmo quando a lista
+    # padrão devolveu o mesmo código numérico, sem contar a nota duas vezes.
+    assert upsert.call_count == 4
+
+
+@pytest.mark.parametrize("modelo,endpoint", [(55, "/nfe"), (65, "/nfce")])
+def test_consulta_canceladas_supera_normalizador_legado_sem_alterar_payload(
+    contexto, monkeypatch, modelo, endpoint
+):
+    from app.nfe.listagem_normalizacao import _normalizar_nota_bling
+
+    db, tenant, upsert = contexto
+    chave = CHAVE[:20] + str(modelo) + CHAVE[22:]
+    raw = {"id": 123, "situacao": 2, "tipo": 1, "chaveAcesso": chave}
+    original = dict(raw)
+    api = Mock()
+    api._request.side_effect = lambda _method, recurso, data: {
+        "data": [raw] if recurso == endpoint else []
+    }
+    monkeypatch.setattr(bling, "BlingAPI", lambda **_: api)
+    monkeypatch.setattr(bling, "_normalizar_nota_bling", _normalizar_nota_bling)
+    monkeypatch.setattr("app.services.xml_contabilidade_service.MAX_DOCUMENTOS", 1)
+
+    bling.sincronizar_periodo_bling(db, tenant, date(2026, 10, 1), date(2026, 10, 19))
+
     assert upsert.call_count == 2
+    notas = [call.args[2] for call in upsert.call_args_list]
+    assert [nota["status"] for nota in notas] == ["Autorizada", "Cancelada"]
+    assert all(nota["modelo"] == modelo for nota in notas)
+    assert all(call.kwargs["resumo_payload"] is raw for call in upsert.call_args_list)
+    assert raw == original
+
+    # A normalização efetiva chega ao coletor real. Uma nota autorizada sem o
+    # comprovante de cancelamento não pode virar um lote parcialmente válido.
+    nota = notas[-1]
+    doc = documentos.Documento(
+        "bling",
+        nota["id"],
+        nota["chave"],
+        modelo,
+        nota["status"].lower(),
+        datetime(2026, 10, 19, 12),
+    )
+    xml = f"""<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe{chave}"><ide><mod>{modelo}</mod><dhEmi>2026-10-19T12:00:00-03:00</dhEmi><tpAmb>1</tpAmb><tpNF>1</tpNF></ide><emit><CNPJ>{CNPJ}</CNPJ></emit></infNFe></NFe><protNFe><infProt><chNFe>{chave}</chNFe><cStat>100</cStat></infProt></protNFe></nfeProc>""".encode()
+    monkeypatch.setattr(documentos, "_cnpj_empresa", lambda *_: CNPJ)
+    monkeypatch.setattr(documentos, "_obter_xml", lambda *_: (xml, {}))
+    monkeypatch.setattr(documentos, "_obter_eventos", lambda *_: {})
+    with pytest.raises(XmlContabilidadeError, match="cancelamento.*parcial"):
+        documentos._coletar_arquivos(
+            db, tenant, [doc], date(2026, 10, 1), date(2026, 10, 31)
+        )
 
 
 def test_cache_preserva_payload_original_da_lista(contexto, monkeypatch):

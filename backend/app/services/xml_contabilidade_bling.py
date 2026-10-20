@@ -35,7 +35,7 @@ def sincronizar_periodo_bling(db, tenant_id, data_inicio, data_fim):
         cnpj_empresa = _cnpj_empresa(db, tenant_id)
         quantidade = 0
         for modelo, endpoint in ((55, "/nfe"), (65, "/nfce")):
-            importados = {}
+            importados = set()
             # GET /nfe omite canceladas quando situacao não é informada.
             # Ambos os modelos documentam situacao=2 para canceladas. A
             # consulta separada também cobre NFC-e sem depender do padrão.
@@ -71,22 +71,25 @@ def sincronizar_periodo_bling(db, tenant_id, data_inicio, data_fim):
                     for row in rows:
                         documento_id = str(row["id"])
                         repetida = documento_id in importados
-                        if repetida and (
-                            situacao != 2
-                            or importados[documento_id] == row.get("situacao")
-                        ):
+                        if repetida and situacao != 2:
                             continue
                         if not _possivel_saida_empresa(row, cnpj_empresa):
                             continue
                         # Pode ter sido cancelada entre as duas consultas:
                         # atualiza o cache, mas conta a mesma nota uma só vez.
-                        importados[documento_id] = row.get("situacao")
+                        importados.add(documento_id)
                         quantidade += int(not repetida)
                         if quantidade > MAX_DOCUMENTOS:
                             raise XmlContabilidadeError(
                                 f"O período no Bling excede {MAX_DOCUMENTOS} notas. Divida-o em períodos menores."
                             )
                         nota = _normalizar_nota_bling(row, modelo=modelo)
+                        if situacao == 2:
+                            # O filtro oficial confirma o cancelamento. O
+                            # normalizador legado interpreta alguns códigos
+                            # numéricos de outra forma; manter o payload bruto
+                            # e exigir o comprovante fiscal neste fluxo.
+                            nota["status"] = "Cancelada"
                         upsert_nota_cache(
                             db, tenant_id, nota, source="bling_api", resumo_payload=row
                         )
