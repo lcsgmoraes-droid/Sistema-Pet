@@ -16,6 +16,7 @@ import api from "../api";
 import CustomerIdentity from "../components/ui/CustomerIdentity";
 import { confirmarCorePet } from "../services/corepetDialog";
 import { metadadosDownloadDanfe } from "../utils/documentoFiscalDownload.mjs";
+import { resumirCancelamentoNota } from "../utils/nfeCancelamentoFeedback";
 
 export default function NotasFiscais() {
   const [notas, setNotas] = useState([]);
@@ -121,17 +122,16 @@ export default function NotasFiscais() {
         justificativa,
       });
 
-      alert(
-        response.data?.cancelamento_solicitado
-          ? "Cancelamento enviado. Atualize a lista para acompanhar a confirmação."
-          : "Nota fiscal cancelada com sucesso!",
-      );
-      setModalCancelar(null);
-      setJustificativa("");
+      const feedback = resumirCancelamentoNota(response.data);
+      alert(feedback.mensagem);
+      if (feedback.confirmado || feedback.solicitado) {
+        setModalCancelar(null);
+        setJustificativa("");
+      }
       carregarNotas();
     } catch (error) {
       console.error("Erro ao cancelar nota:", error);
-      alert(error.response?.data?.detail || "Erro ao cancelar nota fiscal");
+      alert(resumirCancelamentoNota(error.response?.data || { mensagem: error.message }).mensagem);
     } finally {
       setCancelando(false);
     }

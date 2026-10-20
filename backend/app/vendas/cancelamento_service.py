@@ -17,7 +17,7 @@ from app.produtos.tipos import tipo_controla_estoque
 from app.vendas.status_pagamento import pagamento_valido_para_saldo
 from app.vendas.fiscal_status import (
     nota_fiscal_cancelada,
-    validar_cancelamento_fiscal_venda,
+    nota_fiscal_requer_regularizacao,
 )
 from app.utils.timezone import now_brasilia
 
@@ -116,8 +116,6 @@ def cancelar_venda(
 
         if venda.status == "cancelada":
             raise HTTPException(status_code=400, detail="Venda já está cancelada")
-
-        validar_cancelamento_fiscal_venda(venda)
 
         if str(venda.status or "").lower() in {
             "finalizada_devolucao",
@@ -438,6 +436,12 @@ def cancelar_venda(
 
         status_anterior = venda.status
         venda.status = "cancelada"
+        # A baixa comercial não altera a situação fiscal. Mantém a pendência
+        # até o emissor confirmar o cancelamento do documento.
+        if nota_fiscal_requer_regularizacao(venda) and getattr(
+            venda, "nfe_cancelamento_status", None
+        ) not in {"solicitado", "recusado"}:
+            venda.nfe_cancelamento_status = "pendente"
         venda.cancelada_por = user_id
         venda.motivo_cancelamento = motivo
         venda.data_cancelamento = now_brasilia()
@@ -497,7 +501,9 @@ def cancelar_venda(
                 f"Venda {venda.numero_venda} CANCELADA (ATÔMICO) - "
                 f"Motivo: {motivo} - "
                 f"Itens estornados: {itens_estornados} - "
-                f"Contas canceladas: {contas_canceladas}"
+                f"Contas canceladas: {contas_canceladas} - "
+                f"Situação fiscal preservada: {getattr(venda, 'nfe_status', None) or 'sem nota'} - "
+                f"Pendência fiscal: {'sim' if nota_fiscal_requer_regularizacao(venda) else 'não'}"
             ),
             tenant_id=tenant_id,
             commit=False,

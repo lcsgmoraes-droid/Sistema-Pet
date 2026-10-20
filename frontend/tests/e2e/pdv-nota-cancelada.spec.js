@@ -16,7 +16,10 @@ test.skip(
   "requer E2E_BASE_URL explícita de frontend local; todas as APIs são simuladas",
 );
 
-async function prepararApi(page, { statusFiscal = "cancelada", statusVenda = "pago_nf" } = {}) {
+async function prepararApi(
+  page,
+  { statusFiscal = "cancelada", statusVenda = "pago_nf", resultadoFiscal } = {},
+) {
   const tenant = { id: "tenant-sintetico-qa", name: "Loja Sintética QA", login_name: "qa" };
   const user = { id: 42002, name: "Usuário QA", is_admin: true, role: { name: "admin" }, tenant };
   const estado = {
@@ -24,6 +27,7 @@ async function prepararApi(page, { statusFiscal = "cancelada", statusVenda = "pa
     falharConsulta: false,
     consultasFiscais: 0,
     envios: [],
+    avisos: [],
     venda: {
       id: vendaId,
       numero_venda: "QA-NOTA-CANCELADA",
@@ -84,6 +88,10 @@ async function prepararApi(page, { statusFiscal = "cancelada", statusVenda = "pa
         if (estado.statusFiscal === "cancelada" && estado.venda.status === "pago_nf") {
           estado.venda.status = "finalizada";
         }
+        if (estado.statusFiscal === "cancelada") {
+          estado.venda.nfe_cancelamento_status = "confirmado";
+          estado.venda.pendencia_fiscal_cancelamento = false;
+        }
         return route.fulfill({
           json: { success: true, situacao: estado.statusFiscal, provedor: "intnfe" },
         });
@@ -95,8 +103,48 @@ async function prepararApi(page, { statusFiscal = "cancelada", statusVenda = "pa
       if (path === `${apiVenda}/cancelar` && request.method() === "POST") {
         estado.envios.push({ path, payload: request.postDataJSON() });
         estado.venda.status = "cancelada";
+        if (estado.venda.nfe_status !== "cancelada") {
+          estado.venda.nfe_cancelamento_status ||= "pendente";
+          estado.venda.pendencia_fiscal_cancelamento = true;
+        }
         return route.fulfill({ json: estado.venda });
       }
+      if (path === `/api/nfe/vendas/${vendaId}/cancelar` && request.method() === "POST") {
+        const resultado = resultadoFiscal || {
+          cancelamento_status: "solicitado",
+          cancelamento_solicitado: true,
+          success: false,
+        };
+        estado.venda.nfe_cancelamento_status = resultado.cancelamento_status;
+        estado.venda.nfe_cancelamento_codigo = resultado.cancelamento_codigo;
+        estado.venda.nfe_cancelamento_motivo = resultado.cancelamento_motivo;
+        estado.venda.pendencia_fiscal_cancelamento = true;
+        return route.fulfill({ json: { ...resultado, situacao: estado.venda.nfe_status } });
+      }
+      if (path === "/api/nfe/lista") {
+        return route.fulfill({
+          json: {
+            notas: [
+              {
+                ...estado.venda,
+                venda_id: vendaId,
+                venda_status: estado.venda.status,
+                provedor: "intnfe",
+                status: estado.venda.nfe_status,
+                modelo: 65,
+                tipo: "nfce",
+                numero: 18574,
+                serie: 1,
+                valor: 39.9,
+              },
+            ],
+            total: 1,
+            canais: [],
+          },
+        });
+      }
+      if (path === "/api/nfe/atualizar-lista")
+        return route.fulfill({ json: { mensagem: "Notas atualizadas" } });
       if (path === `${apiVenda}/reabrir`) {
         estado.envios.push({ path, payload: request.postDataJSON() });
         return route.fulfill({ status: 500, json: { detail: "Não deve reabrir para cancelar." } });
@@ -118,7 +166,10 @@ async function prepararApi(page, { statusFiscal = "cancelada", statusVenda = "pa
       return route.fulfill({ json: respostas[path] || {} });
     },
   );
-  page.on("dialog", (dialog) => dialog.accept());
+  page.on("dialog", (dialog) => {
+    estado.avisos.push(dialog.message());
+    dialog.accept();
+  });
   return estado;
 }
 
@@ -162,18 +213,34 @@ test.describe("PDV — cancelamento após nota fiscal cancelada", () => {
     expect(estado.venda.status).toBe("cancelada");
   });
 
-  test("mantém nota autorizada bloqueada e atualiza ao retornar ao PDV", async ({ page }) => {
+  test("cancela a venda com nota autorizada e mantém pendência até confirmação fiscal", async ({
+    page,
+  }) => {
     const estado = await prepararApi(page, { statusFiscal: "autorizada" });
     await page.goto(`/pdv?venda_id=${vendaId}`);
     await expect(page.getByText("NFC-e nº 18574 — Autorizada", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Cancelar venda", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Cancelar venda", exact: true }).click();
+    const confirmacao = page.getByRole("dialog", { name: "Cancelar venda?" });
+    await expect(confirmacao.getByText(/a nota fiscal continuará válida/)).toBeVisible();
+    await confirmacao.getByRole("button", { name: "Cancelar venda", exact: true }).click();
+    const justificativa = page.getByRole("dialog", { name: "Justificativa do cancelamento" });
+    await justificativa
+      .getByLabel("Justificativa", { exact: true })
+      .fill("Venda cancelada sem cancelar a nota ainda.");
+    await justificativa.getByRole("button", { name: "Continuar", exact: true }).click();
+    await expect(page.getByRole("alert").filter({ hasText: "Nota a cancelar" })).toBeVisible();
+    await expect(page.getByText("NFC-e nº 18574 — Autorizada", { exact: true })).toBeVisible();
+    expect(estado.venda.status).toBe("cancelada");
+    expect(estado.venda.nfe_status).toBe("autorizada");
     estado.statusFiscal = "cancelada";
     const consultasAntes = estado.consultasFiscais;
     await page.evaluate(() => globalThis.dispatchEvent(new globalThis.Event("focus")));
     await expect.poll(() => estado.consultasFiscais).toBeGreaterThan(consultasAntes);
     await expect(page.getByText("NFC-e nº 18574 — Cancelada", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Cancelar venda", exact: true })).toBeVisible();
-    expect(estado.envios).toHaveLength(0);
+    await expect(page.getByRole("button", { name: "Cancelar venda", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("alert").filter({ hasText: "Nota a cancelar" })).toHaveCount(0);
+    expect(estado.venda.status).toBe("cancelada");
+    expect(estado.envios).toHaveLength(1);
   });
 
   test("não libera cancelar quando a venda já possui devolução", async ({ page }) => {
@@ -193,7 +260,7 @@ test.describe("PDV — cancelamento após nota fiscal cancelada", () => {
       page.getByRole("alert").filter({ hasText: "Não foi possível consultar o emissor" }),
     ).toBeVisible();
     await expect(page.getByText("NFC-e nº 18574 — Autorizada", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Cancelar venda", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Cancelar venda", exact: true })).toBeVisible();
     estado.falharConsulta = false;
     await page.getByRole("button", { name: "Atualizar situação", exact: true }).click();
     await expect(page.getByText("NFC-e nº 18574 — Cancelada", { exact: true })).toBeVisible();
@@ -201,5 +268,69 @@ test.describe("PDV — cancelamento após nota fiscal cancelada", () => {
     await expect(
       page.getByRole("alert").filter({ hasText: "Não foi possível consultar o emissor" }),
     ).toHaveCount(0);
+  });
+
+  test("Central NF mostra recusa 501 legível e preserva pendência na venda cancelada", async ({
+    page,
+  }) => {
+    const estado = await prepararApi(page, {
+      statusFiscal: "autorizada",
+      statusVenda: "cancelada",
+      resultadoFiscal: {
+        success: false,
+        cancelamento_status: "recusado",
+        cancelamento_codigo: "501",
+        cancelamento_motivo: { mensagem: "Prazo de cancelamento excedido" },
+        cancelamento_solicitado: false,
+      },
+    });
+    await page.goto("/notas-fiscais/saida");
+    await page.getByTitle("Cancelar NF-e", { exact: true }).click();
+    const modal = page.getByRole("dialog", { name: "Cancelar Nota Fiscal" });
+    await modal.getByLabel(/Justificativa/).fill("Nota a cancelar após desfazer venda.");
+    await modal.getByRole("button", { name: "Confirmar Cancelamento" }).click();
+    await expect(modal.getByRole("alert")).toContainText("Código 501");
+    await expect(modal.getByRole("alert")).toContainText("Prazo de cancelamento excedido");
+    const aviso = page
+      .getByRole("status")
+      .filter({ hasText: "O cancelamento da nota foi recusado" });
+    await expect(aviso).toContainText("Código 501");
+    await expect(aviso).not.toContainText(/object Object|com sucesso/);
+    expect(estado.venda.nfe_status).toBe("autorizada");
+    await modal.getByRole("button", { name: "Voltar", exact: true }).click();
+    await page.goto(`/pdv?venda_id=${vendaId}`);
+    await expect(page.getByRole("alert").filter({ hasText: "Nota a cancelar" })).toContainText(
+      "Código 501",
+    );
+    await expect(page.getByText("NFC-e nº 18574 — Autorizada", { exact: true })).toBeVisible();
+  });
+
+  test("pedido aceito mostra cancelamento em andamento até confirmação fiscal", async ({
+    page,
+  }) => {
+    const estado = await prepararApi(page, {
+      statusFiscal: "autorizada",
+      statusVenda: "cancelada",
+    });
+    await page.goto("/notas-fiscais/saida");
+    await page.getByTitle("Cancelar NF-e", { exact: true }).click();
+    const modal = page.getByRole("dialog", { name: "Cancelar Nota Fiscal" });
+    await modal.getByLabel(/Justificativa/).fill("Nota a cancelar após desfazer venda.");
+    await modal.getByRole("button", { name: "Confirmar Cancelamento" }).click();
+    await expect(modal).toHaveCount(0);
+    await expect(
+      page.getByText("Cancelamento da nota em andamento", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("status").filter({ hasText: "Cancelamento da nota em andamento" }),
+    ).toBeVisible();
+    expect(estado.venda.nfe_status).toBe("autorizada");
+    estado.statusFiscal = "cancelada";
+    await page.getByTitle("Forçar reconciliação desta NF", { exact: true }).click();
+    await expect(page.getByText("Cancelamento da nota em andamento", { exact: true })).toHaveCount(
+      0,
+    );
+    expect(estado.venda.nfe_status).toBe("cancelada");
+    expect(estado.venda.status).toBe("cancelada");
   });
 });

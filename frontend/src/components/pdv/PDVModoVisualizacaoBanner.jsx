@@ -14,7 +14,7 @@ import ModalDadosVendaFinalizada from "./ModalDadosVendaFinalizada";
 import { mensagemCaixaIndisponivel } from "../../utils/caixaAbertoMonitor";
 import {
   obterSituacaoFiscalVenda,
-  podeCancelarVendaComNotaCancelada,
+  podeCancelarVenda as vendaPermiteCancelamento,
 } from "../../utils/pdvFiscalStatus";
 
 export default function PDVModoVisualizacaoBanner({
@@ -44,7 +44,7 @@ export default function PDVModoVisualizacaoBanner({
   const textoDevolucao = getTextoDevolucaoVendaPDV(vendaAtual);
   const notaCancelada = obterSituacaoFiscalVenda(vendaAtual)?.status === "cancelada";
   const vendaCancelada = ["cancelada", "cancelado"].includes(vendaAtual.status);
-  const podeCancelarVenda = podeCancelarVendaComNotaCancelada(vendaAtual);
+  const podeCancelarVenda = vendaPermiteCancelamento(vendaAtual);
   const notaRejeitada =
     vendaAtual.status === "pago_nf" &&
     String(vendaAtual.nfe_status || "").toLowerCase() === "rejeitada";
@@ -67,13 +67,15 @@ export default function PDVModoVisualizacaoBanner({
     textoDevolucao?.orientacao ||
     (vendaCancelada
       ? "Cancelamento registrado no histórico."
-      : podeCancelarVenda
+      : podeCancelarVenda && notaCancelada
         ? "A nota foi cancelada. Use Cancelar venda para desfazer a venda."
-        : notaRejeitada
-          ? "Clique em Corrigir erro no aviso da nota para revisar os dados fiscais."
-          : vendaAtual.status === "aberta"
-            ? "Clique em Editar para modificar."
-            : "Reabra a venda para modificar.");
+        : podeCancelarVenda
+          ? "Use Cancelar venda para desfazer a venda. A situação da nota é tratada separadamente."
+          : notaRejeitada
+            ? "Clique em Corrigir erro no aviso da nota para revisar os dados fiscais."
+            : vendaAtual.status === "aberta"
+              ? "Clique em Editar para modificar."
+              : "Reabra a venda para modificar.");
 
   return (
     <>

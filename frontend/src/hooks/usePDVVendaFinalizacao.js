@@ -15,7 +15,11 @@ import { confirmarCorePet, perguntarCorePet } from "../services/corepetDialog";
 import { obterTotalRecebidoExistente } from "../components/modalPagamentoUtils";
 import { normalizarDescontosVenda } from "../utils/pdvDescontosUtils";
 import { cancelarEdicaoVenda } from "../utils/pdvCancelarEdicaoVenda";
-import { extrairCamposFiscaisVenda } from "../utils/pdvFiscalStatus";
+import {
+  extrairCamposFiscaisVenda,
+  temNotaFiscalAtiva,
+  obterPendenciaCancelamentoFiscal,
+} from "../utils/pdvFiscalStatus";
 
 async function carregarPagamentosDaVenda(vendaId) {
   try {
@@ -162,7 +166,10 @@ export function usePDVVendaFinalizacao({
     const confirmar = await confirmarCorePet({
       titulo: "Cancelar venda?",
       mensagem:
-        "A venda continuará rastreável no histórico e os itens serão devolvidos ao estoque.",
+        "A venda continuará rastreável no histórico e os itens serão devolvidos ao estoque." +
+        (temNotaFiscalAtiva(vendaAtual)
+          ? " Os efeitos comerciais e financeiros serão estornados, mas a nota fiscal continuará válida até o emissor confirmar seu cancelamento. Será necessário regularizar essa pendência fiscal."
+          : ""),
       confirmarTexto: "Cancelar venda",
       variante: "danger",
     });
@@ -186,10 +193,21 @@ export function usePDVVendaFinalizacao({
     const motivoNormalizado = motivo.trim();
     try {
       setLoading(true);
-      await cancelarVenda(vendaAtual.id, motivoNormalizado);
-      limparVenda();
+      const resultado = await cancelarVenda(vendaAtual.id, motivoNormalizado);
+      const vendaCancelada = { ...vendaAtual, ...resultado, status: "cancelada" };
+      setVendaAtual((atual) =>
+        String(atual.id) === String(vendaAtual.id)
+          ? { ...atual, ...vendaCancelada, cliente: atual.cliente || vendaCancelada.cliente }
+          : atual,
+      );
+      setModoVisualizacao(true);
       carregarVendasRecentes();
-      alert("Venda cancelada com sucesso e mantida no historico.");
+      const pendenciaFiscal = obterPendenciaCancelamentoFiscal(vendaCancelada);
+      alert(
+        pendenciaFiscal
+          ? `Venda cancelada e mantida no histórico. ${pendenciaFiscal.label}. A nota fiscal ainda precisa de regularização.`
+          : "Venda cancelada com sucesso e mantida no historico.",
+      );
     } catch (error) {
       console.error("Erro ao excluir venda:", error);
       alert(montarMensagemErroExclusao(error.response?.data?.detail));

@@ -1,7 +1,5 @@
 """Regras de venda compartilhadas pelos fluxos de situação fiscal."""
 
-from fastapi import HTTPException
-
 
 def nota_fiscal_cancelada(venda) -> bool:
     return str(getattr(venda, "nfe_status", "") or "").strip().lower() in {
@@ -15,6 +13,9 @@ def sincronizar_venda_apos_cancelamento_fiscal(db, venda) -> None:
     # Apenas remove a trava fiscal, preservando cancelamentos e devoluções.
     if not nota_fiscal_cancelada(venda):
         return
+    venda.nfe_cancelamento_status = "confirmado"
+    venda.nfe_cancelamento_codigo = None
+    venda.nfe_cancelamento_motivo = None
     # A consulta externa terminou; outra transação pode ter cancelado/devolvido
     # a venda enquanto aguardávamos. Relê somente o estado comercial com lock,
     # sem enviar os campos fiscais ainda pendentes antes de obter a linha atual.
@@ -24,15 +25,20 @@ def sincronizar_venda_apos_cancelamento_fiscal(db, venda) -> None:
             venda.status = "finalizada"
 
 
-def validar_cancelamento_fiscal_venda(venda) -> None:
+def nota_fiscal_requer_regularizacao(venda) -> bool:
+    """Identifica documento ainda ativo sem confundir a venda com a nota.
+
+    Cancelar comercialmente a venda estorna estoque e financeiro, mas não
+    equivale ao registro de um evento fiscal pelo emissor.
+    """
     if nota_fiscal_cancelada(venda):
-        return
+        return False
 
     situacao = str(getattr(venda, "nfe_status", "") or "").strip().lower()
     if situacao in {"rejeitada", "rascunho", "denegada", "inutilizada"} and not getattr(
         venda, "nfe_data_autorizacao", None
     ):
-        return
+        return False
     if venda.status == "pago_nf" or situacao in {
         "autorizada",
         "emitida",
@@ -44,10 +50,16 @@ def validar_cancelamento_fiscal_venda(venda) -> None:
         "inconclusiva",
         "contingencia",
     }:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Cancele a nota fiscal e aguarde a confirmação do emissor "
-                "antes de cancelar a venda."
-            ),
-        )
+        return True
+    return bool(
+        getattr(venda, "nfe_data_autorizacao", None)
+        or getattr(venda, "nfe_correlation_id", None)
+        or getattr(venda, "nfe_bling_id", None)
+        or getattr(venda, "nfe_protocolo", None)
+    )
+
+
+def pendencia_fiscal_cancelamento(venda) -> bool:
+    return str(
+        getattr(venda, "status", "") or ""
+    ).strip().lower() == "cancelada" and nota_fiscal_requer_regularizacao(venda)

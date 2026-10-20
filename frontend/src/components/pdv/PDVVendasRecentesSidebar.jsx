@@ -10,7 +10,10 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { formatMoneyBRL } from "../../utils/formatters";
-import { obterSituacaoFiscalVenda } from "../../utils/pdvFiscalStatus";
+import {
+  obterSituacaoFiscalVenda,
+  obterPendenciaCancelamentoFiscal,
+} from "../../utils/pdvFiscalStatus";
 import { getTipoDevolucaoVenda } from "../../utils/pdvReturnEligibility";
 import { getSalesChannelInfo, isOnlineSalesChannel } from "../../utils/salesChannel";
 import CopyableCode from "../ui/CopyableCode";
@@ -329,6 +332,7 @@ export default function PDVVendasRecentesSidebar({
                     : "text-amber-800"
                   : "text-green-600";
                 const situacaoFiscal = obterSituacaoFiscalVenda(venda);
+                const pendenciaFiscal = obterPendenciaCancelamentoFiscal(venda);
                 const canalInfo = getCanalInfo(venda.canal);
                 const CanalIcon = canalInfo.Icon;
                 const entregaStatus = getEntregaStatusInfo(venda);
@@ -504,6 +508,15 @@ export default function PDVVendasRecentesSidebar({
                               .join(" — ")}
                           >
                             {situacaoFiscal.label}
+                          </StatusBadge>
+                        )}
+                        {pendenciaFiscal && (
+                          <StatusBadge
+                            intent={pendenciaFiscal.intent}
+                            size="xs"
+                            title={pendenciaFiscal.detalhe}
+                          >
+                            {pendenciaFiscal.label}
                           </StatusBadge>
                         )}
                       </div>
