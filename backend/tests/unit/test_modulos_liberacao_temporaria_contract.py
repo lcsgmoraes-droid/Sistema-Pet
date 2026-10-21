@@ -92,11 +92,8 @@ def test_plano_completo_nao_libera_modulo_fiscal_sem_contratacao():
     assert "fiscal" not in ativos
 
 
-def test_cobranca_bloqueada_zera_modulo_manual_e_assinatura_nao_so_o_do_plano():
-    """Regressao do bug corrigido: antes, so os modulos do plano eram
-    bloqueados quando a cobranca tinha problema — modulos ativados manualmente
-    (modulos_ativos) e via AssinaturaModulo continuavam liberados mesmo com
-    billing bloqueado. Agora acesso_liberado=False bloqueia as 3 fontes."""
+def test_suspensao_administrativa_zera_todas_fontes_de_modulo():
+    """O bloqueio cadastral explicito continua valendo para as tres fontes."""
     assinaturas = [SimpleNamespace(modulo="compras", data_fim=None)]
 
     ativos = _resolver_modulos_ativos(
@@ -105,6 +102,7 @@ def test_cobranca_bloqueada_zera_modulo_manual_e_assinatura_nao_so_o_do_plano():
         agora=datetime(2026, 9, 1, tzinfo=timezone.utc),
         planos=("pet-gestao",),
         acesso_liberado=False,
+        liberar_trial_completo=True,
     )
 
     assert ativos == []
@@ -196,5 +194,12 @@ def test_assinatura_trial_expirada_nao_precisa_mudar_banco_para_sinalizar():
     assert resumo["status_efetivo"] == "expired"
     assert resumo["trial_expirado"] is True
     assert resumo["dias_restantes_trial"] == 0
-    assert resumo["acesso_completo_durante_trial"] is False
-    assert _trial_completo_ativo(tenant, agora) is False
+    assert resumo["acesso_completo_durante_trial"] is True
+    assert _trial_completo_ativo(tenant, agora) is True
+    assert resumo["acesso_operacional_ativo"] is True
+    assert resumo["bloqueio_automatico"] is False
+    assert resumo["avisos_cobranca"] == {
+        "etapa": "revisao_manual",
+        "dias_atraso": None,
+        "requer_revisao": True,
+    }

@@ -17,7 +17,7 @@ const formatarQuantidade = (valor) =>
 export default function VendasPorVendedorPanel({ vendas, dataInicio, dataFim, formatarData }) {
   const [vendedorSelecionado, setVendedorSelecionado] = useState("");
   const [produtoSelecionado, setProdutoSelecionado] = useState("");
-  const [exportando, setExportando] = useState(false);
+  const [exportando, setExportando] = useState("");
   const produtos = useMemo(() => opcoesProdutosVendas(vendas), [vendas]);
   const produto = produtos.find((opcao) => opcao.value === produtoSelecionado);
   const filtrandoProduto = Boolean(produtoSelecionado);
@@ -49,23 +49,38 @@ export default function VendasPorVendedorPanel({ vendas, dataInicio, dataFim, fo
     0,
   );
 
-  const exportar = async () => {
+  const exportar = async (formato) => {
     if (!gruposVisiveis.length) {
       toast.error("Não há vendas para exportar nesse período.");
       return;
     }
-    setExportando(true);
+    setExportando(formato);
     try {
-      await exportarPlanilhasExcel(
-        planilhasVendasPorVendedor(gruposVisiveis, { inicio: dataInicio, fim: dataFim }, produto),
-        `vendas_por_vendedor_${filtrandoProduto ? `produto_${produtoSelecionado}_` : ""}${dataInicio}_${dataFim}.xlsx`,
-      );
+      const periodo = { inicio: dataInicio, fim: dataFim };
+      const nome = `vendas_por_vendedor_${filtrandoProduto ? `produto_${produtoSelecionado}_` : ""}${dataInicio}_${dataFim}`;
+      if (formato === "pdf") {
+        const { criarPdfVendasPorVendedor } = await import("./vendasPorVendedorPdf");
+        const pdf = await criarPdfVendasPorVendedor({
+          grupos: gruposVisiveis,
+          periodo,
+          produto,
+          vendedor:
+            opcoes.find((opcao) => opcao.value === vendedorSelecionado)?.label ||
+            "Todos os vendedores",
+        });
+        pdf.save(`${nome}.pdf`);
+      } else {
+        await exportarPlanilhasExcel(
+          planilhasVendasPorVendedor(gruposVisiveis, periodo, produto),
+          `${nome}.xlsx`,
+        );
+      }
       toast.success("Relatório por vendedor exportado.");
     } catch (error) {
       console.error("Erro ao exportar vendas por vendedor:", error);
       toast.error("Não foi possível exportar o relatório.");
     } finally {
-      setExportando(false);
+      setExportando("");
     }
   };
 
@@ -82,9 +97,20 @@ export default function VendasPorVendedorPanel({ vendas, dataInicio, dataFim, fo
               vendedor é o indicado na venda, independentemente da comissão.
             </p>
           </div>
-          <BotaoInteracao onClick={exportar} disabled={exportando || !gruposVisiveis.length}>
-            {exportando ? "Exportando..." : "Exportar Excel"}
-          </BotaoInteracao>
+          <div className="flex flex-wrap gap-2">
+            <BotaoInteracao
+              onClick={() => exportar("pdf")}
+              disabled={Boolean(exportando) || !gruposVisiveis.length}
+            >
+              {exportando === "pdf" ? "Gerando PDF..." : "Exportar PDF"}
+            </BotaoInteracao>
+            <BotaoInteracao
+              onClick={() => exportar("excel")}
+              disabled={Boolean(exportando) || !gruposVisiveis.length}
+            >
+              {exportando === "excel" ? "Exportando..." : "Exportar Excel"}
+            </BotaoInteracao>
+          </div>
         </div>
         <div className="mt-4 grid max-w-3xl gap-4 sm:grid-cols-2">
           <InputCombobox

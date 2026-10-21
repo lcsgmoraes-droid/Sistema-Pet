@@ -8,8 +8,10 @@ import {
   buildOpsTenantOnboardingPayload,
   buildOpsTenantTabSummaries,
   formatStorageMb,
+  getOpsTenantBlockingAuthorizationError,
   groupOpsTenantsByClient,
   isBillingAttention,
+  requiresOpsTenantBlockingAuthorization,
 } from "./opsTenantsUtils.js";
 
 test("isBillingAttention marca status de cobranca que precisam acompanhamento", () => {
@@ -121,9 +123,9 @@ test("buildOpsTenantCommercialForm monta formulario editavel com valores atuais"
 
   assert.deepEqual(form, {
     status: "active",
-    plan: "basico",
     billing_status: "trial",
-    subscription_source: "manual",
+    blocking_authorized_by_lucas: false,
+    blocking_authorization_reason: "",
   });
 });
 
@@ -144,9 +146,90 @@ test("buildOpsTenantCommercialPayload envia somente campos alterados", () => {
   );
 
   assert.deepEqual(payload, {
-    plan: "premium",
     billing_status: "active",
   });
+});
+
+test("suspensão exige nova autorização e motivo antes de enviar comprovação", () => {
+  const current = buildOpsTenantCommercialForm({ status: "active" });
+  for (const status of ["suspended", "inactive", "trial"]) {
+    const next = { ...current, status };
+    assert.equal(requiresOpsTenantBlockingAuthorization(current, next), true);
+    assert.match(getOpsTenantBlockingAuthorizationError(current, next), /autorização explícita/);
+    assert.deepEqual(buildOpsTenantCommercialPayload(current, next), { status });
+    assert.deepEqual(
+      buildOpsTenantCommercialPayload(current, {
+        ...next,
+        blocking_authorization_reason: "Motivo informado sem marcar a autorização do Lucas.",
+      }),
+      { status },
+    );
+    assert.deepEqual(
+      buildOpsTenantCommercialPayload(current, {
+        ...next,
+        blocking_authorized_by_lucas: true,
+        blocking_authorization_reason: "curto",
+      }),
+      { status },
+    );
+    assert.match(
+      getOpsTenantBlockingAuthorizationError(current, {
+        ...next,
+        blocking_authorized_by_lucas: true,
+        blocking_authorization_reason: "curto",
+      }),
+      /10 caracteres/,
+    );
+    assert.deepEqual(
+      buildOpsTenantCommercialPayload(current, {
+        ...next,
+        blocking_authorized_by_lucas: true,
+        blocking_authorization_reason:
+          " Lucas autorizou por telefone em 21/10; encerramento solicitado. ",
+      }),
+      {
+        status,
+        blocking_authorized_by_lucas: true,
+        blocking_authorization_reason:
+          "Lucas autorizou por telefone em 21/10; encerramento solicitado.",
+      },
+    );
+  }
+});
+
+test("reativação e ajuste de cobrança não exigem nem enviam autorização de bloqueio", () => {
+  for (const [current, next, expected] of [
+    [{ status: "suspended" }, { status: "active" }, { status: "active" }],
+    [
+      { status: "active", billing_status: "active" },
+      { status: "active", billing_status: "past_due" },
+      { billing_status: "past_due" },
+    ],
+    [
+      { status: "inactive", billing_status: "trial" },
+      { status: "inactive", billing_status: "active" },
+      { billing_status: "active" },
+    ],
+  ]) {
+    const form = {
+      ...next,
+      blocking_authorized_by_lucas: true,
+      blocking_authorization_reason: "Autorização anterior não pode ser reaproveitada.",
+    };
+    assert.equal(requiresOpsTenantBlockingAuthorization(current, form), false);
+    assert.equal(getOpsTenantBlockingAuthorizationError(current, form), "");
+    assert.deepEqual(buildOpsTenantCommercialPayload(current, form), expected);
+  }
+});
+
+test("autorização salva nunca é pré-selecionada no formulário", () => {
+  const form = buildOpsTenantCommercialForm({
+    status: "suspended",
+    blocking_authorized_by_lucas: true,
+    blocking_authorization_reason: "Autorização de uma interrupção anterior.",
+  });
+  assert.equal(form.blocking_authorized_by_lucas, false);
+  assert.equal(form.blocking_authorization_reason, "");
 });
 
 test("buildOpsTenantOnboardingForm monta acompanhamento salvo", () => {

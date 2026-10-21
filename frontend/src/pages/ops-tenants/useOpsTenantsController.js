@@ -7,6 +7,7 @@ import {
   buildOpsTenantOnboardingForm,
   buildOpsTenantOnboardingPayload,
   buildOpsTenantTabSummaries,
+  getOpsTenantBlockingAuthorizationError,
   groupOpsTenantsByClient,
 } from "../opsTenantsUtils";
 
@@ -217,7 +218,13 @@ export default function useOpsTenantsController() {
   }, [loadTenants, loadTenantsGrouped]);
 
   function handleCommercialChange(field, value) {
-    setCommercialForm((current) => ({ ...current, [field]: value }));
+    setCommercialForm((current) => ({
+      ...current,
+      [field]: value,
+      ...(field === "status"
+        ? { blocking_authorized_by_lucas: false, blocking_authorization_reason: "" }
+        : {}),
+    }));
     setCommercialError("");
     setCommercialSuccess("");
   }
@@ -230,6 +237,11 @@ export default function useOpsTenantsController() {
     }
 
     const original = buildOpsTenantCommercialForm(selectedTenant);
+    const authorizationError = getOpsTenantBlockingAuthorizationError(original, commercialForm);
+    if (authorizationError) {
+      setCommercialError(authorizationError);
+      return;
+    }
     const payload = buildOpsTenantCommercialPayload(original, commercialForm);
     if (Object.keys(payload).length === 0) {
       setCommercialSuccess("Nenhuma alteracao para salvar.");

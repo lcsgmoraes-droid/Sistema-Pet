@@ -165,6 +165,22 @@ Invoke-GateStep 'Backend format' $ruff @(
     'format', '--check', '.', '--exclude', 'alembic/versions'
 ) $backend
 
+Invoke-GateStep 'Billing operational continuity regression' $python @(
+    '-m', 'pytest',
+    'tests/unit/test_plan_catalog_and_limits.py',
+    'tests/unit/test_modulos_liberacao_temporaria_contract.py',
+    'tests/unit/test_module_access_dependency.py',
+    'tests/unit/test_custom_billing_offers.py',
+    'tests/unit/test_asaas_billing.py',
+    'tests/unit/test_ops_tenants_routes_contract.py', '-q'
+) $backend
+Invoke-GateStep 'Billing notices regression' $node @(
+    'src/utils/billingNotice.test.mjs'
+) $frontend
+Invoke-GateStep 'Tenant suspension authorization regression' $node @(
+    'src/pages/opsTenantsUtils.test.mjs'
+) $frontend
+
 Invoke-GateStep 'Frontend dependency audit' $npm @(
     'run', 'audit:dependencies'
 ) $frontend
