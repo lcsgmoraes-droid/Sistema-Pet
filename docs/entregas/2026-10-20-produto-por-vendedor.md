@@ -100,3 +100,28 @@ reaproveitar esta consulta; nenhum novo menu geral foi criado nesta entrega.
 Aceite técnico local atendido, com testes e limitações registrados. Publicação
 depende da autorização específica de Lucas. Conferência do produto/período real
 fica para o aceite de negócio após disponibilização no ambiente autorizado.
+
+## Atualização em 2026-10-21: exportação PDF
+
+A aba **Por vendedor** também oferece **Exportar PDF**, ao lado do Excel.
+Ambos recebem os mesmos grupos filtrados por período, produto e vendedor.
+O PDF contém filtros, totais, resumo por vendedor e detalhes das vendas;
+com produto selecionado, informa quantidade e valor bruto somente desse produto.
+Sem produto selecionado, mantém os totais originais das vendas.
+
+Geração local no navegador com a dependência jsPDF já existente, sem novo
+endpoint, dependência, configuração ou alteração de banco. Layout A4 paisagem,
+nomes com quebra de linha, cabeçalhos repetidos e páginas numeradas. Uma venda
+com muitos itens pode continuar nas páginas seguintes sem perder produtos.
+Quantidades não recebem unidade fixa, pois o payload não informa UN/KG.
+
+Validação adicional: 12 testes unitários de dados/relatório, 4 testes Playwright
+com API sintética (incluindo PDF filtrado e geral), build frontend, ESLint,
+Prettier e contrato de texto. Três amostras fictícias foram geradas e renderizadas
+com Poppler para conferência visual; a amostra extensa preservou 60 itens em
+seis páginas, além de quantidades fracionadas e valores no formato brasileiro.
+Os arquivos de amostra são temporários e não entram no Git.
+
+Entrega somente frontend. O rollback é reverter o commit desta atualização;
+nenhum dado precisa ser restaurado. A publicação continua dependendo de revisão
+do PR e autorização explícita de Lucas para produção.

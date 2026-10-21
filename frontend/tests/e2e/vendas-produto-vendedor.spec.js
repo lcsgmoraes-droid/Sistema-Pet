@@ -1,4 +1,4 @@
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 
 const baseUrl = process.env.E2E_BASE_URL;
@@ -154,4 +154,49 @@ test("exporta o recorte de produto para um arquivo Excel", async ({ page }) => {
   const dados = await stat(await arquivo.path());
   expect(dados.size).toBeGreaterThan(100);
   await expect(page.getByText("Relatório por vendedor exportado.", { exact: true })).toBeVisible();
+});
+
+async function baixarPdf(page) {
+  const baixar = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Exportar PDF", exact: true }).click();
+  const arquivo = await baixar;
+  expect(await arquivo.failure()).toBeNull();
+  const dados = await readFile(await arquivo.path());
+  expect(dados.subarray(0, 5).toString("ascii")).toBe("%PDF-");
+  expect(dados.length).toBeGreaterThan(1000);
+  return { arquivo, texto: dados.toString("latin1") };
+}
+
+test("exporta PDF somente do produto e vendedor selecionados", async ({ page }) => {
+  await abrirRelatorio(page);
+  await selecionarProduto(page);
+  await page.getByRole("combobox", { name: "Vendedor", exact: true }).fill("Ana QA");
+  await page.getByRole("option", { name: "Ana QA", exact: true }).click();
+  await expect(
+    page.getByText(/Quantidade do produto: 2.*Valor bruto do produto: R\$\s*60,00/),
+  ).toBeVisible();
+
+  const { arquivo, texto } = await baixarPdf(page);
+  expect(arquivo.suggestedFilename()).toMatch(
+    /^vendas_por_vendedor_produto_101_\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}\.pdf$/,
+  );
+  expect(texto).toContain("Ana QA");
+  expect(texto).toContain("60,00");
+  expect(texto).not.toContain("Bruno QA");
+  expect(texto).not.toContain("Areia QA");
+  expect(texto).not.toContain("QA-5");
+});
+
+test("exporta PDF de todos os produtos com o total original das vendas", async ({ page }) => {
+  await abrirRelatorio(page);
+  await expect(page.getByText(/4 venda\(s\) · Total vendido: R\$\s*460,00/)).toBeVisible();
+
+  const { arquivo, texto } = await baixarPdf(page);
+  expect(arquivo.suggestedFilename()).toMatch(
+    /^vendas_por_vendedor_\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}\.pdf$/,
+  );
+  expect(texto).toContain("Ana QA");
+  expect(texto).toContain("Bruno QA");
+  expect(texto).toContain("460,00");
+  expect(texto).not.toContain("QA-5");
 });
