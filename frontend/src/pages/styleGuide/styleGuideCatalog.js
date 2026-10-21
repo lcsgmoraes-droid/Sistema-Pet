@@ -177,7 +177,7 @@ export const styleGuideCatalog = [
         status: "pronto",
         arquivo: "components/v2/ResumoFaturamento/ResumoFaturamento.jsx",
         descricao:
-          "Faturamento líquido compartilhado entre dashboard e PDV: vendas menos descontos/devoluções, entrega separada e detalhes expansíveis de quitação e vendas. Aceita expansão controlada e suporte a modo escuro. Recebe a composição do backend sem recalcular métricas na tela.",
+          "Faturamento líquido por empresa ou caixa, conforme o escopo da composição do backend. No dashboard e fechamento usar mostrarDetalhes=false; expansão de quitação e vendas somente na auditoria do caixa. Aceita expansão controlada e modo escuro, sem recalcular métricas na tela.",
       },
       {
         nome: "EstadoVazio",

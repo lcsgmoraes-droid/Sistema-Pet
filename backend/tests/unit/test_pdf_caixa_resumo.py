@@ -1,4 +1,5 @@
 import pdfplumber
+import pytest
 
 from app.pdf_caixa import gerar_pdf_fechamento_caixa
 
@@ -14,13 +15,15 @@ def test_pdf_fechamento_mostra_vendido_recebido_formas_e_saldo_zerado():
             "total_recebido": 180,
             "vendas_por_forma_pagamento": {
                 "Dinheiro": {"total": 80},
-                "PIX": {"total": 100},
+                "PIX": {"total": 95},
+                "Cashback": {"total": 5},
                 "Crediário": {"total": 35},
                 "Boleto": {"total": 15},
             },
             "recebimentos_por_forma_pagamento": {
                 "Dinheiro": {"total": 80},
-                "PIX": {"total": 100},
+                "PIX": {"total": 95},
+                "Cashback": {"total": 5},
             },
             "totais": {
                 "vendas": 80,
@@ -59,8 +62,11 @@ def test_pdf_fechamento_mostra_vendido_recebido_formas_e_saldo_zerado():
         "Sangrias",
         "Saldo declarado",
         "Diferença",
+        "Cashback",
+        "as quitações podem incluir créditos e cashback",
     ):
         assert trecho.lower() in texto.lower()
+    assert "créditos utilizados ficam separados" not in texto
     assert texto.index("Vendas vinculadas ao caixa") < texto.index(
         "Crediário das vendas vinculadas"
     )
@@ -69,7 +75,13 @@ def test_pdf_fechamento_mostra_vendido_recebido_formas_e_saldo_zerado():
     )
 
 
-def test_pdf_separa_faturamento_liquido_recebimentos_anteriores_e_beneficios():
+@pytest.mark.parametrize(
+    "escopo,rotulo",
+    [("caixa", "origem neste caixa"), ("empresa", "empresa inteira")],
+)
+def test_pdf_separa_faturamento_liquido_recebimentos_anteriores_e_beneficios(
+    escopo, rotulo
+):
     pdf = gerar_pdf_fechamento_caixa(
         {
             "numero_caixa": 2,
@@ -82,6 +94,7 @@ def test_pdf_separa_faturamento_liquido_recebimentos_anteriores_e_beneficios():
             "vendas_periodo": {
                 "data_inicio": "2026-10-09",
                 "data_fim": "2026-10-09",
+                "escopo": escopo,
                 "faturamento_bruto": 220,
                 "descontos": 10,
                 "devolucoes": 25,
@@ -113,7 +126,7 @@ def test_pdf_separa_faturamento_liquido_recebimentos_anteriores_e_beneficios():
     with pdfplumber.open(pdf) as documento:
         texto = " ".join(page.extract_text() or "" for page in documento.pages)
     for trecho in (
-        "Vendas de 09/10/2026 - empresa inteira",
+        f"Vendas de 09/10/2026 - {rotulo}",
         "Faturamento líquido (vendas - descontos - devoluções)",
         "R$ 185,00",
         "R$ 10,00",

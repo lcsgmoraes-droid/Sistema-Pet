@@ -32,8 +32,8 @@ def opcoes_composicao_vendas():
     )
 
 
-def carregar_vendas_periodo(db, tenant_id, inicio, fim):
-    return (
+def carregar_vendas_periodo(db, tenant_id, inicio, fim, *, caixa_id=None):
+    query = (
         db.query(Venda)
         .options(*opcoes_composicao_vendas())
         .filter(
@@ -44,8 +44,10 @@ def carregar_vendas_periodo(db, tenant_id, inicio, fim):
                 Venda.status.is_(None), Venda.status.notin_(["cancelada", "cancelado"])
             ),
         )
-        .all()
     )
+    if caixa_id is not None:
+        query = query.filter(Venda.caixa_id == caixa_id)
+    return query.all()
 
 
 def montar_composicao_vendas(db, tenant_id, vendas, inicio, fim):
@@ -128,8 +130,17 @@ def montar_composicoes_caixa(db, *, caixa, tenant_id, movimentacoes):
     fechamento = instante_fechamento(caixa) if caixa.status == "fechado" else None
     fim = as_brasilia_naive(fechamento).date() if fechamento else now_brasilia().date()
     fim = max(inicio, fim)
-    vendas = carregar_vendas_periodo(db, tenant_id, inicio, fim)
+    # O caixa tem dois recortes distintos: vendas de origem nele e dentro de
+    # suas datas civis; recebimentos vinculados a ele, mesmo de vendas antigas.
+    # Painel e app chamam carregar_vendas_periodo sem caixa_id (empresa inteira).
+    vendas = carregar_vendas_periodo(db, tenant_id, inicio, fim, caixa_id=caixa.id)
     composicao_vendas = montar_composicao_vendas(db, tenant_id, vendas, inicio, fim)
+    composicao_vendas.update(
+        escopo="caixa",
+        caixa_id=caixa.id,
+        numero_caixa=caixa.numero_caixa,
+        criterio="origem_caixa_e_data_venda",
+    )
     # Não há filtro pela origem da venda. Recebimento pertence ao caixa que o
     # registrou; dinheiro vem dos movimentos, e os demais meios dos pagamentos.
     pagamentos = (
@@ -195,9 +206,15 @@ def montar_composicoes_caixa(db, *, caixa, tenant_id, movimentacoes):
                 "tipo": "estorno" if valor < 0 else "pagamento",
             }
         )
+    composicao_recebimentos = compor_recebimentos(
+        eventos, data_inicio=inicio, data_fim=fim
+    )
+    composicao_recebimentos.update(
+        caixa_id=caixa.id,
+        numero_caixa=caixa.numero_caixa,
+        criterio="vinculo_recebimento_caixa",
+    )
     return {
         "vendas_periodo": composicao_vendas,
-        "composicao_recebimentos": compor_recebimentos(
-            eventos, data_inicio=inicio, data_fim=fim
-        ),
+        "composicao_recebimentos": composicao_recebimentos,
     }
