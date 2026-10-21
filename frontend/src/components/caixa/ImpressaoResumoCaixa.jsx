@@ -78,14 +78,14 @@ export default function ImpressaoResumoCaixa({ resumo, onAfterPrint }) {
       </div>
       <div>Abertura: {new Date(resumo.caixa.data_abertura).toLocaleString("pt-BR")}</div>
       <h2>{impressao.tituloVendas}</h2>
-      {resumo.vendas_periodo && <p>Empresa inteira. Vendas − descontos − devoluções.</p>}
+      {impressao.descricaoVendas && <p>{impressao.descricaoVendas}</p>}
       {impressao.linhasVendas.map(([titulo, valor]) => (
         <div className="linha" key={titulo}>
           <span>{titulo}</span>
           <strong>{formatMoneyBRL(valor)}</strong>
         </div>
       ))}
-      <h2>Recebimentos neste caixa</h2>
+      <h2>{impressao.tituloRecebimentos}</h2>
       {impressao.periodoRecebimentos && <p>Período: {impressao.periodoRecebimentos}</p>}
       {impressao.linhasRecebimentos.map(([titulo, valor]) => (
         <div className="linha" key={titulo}>
@@ -100,7 +100,7 @@ export default function ImpressaoResumoCaixa({ resumo, onAfterPrint }) {
           <strong>{formatMoneyBRL(valor)}</strong>
         </div>
       ))}
-      <h2>{impressao.novoContrato ? "Formas de recebimento" : "Formas de quitação (legado)"}</h2>
+      <h2>{impressao.tituloFormas}</h2>
       {formas.map(([forma, dados]) => (
         <div className="linha" key={forma}>
           <span>
@@ -131,10 +131,7 @@ export default function ImpressaoResumoCaixa({ resumo, onAfterPrint }) {
           ))}
         </>
       )}
-      <p>
-        Crediário a receber e créditos utilizados ficam separados dos recebimentos. Apenas dinheiro
-        afeta o saldo físico. Abertura e suprimentos não são vendas.
-      </p>
+      <p>{impressao.notaRecebimentos}</p>
     </div>,
     document.body,
   );

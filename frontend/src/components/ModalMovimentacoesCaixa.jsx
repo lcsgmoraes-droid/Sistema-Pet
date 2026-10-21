@@ -42,7 +42,7 @@ export default function ModalMovimentacoesCaixa({ caixaId, onClose }) {
 
   const getTipoLabel = (tipo) => {
     const labels = {
-      venda: "Venda",
+      venda: "Recebimento de venda",
       suprimento: "Suprimento",
       sangria: "Sangria",
       despesa: "Despesa",

@@ -38,7 +38,19 @@ export function criarResumoImpressaoCaixa(resumo) {
     : [["Quitações registradas no caixa (legado)", resumo.total_recebido]];
 
   return {
-    tituloVendas: vendas ? `Vendas de ${periodoBR(vendas)}` : "Vendas vinculadas ao caixa",
+    tituloVendas: vendas
+      ? `Vendas ${vendas.escopo === "caixa" ? "deste caixa " : ""}de ${periodoBR(vendas)}`
+      : "Vendas vinculadas ao caixa",
+    descricaoVendas: vendas
+      ? `${vendas.escopo === "caixa" ? "Origem neste caixa. " : vendas.escopo === "empresa" ? "Empresa inteira. " : ""}Vendas − descontos − devoluções.`
+      : "",
+    tituloRecebimentos: recebimentos
+      ? "Recebimentos neste caixa"
+      : "Quitações registradas no caixa (legado)",
+    tituloFormas: recebimentos ? "Formas de recebimento" : "Formas de quitação (legado)",
+    notaRecebimentos: recebimentos
+      ? "Crediário a receber e créditos utilizados ficam separados dos recebimentos. Apenas dinheiro afeta o saldo físico. Abertura e suprimentos não são vendas."
+      : "Dados legados: as quitações podem incluir créditos e cashback. Esses registros não comprovam entrada de dinheiro novo. Apenas dinheiro afeta o saldo físico. Abertura e suprimentos não são vendas.",
     periodoRecebimentos: recebimentos ? periodoBR(recebimentos) : "",
     linhasVendas,
     linhasRecebimentos,

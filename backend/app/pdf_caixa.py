@@ -122,7 +122,14 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
         resumo_data.append([titulo, ""])
 
     if vendas:
-        adicionar_secao(f"Vendas de {formatar_periodo(vendas)} - empresa inteira")
+        escopo_vendas = (
+            " - origem neste caixa"
+            if vendas.get("escopo") == "caixa"
+            else " - empresa inteira"
+            if vendas.get("escopo") == "empresa"
+            else ""
+        )
+        adicionar_secao(f"Vendas de {formatar_periodo(vendas)}{escopo_vendas}")
         resumo_data.extend(
             [rotulo, formatar_moeda(vendas.get(chave))]
             for rotulo, chave in (
@@ -338,7 +345,11 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
     elements.append(Spacer(1, 0.5 * cm))
     elements.append(
         Paragraph(
-            "Vendas e recebimentos têm períodos e escopos próprios. Crediário a receber e créditos utilizados ficam separados dos recebimentos. Apenas dinheiro afeta o saldo físico. Suprimentos e abertura não são vendas.",
+            (
+                "Vendas e recebimentos têm períodos e escopos próprios. Crediário a receber e créditos utilizados ficam separados dos recebimentos. Apenas dinheiro afeta o saldo físico. Suprimentos e abertura não são vendas."
+                if recebimentos
+                else "Dados legados: as quitações podem incluir créditos e cashback. Esses registros não comprovam entrada de dinheiro novo. Apenas dinheiro afeta o saldo físico. Suprimentos e abertura não são vendas."
+            ),
             style_normal,
         )
     )

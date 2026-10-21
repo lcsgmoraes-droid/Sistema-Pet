@@ -7,7 +7,11 @@ import {
   periodoFaturamento,
 } from "../v2/ResumoFaturamento/faturamentoPresentation";
 
-export default function RecebimentosCaixaPanel({ composicao }) {
+export default function RecebimentosCaixaPanel({
+  composicao,
+  mostrarDetalhes = true,
+  somenteDetalhes = false,
+}) {
   const [expandido, setExpandido] = useState(false);
   const [formaSelecionada, setFormaSelecionada] = useState(null);
   const [limite, setLimite] = useState(20);
@@ -34,35 +38,63 @@ export default function RecebimentosCaixaPanel({ composicao }) {
 
   return (
     <section className="space-y-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-950/30">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h4 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
-            <WalletCards className="h-4 w-4" />
-            Recebimentos neste caixa
-          </h4>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-slate-950 dark:text-white">
-            {formatMoneyBRL(composicao.total_recebido)}
-          </p>
-          <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-            {periodoFaturamento(composicao)} · Somente este caixa
-          </p>
+      {!somenteDetalhes && (
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h4 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+              <WalletCards className="h-4 w-4" />
+              Recebimentos neste caixa
+            </h4>
+            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-950 dark:text-white">
+              {formatMoneyBRL(composicao.total_recebido)}
+            </p>
+            <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+              {periodoFaturamento(composicao)} · Somente este caixa
+            </p>
+          </div>
+          {mostrarDetalhes && (
+            <BotaoInteracao
+              tamanho="pequeno"
+              icon={expandido ? ChevronUp : ChevronDown}
+              onClick={() => setExpandido((atual) => !atual)}
+              aria-expanded={expandido}
+              aria-controls={detalhesId}
+              aria-label={`${expandido ? "Ocultar" : "Ver"} detalhes dos recebimentos neste caixa`}
+            >
+              {expandido ? "Ocultar detalhes" : "Detalhes"}
+            </BotaoInteracao>
+          )}
         </div>
-        <BotaoInteracao
-          tamanho="pequeno"
-          icon={expandido ? ChevronUp : ChevronDown}
-          onClick={() => setExpandido((atual) => !atual)}
-          aria-expanded={expandido}
-          aria-controls={detalhesId}
-          aria-label={`${expandido ? "Ocultar" : "Ver"} detalhes dos recebimentos neste caixa`}
-        >
-          {expandido ? "Ocultar detalhes" : "Detalhes"}
-        </BotaoInteracao>
-      </div>
+      )}
       <p className="text-xs text-slate-600 dark:text-slate-300">
         Pagamentos das vendas do período e de outras datas, incluindo vendas anteriores, parcelas de
         crediário pagas e registros sem data da venda. Crédito do cliente e cashback ficam
         separados.
       </p>
+      {mostrarDetalhes && (somenteDetalhes || expandido) && (
+        <dl className="space-y-2 text-sm text-slate-700 dark:text-slate-200">
+          <div className="flex justify-between gap-3">
+            <dt>Recebido de vendas do período</dt>
+            <dd className="font-semibold tabular-nums">
+              {formatMoneyBRL(composicao.vendas_periodo)}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt>Recebido de vendas de outras datas ou sem data</dt>
+            <dd className="font-semibold tabular-nums">
+              {formatMoneyBRL(composicao.vendas_anteriores)}
+            </dd>
+          </div>
+          {Number(composicao.devolucoes || 0) !== 0 && (
+            <div className="flex justify-between gap-3">
+              <dt>Devoluções e estornos</dt>
+              <dd className="font-semibold tabular-nums">
+                − {formatMoneyBRL(composicao.devolucoes)}
+              </dd>
+            </div>
+          )}
+        </dl>
+      )}
       <div>
         <h5 className="mb-2 text-sm font-bold text-slate-900 dark:text-white">
           Formas de recebimento
@@ -77,14 +109,16 @@ export default function RecebimentosCaixaPanel({ composicao }) {
                 <p className="font-semibold">{forma}</p>
                 <p className="tabular-nums">{formatMoneyBRL(dados.total)}</p>
               </div>
-              <BotaoInteracao
-                tamanho="pequeno"
-                onClick={() => abrirForma(forma)}
-                aria-pressed={formaSelecionada === forma}
-                aria-label={`Ver recebimentos em ${forma}`}
-              >
-                Detalhes
-              </BotaoInteracao>
+              {mostrarDetalhes && (
+                <BotaoInteracao
+                  tamanho="pequeno"
+                  onClick={() => abrirForma(forma)}
+                  aria-pressed={formaSelecionada === forma}
+                  aria-label={`Ver recebimentos em ${forma}`}
+                >
+                  Detalhes
+                </BotaoInteracao>
+              )}
             </div>
           ))}
           {formas.length === 0 && (
@@ -108,7 +142,7 @@ export default function RecebimentosCaixaPanel({ composicao }) {
             {formatMoneyBRL(composicao.creditos_utilizados)}
           </strong>
         </div>
-        {(composicao.detalhes_creditos || []).length > 0 && (
+        {mostrarDetalhes && (composicao.detalhes_creditos || []).length > 0 && (
           <>
             <BotaoInteracao
               tamanho="pequeno"
@@ -141,33 +175,11 @@ export default function RecebimentosCaixaPanel({ composicao }) {
           </>
         )}
       </div>
-      {expandido && (
+      {mostrarDetalhes && (somenteDetalhes || expandido) && (
         <div
           id={detalhesId}
           className="space-y-3 border-t border-emerald-200 pt-3 dark:border-emerald-800"
         >
-          <dl className="space-y-2 text-sm text-slate-700 dark:text-slate-200">
-            <div className="flex justify-between gap-3">
-              <dt>Vendas do período</dt>
-              <dd className="font-semibold tabular-nums">
-                {formatMoneyBRL(composicao.vendas_periodo)}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt>Vendas de outras datas ou sem data</dt>
-              <dd className="font-semibold tabular-nums">
-                {formatMoneyBRL(composicao.vendas_anteriores)}
-              </dd>
-            </div>
-            {Number(composicao.devolucoes || 0) !== 0 && (
-              <div className="flex justify-between gap-3">
-                <dt>Devoluções e estornos</dt>
-                <dd className="font-semibold tabular-nums">
-                  − {formatMoneyBRL(composicao.devolucoes)}
-                </dd>
-              </div>
-            )}
-          </dl>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h5 className="text-sm font-bold text-slate-900 dark:text-white">
               {formaSelecionada

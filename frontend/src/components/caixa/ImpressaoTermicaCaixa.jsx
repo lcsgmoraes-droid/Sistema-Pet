@@ -101,7 +101,7 @@ export default function ImpressaoTermicaCaixa({ documento, onAfterPrint }) {
           <p>Fechamento: {dataHora(resumo.caixa.data_fechamento)}</p>
           <hr />
           <h1>{impressao.tituloVendas}</h1>
-          {resumo.vendas_periodo && <p>Empresa inteira. Vendas − descontos − devoluções.</p>}
+          {impressao.descricaoVendas && <p>{impressao.descricaoVendas}</p>}
           {impressao.linhasVendas.map(([rotulo, valor]) => (
             <div className="linha" key={rotulo}>
               <span>{rotulo}</span>
@@ -109,7 +109,7 @@ export default function ImpressaoTermicaCaixa({ documento, onAfterPrint }) {
             </div>
           ))}
           <hr />
-          <h1>Recebimentos neste caixa</h1>
+          <h1>{impressao.tituloRecebimentos}</h1>
           {impressao.periodoRecebimentos && <p>Período: {impressao.periodoRecebimentos}</p>}
           {impressao.linhasRecebimentos.map(([rotulo, valor]) => (
             <div className="linha" key={rotulo}>
@@ -117,9 +117,7 @@ export default function ImpressaoTermicaCaixa({ documento, onAfterPrint }) {
               <strong>{formatMoneyBRL(valor ?? 0)}</strong>
             </div>
           ))}
-          <h1>
-            {impressao.novoContrato ? "Formas de recebimento" : "Formas de quitação (legado)"}
-          </h1>
+          <h1>{impressao.tituloFormas}</h1>
           {impressao.formas.map(([forma, dados]) => (
             <div className="linha" key={forma}>
               <span>{forma}</span>
@@ -135,10 +133,7 @@ export default function ImpressaoTermicaCaixa({ documento, onAfterPrint }) {
             </div>
           ))}
           <hr />
-          <p>
-            Crediário a receber e créditos utilizados ficam separados dos recebimentos. Apenas
-            dinheiro afeta o saldo físico. Abertura e suprimentos não são vendas.
-          </p>
+          <p>{impressao.notaRecebimentos}</p>
           <div className="assinatura">
             ____________________________
             <br />

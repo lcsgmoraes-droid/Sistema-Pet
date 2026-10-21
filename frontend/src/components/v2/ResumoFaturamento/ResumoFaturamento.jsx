@@ -168,6 +168,7 @@ export default function ResumoFaturamento({
   detalhesFora = false,
   detalhesId,
   aoAbrirRelatorio,
+  mostrarDetalhes = true,
 }) {
   const idGerado = useId();
   const id = detalhesId || `faturamento-${idGerado}`;
@@ -197,25 +198,33 @@ export default function ResumoFaturamento({
               {formulaFaturamento(composicao)}
             </p>
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              Todas as vendas da empresa pela data da venda.
+              {composicao.escopo === "caixa"
+                ? "Vendas originadas neste caixa, pela data da venda."
+                : "Todas as vendas da empresa pela data da venda."}
             </p>
             {composicao.avisos?.length > 0 && (
-              <p className="mt-2 text-xs font-semibold text-amber-800 dark:text-amber-300">
-                Há ressalvas neste cálculo. Consulte os detalhes.
-              </p>
+              <div className="mt-2 space-y-1 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                {mostrarDetalhes ? (
+                  <p>Há ressalvas neste cálculo. Consulte os detalhes.</p>
+                ) : (
+                  composicao.avisos.map((aviso) => <p key={aviso}>{aviso}</p>)
+                )}
+              </div>
             )}
-            <div className="mt-3">
-              <BotaoInteracao
-                tamanho="pequeno"
-                icon={expandidoAtual ? ChevronUp : ChevronDown}
-                onClick={alternar}
-                aria-expanded={expandidoAtual}
-                aria-controls={id}
-                aria-label={`${expandidoAtual ? "Ocultar" : "Ver"} detalhes do faturamento líquido`}
-              >
-                {expandidoAtual ? "Ocultar detalhes" : "Detalhes"}
-              </BotaoInteracao>
-            </div>
+            {mostrarDetalhes && (
+              <div className="mt-3">
+                <BotaoInteracao
+                  tamanho="pequeno"
+                  icon={expandidoAtual ? ChevronUp : ChevronDown}
+                  onClick={alternar}
+                  aria-expanded={expandidoAtual}
+                  aria-controls={id}
+                  aria-label={`${expandidoAtual ? "Ocultar" : "Ver"} detalhes do faturamento líquido`}
+                >
+                  {expandidoAtual ? "Ocultar detalhes" : "Detalhes"}
+                </BotaoInteracao>
+              </div>
+            )}
           </>
         ) : (
           <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -223,7 +232,7 @@ export default function ResumoFaturamento({
           </p>
         )}
       </CartaoIndicador>
-      {expandidoAtual && !detalhesFora && (
+      {mostrarDetalhes && expandidoAtual && !detalhesFora && (
         <DetalhesFaturamento composicao={composicao} id={id} aoAbrirRelatorio={aoAbrirRelatorio} />
       )}
     </div>

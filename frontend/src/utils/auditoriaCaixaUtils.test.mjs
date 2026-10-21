@@ -8,7 +8,34 @@ import {
   formasAuditoria,
   paginarAuditoria,
   pagamentosVendaAuditoria,
+  selecionarVendasAuditoria,
+  naturezaQuitacaoAuditoria,
 } from "./auditoriaCaixaUtils.js";
+
+test("recorte da auditoria separa as vendas do indicador dos demais vínculos preservados", () => {
+  const registros = [
+    { id: 1, status: "finalizada" },
+    { id: 2, status: "cancelada" },
+    { id: 3, data_venda: "2026-10-08" },
+    { id: 4, caixa_origem_id: 99 },
+  ];
+  const composicao = { detalhes: [{ venda_id: "1" }] };
+  assert.deepEqual(selecionarVendasAuditoria(registros, composicao), [registros[0]]);
+  assert.deepEqual(selecionarVendasAuditoria(registros, composicao, "outros"), registros.slice(1));
+  assert.equal(selecionarVendasAuditoria(registros, composicao, "todos"), registros);
+  assert.equal(selecionarVendasAuditoria(registros, null), registros);
+  assert.deepEqual(selecionarVendasAuditoria(registros, { detalhes: [] }), []);
+});
+
+test("histórico identifica benefícios e planos sem tratar cartão de crédito como benefício", () => {
+  for (const forma of ["Crédito Cliente", "Crédito do cliente", "Cashback utilizado"]) {
+    assert.match(naturezaQuitacaoAuditoria({ forma_pagamento: forma }), /sem entrada de dinheiro/);
+  }
+  assert.match(naturezaQuitacaoAuditoria({ forma_pagamento: "Crediário" }), /não é recebimento/);
+  assert.match(naturezaQuitacaoAuditoria({ intervalo_crediario: "30" }), /não é recebimento/);
+  assert.equal(naturezaQuitacaoAuditoria({ forma_pagamento: "Cartão de crédito" }), "");
+  assert.equal(naturezaQuitacaoAuditoria({ forma_pagamento: "PIX" }), "");
+});
 
 test("auditoria percorre todas as vendas com no máximo 25 por página sem perder referências", () => {
   const registros = Array.from({ length: 72 }, (_, id) => ({ id, assinatura: `assinatura-${id}` }));
