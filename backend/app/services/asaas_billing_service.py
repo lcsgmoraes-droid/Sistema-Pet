@@ -502,6 +502,15 @@ def apply_payment_event(
         # Um webhook atrasado nao pode reabrir uma cobranca ja quitada.
         return tenant
 
+    if str(tenant.billing_status or "").strip().lower() in {
+        "active",
+        "paid",
+        "ok",
+        "em_dia",
+    } and not getattr(tenant, "subscription_activated_at", None):
+        # Preserva a ativacao anterior de cadastros legados. Atraso/estorno
+        # informa a cobranca sem recolocar um cliente pagante em trial.
+        tenant.subscription_activated_at = datetime.now(timezone.utc)
     _apply_payment_snapshot(tenant, payment)
     tenant.subscription_source = "asaas"
     manual_approval = False

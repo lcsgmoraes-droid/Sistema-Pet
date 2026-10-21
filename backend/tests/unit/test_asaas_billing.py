@@ -101,6 +101,33 @@ def test_pagamento_confirmado_ativa_assinatura():
     assert tenant.subscription_source == "asaas"
 
 
+@pytest.mark.parametrize("tenant_status", ["active", "suspended", "inactive"])
+def test_estorno_nao_muda_suspensao_administrativa_nem_reabre_trial(tenant_status):
+    from app.routes.modulos_routes import _assinatura_resumo_tenant
+
+    now = datetime.now(timezone.utc)
+    tenant = _tenant(
+        status=tenant_status,
+        billing_status="active",
+        trial_started_at=now - timedelta(days=31),
+        trial_ends_at=now - timedelta(days=1),
+    )
+
+    apply_payment_event(
+        _FakeSession(tenant),
+        "PAYMENT_REFUNDED",
+        {"id": "pay_refunded", "externalReference": tenant.id, "status": "REFUNDED"},
+    )
+
+    summary = _assinatura_resumo_tenant(tenant, now)
+    assert tenant.status == tenant_status
+    assert tenant.billing_status == "refunded"
+    assert tenant.billing_payment_status == "REFUNDED"
+    assert tenant.subscription_activated_at is not None
+    assert summary["acesso_completo_durante_trial"] is False
+    assert summary["acesso_operacional_ativo"] is (tenant_status == "active")
+
+
 def test_webhook_atrasado_nao_reabre_cobranca_confirmada():
     tenant = _tenant(
         billing_status="active",

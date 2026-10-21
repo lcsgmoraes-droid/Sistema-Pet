@@ -12,7 +12,7 @@ from app.routes.modulos_routes import (
     _assinatura_resumo_tenant,
     _resolver_modulos_ativos,
 )
-from app.services.billing_access import overdue_grace_state
+from app.services.billing_access import billing_warning_state, overdue_grace_state
 from app.security.module_access import _load_active_entitlements
 from app.services import plan_limits
 from app.services.plan_catalog import (
@@ -31,6 +31,7 @@ from app.session_manager import SESSION_SCOPE_ECOMMERCE, SESSION_SCOPE_ERP
 def _tenant(plan: str, **overrides):
     values = {
         "id": "tenant-1",
+        "status": "active",
         "plan": plan,
         "billing_status": "active",
         "trial_started_at": None,
@@ -139,7 +140,7 @@ def test_trial_does_not_apply_the_selected_plan_limit():
     assert db.query.call_count == 1
 
 
-def test_expired_trial_blocks_new_sales_until_activation():
+def test_expired_trial_preserves_sales_until_administrative_decision():
     now = datetime(2026, 7, 18, tzinfo=timezone.utc)
     tenant_query = MagicMock()
     tenant_query.filter.return_value.with_for_update.return_value.first.return_value = (
@@ -153,11 +154,9 @@ def test_expired_trial_blocks_new_sales_until_activation():
     db = MagicMock()
     db.query.return_value = tenant_query
 
-    with pytest.raises(HTTPException) as exc:
-        enforce_monthly_sales_limit(db, "tenant-1")
+    enforce_monthly_sales_limit(db, "tenant-1", now)
 
-    assert exc.value.status_code == 402
-    assert exc.value.detail["code"] == "subscription_inactive"
+    assert db.query.call_count == 1
 
 
 def test_atraso_libera_vendas_ate_o_decimo_quinto_dia():
@@ -177,7 +176,7 @@ def test_atraso_libera_vendas_ate_o_decimo_quinto_dia():
     assert db.query.call_count == 1
 
 
-def test_atraso_bloqueia_vendas_a_partir_do_decimo_sexto_dia():
+def test_atraso_preserva_vendas_depois_do_decimo_sexto_dia():
     tenant_query = MagicMock()
     tenant_query.filter.return_value.with_for_update.return_value.first.return_value = (
         _tenant(
@@ -189,14 +188,12 @@ def test_atraso_bloqueia_vendas_a_partir_do_decimo_sexto_dia():
     db = MagicMock()
     db.query.return_value = tenant_query
 
-    with pytest.raises(HTTPException) as exc:
-        enforce_monthly_sales_limit(db, "tenant-1", datetime(2026, 7, 17, 12, 0))
+    enforce_monthly_sales_limit(db, "tenant-1", datetime(2026, 7, 17, 12, 0))
 
-    assert exc.value.status_code == 402
-    assert exc.value.detail["code"] == "subscription_inactive"
+    assert db.query.call_count == 1
 
 
-def test_atraso_exibe_contagem_e_preserva_recursos_ate_o_limite():
+def test_atraso_exibe_aviso_sem_agendar_bloqueio_e_preserva_recursos():
     due_date = datetime(2026, 7, 1).date()
     tenant = _tenant(
         "pet-venda-ativa",
@@ -209,24 +206,220 @@ def test_atraso_exibe_contagem_e_preserva_recursos_ate_o_limite():
     assert overdue_grace_state(tenant, datetime(2026, 7, 2).date()) == {
         "in_grace": True,
         "access_allowed": True,
-        "days_until_block": 15,
-        "block_on": "2026-07-17",
+        "days_until_block": None,
+        "block_on": None,
     }
     resumo = _assinatura_resumo_tenant(
         tenant, datetime(2026, 7, 2, 12, tzinfo=timezone.utc)
     )
     assert resumo["status_efetivo"] == "past_due"
     assert resumo["acesso_operacional_ativo"] is True
-    assert resumo["tolerancia_atraso"]["dias_restantes"] == 15
+    assert resumo["tolerancia_atraso"]["dias_restantes"] is None
+    assert resumo["tolerancia_atraso"]["bloqueio_em"] is None
+    assert resumo["bloqueio_automatico"] is False
     assert "sales.app_ecommerce" in _load_active_entitlements(
         db, tenant.id, datetime(2026, 7, 16, tzinfo=timezone.utc)
     )
-    assert (
-        _load_active_entitlements(
-            db, tenant.id, datetime(2026, 7, 17, 12, tzinfo=timezone.utc)
-        )
-        == []
+    assert "sales.app_ecommerce" in _load_active_entitlements(
+        db, tenant.id, datetime(2026, 7, 17, 12, tzinfo=timezone.utc)
     )
+
+
+@pytest.mark.parametrize(
+    ("days", "stage", "review"),
+    [
+        (1, "lembrete", False),
+        (7, "lembrete", False),
+        (8, "atencao", False),
+        (15, "atencao", False),
+        (16, "revisao_manual", True),
+        (120, "revisao_manual", True),
+    ],
+)
+def test_avisos_de_atraso_escalonam_sem_interromper_acesso(days, stage, review):
+    due = datetime(2026, 7, 1).date()
+    tenant = _tenant(
+        "pet-venda-ativa", billing_status="past_due", billing_next_due_date=due
+    )
+
+    assert billing_warning_state(tenant, due + timedelta(days=days)) == {
+        "etapa": stage,
+        "dias_atraso": days,
+        "requer_revisao": review,
+    }
+    assert (
+        overdue_grace_state(tenant, due + timedelta(days=days))["access_allowed"]
+        is True
+    )
+
+
+@pytest.mark.parametrize(
+    "billing", ["pending", "past_due", "expired", "blocked", "refunded", "canceled"]
+)
+def test_status_financeiro_nao_bloqueia_vendas_nem_recursos_contratados(billing):
+    now = datetime(2026, 7, 18, tzinfo=timezone.utc)
+    tenant = _tenant("pet-venda-ativa", billing_status=billing)
+    db = MagicMock()
+    db.query.return_value.filter.return_value.with_for_update.return_value.first.return_value = tenant
+    db.query.return_value.filter.return_value.first.return_value = tenant
+
+    enforce_monthly_sales_limit(db, tenant.id, now)
+    summary = _assinatura_resumo_tenant(tenant, now)
+    assert summary["status_efetivo"] == billing
+    assert summary["acesso_operacional_ativo"] is True
+    assert "sales.app_ecommerce" in _load_active_entitlements(db, tenant.id, now)
+
+
+@pytest.mark.parametrize("status", ["inactive", "suspended"])
+def test_suspensao_administrativa_bloqueia_mesmo_com_trial_ativo(status):
+    now = datetime(2026, 7, 18, tzinfo=timezone.utc)
+    tenant = _tenant(
+        "pet-start",
+        status=status,
+        billing_status="trial",
+        trial_started_at=now,
+        trial_ends_at=now + timedelta(days=30),
+    )
+    db = MagicMock()
+    db.query.return_value.filter.return_value.with_for_update.return_value.first.return_value = tenant
+    db.query.return_value.filter.return_value.first.return_value = tenant
+
+    with pytest.raises(HTTPException) as exc:
+        enforce_monthly_sales_limit(db, tenant.id, now)
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] == "tenant_inactive"
+    assert _load_active_entitlements(db, tenant.id, now) == []
+    assert (
+        _assinatura_resumo_tenant(tenant, now)["acesso_completo_durante_trial"] is False
+    )
+
+
+def test_trial_vencido_nao_revoga_sessoes_antes_da_decisao_administrativa():
+    now = datetime(2026, 7, 18, tzinfo=timezone.utc)
+    tenant = _tenant(
+        "pet-start",
+        billing_status="expired",
+        trial_started_at=now - timedelta(days=31),
+        trial_ends_at=now - timedelta(days=1),
+    )
+    db = MagicMock()
+
+    assert (
+        enforce_simultaneous_session_limit(
+            db, tenant, SimpleNamespace(token_jti="new"), now
+        )
+        == 0
+    )
+    db.query.assert_not_called()
+
+
+def test_ativacao_manual_apos_trial_aplica_limite_do_plano_contratado():
+    now = datetime(2026, 7, 18, tzinfo=timezone.utc)
+    tenant = _tenant(
+        "pet-start",
+        billing_status="active",
+        trial_started_at=now - timedelta(days=31),
+        trial_ends_at=now - timedelta(days=1),
+    )
+    tenant_query = MagicMock()
+    tenant_query.filter.return_value.with_for_update.return_value.first.return_value = (
+        tenant
+    )
+    sales_query = MagicMock()
+    sales_query.filter.return_value.count.return_value = 300
+    db = MagicMock()
+    db.query.side_effect = [tenant_query, sales_query]
+
+    with pytest.raises(HTTPException) as exc:
+        enforce_monthly_sales_limit(db, tenant.id, now)
+    assert exc.value.detail["code"] == "monthly_sales_limit_reached"
+    assert (
+        _assinatura_resumo_tenant(tenant, now)["acesso_completo_durante_trial"] is False
+    )
+
+
+@pytest.mark.parametrize(
+    "billing", ["pending", "past_due", "blocked", "refunded", "canceled"]
+)
+def test_cobranca_pendente_nao_retira_escopo_do_trial_ainda_nao_ativado(billing):
+    now = datetime(2026, 7, 18, tzinfo=timezone.utc)
+    tenant = _tenant(
+        "pet-start",
+        billing_status=billing,
+        trial_started_at=now - timedelta(days=31),
+        trial_ends_at=now - timedelta(days=1),
+    )
+    db = MagicMock()
+    db.query.return_value.filter.return_value.with_for_update.return_value.first.return_value = tenant
+    db.query.return_value.filter.return_value.first.return_value = tenant
+
+    enforce_monthly_sales_limit(db, tenant.id, now)
+    assert (
+        enforce_simultaneous_session_limit(
+            db, tenant, SimpleNamespace(token_jti="new"), now
+        )
+        == 0
+    )
+    assert set(_load_active_entitlements(db, tenant.id, now)) == ALL_PUBLIC_ENTITLEMENTS
+    assert (
+        _assinatura_resumo_tenant(tenant, now)["acesso_completo_durante_trial"] is True
+    )
+
+
+@pytest.mark.parametrize(
+    "billing", ["active", "paid", "ok", "em_dia", "past_due", "blocked"]
+)
+def test_ativacao_anterior_nao_reabre_trial_com_atraso_posterior(billing):
+    now = datetime(2026, 7, 18, tzinfo=timezone.utc)
+    tenant = _tenant(
+        "pet-start",
+        billing_status=billing,
+        trial_started_at=now - timedelta(days=31),
+        trial_ends_at=now - timedelta(days=1),
+        subscription_activated_at=now - timedelta(days=2),
+    )
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = tenant
+
+    summary = _assinatura_resumo_tenant(tenant, now)
+    assert summary["acesso_completo_durante_trial"] is False
+    assert "finance.management" not in _load_active_entitlements(db, tenant.id, now)
+    assert summary["acesso_operacional_ativo"] is True
+
+
+@pytest.mark.parametrize("billing", ["active", "paid", "ok", "em_dia"])
+def test_ativacao_manual_sem_timestamp_nao_reabre_trial(billing):
+    now = datetime(2026, 7, 18, tzinfo=timezone.utc)
+    tenant = _tenant(
+        "pet-start",
+        billing_status=billing,
+        trial_started_at=now - timedelta(days=31),
+        trial_ends_at=now - timedelta(days=1),
+    )
+
+    summary = _assinatura_resumo_tenant(tenant, now)
+    assert summary["acesso_completo_durante_trial"] is False
+    assert summary["status_efetivo"] == "active"
+
+
+@pytest.mark.parametrize("billing", ["overdue", "late", "inadimplente"])
+def test_alias_de_atraso_nao_e_exibido_como_plano_em_dia(billing):
+    now = datetime(2026, 7, 18, 12, tzinfo=timezone.utc)
+    tenant = _tenant(
+        "pet-start",
+        billing_status=billing,
+        billing_next_due_date=datetime(2026, 7, 1).date(),
+    )
+
+    summary = _assinatura_resumo_tenant(tenant, now)
+    assert summary["status"] == "past_due"
+    assert summary["status_efetivo"] == "past_due"
+    assert summary["avisos_cobranca"] == {
+        "etapa": "revisao_manual",
+        "dias_atraso": 17,
+        "requer_revisao": True,
+    }
+    assert summary["acesso_operacional_ativo"] is True
 
 
 def test_atraso_sem_data_nao_bloqueia_automaticamente():

@@ -142,11 +142,36 @@ export function buildOpsTenantCommercialForm(tenant = {}) {
     billing_status: String(tenant?.billing_status || "active")
       .trim()
       .toLowerCase(),
+    blocking_authorized_by_lucas: false,
+    blocking_authorization_reason: "",
   };
 }
 
+export function requiresOpsTenantBlockingAuthorization(current = {}, next = {}) {
+  const currentStatus = String(current.status || "")
+    .trim()
+    .toLowerCase();
+  const nextStatus = String(next.status || "")
+    .trim()
+    .toLowerCase();
+  return Boolean(
+    nextStatus && nextStatus !== currentStatus && !["active", "ativo"].includes(nextStatus),
+  );
+}
+
+export function getOpsTenantBlockingAuthorizationError(current = {}, next = {}) {
+  if (!requiresOpsTenantBlockingAuthorization(current, next)) return "";
+  if (next.blocking_authorized_by_lucas !== true) {
+    return "Confirme a autorização explícita do Lucas antes de interromper a operação.";
+  }
+  if (String(next.blocking_authorization_reason || "").trim().length < 10) {
+    return "Registre o motivo e a referência da autorização do Lucas com pelo menos 10 caracteres.";
+  }
+  return "";
+}
+
 export function buildOpsTenantCommercialPayload(current = {}, next = {}) {
-  return ["status", "billing_status"].reduce((payload, field) => {
+  const payload = ["status", "billing_status"].reduce((result, field) => {
     const currentValue = String(current?.[field] || "")
       .trim()
       .toLowerCase();
@@ -154,10 +179,18 @@ export function buildOpsTenantCommercialPayload(current = {}, next = {}) {
       .trim()
       .toLowerCase();
     if (nextValue && nextValue !== currentValue) {
-      payload[field] = nextValue;
+      result[field] = nextValue;
     }
-    return payload;
+    return result;
   }, {});
+  if (
+    requiresOpsTenantBlockingAuthorization(current, next) &&
+    !getOpsTenantBlockingAuthorizationError(current, next)
+  ) {
+    payload.blocking_authorized_by_lucas = true;
+    payload.blocking_authorization_reason = String(next.blocking_authorization_reason).trim();
+  }
+  return payload;
 }
 
 export function buildOpsTenantOnboardingForm(tenant = {}) {

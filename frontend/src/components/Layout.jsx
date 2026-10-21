@@ -9,6 +9,7 @@ import { api } from "../services/api";
 import { isAdminRole } from "../auth/userRole";
 import { useEscapeFallbackForVisibleModals } from "../utils/modalEscape";
 import { isVeterinarioProfile } from "../utils/veterinarioPerfil";
+import { buildBillingNotice } from "../utils/billingNotice";
 import {
   markIntNFeCertificateAlert,
   shouldNotifyIntNFeCertificate,
@@ -45,8 +46,7 @@ const Layout = () => {
   const isBradescoOrganizerRoute = location.pathname === "/organizador-bradesco";
   const { user, logout } = useAuth();
   const { assinaturaAtual, modulosAtivos, moduloAtivo } = useModulos();
-  const toleranciaAtraso = assinaturaAtual?.tolerancia_atraso;
-  const avisoAtraso = assinaturaAtual?.status === "past_due";
+  const avisoCobranca = buildBillingNotice(assinaturaAtual);
 
   // Estado para detectar mobile
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -734,19 +734,17 @@ const Layout = () => {
             />
           )}
 
-          {avisoAtraso && (
+          {avisoCobranca && (
             <div
               role="status"
-              className="flex shrink-0 flex-wrap items-center gap-2 border-b border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+              className={`flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2 text-sm ${
+                avisoCobranca.tone === "rose"
+                  ? "border-rose-300 bg-rose-50 text-rose-950 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-100"
+                  : "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+              }`}
             >
               <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span>
-                {toleranciaAtraso?.em_vigor
-                  ? toleranciaAtraso.dias_restantes == null
-                    ? "Pagamento em atraso. O acesso segue liberado enquanto confirmamos o vencimento."
-                    : `Pagamento em atraso. Faltam ${toleranciaAtraso.dias_restantes} ${toleranciaAtraso.dias_restantes === 1 ? "dia" : "dias"} para o bloqueio das funções.`
-                  : "O prazo de 15 dias após o vencimento terminou. Regularize o pagamento para liberar as funções."}
-              </span>
+              <span>{avisoCobranca.text}</span>
               <Link to="/meu-plano" className="font-semibold underline underline-offset-2">
                 Ver meu plano
               </Link>

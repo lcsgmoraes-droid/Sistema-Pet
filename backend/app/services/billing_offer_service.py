@@ -28,7 +28,6 @@ from app.services.asaas_billing_service import (
     _subscription_payment,
     _trial_active,
 )
-from app.services.billing_access import overdue_grace_state
 from app.services.billing_contract_service import (
     ContractAcceptanceContext,
     build_contract_acceptance,
@@ -780,13 +779,8 @@ def apply_offer_payment_event(
         _sync_offer_modules(db, offer=offer, tenant=tenant, active=True)
     elif normalized_event in PAYMENT_PAST_DUE_EVENTS:
         offer.status = "past_due"
-        # O vencimento permanece visivel, mas os extras seguem ativos na tolerancia.
-        _sync_offer_modules(
-            db,
-            offer=offer,
-            tenant=tenant,
-            active=overdue_grace_state(tenant)["access_allowed"],
-        )
+        # Apenas registra a divida. Nao suspende nem reativa extras: a ultima
+        # decisao comercial explicita continua valendo para cada modulo.
     elif normalized_event in PAYMENT_BLOCK_EVENTS:
         offer.status = "blocked"
-        _sync_offer_modules(db, offer=offer, tenant=tenant, active=False)
+        # Cancelamento/estorno financeiro exige revisao, sem corte automatico.

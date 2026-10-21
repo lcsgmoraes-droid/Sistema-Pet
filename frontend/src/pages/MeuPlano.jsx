@@ -21,6 +21,7 @@ import { buildSalesContactUrl, publicPlans, serviceInvoiceAddon } from "../data/
 import { api } from "../services/api";
 import BillingPaymentProofPanel from "./BillingPaymentProofPanel";
 import { formatMoneyBRL } from "../utils/formatters";
+import { buildBillingNotice } from "../utils/billingNotice";
 
 const WHATSAPP_NUMERO = "5518997401641";
 const PLAN_OPTIONS = Object.entries(publicPlans).flatMap(([segment, plans]) =>
@@ -44,6 +45,14 @@ function formatDate(value) {
 
 function getStatusInfo(assinatura) {
   const status = assinatura?.status_efetivo || assinatura?.status || "trial";
+  const avisoCobranca = buildBillingNotice(assinatura);
+
+  if (avisoCobranca) {
+    return {
+      ...avisoCobranca,
+      icon: { attention: AlertTriangle, clock: Clock3, lock: Lock }[avisoCobranca.icon],
+    };
+  }
 
   if (assinatura?.acesso_completo_durante_trial) {
     return {
@@ -60,55 +69,6 @@ function getStatusInfo(assinatura) {
       tone: "emerald",
       icon: CheckCircle2,
       text: "A empresa está ativa no plano contratado.",
-    };
-  }
-
-  if (status === "past_due" && assinatura?.tolerancia_atraso?.em_vigor) {
-    const dias = assinatura.tolerancia_atraso.dias_restantes;
-    return {
-      label: "Pagamento em atraso",
-      tone: "amber",
-      icon: AlertTriangle,
-      text:
-        dias == null
-          ? "O acesso continua liberado enquanto confirmamos a data de vencimento."
-          : `O acesso continua liberado. Faltam ${dias} ${dias === 1 ? "dia" : "dias"} para o bloqueio das funções caso o pagamento não seja regularizado.`,
-    };
-  }
-
-  if (status === "expired") {
-    return {
-      label: "Trial encerrado",
-      tone: "amber",
-      icon: AlertTriangle,
-      text: "O período de acesso completo terminou. Escolha um plano com nosso atendimento.",
-    };
-  }
-
-  if (status === "blocked") {
-    return {
-      label: "Acesso em analise",
-      tone: "rose",
-      icon: Lock,
-      text: "Entre em contato para regularizar o acesso da empresa.",
-    };
-  }
-
-  if (status === "pending") {
-    return {
-      label: "Pagamento pendente",
-      tone: "amber",
-      icon: Clock3,
-      text: "A assinatura foi criada e aguarda a confirmacao do pagamento.",
-    };
-  }
-
-  if (["past_due", "refunded", "canceled"].includes(status)) {
-    return {
-      label: "Pagamento precisa de atencao",
-      tone: "rose",
-      icon: AlertTriangle,
-      text: "Regularize a assinatura para manter os recursos do plano liberados.",
     };
   }
 

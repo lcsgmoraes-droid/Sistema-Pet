@@ -58,6 +58,8 @@ class CommercialStateRequest(BaseModel):
     plan: str | None = None
     billing_status: str | None = None
     subscription_source: str | None = None
+    blocking_authorized_by_lucas: bool = False
+    blocking_authorization_reason: str | None = Field(default=None, max_length=880)
 
 
 class OnboardingFollowUpRequest(BaseModel):
@@ -225,6 +227,7 @@ def atualizar_estado_comercial_tenant(
             db,
             tenant_id=tenant_id,
             changes=payload.model_dump(exclude_unset=True),
+            actor_platform_admin_id=_current_admin.id,
         )
         db.commit()
         return result
