@@ -69,7 +69,9 @@ def test_mobile_gestor_screen_has_requested_periods_and_indicators():
     ]:
         assert label not in revenue_card
     assert "composicao?.avisos" in revenue_card
-    assert "composicao?.faturamento_liquido ?? vendas.faturamento_liquido" in revenue_card
+    assert (
+        "composicao?.faturamento_liquido ?? vendas.faturamento_liquido" in revenue_card
+    )
     assert '"/app/gestor/resumo"' in service
     for field in [
         "saldo_inicial",
