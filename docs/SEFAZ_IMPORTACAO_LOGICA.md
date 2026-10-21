@@ -1,5 +1,7 @@
 # SEFAZ — Lógica Completa da Importação Automática e o Erro 656
 
+> **Registro histórico:** esta análise descreve o fluxo antigo e contém hipóteses sobre a causa do erro 656, sem confirmação nos logs atuais. Para a implementação e operação vigentes, use [Distribuição de NF-e de entrada pela SEFAZ](SEFAZ_DISTRIBUICAO_ENTRADAS.md). Não use as instruções de reset ou pulo de NSU abaixo para ativar a captura.
+
 > Documento técnico para entender como o sistema busca NF-e na SEFAZ,
 > como o agendamento automático funciona, o que é o erro 656 e como o sistema tenta se defender dele.
 

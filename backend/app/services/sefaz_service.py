@@ -334,14 +334,20 @@ class SefazService:
 
             conteudo_b64 = (elem.text or "").strip()
             if not conteudo_b64:
-                continue
+                raise HTTPException(
+                    status_code=502,
+                    detail="SEFAZ retornou um documento vazio; lote não processado.",
+                )
 
             try:
-                xml_bruto = gzip.decompress(base64.b64decode(conteudo_b64)).decode(
-                    "utf-8", errors="replace"
-                )
-            except Exception:  # noqa: BLE001
-                continue
+                xml_bruto = gzip.decompress(
+                    base64.b64decode(conteudo_b64, validate=True)
+                ).decode("utf-8")
+            except Exception as exc:  # noqa: BLE001
+                raise HTTPException(
+                    status_code=502,
+                    detail="SEFAZ retornou um documento inválido; lote não processado.",
+                ) from exc
 
             documentos.append(
                 {
@@ -474,6 +480,12 @@ class SefazService:
         parsed = cls._parse_retorno_dist_dfe(soap)
 
         c_stat = parsed["c_stat"]
+        if c_stat == "656":
+            raise SefazConsumoIndevidoError(
+                mensagem="SEFAZ bloqueou consultas por consumo indevido (cStat 656).",
+                ult_nsu=parsed.get("ult_nsu", "000000000000000"),
+                max_nsu=parsed.get("max_nsu", "000000000000000"),
+            )
         if c_stat not in {"138", "139", "137"}:
             raise HTTPException(
                 status_code=502,

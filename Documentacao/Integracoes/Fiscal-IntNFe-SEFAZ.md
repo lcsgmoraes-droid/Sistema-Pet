@@ -1,6 +1,6 @@
 ---
 tipo: integracao
-atualizado: 2026-09-12
+atualizado: 2026-10-14
 ---
 
 # Integração — Fiscal (SEFAZ + IntNFe)
@@ -12,10 +12,10 @@ Parte de [[Integracoes]]. Ver [[Produtos-Estoque]]. Fontes pré-existentes usada
 ## 1. SEFAZ (consulta/importação de XML de NF-e destinada ao CNPJ do tenant)
 
 - **Arquivos:** `services/sefaz_service.py`, `services/sefaz_sync_coordinator.py`, `routes/sefaz_routes.py`.
-- **Comunicação:** certificado digital A1 (PFX) + webservice SOAP/REST da SEFAZ, **polling por NSU** (não é webhook).
+- **Comunicação:** certificado digital A1 (PFX) + webservice SOAP `NFeDistribuicaoDFe`, **polling por NSU** (não é webhook).
 - **Autenticação:** `SEFAZ_ENABLED`, `SEFAZ_MODO`, `SEFAZ_CERT_PATH`, `SEFAZ_CERT_PASSWORD`, `SEFAZ_CNPJ`, `SEFAZ_UF`, `SEFAZ_TIMEOUT_SECONDS`, `SEFAZ_ULTIMO_NSU`.
-- **Falhas/retry:** timeout 30s, retry adaptativo por tipo de erro.
-- ⚠️ **Job de sincronização automática está inerte no código** (`_loop_sefaz_sync` retorna imediatamente, `main_background_jobs.py:251-260`) — preservado como histórico, não executa hoje. Ver [[Arquitetura]].
+- **Falhas/retry:** timeout de rede configurável; documentos salvos com erro de importação são reprocessados localmente, sem nova consulta à SEFAZ.
+- **Job de sincronização automática:** o código consulta apenas empresas que ativaram `importacao_automatica`, respeitando o intervalo e o bloqueio da SEFAZ. Cada documento recebido é guardado antes do avanço do NSU. A implantação e a ativação em produção são etapas separadas. Ver `docs/SEFAZ_DISTRIBUICAO_ENTRADAS.md`.
 - **Finalidade:** importação de documentos fiscais destinados ao CNPJ (ex.: notas de entrada emitidas por fornecedores).
 
 ## 2. IntNFe (ativação do emitente próprio, CSC, numeração)
