@@ -47,7 +47,7 @@ Centralização de código · zero redundância · boas práticas (DDD, SOLID) p
 | Fase | Entrega | Situação |
 |---|---|---|
 | Fase 1 | Planejamento macro, documentação e roadmap | **Em andamento** (escopo e roadmap prontos; revisão com o Lucas) |
-| Fase 2 | Protótipo navegável (artefato) com backend conceitual, sem acesso ao sistema | Pendente |
+| Fase 2 | Protótipo navegável (artefato) com backend conceitual, sem acesso ao sistema | **Versão 1 pronta; aguardando ajustes (P.9)** |
 | Fase 3 | Desenvolvimento em etapas 0 a 8 | Pendente |
 
 | Etapa | Tema | Situação |
@@ -81,15 +81,17 @@ Centralização de código · zero redundância · boas práticas (DDD, SOLID) p
 
 Objetivo: fechar a ideia das telas e dos contratos antes de escrever código de produto. Sem acesso ao backend.
 
-- [ ] P.1 Revisar o protótipo anterior de notificações (tela do OPS e histórico de envios) para o novo escopo.
-- [ ] P.2 **Kanban de leads:** colunas, cartões (tutor, pets, última compra, origem, responsável, próxima ação), arrastar entre colunas, criação manual, **identificação visual da loja em cada card**, **filtro de lojas** (ver tudo ou lojas específicas), filtros por responsável, origem e segmento.
-- [ ] P.3 **Ficha 360 do tutor:** linha do tempo unificada, pets, oportunidades sugeridas, consentimento e canais.
-- [ ] P.4 **Caixa de conversas:** lista, conversa, quem responde (IA, humano, aguardando), assumir e devolver, notas internas, janela de 24h e modelos de mensagem.
-- [ ] P.5 **Atendimento por IA:** regras de parada, resumo para o atendente, o que a IA consulta e faz, limites e créditos.
-- [ ] P.6 **Automações:** catálogo de gatilhos (aniversário, ração acabando, vacina, medicação, inativo, recompra), modelos, limites, liga/desliga por loja.
-- [ ] P.7 **Configuração do canal por loja** e tela do OPS (revisada); saldo e consumo de créditos.
-- [ ] P.8 Contratos conceituais: lead, etapa, interação, canal, modelo de mensagem, consentimento, crédito (dados e regras).
+- [x] P.1 Revisar o protótipo anterior (incorporado ao novo protótipo, versão 1) de notificações (tela do OPS e histórico de envios) para o novo escopo.
+- [x] P.2 **Kanban de leads:** colunas, cartões (tutor, pets, última compra, origem, responsável, próxima ação), arrastar entre colunas, criação manual, **identificação visual da loja em cada card**, **filtro de lojas** (ver tudo ou lojas específicas), filtros por responsável, origem e segmento.
+- [x] P.3 **Ficha 360 do tutor:** linha do tempo unificada, pets, oportunidades sugeridas, consentimento e canais.
+- [x] P.4 **Caixa de conversas:** lista, conversa, quem responde (IA, humano, aguardando), assumir e devolver, notas internas, janela de 24h e modelos de mensagem.
+- [x] P.5 **Atendimento por IA:** regras de parada, resumo para o atendente, o que a IA consulta e faz, limites e créditos.
+- [x] P.6 **Automações:** catálogo de gatilhos (aniversário, ração acabando, vacina, medicação, inativo, recompra), modelos, limites, liga/desliga por loja.
+- [x] P.7 **Configuração do canal por loja** e tela do OPS (revisada); saldo e consumo de créditos.
+- [x] P.8 Contratos conceituais: lead, etapa, interação, canal, modelo de mensagem, consentimento, crédito (dados e regras).
 - [ ] P.9 Rodada de ajustes com o Lucas e congelamento do protótipo.
+
+**Protótipo versão 1 (21/10):** `docs/crm/prototipo/crm-prototipo.html` (publicado também como artefato privado). Cobre Kanban com filtro de lojas e loja em cada card, ficha 360, caixa de conversas (IA, assumir, devolver, resumo, janela de 24h, notas), automações com bloqueios, configurações da loja, créditos e OPS. Contratos em `CONTRATOS_CONCEITUAIS.md`.
 
 ---
 
@@ -322,4 +324,5 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 | Data | Mudança |
 |---|---|
+| 21/10/2026 | Protótipo versão 1 e contratos conceituais criados; itens P.1 a P.8 concluídos. |
 | 21/10/2026 | Criação do roadmap detalhado: fases 1 a 3, Etapas 0 a 8 e temas transversais, com as decisões de 19/10 e 21/10 registradas. |
