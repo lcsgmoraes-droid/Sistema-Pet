@@ -197,7 +197,10 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 ### Etapa 2 — Kanban de leads
 
-- [ ] 2.1 Funil padrão e etapas configuráveis pela loja (nome, ordem, cor, final ganho ou perdido). `[?] DECIDIR` etapas iniciais.
+- [ ] 2.1 Colunas configuráveis pela loja (nome, ordem e **tipo**: entrada, em andamento, concluído, encerrado sem resultado; mínimo 1 entrada e 1 concluído; máximo 8). Modelo padrão para pet shop: Novo, Em contato, Proposta enviada, Aguardando tutor, Resolvido, Sem interesse. `[?] DECIDIR` colunas iniciais definitivas.
+- [ ] 2.1a **Oportunidade** como entidade dentro do lead (tipo, detalhe, estado aberta/resolvida/descartada, motivo, ciclo, marca de genérica) e regras: sinal novo soma ao card aberto; sinal genérico esmaece se houver específico; sinal específico ou genérico para card concluído abre novo ciclo e devolve o card à entrada.
+- [ ] 2.1b **Ciclo** e histórico: contador de ciclo no lead, movimentações com ciclo e nota, fechamento de ciclo com resultado por oportunidade, reabertura, "Caminhada do card" na ficha, colunas finais com janela de N dias.
+- [ ] 2.1c Ação "Separar em outro card" e marca "Separado de outro card" (a conversa continua a mesma).
 - [ ] 2.2 Tela do quadro (v2): colunas, cartões, contagem e valor por coluna, estados vazio, carregando e erro.
 - [ ] 2.3 Arrastar e soltar entre colunas, gravando o histórico de movimentação. Decisão de 21/10: sem menu de etapa no card. `[?] DECIDIR` como atender teclado e celular (o arrastar nativo do navegador não funciona por toque): usar biblioteca já instalada que suporta toque e teclado, ou manter o campo de etapa na ficha.
 - [ ] 2.4a **Indicação de vínculo no card:** selo "Lead novo · sem cadastro" só para lead sem pessoa (sem selo quando vinculado); título com o nome do perfil do WhatsApp, sem número no card; número guardado no lead e usado para preencher o cadastro ao criar ou vincular; ficha com os dados da pessoa vindos do cadastro de Pessoas e atalho para abrir o cadastro completo; ações "Vincular a cadastro existente" e "Criar cadastro". `[?] DECIDIR` regras de vínculo (ver Etapas 0.4 e 1.6), um lead por tutor ou por oportunidade, e leads de lojas diferentes do mesmo grupo.
@@ -339,6 +342,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 | Data | Mudança |
 |---|---|
+| 21/10/2026 | Protótipo versão 9: um card por tutor com várias oportunidades, colunas configuráveis com tipos, ciclos, fechamento por oportunidade, reabertura, separação de card, caminhada do card e simulação de sinais do dia. |
 | 21/10/2026 | Protótipo versão 8: cor da origem do lead segue a diretriz (risco e prazo em amarelo, aniversário em rosa). |
 | 21/10/2026 | Protótipo versão 7: diretriz de cores de atenção aplicada e legenda de cores no Mapa do protótipo. |
 | 21/10/2026 | Protótipo versão 6: sem selo de código; só "Lead novo · sem cadastro"; nome do WhatsApp no card e número só na ficha. |

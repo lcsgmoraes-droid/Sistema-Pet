@@ -6,9 +6,10 @@ Descrevem dados e regras como o protótipo (`prototipo/crm-prototipo.html`) as s
 
 | Entidade | Para que serve | Campos principais |
 |---|---|---|
-| Funil e Etapa | Colunas do Kanban, configuráveis pela loja | nome, ordem, final (ganho ou perdido) |
-| Lead | Pessoa em acompanhamento comercial | loja, tutor (cadastro opcional), telefone, etapa, origem, responsável, valor estimado, próxima ação e data, motivo de perda |
-| Movimentação | Histórico de cada mudança de etapa | lead, de, para, quem, quando |
+| Coluna | Colunas do Kanban, configuráveis pela loja | nome, ordem, **tipo** (entrada, em andamento, concluído, encerrado sem resultado); mínimo 1 entrada e 1 concluído, máximo 8 |
+| Oportunidade | Motivo de contato dentro do lead (vacina, ração, sem comprar, aniversário, cashback, VIP em risco...) | lead, ciclo, tipo, detalhe, estado (aberta, resolvida, descartada), motivo, marca de sinal genérico |
+| Lead | **Um por tutor por loja**, permanente; contém as oportunidades e os ciclos | loja, tutor (cadastro opcional), telefone, etapa, origem, responsável, valor estimado, próxima ação e data, motivo de perda |
+| Movimentação | Histórico de cada mudança de coluna, inclusive reaberturas e voltas | lead, ciclo, de, para, quem, quando, nota |
 | Interação | Tudo que aconteceu com o tutor (mensagem, ligação, compra, vacina, banho, etapa) | lead ou tutor, tipo, resumo, origem, quando |
 | Conversa | Troca de mensagens por WhatsApp | loja, lead, estado, última mensagem do tutor, mensagens |
 | Mensagem | Item da conversa | de (tutor, IA, atendente, sistema, nota interna), texto ou modelo, estado de entrega, custo em créditos |
@@ -35,6 +36,12 @@ Descrevem dados e regras como o protótipo (`prototipo/crm-prototipo.html`) as s
 **Automação:** só dispara se a loja ligou, o tutor consentiu, o limite por tutor não foi atingido, está fora do horário de silêncio e há créditos. O disparo cai na conversa e na linha do tempo do lead e consome créditos pela categoria do modelo.
 
 **Créditos:** cada mensagem com modelo e cada resposta da IA consomem créditos (valores de exemplo); o atendente em texto livre consome pouco. Sem saldo, a IA para e a conversa vai para a fila humana. Valores e cobrança serão definidos depois.
+
+**Card por tutor e oportunidades:** o card é do tutor e traz todas as oportunidades abertas (a mais específica primeiro). Um sinal novo é somado ao card aberto; se o card estava concluído ou encerrado, ele **volta para a coluna de entrada** com um novo ciclo. Sinal genérico (ex.: sem comprar) fica esmaecido enquanto houver oportunidade específica. "Separar em outro card" cria um card próprio para uma oportunidade, mantendo a mesma conversa.
+
+**Ciclo e colunas finais:** mover o card para uma coluna de tipo concluído ou encerrado pede o resultado de cada oportunidade aberta (resolvida ou descartada com motivo) e registra o fechamento do ciclo. Colunas finais mostram só os últimos N dias (configurável). Reabrir (mover de volta para coluna em andamento) devolve as oportunidades do ciclo ao estado aberto. Cada ciclo guarda a sua caminhada de colunas.
+
+**Informações do card:** loja, tutor, pets, oportunidades abertas, selo de ciclo, estado do atendimento, consentimento, próxima ação, último contato, tempo na coluna (atenção após 5 dias) e valor.
 
 **Kanban:** o card mostra a loja (nome e marca), tutor, pets, origem, responsável, próxima ação e valor. Mover entre colunas grava Movimentação. O filtro de lojas é limitado às lojas do usuário.
 
