@@ -1,9 +1,11 @@
-import { Plus, SearchX } from "lucide-react";
+import { Plus, SearchX, Settings2 } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "../../contexts/AuthContext";
 import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
 import EstadoVazio from "../../components/v2/EstadoVazio/EstadoVazio";
 import InputComboboxMultiplo from "../../components/v2/InputComboboxMultiplo/InputComboboxMultiplo";
 import InputTexto from "../../components/v2/InputTexto/InputTexto";
+import CrmColunasModal from "./CrmColunasModal";
 import CrmConcluirModal from "./CrmConcluirModal";
 import CrmFichaModal from "./CrmFichaModal";
 import CrmNovoCardModal from "./CrmNovoCardModal";
@@ -25,6 +27,11 @@ function Esqueleto() {
 
 export default function CrmPage() {
   const crm = useCrmQuadro();
+  const { user } = useAuth();
+  const permissoes = user?.permissions || [];
+  const podeCriar = permissoes.includes("crm.leads");
+  const podeConfigurar = permissoes.includes("crm.configurar");
+  const [configurando, setConfigurando] = useState(false);
   const [novoCard, setNovoCard] = useState(false);
   const [fichaDoCard, setFichaDoCard] = useState(null);
   const semCards = crm.colunas.every((coluna) => coluna.total === 0);
@@ -43,9 +50,18 @@ export default function CrmPage() {
             Acompanhe seus tutores e oportunidades. Arraste os cards entre as colunas.
           </p>
         </div>
-        <BotaoInteracao icon={Plus} onClick={() => setNovoCard(true)}>
-          Novo card
-        </BotaoInteracao>
+        <div className="flex flex-wrap gap-2">
+          {podeConfigurar && crm.lojasDoQuadro[0] ? (
+            <BotaoInteracao icon={Settings2} onClick={() => setConfigurando(true)}>
+              Colunas
+            </BotaoInteracao>
+          ) : null}
+          {podeCriar ? (
+            <BotaoInteracao icon={Plus} onClick={() => setNovoCard(true)}>
+              Novo card
+            </BotaoInteracao>
+          ) : null}
+        </div>
       </header>
 
       <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -111,6 +127,17 @@ export default function CrmPage() {
           onFechar={() => setNovoCard(false)}
           onCriado={() => {
             setNovoCard(false);
+            crm.recarregar();
+          }}
+        />
+      ) : null}
+
+      {configurando && crm.lojasDoQuadro[0] ? (
+        <CrmColunasModal
+          loja={crm.lojasDoQuadro[0]}
+          onFechar={() => setConfigurando(false)}
+          onSalvo={() => {
+            setConfigurando(false);
             crm.recarregar();
           }}
         />

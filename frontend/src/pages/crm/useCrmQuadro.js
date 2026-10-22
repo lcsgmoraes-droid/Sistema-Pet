@@ -178,6 +178,7 @@ export default function useCrmQuadro() {
     escolherLojas,
     idsValidos,
     lojasDisponiveis,
+    lojasDoQuadro,
     movendoId,
     moverCard,
     multiLoja,

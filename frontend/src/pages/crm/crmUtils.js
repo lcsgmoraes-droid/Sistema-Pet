@@ -2,6 +2,7 @@
 
 export const TIPOS_FINAIS = ["concluido", "encerrado"];
 export const DIAS_PARA_ATENCAO = 5;
+export const MAXIMO_DE_COLUNAS = 8;
 
 export const ROTULO_TIPO_DE_COLUNA = {
   entrada: "Entrada",
@@ -130,4 +131,27 @@ export function exigenciasDaMovimentacao(card, colunaDestino, colunaOrigem) {
     exigeMotivoDaPerda,
     oportunidades,
   };
+}
+
+/** Mesmas regras do servidor: devolve a mensagem do problema ou "" se estiver tudo certo. */
+export function validarColunas(colunas) {
+  if (colunas.length < 2) return "Use pelo menos duas colunas.";
+  if (colunas.length > MAXIMO_DE_COLUNAS) {
+    return `O funil pode ter no máximo ${MAXIMO_DE_COLUNAS} colunas.`;
+  }
+  const nomes = new Set();
+  for (const coluna of colunas) {
+    const nome = String(coluna.nome || "").trim();
+    if (!nome) return "Toda coluna precisa de um nome.";
+    const chave = nome.toLocaleLowerCase("pt-BR");
+    if (nomes.has(chave)) return `Já existe uma coluna chamada “${nome}”.`;
+    nomes.add(chave);
+  }
+  if (!colunas.some((coluna) => coluna.tipo === "entrada")) {
+    return "O funil precisa de uma coluna de entrada.";
+  }
+  if (!colunas.some((coluna) => coluna.tipo === "concluido")) {
+    return "O funil precisa de uma coluna de concluído.";
+  }
+  return "";
 }

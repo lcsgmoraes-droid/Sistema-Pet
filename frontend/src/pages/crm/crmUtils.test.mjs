@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { exigenciasDaMovimentacao, situacaoDoPasso, unificarQuadros } from "./crmUtils.js";
+import {
+  exigenciasDaMovimentacao,
+  situacaoDoPasso,
+  unificarQuadros,
+  validarColunas,
+} from "./crmUtils.js";
 
 const coluna = (id, nome, tipo, ordem, cards = []) => ({
   id,
@@ -81,4 +86,17 @@ test("exigenciasDaMovimentacao pede resultado só ao concluir com oportunidades 
   );
   // De coluna final para outra final não repete a pergunta.
   assert.equal(exigenciasDaMovimentacao(card, encerrado, concluido).exigeModal, false);
+});
+
+test("validarColunas segue as regras do servidor", () => {
+  const c = (nome, tipo) => ({ nome, tipo });
+
+  assert.equal(validarColunas([c("Novo", "entrada"), c("Feito", "concluido")]), "");
+  assert.match(validarColunas([c("Novo", "entrada")]), /pelo menos duas/);
+  assert.match(validarColunas([c("Novo", "andamento"), c("Feito", "concluido")]), /entrada/);
+  assert.match(validarColunas([c("Novo", "entrada"), c("Feito", "andamento")]), /concluído/);
+  assert.match(validarColunas([c("Novo", "entrada"), c("novo", "concluido")]), /Já existe/);
+  assert.match(validarColunas([c("", "entrada"), c("Feito", "concluido")]), /nome/);
+  const nove = Array.from({ length: 9 }, (_, i) => c(`C${i}`, "andamento"));
+  assert.match(validarColunas(nove), /no máximo 8/);
 });
