@@ -27,12 +27,84 @@ function LinhasValores({ linhas }) {
   );
 }
 
+export function TotaisFormasPagamento({ composicao }) {
+  const formas = composicao?.formas_pagamento;
+  const disponivel =
+    Array.isArray(formas) &&
+    composicao.valor_pago != null &&
+    Number.isFinite(Number(composicao.valor_pago)) &&
+    composicao.ajustes_formas_pagamento != null &&
+    Number.isFinite(Number(composicao.ajustes_formas_pagamento));
+  const ajuste = disponivel ? Number(composicao.ajustes_formas_pagamento) : 0;
+
+  return (
+    <section
+      aria-label="Pagamentos das vendas do período"
+      className="border-t border-slate-200 pt-3 dark:border-slate-700"
+    >
+      <h4 className="mb-2 text-sm font-bold text-slate-900 dark:text-white">
+        Pagamentos das vendas do período
+      </h4>
+      <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+        Pagamentos das mesmas vendas deste indicador, inclusive os realizados em outras datas ou
+        caixas. Créditos, cashback e crediário a receber aparecem separados na situação das vendas.
+      </p>
+      {!disponivel ? (
+        <p role="status" className="text-sm text-slate-500 dark:text-slate-400">
+          Os totais por forma de pagamento estão indisponíveis. Atualize o painel.
+        </p>
+      ) : (
+        <>
+          {formas.length === 0 && Number(composicao.valor_pago) === 0 && ajuste === 0 && (
+            <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
+              Nenhum pagamento registrado para as vendas do período.
+            </p>
+          )}
+          <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+            {formas.map((forma) => (
+              <div key={forma.forma_pagamento} className="flex items-start justify-between gap-3">
+                <dt className="text-slate-600 dark:text-slate-300">{forma.forma_pagamento}</dt>
+                <dd className="shrink-0 font-semibold tabular-nums text-slate-950 dark:text-white">
+                  {formatMoneyBRL(forma.total)}
+                </dd>
+              </div>
+            ))}
+            {ajuste !== 0 && (
+              <div className="flex items-start justify-between gap-3 sm:col-span-2">
+                <dt className="text-slate-600 dark:text-slate-300">
+                  Ajustes não atribuídos a uma forma
+                </dt>
+                <dd className="shrink-0 font-semibold tabular-nums text-slate-950 dark:text-white">
+                  {formatMoneyBRL(composicao.ajustes_formas_pagamento)}
+                </dd>
+              </div>
+            )}
+            <div className="flex items-start justify-between gap-3 border-t border-slate-200 pt-2 sm:col-span-2 dark:border-slate-700">
+              <dt className="font-bold text-slate-900 dark:text-white">Total pago</dt>
+              <dd className="shrink-0 font-bold tabular-nums text-slate-950 dark:text-white">
+                {formatMoneyBRL(composicao.valor_pago)}
+              </dd>
+            </div>
+          </dl>
+          {ajuste !== 0 && (
+            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+              Devoluções e diferenças entre os pagamentos registrados e o total quitado ficam
+              separadas quando a forma do ajuste não está identificada.
+            </p>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 export function DetalhesFaturamento({
   composicao,
   id,
   aoAbrirRelatorio,
   renderAcoesVenda,
   classeVenda,
+  mostrarTotaisPorForma = false,
 }) {
   const [limite, setLimite] = useState(20);
   if (!composicao) return null;
@@ -76,6 +148,7 @@ export function DetalhesFaturamento({
           </p>
         </div>
       </div>
+      {mostrarTotaisPorForma && <TotaisFormasPagamento composicao={composicao} />}
       <div className="border-t border-slate-200 pt-3 dark:border-slate-700">
         <h4 className="mb-2 text-sm font-bold text-slate-900 dark:text-white">
           Vendas que compõem o valor ({composicao.quantidade || 0})
@@ -178,6 +251,7 @@ export default function ResumoFaturamento({
   mostrarDetalhes = true,
   renderAcoesVenda,
   classeVenda,
+  mostrarTotaisPorForma = false,
 }) {
   const idGerado = useId();
   const id = detalhesId || `faturamento-${idGerado}`;
@@ -248,6 +322,7 @@ export default function ResumoFaturamento({
           aoAbrirRelatorio={aoAbrirRelatorio}
           renderAcoesVenda={renderAcoesVenda}
           classeVenda={classeVenda}
+          mostrarTotaisPorForma={mostrarTotaisPorForma}
         />
       )}
     </div>

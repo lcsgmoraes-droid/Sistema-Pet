@@ -75,16 +75,24 @@ test("mostra os três estados do servidor sem marcar opção nem salvar automati
   }
 });
 
-test("selecionar estado cria rascunho sem antecipar o estado salvo", async () => {
-  const env = preparar();
-  const nomeRadio = env.encontrar("InputRadio").props.name;
-  await env.harness.act(() => env.encontrar("InputRadio").props.onChange("ok"));
-  assert.equal(env.encontrar("InputRadio").props.name, nomeRadio);
-  assert.equal(env.encontrar("InputRadio").props.value, "ok");
-  assert.equal(env.encontrar("InputTextoLongo").props.required, false);
-  assert.match(elementText(env.harness.tree), /Alteração ainda não salva/);
-  assert.equal(elementText(env.situacao()).trim(), "Pendente");
-  assert.deepEqual(env.gravacoes, []);
+test("OK e pendente salvam no clique sem formulário, confirmação extra ou nota antiga", async (t) => {
+  for (const estado of ["ok", "pendente"]) {
+    await t.test(estado, async () => {
+      const item = registro({
+        estado_conferencia: "divergencia",
+        conferencia: { observacao: "Crédito foi lançado como débito." },
+      });
+      const env = preparar({ item });
+      const nomeRadio = env.encontrar("InputRadio").props.name;
+      await env.harness.act(() => env.encontrar("InputRadio").props.onChange(estado));
+      assert.deepEqual(env.gravacoes, [["pagamento", item, estado, ""]]);
+      assert.equal(env.encontrar("InputRadio").props.name, nomeRadio);
+      assert.equal(env.encontrar("InputTextoLongo"), undefined);
+      assert.equal(env.encontrar("BotaoSalva"), undefined);
+      assert.equal(env.encontrar("BotaoCancelar"), undefined);
+      assert.equal(elementText(env.situacao()).trim(), "Com divergência");
+    });
+  }
 });
 
 test("divergência exige motivo, apresenta erro, foca o campo e só envia nota preenchida", async () => {
@@ -129,6 +137,7 @@ test("retorno false ou indefinido preserva escolha e observação para nova tent
       assert.equal(env.encontrar("BotaoSalva").props.disabled, false);
       assert.equal(env.encontrar("BotaoSalva").props.loading, false);
       assert.equal(elementText(env.situacao()).trim(), "Pendente");
+      assert.match(env.encontrar("InputTextoLongo").props.error, /confirmar a gravação/);
     });
   }
 });
@@ -141,12 +150,12 @@ test("falha apresenta mensagem e mantém rascunho; sucesso posterior fecha a edi
       return true;
     },
   });
-  await env.harness.act(() => env.encontrar("InputRadio").props.onChange("ok"));
+  await env.harness.act(() => env.encontrar("InputRadio").props.onChange("divergencia"));
   await env.harness.act(() =>
-    env.encontrar("InputTextoLongo").props.onChange("Conferido no extrato."),
+    env.encontrar("InputTextoLongo").props.onChange("Forma de pagamento incorreta."),
   );
   await env.harness.act(() => env.encontrar("BotaoSalva").props.onClick());
-  assert.equal(env.encontrar("InputTextoLongo").props.value, "Conferido no extrato.");
+  assert.equal(env.encontrar("InputTextoLongo").props.value, "Forma de pagamento incorreta.");
   assert.match(env.encontrar("InputTextoLongo").props.error, /O lançamento mudou/);
   falhar = false;
   await env.harness.act(() => env.encontrar("BotaoSalva").props.onClick());
@@ -155,7 +164,7 @@ test("falha apresenta mensagem e mantém rascunho; sucesso posterior fecha a edi
   assert.equal(env.encontrar("InputRadio").props.value, "");
 });
 
-test("salvamento verdadeiro usa o estado atualizado pelo servidor e fecha apenas o rascunho salvo", async () => {
+test("OK só muda após leitura do servidor e dispensa histórico de acerto na interface", async () => {
   const item = registro();
   let env;
   env = preparar({
@@ -165,23 +174,24 @@ test("salvamento verdadeiro usa o estado atualizado pelo servidor e fecha apenas
       await env.harness.update({
         item: registro({
           estado_conferencia: estado,
-          conferencia: { usuario_nome: "Lucas", data: "2026-10-22T15:20:00Z", observacao },
+          conferencia: {
+            usuario_nome: "Lucas",
+            data: "2026-10-22T15:20:00Z",
+            observacao: observacao || "Observação antiga que não deve aparecer.",
+          },
         }),
       });
       return true;
     },
   });
   await env.harness.act(() => env.encontrar("InputRadio").props.onChange("ok"));
-  await env.harness.act(() => env.encontrar("InputTextoLongo").props.onChange("Valor correto."));
-  await env.harness.act(() => env.encontrar("BotaoSalva").props.onClick());
+  assert.deepEqual(env.gravacoes, [["pagamento", item, "ok", ""]]);
   assert.equal(env.encontrar("InputTextoLongo"), undefined);
   assert.equal(elementText(env.situacao()).trim(), "OK — conferido");
-  assert.match(elementText(env.harness.tree), /Lucas/);
-  assert.match(elementText(env.harness.tree), /22\/10\/2026.*12:20/);
-  assert.match(elementText(env.harness.tree), /Valor correto\./);
+  assert.doesNotMatch(elementText(env.harness.tree), /Último registro|Lucas|Observação antiga/);
 });
 
-test("duplo clique envia uma vez e mantém controles bloqueados enquanto aguarda resposta", async () => {
+test("duplo clique em OK envia uma vez e bloqueia as opções sem antecipar a cor", async () => {
   let concluir;
   const env = preparar({
     salvar: () =>
@@ -189,21 +199,24 @@ test("duplo clique envia uma vez e mantém controles bloqueados enquanto aguarda
         concluir = resolve;
       }),
   });
-  await env.harness.act(() => env.encontrar("InputRadio").props.onChange("ok"));
-  const confirmar = env.encontrar("BotaoSalva").props.onClick;
-  const primeiro = confirmar();
-  const segundo = confirmar();
+  const selecionar = env.encontrar("InputRadio").props.onChange;
+  const primeiro = selecionar("ok");
+  const segundo = selecionar("ok");
+  await selecionar("divergencia");
   await env.harness.settle();
   assert.equal(env.gravacoes.length, 1);
   assert.equal(env.harness.tree.props["aria-busy"], true);
   assert.equal(env.encontrar("InputRadio").props.disabled, true);
-  assert.equal(env.encontrar("BotaoSalva").props.loading, true);
-  assert.equal(env.encontrar("BotaoCancelar").props.disabled, true);
+  assert.equal(env.encontrar("BotaoSalva"), undefined);
+  assert.equal(env.encontrar("InputTextoLongo"), undefined);
+  assert.match(elementText(env.harness.tree), /Salvando conferência/);
+  assert.equal(elementText(env.situacao()).trim(), "Pendente");
   concluir(false);
   await Promise.all([primeiro, segundo]);
   await env.harness.settle();
   assert.equal(env.harness.tree.props["aria-busy"], false);
-  assert.equal(env.encontrar("InputRadio").props.value, "ok");
+  assert.equal(env.encontrar("InputRadio").props.value, "");
+  assert.match(elementText(env.harness.tree), /confirmar a gravação/);
 });
 
 test("metadados ausentes, tipo inválido e bloqueio impedem iniciar uma conferência", async (t) => {
@@ -227,9 +240,9 @@ test("metadados ausentes, tipo inválido e bloqueio impedem iniciar uma conferê
   }
 });
 
-test("bloqueio durante atualização conserva rascunho e impede enviar assinatura antiga", async () => {
+test("bloqueio durante atualização conserva divergência e impede enviar assinatura antiga", async () => {
   const env = preparar();
-  await env.harness.act(() => env.encontrar("InputRadio").props.onChange("ok"));
+  await env.harness.act(() => env.encontrar("InputRadio").props.onChange("divergencia"));
   await env.harness.act(() =>
     env.encontrar("InputTextoLongo").props.onChange("Conferência iniciada."),
   );
@@ -266,11 +279,114 @@ test("abrir venda chama apenas a navegação e preserva a divergência ainda nã
 test("sem venda válida não há ação de abrir; cancelar elimina apenas a edição", async () => {
   const env = preparar({ item: registro({ estado_conferencia: "ok" }), props: { vendaId: null } });
   assert.equal(env.encontrar("BotaoInteracao"), undefined);
-  await env.harness.act(() => env.encontrar("InputRadio").props.onChange("pendente"));
+  await env.harness.act(() => env.encontrar("InputRadio").props.onChange("divergencia"));
   await env.harness.act(() => env.encontrar("BotaoCancelar").props.onClick());
   assert.equal(env.encontrar("InputTextoLongo"), undefined);
   assert.equal(elementText(env.situacao()).trim(), "OK — conferido");
   assert.deepEqual(env.gravacoes, []);
+});
+
+test("falha ao clicar OK ou pendente mostra erro e exige novo clique consciente", async (t) => {
+  for (const estado of ["ok", "pendente"]) {
+    for (const retorno of [false, undefined, "erro"]) {
+      await t.test(`${estado}: ${retorno}`, async () => {
+        const item = registro({ estado_conferencia: "divergencia" });
+        let falhar = true;
+        const env = preparar({
+          item,
+          salvar: async () => {
+            if (!falhar) return true;
+            if (retorno === "erro") throw new Error("Servidor indisponível.");
+            return retorno;
+          },
+        });
+        await env.harness.act(() => env.encontrar("InputRadio").props.onChange(estado));
+        assert.equal(env.gravacoes.length, 1);
+        assert.equal(elementText(env.situacao()).trim(), "Com divergência");
+        assert.match(env.harness.tree.props.className, /border-red-/);
+        const alerta = elements(env.harness.tree).find((node) => node.props?.role === "alert");
+        assert.match(elementText(alerta), /Servidor indisponível|confirmar a gravação/);
+        assert.equal(env.encontrar("InputRadio").props.disabled, false);
+        assert.equal(env.encontrar("InputTextoLongo"), undefined);
+        falhar = false;
+        await env.harness.settle();
+        assert.equal(env.gravacoes.length, 1, "nenhuma tentativa automática após a falha");
+        await env.harness.act(() => env.encontrar("InputRadio").props.onChange(estado));
+        assert.equal(env.gravacoes.length, 2);
+        assert.equal(
+          elements(env.harness.tree).find((node) => node.props?.role === "alert"),
+          undefined,
+        );
+      });
+    }
+  }
+});
+
+test("trocar rascunho de divergência por OK não grava a justificativa ainda não salva", async () => {
+  const item = registro();
+  const env = preparar({ item });
+  await env.harness.act(() => env.encontrar("InputRadio").props.onChange("divergencia"));
+  await env.harness.act(() =>
+    env.encontrar("InputTextoLongo").props.onChange("Rascunho que foi descartado."),
+  );
+  await env.harness.act(() => env.encontrar("InputRadio").props.onChange("ok"));
+  assert.deepEqual(env.gravacoes, [["pagamento", item, "ok", ""]]);
+  assert.equal(env.encontrar("InputTextoLongo"), undefined);
+  assert.equal(env.encontrar("BotaoSalva"), undefined);
+});
+
+test("somente divergência mostra motivo, responsável e horário; demais estados não herdam nota", async (t) => {
+  for (const estado of ["pendente", "ok", "divergencia"]) {
+    await t.test(estado, async () => {
+      const env = preparar({
+        item: registro({
+          estado_conferencia: estado,
+          conferencia: {
+            usuario_nome: "Lucas",
+            data: "2026-10-22T15:20:00Z",
+            observacao: "Crédito lançado como débito.",
+          },
+        }),
+      });
+      const texto = elementText(env.harness.tree);
+      if (estado === "divergencia") {
+        assert.match(texto, /Último registro:.*Lucas/);
+        assert.match(texto, /22\/10\/2026.*12:20/);
+        assert.match(texto, /Crédito lançado como débito/);
+      } else {
+        assert.doesNotMatch(texto, /Último registro|Lucas|Crédito lançado como débito/);
+      }
+      await env.harness.act(() => env.encontrar("InputRadio").props.onChange("divergencia"));
+      assert.equal(
+        env.encontrar("InputTextoLongo").props.value,
+        estado === "divergencia" ? "Crédito lançado como débito." : "",
+      );
+    });
+  }
+});
+
+test("dupla confirmação de divergência não duplica o registro e preserva o motivo na falha", async () => {
+  let concluir;
+  const env = preparar({
+    salvar: () =>
+      new Promise((resolve) => {
+        concluir = resolve;
+      }),
+  });
+  await env.harness.act(() => env.encontrar("InputRadio").props.onChange("divergencia"));
+  await env.harness.act(() => env.encontrar("InputTextoLongo").props.onChange("Corrigir forma."));
+  const confirmar = env.encontrar("BotaoSalva").props.onClick;
+  const primeiro = confirmar();
+  const segundo = confirmar();
+  await env.harness.settle();
+  assert.equal(env.gravacoes.length, 1);
+  assert.equal(env.encontrar("BotaoSalva").props.loading, true);
+  assert.equal(env.encontrar("BotaoCancelar").props.disabled, true);
+  concluir(false);
+  await Promise.all([primeiro, segundo]);
+  await env.harness.settle();
+  assert.equal(env.encontrar("InputTextoLongo").props.value, "Corrigir forma.");
+  assert.equal(env.encontrar("BotaoSalva").props.loading, false);
 });
 
 test("trocar de lançamento não reaproveita o motivo do anterior", async () => {

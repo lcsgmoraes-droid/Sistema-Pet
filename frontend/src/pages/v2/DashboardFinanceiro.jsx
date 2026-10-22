@@ -376,6 +376,7 @@ export default function DashboardFinanceiro() {
           <div className="mt-4">
             <DetalhesFaturamento
               composicao={composicaoVendas}
+              mostrarTotaisPorForma
               id="dashboard-detalhes-faturamento"
               aoAbrirRelatorio={() => navigate(getDashboardDetailPath("sales", periodDays))}
             />

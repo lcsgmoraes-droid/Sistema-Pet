@@ -37,6 +37,29 @@ def normalizar(valor):
     )
 
 
+def _forma_pagamento_venda(forma):
+    texto = str(forma or "Não informada").strip() or "Não informada"
+    # Mesmos aliases de cartão aceitos pelo PDV, sem interpretar IDs como
+    # formas universais: os cadastros e seus IDs pertencem a cada tenant.
+    aliases = {
+        "dinheiro": "Dinheiro",
+        "pix": "Pix",
+        "debito": "Cartão de débito",
+        "cartao debito": "Cartão de débito",
+        "cartao de debito": "Cartão de débito",
+        "credito": "Cartão de crédito",
+        "cartao credito": "Cartão de crédito",
+        "cartao de credito": "Cartão de crédito",
+        "credito parcelado": "Cartão de crédito",
+        "transferencia": "Transferência",
+        "transferencia bancaria": "Transferência",
+        "link": "Link de pagamento",
+        "link pagamento": "Link de pagamento",
+        "link de pagamento": "Link de pagamento",
+    }
+    return aliases.get(normalizar(texto), texto)
+
+
 def eh_beneficio(forma):
     texto = normalizar(forma)
     return "cashback" in texto or ("credito" in texto and "cliente" in texto)
@@ -247,6 +270,43 @@ def _quitacao(venda, total, eventos, recebimentos_por_conta, espelhos):
     }
 
 
+def _formas_pagamento_vendas(detalhes):
+    """Resume a quitação deduplicada de todas as vendas, sem recortar a data do pagamento.
+
+    O histórico preserva valores anteriores às devoluções. Quando não há uma
+    contrapartida com forma rastreável, a diferença para a quitação atual fica
+    explícita; não distribuir uma devolução entre dinheiro/cartão por suposição.
+    """
+    por_forma = {}
+    total_pago = ZERO
+    for venda in detalhes:
+        total_pago += moeda(venda["valor_pago"])
+        for pagamento in venda["pagamentos"]:
+            if pagamento["tipo"] != "pagamento":
+                continue
+            valor = moeda(pagamento["valor"])
+            if valor == ZERO:
+                continue
+            forma = _forma_pagamento_venda(pagamento["forma_pagamento"])
+            chave = normalizar(forma)
+            grupo = por_forma.setdefault(
+                chave,
+                {"forma_pagamento": forma, "total": ZERO, "quantidade": 0},
+            )
+            grupo["total"] += valor
+            grupo["quantidade"] += 1
+    total_registrado = sum((grupo["total"] for grupo in por_forma.values()), ZERO)
+    return {
+        "criterio_formas_pagamento": "quitacao_das_vendas_selecionadas",
+        "formas_pagamento": [
+            {**grupo, "total": float(grupo["total"])}
+            for _chave, grupo in sorted(por_forma.items())
+        ],
+        "total_formas_pagamento": float(total_registrado),
+        "ajustes_formas_pagamento": float(total_pago - total_registrado),
+    }
+
+
 def compor_vendas(
     vendas,
     *,
@@ -327,6 +387,7 @@ def compor_vendas(
         "escopo": "empresa",
         "quantidade": len(detalhes),
         **{campo: float(valor) for campo, valor in totais.items()},
+        **_formas_pagamento_vendas(detalhes),
         "detalhes": sorted(
             detalhes,
             key=lambda v: (v["data_venda"] or "", v["venda_id"] or 0),

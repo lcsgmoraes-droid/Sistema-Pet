@@ -177,7 +177,14 @@ export const styleGuideCatalog = [
         status: "pronto",
         arquivo: "components/v2/ResumoFaturamento/ResumoFaturamento.jsx",
         descricao:
-          "Faturamento líquido por empresa ou caixa, conforme o escopo da composição do backend. Detalhes expansíveis de vendas e formas de quitação no dashboard, fechamento e auditoria do caixa. Aceita expansão controlada, detalhes em largura total e modo escuro, sem recalcular métricas na tela.",
+          "Faturamento líquido por empresa ou caixa, conforme o escopo da composição do backend. Detalhes expansíveis de vendas e formas de quitação no dashboard, fechamento e auditoria do caixa. Aceita expansão controlada, detalhes em largura total, totais por forma com mostrarTotaisPorForma e modo escuro, sem recalcular métricas na tela.",
+      },
+      {
+        nome: "TotaisFormasPagamento",
+        status: "pronto",
+        arquivo: "components/v2/ResumoFaturamento/ResumoFaturamento.jsx",
+        descricao:
+          "Export nomeado com os totais por forma das mesmas vendas do faturamento. Usa o agregado do backend, apresenta ajustes sem forma identificada separadamente e reconcilia com o total pago; não representa os recebimentos do caixa ou da data do pagamento.",
       },
       {
         nome: "EstadoVazio",

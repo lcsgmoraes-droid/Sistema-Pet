@@ -43,7 +43,7 @@ function formatarDataConferencia(valor) {
 }
 
 // onSalvar resolve true após salvar e atualizar o item do servidor.
-// false, undefined ou erro mantêm o rascunho para uma nova tentativa.
+// Só divergências têm rascunho; OK e pendente são salvos no próprio clique.
 export default function ConferenciaCaixaItem({
   item,
   tipo,
@@ -83,32 +83,21 @@ export default function ConferenciaCaixaItem({
     };
   }, []);
 
-  const selecionarEstado = (proximoEstado) => {
-    if (desabilitado || !Object.hasOwn(ESTADOS, proximoEstado)) return;
-    setErro(null);
-    setRascunho((atual) => ({
-      chave,
-      estado: proximoEstado,
-      observacao: atual?.chave === chave ? atual.observacao : conferencia?.observacao || "",
-    }));
-  };
-
-  const confirmar = async () => {
-    if (desabilitado || envioRef.current || !edicao) return;
-    const observacao = edicao.observacao.trim();
-    if (edicao.estado === "divergencia" && !observacao) {
-      setErro({ chave, mensagem: "Descreva a divergência antes de confirmar." });
-      observacaoRef.current?.focus();
-      return;
-    }
-    const enviado = edicao;
+  const salvarConferencia = async (proximoEstado, observacao = "", enviado = null) => {
+    if (desabilitado || envioRef.current) return;
     envioRef.current = true;
     setEnviando(true);
     setErro(null);
     try {
-      const salvo = await onSalvar(tipo, item, enviado.estado, observacao);
+      const salvo = await onSalvar(tipo, item, proximoEstado, observacao);
       if (salvo === true && montadoRef.current) {
         setRascunho((atual) => (atual === enviado ? null : atual));
+      } else if (montadoRef.current) {
+        setErro({
+          chave,
+          mensagem:
+            "Não foi possível confirmar a gravação. Confira o estado atualizado e tente novamente.",
+        });
       }
     } catch (error) {
       if (montadoRef.current) {
@@ -118,13 +107,44 @@ export default function ConferenciaCaixaItem({
           mensagem:
             (typeof detalhe === "string" ? detalhe : "") ||
             error?.message ||
-            "Não foi possível salvar a conferência. O rascunho foi mantido.",
+            "Não foi possível confirmar a gravação. Confira o estado atualizado e tente novamente.",
         });
       }
     } finally {
       envioRef.current = false;
       if (montadoRef.current) setEnviando(false);
     }
+  };
+
+  const selecionarEstado = async (proximoEstado) => {
+    if (desabilitado || envioRef.current || !Object.hasOwn(ESTADOS, proximoEstado)) return;
+    setErro(null);
+    if (proximoEstado === "divergencia") {
+      setRascunho((atual) => ({
+        chave,
+        estado: proximoEstado,
+        observacao:
+          atual?.chave === chave
+            ? atual.observacao
+            : estadoSalvo === "divergencia"
+              ? conferencia?.observacao || ""
+              : "",
+      }));
+      return;
+    }
+    setRascunho(null);
+    await salvarConferencia(proximoEstado);
+  };
+
+  const confirmar = async () => {
+    if (desabilitado || envioRef.current || !edicao) return;
+    const observacao = edicao.observacao.trim();
+    if (!observacao) {
+      setErro({ chave, mensagem: "Descreva a divergência antes de confirmar." });
+      observacaoRef.current?.focus();
+      return;
+    }
+    await salvarConferencia("divergencia", observacao, edicao);
   };
 
   return (
@@ -154,7 +174,7 @@ export default function ConferenciaCaixaItem({
           Confira novamente este lançamento. A conferência anterior precisa ser atualizada.
         </p>
       )}
-      {conferencia ? (
+      {conferencia && estadoSalvo === "divergencia" && (
         <div className="space-y-1 text-xs">
           <p>
             Último registro: {conferencia.usuario_nome || "Usuário não informado"} ·{" "}
@@ -164,8 +184,6 @@ export default function ConferenciaCaixaItem({
             <p className="whitespace-pre-wrap break-words">{conferencia.observacao}</p>
           )}
         </div>
-      ) : (
-        <p className="text-xs">Ainda não há registro de conferência deste lançamento.</p>
       )}
       {!identificavel ? (
         <p className="text-sm" role="status">
@@ -195,20 +213,26 @@ export default function ConferenciaCaixaItem({
             ),
           };
         })}
-        help="Escolha um estado e confirme para salvar a conferência."
+        help="OK e pendente são salvos ao clicar. Descreva e confirme somente divergências."
       />
+      {ocupado && !edicao && (
+        <p className="text-xs" role="status">
+          Salvando conferência…
+        </p>
+      )}
+      {erroAtual && !edicao && (
+        <p className="text-sm text-red-700 dark:text-red-400" role="alert">
+          {erroAtual}
+        </p>
+      )}
       {edicao && (
         <div className="space-y-3 rounded-lg border border-slate-300 bg-white/70 p-3 dark:border-slate-700 dark:bg-slate-900/70">
           <p className="text-xs font-semibold">Alteração ainda não salva.</p>
           <InputTextoLongo
             ref={observacaoRef}
             id={`observacao-conferencia-${campoId}`}
-            label={
-              edicao.estado === "divergencia"
-                ? "Motivo da divergência"
-                : "Observação da conferência (opcional)"
-            }
-            required={edicao.estado === "divergencia"}
+            label="Motivo da divergência"
+            required
             maxLength={1000}
             linhas={3}
             value={edicao.observacao}

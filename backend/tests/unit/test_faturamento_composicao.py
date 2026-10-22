@@ -61,6 +61,19 @@ def confere_identidades(composicao):
         ),
         Decimal(0),
     )
+    assert d("total_formas_pagamento") == sum(
+        (Decimal(str(forma["total"])) for forma in composicao["formas_pagamento"]),
+        Decimal(0),
+    )
+    assert d("valor_pago") == (
+        d("total_formas_pagamento") + d("ajustes_formas_pagamento")
+    )
+
+
+def formas(resultado):
+    return {
+        item["forma_pagamento"]: item["total"] for item in resultado["formas_pagamento"]
+    }
 
 
 def test_liquido_comercial_separa_desconto_entrega_beneficios_e_em_aberto():
@@ -103,6 +116,7 @@ def test_pagamento_invalido_nao_e_ressuscitado_pelo_status_finalizada(status):
     resultado = resumo([venda(pagamentos=[pagamento(100, status=status)])])
     assert resultado["valor_pago"] == 0
     assert resultado["em_aberto"] == 100
+    assert resultado["formas_pagamento"] == []
     confere_identidades(resultado)
 
 
@@ -142,6 +156,8 @@ def test_parcela_recebida_so_conta_uma_vez_com_ou_sem_espelho_pagamento(espelhad
     assert resultado["valor_pago"] == 20
     assert resultado["crediario_receber"] == 80
     assert resultado["em_aberto"] == 0
+    assert resultado["total_formas_pagamento"] == 20
+    assert resultado["ajustes_formas_pagamento"] == 0
     confere_identidades(resultado)
 
 
@@ -165,6 +181,7 @@ def test_baixa_lote_sem_marcador_usa_vinculo_imutavel_para_nao_duplicar():
     )
     assert resultado["valor_pago"] == 20
     assert resultado["crediario_receber"] == 80
+    assert formas(resultado) == {"Pix": 20}
     confere_identidades(resultado)
 
 
@@ -248,6 +265,10 @@ def test_fallback_valor_recebido_salvo_adiciona_somente_diferenca_das_contas():
     detalhes = resultado["detalhes"][0]["pagamentos"]
     assert [p["valor"] for p in detalhes] == [30, 10]
     assert [p["origem"] for p in detalhes] == ["conta_legada", "venda_legada"]
+    assert formas(resultado) == {
+        "Recebimento legado": 30,
+        "Quitação legada (valor recebido salvo)": 10,
+    }
     confere_identidades(resultado)
 
 
@@ -268,6 +289,8 @@ def test_devolucao_abate_apenas_valor_rastreado_e_preserva_entrega(
     assert resultado["faturamento_liquido"] == liquido
     assert resultado["total_vendas"] == total
     assert resultado["valor_pago"] == total
+    assert formas(resultado) == {"Pix": 105}
+    assert resultado["ajustes_formas_pagamento"] == total - 105
     assert original.total == 105
     confere_identidades(resultado)
 
@@ -307,6 +330,127 @@ def test_arredondamento_decimal_nao_perde_centavo_em_muitas_vendas():
     assert resultado["faturamento_bruto"] == 20
     assert resultado["descontos"] == 10
     assert resultado["faturamento_liquido"] == 10
+    assert resultado["formas_pagamento"] == [
+        {"forma_pagamento": "Pix", "total": 10, "quantidade": 1000}
+    ]
+    confere_identidades(resultado)
+
+
+def test_formas_de_todas_as_vendas_agregam_aliases_sem_confundir_beneficios_e_planos():
+    posterior = pagamento(25, "Pix")
+    posterior.data_pagamento = datetime(2026, 10, 22, 12)
+    resultado = resumo(
+        [
+            venda(
+                ident=1,
+                pagamentos=[
+                    pagamento(40, "PIX"),
+                    pagamento(10, "cartao_debito", ident=2),
+                    pagamento(5, "Crédito Cliente", ident=3),
+                    pagamento(45, "Crediário", ident=4),
+                ],
+            ),
+            venda(80, ident=2, pagamentos=[pagamento(80, "dinheiro")]),
+            venda(25, ident=3, pagamentos=[posterior]),
+            venda(
+                20,
+                ident=4,
+                pagamentos=[
+                    pagamento(8, "Débito"),
+                    pagamento(12, "Cartão de débito", 2),
+                ],
+            ),
+            venda(
+                30,
+                ident=5,
+                pagamentos=[
+                    pagamento(10, "Crédito"),
+                    pagamento(20, "cartao_credito", 2),
+                ],
+            ),
+            venda(999, ident=6, status="cancelada", pagamentos=[pagamento(999)]),
+        ]
+    )
+    assert formas(resultado) == {
+        "Cartão de crédito": 30,
+        "Cartão de débito": 30,
+        "Dinheiro": 80,
+        "Pix": 65,
+    }
+    assert resultado["criterio_formas_pagamento"] == (
+        "quitacao_das_vendas_selecionadas"
+    )
+    assert resultado["valor_pago"] == 205
+    assert resultado["creditos_utilizados"] == 5
+    assert resultado["crediario_receber"] == 45
+    assert resultado["ajustes_formas_pagamento"] == 0
+    pix = next(
+        f for f in resultado["formas_pagamento"] if f["forma_pagamento"] == "Pix"
+    )
+    assert pix["quantidade"] == 2
+    confere_identidades(resultado)
+
+
+def test_formas_preservam_contrapartida_negativa_e_expoem_limite_sem_inventar_meio():
+    resultado = resumo(
+        [venda(50, pagamentos=[pagamento(100), pagamento(-20, "Cartão de crédito", 2)])]
+    )
+    assert formas(resultado) == {"Pix": 100, "Cartão de crédito": -20}
+    assert resultado["valor_pago"] == 50
+    assert resultado["total_formas_pagamento"] == 80
+    assert resultado["ajustes_formas_pagamento"] == -30
+    confere_identidades(resultado)
+
+
+def test_formas_nao_interpretam_id_como_forma_universal_nem_renomeiam_cadastro():
+    resultado = resumo(
+        [
+            venda(
+                60,
+                pagamentos=[
+                    pagamento(10, "2"),
+                    pagamento(20, "Pix", 2),
+                    pagamento(30, "Convênio Loja", 3),
+                ],
+            )
+        ]
+    )
+    assert formas(resultado) == {"2": 10, "Pix": 20, "Convênio Loja": 30}
+    confere_identidades(resultado)
+
+
+def test_formas_excluem_recibos_de_outro_tenant_e_preservam_forma_legada():
+    conta = NS(id=7, valor_recebido=30, status="parcial", tenant_id="empresa")
+    recibos = [
+        NS(
+            id=9,
+            valor_recebido=20,
+            forma_pagamento=NS(nome="Pix"),
+            observacoes=None,
+            tenant_id="empresa",
+        ),
+        NS(
+            id=10,
+            valor_recebido=999,
+            forma_pagamento=NS(nome="Cartão de crédito"),
+            observacoes=None,
+            tenant_id="outra",
+        ),
+    ]
+    resultado = resumo(
+        [venda(tenant_id="empresa", status="aberta", contas_receber=[conta])],
+        recebimentos_por_conta={7: recibos},
+    )
+    assert formas(resultado) == {"Pix": 20}
+    assert resultado["valor_pago"] == 20
+    confere_identidades(resultado)
+
+
+def test_sem_vendas_produz_agregado_vazio_ao_inves_de_forma_inventada():
+    resultado = resumo([])
+    assert resultado["formas_pagamento"] == []
+    assert resultado["total_formas_pagamento"] == 0
+    assert resultado["ajustes_formas_pagamento"] == 0
     confere_identidades(resultado)
 
 
