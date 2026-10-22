@@ -152,11 +152,11 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 - [x] Testes de segurança e contrato (`backend/tests/unit/test_whatsapp_seguranca_canal_interno_e_config.py`).
 
 **0.6 Custo e abuso**
-- [ ] Limite de uso da IA por loja ligado ao **saldo de créditos** (ver tema T.1).
-- [ ] Limite de frequência por telefone e por tutor.
-- [ ] Decidir o destino da chave de IA de reserva compartilhada entre lojas (a chave passa a ser do CorePet). `[?] DECIDIR`
-- [ ] Ligar o controle de custo existente (hoje sem uso) ou substituí-lo.
-- [ ] Medição por mensagem: modelo usado, tokens de entrada e saída, custo.
+- [~] Limite de uso da IA por loja: **válvula de segurança provisória** (22/10/2026) de tokens por dia por loja, medida pelas respostas já gravadas (`backend/app/whatsapp/usage_limits.py`; padrão 1.000.000 tokens/dia, ajustável em `WHATSAPP_IA_DAILY_TOKEN_LIMIT`, 0 desliga). Ao atingir, a IA para e a conversa vai para a fila de atendimento humano com o aviso de espera. **Falta ligar ao saldo de créditos (tema T.1).**
+- [x] Limite de frequência por telefone (22/10/2026): acima de 15 mensagens em 10 minutos na mesma conversa, a IA para de responder em silêncio (ajustável em `WHATSAPP_IA_MAX_MESSAGES_PER_WINDOW` e `WHATSAPP_IA_WINDOW_MINUTES`). Limite por tutor (somando telefones) fica para quando o vínculo com cadastro for central (Etapa 1).
+- [ ] Destino da chave de IA de reserva compartilhada entre lojas: com a decisão de 21/10 (custo da IA é do CorePet), a chave da plataforma passa a ser a chave oficial e o consumo de cada loja é medido e limitado. `[?] DECIDIR` se a loja ainda pode usar chave própria e como a chave da plataforma é guardada (hoje é variável de ambiente).
+- [x] O controle de custo antigo (`ai/cost_control.py`: em memória, por processo e com identificador de loja inteiro) **não serve** e não foi ligado; foi substituído pela medição durável a partir das mensagens gravadas. Remoção do código antigo entra na limpeza da Etapa 0.8.
+- [~] Medição por mensagem: modelo usado, tokens de entrada e saída **já são gravados** em cada resposta; falta o custo em créditos (tema T.1).
 
 **0.7 LGPD operacional e consentimento**
 - [ ] Consentimento verificado em todo envio (bot, automações e atendimento ativo).
@@ -351,6 +351,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 | Data | Mudança |
 |---|---|
+| 22/10/2026 | Etapa 0.6 em grande parte concluída: limite de frequência por telefone e válvula de segurança de tokens por dia por loja, medidos no banco; falta ligar ao saldo de créditos (T.1). |
 | 22/10/2026 | Etapa 0.5 concluída: canal interno com comparação segura e sem token de exemplo em produção, valores fixos removidos (n8n, compose de produção, webhook antigo), erro do teste de conexão sem vazamento, telefone mascarado nos logs e configuração protegida por permissão. Exige definir token forte no servidor antes da publicação. |
 | 22/10/2026 | Etapa 0.4 concluída (exceto a decisão de como tratar ambiguidade na tela): serviço único telefone → tutor, vínculo antigo validado, telefone de 40 caracteres (migração nova) e script de conferência. |
 | 22/10/2026 | Etapa 0.3 concluída (exceto escala com mais de uma instância, que segue a decidir): tempo real separado por loja, conexão só para o atendente da própria loja com o módulo contratado, eventos de mensagem nova e de nova fila passam a ser emitidos. |

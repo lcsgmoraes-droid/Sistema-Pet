@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 from app.db import get_session as get_db
 from app.whatsapp.models import TenantWhatsAppConfig, WhatsAppSession, WhatsAppMessage
 from app.whatsapp.log_safety import mascarar_telefone
+from app.whatsapp.usage_limits import LIMITE_DIARIO, avaliar_limites
 from app.whatsapp.tenant_context import whatsapp_tenant_context
 from app.whatsapp.customer_lookup import SITUACAO_AMBIGUO, resolver_tutor_por_telefone
 
@@ -453,6 +454,23 @@ async def _process_incoming_message_with_context(
                 },
             }
 
+        # CRM etapa 0.6: limites de uso da IA (spam e gasto da loja).
+        motivo_limite = _motivo_de_limite_da_ia(db, tenant_id, session)
+        if motivo_limite:
+            aviso_enviado = await _bloquear_ia_por_limite(
+                db, tenant_id, session, motivo_limite
+            )
+            return {
+                "status": "processed",
+                "whatsapp_message_id": provider_message_id,
+                "message_id": message.id,
+                "processor_result": {
+                    "action": "skipped_ia_limit",
+                    "reason": motivo_limite,
+                    "waiting_notice_sent": aviso_enviado,
+                },
+            }
+
         # 4. Processar com IA
         processor_result = None
         try:
@@ -507,6 +525,62 @@ AVISO_ESPERA_ATENDENTE = (
 )
 # Evita repetir o aviso a cada mensagem enquanto o tutor espera.
 JANELA_AVISO_ESPERA_MINUTOS = 30
+
+
+def _motivo_de_limite_da_ia(db: Session, tenant_id: str, session: Any):
+    """Motivo para a IA nao responder agora (limite), ou None. Falha libera a IA."""
+    try:
+        return avaliar_limites(db, tenant_id, session.id)
+    except Exception as erro:
+        logger.warning("Falha ao conferir limites da IA: %s", erro)
+        return None
+
+
+async def _bloquear_ia_por_limite(
+    db: Session, tenant_id: str, session: Any, motivo: str
+) -> bool:
+    """Pausa a IA nesta mensagem. Sem IA hoje (limite diario), vai para a fila humana."""
+    logger.warning(
+        "IA bloqueada por limite de uso: tenant=%s session=%s motivo=%s",
+        tenant_id,
+        session.id,
+        motivo,
+    )
+    if motivo != LIMITE_DIARIO:
+        # Excesso de mensagens: silencio. Nao ha resposta nem novo atendimento.
+        return False
+    try:
+        from app.whatsapp.handoff_manager import get_handoff_manager
+
+        gerente = get_handoff_manager(db, tenant_id)
+        if not gerente.get_active_handoff(session.id):
+            handoff = gerente.create_handoff(
+                session_id=session.id,
+                phone_number=session.phone_number,
+                reason="ia_limite_diario",
+                priority="medium",
+                reason_details=(
+                    "Limite diario de uso da IA atingido: atendimento humano."
+                ),
+            )
+            from app.whatsapp.websocket import emit_new_handoff
+
+            await emit_new_handoff(
+                {
+                    "id": str(handoff.id),
+                    "session_id": str(session.id),
+                    "phone_number": handoff.phone_number,
+                    "reason": handoff.reason,
+                    "priority": handoff.priority,
+                    "status": handoff.status,
+                },
+                str(tenant_id),
+                db,
+            )
+        return await _avisar_espera_atendente(db, tenant_id, session)
+    except Exception as erro:
+        logger.warning("Falha ao enviar conversa para atendimento humano: %s", erro)
+        return False
 
 
 async def _avisar_nova_mensagem(
