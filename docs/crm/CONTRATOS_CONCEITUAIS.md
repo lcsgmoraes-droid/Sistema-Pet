@@ -11,6 +11,8 @@ Descrevem dados e regras como o protótipo (`prototipo/crm-prototipo.html`) as s
 | Lead | **Um por tutor por loja**, permanente; contém as oportunidades e os ciclos | loja, tutor (cadastro opcional), telefone, etapa, origem, responsável, valor estimado, próxima ação e data, motivo de perda |
 | Movimentação | Histórico de cada mudança de coluna, inclusive reaberturas e voltas | lead, ciclo, de, para, quem, quando, nota |
 | Interação | Tudo que aconteceu com o tutor (mensagem, ligação, compra, vacina, banho, etapa) | lead ou tutor, tipo, resumo, origem, quando |
+| Ação registrada | O que o usuário fez com o tutor (ligação, mensagem, visita, atendimento, observação) | lead, tipo, observação, quem, quando; atualiza "último contato" |
+| Próximo passo | O que será feito e quando | lead, tipo (ligar, enviar mensagem, visita, oferecer, outro), descrição, data, hora, responsável |
 | Conversa | Troca de mensagens por WhatsApp | loja, lead, estado, última mensagem do tutor, mensagens |
 | Mensagem | Item da conversa | de (tutor, IA, atendente, sistema, nota interna), texto ou modelo, estado de entrega, custo em créditos |
 | Canal da loja | Número oficial da loja | loja, número, provedor, estado, qualidade |
@@ -40,6 +42,8 @@ Descrevem dados e regras como o protótipo (`prototipo/crm-prototipo.html`) as s
 **Card por tutor e oportunidades:** o card é do tutor e traz todas as oportunidades abertas (a mais específica primeiro). Um sinal novo é somado ao card aberto; se o card estava concluído ou encerrado, ele **volta para a coluna de entrada** com um novo ciclo. Sinal genérico (ex.: sem comprar) fica esmaecido enquanto houver oportunidade específica. "Separar em outro card" cria um card próprio para uma oportunidade, mantendo a mesma conversa.
 
 **Ciclo e colunas finais:** mover o card para uma coluna de tipo concluído ou encerrado pede o resultado de cada oportunidade aberta (resolvida ou descartada com motivo) e registra o fechamento do ciclo. Colunas finais mostram só os últimos N dias (configurável). Reabrir (mover de volta para coluna em andamento) devolve as oportunidades do ciclo ao estado aberto. Cada ciclo guarda a sua caminhada de colunas.
+
+**Última ação e próximo passo:** o usuário registra ações e agenda o próximo passo (data, hora, responsável). Registrar uma ação pode concluir o passo agendado. Mensagens enviadas e recebidas pelo WhatsApp atualizam o último contato automaticamente. No card, passo ausente ou de hoje aparece em amarelo e passo atrasado em vermelho.
 
 **Informações do card:** loja, tutor, pets, oportunidades abertas, selo de ciclo, estado do atendimento, consentimento, próxima ação, último contato, tempo na coluna (atenção após 5 dias) e valor.
 

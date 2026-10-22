@@ -44,7 +44,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .pill { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 99px; font-size: .72rem; font-weight: 600; background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line); white-space: nowrap; }
 .pill.ok { background: var(--ok-soft); color: var(--ok); border-color: transparent; } .pill.warn { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
 .pill.bad { background: var(--bad-soft); color: var(--bad); border-color: transparent; } .pill.info { background: var(--accent-soft); color: var(--accent); border-color: transparent; } .pill.pink { background: var(--pink-soft); color: var(--pink); border-color: transparent; } .pill.ia { background: var(--ia-soft); color: var(--ia); border-color: transparent; }
-input[type=text], input[type=number], select, textarea { width: 100%; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; min-height: 38px; }
+input[type=text], input[type=number], input[type=date], input[type=time], select, textarea { width: 100%; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; min-height: 38px; }
 textarea { min-height: 80px; resize: vertical; } label.f { display: block; font-size: .78rem; font-weight: 600; color: var(--ink-2); }
 label.f > input, label.f > select, label.f > textarea { margin-top: 3px; }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; min-width: 0; }
@@ -73,7 +73,8 @@ label.f > input, label.f > select, label.f > textarea { margin-top: 3px; }
 .msg.nota { align-self: center; background: var(--surface); border: 1px dashed var(--ink-3); font-size: .78rem; } .msg .w { font-size: .68rem; color: var(--ink-3); display: block; margin-top: 2px; }
 .tl { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; } .tl li { display: grid; grid-template-columns: 62px 1fr; gap: 8px; font-size: .82rem; } .tl .d { color: var(--ink-3); font-family: var(--mono); font-size: .72rem; }
 .drawer { position: fixed; inset: 0; background: rgba(8,12,24,.55); z-index: 30; display: flex; justify-content: flex-end; }
-.drawer > div { width: min(640px, 100%); background: var(--bg); height: 100%; overflow-y: auto; padding: 16px; padding-top: calc(16px + env(safe-area-inset-top, 0px)); display: grid; gap: 12px; align-content: start; }
+.drawer > div { width: min(640px, 100%); background: var(--bg); height: 100%; overflow-y: auto; padding: 0 16px 24px; display: grid; gap: 12px; align-content: start; }
+.dhead { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: calc(14px + env(safe-area-inset-top, 0px)) 0 10px; border-bottom: 1px solid var(--line); display: grid; gap: 10px; }
 .scroll { overflow-x: auto; } table { width: 100%; border-collapse: collapse; } th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; } th { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); }
 .sw { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; } .sw input { width: 20px; height: 20px; accent-color: var(--accent); }
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-weight: 600; z-index: 50; max-width: calc(100% - 32px); }
@@ -238,6 +239,14 @@ LEADS.forEach(function (l) {
   l.ops.forEach(function (o) { if (!o.c) o.c = l.ciclo; });
   syncLead(l);
 });
+function iso(d) { return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
+function addDias(n) { var d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return iso(d); }
+function difDias(dt) { var a = new Date(dt + "T12:00:00"), b = new Date(); b.setHours(12, 0, 0, 0); return Math.round((a - b) / 86400000); }
+function paQuando(pa) { var n = difDias(pa.dt), h = pa.hr ? " " + pa.hr : "", p = pa.dt.split("-"); return n < 0 ? "atrasada há " + (-n) + " dia(s)" : n === 0 ? "hoje" + h : n === 1 ? "amanhã" + h : p[2] + "/" + p[1] + h; }
+function paTom(pa) { var n = difDias(pa.dt); return n < 0 ? "bad" : n === 0 ? "warn" : ""; }
+function setPa(l, pa) { l.pa = pa; l.prox = pa ? pa.txt + " · " + paQuando(pa) : "—"; }
+var PA = { 1: ["Mensagem", "Oferecer ração 15 kg", 1, "09:00"], 2: ["Ligação", "Ligar e perguntar sobre a Nina", 0, "14:00"], 3: ["Mensagem", "Agendar reforço V10", 2, ""], 4: ["Mensagem", "Enviar proposta do plano de banho", 4, ""], 5: ["Mensagem", "Parabenizar a Pipoca", 3, ""], 6: ["Identificar", "Identificar o tutor", 0, ""], 7: ["Mensagem", "Oferecer pacote de 4 banhos", -2, ""], 10: ["Identificar", "Identificar o tutor", 0, ""] };
+LEADS.forEach(function (l) { var x = PA[l.id]; setPa(l, x ? { tipo: x[0], txt: x[1], dt: addDias(x[2]), hr: x[3] } : null); });
 
 /* ================= Kanban ================= */
 function viewKanban() {
@@ -285,7 +294,7 @@ function cardLead(l) {
     '<div class="row" style="margin-top:6px">' + chipsOps(l) + "</div>" +
     '<div class="row" style="margin-top:6px">' + (l.ciclo > 1 ? '<span class="pill info" title="Este tutor já teve ciclos anteriores; o histórico está na ficha">Voltou · ' + l.ciclo + "º ciclo</span>" : "") + (l.sepDe ? '<span class="pill">Separado de outro card</span>' : "") +
     (c.estado === "aguardando" || c.estado === "humano" ? '<span class="pill ' + EST[c.estado][0] + '">' + EST[c.estado][1] + "</span>" : "") + (l.consent === "ok" || l.consent === "sistema" ? "" : pillCons(l.consent)) + (consCfg(l) && consCfg(l).lead === "pausar" ? '<span class="pill">Pausado</span>' : "") + "</div>" +
-    (fim ? "" : consCfg(l) && consCfg(l).tarefa === "remover" ? '<p class="small" style="margin-top:6px">Sem tarefa de contato (regra da loja para quem recusa mensagens)</p>' : l.prox !== "—" ? '<p class="small" style="margin-top:6px' + (/hoje/.test(l.prox) ? ";color:var(--warn);font-weight:600" : "") + '">Próxima ação: ' + esc(l.prox) + "</p>" : "") +
+    (fim ? "" : consCfg(l) && consCfg(l).tarefa === "remover" ? '<p class="small" style="margin-top:6px">Sem tarefa de contato (regra da loja para quem recusa mensagens)</p>' : l.pa ? '<p class="small" style="margin-top:6px' + (paTom(l.pa) === "bad" ? ";color:var(--bad);font-weight:600" : paTom(l.pa) === "warn" ? ";color:var(--warn);font-weight:600" : "") + '">Próximo passo: ' + esc(l.pa.tipo) + " · " + esc(l.pa.txt) + " · " + paQuando(l.pa) + "</p>" : '<p class="small" style="margin-top:6px;color:var(--warn);font-weight:600">Sem próximo passo agendado</p>') +
     '<p class="small" style="margin-top:4px">Último contato: ' + esc(l.ult) + "</p>" +
     '<p class="small"' + (parado ? ' style="color:var(--warn);font-weight:600"' : "") + ">" + (fim ? (e.t === "concluido" ? "Concluído " : "Encerrado ") : parado ? "Parado nesta coluna " : "Nesta coluna ") + quando + "</p>" +
     (l.valor && !fim ? '<p class="small">' + money(l.valor) + "</p>" : "") +
@@ -308,7 +317,7 @@ function confirmarFim() {
   ab.forEach(function (o, i) { var s = f.sel[i]; o.st = s.r; if (s.r === "descartada") { o.motivo = s.m; desc++; motivo = motivo || s.m; } else { res++; } });
   var de = etp(l.etapa), para = etp(f.etapa), nota = "Ciclo " + l.ciclo + " fechado: " + res + " resolvida(s), " + desc + " descartada(s)";
   if (para.t === "encerrado" && motivo) l.perda = motivo;
-  st.fim = null; l.etapa = f.etapa; l.desde = 0; l.prox = "—"; l.mov.push(mv(l.ciclo, para.n, agora(), nota)); l.tl.unshift([agora(), "Ciclo", nota]); l.tl.unshift([agora(), "Etapa", de.n + " → " + para.n]);
+  st.fim = null; l.etapa = f.etapa; l.desde = 0; setPa(l, null); l.mov.push(mv(l.ciclo, para.n, agora(), nota)); l.tl.unshift([agora(), "Ciclo", nota]); l.tl.unshift([agora(), "Etapa", de.n + " → " + para.n]);
   syncLead(l); toast(nota + "."); render();
 }
 function viewFim() {
@@ -326,7 +335,7 @@ function novoSinal(l, o) {
   var e = etp(l.etapa), nome = l.tutor.split(" ")[0];
   if (ehFim(e)) {
     var ent = ETAPAS.filter(function (x) { return x.t === "entrada"; })[0];
-    l.ciclo += 1; o.c = l.ciclo; l.ops.push(o); l.etapa = ent.id; l.desde = 0; l.prox = "Contatar o tutor sobre: " + opTxt(o); l.perda = "";
+    l.ciclo += 1; o.c = l.ciclo; l.ops.push(o); l.etapa = ent.id; l.desde = 0; setPa(l, { tipo: "Mensagem", txt: "Contatar o tutor sobre: " + opTxt(o), dt: addDias(0), hr: "" }); l.perda = "";
     l.mov.push(mv(l.ciclo, ent.n, agora(), "Novo sinal: " + opTxt(o))); l.tl.unshift([agora(), "Ciclo", "Novo ciclo " + l.ciclo + " aberto: " + opTxt(o)]); syncLead(l);
     return nome + " voltou para " + ent.n + " (" + l.ciclo + "º ciclo)";
   }
@@ -343,7 +352,7 @@ function separar(id, i) {
   var l = lead(id), o = l.ops[i]; if (!o) return;
   l.ops.splice(i, 1);
   var nid = Math.max.apply(null, LEADS.map(function (x) { return x.id; })) + 1, cp = JSON.parse(JSON.stringify(l));
-  cp.id = nid; cp.ops = [o]; cp.sepDe = l.id; cp.desde = 0; cp.valor = 0; cp.prox = "Tratar: " + opTxt(o);
+  cp.id = nid; cp.ops = [o]; cp.sepDe = l.id; cp.desde = 0; cp.valor = 0; setPa(cp, { tipo: "Outro", txt: "Tratar: " + opTxt(o), dt: addDias(0), hr: "" });
   cp.mov = [mv(l.ciclo, etp(l.etapa).n, agora(), "Separado do card principal: " + opTxt(o))]; cp.tl = [[agora(), "Card", "Separado do card principal: " + opTxt(o)]].concat(l.tl);
   if (PES[l.id]) PES[nid] = PES[l.id];
   l.tl.unshift([agora(), "Card", "Oportunidade separada em outro card: " + opTxt(o)]);
@@ -375,6 +384,25 @@ function secCaminhada(l) {
 }
 
 /* ================= Ficha 360 ================= */
+function painelAcoes(l) {
+  var tiposAcao = ["Ligação", "Mensagem enviada", "Visita na loja", "Atendimento presencial", "Observação"];
+  var tiposPa = ["Ligar", "Enviar mensagem", "Visita", "Oferecer produto ou serviço", "Outro"];
+  var pa = l.pa, tom = pa ? paTom(pa) : "warn";
+  return '<section class="panel"><header><h4>Última ação e próximo passo</h4><span class="small">o que foi feito e o que vem a seguir</span></header>' +
+    '<div class="grid" style="gap:14px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">' +
+    '<div><p class="small">Última ação</p><p>' + esc(l.ult) + "</p>" +
+    '<label class="f" style="margin-top:6px">Registrar uma ação<select id="acao-tipo">' + tiposAcao.map(function (t) { return "<option>" + t + "</option>"; }).join("") + "</select></label>" +
+    '<label class="f" style="margin-top:6px">O que aconteceu?<textarea id="acao-obs" placeholder="Ex.: Liguei, ela vai pensar e retorna na sexta" style="min-height:64px"></textarea></label>' +
+    (pa ? '<label class="sw"><input type="checkbox" id="acao-conclui" checked> Conclui o próximo passo agendado</label>' : "") +
+    '<div><button class="btn pri sm" type="button" data-act="acao-registrar" data-id="' + l.id + '">Registrar ação</button></div></div>' +
+    '<div><p class="small">Próximo passo</p>' + (pa ? '<p><span class="pill ' + tom + '">' + esc(paQuando(pa)) + "</span> " + esc(pa.tipo) + " · " + esc(pa.txt) + "</p>" : '<p><span class="pill warn">Nenhum passo agendado</span></p>') +
+    '<label class="f" style="margin-top:6px">O que fazer<select id="pa-tipo">' + tiposPa.map(function (t) { return "<option>" + t + "</option>"; }).join("") + "</select></label>" +
+    '<label class="f" style="margin-top:6px">Descrição<input type="text" id="pa-txt" value="' + (pa ? esc(pa.txt) : "") + '" placeholder="Ex.: Retornar sobre a proposta do plano"></label>' +
+    '<div class="row" style="margin-top:6px"><label class="f" style="flex:1;min-width:130px">Data<input type="date" id="pa-dt" value="' + (pa ? pa.dt : addDias(1)) + '"></label><label class="f" style="width:110px">Hora<input type="time" id="pa-hr" value="' + (pa ? pa.hr : "") + '"></label></div>' +
+    '<div class="row" style="margin-top:6px">' + [["Hoje", 0], ["Amanhã", 1], ["Em 3 dias", 3], ["Em 1 semana", 7]].map(function (x) { return '<button class="chip" type="button" data-act="pa-rapido" data-d="' + x[1] + '">' + x[0] + "</button>"; }).join("") + "</div>" +
+    '<label class="f" style="margin-top:6px">Responsável<select id="pa-resp">' + RESP.map(function (r) { return "<option" + (r === l.resp ? " selected" : "") + ">" + r + "</option>"; }).join("") + "</select></label>" +
+    '<div class="row" style="margin-top:8px"><button class="btn pri sm" type="button" data-act="pa-agendar" data-id="' + l.id + '">Agendar próximo passo</button>' + (pa ? '<button class="btn sm" type="button" data-act="pa-remover" data-id="' + l.id + '">Remover agendamento</button>' : "") + "</div></div></div></section>";
+}
 function painelIdentidade(l) {
   if (!l.cad) {
     return '<section class="panel"><header><h4>Lead sem cadastro</h4><span class="pill warn">Lead novo</span></header><p class="muted">Este contato ainda não está ligado a nenhuma pessoa cadastrada. Temos só o telefone e o que foi dito na conversa.</p>' +
@@ -401,14 +429,14 @@ function viewDrawer() {
   } else {
     var pets = l.pets.length ? l.pets.map(function (p) { return '<li><b>' + esc(p.n) + '</b> <span class="muted">' + esc(p.d) + "</span></li>"; }).join("") : '<li class="muted">Nenhum pet. Ao vincular ao cadastro, os pets aparecem aqui.</li>';
     var tl = l.tl.map(function (t) { return '<li><span class="d">' + t[0] + '</span><span><b>' + t[1] + "</b> · " + esc(t[2]) + "</span></li>"; }).join("");
-    corpo = painelIdentidade(l) + '<div class="row">' + (podeConv ? '<button class="btn pri sm" type="button" data-act="dtab" data-id="conversa">Abrir conversa</button>' : '<button class="btn pri sm" type="button" data-act="ir-conversa" data-id="' + l.conv + '">Abrir conversa</button>') + 
+    corpo = painelAcoes(l) + painelIdentidade(l) + '<div class="row">' + (podeConv ? '<button class="btn pri sm" type="button" data-act="dtab" data-id="conversa">Abrir conversa</button>' : '<button class="btn pri sm" type="button" data-act="ir-conversa" data-id="' + l.conv + '">Abrir conversa</button>') + 
       '<select aria-label="Etapa" data-act="mover" data-id="' + l.id + '" style="width:auto">' + ETAPAS.map(function (e) { return '<option value="' + e.id + '"' + (e.id === l.etapa ? " selected" : "") + ">" + e.n + "</option>"; }).join("") + "</select></div>" +
       secOportunidades(l) + secCaminhada(l) +
       '<section class="panel"><header><h4>Pets</h4></header><ul style="margin:0;padding-left:18px">' + pets + "</ul></section>" +
       '<section class="panel"><header><h4>Linha do tempo</h4><span class="small">compras, saúde, banho, mensagens, etapas</span></header><ul class="tl">' + tl + "</ul></section>" +
-      '<section class="panel"><header><h4>Responsável e próxima ação</h4></header><p class="muted">' + esc(l.resp) + " · " + esc(l.prox) + "</p>" + (l.perda ? '<p class="small">Motivo da perda: ' + esc(l.perda) + "</p>" : "") + "</section>";
+      '<section class="panel"><header><h4>Responsável e próxima ação</h4></header><p class="muted">' + esc(l.resp) + " · " + (l.pa ? esc(l.pa.txt + " · " + paQuando(l.pa)) : "sem próximo passo") + "</p>" + (l.perda ? '<p class="small">Motivo da perda: ' + esc(l.perda) + "</p>" : "") + "</section>";
   }
-  return '<div class="drawer" role="dialog" aria-modal="true" aria-label="Tutor"><div>' + cab + corpo + "</div></div>";
+  return '<div class="drawer" role="dialog" aria-modal="true" aria-label="Tutor"><div><div class="dhead">' + cab + "</div>" + corpo + "</div></div>";
 }
 
 /* ================= Conversas ================= */
@@ -451,7 +479,7 @@ function painelConversa(l, c) {
     '<textarea id="txt" aria-label="Mensagem" placeholder="' + (fora ? "Texto livre indisponível" : "Escreva a resposta") + '"' + (fora ? " disabled" : "") + '></textarea><div class="row"><button class="btn pri sm" type="button" data-act="enviar"' + (fora ? " disabled" : "") + '>Enviar</button><button class="btn sm" type="button" data-act="modelo" data-id="' + l.id + '">Enviar modelo aprovado</button><button class="btn sm" type="button" data-act="nota">Nota interna</button><button class="btn sm" type="button" data-act="sim-tutor">Simular mensagem do tutor</button></div></div>';
   return topo + resumo + '<div class="chat" id="chat">' + bolhas + "</div>" + composer;
 }
-function addMsg(id, de, txt) { CONVS[id].msgs.push(m(de, txt, agora())); }
+function addMsg(id, de, txt) { CONVS[id].msgs.push(m(de, txt, agora())); var lx = lead(id); if (lx && de === "eu") lx.ult = "hoje · WhatsApp (enviado)"; if (lx && de === "tutor") lx.ult = "hoje · WhatsApp (tutor respondeu)"; }
 function respostaIA(l, texto) {
   var t = texto.toLowerCase();
   if (/atendente|humano|pessoa|reclam|chatead|péssim/.test(t)) return { transf: true, txt: "Entendi. Vou chamar um atendente da loja para continuar com você." };
@@ -572,7 +600,7 @@ function viewMapa() {
   var rows = [["Kanban com filtro de lojas e loja em cada card", "Etapa 2 · Fase 2 P.2"], ["Ficha 360 e oportunidades", "Etapa 3 · P.3"], ["Caixa de conversas, assumir e devolver, janela de 24h", "Etapa 5 · P.4"], ["IA, parada, resumo para humano, créditos", "Etapas 0.1, 0.2 e 6 · P.5"], ["Automações, limites e consentimento", "Etapa 7 e 0.7 · P.6"], ["Canal por loja, funil, créditos, OPS", "Etapas 1, 4 e tema T.1 · P.7"], ["Um card por tutor com várias oportunidades, colunas configuráveis e ciclos", "Etapa 2 · P.2"]];
   var legenda = '<section class="panel" style="margin-bottom:14px"><header><h3>Cores: o que pede atenção e o que só informa</h3></header><div class="row"><span class="pill warn">Amarelo</span><span class="pill bad">Vermelho</span><span class="badge">Laranja</span><span class="small">pedem ação ou cuidado: pendências, bloqueios, não lidas, prazos, créditos baixos.</span></div><div class="row" style="margin-top:8px"><span class="pill info">Azul</span><span class="pill ok">Verde</span><span class="pill ia">Roxo</span><span class="small">apenas informam: origem, estado normal, quem está atendendo, confirmações.</span></div></section>';
   return legenda + '<section class="panel"><header><h3>O que cada tela cobre no roadmap</h3></header><div class="scroll"><table><tbody>' + rows.map(function (r) { return "<tr><td>" + r[0] + '</td><td class="small">' + r[1] + "</td></tr>"; }).join("") + '</tbody></table></div></section>' +
-    '<section class="panel" style="margin-top:14px"><header><h3>Experimente</h3></header><ol class="steps"><li><span class="n">1</span><span>Kanban: arraste um card, filtre as lojas e abra a ficha de um tutor.</span></li><li><span class="n">2</span><span>Conversas: em "Camila", clique em Simular mensagem. A IA responde e gasta créditos. Quando o texto pede atendente, a conversa vai para a fila humana com resumo.</span></li><li><span class="n">3</span><span>Assuma a conversa da Juliana e veja o texto livre e a janela de 24h. Em Aline, a janela está fechada.</span></li><li><span class="n">4</span><span>Paulo disse SAIR e Henrique não tem consentimento: veja os bloqueios, inclusive em Automações > Simular disparo.</span></li><li><span class="n">5</span><span>Kanban: clique em "Simular sinais do dia". Sônia (concluída) volta para Novo no 2º ciclo, Roberto ganha uma oportunidade no card que já existe, e Aline recebe um sinal genérico esmaecido.</span></li><li><span class="n">6</span><span>Arraste Camila para "Resolvido": o sistema pergunta o que aconteceu com cada uma das 3 oportunidades. Depois arraste de volta para uma coluna em andamento para reabrir.</span></li><li><span class="n">7</span><span>Abra a ficha de Camila e use "Separar em outro card"; veja a "Caminhada do card" com os ciclos. Em Configurações da loja > Funil, renomeie colunas e mude os tipos.</span></li></ol></section>';
+    '<section class="panel" style="margin-top:14px"><header><h3>Experimente</h3></header><ol class="steps"><li><span class="n">1</span><span>Kanban: arraste um card, filtre as lojas e abra a ficha de um tutor.</span></li><li><span class="n">2</span><span>Conversas: em "Camila", clique em Simular mensagem. A IA responde e gasta créditos. Quando o texto pede atendente, a conversa vai para a fila humana com resumo.</span></li><li><span class="n">3</span><span>Assuma a conversa da Juliana e veja o texto livre e a janela de 24h. Em Aline, a janela está fechada.</span></li><li><span class="n">4</span><span>Paulo disse SAIR e Henrique não tem consentimento: veja os bloqueios, inclusive em Automações > Simular disparo.</span></li><li><span class="n">5</span><span>Kanban: clique em "Simular sinais do dia". Sônia (concluída) volta para Novo no 2º ciclo, Roberto ganha uma oportunidade no card que já existe, e Aline recebe um sinal genérico esmaecido.</span></li><li><span class="n">6</span><span>Arraste Camila para "Resolvido": o sistema pergunta o que aconteceu com cada uma das 3 oportunidades. Depois arraste de volta para uma coluna em andamento para reabrir.</span></li><li><span class="n">7</span><span>Abra a ficha de Camila e use "Separar em outro card"; veja a "Caminhada do card" com os ciclos. Em Configurações da loja > Funil, renomeie colunas e mude os tipos.</span></li><li><span class="n">8</span><span>Na ficha, registre uma ação (ligação, visita, nota) e agende o próximo passo com data e hora. Cards sem próximo passo aparecem em amarelo, de hoje em amarelo e atrasados em vermelho (Henrique está atrasado).</span></li></ol></section>';
 }
 
 /* ================= Render e eventos ================= */
@@ -597,7 +625,7 @@ document.addEventListener("click", function (e) {
   else if (a === "fechar-lead") st.lead = null;
   else if (a === "ir-conversa") { st.tab = "conversas"; st.conv = +id; st.lead = null; }
   else if (a === "conv") st.conv = +id;
-  else if (a === "novo-lead") { var nid = Math.max.apply(null, LEADS.map(function (x) { return x.id; })) + 1; LEADS.unshift({ id: nid, tutor: "Novo lead " + nid, tel: "(11) 90000-000" + nid, loja: Object.keys(st.lojas).filter(function (k) { return st.lojas[k]; })[0], etapa: ETAPAS.filter(function (x) { return x.t === "entrada"; })[0].id, origem: "WhatsApp espontâneo", resp: "Sem responsável", valor: 0, prox: "Qualificar o lead", consent: "nao", cad: false, pets: [], conv: nid, tl: [[agora(), "Lead", "Criado manualmente"]], ops: [op("WhatsApp espontâneo", "criado manualmente", { c: 1 })], ciclo: 1, desde: 0, ult: "agora", mov: [mv(1, ETAPAS.filter(function (x) { return x.t === "entrada"; })[0].n, "hoje")] }); CONVS[nid] = { estado: "ia", janela: 99, nao: 0, msgs: [m("sis", "Lead criado manualmente. Sem consentimento: apenas resposta ao tutor é permitida.", "")] }; toast("Lead criado na etapa Novo."); }
+  else if (a === "novo-lead") { var nid = Math.max.apply(null, LEADS.map(function (x) { return x.id; })) + 1; LEADS.unshift({ id: nid, tutor: "Novo lead " + nid, tel: "(11) 90000-000" + nid, loja: Object.keys(st.lojas).filter(function (k) { return st.lojas[k]; })[0], etapa: ETAPAS.filter(function (x) { return x.t === "entrada"; })[0].id, origem: "WhatsApp espontâneo", resp: "Sem responsável", valor: 0, prox: "Qualificar o lead", consent: "nao", cad: false, pets: [], conv: nid, tl: [[agora(), "Lead", "Criado manualmente"]], ops: [op("WhatsApp espontâneo", "criado manualmente", { c: 1 })], ciclo: 1, desde: 0, ult: "agora", mov: [mv(1, ETAPAS.filter(function (x) { return x.t === "entrada"; })[0].n, "hoje")] }); setPa(LEADS[0], { tipo: "Outro", txt: "Qualificar o lead", dt: addDias(0), hr: "" }); CONVS[nid] = { estado: "ia", janela: 99, nao: 0, msgs: [m("sis", "Lead criado manualmente. Sem consentimento: apenas resposta ao tutor é permitida.", "")] }; toast("Lead criado na etapa Novo."); }
   else if (a === "criar-cadastro") { var l0 = lead(+id); l0.cad = true; l0.tutor = l0.semNome ? "Novo tutor" : l0.tutor; PES[l0.id] = { cod: "C-" + (1500 + l0.id), cpf: "—", email: "—", end: "—", desde: "agora", n: 0, total: 0, ticket: 0, cash: 0, cred: 0 }; l0.tl.unshift([agora(), "Cadastro", "Cadastro criado a partir do lead"]); toast("Cadastro criado (simulado) com o nome e o número do WhatsApp."); }
   else if (a === "vincular") { var l = lead(+id); l.cad = true; l.tutor = "Fernanda Ribeiro"; PES[l.id] = { cod: "C-0688", cpf: "***.402.118-**", email: "fernanda.r@email.com", end: "Rua Azul, 55 · Jardins", desde: "04/2022", n: 12, total: 1650, ticket: 138, cash: 9.5, cred: 0 }; l.pets = [{ n: "Toby", d: "Spitz, 3 anos" }]; l.tl.unshift([agora(), "Cadastro", "Vinculado a Fernanda Ribeiro"]); toast("Lead vinculado a um cadastro existente (simulado)."); }
   else if (a === "assumir") { var c = CONVS[st.conv]; c.estado = "humano"; addMsg(st.conv, "inf", "Atendimento assumido por Marina. A IA não responde mais nesta conversa."); }
@@ -608,6 +636,10 @@ document.addEventListener("click", function (e) {
   else if (a === "sim-tutor") { return simTutor(); }
   else if (a === "modelo") { var ll = lead(+id); if (ll.consent === "saiu" || ll.consent === "nao") return toast("Bloqueado: tutor sem consentimento. Nada enviado."); if (st.saldo < 2) return toast("Créditos insuficientes."); addMsg(ll.conv, "eu", "[Modelo reativacao_v1] Olá, " + ll.tutor.split(" ")[0] + "! Sentimos sua falta. Quer ver as novidades da loja?"); cobrar(4, "Modelo reativacao_v1 · " + ll.tutor.split(" ")[0]); CONVS[ll.conv].estado = CONVS[ll.conv].estado === "encerrada" ? "ia" : CONVS[ll.conv].estado; toast("Modelo enviado (4 créditos)."); }
   else if (a === "disparar") return disparar(+b.dataset.i);
+  else if (a === "pa-rapido") { var dd = $("pa-dt"); if (dd) dd.value = addDias(+b.dataset.d); return; }
+  else if (a === "acao-registrar") { var lr = lead(+id), tpa = $("acao-tipo").value, obs = $("acao-obs").value.trim(), conc = $("acao-conclui"), concluiu = !!(conc && conc.checked && lr.pa); lr.tl.unshift([agora(), "Ação", tpa + (obs ? " · " + obs : "")]); lr.ult = "hoje · " + tpa; if (concluiu) setPa(lr, null); toast("Ação registrada." + (concluiu ? " Próximo passo concluído: agende o seguinte." : "")); }
+  else if (a === "pa-agendar") { var lp = lead(+id), dtv = $("pa-dt").value, hrv = $("pa-hr").value, txtv = $("pa-txt").value.trim(), tipov = $("pa-tipo").value; if (!dtv) return toast("Escolha a data do próximo passo."); if (difDias(dtv) < 0) return toast("A data não pode ser no passado."); setPa(lp, { tipo: tipov, txt: txtv || tipov, dt: dtv, hr: hrv }); lp.resp = $("pa-resp").value; lp.tl.unshift([agora(), "Agenda", tipov + " · " + (txtv || tipov) + " · " + paQuando(lp.pa)]); toast("Próximo passo agendado: " + paQuando(lp.pa) + "."); }
+  else if (a === "pa-remover") { var lq = lead(+id); setPa(lq, null); lq.tl.unshift([agora(), "Agenda", "Agendamento removido"]); toast("Agendamento removido."); }
   else if (a === "ver-todos") st.verTodos = !st.verTodos;
   else if (a === "sim-sinais") return simSinais();
   else if (a === "sinal-ficha") { var lf = lead(+id), tp = $("sinal-tipo").value, dets = { "Ração acabando": "acaba em 5 dias", "Vacina vencendo": "vence em 7 dias", "Sem comprar": "46 dias", "Aniversário do pet": "em 6 dias", "Cashback a vencer": "vence em 10 dias" }; if (hasOp(lf, tp)) toast("Já existe essa oportunidade aberta para o tutor."); else toast(novoSinal(lf, op(tp, dets[tp], { gen: tp === "Sem comprar" })) + "."); }
@@ -630,7 +662,7 @@ document.addEventListener("change", function (e) {
   if (a === "auto-on") { AUTO[+t.dataset.i].on[t.dataset.l] = t.checked; toast(AUTO[+t.dataset.i].nome + ": " + (t.checked ? "ligada" : "desligada") + " em " + loja(t.dataset.l).nome + "."); }
   else if (a === "cons") {
     var cc = st.cons[t.dataset.s]; cc[t.dataset.k] = t.value;
-    if (t.dataset.k === "lead" && t.value === "perdido") { var n = 0, enc = ETAPAS.filter(function (x) { return x.t === "encerrado"; })[0]; if (!enc) { toast("Crie uma coluna de encerrado sem resultado antes."); } else { LEADS.slice().forEach(function (l) { if (l.consent === "saiu" && !ehFim(etp(l.etapa))) { n++; opsAbertas(l).forEach(function (o) { o.st = "descartada"; o.motivo = "Recusou mensagens"; }); l.perda = "Recusou mensagens"; l.prox = "—"; moverLead(l.id, enc.id, true); } }); toast("Regra salva. " + n + " card(s) movido(s) para " + enc.n + "."); } }
+    if (t.dataset.k === "lead" && t.value === "perdido") { var n = 0, enc = ETAPAS.filter(function (x) { return x.t === "encerrado"; })[0]; if (!enc) { toast("Crie uma coluna de encerrado sem resultado antes."); } else { LEADS.slice().forEach(function (l) { if (l.consent === "saiu" && !ehFim(etp(l.etapa))) { n++; opsAbertas(l).forEach(function (o) { o.st = "descartada"; o.motivo = "Recusou mensagens"; }); l.perda = "Recusou mensagens"; setPa(l, null); moverLead(l.id, enc.id, true); } }); toast("Regra salva. " + n + " card(s) movido(s) para " + enc.n + "."); } }
     else toast("Regra salva e aplicada nos cards.");
   }
   else if (a === "fim-r") { st.fim.sel[+t.dataset.i].r = t.value; }
