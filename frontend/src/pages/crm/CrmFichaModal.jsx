@@ -1,3 +1,4 @@
+import { MessageCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../../api";
@@ -7,6 +8,7 @@ import InputCombobox from "../../components/v2/InputCombobox/InputCombobox";
 import InputDataHora from "../../components/v2/InputDataHora/InputDataHora";
 import InputTextoLongo from "../../components/v2/InputTextoLongo/InputTextoLongo";
 import ModalPadrao from "../../components/v2/ModalPadrao/ModalPadrao";
+import { whatsappUrl } from "../lembretes/lembretesUtils";
 import { rotuloDaOportunidade } from "./crmUtils";
 
 const TIPOS_DE_ACAO = [
@@ -84,6 +86,22 @@ export default function CrmFichaModal({ card, onAlterado, onFechar }) {
     }
   };
 
+  // Contato manual enquanto o canal oficial da loja não existe (ROADMAP 2.10): abre o
+  // WhatsApp e já deixa o contato registrado na linha do tempo e no "último contato".
+  const conversarNoWhatsapp = async () => {
+    const url = whatsappUrl(ficha?.telefone, "");
+    if (!url) {
+      toast.error("Este card não tem telefone.");
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+    await enviar(
+      "acoes",
+      { tipo: "mensagem", observacao: "Contato iniciado pelo WhatsApp" },
+      "Contato registrado.",
+    );
+  };
+
   const registrarAcao = async () => {
     const ok = await enviar("acoes", { tipo: tipoAcao, observacao }, "Ação registrada.");
     if (ok) setObservacao("");
@@ -129,6 +147,12 @@ export default function CrmFichaModal({ card, onAlterado, onFechar }) {
             {ficha.origem} · ciclo {ficha.ciclo}
             {ficha.telefone ? ` · ${ficha.telefone}` : ""}
           </p>
+
+          {ficha.telefone ? (
+            <BotaoInteracao icon={MessageCircle} onClick={conversarNoWhatsapp} loading={enviando}>
+              Conversar no WhatsApp
+            </BotaoInteracao>
+          ) : null}
 
           <section aria-labelledby="crm-ficha-oportunidades">
             <h3 id="crm-ficha-oportunidades" className="text-sm font-bold">

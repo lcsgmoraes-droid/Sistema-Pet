@@ -215,7 +215,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 - [ ] 2.8b Cabeçalho fixo no painel do tutor (nome, loja, telefone, consentimento, abas).
 - [~] 2.9 Filtros e busca (responsável, origem, segmento, etapa, período). **Busca por nome feita; faltam responsável, origem, segmento e período na tela (a API já filtra responsável e origem).**
 - [ ] 2.10b Botão "Conversar" no card com contador de não lidas e painel lateral (conversa e ficha 360), reaproveitando o painel de conversa da Etapa 5 (um único componente).
-- [ ] 2.10 Contato manual por WhatsApp (link com registro da interação) enquanto o canal oficial não existe.
+- [x] 2.10 Contato manual por WhatsApp (link com registro da interação) enquanto o canal oficial não existe. **Botão "Conversar no WhatsApp" na ficha: abre o WhatsApp e registra o contato (atualiza o último contato).**
 - [ ] 2.11 Ganho e perda: motivos de perda. `[?] DECIDIR` lista de motivos.
 - [~] 2.12 Desempenho com muitos cartões (paginação por coluna) e uso no celular. **Quadro limitado a 50 cards por coluna no servidor; falta paginação "ver mais" e a tela.**
 - [ ] 2.13 Testes e documentação.
