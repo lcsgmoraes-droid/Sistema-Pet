@@ -11,6 +11,10 @@ from app.services.lgpd_utils import (
     num,
     utcnow,
 )
+from app.whatsapp.lgpd_dados import (
+    anonimizar_conversas_do_tutor,
+    exportar_conversas_do_tutor,
+)
 from app.whatsapp.security import DataPrivacyConsent
 
 logger = logging.getLogger(__name__)
@@ -84,6 +88,16 @@ class PrivacyCustomerDataMixin:
             self.db.query(Pet)
             .filter(Pet.tenant_id == self.tenant_id, Pet.cliente_id == cliente.id)
             .all()
+        )
+
+        # Conversas de WhatsApp: tratadas ANTES de apagar o telefone do cadastro,
+        # que e o que liga o cliente as conversas.
+        whatsapp = anonimizar_conversas_do_tutor(
+            self.db,
+            self.tenant_id,
+            cliente.id,
+            [cliente.celular, cliente.telefone],
+            now,
         )
 
         cliente.nome = f"Cliente anonimizado #{cliente.id}"
@@ -174,6 +188,7 @@ class PrivacyCustomerDataMixin:
             "pets_anonymized": len(pets),
             "pet_photos_deleted": deleted_pet_photos,
             "consents_revoked": revoked_consents,
+            "whatsapp": whatsapp,
             "completed_at": now.isoformat(),
         }
 
@@ -321,6 +336,12 @@ class PrivacyCustomerDataMixin:
                 "customer", str(cliente.id)
             ),
             "logs_acesso": self._access_logs("customer", str(cliente.id)),
+            "whatsapp": exportar_conversas_do_tutor(
+                self.db,
+                self.tenant_id,
+                cliente.id,
+                [cliente.celular, cliente.telefone],
+            ),
         }
 
         self.log_data_access(

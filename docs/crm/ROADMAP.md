@@ -159,12 +159,12 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 - [~] Medição por mensagem: modelo usado, tokens de entrada e saída **já são gravados** em cada resposta; falta o custo em créditos (tema T.1).
 
 **0.7 LGPD operacional e consentimento**
-- [ ] Consentimento verificado em todo envio (bot, automações e atendimento ativo).
-- [ ] Palavra SAIR (e variações) bloqueia na hora e fica registrada.
+- [~] Consentimento verificado em todo envio: regra única criada (`backend/app/whatsapp/consent_service.py`, `pode_enviar_whatsapp`; recusa do cadastro ou do contato, vale o registro mais recente; quem recusou não recebe nada, com a única exceção de responder ao tutor quando a loja permitir). Já aplicada ao bot (quem recusou não recebe resposta da IA nem aviso automático e vai para um atendente). **Falta ligar nos envios do atendente e das automações quando esses caminhos existirem (Etapas 0.8, 4 e 7).**
+- [x] Palavra SAIR (e variações: parar, stop, descadastrar, "não quero receber") bloqueia na hora e fica registrada (cadastro ou contato sem cadastro, pelo número); o tutor recebe uma confirmação. Só vale a mensagem inteira, para não confundir com frases normais.
 - [ ] **Configuração por situação (decisão de 21/10):** para "recusou mensagens" e "ainda não autorizou", cada loja escolhe: conversa iniciada pelo atendente (bloquear ou só responder dentro da janela), lead no funil (manter, pausar, mover para Perdido com motivo) e tarefas de contato por outros meios (manter ou remover). Padrões seguros: bloquear, manter, manter. Mensagens automáticas e modelos nunca são liberados.
 - [ ] Revisar o vocabulário dos estados de consentimento em todo o sistema (Autorizou mensagens, Autorizou no sistema, Sem autorização, Recusou mensagens automáticas). `[?] DECIDIR` se o termo "SAIR" aparece ao usuário final.
-- [ ] Exclusão, exportação e anonimização passam a executar de verdade (hoje são casca).
-- [ ] Auditoria de acesso a dados do tutor no atendimento.
+- [x] Exportação e anonimização das conversas de WhatsApp entram no fluxo central de LGPD do cliente (`backend/app/whatsapp/lgpd_dados.py`): dossiê inclui conversas e atendimentos; anonimizar remove mensagens, telefone, notas e vínculo, antes de o cadastro perder o telefone. O fluxo paralelo antigo do WhatsApp (`DataDeletionRequest` e `LGPDService.process_deletion_request`) continua sem executar e será unificado ou removido na Etapa 0.8.
+- [~] Auditoria de acesso: a leitura das mensagens de uma conversa passa a ser registrada (quem, quando, titular). Falta nos demais pontos (ficha do tutor, detalhe do atendimento): Etapa 5.
 - [ ] **Decidir a melhor forma de solicitar o consentimento** (aceite no cadastro/PDV, mensagem de confirmação pelo WhatsApp, ou os dois). `[?] DECIDIR` — proposta inicial: aceite registrado no sistema + confirmação com botão no WhatsApp.
 - [ ] Mudar a regra atual (presume consentimento) e avaliar impacto nas campanhas que já existem. `[?] DECIDIR` migração dos tutores atuais.
 - [ ] Prazo de retenção das conversas. `[?] DECIDIR`
@@ -351,6 +351,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 | Data | Mudança |
 |---|---|
+| 22/10/2026 | Etapa 0.7 avançada (sem as decisões de consentimento e retenção): SAIR registrado e confirmado, quem recusou não recebe IA nem aviso, conversas entram no dossiê e na anonimização LGPD, leitura de mensagens auditada. |
 | 22/10/2026 | Etapa 0.6 em grande parte concluída: limite de frequência por telefone e válvula de segurança de tokens por dia por loja, medidos no banco; falta ligar ao saldo de créditos (T.1). |
 | 22/10/2026 | Etapa 0.5 concluída: canal interno com comparação segura e sem token de exemplo em produção, valores fixos removidos (n8n, compose de produção, webhook antigo), erro do teste de conexão sem vazamento, telefone mascarado nos logs e configuração protegida por permissão. Exige definir token forte no servidor antes da publicação. |
 | 22/10/2026 | Etapa 0.4 concluída (exceto a decisão de como tratar ambiguidade na tela): serviço único telefone → tutor, vínculo antigo validado, telefone de 40 caracteres (migração nova) e script de conferência. |

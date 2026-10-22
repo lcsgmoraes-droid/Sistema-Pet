@@ -3,6 +3,7 @@ WhatsApp IA - Sprint 3 Endpoints
 Core IA Features: Intent detection, AI processing, metrics
 """
 
+import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Union
 from uuid import UUID
@@ -15,6 +16,8 @@ from app.auth import get_current_user_and_tenant
 from app.whatsapp.intents import detect_intent_with_confidence, intent_detector
 from app.whatsapp.ai_service import get_ai_service
 from app.whatsapp.metrics import get_metrics_analyzer
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/whatsapp", tags=["WhatsApp IA"])
 
@@ -277,6 +280,40 @@ def get_whatsapp_session(
     return session
 
 
+def _registrar_acesso_a_conversa(db, tenant_id, session_id: str, usuario) -> None:
+    """Auditoria LGPD: registra quem leu as mensagens de um tutor. Nao bloqueia a leitura."""
+    try:
+        from app.whatsapp.consent_service import chave_contato
+        from app.whatsapp.models import WhatsAppSession
+        from app.whatsapp.security import LGPDService
+
+        sessao = (
+            db.query(WhatsAppSession)
+            .filter(
+                WhatsAppSession.id == session_id,
+                WhatsAppSession.tenant_id == tenant_id,
+            )
+            .first()
+        )
+        if sessao is None:
+            return
+        if sessao.cliente_id:
+            tipo, titular = "customer", str(sessao.cliente_id)
+        else:
+            tipo, titular = "contact", chave_contato(sessao.phone_number)
+        LGPDService(db, str(tenant_id)).log_data_access(
+            subject_type=tipo,
+            subject_id=titular,
+            access_type="view",
+            resource_type="whatsapp_conversa",
+            resource_id=str(session_id),
+            accessed_by_user_id=getattr(usuario, "id", None),
+            justification="Leitura das mensagens no atendimento",
+        )
+    except Exception as erro:
+        logger.warning("Falha ao registrar acesso a conversa: %s", erro)
+
+
 @router.get("/sessions/{session_id}/messages")
 def get_session_messages(
     session_id: str,
@@ -297,6 +334,8 @@ def get_session_messages(
         .order_by(WhatsAppMessage.created_at)
         .all()
     )
+
+    _registrar_acesso_a_conversa(db, tenant_id, session_id, current_user)
 
     return messages
 

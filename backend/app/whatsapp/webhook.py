@@ -20,6 +20,12 @@ from datetime import datetime, timedelta
 
 from app.db import get_session as get_db
 from app.whatsapp.models import TenantWhatsAppConfig, WhatsAppSession, WhatsAppMessage
+from app.whatsapp.consent_service import (
+    CONFIRMACAO_DE_SAIDA,
+    e_pedido_de_saida,
+    recusou_mensagens,
+    registrar_recusa,
+)
 from app.whatsapp.log_safety import mascarar_telefone
 from app.whatsapp.usage_limits import LIMITE_DIARIO, avaliar_limites
 from app.whatsapp.tenant_context import whatsapp_tenant_context
@@ -434,6 +440,21 @@ async def _process_incoming_message_with_context(
 
         await _avisar_nova_mensagem(tenant_id, session, message, message_content)
 
+        # CRM etapa 0.7: o tutor respondeu SAIR (ou equivalente).
+        if e_pedido_de_saida(message_content):
+            confirmada = await _registrar_saida_do_tutor(
+                db, tenant_id, session, phone_normalized
+            )
+            return {
+                "status": "processed",
+                "whatsapp_message_id": provider_message_id,
+                "message_id": message.id,
+                "processor_result": {
+                    "action": "opt_out_registered",
+                    "confirmation_sent": confirmada,
+                },
+            }
+
         # CRM etapa 0.1: com atendimento humano ativo ou aguardando, a IA nao
         # responde. A mensagem ja foi salva para o atendente ver.
         if atendimento_humano_ativo(session):
@@ -452,6 +473,17 @@ async def _process_incoming_message_with_context(
                     "session_status": session.status,
                     "waiting_notice_sent": aviso_enviado,
                 },
+            }
+
+        # CRM etapa 0.7: quem recusou mensagens automaticas nao recebe resposta da
+        # IA; a conversa vai para um atendente decidir, sem aviso automatico.
+        if _tutor_recusou(db, tenant_id, session):
+            await _encaminhar_recusa_para_atendente(db, tenant_id, session)
+            return {
+                "status": "processed",
+                "whatsapp_message_id": provider_message_id,
+                "message_id": message.id,
+                "processor_result": {"action": "skipped_opt_out"},
             }
 
         # CRM etapa 0.6: limites de uso da IA (spam e gasto da loja).
@@ -608,6 +640,79 @@ async def _avisar_nova_mensagem(
         logger.warning("Falha ao avisar nova mensagem em tempo real: %s", erro)
 
 
+def _tutor_recusou(db: Session, tenant_id: str, session: Any) -> bool:
+    try:
+        return recusou_mensagens(
+            db,
+            tenant_id,
+            getattr(session, "phone_number", None),
+            getattr(session, "cliente_id", None),
+        )
+    except Exception as erro:
+        logger.warning("Falha ao conferir recusa de mensagens: %s", erro)
+        return False
+
+
+async def _registrar_saida_do_tutor(
+    db: Session, tenant_id: str, session: Any, phone: str
+) -> bool:
+    """Grava a recusa e confirma ao tutor. Falha ao confirmar nao desfaz a recusa."""
+    try:
+        registrar_recusa(db, tenant_id, phone, getattr(session, "cliente_id", None))
+    except Exception as erro:
+        logger.error("Falha ao registrar recusa de mensagens: %s", erro)
+        db.rollback()
+        return False
+    try:
+        from app.whatsapp.sender import send_whatsapp_message
+
+        enviada = await send_whatsapp_message(
+            db=db,
+            tenant_id=tenant_id,
+            session_id=session.id,
+            message=CONFIRMACAO_DE_SAIDA,
+        )
+        return enviada is not None
+    except Exception as erro:
+        logger.warning("Falha ao confirmar a saida ao tutor: %s", erro)
+        return False
+
+
+async def _encaminhar_recusa_para_atendente(
+    db: Session, tenant_id: str, session: Any
+) -> None:
+    """Quem recusou escreveu de novo: um atendente decide (sem aviso automatico)."""
+    try:
+        from app.whatsapp.handoff_manager import get_handoff_manager
+
+        gerente = get_handoff_manager(db, tenant_id)
+        if gerente.get_active_handoff(session.id):
+            return
+        handoff = gerente.create_handoff(
+            session_id=session.id,
+            phone_number=session.phone_number,
+            reason="recusou_mensagens",
+            priority="low",
+            reason_details="O tutor recusou mensagens automaticas e escreveu de novo.",
+        )
+        from app.whatsapp.websocket import emit_new_handoff
+
+        await emit_new_handoff(
+            {
+                "id": str(handoff.id),
+                "session_id": str(session.id),
+                "phone_number": handoff.phone_number,
+                "reason": handoff.reason,
+                "priority": handoff.priority,
+                "status": handoff.status,
+            },
+            str(tenant_id),
+            db,
+        )
+    except Exception as erro:
+        logger.warning("Falha ao encaminhar conversa de quem recusou: %s", erro)
+
+
 async def _avisar_espera_atendente(db: Session, tenant_id: str, session: Any) -> bool:
     """Avisa o tutor que um atendente vai falar com ele, no maximo 1 vez por janela.
 
@@ -616,6 +721,8 @@ async def _avisar_espera_atendente(db: Session, tenant_id: str, session: Any) ->
     derruba o processamento da mensagem recebida.
     """
     if getattr(session, "status", None) != "waiting_human":
+        return False
+    if _tutor_recusou(db, tenant_id, session):
         return False
     try:
         limite = datetime.utcnow() - timedelta(minutes=JANELA_AVISO_ESPERA_MINUTOS)
