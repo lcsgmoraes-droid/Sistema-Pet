@@ -14,7 +14,7 @@ Relacionamento com o tutor por loja: funil de leads em quadro, ficha 360 (compra
 ## Identificação
 
 - Módulo: `crm` (fora da oferta pública e de contratação separada até decidir planos e preço — ROADMAP 1.2). Não entra em beta, teste completo nem planos "todos os módulos".
-- Rota frontend: `/crm` (`frontend/src/pages/crm/CrmPage.jsx`, rota em `app/routes/DeliveryAiRoutes.jsx`, menu em `components/layout/menuConfig.js`).
+- Rota frontend: `/crm` (`frontend/src/pages/crm/`: `CrmPage` + `useCrmQuadro` (dados e filtro de lojas), `CrmQuadro`/`CrmColuna`/`CrmCard` (arrastar pela alça, dnd-kit), modais `CrmFichaModal`, `CrmNovoCardModal`, `CrmConcluirModal`, `CrmColunasModal`, `crmUtils.js` testado em Node; rota em rota em `app/routes/DeliveryAiRoutes.jsx`, menu em `components/layout/menuConfig.js`).
 - Permissões: `crm.visualizar`, `crm.atender`, `crm.leads`, `crm.configurar`, `crm.todas_lojas` (migração `zzzzl20261022a1`; perfil Gerente padrão recebe todas; quem tinha `ia.whatsapp` recebeu o backfill).
 
 ## Backend
@@ -23,7 +23,10 @@ Relacionamento com o tutor por loja: funil de leads em quadro, ficha 360 (compra
   - `models.py` — tabelas `crm_funis`, `crm_colunas`, `crm_leads`, `crm_oportunidades`, `crm_movimentacoes`, `crm_interacoes`, `crm_acoes`, `crm_proximos_passos` (migração `zzzzm20261022a1`, todas com RLS por loja).
   - `lojas.py` — multi-loja: `lojas_permitidas`, `resolver_lojas`, `consultar_por_loja`. Cada consulta roda em UMA loja por vez e marca `loja_id`/`loja_nome`.
   - `leads_service.py` — funil padrão sob demanda e `identificar_ou_criar_lead`.
-  - `routes.py` — `GET /crm/lojas` (router montado em `main_routers.py` com o módulo `crm` exigido).
+  - `funil_service.py` — regras: colunas (1 entrada, 1 concluído, máx. 8), mover card, ciclos, oportunidades (`registrar_sinal`).
+  - `acoes_service.py` — criar card, registrar ação, agendar passo, ficha, buscar pessoa e vincular a cadastro.
+  - `quadro_service.py` — leitura do quadro de uma loja (50 cards por coluna; card sem telefone).
+  - `routes.py` — `/crm/lojas`, `/crm/quadro`, `/crm/tutores`, `/crm/leads` (+ `/mover`, `/acoes`, `/proximo-passo`, `/vincular`), `PUT /crm/funil/colunas`. Router montado em `main_routers.py` com o módulo `crm` exigido; cada rota age em UMA loja e confere a permissão nela.
 - Conversas de WhatsApp: `backend/app/whatsapp/` (webhook, processor, handoff, websocket). A criação de uma sessão nova registra o card do tutor quando o CRM está ativo na loja.
 
 ## Regras que não são óbvias
