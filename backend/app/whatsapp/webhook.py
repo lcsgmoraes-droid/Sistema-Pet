@@ -426,6 +426,8 @@ async def _process_incoming_message_with_context(
 
         logger.info(f"✅ Mensagem salva: session={session.id}")
 
+        await _avisar_nova_mensagem(tenant_id, session, message, message_content)
+
         # CRM etapa 0.1: com atendimento humano ativo ou aguardando, a IA nao
         # responde. A mensagem ja foi salva para o atendente ver.
         if atendimento_humano_ativo(session):
@@ -500,6 +502,31 @@ AVISO_ESPERA_ATENDENTE = (
 )
 # Evita repetir o aviso a cada mensagem enquanto o tutor espera.
 JANELA_AVISO_ESPERA_MINUTOS = 30
+
+
+async def _avisar_nova_mensagem(
+    tenant_id: str, session: Any, message: Any, conteudo: str
+) -> None:
+    """Avisa em tempo real os atendentes da loja sobre a mensagem do tutor."""
+    try:
+        from app.whatsapp.websocket import emit_new_message
+
+        await emit_new_message(
+            str(session.id),
+            {
+                "id": str(message.id),
+                "session_id": str(session.id),
+                "tipo": "recebida",
+                "sender_type": "customer",
+                "content": conteudo,
+                "conteudo": conteudo,
+                "timestamp": datetime.utcnow().isoformat(),
+                "read": False,
+            },
+            str(tenant_id),
+        )
+    except Exception as erro:
+        logger.warning("Falha ao avisar nova mensagem em tempo real: %s", erro)
 
 
 async def _avisar_espera_atendente(db: Session, tenant_id: str, session: Any) -> bool:

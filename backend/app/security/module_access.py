@@ -107,6 +107,11 @@ def _load_active_entitlements(
     return sorted(entitlements)
 
 
+def tenant_has_active_module(db: Session, tenant_id: str, modulo: str) -> bool:
+    """True quando a loja tem o modulo ativo (uso fora de rotas HTTP, ex.: WebSocket)."""
+    return modulo in _load_active_modules(db, str(tenant_id))
+
+
 def _is_public_bling_webhook(modulo: str, request: Request | None) -> bool:
     if modulo != "bling" or request is None:
         return False

@@ -209,6 +209,26 @@ class WhatsAppResponseFlowMixin:
             "images_sent": images_sent,
         }
 
+    async def _avisar_novo_handoff(self, handoff, session) -> None:
+        """Avisa em tempo real os atendentes da loja. Nunca derruba o fluxo."""
+        try:
+            from app.whatsapp.websocket import emit_new_handoff
+
+            await emit_new_handoff(
+                {
+                    "id": str(handoff.id),
+                    "session_id": str(session.id),
+                    "phone_number": handoff.phone_number,
+                    "reason": handoff.reason,
+                    "priority": handoff.priority,
+                    "status": handoff.status,
+                },
+                str(self.tenant_id),
+                self.db,
+            )
+        except Exception as erro:
+            logger.warning("Falha ao avisar novo handoff em tempo real: %s", erro)
+
     async def _transfer_to_human(
         self,
         session_id: str,
@@ -221,6 +241,7 @@ class WhatsAppResponseFlowMixin:
         """
         session = self.db.query(WhatsAppSession).get(session_id)
         handoff = None
+        handoff_criado = False
 
         if session:
             session.status = "waiting_human"
@@ -243,8 +264,12 @@ class WhatsAppResponseFlowMixin:
                     reason_details=reason_details
                     or f"Transferência automática por intent: {reason}",
                 )
+                handoff_criado = True
 
             self.db.commit()
+
+            if handoff_criado:
+                await self._avisar_novo_handoff(handoff, session)
 
         transfer_messages = {
             "medical_guidance": (

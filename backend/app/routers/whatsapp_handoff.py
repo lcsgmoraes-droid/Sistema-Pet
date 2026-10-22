@@ -229,7 +229,7 @@ async def update_agent(
                 "status": agent.status,
                 "current_chats": agent.current_chats,
             },
-            db,
+            str(agent.tenant_id),
         )
 
     return agent
@@ -548,7 +548,7 @@ async def resolve_handoff(
     db.refresh(handoff)
 
     # Emit WebSocket event
-    await emit_handoff_resolved(handoff_id, db)
+    await emit_handoff_resolved(handoff_id, str(handoff.tenant_id))
 
     return _serialize_handoff(handoff)
 

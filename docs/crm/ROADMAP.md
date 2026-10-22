@@ -127,12 +127,12 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 - [x] Testes ponta a ponta: assumir, resolver, devolver e a IA parando e voltando (`backend/tests/unit/test_whatsapp_handoff_ciclo_atendimento.py`). Falta o teste de "responder" (o envio pelo atendente é a Etapa 0.8).
 
 **0.3 Tempo real (WebSocket) separado por loja**
-- [ ] Validar que o atendente da conexão pertence ao usuário e à loja.
-- [ ] Gerenciar conexões e eventos por loja; nenhum evento cruza lojas.
-- [ ] Exigir o módulo contratado na conexão.
-- [ ] Emitir de fato os eventos de mensagem nova e de nova fila (hoje nunca são chamados).
+- [x] Validar que o atendente da conexão pertence ao usuário e à loja (22/10/2026: `autorizar_conexao_agente` em `backend/app/routers/whatsapp_websocket.py`; qualquer falha recusa a conexão sem detalhes).
+- [x] Gerenciar conexões e eventos por loja; nenhum evento cruza lojas (o envio para "todas as lojas" foi removido; todos os emissores exigem a loja).
+- [x] Exigir o módulo contratado na conexão (novo `tenant_has_active_module`).
+- [x] Emitir de fato os eventos de mensagem nova (webhook) e de nova fila de atendimento (transferência para humano), sempre para a loja certa e sem derrubar o fluxo em caso de falha.
 - [ ] Escala com mais de uma instância (mensagens entre processos). `[?] DECIDIR` quando houver mais de uma réplica.
-- [ ] Testes de isolamento entre lojas.
+- [x] Testes de isolamento entre lojas e de autorização da conexão (`backend/tests/unit/test_whatsapp_websocket_isolamento_loja.py`).
 
 **0.4 Serviço único: telefone → tutor**
 - [ ] Normalizar o telefone (DDI 55, 9º dígito, formatos com e sem máscara, identificadores especiais do WhatsApp).
@@ -351,6 +351,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 | Data | Mudança |
 |---|---|
+| 22/10/2026 | Etapa 0.3 concluída (exceto escala com mais de uma instância, que segue a decidir): tempo real separado por loja, conexão só para o atendente da própria loja com o módulo contratado, eventos de mensagem nova e de nova fila passam a ser emitidos. |
 | 22/10/2026 | Etapa 0.2 concluída (exceto a ligação das regras por sentimento, repetição e tempo, que segue a decidir): estados unificados, assumir e resolver sincronizam a conversa, devolução ao bot por escolha. |
 | 22/10/2026 | Etapa 0.1 concluída: a IA não responde com atendimento humano ativo e o tutor que aguarda atendente recebe um aviso de espera (1 vez a cada 30 minutos). |
 | 22/10/2026 | Protótipo congelado; Fase 2 concluída; início da Fase 3 (Etapa 0.1). |
