@@ -58,8 +58,8 @@ Centralização de código · zero redundância · boas práticas (DDD, SOLID) p
 | Fase | Entrega | Situação |
 |---|---|---|
 | Fase 1 | Planejamento macro, documentação e roadmap | **Em andamento** (escopo e roadmap prontos; revisão com o Lucas) |
-| Fase 2 | Protótipo navegável (artefato) com backend conceitual, sem acesso ao sistema | **Versão 1 pronta; aguardando ajustes (P.9)** |
-| Fase 3 | Desenvolvimento em etapas 0 a 8 | Pendente |
+| Fase 2 | Protótipo navegável (artefato) com backend conceitual, sem acesso ao sistema | **Concluída: protótipo congelado na versão 11 (22/10/2026)** |
+| Fase 3 | Desenvolvimento em etapas 0 a 8 | **Em andamento: iniciando pela Etapa 0.1** |
 
 | Etapa | Tema | Situação |
 |---|---|---|
@@ -100,7 +100,7 @@ Objetivo: fechar a ideia das telas e dos contratos antes de escrever código de 
 - [x] P.6 **Automações:** catálogo de gatilhos (aniversário, ração acabando, vacina, medicação, inativo, recompra), modelos, limites, liga/desliga por loja.
 - [x] P.7 **Configuração do canal por loja** e tela do OPS (revisada); saldo e consumo de créditos.
 - [x] P.8 Contratos conceituais: lead, etapa, interação, canal, modelo de mensagem, consentimento, crédito (dados e regras).
-- [ ] P.9 Rodada de ajustes com o Lucas e congelamento do protótipo.
+- [x] P.9 Rodada de ajustes com o Lucas e congelamento do protótipo (versão 11, em 22/10/2026).
 
 **Protótipo versão 1 (21/10):** `docs/crm/prototipo/crm-prototipo.html` (publicado também como artefato privado). Cobre Kanban com filtro de lojas e loja em cada card, ficha 360, caixa de conversas (IA, assumir, devolver, resumo, janela de 24h, notas), automações com bloqueios, configurações da loja, créditos e OPS. Contratos em `CONTRATOS_CONCEITUAIS.md`.
 
@@ -345,6 +345,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 | Data | Mudança |
 |---|---|
+| 22/10/2026 | Protótipo congelado; Fase 2 concluída; início da Fase 3 (Etapa 0.1). |
 | 21/10/2026 | Protótipo versão 11: painel de última ação e próximo passo em coluna única com formulários sob demanda; duplo clique no card abre a ficha 360. |
 | 21/10/2026 | Protótipo versão 10: cabeçalho do painel fixo; registrar última ação e agendar próximo passo com data, hora e responsável; cores de atenção para passo atrasado, de hoje ou ausente. |
 | 21/10/2026 | Protótipo versão 9: um card por tutor com várias oportunidades, colunas configuráveis com tipos, ciclos, fechamento por oportunidade, reabertura, separação de card, caminhada do card e simulação de sinais do dia. |
