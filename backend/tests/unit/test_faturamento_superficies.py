@@ -297,6 +297,33 @@ async def test_superficies_compartilham_calculo_e_explicitam_empresa_versus_caix
     assert vendas["creditos_utilizados"] == 5
     assert vendas["crediario_receber"] == 50
     assert vendas["em_aberto"] == 0
+    # Os agregados cobrem todas as vendas selecionadas, sem duplicar benefício
+    # ou o plano. A devolução sem contrapartida por forma permanece explícita.
+    assert vendas["formas_pagamento"] == [
+        {"forma_pagamento": "Dinheiro", "total": 40, "quantidade": 1},
+        {"forma_pagamento": "Pix", "total": 110, "quantidade": 2},
+    ]
+    assert vendas["total_formas_pagamento"] == 150
+    assert vendas["ajustes_formas_pagamento"] == -25
+    assert (
+        dashboard["composicao_vendas"]["formas_pagamento"]
+        == (vendas["formas_pagamento"])
+    )
+    assert dashboard["composicao_vendas"]["ajustes_formas_pagamento"] == -25
+    # Somente o topo recebeu campos de apresentação. Não entram no snapshot
+    # por venda que compõe a assinatura de uma conferência já salva.
+    campos_agregados = {
+        "formas_pagamento",
+        "total_formas_pagamento",
+        "ajustes_formas_pagamento",
+        "criterio_formas_pagamento",
+    }
+    auditoria = obter_auditoria_caixa(caso.atual.id, caso.db, caso.auth)
+    assert all(
+        not campos_agregados.intersection(item["composicao_comercial"])
+        for item in auditoria["vendas"]
+        if item["composicao_comercial"]
+    )
     # A venda sem caixa continua no painel/app, mas nao no caixa auditado.
     assert dashboard["composicao_vendas"]["em_aberto"] == 20
     assert mobile["vendas"]["faturamento_liquido"] == 185
@@ -339,6 +366,39 @@ async def test_superficies_compartilham_calculo_e_explicitam_empresa_versus_caix
             ),
             encoding="utf-8",
         )
+
+
+@pytest.mark.asyncio
+async def test_dashboard_atualiza_total_por_forma_apos_correcao_no_pagamento(cenario):
+    caso = cenario
+    antes = (await obter_resumo_dashboard(1, caso.db, caso.auth))["composicao_vendas"]
+    original = (
+        caso.db.query(VendaPagamento)
+        .join(Venda, Venda.id == VendaPagamento.venda_id)
+        .filter(
+            VendaPagamento.tenant_id == caso.auth[1],
+            Venda.numero_venda == "202610090001",
+            VendaPagamento.forma_pagamento == "PIX",
+        )
+        .one()
+    )
+    original.forma_pagamento = "Cartão de débito"
+    caso.db.flush()
+    caso.db.expire_all()
+    depois = (await obter_resumo_dashboard(1, caso.db, caso.auth))["composicao_vendas"]
+    assert antes["formas_pagamento"] == [
+        {"forma_pagamento": "Dinheiro", "total": 40, "quantidade": 1},
+        {"forma_pagamento": "Pix", "total": 110, "quantidade": 2},
+    ]
+    assert depois["formas_pagamento"] == [
+        {"forma_pagamento": "Cartão de débito", "total": 10, "quantidade": 1},
+        {"forma_pagamento": "Dinheiro", "total": 40, "quantidade": 1},
+        {"forma_pagamento": "Pix", "total": 100, "quantidade": 1},
+    ]
+    assert antes["valor_pago"] == depois["valor_pago"] == 125
+    assert (
+        antes["ajustes_formas_pagamento"] == depois["ajustes_formas_pagamento"] == -25
+    )
 
 
 def test_caixa_fechado_preserva_periodo_civil_original(cenario, monkeypatch):

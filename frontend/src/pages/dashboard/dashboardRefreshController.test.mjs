@@ -17,12 +17,16 @@ const UI = {
 };
 const vazio = () => {};
 
-function respostaResumo(liquido, vendaIds) {
+function respostaResumo(liquido, vendaIds, formas = [{ forma_pagamento: "Pix", total: liquido }]) {
   const composicao = {
     escopo: "empresa",
     data_inicio: "2026-10-01",
     data_fim: "2026-10-22",
     faturamento_liquido: liquido,
+    valor_pago: liquido,
+    formas_pagamento: formas,
+    total_formas_pagamento: liquido,
+    ajustes_formas_pagamento: 0,
     quantidade: vendaIds.length,
     detalhes: vendaIds.map((venda_id) => ({
       venda_id,
@@ -161,6 +165,10 @@ test("atualizacao automatica renova vendas e pagamentos com tres GET sem recolhe
   await caso.concluir(caso.consultas.slice(), respostaResumo(100, [1]));
   await caso.harness.act(() => caso.encontrar(UI.resumo).props.aoAlternarDetalhes());
   assert.equal(caso.encontrar(UI.resumo).props.expandido, true);
+  assert.equal(caso.encontrar(UI.detalhes).props.mostrarTotaisPorForma, true);
+  assert.deepEqual(caso.encontrar(UI.detalhes).props.composicao.formas_pagamento, [
+    { forma_pagamento: "Pix", total: 100 },
+  ]);
   assert.deepEqual(
     caso.encontrar(UI.detalhes).props.composicao.detalhes.map((v) => v.venda_id),
     [1],
@@ -175,13 +183,24 @@ test("atualizacao automatica renova vendas e pagamentos com tres GET sem recolhe
   ]);
   assert.ok(automaticas.every((consulta) => consulta.config.params.periodo_dias === 30));
   assert.equal((await caso.atualizarAutomaticamente()).length, 0, "Consulta pendente nao sobrepoe");
-  const atual = respostaResumo(125, [1, 2]);
+  const atual = respostaResumo(
+    125,
+    [1, 2],
+    [
+      { forma_pagamento: "Pix", total: 100 },
+      { forma_pagamento: "Cartão de débito", total: 25 },
+    ],
+  );
   await caso.concluir(automaticas, atual);
   const cartao = caso.encontrar(UI.resumo);
   const detalhes = caso.encontrar(UI.detalhes);
   assert.equal(cartao.props.expandido, true);
   assert.equal(cartao.props.composicao, atual.composicao_vendas);
   assert.equal(detalhes.props.composicao, atual.composicao_vendas);
+  assert.deepEqual(detalhes.props.composicao.formas_pagamento, [
+    { forma_pagamento: "Pix", total: 100 },
+    { forma_pagamento: "Cartão de débito", total: 25 },
+  ]);
   assert.deepEqual(
     detalhes.props.composicao.detalhes.map((v) => v.venda_id),
     [1, 2],
@@ -194,12 +213,16 @@ test("falha do resumo no mesmo periodo preserva valores e horario da ultima carg
   const caso = preparar();
   const valido = respostaResumo(180, [7]);
   await caso.concluir(caso.consultas.slice(), valido);
+  await caso.harness.act(() => caso.encontrar(UI.resumo).props.aoAlternarDetalhes());
   const antes = caso.horario();
   assert.ok(antes);
   caso.avancarMinuto();
   const automaticas = await caso.atualizarAutomaticamente();
   await caso.concluir(automaticas, null, { falharResumo: true });
   assert.equal(caso.encontrar(UI.resumo).props.composicao, valido.composicao_vendas);
+  assert.deepEqual(caso.encontrar(UI.detalhes).props.composicao.formas_pagamento, [
+    { forma_pagamento: "Pix", total: 180 },
+  ]);
   assert.equal(caso.horario(), antes);
   assert.match(elementText(caso.harness.tree), /resumo financeiro/);
 });
