@@ -20,6 +20,11 @@ Este é o guia de todo o desenvolvimento do CRM. Ele registra o que já foi feit
 
 Centralização de código · zero redundância · boas práticas (DDD, SOLID) para robustez e manutenção simples · documentação completa da evolução e das interações com o resto do sistema.
 
+## Diretrizes visuais (valem para todo o módulo)
+
+- **Cores de atenção:** tudo que exige atenção ou ação do usuário usa **amarelo, laranja ou vermelho** (pendências, bloqueios, mensagens não lidas, prazo de hoje, saldo baixo, falta confirmar). O que é só informativo usa **azul, verde, rosa, roxo** e afins. As cores de identidade das lojas nunca usam amarelo, laranja ou vermelho.
+- Componentes v2 do styleguide em todas as telas; botão de ação em azul, destrutivo em vermelho.
+
 ## Registro de decisões
 
 | Data | Decisão | Origem |
@@ -334,6 +339,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 | Data | Mudança |
 |---|---|
+| 21/10/2026 | Protótipo versão 7: diretriz de cores de atenção aplicada e legenda de cores no Mapa do protótipo. |
 | 21/10/2026 | Protótipo versão 6: sem selo de código; só "Lead novo · sem cadastro"; nome do WhatsApp no card e número só na ficha. |
 | 21/10/2026 | Protótipo versão 5: indicação de lead novo ou cliente cadastrado no card e dados do cadastro na ficha. |
 | 21/10/2026 | Protótipo versão 4: menu de etapa removido do card; mudança só por arrastar e soltar. |

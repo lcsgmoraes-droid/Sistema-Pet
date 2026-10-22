@@ -7,19 +7,19 @@
   --bg: #f4f6fa; --surface: #ffffff; --surface-2: #f8f9fc; --ink: #172033; --ink-2: #4a5670; --ink-3: #6b7790;
   --line: #dde3ee; --accent: #2554c7; --accent-ink: #ffffff; --accent-soft: #e6edfc;
   --ok: #17794a; --ok-soft: #e3f4ea; --warn: #8a5200; --warn-soft: #fdf0d8; --bad: #b3261e; --bad-soft: #fbe5e3;
-  --wa-bubble: #dcf5e4; --chat-bg: #efe9df; --ia: #6b3fb5; --ia-soft: #efe7fb;
+  --wa-bubble: #dcf5e4; --chat-bg: #efe9df; --ia: #6b3fb5; --ia-soft: #efe7fb; --attn: #b45309; --attn-ink: #ffffff;
   --font: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #0f1522; --surface: #172033; --surface-2: #1b2640; --ink: #e8edf7; --ink-2: #b2bdd3; --ink-3: #93a0ba;
   --line: #2a3650; --accent: #6f95ff; --accent-ink: #0b1226; --accent-soft: #1c2c57;
   --ok: #55d08c; --ok-soft: #14301f; --warn: #f0b24f; --warn-soft: #382a0f; --bad: #ff8a80; --bad-soft: #3a1815;
-  --wa-bubble: #1d4a33; --chat-bg: #1b2430; --ia: #b99bf0; --ia-soft: #2a2145; color-scheme: dark; } }
+  --wa-bubble: #1d4a33; --chat-bg: #1b2430; --ia: #b99bf0; --ia-soft: #2a2145; --attn: #f0b24f; --attn-ink: #1b1200; color-scheme: dark; } }
 :root[data-theme="dark"] {
   --bg: #0f1522; --surface: #172033; --surface-2: #1b2640; --ink: #e8edf7; --ink-2: #b2bdd3; --ink-3: #93a0ba;
   --line: #2a3650; --accent: #6f95ff; --accent-ink: #0b1226; --accent-soft: #1c2c57;
   --ok: #55d08c; --ok-soft: #14301f; --warn: #f0b24f; --warn-soft: #382a0f; --bad: #ff8a80; --bad-soft: #3a1815;
-  --wa-bubble: #1d4a33; --chat-bg: #1b2430; --ia: #b99bf0; --ia-soft: #2a2145; color-scheme: dark; }
+  --wa-bubble: #1d4a33; --chat-bg: #1b2430; --ia: #b99bf0; --ia-soft: #2a2145; --attn: #f0b24f; --attn-ink: #1b1200; color-scheme: dark; }
 * { box-sizing: border-box; }
 body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 14px; line-height: 1.5; padding-block: 0 56px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
@@ -34,7 +34,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .tabs { display: flex; gap: 2px; overflow-x: auto; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
 .tabs button { border: 0; background: transparent; padding: 10px 14px; font-weight: 600; color: var(--ink-2); border-bottom: 2px solid transparent; white-space: nowrap; min-height: 44px; display: inline-flex; gap: 6px; align-items: center; }
 .tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
-.badge { background: var(--accent); color: var(--accent-ink); border-radius: 99px; font-size: .7rem; padding: 0 7px; font-weight: 700; min-width: 20px; text-align: center; }
+.badge { background: var(--attn); color: var(--attn-ink); border-radius: 99px; font-size: .7rem; padding: 0 7px; font-weight: 700; min-width: 20px; text-align: center; }
 .btn { border: 1px solid var(--line); background: var(--surface); padding: 7px 13px; border-radius: 8px; font-weight: 600; min-height: 38px; }
 .btn.pri { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); } .btn.sm { min-height: 32px; padding: 3px 10px; font-size: .78rem; } .btn[disabled] { opacity: .5; cursor: not-allowed; }
 .btn.bad { color: var(--bad); } .btn.full { width: 100%; display: flex; justify-content: center; align-items: center; gap: 6px; }
@@ -69,6 +69,7 @@ label.f > input, label.f > select, label.f > textarea { margin-top: 3px; }
 .chat { background: var(--chat-bg); border-radius: 12px; padding: 12px; height: 380px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
 .msg { max-width: 82%; padding: 7px 11px; border-radius: 10px; font-size: .88rem; box-shadow: 0 1px 1px rgba(0,0,0,.1); background: var(--surface); }
 .msg.eu { align-self: flex-end; background: var(--wa-bubble); } .msg.ia { align-self: flex-end; background: var(--ia-soft); } .msg.sis { align-self: center; background: var(--warn-soft); color: var(--warn); font-size: .75rem; max-width: 92%; text-align: center; }
+.msg.inf { align-self: center; background: var(--accent-soft); color: var(--accent); font-size: .75rem; max-width: 92%; text-align: center; }
 .msg.nota { align-self: center; background: var(--surface); border: 1px dashed var(--ink-3); font-size: .78rem; } .msg .w { font-size: .68rem; color: var(--ink-3); display: block; margin-top: 2px; }
 .tl { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; } .tl li { display: grid; grid-template-columns: 62px 1fr; gap: 8px; font-size: .82rem; } .tl .d { color: var(--ink-3); font-family: var(--mono); font-size: .72rem; }
 .drawer { position: fixed; inset: 0; background: rgba(8,12,24,.55); z-index: 30; display: flex; justify-content: flex-end; }
@@ -178,7 +179,7 @@ function loja(id) { return LOJAS.filter(function (l) { return l.id === id; })[0]
 function lead(id) { return LEADS.filter(function (l) { return l.id === id; })[0]; }
 function tagLoja(id) { var l = loja(id); return '<span class="loja"><span class="dot" style="background:' + l.cor + '"></span>' + esc(l.nome.replace("Pet Amigo ", "")) + "</span>"; }
 function money(v) { return "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2 }); }
-var CONS = { ok: ["ok", "Autorizou mensagens"], sistema: ["info", "Autorizou no sistema · falta confirmar"], nao: ["warn", "Sem autorização de mensagens"], saiu: ["bad", "Recusou mensagens automáticas"] };
+var CONS = { ok: ["ok", "Autorizou mensagens"], sistema: ["warn", "Autorizou no sistema · falta confirmar"], nao: ["warn", "Sem autorização de mensagens"], saiu: ["bad", "Recusou mensagens automáticas"] };
 var CONSDICA = { ok: "Confirmou pelo WhatsApp que quer receber mensagens.", sistema: "Aceitou no sistema; falta a confirmação pelo WhatsApp.", nao: "Ainda não autorizou: mensagens automáticas e modelos ficam bloqueados.", saiu: "Respondeu SAIR: mensagens automáticas e modelos ficam bloqueados." };
 var EST = { ia: ["ia", "IA atendendo"], humano: ["info", "Humano atendendo"], aguardando: ["warn", "Aguardando atendente"], encerrada: ["", "Encerrada"] };
 function pillCons(c) { return '<span class="pill ' + CONS[c][0] + '" title="' + CONSDICA[c] + '">' + CONS[c][1] + "</span>"; }
@@ -193,7 +194,7 @@ function renderTop() {
   $("sub").textContent = st.tab === "ops" ? "Visão da equipe CorePet: todas as lojas, provedor, modelos e pacotes." : "Relacionamento com o tutor, por loja.";
   var chips = LOJAS.map(function (l) { return '<button type="button" class="chip" data-act="loja" data-id="' + l.id + '" aria-pressed="' + st.lojas[l.id] + '"><span class="dot" style="background:' + l.cor + '"></span>' + esc(l.nome.replace("Pet Amigo ", "")) + "</button>"; }).join("");
   $("topbar").innerHTML = '<span class="small">Lojas:</span>' + chips + '<button type="button" class="chip" data-act="lojas-todas">Ver todas</button>' +
-    '<span class="pill ' + (st.saldo < 500 ? "bad" : "info") + '" title="Créditos de mensagens e IA">Créditos: ' + st.saldo.toLocaleString("pt-BR") + "</span>";
+    '<span class="pill ' + (st.saldo < 500 ? "bad" : st.saldo < 1000 ? "warn" : "info") + '" title="Créditos de mensagens e IA">Créditos: ' + st.saldo.toLocaleString("pt-BR") + "</span>";
   var nao = Object.keys(CONVS).filter(function (k) { var c = CONVS[k]; return c.nao && st.lojas[lead(+k).loja]; }).length;
   $("tabs").innerHTML = TABS.map(function (t) {
     return '<button type="button" role="tab" data-act="aba" data-id="' + t[0] + '" aria-selected="' + (st.tab === t[0]) + '">' + t[1] + (t[0] === "conversas" && nao ? ' <span class="badge">' + nao + "</span>" : "") + "</button>";
@@ -227,9 +228,9 @@ function cardLead(l) {
     (l.cad ? '<p class="small">' + (l.pets.length ? l.pets.map(function (p) { return esc(p.n); }).join(", ") : "Sem pets cadastrados") + "</p>" : (l.semNome ? "" : '<p class="small">Nome do perfil do WhatsApp</p>')) +
     (l.cad ? "" : '<div class="row" style="margin-top:6px"><span class="pill warn" title="Ainda não está ligado a nenhuma pessoa cadastrada">Lead novo · sem cadastro</span></div>') +
     '<div class="row" style="margin-top:6px"><span class="pill info">' + esc(l.origem) + "</span>" + (CONVS[l.conv].estado === "aguardando" || CONVS[l.conv].estado === "humano" ? '<span class="pill ' + EST[CONVS[l.conv].estado][0] + '">' + EST[CONVS[l.conv].estado][1] + "</span>" : "") + (l.consent === "ok" || l.consent === "sistema" ? "" : pillCons(l.consent)) + (consCfg(l) && consCfg(l).lead === "pausar" ? '<span class="pill">Pausado</span>' : "") + "</div>" +
-    (consCfg(l) && consCfg(l).tarefa === "remover" ? '<p class="small" style="margin-top:6px">Sem tarefa de contato (regra da loja para quem recusa mensagens)</p>' : l.prox !== "—" ? '<p class="small" style="margin-top:6px">Próxima ação: ' + esc(l.prox) + "</p>" : "") +
+    (consCfg(l) && consCfg(l).tarefa === "remover" ? '<p class="small" style="margin-top:6px">Sem tarefa de contato (regra da loja para quem recusa mensagens)</p>' : l.prox !== "—" ? '<p class="small" style="margin-top:6px' + (/hoje/.test(l.prox) ? ";color:var(--warn);font-weight:600" : "") + '">Próxima ação: ' + esc(l.prox) + "</p>" : "") +
     (l.valor ? '<p class="small">' + money(l.valor) + "</p>" : "") +
-    '<div style="margin-top:8px;display:grid;gap:6px"><button type="button" class="btn pri sm full" data-act="abrir-conversa-card" data-id="' + l.id + '" aria-label="Conversa com ' + esc(l.tutor) + ' no WhatsApp"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="flex:none"><path d="M12 3a9 9 0 0 0-7.7 13.6L3 21l4.5-1.2A9 9 0 1 0 12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8.5c0 3.5 3 6.5 6.5 6.5l1-1.6-2-1-1 .8c-1-.5-2-1.5-2.5-2.5l.8-1-1-2z" fill="currentColor"/></svg>Conversa' + (CONVS[l.conv].nao ? ' <span class="badge" style="background:var(--surface);color:var(--accent)">' + CONVS[l.conv].nao + "</span>" : "") + "</button>" +
+    '<div style="margin-top:8px;display:grid;gap:6px"><button type="button" class="btn pri sm full" data-act="abrir-conversa-card" data-id="' + l.id + '" aria-label="Conversa com ' + esc(l.tutor) + ' no WhatsApp"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="flex:none"><path d="M12 3a9 9 0 0 0-7.7 13.6L3 21l4.5-1.2A9 9 0 1 0 12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8.5c0 3.5 3 6.5 6.5 6.5l1-1.6-2-1-1 .8c-1-.5-2-1.5-2.5-2.5l.8-1-1-2z" fill="currentColor"/></svg>Conversa' + (CONVS[l.conv].nao ? ' <span class="badge">' + CONVS[l.conv].nao + "</span>" : "") + "</button>" +
     "</div></article>";
 }
 function moverLead(id, etapa) {
@@ -297,7 +298,7 @@ function viewConversas() {
 function painelConversa(l, c) {
   c.nao = 0;
   var bolhas = c.msgs.map(function (x) {
-    var cls = x.de === "tutor" ? "" : x.de === "eu" ? "eu" : x.de === "ia" ? "ia" : x.de === "sis" ? "sis" : "nota";
+    var cls = x.de === "tutor" ? "" : x.de === "eu" ? "eu" : x.de === "ia" ? "ia" : x.de === "sis" ? "sis" : x.de === "inf" ? "inf" : "nota";
     var quem = x.de === "ia" ? "IA · " : x.de === "eu" ? "Atendente · " : x.de === "nota" ? "Nota interna · " : "";
     return '<div class="msg ' + cls + '">' + quem + esc(x.txt) + (x.w ? '<span class="w">' + x.w + "</span>" : "") + "</div>";
   }).join("") + (st.digitando ? '<div class="msg ia">IA digitando…</div>' : "");
@@ -431,7 +432,8 @@ function viewOps() {
 /* ================= Mapa ================= */
 function viewMapa() {
   var rows = [["Kanban com filtro de lojas e loja em cada card", "Etapa 2 · Fase 2 P.2"], ["Ficha 360 e oportunidades", "Etapa 3 · P.3"], ["Caixa de conversas, assumir e devolver, janela de 24h", "Etapa 5 · P.4"], ["IA, parada, resumo para humano, créditos", "Etapas 0.1, 0.2 e 6 · P.5"], ["Automações, limites e consentimento", "Etapa 7 e 0.7 · P.6"], ["Canal por loja, funil, créditos, OPS", "Etapas 1, 4 e tema T.1 · P.7"]];
-  return '<section class="panel"><header><h3>O que cada tela cobre no roadmap</h3></header><div class="scroll"><table><tbody>' + rows.map(function (r) { return "<tr><td>" + r[0] + '</td><td class="small">' + r[1] + "</td></tr>"; }).join("") + '</tbody></table></div></section>' +
+  var legenda = '<section class="panel" style="margin-bottom:14px"><header><h3>Cores: o que pede atenção e o que só informa</h3></header><div class="row"><span class="pill warn">Amarelo</span><span class="pill bad">Vermelho</span><span class="badge">Laranja</span><span class="small">pedem ação ou cuidado: pendências, bloqueios, não lidas, prazos, créditos baixos.</span></div><div class="row" style="margin-top:8px"><span class="pill info">Azul</span><span class="pill ok">Verde</span><span class="pill ia">Roxo</span><span class="small">apenas informam: origem, estado normal, quem está atendendo, confirmações.</span></div></section>';
+  return legenda + '<section class="panel"><header><h3>O que cada tela cobre no roadmap</h3></header><div class="scroll"><table><tbody>' + rows.map(function (r) { return "<tr><td>" + r[0] + '</td><td class="small">' + r[1] + "</td></tr>"; }).join("") + '</tbody></table></div></section>' +
     '<section class="panel" style="margin-top:14px"><header><h3>Experimente</h3></header><ol class="steps"><li><span class="n">1</span><span>Kanban: arraste um card, filtre as lojas e abra a ficha de um tutor.</span></li><li><span class="n">2</span><span>Conversas: em "Camila", clique em Simular mensagem. A IA responde e gasta créditos. Quando o texto pede atendente, a conversa vai para a fila humana com resumo.</span></li><li><span class="n">3</span><span>Assuma a conversa da Juliana e veja o texto livre e a janela de 24h. Em Aline, a janela está fechada.</span></li><li><span class="n">4</span><span>Paulo disse SAIR e Henrique não tem consentimento: veja os bloqueios, inclusive em Automações > Simular disparo.</span></li></ol></section>';
 }
 
@@ -460,9 +462,9 @@ document.addEventListener("click", function (e) {
   else if (a === "novo-lead") { var nid = LEADS.length + 1; LEADS.unshift({ id: nid, tutor: "Novo lead " + nid, tel: "(11) 90000-000" + nid, loja: Object.keys(st.lojas).filter(function (k) { return st.lojas[k]; })[0], etapa: "novo", origem: "WhatsApp espontâneo", resp: "Sem responsável", valor: 0, prox: "Qualificar o lead", consent: "nao", cad: false, pets: [], conv: nid, tl: [[agora(), "Lead", "Criado manualmente"]], opp: [] }); CONVS[nid] = { estado: "ia", janela: 99, nao: 0, msgs: [m("sis", "Lead criado manualmente. Sem consentimento: apenas resposta ao tutor é permitida.", "")] }; toast("Lead criado na etapa Novo."); }
   else if (a === "criar-cadastro") { var l0 = lead(+id); l0.cad = true; l0.tutor = l0.semNome ? "Novo tutor" : l0.tutor; PES[l0.id] = { cod: "C-" + (1500 + l0.id), cpf: "—", email: "—", end: "—", desde: "agora", n: 0, total: 0, ticket: 0, cash: 0, cred: 0 }; l0.tl.unshift([agora(), "Cadastro", "Cadastro criado a partir do lead"]); toast("Cadastro criado (simulado) com o nome e o número do WhatsApp."); }
   else if (a === "vincular") { var l = lead(+id); l.cad = true; l.tutor = "Fernanda Ribeiro"; PES[l.id] = { cod: "C-0688", cpf: "***.402.118-**", email: "fernanda.r@email.com", end: "Rua Azul, 55 · Jardins", desde: "04/2022", n: 12, total: 1650, ticket: 138, cash: 9.5, cred: 0 }; l.pets = [{ n: "Toby", d: "Spitz, 3 anos" }]; l.opp = ["Cadastro vinculado: ofereça os serviços para o Toby"]; l.tl.unshift([agora(), "Cadastro", "Vinculado a Fernanda Ribeiro"]); toast("Lead vinculado a um cadastro existente (simulado)."); }
-  else if (a === "assumir") { var c = CONVS[st.conv]; c.estado = "humano"; addMsg(st.conv, "sis", "Atendimento assumido por Marina. A IA não responde mais nesta conversa."); }
-  else if (a === "devolver") { CONVS[st.conv].estado = "ia"; addMsg(st.conv, "sis", "Conversa devolvida à IA."); }
-  else if (a === "encerrar") { CONVS[st.conv].estado = "encerrada"; addMsg(st.conv, "sis", "Atendimento encerrado."); }
+  else if (a === "assumir") { var c = CONVS[st.conv]; c.estado = "humano"; addMsg(st.conv, "inf", "Atendimento assumido por Marina. A IA não responde mais nesta conversa."); }
+  else if (a === "devolver") { CONVS[st.conv].estado = "ia"; addMsg(st.conv, "inf", "Conversa devolvida à IA."); }
+  else if (a === "encerrar") { CONVS[st.conv].estado = "encerrada"; addMsg(st.conv, "inf", "Atendimento encerrado."); }
   else if (a === "enviar") { var t = $("txt"); if (!t || !t.value.trim()) return; addMsg(st.conv, "eu", t.value.trim()); cobrar(1, "Resposta do atendente"); }
   else if (a === "nota") { var t2 = $("txt"); if (!t2 || !t2.value.trim()) return toast("Escreva a nota no campo e clique de novo."); addMsg(st.conv, "nota", t2.value.trim()); }
   else if (a === "sim-tutor") { return simTutor(); }
