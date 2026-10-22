@@ -266,7 +266,7 @@ export const styleGuideCatalog = [
         status: "pronto",
         arquivo: "components/v2/ModalPadrao/ModalPadrao.jsx",
         descricao:
-          "Casca padrão de modal — título, corpo (children) e rodapé de ações (prop rodape); fechar sempre pelo X no mesmo lugar, nunca clicando fora.",
+          "Casca padrão de modal — título, corpo (children) e rodapé de ações (prop rodape); tamanhos pequena, normal, grande e ampla (duas colunas de conteúdo). Fechar sempre pelo X no mesmo lugar, nunca clicando fora.",
       },
     ],
   },

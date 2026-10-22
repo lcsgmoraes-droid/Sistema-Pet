@@ -17,7 +17,13 @@ function validateSourcePath(path) {
 // Execute actual component handlers with isolated hooks and mocked imports, without a DOM.
 export function createControllerHarness(
   componentPath,
-  { mocks, props, globals = {}, exportName = "default" },
+  {
+    mocks,
+    props,
+    globals = {},
+    exportName = "default",
+    invoke = (Controller, currentProps) => Controller(currentProps),
+  },
 ) {
   const slots = [];
   const cache = new Map();
@@ -107,7 +113,7 @@ export function createControllerHarness(
     index = 0;
     dirty = false;
     effects = [];
-    tree = Controller(currentProps);
+    tree = invoke(Controller, currentProps);
     effects.forEach((effect) => effect());
   }
   async function settle() {

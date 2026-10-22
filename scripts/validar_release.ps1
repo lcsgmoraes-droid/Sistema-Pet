@@ -187,6 +187,12 @@ Invoke-GateStep 'Frontend dependency audit' $npm @(
 Invoke-GateStep 'Frontend lint' $npm @('run', 'lint:core') $frontend
 Invoke-GateStep 'Frontend format' $npm @('run', 'format:core:check') $frontend
 Invoke-GateStep 'Frontend production build' $npm @('run', 'build') $frontend
+Invoke-GateStep 'Frontend iFood and product regression tests' $npm @('run', 'test:ifood') $frontend
+Invoke-GateStep 'Backend iFood safety contracts' $python @(
+    '-m', 'pytest', 'tests/unit/test_ifood_management.py',
+    'tests/unit/test_ifood_catalog_contract.py', 'tests/unit/test_ifood_routes_contract.py',
+    'tests/unit/test_ifood_orders_contract.py', 'tests/unit/test_ifood_client_contract.py', '-q'
+) $backend
 
 if ($Nivel -eq 'rapido') {
     Write-Host "`nOK: gate rapido passou." -ForegroundColor Green
