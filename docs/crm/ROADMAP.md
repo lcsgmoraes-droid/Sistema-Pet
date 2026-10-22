@@ -41,6 +41,7 @@ Centralização de código · zero redundância · boas práticas (DDD, SOLID) p
 | 21/10 | **O CRM é por loja.** Usuário com permissão para mais de uma loja vê as lojas dele no CRM: cada card indica claramente a loja e há filtro fácil para ver tudo ou lojas específicas. | Lucas |
 | 21/10 | **Custo da IA e das mensagens fica com o CorePet.** Venda por **pacotes de créditos** consumidos pelo cliente, na mesma lógica de tokens dos modelos de IA. Detalhes da cobrança ficam para mais adiante. | Lucas |
 | 21/10 | Lembretes continua como central operacional interna; o CRM é a camada de relacionamento. | Lucas |
+| 21/10 | **A conversa também se acessa pelo card do Kanban:** botão "Conversar" (com contador de não lidas e estado do atendimento) abre a conversa num painel lateral sobre o quadro, sem perder filtros; o painel tem abas Conversa e Ficha 360. | Lucas |
 
 ## Visão geral das fases e etapas
 
@@ -193,6 +194,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 - [ ] 2.7 Criação automática de leads a partir de sinais já existentes (cliente inativo, cashback a vencer, VIP em risco, recompra atrasada). `[?] DECIDIR` quais sinais e como evitar duplicar leads.
 - [ ] 2.8 Detalhe do lead: interações, notas, tarefas e próxima ação com data.
 - [ ] 2.9 Filtros e busca (responsável, origem, segmento, etapa, período).
+- [ ] 2.10b Botão "Conversar" no card com contador de não lidas e painel lateral (conversa e ficha 360), reaproveitando o painel de conversa da Etapa 5 (um único componente).
 - [ ] 2.10 Contato manual por WhatsApp (link com registro da interação) enquanto o canal oficial não existe.
 - [ ] 2.11 Ganho e perda: motivos de perda. `[?] DECIDIR` lista de motivos.
 - [ ] 2.12 Desempenho com muitos cartões (paginação por coluna) e uso no celular.
@@ -324,5 +326,6 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 | Data | Mudança |
 |---|---|
+| 21/10/2026 | Protótipo versão 2: conversa acessível pelo card do Kanban (painel lateral com abas Conversa e Ficha 360). |
 | 21/10/2026 | Protótipo versão 1 e contratos conceituais criados; itens P.1 a P.8 concluídos. |
 | 21/10/2026 | Criação do roadmap detalhado: fases 1 a 3, Etapas 0 a 8 e temas transversais, com as decisões de 19/10 e 21/10 registradas. |

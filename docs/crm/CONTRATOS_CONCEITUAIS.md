@@ -34,6 +34,8 @@ Descrevem dados e regras como o protótipo (`prototipo/crm-prototipo.html`) as s
 
 **Kanban:** o card mostra a loja (nome e marca), tutor, pets, origem, responsável, próxima ação e valor. Mover entre colunas grava Movimentação. O filtro de lojas é limitado às lojas do usuário.
 
+**Conversa pelo card:** o card do Kanban abre a conversa do lead num painel lateral (mesmo componente da caixa de conversas); o contador de não lidas e o estado (aguardando, humano) aparecem no card.
+
 **Lead sem cadastro:** número desconhecido vira lead sem tutor e pode ser vinculado a um cadastro existente.
 
 ## O que o protótipo ainda não decide

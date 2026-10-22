@@ -60,7 +60,7 @@ label.f > input, label.f > select, label.f > textarea { margin-top: 3px; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-bottom: 8px; cursor: grab; border-left: 4px solid var(--lc, var(--line)); }
 .card:active { cursor: grabbing; } .card .nm { font-weight: 650; background: none; border: 0; padding: 0; text-align: left; color: var(--ink); }
 .loja { display: inline-flex; gap: 5px; align-items: center; font-size: .72rem; font-weight: 700; color: var(--ink-2); }
-.card select { width: auto; min-height: 30px; padding: 2px 6px; font-size: .75rem; margin-top: 6px; }
+.card select { width: auto; min-height: 32px; padding: 2px 6px; font-size: .75rem; }
 /* conversas */
 .inbox { display: grid; grid-template-columns: 300px minmax(0, 1fr) 280px; gap: 12px; align-items: start; }
 @media (max-width: 1000px) { .inbox { grid-template-columns: 1fr; } }
@@ -72,7 +72,7 @@ label.f > input, label.f > select, label.f > textarea { margin-top: 3px; }
 .msg.nota { align-self: center; background: var(--surface); border: 1px dashed var(--ink-3); font-size: .78rem; } .msg .w { font-size: .68rem; color: var(--ink-3); display: block; margin-top: 2px; }
 .tl { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; } .tl li { display: grid; grid-template-columns: 62px 1fr; gap: 8px; font-size: .82rem; } .tl .d { color: var(--ink-3); font-family: var(--mono); font-size: .72rem; }
 .drawer { position: fixed; inset: 0; background: rgba(8,12,24,.55); z-index: 30; display: flex; justify-content: flex-end; }
-.drawer > div { width: min(520px, 100%); background: var(--bg); height: 100%; overflow-y: auto; padding: 16px; padding-top: calc(16px + env(safe-area-inset-top, 0px)); display: grid; gap: 12px; align-content: start; }
+.drawer > div { width: min(640px, 100%); background: var(--bg); height: 100%; overflow-y: auto; padding: 16px; padding-top: calc(16px + env(safe-area-inset-top, 0px)); display: grid; gap: 12px; align-content: start; }
 .scroll { overflow-x: auto; } table { width: 100%; border-collapse: collapse; } th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; } th { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); }
 .sw { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; } .sw input { width: 20px; height: 20px; accent-color: var(--accent); }
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-weight: 600; z-index: 50; max-width: calc(100% - 32px); }
@@ -149,7 +149,7 @@ var AUTO = [
   { id: "inat", nome: "Cliente inativo", gat: "60 dias sem compra", modelo: "reativacao_v1", cat: "Marketing", meta: "Aprovado", txt: "Olá, {{1}}! Sentimos falta de você e da {{2}}. Temos novidades na {{3}}. Quer ver?", ex: ["Paulo", "Nina", "Pet Amigo Centro"], on: { c: true, j: false, s: false }, origem: "Cliente inativo" }
 ];
 var st = {
-  tab: "kanban", lojas: { c: true, j: true, s: true }, resp: "Todos", origem: "Todas", busca: "", lead: null, conv: 3, nota: false,
+  tab: "kanban", dtab: "ficha", lojas: { c: true, j: true, s: true }, resp: "Todos", origem: "Todas", busca: "", lead: null, conv: 3, nota: false,
   saldo: 4820, extrato: [["19/10", "Pacote 5.000 créditos", "+5.000"], ["20/10", "Respostas da IA (38)", "-114"], ["20/10", "Mensagens com modelo (33)", "-66"]],
   cfgTab: "canal", opsTab: "lojas", freq: 1, silencio: true, ia: { pedido: false, agenda: true, cupom: false }, digitando: false, tom: "Amigável"
 };
@@ -210,10 +210,11 @@ function cardLead(l) {
   return '<article class="card" draggable="true" data-id="' + l.id + '" style="--lc:' + lj.cor + '"><div class="row" style="justify-content:space-between">' + tagLoja(l.loja) + '<span class="small">' + esc(l.resp) + "</span></div>" +
     '<button type="button" class="nm" data-act="abrir-lead" data-id="' + l.id + '">' + esc(l.tutor) + "</button>" +
     '<p class="small">' + (l.pets.length ? l.pets.map(function (p) { return esc(p.n); }).join(", ") : "Sem pet cadastrado") + "</p>" +
-    '<div class="row" style="margin-top:6px"><span class="pill info">' + esc(l.origem) + "</span>" + (l.consent === "ok" || l.consent === "sistema" ? "" : '<span class="pill ' + CONS[l.consent][0] + '">' + CONS[l.consent][1] + "</span>") + "</div>" +
+    '<div class="row" style="margin-top:6px"><span class="pill info">' + esc(l.origem) + "</span>" + (CONVS[l.conv].estado === "aguardando" || CONVS[l.conv].estado === "humano" ? '<span class="pill ' + EST[CONVS[l.conv].estado][0] + '">' + EST[CONVS[l.conv].estado][1] + "</span>" : "") + (l.consent === "ok" || l.consent === "sistema" ? "" : '<span class="pill ' + CONS[l.consent][0] + '">' + CONS[l.consent][1] + "</span>") + "</div>" +
     (l.prox !== "—" ? '<p class="small" style="margin-top:6px">Próxima ação: ' + esc(l.prox) + "</p>" : "") +
     (l.valor ? '<p class="small">' + money(l.valor) + "</p>" : "") +
-    '<select data-act="mover" data-id="' + l.id + '" aria-label="Mover ' + esc(l.tutor) + ' para outra etapa">' + ETAPAS.map(function (e) { return '<option value="' + e.id + '"' + (e.id === l.etapa ? " selected" : "") + ">" + (e.id === l.etapa ? "Etapa: " : "Mover: ") + e.n + "</option>"; }).join("") + "</select></article>";
+    '<div class="row" style="margin-top:8px"><button type="button" class="btn pri sm" data-act="abrir-conversa-card" data-id="' + l.id + '" aria-label="Conversar com ' + esc(l.tutor) + '">Conversar' + (CONVS[l.conv].nao ? ' <span class="badge" style="background:var(--surface);color:var(--accent)">' + CONVS[l.conv].nao + "</span>" : "") + "</button>" +
+    '<select data-act="mover" data-id="' + l.id + '" aria-label="Mover ' + esc(l.tutor) + ' para outra etapa">' + ETAPAS.map(function (e) { return '<option value="' + e.id + '"' + (e.id === l.etapa ? " selected" : "") + ">" + (e.id === l.etapa ? "Etapa: " : "Mover: ") + e.n + "</option>"; }).join("") + "</select></div></article>";
 }
 function moverLead(id, etapa) {
   var l = lead(id); if (!l || l.etapa === etapa) return;
@@ -227,18 +228,25 @@ function moverLead(id, etapa) {
 function viewDrawer() {
   if (!st.lead) return "";
   var l = lead(st.lead), c = CONVS[l.conv];
-  var pets = l.pets.length ? l.pets.map(function (p) { return '<li><b>' + esc(p.n) + '</b> <span class="muted">' + esc(p.d) + "</span></li>"; }).join("") : '<li class="muted">Nenhum pet. Ao vincular ao cadastro, os pets aparecem aqui.</li>';
-  var tl = l.tl.map(function (t) { return '<li><span class="d">' + t[0] + '</span><span><b>' + t[1] + "</b> · " + esc(t[2]) + "</span></li>"; }).join("");
-  var opp = l.opp.length ? l.opp.map(function (o) { return '<li class="note" style="margin-bottom:6px">' + esc(o) + "</li>"; }).join("") : '<li class="small">Sem oportunidades no momento.</li>';
-  return '<div class="drawer" role="dialog" aria-modal="true" aria-label="Ficha do tutor"><div><div class="row" style="justify-content:space-between"><h2>' + esc(l.tutor) + '</h2><button class="btn sm" type="button" data-act="fechar-lead">Fechar</button></div>' +
-    '<div class="row">' + tagLoja(l.loja) + '<span class="pill">' + esc(l.tel) + "</span>" + pillCons(l.consent) + (l.cad ? "" : '<span class="pill warn">Sem cadastro</span>') + "</div>" +
-    '<div class="row"><button class="btn pri sm" type="button" data-act="ir-conversa" data-id="' + l.conv + '">Abrir conversa</button>' + (l.cad ? "" : '<button class="btn sm" type="button" data-act="vincular" data-id="' + l.id + '">Vincular a cadastro</button>') +
-    '<select aria-label="Etapa" data-act="mover" data-id="' + l.id + '" style="width:auto">' + ETAPAS.map(function (e) { return '<option value="' + e.id + '"' + (e.id === l.etapa ? " selected" : "") + ">" + e.n + "</option>"; }).join("") + "</select></div>" +
-    '<section class="panel"><header><h4>Oportunidades sugeridas</h4><span class="small">com o motivo de cada uma</span></header><ul style="list-style:none;padding:0;margin:0">' + opp + "</ul></section>" +
-    '<section class="panel"><header><h4>Pets</h4></header><ul style="margin:0;padding-left:18px">' + pets + "</ul></section>" +
-    '<section class="panel"><header><h4>Linha do tempo</h4><span class="small">compras, saúde, banho, mensagens, etapas</span></header><ul class="tl">' + tl + "</ul></section>" +
-    '<section class="panel"><header><h4>Responsável e próxima ação</h4></header><p class="muted">' + esc(l.resp) + " · " + esc(l.prox) + "</p>" + (l.perda ? '<p class="small">Motivo da perda: ' + esc(l.perda) + "</p>" : "") + "</section>" +
-    '<p class="small">Conversa: ' + (c ? EST[c.estado][1] : "—") + "</p></div></div>";
+  var podeConv = st.tab !== "conversas";
+  var dtab = podeConv ? st.dtab : "ficha";
+  var abas = podeConv ? '<div class="row"><button class="chip" type="button" data-act="dtab" data-id="conversa" aria-pressed="' + (dtab === "conversa") + '">Conversa' + (c && c.nao ? ' <span class="badge">' + c.nao + "</span>" : "") + '</button><button class="chip" type="button" data-act="dtab" data-id="ficha" aria-pressed="' + (dtab === "ficha") + '">Ficha 360</button></div>' : "";
+  var cab = '<div class="row" style="justify-content:space-between"><h2>' + esc(l.tutor) + '</h2><button class="btn sm" type="button" data-act="fechar-lead">Fechar</button></div><div class="row">' + tagLoja(l.loja) + '<span class="pill">' + esc(l.tel) + "</span>" + pillCons(l.consent) + (l.cad ? "" : '<span class="pill warn">Sem cadastro</span>') + "</div>" + abas;
+  var corpo;
+  if (dtab === "conversa") {
+    corpo = '<section class="panel">' + painelConversa(l, c) + '</section><div class="row"><button class="btn sm" type="button" data-act="ir-conversa-aba" data-id="' + l.conv + '">Abrir na caixa de conversas</button></div>';
+  } else {
+    var pets = l.pets.length ? l.pets.map(function (p) { return '<li><b>' + esc(p.n) + '</b> <span class="muted">' + esc(p.d) + "</span></li>"; }).join("") : '<li class="muted">Nenhum pet. Ao vincular ao cadastro, os pets aparecem aqui.</li>';
+    var tl = l.tl.map(function (t) { return '<li><span class="d">' + t[0] + '</span><span><b>' + t[1] + "</b> · " + esc(t[2]) + "</span></li>"; }).join("");
+    var opp = l.opp.length ? l.opp.map(function (o) { return '<li class="note" style="margin-bottom:6px">' + esc(o) + "</li>"; }).join("") : '<li class="small">Sem oportunidades no momento.</li>';
+    corpo = '<div class="row">' + (podeConv ? '<button class="btn pri sm" type="button" data-act="dtab" data-id="conversa">Abrir conversa</button>' : '<button class="btn pri sm" type="button" data-act="ir-conversa" data-id="' + l.conv + '">Abrir conversa</button>') + (l.cad ? "" : '<button class="btn sm" type="button" data-act="vincular" data-id="' + l.id + '">Vincular a cadastro</button>') +
+      '<select aria-label="Etapa" data-act="mover" data-id="' + l.id + '" style="width:auto">' + ETAPAS.map(function (e) { return '<option value="' + e.id + '"' + (e.id === l.etapa ? " selected" : "") + ">" + e.n + "</option>"; }).join("") + "</select></div>" +
+      '<section class="panel"><header><h4>Oportunidades sugeridas</h4><span class="small">com o motivo de cada uma</span></header><ul style="list-style:none;padding:0;margin:0">' + opp + "</ul></section>" +
+      '<section class="panel"><header><h4>Pets</h4></header><ul style="margin:0;padding-left:18px">' + pets + "</ul></section>" +
+      '<section class="panel"><header><h4>Linha do tempo</h4><span class="small">compras, saúde, banho, mensagens, etapas</span></header><ul class="tl">' + tl + "</ul></section>" +
+      '<section class="panel"><header><h4>Responsável e próxima ação</h4></header><p class="muted">' + esc(l.resp) + " · " + esc(l.prox) + "</p>" + (l.perda ? '<p class="small">Motivo da perda: ' + esc(l.perda) + "</p>" : "") + "</section>";
+  }
+  return '<div class="drawer" role="dialog" aria-modal="true" aria-label="Tutor"><div>' + cab + corpo + "</div></div>";
 }
 
 /* ================= Conversas ================= */
@@ -252,6 +260,12 @@ function viewConversas() {
   }).join("") || '<p class="small">Nenhuma conversa nas lojas selecionadas.</p>';
   var l = lead(st.conv), c = CONVS[st.conv];
   if (!l || !st.lojas[l.loja]) return '<div class="inbox"><div class="clist">' + list + '</div><div class="panel"><p class="muted">Selecione uma conversa.</p></div></div>';
+  var painel = painelConversa(l, c);
+  var lado = '<aside class="panel"><h4>Contexto rápido</h4><p class="small">' + esc(l.tel) + "</p>" + (l.pets.length ? '<ul style="padding-left:16px;margin:8px 0">' + l.pets.map(function (p) { return "<li>" + esc(p.n) + ' <span class="small">' + esc(p.d) + "</span></li>"; }).join("") + "</ul>" : '<p class="small" style="margin:8px 0">Sem cadastro vinculado.</p>') +
+    '<h4 style="margin-top:8px">Sugestões</h4>' + (l.opp.length ? l.opp.map(function (o) { return '<p class="small" style="margin:4px 0">• ' + esc(o) + "</p>"; }).join("") : '<p class="small">Nada no momento.</p>') + "</aside>";
+  return '<div class="inbox"><div class="clist">' + list + '</div><div class="panel">' + painel + "</div>" + lado + "</div>";
+}
+function painelConversa(l, c) {
   c.nao = 0;
   var bolhas = c.msgs.map(function (x) {
     var cls = x.de === "tutor" ? "" : x.de === "eu" ? "eu" : x.de === "ia" ? "ia" : x.de === "sis" ? "sis" : "nota";
@@ -273,9 +287,7 @@ function viewConversas() {
   else if (c.estado !== "humano") composer = avisoIA + '<div class="row" style="margin-top:8px"><button class="btn sm" type="button" data-act="sim-tutor">Simular mensagem do tutor</button><button class="btn sm" type="button" data-act="modelo" data-id="' + l.id + '">Enviar modelo aprovado</button></div>';
   else composer = '<div style="margin-top:8px;display:grid;gap:6px">' + (fora ? '<div class="note warn">Fora da janela de 24h: só modelo aprovado. Texto livre fica desabilitado.</div>' : "") +
     '<textarea id="txt" aria-label="Mensagem" placeholder="' + (fora ? "Texto livre indisponível" : "Escreva a resposta") + '"' + (fora ? " disabled" : "") + '></textarea><div class="row"><button class="btn pri sm" type="button" data-act="enviar"' + (fora ? " disabled" : "") + '>Enviar</button><button class="btn sm" type="button" data-act="modelo" data-id="' + l.id + '">Enviar modelo aprovado</button><button class="btn sm" type="button" data-act="nota">Nota interna</button><button class="btn sm" type="button" data-act="sim-tutor">Simular mensagem do tutor</button></div></div>';
-  var lado = '<aside class="panel"><h4>Contexto rápido</h4><p class="small">' + esc(l.tel) + "</p>" + (l.pets.length ? '<ul style="padding-left:16px;margin:8px 0">' + l.pets.map(function (p) { return "<li>" + esc(p.n) + ' <span class="small">' + esc(p.d) + "</span></li>"; }).join("") + "</ul>" : '<p class="small" style="margin:8px 0">Sem cadastro vinculado.</p>') +
-    '<h4 style="margin-top:8px">Sugestões</h4>' + (l.opp.length ? l.opp.map(function (o) { return '<p class="small" style="margin:4px 0">• ' + esc(o) + "</p>"; }).join("") : '<p class="small">Nada no momento.</p>') + "</aside>";
-  return '<div class="inbox"><div class="clist">' + list + '</div><div class="panel">' + topo + resumo + '<div class="chat" id="chat">' + bolhas + "</div>" + composer + "</div>" + lado + "</div>";
+  return topo + resumo + '<div class="chat" id="chat">' + bolhas + "</div>" + composer;
 }
 function addMsg(id, de, txt) { CONVS[id].msgs.push(m(de, txt, agora())); }
 function respostaIA(l, texto) {
@@ -401,7 +413,10 @@ document.addEventListener("click", function (e) {
   if (a === "aba") { st.tab = id; st.lead = null; }
   else if (a === "loja") { st.lojas[id] = !st.lojas[id]; if (!Object.keys(st.lojas).some(function (k) { return st.lojas[k]; })) st.lojas[id] = true; }
   else if (a === "lojas-todas") { Object.keys(st.lojas).forEach(function (k) { st.lojas[k] = true; }); }
-  else if (a === "abrir-lead") st.lead = +id;
+  else if (a === "abrir-lead") { st.lead = +id; st.dtab = "ficha"; st.conv = lead(+id).conv; }
+  else if (a === "abrir-conversa-card") { st.lead = +id; st.dtab = "conversa"; st.conv = lead(+id).conv; }
+  else if (a === "dtab") st.dtab = id;
+  else if (a === "ir-conversa-aba") { st.tab = "conversas"; st.conv = +id; st.lead = null; }
   else if (a === "fechar-lead") st.lead = null;
   else if (a === "ir-conversa") { st.tab = "conversas"; st.conv = +id; st.lead = null; }
   else if (a === "conv") st.conv = +id;
