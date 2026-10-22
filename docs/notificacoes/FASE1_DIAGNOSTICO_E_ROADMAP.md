@@ -1,5 +1,7 @@
 # Central de Notificações — Fase 1: diagnóstico e roadmap (19/10/2026)
 
+> **Atenção (21/10/2026):** o escopo mudou para o módulo CRM voltado ao tutor. Este documento permanece como histórico do diagnóstico de WhatsApp e e-mail; o planejamento vigente está em `docs/crm/FASE1_ESCOPO_E_ROADMAP.md`. A decisão de número único do CorePet vale só para avisos da plataforma; a conversa com tutores usa o número de cada loja.
+
 ## Contexto
 
 O Lucas quer uma central de notificações: o sistema avisa por WhatsApp e/ou e-mail quando um fluxo gera um alerta (ex.: produtos perto do vencimento). Cada notificação é criada só por nós, ligada a um fluxo, e a loja apenas liga/desliga os canais e (opcionalmente) personaliza o texto. Antes disso, é preciso garantir que envio de WhatsApp e de e-mail funcionam. O trabalho segue 3 fases: (1) planejamento/roadmap, (2) protótipo de telas + backend simulado em artefato, (3) desenvolvimento por etapas. Premissas: centralização, zero redundância, DDD/SOLID, tudo documentado, discutir conflitos.
