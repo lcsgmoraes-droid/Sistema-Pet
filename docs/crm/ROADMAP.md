@@ -210,6 +210,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 - [ ] 2.7 Criação automática de leads a partir de sinais já existentes (cliente inativo, cashback a vencer, VIP em risco, recompra atrasada). `[?] DECIDIR` quais sinais e como evitar duplicar leads.
 - [ ] 2.8 Detalhe do lead: interações, notas, tarefas e próxima ação com data.
 - [ ] 2.8a **Registrar ação e agendar próximo passo:** ação (tipo, observação, quem e quando) grava interação e atualiza "último contato"; próximo passo (tipo, descrição, data, hora, responsável) com atalhos de data; registrar ação pode concluir o passo; cores de atenção (sem passo e hoje em amarelo, atrasado em vermelho); contato por WhatsApp e mensagens do atendente atualizam o último contato sozinhos. `[?] DECIDIR` se o responsável recebe aviso (notificação no app ou e-mail) quando o passo vence, e se haverá visão "Minha agenda" com os passos do dia.
+- [ ] 2.8c Duplo clique no card abre a ficha 360 (e clique no nome continua abrindo); formulários de ação e de agendamento em coluna única, sob demanda.
 - [ ] 2.8b Cabeçalho fixo no painel do tutor (nome, loja, telefone, consentimento, abas).
 - [ ] 2.9 Filtros e busca (responsável, origem, segmento, etapa, período).
 - [ ] 2.10b Botão "Conversar" no card com contador de não lidas e painel lateral (conversa e ficha 360), reaproveitando o painel de conversa da Etapa 5 (um único componente).
@@ -344,6 +345,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 | Data | Mudança |
 |---|---|
+| 21/10/2026 | Protótipo versão 11: painel de última ação e próximo passo em coluna única com formulários sob demanda; duplo clique no card abre a ficha 360. |
 | 21/10/2026 | Protótipo versão 10: cabeçalho do painel fixo; registrar última ação e agendar próximo passo com data, hora e responsável; cores de atenção para passo atrasado, de hoje ou ausente. |
 | 21/10/2026 | Protótipo versão 9: um card por tutor com várias oportunidades, colunas configuráveis com tipos, ciclos, fechamento por oportunidade, reabertura, separação de card, caminhada do card e simulação de sinais do dia. |
 | 21/10/2026 | Protótipo versão 8: cor da origem do lead segue a diretriz (risco e prazo em amarelo, aniversário em rosa). |

@@ -168,7 +168,7 @@ var AUTO = [
   { id: "inat", nome: "Reativação de cliente", gat: "60 dias sem compra", modelo: "reativacao_v1", cat: "Marketing", meta: "Aprovado", txt: "Olá, {{1}}! Sentimos falta de você e da {{2}}. Temos novidades na {{3}}. Quer ver?", ex: ["Paulo", "Nina", "Pet Amigo Centro"], on: { c: true, j: false, s: false }, origem: "Sem comprar" }
 ];
 var st = {
-  tab: "kanban", dtab: "ficha", diasConcl: 7, verTodos: false, fim: null, lojas: { c: true, j: true, s: true }, resp: "Todos", origem: "Todas", busca: "", lead: null, conv: 3, nota: false,
+  tab: "kanban", dtab: "ficha", diasConcl: 7, verTodos: false, fim: null, pnl: null, lojas: { c: true, j: true, s: true }, resp: "Todos", origem: "Todas", busca: "", lead: null, conv: 3, nota: false,
   saldo: 4820, extrato: [["19/10", "Pacote 5.000 créditos", "+5.000"], ["20/10", "Respostas da IA (38)", "-114"], ["20/10", "Mensagens com modelo (33)", "-66"]],
   cfgTab: "canal", opsTab: "lojas", cons: { saiu: { ativa: "bloquear", lead: "manter", tarefa: "manter" }, nao: { ativa: "bloquear", lead: "manter", tarefa: "manter" } }, freq: 1, silencio: true, ia: { pedido: false, agenda: true, cupom: false }, digitando: false, tom: "Amigável"
 };
@@ -287,7 +287,7 @@ function chipsOps(l) {
 function cardLead(l) {
   var lj = loja(l.loja), e = etp(l.etapa), fim = ehFim(e), c = CONVS[l.conv], parado = !fim && l.desde >= 5;
   var quando = l.desde === 0 ? "hoje" : "há " + l.desde + " dia(s)";
-  return '<article class="card" draggable="true" data-id="' + l.id + '" style="--lc:' + lj.cor + '"><div class="row" style="justify-content:space-between">' + tagLoja(l.loja) + '<span class="small">' + esc(l.resp) + "</span></div>" +
+  return '<article class="card" draggable="true" title="Duplo clique para abrir a ficha 360" data-id="' + l.id + '" style="--lc:' + lj.cor + '"><div class="row" style="justify-content:space-between">' + tagLoja(l.loja) + '<span class="small">' + esc(l.resp) + "</span></div>" +
     '<button type="button" class="nm" data-act="abrir-lead" data-id="' + l.id + '">' + esc(l.tutor) + "</button>" +
     (l.cad ? '<p class="small">' + (l.pets.length ? l.pets.map(function (p) { return esc(p.n); }).join(", ") : "Sem pets cadastrados") + "</p>" : (l.semNome ? "" : '<p class="small">Nome do perfil do WhatsApp</p>')) +
     (l.cad ? "" : '<div class="row" style="margin-top:6px"><span class="pill warn" title="Ainda não está ligado a nenhuma pessoa cadastrada">Lead novo · sem cadastro</span></div>') +
@@ -386,22 +386,30 @@ function secCaminhada(l) {
 /* ================= Ficha 360 ================= */
 function painelAcoes(l) {
   var tiposAcao = ["Ligação", "Mensagem enviada", "Visita na loja", "Atendimento presencial", "Observação"];
-  var tiposPa = ["Ligar", "Enviar mensagem", "Visita", "Oferecer produto ou serviço", "Outro"];
+  var tiposPa = ["Ligação", "Mensagem", "Visita", "Oferecer", "Identificar", "Outro"];
   var pa = l.pa, tom = pa ? paTom(pa) : "warn";
-  return '<section class="panel"><header><h4>Última ação e próximo passo</h4><span class="small">o que foi feito e o que vem a seguir</span></header>' +
-    '<div class="grid" style="gap:14px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">' +
-    '<div><p class="small">Última ação</p><p>' + esc(l.ult) + "</p>" +
-    '<label class="f" style="margin-top:6px">Registrar uma ação<select id="acao-tipo">' + tiposAcao.map(function (t) { return "<option>" + t + "</option>"; }).join("") + "</select></label>" +
-    '<label class="f" style="margin-top:6px">O que aconteceu?<textarea id="acao-obs" placeholder="Ex.: Liguei, ela vai pensar e retorna na sexta" style="min-height:64px"></textarea></label>' +
-    (pa ? '<label class="sw"><input type="checkbox" id="acao-conclui" checked> Conclui o próximo passo agendado</label>' : "") +
-    '<div><button class="btn pri sm" type="button" data-act="acao-registrar" data-id="' + l.id + '">Registrar ação</button></div></div>' +
-    '<div><p class="small">Próximo passo</p>' + (pa ? '<p><span class="pill ' + tom + '">' + esc(paQuando(pa)) + "</span> " + esc(pa.tipo) + " · " + esc(pa.txt) + "</p>" : '<p><span class="pill warn">Nenhum passo agendado</span></p>') +
-    '<label class="f" style="margin-top:6px">O que fazer<select id="pa-tipo">' + tiposPa.map(function (t) { return "<option>" + t + "</option>"; }).join("") + "</select></label>" +
-    '<label class="f" style="margin-top:6px">Descrição<input type="text" id="pa-txt" value="' + (pa ? esc(pa.txt) : "") + '" placeholder="Ex.: Retornar sobre a proposta do plano"></label>' +
-    '<div class="row" style="margin-top:6px"><label class="f" style="flex:1;min-width:130px">Data<input type="date" id="pa-dt" value="' + (pa ? pa.dt : addDias(1)) + '"></label><label class="f" style="width:110px">Hora<input type="time" id="pa-hr" value="' + (pa ? pa.hr : "") + '"></label></div>' +
-    '<div class="row" style="margin-top:6px">' + [["Hoje", 0], ["Amanhã", 1], ["Em 3 dias", 3], ["Em 1 semana", 7]].map(function (x) { return '<button class="chip" type="button" data-act="pa-rapido" data-d="' + x[1] + '">' + x[0] + "</button>"; }).join("") + "</div>" +
-    '<label class="f" style="margin-top:6px">Responsável<select id="pa-resp">' + RESP.map(function (r) { return "<option" + (r === l.resp ? " selected" : "") + ">" + r + "</option>"; }).join("") + "</select></label>" +
-    '<div class="row" style="margin-top:8px"><button class="btn pri sm" type="button" data-act="pa-agendar" data-id="' + l.id + '">Agendar próximo passo</button>' + (pa ? '<button class="btn sm" type="button" data-act="pa-remover" data-id="' + l.id + '">Remover agendamento</button>' : "") + "</div></div></div></section>";
+  function linha(r, v) { return '<div class="small" style="padding-top:2px">' + r + "</div><div>" + v + "</div>"; }
+  var resumo = '<div style="display:grid;grid-template-columns:110px minmax(0,1fr);gap:6px 10px;align-items:start">' +
+    linha("Última ação", esc(l.ult)) +
+    linha("Próximo passo", pa ? '<span class="pill ' + tom + '">' + esc(paQuando(pa)) + "</span> " + esc(pa.tipo) + " · " + esc(pa.txt) : '<span class="pill warn">Nenhum passo agendado</span>') + "</div>";
+  var abas = '<div class="row" style="margin-top:12px"><button class="chip" type="button" data-act="pnl" data-id="acao" aria-pressed="' + (st.pnl === "acao") + '">Registrar ação</button><button class="chip" type="button" data-act="pnl" data-id="passo" aria-pressed="' + (st.pnl === "passo") + '">' + (pa ? "Reagendar próximo passo" : "Agendar próximo passo") + "</button></div>";
+  var form = "";
+  if (st.pnl === "acao") {
+    form = '<div style="display:grid;gap:10px;margin-top:12px;border-top:1px solid var(--line);padding-top:12px">' +
+      '<label class="f" style="max-width:240px">Tipo<select id="acao-tipo">' + tiposAcao.map(function (t) { return "<option>" + t + "</option>"; }).join("") + "</select></label>" +
+      '<label class="f">O que aconteceu?<textarea id="acao-obs" placeholder="Ex.: Liguei, ela vai pensar e retorna na sexta" style="min-height:64px"></textarea></label>' +
+      (pa ? '<label class="sw"><input type="checkbox" id="acao-conclui" checked> Conclui o próximo passo agendado</label>' : "") +
+      '<div><button class="btn pri sm" type="button" data-act="acao-registrar" data-id="' + l.id + '">Registrar ação</button></div></div>';
+  } else if (st.pnl === "passo") {
+    form = '<div style="display:grid;gap:10px;margin-top:12px;border-top:1px solid var(--line);padding-top:12px">' +
+      '<label class="f" style="max-width:240px">O que fazer<select id="pa-tipo">' + tiposPa.map(function (t) { return "<option" + (pa && pa.tipo === t ? " selected" : "") + ">" + t + "</option>"; }).join("") + "</select></label>" +
+      '<label class="f">Descrição<input type="text" id="pa-txt" value="' + (pa ? esc(pa.txt) : "") + '" placeholder="Ex.: Retornar sobre a proposta do plano"></label>' +
+      '<div class="row" style="align-items:end"><label class="f" style="width:160px">Data<input type="date" id="pa-dt" value="' + (pa ? pa.dt : addDias(1)) + '"></label><label class="f" style="width:110px">Hora<input type="time" id="pa-hr" value="' + (pa ? pa.hr : "") + '"></label>' +
+      [["Hoje", 0], ["Amanhã", 1], ["+3 dias", 3], ["+1 semana", 7]].map(function (x) { return '<button class="chip" type="button" data-act="pa-rapido" data-d="' + x[1] + '">' + x[0] + "</button>"; }).join("") + "</div>" +
+      '<label class="f" style="max-width:220px">Responsável<select id="pa-resp">' + RESP.map(function (r) { return "<option" + (r === l.resp ? " selected" : "") + ">" + r + "</option>"; }).join("") + "</select></label>" +
+      '<div class="row"><button class="btn pri sm" type="button" data-act="pa-agendar" data-id="' + l.id + '">' + (pa ? "Salvar novo agendamento" : "Agendar") + "</button>" + (pa ? '<button class="btn sm" type="button" data-act="pa-remover" data-id="' + l.id + '">Remover agendamento</button>' : "") + "</div></div>";
+  }
+  return '<section class="panel"><header><h4>Última ação e próximo passo</h4></header>' + resumo + abas + form + "</section>";
 }
 function painelIdentidade(l) {
   if (!l.cad) {
@@ -618,7 +626,7 @@ document.addEventListener("click", function (e) {
   if (a === "aba") { st.tab = id; st.lead = null; }
   else if (a === "loja") { st.lojas[id] = !st.lojas[id]; if (!Object.keys(st.lojas).some(function (k) { return st.lojas[k]; })) st.lojas[id] = true; }
   else if (a === "lojas-todas") { Object.keys(st.lojas).forEach(function (k) { st.lojas[k] = true; }); }
-  else if (a === "abrir-lead") { st.lead = +id; st.dtab = "ficha"; st.conv = lead(+id).conv; }
+  else if (a === "abrir-lead") { st.lead = +id; st.pnl = null; st.dtab = "ficha"; st.conv = lead(+id).conv; }
   else if (a === "abrir-conversa-card") { st.lead = +id; st.dtab = "conversa"; st.conv = lead(+id).conv; }
   else if (a === "dtab") st.dtab = id;
   else if (a === "ir-conversa-aba") { st.tab = "conversas"; st.conv = +id; st.lead = null; }
@@ -636,10 +644,11 @@ document.addEventListener("click", function (e) {
   else if (a === "sim-tutor") { return simTutor(); }
   else if (a === "modelo") { var ll = lead(+id); if (ll.consent === "saiu" || ll.consent === "nao") return toast("Bloqueado: tutor sem consentimento. Nada enviado."); if (st.saldo < 2) return toast("Créditos insuficientes."); addMsg(ll.conv, "eu", "[Modelo reativacao_v1] Olá, " + ll.tutor.split(" ")[0] + "! Sentimos sua falta. Quer ver as novidades da loja?"); cobrar(4, "Modelo reativacao_v1 · " + ll.tutor.split(" ")[0]); CONVS[ll.conv].estado = CONVS[ll.conv].estado === "encerrada" ? "ia" : CONVS[ll.conv].estado; toast("Modelo enviado (4 créditos)."); }
   else if (a === "disparar") return disparar(+b.dataset.i);
+  else if (a === "pnl") st.pnl = st.pnl === id ? null : id;
   else if (a === "pa-rapido") { var dd = $("pa-dt"); if (dd) dd.value = addDias(+b.dataset.d); return; }
-  else if (a === "acao-registrar") { var lr = lead(+id), tpa = $("acao-tipo").value, obs = $("acao-obs").value.trim(), conc = $("acao-conclui"), concluiu = !!(conc && conc.checked && lr.pa); lr.tl.unshift([agora(), "Ação", tpa + (obs ? " · " + obs : "")]); lr.ult = "hoje · " + tpa; if (concluiu) setPa(lr, null); toast("Ação registrada." + (concluiu ? " Próximo passo concluído: agende o seguinte." : "")); }
-  else if (a === "pa-agendar") { var lp = lead(+id), dtv = $("pa-dt").value, hrv = $("pa-hr").value, txtv = $("pa-txt").value.trim(), tipov = $("pa-tipo").value; if (!dtv) return toast("Escolha a data do próximo passo."); if (difDias(dtv) < 0) return toast("A data não pode ser no passado."); setPa(lp, { tipo: tipov, txt: txtv || tipov, dt: dtv, hr: hrv }); lp.resp = $("pa-resp").value; lp.tl.unshift([agora(), "Agenda", tipov + " · " + (txtv || tipov) + " · " + paQuando(lp.pa)]); toast("Próximo passo agendado: " + paQuando(lp.pa) + "."); }
-  else if (a === "pa-remover") { var lq = lead(+id); setPa(lq, null); lq.tl.unshift([agora(), "Agenda", "Agendamento removido"]); toast("Agendamento removido."); }
+  else if (a === "acao-registrar") { var lr = lead(+id), tpa = $("acao-tipo").value, obs = $("acao-obs").value.trim(), conc = $("acao-conclui"), concluiu = !!(conc && conc.checked && lr.pa); lr.tl.unshift([agora(), "Ação", tpa + (obs ? " · " + obs : "")]); lr.ult = "hoje · " + tpa; if (concluiu) setPa(lr, null); st.pnl = concluiu ? "passo" : null; toast("Ação registrada." + (concluiu ? " Próximo passo concluído: agende o seguinte." : "")); }
+  else if (a === "pa-agendar") { var lp = lead(+id), dtv = $("pa-dt").value, hrv = $("pa-hr").value, txtv = $("pa-txt").value.trim(), tipov = $("pa-tipo").value; if (!dtv) return toast("Escolha a data do próximo passo."); if (difDias(dtv) < 0) return toast("A data não pode ser no passado."); setPa(lp, { tipo: tipov, txt: txtv || tipov, dt: dtv, hr: hrv }); lp.resp = $("pa-resp").value; st.pnl = null; lp.tl.unshift([agora(), "Agenda", tipov + " · " + (txtv || tipov) + " · " + paQuando(lp.pa)]); toast("Próximo passo agendado: " + paQuando(lp.pa) + "."); }
+  else if (a === "pa-remover") { var lq = lead(+id); setPa(lq, null); st.pnl = null; lq.tl.unshift([agora(), "Agenda", "Agendamento removido"]); toast("Agendamento removido."); }
   else if (a === "ver-todos") st.verTodos = !st.verTodos;
   else if (a === "sim-sinais") return simSinais();
   else if (a === "sinal-ficha") { var lf = lead(+id), tp = $("sinal-tipo").value, dets = { "Ração acabando": "acaba em 5 dias", "Vacina vencendo": "vence em 7 dias", "Sem comprar": "46 dias", "Aniversário do pet": "em 6 dias", "Cashback a vencer": "vence em 10 dias" }; if (hasOp(lf, tp)) toast("Já existe essa oportunidade aberta para o tutor."); else toast(novoSinal(lf, op(tp, dets[tp], { gen: tp === "Sem comprar" })) + "."); }
@@ -680,5 +689,10 @@ document.addEventListener("dragstart", function (e) { var c = e.target.closest &
 document.addEventListener("dragover", function (e) { var col = e.target.closest && e.target.closest(".colk"); if (col) { e.preventDefault(); document.querySelectorAll(".colk.over").forEach(function (x) { if (x !== col) x.classList.remove("over"); }); col.classList.add("over"); } });
 document.addEventListener("drop", function (e) { var col = e.target.closest && e.target.closest(".colk"); if (!col) return; e.preventDefault(); var id = +e.dataTransfer.getData("text/plain"); moverLead(id, col.dataset.col); });
 document.addEventListener("dragend", function () { document.querySelectorAll(".colk.over").forEach(function (x) { x.classList.remove("over"); }); });
+document.addEventListener("dblclick", function (e) {
+  var c = e.target.closest && e.target.closest(".card"); if (!c || e.target.closest('[data-act="abrir-conversa-card"]')) return;
+  var l = lead(+c.dataset.id); if (!l) return;
+  st.lead = l.id; st.pnl = null; st.dtab = "ficha"; st.conv = l.conv; render();
+});
 render();
 </script>
