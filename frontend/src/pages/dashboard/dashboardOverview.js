@@ -1,3 +1,5 @@
+import { parametrosPeriodoDashboard, validarPeriodoDashboard } from "./dashboardPeriod.js";
+
 export function createEmptyDashboardSummary() {
   return {
     saldo_atual: 0,
@@ -38,10 +40,15 @@ export function getPeriodLabel(periodDays) {
 }
 
 export function getDashboardDetailPath(detail, periodDays = 30) {
-  const dias = Math.min(Math.max(Number(periodDays) || 30, 1), 366);
+  const dias = Math.min(Math.max(Number(periodDays?.dias || periodDays) || 30, 1), 366);
+  const params = new URLSearchParams(
+    periodDays && typeof periodDays === "object"
+      ? parametrosPeriodoDashboard(periodDays)
+      : { periodo_dias: dias },
+  );
   const paths = {
-    sales: `/financeiro/vendas?periodo_dias=${dias}`,
-    cashFlow: `/financeiro/fluxo-caixa?periodo_dias=${dias}`,
+    sales: `/financeiro/vendas?${params}`,
+    cashFlow: `/financeiro/fluxo-caixa?${params}`,
     receivableOpen: "/financeiro/contas-receber?filtro=em_aberto",
     payableOpen: "/financeiro/contas-pagar?filtro=em_aberto",
     receivableOverdue: "/financeiro/contas-receber?filtro=vencidas",
@@ -58,6 +65,14 @@ export function getDashboardDetailPath(detail, periodDays = 30) {
 }
 
 export function getDashboardPeriodFromSearch(searchParams, referenceDate = new Date()) {
+  const inicio = searchParams?.get?.("data_inicio");
+  const fim = searchParams?.get?.("data_fim");
+  if (inicio || fim) {
+    const resultado = validarPeriodoDashboard({ inicio, fim });
+    return resultado.erro
+      ? null
+      : { days: resultado.dias, start: inicio, end: fim, quickFilter: "personalizado" };
+  }
   const rawDays = Number(searchParams?.get?.("periodo_dias"));
   if (!Number.isInteger(rawDays) || rawDays < 1 || rawDays > 366) return null;
 

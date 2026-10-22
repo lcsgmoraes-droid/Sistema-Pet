@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { conferirItemCaixa, obterAuditoriaCaixa, validarCaixaAtual } from "../../api/caixa";
+import {
+  conferirItemCaixa,
+  identificarPixCaixa,
+  obterAuditoriaCaixa,
+  validarCaixaAtual,
+} from "../../api/caixa";
 import { urlConsultaVendaPdv } from "../../utils/conferenciaFechamentoUtils";
 
 const colecoes = { venda: "vendas", pagamento: "pagamentos", movimentacao: "movimentacoes" };
@@ -178,10 +183,74 @@ export default function useConferenciaFechamento(caixaId, { onResumo, bloqueado 
     if (url) window.open(url, "_blank", "noopener,noreferrer");
   }, []);
 
+  const salvarPix = useCallback(
+    async (item, proximoEstado, justificativa) => {
+      if (
+        !contexto.ativo ||
+        contexto.envio ||
+        contexto.leitura ||
+        !contexto.valido ||
+        opcoes.current.bloqueado ||
+        !["identificado", "nao_identificado"].includes(proximoEstado)
+      )
+        return false;
+      const original = contexto.auditoria?.pagamentos?.find((linha) => linha.id === item?.id);
+      const identificacao = original?.identificacao_pix;
+      const nota = String(justificativa || "").trim();
+      if (
+        !identificacao ||
+        original.assinatura !== item?.assinatura ||
+        (identificacao.registro_id ?? null) !== (item?.identificacao_pix?.registro_id ?? null) ||
+        identificacao.estado === proximoEstado ||
+        !nota ||
+        nota.length > 1000
+      )
+        return false;
+      contexto.envio = true;
+      setEstado((anterior) => ({ ...anterior, salvando: true, erro: null }));
+      try {
+        await identificarPixCaixa(caixaId, {
+          pagamento_id: original.id,
+          assinatura: original.assinatura,
+          registro_id: identificacao.registro_id ?? null,
+          estado: proximoEstado,
+          justificativa: nota,
+        });
+        if (!contexto.ativo) return false;
+        const dados = await carregar();
+        if (!dados && contexto.ativo)
+          setEstado((anterior) => ({
+            ...anterior,
+            erro: "Identificação salva, mas a atualização falhou. Atualize o caixa para conferir o resultado.",
+          }));
+        return Boolean(dados);
+      } catch (erro) {
+        if (!contexto.ativo) return false;
+        await carregar();
+        if (contexto.ativo)
+          setEstado((anterior) => ({
+            ...anterior,
+            erro: [404, 409].includes(erro?.response?.status)
+              ? "O Pix foi atualizado. Confira novamente antes de confirmar a identificação."
+              : mensagemErro(
+                  erro,
+                  "Não foi possível confirmar a identificação. Confira o estado atualizado e tente novamente.",
+                ),
+          }));
+        return false;
+      } finally {
+        contexto.envio = false;
+        if (contexto.ativo) setEstado((anterior) => ({ ...anterior, salvando: false }));
+      }
+    },
+    [caixaId, contexto, carregar],
+  );
+
   return {
     ...atual,
     atualizar,
     salvar,
+    salvarPix,
     abrirVenda,
     ocupado: Boolean(bloqueado || atual.atualizando || atual.salvando),
     bloqueado: Boolean(bloqueado || !atual.valido || atual.atualizando || atual.salvando),

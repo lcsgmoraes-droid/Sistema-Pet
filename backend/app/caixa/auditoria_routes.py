@@ -19,6 +19,12 @@ from app.caixa.auditoria import (
 )
 from app.caixa.escopo import buscar_caixa_acessivel
 from app.caixa.recebimentos import filtro_recebimentos_caixa
+from app.caixa.pix_identificacao import (
+    IdentificacaoPixSchema,
+    carregar_identificacoes_pix,
+    item_pagamento_auditoria,
+    registrar_identificacao_pix,
+)
 from app.db import get_session
 from app.models import AuditLog
 from app.vendas_models import Venda, VendaPagamento
@@ -87,24 +93,7 @@ def _itens_caixa(db, caixa_id, usuario_e_tenant, *, resumo=None):
         "movimentacao": listar_movimentacoes_caixa(
             caixa_id, db=db, current_user_and_tenant=usuario_e_tenant
         )["movimentacoes"],
-        "pagamento": [
-            {
-                **pagamento.to_dict(),
-                "venda_id": pagamento.venda_id,
-                "venda_numero": pagamento.venda.numero_venda,
-                "data_movimento": pagamento.data_pagamento.isoformat()
-                if pagamento.data_pagamento
-                else None,
-                "tipo": "estorno" if pagamento.valor < 0 else "recebimento",
-                "descricao": (
-                    f"Estorno do recebimento da venda {pagamento.venda.numero_venda}"
-                    if pagamento.valor < 0
-                    else f"Recebimento da venda {pagamento.venda.numero_venda}"
-                ),
-                "natureza": "saida" if pagamento.valor < 0 else "entrada",
-            }
-            for pagamento in pagamentos
-        ],
+        "pagamento": [item_pagamento_auditoria(pagamento) for pagamento in pagamentos],
     }
 
 
@@ -173,6 +162,7 @@ def obter_auditoria_caixa(
             item["assinatura"] = assinatura
             item["conferencia"] = conferencia
             item.update(situacao_conferencia(assinatura, conferencia))
+    carregar_identificacoes_pix(db, tenant_id, itens["pagamento"])
     return {
         "resumo": resumo,
         "vendas": itens["venda"],
@@ -212,3 +202,15 @@ def conferir_item_caixa(
     )
     db.commit()
     return {"success": True, "estado": dados.estado, "conferido": dados.conferido}
+
+
+@router.post("/{caixa_id}/auditoria/pix")
+def identificar_pix_caixa(
+    caixa_id: int,
+    dados: IdentificacaoPixSchema,
+    db: Session = Depends(get_session),
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    return registrar_identificacao_pix(
+        db, current_user_and_tenant, dados, caixa_id=caixa_id
+    )

@@ -23,6 +23,7 @@ def assinatura_item(item: dict) -> str:
             "conferido",
             "estado_conferencia",
             "conferencia_alterada",
+            "identificacao_pix",
         }
     }
     return hashlib.sha256(

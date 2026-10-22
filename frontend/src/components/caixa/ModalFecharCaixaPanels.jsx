@@ -8,6 +8,7 @@ import ResumoFaturamento from "../v2/ResumoFaturamento/ResumoFaturamento";
 import { periodoFaturamento } from "../v2/ResumoFaturamento/faturamentoPresentation";
 import RecebimentosCaixaPanel from "./RecebimentosCaixaPanel";
 import ConferenciaCaixaItem from "./ConferenciaCaixaItem";
+import IdentificacaoPixItem from "./IdentificacaoPixItem";
 import {
   classeConferenciaCaixa,
   localizarLancamentoConferencia,
@@ -266,16 +267,26 @@ export function PaymentBreakdownPanel({ resumo, conferencia }) {
     const tipo = referencia?.tipo || tipoPadrao;
     const item = referencia?.item;
     return (
-      <ConferenciaCaixaItem
-        key={`${tipo}:${item?.id ?? registro.id ?? registro.venda_id}:${item?.assinatura || "sem-assinatura"}`}
-        item={item}
-        tipo={tipo}
-        vendaId={registro.venda_id ?? (tipo === "venda" ? registro.id : null)}
-        salvando={Boolean(conferencia?.salvando)}
-        bloqueado={conferenciaBloqueada}
-        onSalvar={conferencia?.salvar}
-        onAbrirVenda={conferencia?.abrirVenda}
-      />
+      <div className="space-y-2" key={`${tipo}:${item?.id ?? registro.id ?? registro.venda_id}`}>
+        <ConferenciaCaixaItem
+          key={`${tipo}:${item?.id}:${item?.assinatura || "sem-assinatura"}`}
+          item={item}
+          tipo={tipo}
+          vendaId={registro.venda_id ?? (tipo === "venda" ? registro.id : null)}
+          salvando={Boolean(conferencia?.salvando)}
+          bloqueado={conferenciaBloqueada}
+          onSalvar={conferencia?.salvar}
+          onAbrirVenda={conferencia?.abrirVenda}
+        />
+        {tipo === "pagamento" && (
+          <IdentificacaoPixItem
+            item={item}
+            salvando={Boolean(conferencia?.salvando)}
+            bloqueado={conferenciaBloqueada}
+            onSalvar={conferencia?.salvarPix}
+          />
+        )}
+      </div>
     );
   };
 
@@ -320,6 +331,17 @@ export function PaymentBreakdownPanel({ resumo, conferencia }) {
           {conferencia.erro && (
             <p role="alert" className="text-xs font-semibold text-red-700 dark:text-red-300">
               {conferencia.erro}
+            </p>
+          )}
+          {conferencia.auditoria?.pagamentos?.some(
+            (item) => item.identificacao_pix?.estado === "nao_identificado",
+          ) && (
+            <p
+              role="status"
+              className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
+            >
+              Há Pix não identificado neste caixa. A pendência fica nos Alertas do gestor e não
+              impede o fechamento.
             </p>
           )}
         </div>

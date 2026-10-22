@@ -23,6 +23,7 @@ const adiar = () => {
 function preparar() {
   const leituras = [],
     gravacoes = [],
+    gravacoesPix = [],
     resumos = [],
     abas = [],
     validacoes = [];
@@ -45,6 +46,11 @@ function preparar() {
       gravacoes.push({ ...pendente, id, dados });
       return pendente.promise;
     },
+    identificarPixCaixa(id, dados) {
+      const pendente = adiar();
+      gravacoesPix.push({ ...pendente, id, dados });
+      return pendente.promise;
+    },
   };
   const h = createControllerHarness(componente, {
     props: { caixaId: 1, bloqueado: false },
@@ -56,7 +62,17 @@ function preparar() {
         bloqueado: props.bloqueado,
       }),
   });
-  return { h, leituras, gravacoes, resumos, abas, validacoes, windowTarget, documento };
+  return {
+    h,
+    leituras,
+    gravacoes,
+    gravacoesPix,
+    resumos,
+    abas,
+    validacoes,
+    windowTarget,
+    documento,
+  };
 }
 async function iniciar(c) {
   await c.h.settle();
@@ -189,4 +205,120 @@ test("resposta de caixa anterior é cancelada e não sobrescreve a nova conferê
     [90],
   );
   assert.equal(c.h.tree.auditoria.resumo.totais.saldo_atual, 90);
+});
+
+const snapshotPix = (estado = "nao_conferido", registroId = null, hash = assinatura) => ({
+  ...snapshot(),
+  pagamentos: [
+    {
+      id: 42,
+      assinatura: hash,
+      forma_pagamento: "Pix",
+      valor: 50,
+      identificacao_pix: {
+        estado,
+        registro_id: registroId,
+        justificativa: registroId ? "Motivo salvo" : "",
+        historico: [],
+      },
+    },
+  ],
+});
+async function iniciarPix(c, dados = snapshotPix()) {
+  await c.h.settle();
+  c.leituras[0].resolve(dados);
+  await c.h.settle();
+  return c.h.tree.auditoria.pagamentos[0];
+}
+
+test("identificacao Pix exige motivo e metadados atuais, sem alterar conferencia financeira", async () => {
+  const c = preparar();
+  const item = await iniciarPix(c);
+  for (const args of [
+    [item, "identificado", " "],
+    [item, "pendente", "motivo"],
+    [{ ...item, assinatura: "velha" }, "identificado", "motivo"],
+    [
+      { ...item, identificacao_pix: { estado: "nao_conferido", registro_id: 99 } },
+      "identificado",
+      "motivo",
+    ],
+    [{ id: 123, assinatura }, "identificado", "motivo"],
+  ])
+    assert.equal(await c.h.tree.salvarPix(...args), false);
+  assert.equal(c.gravacoesPix.length, 0);
+  assert.equal(c.gravacoes.length, 0);
+});
+
+test("Pix nao identificado salva com motivo, rele servidor e continua permitindo fechar o caixa", async () => {
+  const c = preparar();
+  const item = await iniciarPix(c);
+  const resultado = c.h.tree.salvarPix(
+    item,
+    "nao_identificado",
+    "  Crédito não encontrado no extrato.  ",
+  );
+  assert.equal(await c.h.tree.salvarPix(item, "nao_identificado", "duplicado"), false);
+  assert.equal(await c.h.tree.salvar("venda", c.h.tree.auditoria.vendas[0], "ok"), false);
+  await c.h.settle();
+  assert.equal(c.h.tree.auditoria.pagamentos[0].identificacao_pix.estado, "nao_conferido");
+  assert.deepEqual(c.gravacoesPix[0].dados, {
+    pagamento_id: 42,
+    assinatura,
+    registro_id: null,
+    estado: "nao_identificado",
+    justificativa: "Crédito não encontrado no extrato.",
+  });
+  c.gravacoesPix[0].resolve({ success: true });
+  await c.h.settle();
+  c.leituras[1].resolve(snapshotPix("nao_identificado", 17));
+  assert.equal(await resultado, true);
+  await c.h.settle();
+  assert.equal(c.h.tree.auditoria.pagamentos[0].identificacao_pix.estado, "nao_identificado");
+  assert.equal(c.h.tree.bloqueado, false);
+  assert.equal(c.h.tree.ocupado, false);
+  assert.equal(c.resumos.at(-1).totais.saldo_atual, 50);
+  assert.equal(
+    await c.h.tree.salvarPix(c.h.tree.auditoria.pagamentos[0], "nao_identificado", "mesmo estado"),
+    false,
+  );
+  assert.equal(c.gravacoesPix.length, 1);
+  assert.equal(c.gravacoes.length, 0);
+});
+
+test("conflito Pix atualiza registro e assinatura sem repetir a alteracao nem perder resumo", async () => {
+  const c = preparar();
+  const item = await iniciarPix(c, snapshotPix("nao_identificado", 17));
+  const resultado = c.h.tree.salvarPix(item, "identificado", "Comprovante encontrado.");
+  c.gravacoesPix[0].reject({ response: { status: 409 } });
+  await c.h.settle();
+  c.leituras[1].resolve(snapshotPix("nao_conferido", 18, "b".repeat(64)));
+  assert.equal(await resultado, false);
+  await c.h.settle();
+  assert.equal(c.gravacoesPix.length, 1);
+  assert.equal(c.h.tree.auditoria.pagamentos[0].identificacao_pix.registro_id, 18);
+  assert.match(c.h.tree.erro, /Pix foi atualizado/);
+  assert.equal(await c.h.tree.salvarPix(item, "identificado", "Repeticao antiga"), false);
+  assert.equal(c.gravacoesPix.length, 1);
+});
+
+test("POST Pix salvo e leitura falha mantem estado anterior bloqueado ate recuperar uma leitura valida", async () => {
+  const c = preparar();
+  const item = await iniciarPix(c);
+  const resultado = c.h.tree.salvarPix(item, "identificado", "Crédito confirmado.");
+  c.gravacoesPix[0].resolve({ success: true });
+  await c.h.settle();
+  c.leituras[1].reject(new Error("offline"));
+  assert.equal(await resultado, false);
+  await c.h.settle();
+  assert.equal(c.h.tree.bloqueado, true);
+  assert.equal(c.h.tree.auditoria.pagamentos[0].identificacao_pix.estado, "nao_conferido");
+  assert.match(c.h.tree.erro, /Identificação salva/);
+  const leitura = c.h.tree.atualizar();
+  await c.h.settle();
+  c.leituras[2].resolve(snapshotPix("identificado", 18));
+  await leitura;
+  await c.h.settle();
+  assert.equal(c.h.tree.bloqueado, false);
+  assert.equal(c.h.tree.auditoria.pagamentos[0].identificacao_pix.estado, "identificado");
 });
