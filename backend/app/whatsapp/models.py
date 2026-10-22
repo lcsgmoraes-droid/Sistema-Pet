@@ -132,7 +132,7 @@ class WhatsAppSession(TenantScoped, Base):
     id = Column(String, primary_key=True, default=generate_uuid)
     tenant_id = Column(UUID(as_uuid=True), ForeignKey(TENANTS_ID_FK), nullable=False)
     cliente_id = Column(Integer, ForeignKey("clientes.id"))
-    phone_number = Column(String(20), nullable=False)
+    phone_number = Column(String(40), nullable=False)
 
     # Status
     status = Column(String(20), default="bot")  # bot, human, waiting_human, closed

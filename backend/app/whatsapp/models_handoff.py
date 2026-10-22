@@ -74,7 +74,7 @@ class WhatsAppHandoff(TenantScoped, Base):
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
     session_id = Column(String, ForeignKey("whatsapp_ia_sessions.id"), nullable=False)
 
-    phone_number = Column(String(20), nullable=False)
+    phone_number = Column(String(40), nullable=False)
     customer_name = Column(String(200))
 
     # Motivo da transferência

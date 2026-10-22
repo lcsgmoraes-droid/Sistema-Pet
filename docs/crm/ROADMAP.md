@@ -135,12 +135,12 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 - [x] Testes de isolamento entre lojas e de autorização da conexão (`backend/tests/unit/test_whatsapp_websocket_isolamento_loja.py`).
 
 **0.4 Serviço único: telefone → tutor**
-- [ ] Normalizar o telefone (DDI 55, 9º dígito, formatos com e sem máscara, identificadores especiais do WhatsApp).
-- [ ] Um único serviço de resolução com correspondência rígida (substitui a correspondência frouxa da criação da sessão).
-- [ ] Tratar ambiguidade (dois cadastros com o mesmo número): `[?] DECIDIR` como lidar (pedir confirmação? lead sem vínculo?).
-- [ ] Ampliar o tamanho do campo de telefone da sessão.
-- [ ] Reconciliar sessões já gravadas com o vínculo errado (script de conferência, sem alteração automática).
-- [ ] Testes com casos reais de formato de telefone.
+- [x] Normalizar o telefone na comparação (22/10/2026): DDI 55, 9º dígito e máscara não atrapalham; compara DDD e os 8 últimos dígitos; identificadores internos do WhatsApp (@lid) não são telefone.
+- [x] Um único serviço de resolução com correspondência rígida: `backend/app/whatsapp/customer_lookup.py` (`resolver_tutor_por_telefone`), usado na criação da conversa, no contexto do atendimento e no pedido pelo WhatsApp. Cadastros fundidos não participam. Vínculo antigo gravado pela regra frouxa só vale se o telefone do cadastro corresponder ao da conversa.
+- [ ] Tratar ambiguidade (dois cadastros com o mesmo número): por padrão seguro, a conversa fica **sem vínculo** e a ambiguidade é registrada no log (implementado). `[?] DECIDIR` se haverá confirmação por um atendente e como ela aparece no CRM.
+- [x] Ampliar o tamanho do campo de telefone da conversa e do atendimento para 40 caracteres (migração `zzzzk20261022a1`; **precisa ser aplicada no ensaio e na publicação**).
+- [x] Script de conferência dos vínculos antigos, somente leitura: `python -m scripts.conferir_vinculo_sessoes_whatsapp --saida relatorio.json` (classifica: ok, duvidoso, sem vínculo único, ambíguo, sem vínculo). **Rodar no ensaio com a cópia do banco de produção antes de qualquer correção.**
+- [x] Testes com formatos reais de telefone, ambiguidade e vínculo antigo (`test_whatsapp_customer_lookup.py` e `test_whatsapp_vinculo_telefone_migracao_e_conferencia.py`).
 
 **0.5 Segredos e exposição de dados**
 - [ ] Token interno do orquestrador: por loja ou por integração, comparação segura, nunca com valor padrão.
@@ -351,6 +351,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 | Data | Mudança |
 |---|---|
+| 22/10/2026 | Etapa 0.4 concluída (exceto a decisão de como tratar ambiguidade na tela): serviço único telefone → tutor, vínculo antigo validado, telefone de 40 caracteres (migração nova) e script de conferência. |
 | 22/10/2026 | Etapa 0.3 concluída (exceto escala com mais de uma instância, que segue a decidir): tempo real separado por loja, conexão só para o atendente da própria loja com o módulo contratado, eventos de mensagem nova e de nova fila passam a ser emitidos. |
 | 22/10/2026 | Etapa 0.2 concluída (exceto a ligação das regras por sentimento, repetição e tempo, que segue a decidir): estados unificados, assumir e resolver sincronizam a conversa, devolução ao bot por escolha. |
 | 22/10/2026 | Etapa 0.1 concluída: a IA não responde com atendimento humano ativo e o tutor que aguarda atendente recebe um aviso de espera (1 vez a cada 30 minutos). |

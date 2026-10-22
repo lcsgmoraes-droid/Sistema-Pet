@@ -21,7 +21,7 @@ from datetime import datetime, timedelta
 from app.db import get_session as get_db
 from app.whatsapp.models import TenantWhatsAppConfig, WhatsAppSession, WhatsAppMessage
 from app.whatsapp.tenant_context import whatsapp_tenant_context
-from app.models import Cliente
+from app.whatsapp.customer_lookup import SITUACAO_AMBIGUO, resolver_tutor_por_telefone
 
 logger = logging.getLogger(__name__)
 
@@ -611,27 +611,18 @@ def _get_or_create_session_with_context(
     if session:
         return session
 
-    # Buscar cliente (se identificado) sem carregar todas as colunas de `clientes`,
-    # para evitar quebrar em bancos legados com schema parcial.
+    # Identificar o tutor pelo telefone com a regra unica do atendimento
+    # (exatamente um cadastro compativel; ambiguo ou ausente = sem vinculo).
     cliente_id = None
     try:
-        telefone_sufixo = phone[-8:] if phone else ""
-        cliente_row = (
-            db.query(Cliente.id)
-            .filter(
-                Cliente.tenant_id == tenant_id,
-                (
-                    (Cliente.celular == phone)
-                    | (Cliente.telefone == phone)
-                    | (Cliente.celular.ilike(f"%{telefone_sufixo}%"))
-                    | (Cliente.telefone.ilike(f"%{telefone_sufixo}%"))
-                ),
-            )
-            .first()
-        )
-        if cliente_row:
-            cliente_id = (
-                cliente_row[0] if isinstance(cliente_row, tuple) else cliente_row
+        resolucao = resolver_tutor_por_telefone(db, tenant_id, phone)
+        cliente_id = resolucao.cliente_id
+        if resolucao.situacao == SITUACAO_AMBIGUO:
+            logger.warning(
+                "Telefone ligado a mais de um cadastro; sessao sem vinculo: "
+                "tenant=%s candidatos=%s",
+                tenant_id,
+                list(resolucao.candidatos),
             )
     except Exception as cliente_lookup_error:
         logger.warning(

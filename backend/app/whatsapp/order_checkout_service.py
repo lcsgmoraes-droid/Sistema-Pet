@@ -11,7 +11,7 @@ from typing import Any, Callable, Literal, Optional
 
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import or_, text
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 
@@ -38,33 +38,16 @@ def phone_digits(value: str) -> str:
 
 def resolve_customer(db: Session, tenant_id, *, phone: str):
     from app.models import Cliente
+    from app.whatsapp.customer_lookup import resolver_tutor_por_telefone
 
-    digits = phone_digits(phone)
-    if len(digits) < 8:
+    resolucao = resolver_tutor_por_telefone(db, tenant_id, phone)
+    if resolucao.cliente_id is None:
         return None
-    last_four = digits[-4:]
-    candidates = (
+    return (
         db.query(Cliente)
-        .filter(
-            Cliente.tenant_id == tenant_id,
-            or_(
-                Cliente.celular.ilike(f"%{last_four}%"),
-                Cliente.telefone.ilike(f"%{last_four}%"),
-            ),
-        )
-        .limit(20)
-        .all()
+        .filter(Cliente.tenant_id == tenant_id, Cliente.id == resolucao.cliente_id)
+        .first()
     )
-    matches = [
-        candidate
-        for candidate in candidates
-        if any(
-            phone_digits(value).endswith(digits[-8:])
-            for value in (candidate.celular, candidate.telefone)
-            if value
-        )
-    ]
-    return matches[0] if len(matches) == 1 else None
 
 
 def customer_delivery_address(customer) -> str:

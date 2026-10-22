@@ -12,6 +12,10 @@ from sqlalchemy.orm import joinedload
 from app.models import Cliente, Tenant
 from app.produtos_models import Produto
 from app.vendas_models import Venda, VendaItem
+from app.whatsapp.customer_lookup import (
+    resolver_tutor_por_telefone,
+    telefones_compativeis,
+)
 from app.whatsapp.models import TenantWhatsAppConfig, WhatsAppSession
 from app.whatsapp.remote_corepet_client import (
     fetch_remote_customer_context,
@@ -50,7 +54,7 @@ def resolve_session_customer(
             )
 
     if session.cliente_id:
-        return (
+        vinculado = (
             db.query(Cliente)
             .filter(
                 Cliente.tenant_id == tenant_id,
@@ -58,37 +62,23 @@ def resolve_session_customer(
             )
             .first()
         )
+        # Vinculos gravados por regras antigas (frouxas) so valem se o telefone
+        # do cadastro realmente corresponde ao da conversa.
+        if vinculado is not None and any(
+            telefones_compativeis(session.phone_number, telefone)
+            for telefone in (vinculado.celular, vinculado.telefone)
+            if telefone
+        ):
+            return vinculado
 
-    phone_digits = _digits(session.phone_number)
-    if len(phone_digits) < 8:
+    resolucao = resolver_tutor_por_telefone(db, tenant_id, session.phone_number)
+    if resolucao.cliente_id is None:
         return None
-
-    last_four = phone_digits[-4:]
-    candidates = (
+    return (
         db.query(Cliente)
-        .filter(
-            Cliente.tenant_id == tenant_id,
-            or_(
-                Cliente.celular.ilike(f"%{last_four}%"),
-                Cliente.telefone.ilike(f"%{last_four}%"),
-            ),
-        )
-        .limit(20)
-        .all()
+        .filter(Cliente.tenant_id == tenant_id, Cliente.id == resolucao.cliente_id)
+        .first()
     )
-    matched = [
-        customer
-        for customer in candidates
-        if any(
-            _digits(phone).endswith(phone_digits[-8:])
-            for phone in (customer.celular, customer.telefone)
-            if phone
-        )
-    ]
-    if len(matched) != 1:
-        return None
-
-    return matched[0]
 
 
 def load_latest_purchase(db, *, tenant_id: str, customer_id: int) -> Optional[dict]:
