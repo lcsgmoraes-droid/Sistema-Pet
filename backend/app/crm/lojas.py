@@ -13,6 +13,7 @@ nunca e contornado) e o resultado volta marcado com a loja de origem.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -117,3 +118,35 @@ def consultar_por_loja(
     finally:
         sync_rls_tenant(db, UUID(str(tenant_atual)))
     return resultado
+
+
+def exigir_loja(
+    db: Session, user: Any, tenant_atual: UUID, loja_id: Any = None
+) -> Loja:
+    """A loja pedida (ou a atual), desde que o usuario possa ver o CRM dela."""
+    permitidas = lojas_permitidas(db, user, tenant_atual)
+    if loja_id in (None, ""):
+        return permitidas[0]
+    return resolver_lojas(permitidas, [loja_id])[0]
+
+
+@contextmanager
+def na_loja(db: Session, loja: Loja, tenant_atual: UUID):
+    """Executa um bloco no contexto da loja e volta para a loja atual no fim."""
+    try:
+        with tenant_context(loja.id):
+            sync_rls_tenant(db, loja.id)
+            yield loja
+    finally:
+        sync_rls_tenant(db, UUID(str(tenant_atual)))
+
+
+def exigir_permissao_na_loja(
+    db: Session, user: Any, loja: Loja, permissao: str
+) -> None:
+    """403 se o usuario nao tem `permissao` na loja (chamar dentro de `na_loja`)."""
+    if permissao not in get_user_permissions(db, user.id, loja.id):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Você não tem permissão para isso na loja {loja.nome}.",
+        )

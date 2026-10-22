@@ -207,17 +207,17 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 - [ ] 2.4a **Indicação de vínculo no card:** selo "Lead novo · sem cadastro" só para lead sem pessoa (sem selo quando vinculado); título com o nome do perfil do WhatsApp, sem número no card; número guardado no lead e usado para preencher o cadastro ao criar ou vincular; ficha com os dados da pessoa vindos do cadastro de Pessoas e atalho para abrir o cadastro completo; ações "Vincular a cadastro existente" e "Criar cadastro". `[?] DECIDIR` regras de vínculo (ver Etapas 0.4 e 1.6), um lead por tutor ou por oportunidade, e leads de lojas diferentes do mesmo grupo.
 - [ ] 2.4 Cartão do lead: tutor, pets, última compra, origem, responsável, próxima ação, **identificação clara da loja** (nome e marca visual).
 - [ ] 2.5 **Filtro de lojas:** ver tudo ou lojas específicas, limitado às lojas que o usuário pode acessar; lembrar a última escolha.
-- [ ] 2.6 Criação manual de lead (com busca de tutor existente).
+- [~] 2.6 Criação manual de lead (com busca de tutor existente). **API pronta (`POST /crm/leads`, valida duplicidade); falta a tela.**
 - [ ] 2.7 Criação automática de leads a partir de sinais já existentes (cliente inativo, cashback a vencer, VIP em risco, recompra atrasada). `[?] DECIDIR` quais sinais e como evitar duplicar leads.
 - [ ] 2.8 Detalhe do lead: interações, notas, tarefas e próxima ação com data.
-- [ ] 2.8a **Registrar ação e agendar próximo passo:** ação (tipo, observação, quem e quando) grava interação e atualiza "último contato"; próximo passo (tipo, descrição, data, hora, responsável) com atalhos de data; registrar ação pode concluir o passo; cores de atenção (sem passo e hoje em amarelo, atrasado em vermelho); contato por WhatsApp e mensagens do atendente atualizam o último contato sozinhos. `[?] DECIDIR` se o responsável recebe aviso (notificação no app ou e-mail) quando o passo vence, e se haverá visão "Minha agenda" com os passos do dia.
+- [~] 2.8a **Registrar ação e agendar próximo passo:** ação (tipo, observação, quem e quando) grava interação e atualiza "último contato"; próximo passo (tipo, descrição, data, hora, responsável) com atalhos de data; registrar ação pode concluir o passo; cores de atenção (sem passo e hoje em amarelo, atrasado em vermelho); contato por WhatsApp e mensagens do atendente atualizam o último contato sozinhos. `[?] DECIDIR` se o responsável recebe aviso (notificação no app ou e-mail) quando o passo vence, e se haverá visão "Minha agenda" com os passos do dia. **API pronta (ação atualiza último contato e conclui o passo; observação não conta como contato; novo passo substitui o pendente); falta a tela e as decisões de aviso e agenda.**
 - [ ] 2.8c Duplo clique no card abre a ficha 360 (e clique no nome continua abrindo); formulários de ação e de agendamento em coluna única, sob demanda.
 - [ ] 2.8b Cabeçalho fixo no painel do tutor (nome, loja, telefone, consentimento, abas).
 - [ ] 2.9 Filtros e busca (responsável, origem, segmento, etapa, período).
 - [ ] 2.10b Botão "Conversar" no card com contador de não lidas e painel lateral (conversa e ficha 360), reaproveitando o painel de conversa da Etapa 5 (um único componente).
 - [ ] 2.10 Contato manual por WhatsApp (link com registro da interação) enquanto o canal oficial não existe.
 - [ ] 2.11 Ganho e perda: motivos de perda. `[?] DECIDIR` lista de motivos.
-- [ ] 2.12 Desempenho com muitos cartões (paginação por coluna) e uso no celular.
+- [~] 2.12 Desempenho com muitos cartões (paginação por coluna) e uso no celular. **Quadro limitado a 50 cards por coluna no servidor; falta paginação "ver mais" e a tela.**
 - [ ] 2.13 Testes e documentação.
 
 ### Etapa 3 — Ficha 360 e sinais do tutor
@@ -353,6 +353,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 |---|---|
 | 22/10/2026 | Etapa 0.9 em grande parte concluída: nova tentativa da IA com fallback para atendente, sessão de banco própria no segundo plano e entrada do n8n sem espera; falta a fila durável (Etapa 4.8) e as chamadas bloqueantes da ponte do piloto. |
 | 22/10/2026 | Etapa 0.8 em grande parte concluída: envio do atendente funcionando, formato único de mensagem entre tela e API, histórico da ficha lendo do modelo definitivo e código morto removido; falta revisar o restante do legado do bot e remover o modelo paralelo após conferir o banco de produção. |
+| 22/10/2026 | Etapa 2 (API do quadro): leitura do quadro por loja(s), criar card, mover, registrar ação, agendar próximo passo, configurar colunas e ficha do card, com permissões por loja. Telas ainda não feitas. |
 | 22/10/2026 | Etapa 2 (regras do funil no servidor): colunas configuráveis, movimentação, ciclos e oportunidades com testes. Telas ainda não feitas. |
 | 22/10/2026 | Etapa 1.6: número novo no WhatsApp vira card sem cadastro (ou usa o cadastro do tutor); funil padrão provisório criado sob demanda. |
 | 22/10/2026 | Etapa 1.5: visão de várias lojas no CRM com travas de permissão, módulo e vínculo; lista de lojas permitidas pronta para o filtro da tela. |
