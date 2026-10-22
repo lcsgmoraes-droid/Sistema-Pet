@@ -16,7 +16,7 @@ import hashlib
 import hmac
 import logging
 from typing import Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.db import get_session as get_db
 from app.whatsapp.models import TenantWhatsAppConfig, WhatsAppSession, WhatsAppMessage
@@ -434,6 +434,7 @@ async def _process_incoming_message_with_context(
                 session.id,
                 session.status,
             )
+            aviso_enviado = await _avisar_espera_atendente(db, tenant_id, session)
             return {
                 "status": "processed",
                 "whatsapp_message_id": provider_message_id,
@@ -441,6 +442,7 @@ async def _process_incoming_message_with_context(
                 "processor_result": {
                     "action": "skipped_human_handling",
                     "session_status": session.status,
+                    "waiting_notice_sent": aviso_enviado,
                 },
             }
 
@@ -491,6 +493,51 @@ STATUS_ATENDIMENTO_HUMANO = ("human", "waiting_human")
 def atendimento_humano_ativo(session: Any) -> bool:
     """True quando a conversa esta com humano ou aguardando um atendente."""
     return getattr(session, "status", None) in STATUS_ATENDIMENTO_HUMANO
+
+
+AVISO_ESPERA_ATENDENTE = (
+    "Recebemos sua mensagem. Um atendente da loja vai conversar com você em breve."
+)
+# Evita repetir o aviso a cada mensagem enquanto o tutor espera.
+JANELA_AVISO_ESPERA_MINUTOS = 30
+
+
+async def _avisar_espera_atendente(db: Session, tenant_id: str, session: Any) -> bool:
+    """Avisa o tutor que um atendente vai falar com ele, no maximo 1 vez por janela.
+
+    So vale para conversa aguardando atendente. Quando o atendente ja assumiu
+    (status human) ele mesmo conversa, entao nao ha aviso. Falha no envio nunca
+    derruba o processamento da mensagem recebida.
+    """
+    if getattr(session, "status", None) != "waiting_human":
+        return False
+    try:
+        limite = datetime.utcnow() - timedelta(minutes=JANELA_AVISO_ESPERA_MINUTOS)
+        ja_avisado = (
+            db.query(WhatsAppMessage)
+            .filter(
+                WhatsAppMessage.session_id == session.id,
+                WhatsAppMessage.tipo == "enviada",
+                WhatsAppMessage.conteudo == AVISO_ESPERA_ATENDENTE,
+                WhatsAppMessage.created_at >= limite,
+            )
+            .first()
+        )
+        if ja_avisado:
+            return False
+
+        from app.whatsapp.sender import send_whatsapp_message
+
+        enviada = await send_whatsapp_message(
+            db=db,
+            tenant_id=tenant_id,
+            session_id=session.id,
+            message=AVISO_ESPERA_ATENDENTE,
+        )
+        return enviada is not None
+    except Exception as erro:
+        logger.warning("Falha ao avisar espera de atendente: %s", erro)
+        return False
 
 
 def normalize_phone(phone: str) -> str:

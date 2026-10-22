@@ -115,7 +115,8 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 **0.1 Bot não pode responder durante atendimento humano**
 - [x] Barrar o bot quando a conversa está com humano ou aguardando humano (22/10/2026: `atendimento_humano_ativo` em `backend/app/whatsapp/webhook.py`; vale também para a entrada do n8n, que usa a mesma função).
 - [x] Teste: mensagem nova do tutor em conversa com humano não gera resposta da IA (`backend/tests/unit/test_whatsapp_ia_pausa_atendimento_humano.py`).
-- [ ] Definir o que acontece com mensagens recebidas enquanto aguarda atendente (aviso ao tutor? fila?). `[?] DECIDIR`
+- [x] Decisão de 22/10: o tutor que escreve enquanto aguarda atendente recebe o aviso "Recebemos sua mensagem. Um atendente da loja vai conversar com você em breve." Enviado no máximo 1 vez a cada 30 minutos por conversa, só enquanto aguarda atendente (não quando o atendente já assumiu); falha no envio não derruba o processamento. Implementado em `backend/app/whatsapp/webhook.py`.
+- [ ] Regras finas do aviso: usar o texto por loja (configurável), respeitar quem respondeu SAIR e o horário de atendimento. `[?] DECIDIR`
 
 **0.2 Atendimento humano: estados e devolução ao bot**
 - [ ] Unificar os estados do atendimento (hoje há dois vocabulários diferentes entre modelo, regra e tela).
@@ -350,7 +351,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 | Data | Mudança |
 |---|---|
-| 22/10/2026 | Etapa 0.1 (parte principal) concluída: a IA não responde com atendimento humano ativo; falta decidir o aviso ao tutor que aguarda atendente. |
+| 22/10/2026 | Etapa 0.1 concluída: a IA não responde com atendimento humano ativo e o tutor que aguarda atendente recebe um aviso de espera (1 vez a cada 30 minutos). |
 | 22/10/2026 | Protótipo congelado; Fase 2 concluída; início da Fase 3 (Etapa 0.1). |
 | 21/10/2026 | Protótipo versão 11: painel de última ação e próximo passo em coluna única com formulários sob demanda; duplo clique no card abre a ficha 360. |
 | 21/10/2026 | Protótipo versão 10: cabeçalho do painel fixo; registrar última ação e agendar próximo passo com data, hora e responsável; cores de atenção para passo atrasado, de hoje ou ausente. |
