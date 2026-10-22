@@ -5,6 +5,7 @@ import {
   FiAlertTriangle,
   FiBarChart2,
   FiDatabase,
+  FiGrid,
   FiHome,
   FiLayout,
   FiLogOut,
@@ -35,6 +36,12 @@ const navItems = [
     label: "Tenants",
     description: "Clientes e catalogo",
     icon: FiUsers,
+  },
+  {
+    to: "/ops/lojas",
+    label: "Lojas e módulos",
+    description: "Agrupamento e módulos ativos",
+    icon: FiGrid,
   },
   {
     to: "/ops/observabilidade",

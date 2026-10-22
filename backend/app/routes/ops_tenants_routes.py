@@ -37,9 +37,24 @@ from app.services.ops_tenants_service import (
     update_ops_tenant_commercial_state,
     update_ops_tenant_onboarding_follow_up,
 )
+from app.services.ops_tenant_log_service import (
+    CATEGORIA_ACOMPANHAMENTO,
+    CATEGORIA_COMERCIAL,
+    ler_campos_da_loja,
+    registrar_alteracoes,
+)
 from app.services.plan_catalog import PLAN_CATALOG
 
 router = APIRouter(prefix="/admin/tenants", tags=["Admin - Tenants"])
+
+# Colunas da loja que estas rotas alteram (lista fechada: vai direto para o SQL de leitura).
+_CAMPOS_COMERCIAIS = ("status", "plan", "billing_status", "subscription_source")
+_CAMPOS_ACOMPANHAMENTO = (
+    "onboarding_owner_name",
+    "onboarding_unblocked_on",
+    "onboarding_next_contact_on",
+    "onboarding_satisfaction",
+)
 
 
 @router.get("/planos-catalogo")
@@ -221,10 +236,21 @@ def atualizar_estado_comercial_tenant(
     db: Session = Depends(get_session),
 ) -> dict[str, Any]:
     try:
+        mudancas = payload.model_dump(exclude_unset=True)
+        campos = [c for c in mudancas if c in _CAMPOS_COMERCIAIS]
+        antes = ler_campos_da_loja(db, tenant_id, campos)
         result = update_ops_tenant_commercial_state(
             db,
             tenant_id=tenant_id,
-            changes=payload.model_dump(exclude_unset=True),
+            changes=mudancas,
+        )
+        registrar_alteracoes(
+            db,
+            tenant_id=tenant_id,
+            admin=_current_admin,
+            categoria=CATEGORIA_COMERCIAL,
+            antes=antes,
+            depois=ler_campos_da_loja(db, tenant_id, campos),
         )
         db.commit()
         return result
@@ -264,10 +290,20 @@ def atualizar_acompanhamento_onboarding(
     changes = payload.model_dump(exclude_unset=True)
     mapped_changes = {f"onboarding_{field}": value for field, value in changes.items()}
     try:
+        campos = [c for c in mapped_changes if c in _CAMPOS_ACOMPANHAMENTO]
+        antes = ler_campos_da_loja(db, tenant_id, campos)
         result = update_ops_tenant_onboarding_follow_up(
             db,
             tenant_id=tenant_id,
             changes=mapped_changes,
+        )
+        registrar_alteracoes(
+            db,
+            tenant_id=tenant_id,
+            admin=_current_admin,
+            categoria=CATEGORIA_ACOMPANHAMENTO,
+            antes=antes,
+            depois=ler_campos_da_loja(db, tenant_id, campos),
         )
         db.commit()
         return result
