@@ -416,7 +416,13 @@ export function useModalPagamentoActions({
         );
       } else {
         const detalhe = error.response?.data?.detail;
-        setErro(typeof detalhe === "string" ? detalhe : "Erro ao finalizar venda");
+        setErro(
+          typeof detalhe === "string"
+            ? detalhe
+            : typeof detalhe?.mensagem === "string"
+              ? detalhe.mensagem
+              : "Erro ao finalizar venda",
+        );
       }
     } finally {
       finalizacaoEmAndamentoRef.current = false;

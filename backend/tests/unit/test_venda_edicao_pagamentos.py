@@ -64,7 +64,7 @@ def registrar(caso, valor="119.90", forma="Cartão de crédito", **extra):
         caixa_id=2,
         forma_pagamento=forma,
         valor=Decimal(str(valor)),
-        status="confirmado",
+        status=extra.pop("status", "confirmado"),
         **extra,
     )
     caso.db.add(pagamento)

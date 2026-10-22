@@ -695,15 +695,15 @@ def test_complemento_centavo_baixa_conta_parcial_legada_sem_duplicar(cenario):
     cenario.venda.subtotal = Decimal("1.00")
     cenario.venda.status = "baixa_parcial"
     cenario.db.get(LancamentoManual, 1).valor = Decimal("0.01")
-    cenario.db.add(
-        VendaPagamento(
-            tenant_id=cenario.tenant,
-            venda_id=1,
-            forma_pagamento_id=1,
-            forma_pagamento="PIX",
-            valor=Decimal("0.99"),
-        )
+    pagamento = VendaPagamento(
+        tenant_id=cenario.tenant,
+        venda_id=1,
+        forma_pagamento_id=1,
+        forma_pagamento="PIX",
+        valor=Decimal("0.99"),
     )
+    cenario.db.add(pagamento)
+    cenario.db.flush()
     conta = ContaReceber(
         tenant_id=cenario.tenant,
         venda_id=1,
@@ -717,6 +717,7 @@ def test_complemento_centavo_baixa_conta_parcial_legada_sem_duplicar(cenario):
         user_id=1,
         data_emissao=date.today(),
         data_vencimento=date.today(),
+        observacoes=f"[venda_pagamento:{pagamento.id}]",
     )
     cenario.db.add(conta)
     cenario.db.flush()
@@ -728,6 +729,7 @@ def test_complemento_centavo_baixa_conta_parcial_legada_sem_duplicar(cenario):
             data_recebimento=date.today(),
             forma_pagamento_id=1,
             user_id=1,
+            observacoes=f"[venda_pagamento:{pagamento.id}]",
         )
     )
     cenario.db.commit()

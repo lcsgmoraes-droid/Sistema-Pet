@@ -7,6 +7,7 @@ from decimal import Decimal
 from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
@@ -17,6 +18,7 @@ from app.caixa_models import MovimentacaoCaixa
 from app.financeiro_models import ContaReceber, Recebimento
 from app.models import AuditLog
 from app.vendas import finalizacao
+from app.vendas.pagamentos_routes import listar_pagamentos_venda
 from app.vendas.finalizacao_pagamentos import _calcular_pagamentos_finalizacao
 from app.vendas.finalizacao_pagamentos import preparar_formas_pagamentos_finalizacao
 from app.vendas.pagamento_excedente import (
@@ -147,6 +149,114 @@ def test_refinalizacao_sem_novos_preserva_pix_e_baixa_avulsa(caso):
     assert resultado["venda"]["total_recebido"] == 100
     assert caso.db.query(VendaPagamento).count() == 1
     assert caso.db.query(Recebimento).count() == 2
+    assert caso.db.query(AuditLog).filter(AuditLog.action == ACAO_EXCESSO).count() == 0
+
+
+def test_conta_sem_forma_com_recibo_identificado_compoe_recebido_real(caso):
+    conta = _receber_avulso_depois_do_pix(caso)
+    conta.forma_pagamento_id = None
+    caso.db.commit()
+    fotografia = snapshot_pagamentos_excedente(caso.db, caso.venda, caso.tenant)
+    assert fotografia["total_ja_pago"] == 100
+    assert fotografia["recebido_monetario"] == 100
+
+
+def test_get_pagamentos_inclui_baixa_avulsa_sem_inventar_venda_pagamento(caso):
+    _receber_avulso_depois_do_pix(caso)
+    resultado = listar_pagamentos_venda(
+        caso.venda.id,
+        db=caso.db,
+        user_and_tenant=(SimpleNamespace(id=1, nome="Operador"), caso.tenant),
+    )
+    assert resultado["total_pago"] == resultado["total_recebido"] == 100
+    assert resultado["recebido_monetario"] == 100
+    assert resultado["creditos_utilizados"] == resultado["crediario_pendente"] == 0
+    assert resultado["valor_restante"] == 0
+    assert resultado["status_pagamento"] == "pago"
+    assert len(resultado["pagamentos"]) == 1
+    assert resultado["pagamentos"][0]["valor"] == 30
+    assert caso.db.query(VendaPagamento).count() == 1
+
+
+def test_get_pagamentos_separa_plano_pendente_do_recebido_real(caso):
+    caso.venda.total = caso.venda.subtotal = 100
+    caso.venda.desconto_valor = 0
+    caso.db.add(
+        VendaPagamento(
+            tenant_id=caso.tenant,
+            venda_id=caso.venda.id,
+            forma_pagamento="Crediário",
+            forma_pagamento_id=1,
+            valor=100,
+        )
+    )
+    conta = ContaReceber(
+        tenant_id=caso.tenant,
+        venda_id=caso.venda.id,
+        forma_pagamento_id=1,
+        descricao="Parcela do crediário",
+        valor_original=100,
+        valor_final=100,
+        valor_recebido=20,
+        valor_juros=0,
+        valor_multa=0,
+        valor_desconto=0,
+        status="parcial",
+        user_id=1,
+        dre_subcategoria_id=1,
+        canal="loja_fisica",
+        data_emissao=date(2026, 10, 22),
+        data_vencimento=date(2026, 10, 22),
+    )
+    caso.db.add(conta)
+    caso.db.flush()
+    caso.db.add(
+        Recebimento(
+            tenant_id=caso.tenant,
+            conta_receber_id=conta.id,
+            forma_pagamento_id=1,
+            valor_recebido=20,
+            data_recebimento=date(2026, 10, 22),
+            user_id=1,
+        )
+    )
+    caso.db.commit()
+    resultado = listar_pagamentos_venda(
+        caso.venda.id,
+        db=caso.db,
+        user_and_tenant=(SimpleNamespace(id=1, nome="Operador"), caso.tenant),
+    )
+    assert resultado["total_pago"] == resultado["total_recebido"] == 20
+    assert resultado["crediario_pendente"] == resultado["valor_restante"] == 80
+    assert resultado["status_pagamento"] == "parcial"
+    assert len(resultado["pagamentos"]) == 1
+    assert resultado["pagamentos"][0]["valor"] == 100
+
+
+def test_legado_sem_forma_nem_vinculo_bloqueia_sem_inventar_soma_ou_excecao(caso):
+    conta = _receber_avulso_depois_do_pix(caso)
+    conta.forma_pagamento_id = None
+    recibo = caso.db.query(Recebimento).filter_by(conta_receber_id=conta.id).one()
+    recibo.forma_pagamento_id = None
+    caso.db.commit()
+    with pytest.raises(HTTPException) as erro:
+        executar(
+            caso,
+            [],
+            motivo="Este motivo não comprova vínculo financeiro",
+            contexto={
+                "total_venda": 100,
+                "total_ja_pago": 170,
+                "total_novos_pagamentos": 0,
+                "crediario_pendente": 0,
+            },
+        )
+    assert erro.value.status_code == 409
+    assert isinstance(erro.value.detail, dict)
+    assert erro.value.detail["code"] == "PAGAMENTO_LEGADO_SEM_VINCULO"
+    assert "vínculos" in erro.value.detail["mensagem"]
+    assert caso.db.query(Recebimento).count() == 2
+    assert caso.db.query(VendaPagamento).count() == 1
     assert caso.db.query(AuditLog).filter(AuditLog.action == ACAO_EXCESSO).count() == 0
 
 

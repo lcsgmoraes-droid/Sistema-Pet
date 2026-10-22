@@ -644,6 +644,7 @@ jobs:
           tests/unit/test_venda_edicao_pagamentos.py
           tests/unit/test_contas_receber_saldo_venda.py
           tests/unit/test_venda_finalizacao_pagamentos.py
+          tests/unit/test_venda_status_pagamento.py
           tests/unit/test_finalizacao_recebiveis_atomicidade.py
           tests/unit/test_vendas_fechamento_edicao.py
           tests/unit/test_vendas_comissao_reprocessamento_contract.py -q

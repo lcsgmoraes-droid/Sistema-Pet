@@ -17,6 +17,7 @@ from sqlalchemy.schema import CreateTable
 from app import contas_receber_recebimentos_routes as rotas
 from app.contas_receber_schemas import RecebimentoCreate, RecebimentoLoteCreate
 from app.financeiro_models import ContaReceber, Recebimento
+from app.vendas.edicao_pagamentos import fotografar_pagamentos_edicao
 from app.vendas_models import Venda, VendaBaixaLoteItem, VendaPagamento
 from tests.unit import test_finalizacao_recebiveis_atomicidade as recebiveis
 
@@ -291,6 +292,94 @@ def test_beneficio_aplicado_tambem_ocupa_saldo_da_venda(caso):
     registro = conta(caso)
     bloquear(lambda: pagar(caso, registro, 100))
     assert pagar(caso, registro, 90)["valor_recebido_total"] == 90
+
+
+@pytest.mark.parametrize(
+    "valor,alteracao",
+    [(100, {}), (90, {"valor_desconto": 10}), (110, {"valor_juros": 10})],
+)
+def test_repasse_bancario_vinculado_nao_e_pagamento_novo_nem_amplia_saldo(
+    caso, valor, alteracao
+):
+    pagamento = VendaPagamento(
+        tenant_id=caso.tenant,
+        venda_id=1,
+        forma_pagamento="Cartão de crédito",
+        valor=100,
+    )
+    caso.db.add(pagamento)
+    caso.db.commit()
+    repasse = conta(caso, observacoes=f"[venda_pagamento:{pagamento.id}]")
+    resultado = pagar(caso, repasse, valor, **alteracao)
+    assert resultado["valor_recebido_total"] == valor
+    foto = fotografar_pagamentos_edicao(
+        caso.db, venda=caso.venda, tenant_id=caso.tenant
+    )
+    assert foto["total_ja_pago"] == 100
+    assert len(foto["pagamentos"]) == 1
+    nova_cobranca = conta(caso, 10)
+    bloquear(lambda: pagar(caso, nova_cobranca, 10))
+    assert caso.db.query(Recebimento).count() == 1
+
+
+def test_repasse_de_partida_cancelada_exige_revisao_pdv(caso):
+    pagamento = VendaPagamento(
+        tenant_id=caso.tenant,
+        venda_id=1,
+        forma_pagamento="Cartão de crédito",
+        valor=100,
+        status="cancelado",
+    )
+    caso.db.add(pagamento)
+    caso.db.commit()
+    repasse = conta(caso, observacoes=f"[venda_pagamento:{pagamento.id}]")
+    bloquear(lambda: pagar(caso, repasse, 100))
+    assert caso.db.query(Recebimento).count() == 0
+
+
+def test_marcador_de_crediario_continua_sendo_recebimento_de_cliente(caso):
+    plano = VendaPagamento(
+        tenant_id=caso.tenant,
+        venda_id=1,
+        forma_pagamento="Crediário",
+        valor=100,
+        forma_pagamento_id=1,
+    )
+    caso.db.add(plano)
+    caso.db.commit()
+    parcela = conta(caso, observacoes=f"[venda_pagamento:{plano.id}]")
+    assert pagar(caso, parcela, 100)["valor_recebido_total"] == 100
+    outra = conta(caso, 10)
+    bloquear(lambda: pagar(caso, outra, 10))
+
+
+@pytest.mark.parametrize("referencia", ["inexistente", "outra_venda", "outro_tenant"])
+def test_marcador_alheio_ou_inexistente_nao_dispensa_guarda(
+    caso, referencia, tenant_context
+):
+    caso.db.add(
+        VendaPagamento(
+            tenant_id=caso.tenant, venda_id=1, forma_pagamento="Pix", valor=100
+        )
+    )
+    caso.db.commit()
+    ident = 999999
+    if referencia != "inexistente":
+        tenant = uuid4() if referencia == "outro_tenant" else caso.tenant
+        tenant_context(tenant)
+        alheio = VendaPagamento(
+            tenant_id=tenant,
+            venda_id=999 if referencia == "outra_venda" else 1,
+            forma_pagamento="Pix",
+            valor=100,
+        )
+        caso.db.add(alheio)
+        caso.db.commit()
+        ident = alheio.id
+        tenant_context(caso.tenant)
+    registro = conta(caso, observacoes=f"[venda_pagamento:{ident}]")
+    bloquear(lambda: pagar(caso, registro, 100))
+    assert caso.db.query(Recebimento).count() == 0
 
 
 def test_duas_baixas_concorrentes_na_mesma_venda_revalidam_saldo(caso):

@@ -9,6 +9,8 @@ from sqlalchemy.orm import joinedload
 from app.contas_receber_encargos import dinheiro
 from app.financeiro_models import ContaReceber
 from app.vendas.edicao_pagamentos import fotografar_pagamentos_edicao
+from app.vendas.recebimentos_independentes import pagamentos_representados_pelas_contas
+from app.vendas.status_pagamento import pagamento_valido_para_saldo
 from app.vendas_models import Venda
 
 
@@ -79,18 +81,41 @@ def validar_saldo_vendas(db, *, tenant_id, vendas, contas, baixas):
             por_venda[conta.venda_id].append(conta)
     novas_baixas = defaultdict(lambda: dinheiro(0))
     previas = {}
-    for conta, previa, valor in baixas:
-        if conta.venda_id in vendas:
-            novas_baixas[conta.venda_id] += dinheiro(valor)
-            previas[conta.id] = previa
+    repasses = {}
+    fotografias = {}
     for venda_id, venda in vendas.items():
         if str(venda.status or "").strip().lower() in {"cancelada", "cancelado"}:
             raise HTTPException(
                 409,
                 "A venda vinculada está cancelada. Revise a venda pelo PDV antes de receber.",
             )
-        fotografia = fotografar_pagamentos_edicao(db, venda=venda, tenant_id=tenant_id)
-        titulos = por_venda[venda_id]
+        # Carrega o histórico sob o lock da venda antes de distinguir repasse.
+        fotografias[venda_id] = fotografar_pagamentos_edicao(
+            db, venda=venda, tenant_id=tenant_id
+        )
+        repasses[venda_id] = pagamentos_representados_pelas_contas(
+            venda, por_venda[venda_id]
+        )
+    for conta, previa, valor in baixas:
+        if conta.venda_id in vendas:
+            partida = repasses[conta.venda_id].get(conta.id)
+            if partida is not None:
+                if (
+                    not pagamento_valido_para_saldo(partida)
+                    or dinheiro(partida.valor) <= 0
+                ):
+                    raise HTTPException(
+                        409,
+                        "A partida do repasse não está ativa. Revise a venda pelo PDV antes de receber.",
+                    )
+            else:
+                novas_baixas[conta.venda_id] += dinheiro(valor)
+            previas[conta.id] = previa
+    for venda_id, venda in vendas.items():
+        if novas_baixas[venda_id] == 0:
+            continue
+        fotografia = fotografias[venda_id]
+        titulos = [c for c in por_venda[venda_id] if c.id not in repasses[venda_id]]
         recebido = fotografia["total_ja_pago"]
         encargos = sum(
             (

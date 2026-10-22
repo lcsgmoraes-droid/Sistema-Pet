@@ -276,6 +276,31 @@ test("recebimento parcial e registrado sem exigir quitar todo saldo nem justific
   assert.equal(c.chamadas.finalizar[0].options.contexto_pagamento_excedente, undefined);
 });
 
+test("409 de pagamento legado exibe orientacao sem autorizar excedente ou repetir a gravacao", async () => {
+  const pagamento = montar({ id: 4, nome: "Pix", tipo: "pix" }, 50, 119.9);
+  const mensagem = "Confira os vínculos dos recebimentos antigos antes de finalizar a venda.";
+  const c = preparar({
+    props: { pagamentos: [pagamento] },
+    finalizar() {
+      throw {
+        response: {
+          status: 409,
+          data: { detail: { code: "PAGAMENTO_LEGADO_SEM_VINCULO", mensagem } },
+        },
+      };
+    },
+  });
+  await c.h.act(() => c.h.tree.handleFinalizar());
+  await c.h.settle();
+  assert.equal(c.alteracoes.Erro, mensagem);
+  assert.equal(c.chamadas.persistir.length, 1);
+  assert.equal(c.chamadas.finalizar.length, 1);
+  assert.equal(c.alteracoes.ContextoExcedenteServidor, undefined);
+  assert.equal(c.alteracoes.AutorizacaoExcedente, undefined);
+  assert.equal(c.alteracoes.Pagamentos, undefined);
+  assert.equal(c.alteracoes.Loading, false);
+});
+
 test("justificativa de excedente nao autoriza beneficio, dinheiro aplicado ou plano acima do saldo", async () => {
   for (const tipo of ["credito_cliente", "cashback", "crediario", "boleto", "dinheiro"]) {
     const pagamento = { forma_pagamento_tipo: tipo, valor: 119.9, valor_recebido: 119.9 };
