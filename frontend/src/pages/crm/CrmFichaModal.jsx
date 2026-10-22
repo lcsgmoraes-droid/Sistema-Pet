@@ -8,6 +8,7 @@ import InputCombobox from "../../components/v2/InputCombobox/InputCombobox";
 import InputDataHora from "../../components/v2/InputDataHora/InputDataHora";
 import InputTextoLongo from "../../components/v2/InputTextoLongo/InputTextoLongo";
 import ModalPadrao from "../../components/v2/ModalPadrao/ModalPadrao";
+import CrmBuscaTutor from "./CrmBuscaTutor";
 import { whatsappUrl } from "../lembretes/lembretesUtils";
 import { rotuloDaOportunidade } from "./crmUtils";
 
@@ -45,6 +46,7 @@ export default function CrmFichaModal({ card, onAlterado, onFechar }) {
   const [observacao, setObservacao] = useState("");
   const [tipoPasso, setTipoPasso] = useState("ligar");
   const [quando, setQuando] = useState("");
+  const [clienteVinculo, setClienteVinculo] = useState(null);
   const [enviando, setEnviando] = useState(false);
   const [tentouPasso, setTentouPasso] = useState(false);
 
@@ -102,6 +104,12 @@ export default function CrmFichaModal({ card, onAlterado, onFechar }) {
     );
   };
 
+  const vincular = async () => {
+    if (!clienteVinculo) return;
+    const ok = await enviar("vincular", { cliente_id: clienteVinculo }, "Card ligado ao cadastro.");
+    if (ok) setClienteVinculo(null);
+  };
+
   const registrarAcao = async () => {
     const ok = await enviar("acoes", { tipo: tipoAcao, observacao }, "Ação registrada.");
     if (ok) setObservacao("");
@@ -152,6 +160,23 @@ export default function CrmFichaModal({ card, onAlterado, onFechar }) {
             <BotaoInteracao icon={MessageCircle} onClick={conversarNoWhatsapp} loading={enviando}>
               Conversar no WhatsApp
             </BotaoInteracao>
+          ) : null}
+
+          {ficha.sem_cadastro ? (
+            <section aria-labelledby="crm-ficha-vinculo" className="space-y-3">
+              <h3 id="crm-ficha-vinculo" className="text-sm font-bold">
+                Ligar a um cadastro
+              </h3>
+              <CrmBuscaTutor
+                id="crm-vinculo"
+                lojaId={card.loja_id}
+                value={clienteVinculo}
+                onEscolher={setClienteVinculo}
+              />
+              <BotaoInteracao onClick={vincular} loading={enviando} disabled={!clienteVinculo}>
+                Ligar ao cadastro
+              </BotaoInteracao>
+            </section>
           ) : null}
 
           <section aria-labelledby="crm-ficha-oportunidades">

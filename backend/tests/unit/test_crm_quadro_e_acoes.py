@@ -214,3 +214,56 @@ def test_card_de_outra_loja_nao_e_encontrado(db):
     with pytest.raises(RegraDoCrm, match="não encontrado"):
         acoes.obter_lead(db, OUTRA_LOJA, lead.id)
     assert db.query(CrmLead).filter(CrmLead.tenant_id == OUTRA_LOJA).count() == 0
+
+
+def _cliente(db, nome, celular, **extra):
+    db.add(
+        Cliente(
+            tenant_id=TENANT,
+            user_id=1,
+            nome=nome,
+            celular=celular,
+            is_cliente=True,
+            **extra,
+        )
+    )
+    db.flush()
+    return db.query(Cliente).filter_by(nome=nome).one()
+
+
+def test_busca_de_tutores_por_nome_ou_telefone_e_marca_quem_ja_tem_card(db):
+    maria = _cliente(db, "Maria Souza", "11999998888")
+    _cliente(db, "Mario Lima", "11977776666")
+    acoes.criar_lead_manual(db, TENANT, cliente_id=maria.id)
+
+    por_nome = acoes.buscar_tutores(db, TENANT, "mari")
+    por_fone = acoes.buscar_tutores(db, TENANT, "9999-8888".replace("-", ""))
+
+    assert {t["nome"]: t["tem_card"] for t in por_nome} == {
+        "Maria Souza": True,
+        "Mario Lima": False,
+    }
+    assert [t["nome"] for t in por_fone] == ["Maria Souza"]
+    assert acoes.buscar_tutores(db, TENANT, "m") == []
+
+
+def test_vincular_card_sem_cadastro_a_uma_pessoa(db):
+    lead = _manual(db)
+    maria = _cliente(db, "Maria Souza", "11999998888")
+
+    acoes.vincular_a_cadastro(db, lead, maria.id, user_id=2)
+
+    assert lead.cliente_id == maria.id and lead.nome_exibicao == "Maria Souza"
+    with pytest.raises(RegraDoCrm, match="já está ligado"):
+        acoes.vincular_a_cadastro(db, lead, maria.id)
+
+
+def test_vincular_nao_duplica_card_de_quem_ja_tem_um(db):
+    maria = _cliente(db, "Maria Souza", "11999998888")
+    acoes.criar_lead_manual(db, TENANT, cliente_id=maria.id)
+    outro = _manual(db, "Contato", "11922223333")
+
+    with pytest.raises(RegraDoCrm, match="outro card"):
+        acoes.vincular_a_cadastro(db, outro, maria.id)
+    with pytest.raises(RegraDoCrm, match="não encontrada"):
+        acoes.vincular_a_cadastro(db, outro, 12345)

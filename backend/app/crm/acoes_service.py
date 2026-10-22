@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.crm.funil_service import RegraDoCrm, oportunidades_abertas
@@ -249,3 +250,79 @@ def detalhe_do_lead(db: Session, lead: CrmLead, limite: int = 100) -> dict[str, 
             for i in interacoes
         ],
     }
+
+
+def buscar_tutores(
+    db: Session, tenant_id: Any, busca: str, limite: int = 10
+) -> list[dict[str, Any]]:
+    """Pessoas cadastradas (clientes) por nome ou telefone, para criar/vincular cards."""
+    termo = (busca or "").strip()
+    if len(termo) < 2:
+        return []
+    filtros = [Cliente.nome.ilike(f"%{termo}%")]
+    digitos = somente_digitos(termo)
+    if len(digitos) >= 4:
+        filtros += [
+            Cliente.celular.ilike(f"%{digitos}%"),
+            Cliente.telefone.ilike(f"%{digitos}%"),
+        ]
+    consulta = db.query(Cliente).filter(
+        Cliente.tenant_id == tenant_id,
+        Cliente.is_cliente.is_(True),
+        Cliente.ativo.is_(True),
+        or_(*filtros),
+    )
+    fundido_em = getattr(Cliente, "merged_into_id", None)
+    if fundido_em is not None:
+        consulta = consulta.filter(fundido_em.is_(None))
+    clientes = consulta.order_by(Cliente.nome).limit(limite).all()
+    com_card = {
+        linha[0]
+        for linha in db.query(CrmLead.cliente_id).filter(
+            CrmLead.tenant_id == tenant_id,
+            CrmLead.separado_de_lead_id.is_(None),
+            CrmLead.cliente_id.in_([c.id for c in clientes] or [0]),
+        )
+    }
+    return [
+        {
+            "id": c.id,
+            "nome": c.nome,
+            "telefone": c.celular or c.telefone,
+            "tem_card": c.id in com_card,
+        }
+        for c in clientes
+    ]
+
+
+def vincular_a_cadastro(
+    db: Session, lead: CrmLead, cliente_id: int, user_id: int | None = None
+) -> CrmLead:
+    """Liga um card sem cadastro a uma pessoa ja cadastrada (os dados passam a vir dela)."""
+    if lead.cliente_id is not None:
+        raise RegraDoCrm("Este card já está ligado a um cadastro.")
+    cliente = (
+        db.query(Cliente)
+        .filter(Cliente.id == cliente_id, Cliente.tenant_id == lead.tenant_id)
+        .first()
+    )
+    if cliente is None:
+        raise RegraDoCrm("Pessoa não encontrada nesta loja.")
+    if _lead_principal(db, lead.tenant_id, cliente_id=cliente_id) is not None:
+        raise RegraDoCrm(
+            "Esta pessoa já tem outro card no funil. Use o card dela em vez de criar outro."
+        )
+    lead.cliente_id = cliente.id
+    lead.nome_exibicao = cliente.nome
+    db.add(
+        CrmInteracao(
+            tenant_id=lead.tenant_id,
+            lead_id=lead.id,
+            cliente_id=cliente.id,
+            tipo="vinculo",
+            resumo=f"Card ligado ao cadastro de {cliente.nome}",
+            origem="usuario" if user_id else "sistema",
+        )
+    )
+    db.flush()
+    return lead

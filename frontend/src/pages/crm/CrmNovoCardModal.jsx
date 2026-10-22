@@ -4,19 +4,22 @@ import api from "../../api";
 import BotaoCancelar from "../../components/v2/BotaoCancelar/BotaoCancelar";
 import BotaoSalva from "../../components/v2/BotaoSalva/BotaoSalva";
 import InputCombobox from "../../components/v2/InputCombobox/InputCombobox";
+import InputRadio from "../../components/v2/InputRadio/InputRadio";
 import InputMoeda from "../../components/v2/InputMoeda/InputMoeda";
 import InputTelefone from "../../components/v2/InputTelefone/InputTelefone";
 import InputTexto from "../../components/v2/InputTexto/InputTexto";
 import ModalPadrao from "../../components/v2/ModalPadrao/ModalPadrao";
+import CrmBuscaTutor from "./CrmBuscaTutor";
 
 function apenasDigitos(texto) {
   return String(texto || "").replace(/\D/g, "");
 }
 
-// Criação manual de um card para um contato sem cadastro. Vincular a uma pessoa já cadastrada
-// entra junto da busca de tutor (ROADMAP 2.6).
+// Criação manual de um card: contato novo (sem cadastro) ou pessoa já cadastrada (ROADMAP 2.6).
 export default function CrmNovoCardModal({ lojas, lojaInicial, onCriado, onFechar }) {
   const [lojaId, setLojaId] = useState(lojaInicial || lojas[0]?.id || "");
+  const [modo, setModo] = useState("novo");
+  const [clienteId, setClienteId] = useState(null);
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [valor, setValor] = useState(0);
@@ -24,11 +27,14 @@ export default function CrmNovoCardModal({ lojas, lojaInicial, onCriado, onFecha
   const [enviando, setEnviando] = useState(false);
   const [erroGeral, setErroGeral] = useState("");
 
+  const cadastrada = modo === "cadastrada";
   const erros = {
-    nome: nome.trim() ? "" : "Informe o nome do contato.",
-    telefone: apenasDigitos(telefone).length >= 10 ? "" : "Informe o telefone com DDD.",
+    nome: cadastrada || nome.trim() ? "" : "Informe o nome do contato.",
+    telefone:
+      cadastrada || apenasDigitos(telefone).length >= 10 ? "" : "Informe o telefone com DDD.",
+    pessoa: cadastrada && !clienteId ? "Escolha uma pessoa da lista." : "",
   };
-  const valido = !erros.nome && !erros.telefone;
+  const valido = !erros.nome && !erros.telefone && !erros.pessoa;
 
   const salvar = async (evento) => {
     evento.preventDefault();
@@ -39,8 +45,9 @@ export default function CrmNovoCardModal({ lojas, lojaInicial, onCriado, onFecha
     try {
       await api.post("/crm/leads", {
         loja_id: lojaId || null,
-        nome: nome.trim(),
-        telefone: apenasDigitos(telefone),
+        cliente_id: cadastrada ? clienteId : null,
+        nome: cadastrada ? null : nome.trim(),
+        telefone: cadastrada ? null : apenasDigitos(telefone),
         valor_estimado: valor > 0 ? valor : null,
       });
       toast.success("Card criado.");
@@ -78,25 +85,47 @@ export default function CrmNovoCardModal({ lojas, lojaInicial, onCriado, onFecha
             required
           />
         ) : null}
-        <InputTexto
-          id="crm-novo-nome"
-          label="Nome do contato"
-          value={nome}
-          maxLength={200}
-          onChange={setNome}
-          error={tentou ? erros.nome : ""}
-          autoFocus
-          required
+        <InputRadio
+          name="crm-novo-modo"
+          label="Quem é o contato?"
+          value={modo}
+          onChange={setModo}
+          opcoes={[
+            { value: "novo", label: "Contato novo" },
+            { value: "cadastrada", label: "Pessoa já cadastrada" },
+          ]}
         />
-        <InputTelefone
-          id="crm-novo-telefone"
-          label="Telefone (WhatsApp)"
-          tipo="celular"
-          value={telefone}
-          onChange={setTelefone}
-          error={tentou ? erros.telefone : ""}
-          required
-        />
+        {cadastrada ? (
+          <CrmBuscaTutor
+            id="crm-novo-pessoa"
+            lojaId={lojaId}
+            value={clienteId}
+            onEscolher={setClienteId}
+            error={tentou ? erros.pessoa : ""}
+          />
+        ) : (
+          <>
+            <InputTexto
+              id="crm-novo-nome"
+              label="Nome do contato"
+              value={nome}
+              maxLength={200}
+              onChange={setNome}
+              error={tentou ? erros.nome : ""}
+              autoFocus
+              required
+            />
+            <InputTelefone
+              id="crm-novo-telefone"
+              label="Telefone (WhatsApp)"
+              tipo="celular"
+              value={telefone}
+              onChange={setTelefone}
+              error={tentou ? erros.telefone : ""}
+              required
+            />
+          </>
+        )}
         <InputMoeda
           id="crm-novo-valor"
           label="Valor estimado (opcional)"

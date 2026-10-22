@@ -76,6 +76,11 @@ class PassoNovo(BaseModel):
     responsavel_user_id: int | None = None
 
 
+class Vinculo(BaseModel):
+    loja_id: str | None = None
+    cliente_id: int
+
+
 class ColunaConfig(BaseModel):
     id: int | None = None
     nome: str
@@ -151,6 +156,45 @@ async def quadro(
         return [dados]
 
     return {"lojas": consultar_por_loja(db, escolhidas, _consulta, tenant_atual)}
+
+
+@router.get("/tutores")
+async def buscar_tutores(
+    busca: str = Query(min_length=2, max_length=100),
+    loja_id: str | None = None,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Busca pessoas cadastradas da loja para criar ou vincular um card."""
+    return _executar(
+        db,
+        user_and_tenant,
+        loja_id,
+        "crm.visualizar",
+        lambda tenant_id: acoes_service.buscar_tutores(db, tenant_id, busca),
+        gravar=False,
+    )
+
+
+@router.post("/leads/{lead_id}/vincular")
+async def vincular_a_cadastro(
+    lead_id: int,
+    dados: Vinculo,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    usuario, _ = user_and_tenant
+
+    def _vincular(tenant_id):
+        lead = acoes_service.obter_lead(db, tenant_id, lead_id)
+        acoes_service.vincular_a_cadastro(db, lead, dados.cliente_id, usuario.id)
+        return {
+            "id": lead.id,
+            "cliente_id": lead.cliente_id,
+            "nome": lead.nome_exibicao,
+        }
+
+    return _executar(db, user_and_tenant, dados.loja_id, PERM_LEADS, _vincular)
 
 
 @router.post("/leads", status_code=201)
