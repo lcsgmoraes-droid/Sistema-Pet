@@ -4,7 +4,6 @@ import logging
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -36,6 +35,7 @@ from app.grupo_comercial_estoque_compartilhado_service import (
     GrupoComercialEstoqueCompartilhadoService,
 )
 from app.services.produto_busca_grupo_service import buscar_produtos_outras_lojas_grupo
+from app.utils.search_query import desativar_jit_busca
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -51,12 +51,7 @@ def _desativar_jit_busca_rapida_produtos(
     if not termo_busca or contar_total:
         return
 
-    bind = db.get_bind()
-    if bind.dialect.name == "postgresql":
-        # Com estoque compartilhado, o planner superestima o custo da consulta
-        # e gasta segundos compilando JIT, embora a execucao real leve milissegundos.
-        # SET LOCAL vale somente para a transacao desta requisicao.
-        db.execute(text("SET LOCAL jit = off"))
+    desativar_jit_busca(db, termo_busca)
 
 
 @router.get("/vendaveis", response_model=ProdutosPaginadosResponse)
@@ -222,6 +217,7 @@ def listar_produtos(
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     termo_busca = (busca or "").strip()
+    desativar_jit_busca(db, termo_busca)
     ativo = _normalizar_filtro_ativo_produtos(ativo, incluir_inativos)
 
     # Incluir produtos de tenants parceiros (ex.: pet shop parceiro da clínica)

@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import Float, Integer, and_, case, cast, func, or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.audit_log import log_action, log_create, log_delete, log_update
 from app.auth.dependencies import get_current_user_and_tenant
@@ -69,6 +69,7 @@ from app.services.user_account_service import (
     is_unique_username_violation,
 )
 from app.utils.tenant_safe_sql import execute_tenant_safe
+from app.utils.search_query import desativar_jit_busca
 
 logger = logging.getLogger(__name__)
 
@@ -335,6 +336,7 @@ def list_clientes(
     _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     try:
+        desativar_jit_busca(db, search)
         query = _montar_query_listagem_clientes(
             db,
             tenant_id=tenant_id,
@@ -365,7 +367,18 @@ def list_clientes(
         )
         total = query.count()
         query = _ordenar_query_listagem(query, search)
-        clientes = query.offset(skip).limit(limit).all()
+        # A resposta inclui pets, contatos e grupo: carregar por pagina evita
+        # uma consulta adicional por pessoa para cada relacionamento.
+        clientes = (
+            query.options(
+                selectinload(Cliente.pets),
+                selectinload(Cliente.contatos_adicionais),
+                selectinload(Cliente.fornecedor_grupo),
+            )
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
         _marcar_clientes_de_parceiro(clientes, tenant_id)
         _anexar_metadados_criacao_cliente(db, clientes)
         return ClientesListResponse(
