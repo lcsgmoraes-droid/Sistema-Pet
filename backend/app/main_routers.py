@@ -161,6 +161,7 @@ from app.orcamentos_grupo_routes import router as orcamentos_grupo_router
 from app.whatsapp.webhook import router as whatsapp_webhook_router
 from app.routers.whatsapp_config import router as whatsapp_config_router
 from app.routers.whatsapp_handoff import router as whatsapp_handoff_router  # Sprint 4
+from app.crm.routes import router as crm_router
 from app.routers.whatsapp_websocket import (
     router as whatsapp_websocket_router,
 )  # Sprint 5: WebSocket
@@ -630,6 +631,7 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(
         whatsapp_handoff_router, dependencies=_module_dependencies("whatsapp")
     )  # Sprint 4: Human Handoff (com auth)
+    app.include_router(crm_router, dependencies=_module_dependencies("crm"))
     app.include_router(whatsapp_websocket_router)  # Sprint 5: WebSocket Real-time
     app.include_router(
         whatsapp_api_router, dependencies=_module_dependencies("whatsapp")

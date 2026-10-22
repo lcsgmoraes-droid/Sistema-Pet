@@ -26,7 +26,9 @@ def test_migracao_cria_as_mesmas_tabelas_e_colunas_do_modelo():
     fonte = MIGRACAO.read_text(encoding="utf-8")
     assert "apply_tenant_rls" in fonte and "enable=True" in fonte
     for nome in crm.TABELAS_DO_CRM:
-        trecho = fonte.split(f'"{nome}",\n        *_base')[1].split("op.create_table")[0]
+        trecho = fonte.split(f'"{nome}",\n        *_base')[1].split("op.create_table")[
+            0
+        ]
         for coluna in Base.metadata.tables[nome].c:
             if coluna.name in {"id", "tenant_id", "created_at", "updated_at"}:
                 continue
@@ -52,4 +54,9 @@ def test_migracao_continua_a_cadeia_com_uma_unica_cabeca():
 
 
 def test_tipos_de_coluna_do_funil():
-    assert set(crm.TIPOS_DE_COLUNA) == {"entrada", "andamento", "concluido", "encerrado"}
+    assert set(crm.TIPOS_DE_COLUNA) == {
+        "entrada",
+        "andamento",
+        "concluido",
+        "encerrado",
+    }
