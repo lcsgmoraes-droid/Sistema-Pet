@@ -12,6 +12,7 @@ import {
   getProduto,
 } from "../api/produtos";
 import { calcularMargemSobreVenda } from "../utils/produtoMargem";
+import { dataHoraIfoodParaFormulario } from "../components/produto/ifoodProdutoDates";
 import {
   montarEstadoProdutoClonado,
   montarEstadoProdutoPreCadastroGrupo,
@@ -65,15 +66,17 @@ export default function useProdutosNovoCarregamento({
   setImagens,
   setLotes,
   setFornecedores,
+  setGranelVinculos,
 }) {
   const produtoRequestRef = useRef(0);
 
-  const carregarOpcoesRacao = async () => {
+  const carregarOpcoesRacao = async (requestAindaAtiva) => {
     try {
       const { data } = await api.get("/opcoes-racao/resumo", {
         params: { apenas_ativos: true },
       });
 
+      if (!requestAindaAtiva()) return;
       setOpcoesLinhas(Array.isArray(data?.linhas) ? data.linhas : []);
       setOpcoesPortes(Array.isArray(data?.portes) ? data.portes : []);
       setOpcoesFases(Array.isArray(data?.fases) ? data.fases : []);
@@ -85,8 +88,8 @@ export default function useProdutosNovoCarregamento({
     }
   };
 
-  const carregarDadosAuxiliares = async () => {
-    const [categoriasResult, marcasResult, departamentosResult, clientesResult] =
+  const carregarDadosAuxiliares = async (requestAindaAtiva = () => true) => {
+    const [categoriasResult, marcasResult, departamentosResult, clientesResult, racaoResult] =
       await Promise.allSettled([
         getCategorias(),
         getMarcas(),
@@ -94,8 +97,12 @@ export default function useProdutosNovoCarregamento({
         api.get("/clientes/", {
           params: { is_fornecedor: true, apenas_ativos: true },
         }),
-        carregarOpcoesRacao(),
+        carregarOpcoesRacao(requestAindaAtiva),
       ]);
+
+    if (!requestAindaAtiva()) return;
+    if (racaoResult.status === "rejected")
+      console.error("Erro ao carregar opções de ração:", racaoResult.reason);
 
     if (categoriasResult.status === "fulfilled") {
       const categoriasCarregadas = categoriasResult.value.data || [];
@@ -160,6 +167,7 @@ export default function useProdutosNovoCarregamento({
   const carregarProduto = async () => {
     const requestId = ++produtoRequestRef.current;
     const requestAindaAtiva = () => produtoRequestRef.current === requestId;
+    const auxiliares = carregarDadosAuxiliares(requestAindaAtiva);
 
     try {
       setLoading(true);
@@ -212,6 +220,12 @@ export default function useProdutosNovoCarregamento({
         preco_app_promo_fim: produto.preco_app_promo_fim ?? "",
         anunciar_ecommerce: produto.anunciar_ecommerce ?? true,
         anunciar_app: produto.anunciar_app ?? true,
+        anunciar_ifood: produto.anunciar_ifood ?? false,
+        ifood_pausado: produto.ifood_pausado ?? false,
+        preco_ifood: produto.preco_ifood ?? null,
+        preco_ifood_promo: produto.preco_ifood_promo ?? null,
+        preco_ifood_promo_inicio: dataHoraIfoodParaFormulario(produto.preco_ifood_promo_inicio),
+        preco_ifood_promo_fim: dataHoraIfoodParaFormulario(produto.preco_ifood_promo_fim),
         ativo: produto.ativo ?? true,
         situacao: produto.situacao ?? true,
         estoque_minimo: produto.estoque_minimo || "",
@@ -272,8 +286,6 @@ export default function useProdutosNovoCarregamento({
         sabor_proteina_id: produto.sabor_proteina_id || "",
         apresentacao_peso_id: produto.apresentacao_peso_id || "",
       });
-      setLoading(false);
-
       const carregarPredecessor = async () => {
         if (!produto.produto_predecessor_id) return;
         const predecessorRes = await getProduto(produto.produto_predecessor_id);
@@ -328,6 +340,11 @@ export default function useProdutosNovoCarregamento({
         if (requestAindaAtiva()) setFornecedores(fornecedoresResponse.data || []);
       };
 
+      const carregarVinculosGranel = async () => {
+        const { data } = await api.get(`/estoque/granel/vinculos/granel/${id}`);
+        if (requestAindaAtiva()) setGranelVinculos(Array.isArray(data) ? data : []);
+      };
+
       const resultadosComplementares = await Promise.allSettled([
         carregarPredecessor(),
         carregarSucessor(),
@@ -335,6 +352,7 @@ export default function useProdutosNovoCarregamento({
         carregarLotesProduto(),
         carregarFornecedoresProduto(),
         carregarFiscal(produto, requestAindaAtiva),
+        carregarVinculosGranel(),
       ]);
 
       resultadosComplementares.forEach((resultado, indice) => {
@@ -349,11 +367,15 @@ export default function useProdutosNovoCarregamento({
         error.response?.data?.detail || error.message || "Produto não encontrado.",
       );
     } finally {
+      await auxiliares;
       if (requestAindaAtiva()) setLoading(false);
     }
   };
 
   const carregarProdutoParaClone = async () => {
+    const requestId = ++produtoRequestRef.current;
+    const requestAindaAtiva = () => produtoRequestRef.current === requestId;
+    const auxiliares = carregarDadosAuxiliares(requestAindaAtiva);
     try {
       setLoading(true);
       setErroCarregamento(null);
@@ -364,6 +386,7 @@ export default function useProdutosNovoCarregamento({
       setFornecedores([]);
 
       const response = await getProduto(cloneId);
+      if (!requestAindaAtiva()) return;
       const produto = response.data;
       const clone = montarEstadoProdutoClonado(produto);
 
@@ -379,19 +402,35 @@ export default function useProdutosNovoCarregamento({
       setFormData((prev) => ({
         ...prev,
         ...clone,
+        id: undefined,
+        estoque_compartilhado: false,
+        estoque_origem_empresa_id: null,
+        estoque_origem_nome: null,
+        imagem_principal: null,
+        anunciar_ifood: false,
+        ifood_pausado: false,
+        preco_ifood: produto.preco_ifood ?? null,
+        preco_ifood_promo: produto.preco_ifood_promo ?? null,
+        preco_ifood_promo_inicio: dataHoraIfoodParaFormulario(produto.preco_ifood_promo_inicio),
+        preco_ifood_promo_fim: dataHoraIfoodParaFormulario(produto.preco_ifood_promo_fim),
         margem,
       }));
     } catch (error) {
+      if (!requestAindaAtiva()) return;
       console.error("Erro ao carregar produto para clone:", error);
       setErroCarregamento(
         error.response?.data?.detail || error.message || "Produto não encontrado.",
       );
     } finally {
-      setLoading(false);
+      await auxiliares;
+      if (requestAindaAtiva()) setLoading(false);
     }
   };
 
   const carregarProdutoParaPreCadastroGrupo = async () => {
+    const requestId = ++produtoRequestRef.current;
+    const requestAindaAtiva = () => produtoRequestRef.current === requestId;
+    const auxiliares = carregarDadosAuxiliares(requestAindaAtiva);
     try {
       setLoading(true);
       setErroCarregamento(null);
@@ -405,13 +444,26 @@ export default function useProdutosNovoCarregamento({
         preCadastroGrupoId,
         preCadastroGrupoTenantOrigem,
       );
+      if (!requestAindaAtiva()) return;
       const pre = montarEstadoProdutoPreCadastroGrupo(response.data);
 
       setFormData((prev) => ({
         ...prev,
         ...pre,
+        id: undefined,
+        estoque_compartilhado: false,
+        estoque_origem_empresa_id: null,
+        estoque_origem_nome: null,
+        imagem_principal: null,
+        anunciar_ifood: false,
+        ifood_pausado: false,
+        preco_ifood: null,
+        preco_ifood_promo: null,
+        preco_ifood_promo_inicio: "",
+        preco_ifood_promo_fim: "",
       }));
     } catch (error) {
+      if (!requestAindaAtiva()) return;
       console.error("Erro ao carregar produto de outra loja do grupo:", error);
       setErroCarregamento(
         error.response?.data?.detail ||
@@ -419,7 +471,8 @@ export default function useProdutosNovoCarregamento({
           "Não foi possível trazer os dados desse produto.",
       );
     } finally {
-      setLoading(false);
+      await auxiliares;
+      if (requestAindaAtiva()) setLoading(false);
     }
   };
 
@@ -446,16 +499,19 @@ export default function useProdutosNovoCarregamento({
   };
 
   useEffect(() => {
-    carregarDadosAuxiliares();
-  }, []);
-
-  useEffect(() => {
     if (isEdicao) {
       carregarProduto();
     } else if (cloneId) {
       carregarProdutoParaClone();
     } else if (preCadastroGrupoId && preCadastroGrupoTenantOrigem) {
       carregarProdutoParaPreCadastroGrupo();
+    } else {
+      const requestId = ++produtoRequestRef.current;
+      const requestAindaAtiva = () => produtoRequestRef.current === requestId;
+      setLoading(true);
+      carregarDadosAuxiliares(requestAindaAtiva).finally(() => {
+        if (requestAindaAtiva()) setLoading(false);
+      });
     }
 
     return () => {

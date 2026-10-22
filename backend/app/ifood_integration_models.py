@@ -33,6 +33,13 @@ class IfoodMerchantConfig(BaseTenantModel):
     catalog_source = Column(String(20), nullable=False, default="ecommerce")
     default_markup_percent = Column(Float, nullable=False, default=0)
     stock_safety = Column(Float, nullable=False, default=0)
+    # NULL significa desconhecido. Zero precisa ser informado explicitamente.
+    commission_merchant_percent = Column(Float, nullable=True)
+    commission_ifood_percent = Column(Float, nullable=True)
+    payment_fee_percent = Column(Float, nullable=True)
+    tax_percent = Column(Float, nullable=True)
+    additional_unit_cost = Column(Float, nullable=True)
+    target_margin_percent = Column(Float, nullable=True)
     status = Column(String(32), nullable=False, default="draft")
     last_connection_check_at = Column(DateTime(timezone=True), nullable=True)
     last_catalog_sync_at = Column(DateTime(timezone=True), nullable=True)

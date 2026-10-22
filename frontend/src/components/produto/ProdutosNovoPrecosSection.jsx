@@ -1,259 +1,130 @@
+import InputCheckTexto from "../v2/InputCheckTexto/InputCheckTexto";
+import InputDataHora from "../v2/InputDataHora/InputDataHora";
+import InputMoeda from "../v2/InputMoeda/InputMoeda";
 import PromocaoFields from "./PromocaoFields";
 import MargemPrecoField from "./MargemPrecoField";
-
-function formatMoeda(value, parseNumber) {
-  return value ? `R$ ${parseNumber(value).toFixed(2).replace(".", ",")}` : "R$ 0,00";
-}
+import IfoodProdutoSection from "./IfoodProdutoSection";
 
 export default function ProdutosNovoPrecosSection({
   camposEmEdicao,
   formData,
   handleChange,
-  parseNumber,
+  imagens,
+  onCorrigirIfood,
   setCamposEmEdicao,
 }) {
-  if (formData.tipo_produto === "PAI") {
-    return null;
-  }
+  if (formData.tipo_produto === "PAI") return null;
 
   const lojaFisicaAtiva = formData.ativo !== false && formData.situacao !== false;
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Preco de Custo</label>
-          <input
-            type="text"
-            value={
-              camposEmEdicao.preco_custo
-                ? formData.preco_custo || ""
-                : formatMoeda(formData.preco_custo, parseNumber)
-            }
-            onChange={(e) => {
-              const value = e.target.value.replace(/[^\d.,]/g, "").replace(",", ".");
-              handleChange("preco_custo", value);
-            }}
-            onFocus={(e) => {
-              setCamposEmEdicao((prev) => ({ ...prev, preco_custo: true }));
-              e.target.select();
-            }}
-            onBlur={(e) => {
-              setCamposEmEdicao((prev) => ({ ...prev, preco_custo: false }));
-              const value = parseNumber(e.target.value);
-              handleChange("preco_custo", value > 0 ? value.toFixed(2) : "");
-            }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="R$ 0,00"
-          />
-        </div>
-
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <InputMoeda
+          id="produto-preco-custo"
+          label="Preço de custo (R$)"
+          value={formData.preco_custo}
+          onChange={(value) => handleChange("preco_custo", value)}
+        />
         <MargemPrecoField
           camposEmEdicao={camposEmEdicao}
           formData={formData}
           handleChange={handleChange}
           setCamposEmEdicao={setCamposEmEdicao}
         />
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Preco de Venda *</label>
-          <input
-            type="text"
-            value={
-              camposEmEdicao.preco_venda
-                ? formData.preco_venda || ""
-                : formatMoeda(formData.preco_venda, parseNumber)
-            }
-            onChange={(e) => {
-              const value = e.target.value.replace(/[^\d.,]/g, "").replace(",", ".");
-              handleChange("preco_venda", value);
-            }}
-            onFocus={(e) => {
-              setCamposEmEdicao((prev) => ({ ...prev, preco_venda: true }));
-              e.target.select();
-            }}
-            onBlur={(e) => {
-              setCamposEmEdicao((prev) => ({ ...prev, preco_venda: false }));
-              const value = parseNumber(e.target.value);
-              handleChange("preco_venda", value > 0 ? value.toFixed(2) : "");
-            }}
-            required
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="R$ 0,00"
-          />
-        </div>
+        <InputMoeda
+          id="produto-preco-venda"
+          label="Preço de venda (R$)"
+          required
+          value={formData.preco_venda}
+          onChange={(value) => handleChange("preco_venda", value)}
+        />
       </div>
 
       <PromocaoFields
-        title="Promocao ERP / Loja fisica"
-        description="Quando estiver dentro da janela, este preco entra automaticamente no PDV."
-        startLabel="Inicio da promocao"
-        endLabel="Fim da promocao"
+        title="Promoção ERP / Loja física"
+        description="Durante o período, este preço entra automaticamente no PDV."
+        startLabel="Início da promoção"
+        endLabel="Fim da promoção"
         startValue={formData.data_inicio_promocao}
         endValue={formData.data_fim_promocao}
         onStartChange={(value) => handleChange("data_inicio_promocao", value)}
         onEndChange={(value) => handleChange("data_fim_promocao", value)}
         priceControl={
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Preco promocional
-            </label>
-            <input
-              type="text"
-              value={
-                camposEmEdicao.preco_promocional
-                  ? formData.preco_promocional || ""
-                  : formatMoeda(formData.preco_promocional, parseNumber)
-              }
-              onChange={(e) => {
-                const value = e.target.value.replace(/[^\d.,]/g, "").replace(",", ".");
-                handleChange("preco_promocional", value);
-              }}
-              onFocus={(e) => {
-                setCamposEmEdicao((prev) => ({ ...prev, preco_promocional: true }));
-                e.target.select();
-              }}
-              onBlur={(e) => {
-                setCamposEmEdicao((prev) => ({ ...prev, preco_promocional: false }));
-                const value = parseNumber(e.target.value);
-                handleChange("preco_promocional", value > 0 ? value.toFixed(2) : "");
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-              placeholder="R$ 0,00"
-            />
-          </div>
+          <InputMoeda
+            id="produto-preco-promocional"
+            label="Preço promocional (R$)"
+            value={formData.preco_promocional}
+            onChange={(value) => handleChange("preco_promocional", value > 0 ? value : "")}
+          />
         }
       />
 
-      <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-4">
+      <section className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
         <div>
-          <h3 className="text-sm font-semibold text-gray-700">
-            Precos por Canal (Ecommerce / App)
-          </h3>
-          <p className="text-xs text-gray-500 mt-1">
-            Se deixar vazio, o sistema usa o preco de venda padrao.
+          <h3 className="v2-titulo-secao">Canais de venda</h3>
+          <p className="v2-texto-ajuda mt-1">
+            Preço e seleção são desta loja. No app e ecommerce, preço vazio usa o preço de venda
+            padrão.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-xs font-bold text-purple-700 uppercase">Ecommerce</div>
-              <label className="flex items-center gap-2 text-xs text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={lojaFisicaAtiva && formData.anunciar_ecommerce !== false}
-                  onChange={(e) => handleChange("anunciar_ecommerce", e.target.checked)}
-                  disabled={!lojaFisicaAtiva}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {[
+            { campo: "ecommerce", nome: "Ecommerce" },
+            { campo: "app", nome: "App móvel" },
+          ].map(({ campo, nome }) => (
+            <div key={campo} className="space-y-3">
+              <InputCheckTexto
+                id={`produto-anunciar-${campo}`}
+                checked={lojaFisicaAtiva && formData[`anunciar_${campo}`] !== false}
+                disabled={!lojaFisicaAtiva}
+                onChange={(checked) => handleChange(`anunciar_${campo}`, checked)}
+              >
+                Exibir no {nome}
+              </InputCheckTexto>
+              <InputMoeda
+                id={`produto-preco-${campo}`}
+                label={`Preço específico ${nome} (R$)`}
+                value={formData[`preco_${campo}`]}
+                onChange={(value) => handleChange(`preco_${campo}`, value > 0 ? value : "")}
+              />
+              <InputMoeda
+                id={`produto-preco-${campo}-promo`}
+                label={`Preço promocional ${nome} (R$)`}
+                value={formData[`preco_${campo}_promo`]}
+                onChange={(value) => handleChange(`preco_${campo}_promo`, value > 0 ? value : "")}
+              />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <InputDataHora
+                  id={`produto-${campo}-promo-inicio`}
+                  label="Início da promoção"
+                  value={formData[`preco_${campo}_promo_inicio`] || ""}
+                  onChange={(value) => handleChange(`preco_${campo}_promo_inicio`, value)}
                 />
-                Exibir no canal
-              </label>
-            </div>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={formData.preco_ecommerce}
-              onChange={(e) => handleChange("preco_ecommerce", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="Preco normal"
-            />
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={formData.preco_ecommerce_promo}
-              onChange={(e) => handleChange("preco_ecommerce_promo", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="Preco promocional"
-            />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <input
-                type="datetime-local"
-                value={
-                  formData.preco_ecommerce_promo_inicio
-                    ? formData.preco_ecommerce_promo_inicio.toString().slice(0, 16)
-                    : ""
-                }
-                onChange={(e) => handleChange("preco_ecommerce_promo_inicio", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
-              <input
-                type="datetime-local"
-                value={
-                  formData.preco_ecommerce_promo_fim
-                    ? formData.preco_ecommerce_promo_fim.toString().slice(0, 16)
-                    : ""
-                }
-                onChange={(e) => handleChange("preco_ecommerce_promo_fim", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-xs font-bold text-green-700 uppercase">App Movel</div>
-              <label className="flex items-center gap-2 text-xs text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={lojaFisicaAtiva && formData.anunciar_app !== false}
-                  onChange={(e) => handleChange("anunciar_app", e.target.checked)}
-                  disabled={!lojaFisicaAtiva}
+                <InputDataHora
+                  id={`produto-${campo}-promo-fim`}
+                  label="Fim da promoção"
+                  value={formData[`preco_${campo}_promo_fim`] || ""}
+                  onChange={(value) => handleChange(`preco_${campo}_promo_fim`, value)}
                 />
-                Exibir no canal
-              </label>
+              </div>
             </div>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={formData.preco_app}
-              onChange={(e) => handleChange("preco_app", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              placeholder="Preco normal"
-            />
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={formData.preco_app_promo}
-              onChange={(e) => handleChange("preco_app_promo", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              placeholder="Preco promocional"
-            />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <input
-                type="datetime-local"
-                value={
-                  formData.preco_app_promo_inicio
-                    ? formData.preco_app_promo_inicio.toString().slice(0, 16)
-                    : ""
-                }
-                onChange={(e) => handleChange("preco_app_promo_inicio", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-              <input
-                type="datetime-local"
-                value={
-                  formData.preco_app_promo_fim
-                    ? formData.preco_app_promo_fim.toString().slice(0, 16)
-                    : ""
-                }
-                onChange={(e) => handleChange("preco_app_promo_fim", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-            </div>
-          </div>
+          ))}
         </div>
-
-        {!lojaFisicaAtiva && (
-          <p className="text-xs text-amber-700">
-            Produto inativo na loja fisica: anuncio em Ecommerce e App Movel fica desativado
-            automaticamente.
+        {!lojaFisicaAtiva ? (
+          <p className="text-xs text-amber-700 dark:text-amber-300">
+            Produto inativo na loja física: ecommerce e app ficam desativados automaticamente.
           </p>
-        )}
-      </div>
+        ) : null}
+
+        <IfoodProdutoSection
+          formData={formData}
+          handleChange={handleChange}
+          imagens={imagens}
+          onCorrigir={onCorrigirIfood}
+        />
+      </section>
     </>
   );
 }

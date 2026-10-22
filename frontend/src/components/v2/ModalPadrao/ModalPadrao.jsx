@@ -4,6 +4,7 @@ const LARGURAS = {
   pequena: "max-w-md",
   normal: "max-w-2xl",
   grande: "max-w-3xl",
+  ampla: "max-w-5xl",
 };
 
 // Casca padrão de modal do sistema — título + corpo + rodapé de ações, com o fechar (X) sempre no
