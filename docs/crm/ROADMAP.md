@@ -193,8 +193,8 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 - [x] 1.5 **Multi-loja** (`backend/app/crm/lojas.py`, rota `GET /crm/lojas`): sem `crm.todas_lojas` o usuário vê só a loja em que está; com ela, vê também as outras lojas dele onde tem vínculo ativo, `crm.visualizar` e o módulo CRM contratado. Cada consulta roda em uma loja por vez (isolamento por RLS intacto) e cada registro volta marcado com `loja_id`/`loja_nome`; pedir loja não permitida dá 403. A tela do filtro de lojas entra com o quadro (etapa 2.2).
 - [x] 1.6 Identificação do tutor e card (`backend/app/crm/leads_service.py`): usa o serviço único de telefone (0.4). Cadastro único → card do cadastro; número desconhecido ou ambíguo → card **sem cadastro** (nome "Sem nome no WhatsApp" até a loja ter outro), nunca vinculado por chute; quando o número passa a ter um único dono, o card sem cadastro é vinculado em vez de duplicar; identificador interno do WhatsApp não vira card. Funil padrão da loja nasce na primeira necessidade com as 6 colunas provisórias (`[?] DECIDIR` 2.1). Lojas com o CRM ativo ganham o card quando a primeira conversa de WhatsApp de um número começa. Falha ao criar o card só vai para o log, nunca atrapalha o atendimento.
 - [ ] 1.7 Migração do menu: onde ficam o dashboard e o bot atuais no novo módulo. `[?] DECIDIR` convivência durante a transição.
-- [ ] 1.8 Skill de documentação `.claude/skills/crm/SKILL.md` e entradas no catálogo do styleguide para componentes novos.
-- [ ] 1.9 Testes de contrato do módulo e isolamento entre lojas.
+- [x] 1.8 Skill `.claude/skills/crm/SKILL.md` criada. Entradas no catálogo do styleguide serão feitas junto de cada componente novo (nenhum criado ainda).
+- [x] 1.9 Testes de contrato do módulo, modelo/migração, multi-loja e identificação do tutor (`test_crm_*.py`).
 
 ### Etapa 2 — Kanban de leads
 
