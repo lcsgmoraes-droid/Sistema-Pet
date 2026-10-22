@@ -408,8 +408,8 @@ export default function IfoodProdutoSection({ formData, handleChange, imagens = 
         </>
       ) : null}
       <p className="v2-texto-ajuda">
-        Preparação para validação em DEV. Salvar mantém a intenção de venda e as pendências no
-        CorePet; esta etapa ainda não envia alterações ao iFood.
+        Salvar mantém a intenção de venda e as pendências no CorePet. A publicação no iFood é uma
+        ação separada.
       </p>
     </div>
   );

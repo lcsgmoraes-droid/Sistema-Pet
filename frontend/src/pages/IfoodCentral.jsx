@@ -327,8 +327,8 @@ export default function IfoodCentral() {
         </BotaoInteracao>
       </div>
       <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
-        Preparação local: o envio real ao iFood permanece desativado nesta etapa. A seleção não
-        confirma a publicação do anúncio.
+        Esta central prepara o catálogo no CorePet. Selecionar produtos ou aplicar preços não
+        publica alterações no iFood.
       </div>
       {erro ? (
         <p
