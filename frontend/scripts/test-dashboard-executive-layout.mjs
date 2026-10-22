@@ -1,38 +1,24 @@
+import assert from "node:assert/strict";
 import fs from "node:fs";
-import path from "node:path";
-import process from "node:process";
 
-const root = process.cwd();
-const dashboardPath = path.join(root, "src/pages/DashboardFinanceiro.jsx");
-const cardsPath = path.join(root, "src/pages/dashboard/DashboardCards.jsx");
-const dashboardSource = fs.readFileSync(dashboardPath, "utf8");
-const cardsSource = fs.readFileSync(cardsPath, "utf8");
-
-function assert(condition, message) {
-  if (!condition) throw new Error(message);
+const dashboard = fs.readFileSync("src/pages/v2/DashboardFinanceiro.jsx", "utf8");
+const revenue = fs.readFileSync(
+  "src/components/v2/ResumoFaturamento/ResumoFaturamento.jsx",
+  "utf8",
+);
+for (const title of ["Pedidos / unidades", "Lucro das vendas", "Pagamentos que vencem hoje"]) {
+  assert.ok(dashboard.includes(`titulo="${title}"`), `Indicador ausente: ${title}`);
 }
-
-for (const label of ["Pedidos / unidades", "Lucro das vendas"]) {
-  assert(dashboardSource.includes(`label="${label}"`), `Card principal ausente: ${label}`);
-}
-
-assert(
-  dashboardSource.includes('label={porRecebimento ? "Recebimentos de vendas" : "Faturamento"}'),
-  "Indicador principal deve acompanhar a visão da empresa, preservando Faturamento no padrão",
+assert.ok(dashboard.includes("<ResumoFaturamento"));
+assert.ok(dashboard.includes("summary?.composicao_vendas"));
+assert.ok(dashboard.includes("mostrarDetalhes={false}"));
+assert.ok(!dashboard.includes("DetalhesFaturamento"));
+assert.ok(
+  !dashboard.includes("summary?.indicador_comercial"),
+  "Faturamento não pode alternar para recebimentos/bruto",
 );
-
-assert(
-  dashboardSource.includes('onClick={() => navigate("/financeiro/dre")}'),
-  "Lucro das vendas deve abrir o detalhamento da DRE",
-);
-assert(
-  dashboardSource.includes('label="Pagamentos que vencem hoje"'),
-  "Dashboard deve separar pagamentos que vencem hoje",
-);
-assert(
-  !dashboardSource.includes("Visão geral do negócio"),
-  "Cabecalho alto antigo deve sair da abertura do dashboard",
-);
-assert(cardsSource.includes("CompactMetricCard"), "Cards secundarios devem usar formato compacto");
-
-console.log("Dashboard executive layout contract OK");
+assert.ok(revenue.includes('titulo = "Faturamento líquido"'));
+assert.ok(revenue.includes("composicao.faturamento_liquido"));
+assert.ok(revenue.includes("aria-expanded={expandidoAtual}"));
+assert.ok(dashboard.includes('navigate("/financeiro/dre")'));
+console.log("Dashboard executivo usa faturamento líquido, sem detalhamento de caixa.");

@@ -413,10 +413,10 @@ def test_atraso_preserva_modulos_da_proposta_durante_tolerancia(monkeypatch):
     )
 
     assert offer.status == "past_due"
-    assert calls == [True]
+    assert calls == []
 
 
-def test_atraso_suspende_extras_depois_da_tolerancia(monkeypatch):
+def test_atraso_nao_suspende_extras_depois_da_tolerancia(monkeypatch):
     tenant = _tenant(
         plan="pet-venda-ativa",
         billing_status="past_due",
@@ -439,7 +439,46 @@ def test_atraso_suspende_extras_depois_da_tolerancia(monkeypatch):
     )
 
     assert offer.status == "past_due"
-    assert calls == [False]
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("event", "payment_status", "offer_status"),
+    [
+        ("PAYMENT_OVERDUE", "OVERDUE", "past_due"),
+        ("PAYMENT_REFUNDED", "REFUNDED", "blocked"),
+        ("PAYMENT_DELETED", "DELETED", "blocked"),
+        ("PAYMENT_CHARGEBACK_REQUESTED", "CHARGEBACK_REQUESTED", "blocked"),
+    ],
+)
+def test_evento_financeiro_preserva_extra_atual_e_nao_reativa_extra_removido(
+    event, payment_status, offer_status
+):
+    tenant = _tenant(status="active")
+    offer = _offer(status="active")
+    active = SimpleNamespace(modulo="veterinario", status="ativo", data_fim=None)
+    removed_at = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    removed = SimpleNamespace(
+        modulo="banho_tosa", status="cancelado", data_fim=removed_at
+    )
+    db = _Session(tenant=tenant, offers=[offer], modules=[active, removed])
+
+    service.apply_offer_payment_event(
+        db,
+        offer=offer,
+        tenant=tenant,
+        event_type=event,
+        payment={"id": "pay_test", "status": payment_status},
+    )
+
+    assert offer.status == offer_status
+    assert offer.payment_status == payment_status
+    assert active.status == "ativo"
+    assert active.data_fim is None
+    assert removed.status == "cancelado"
+    assert removed.data_fim == removed_at
+    assert tenant.status == "active"
+    assert db.added == []
 
 
 def test_sincronizacao_cria_assinatura_do_modulo_veterinario():

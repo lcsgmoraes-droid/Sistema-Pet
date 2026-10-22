@@ -24,14 +24,11 @@ export default function ModalFecharCaixaContent({
   atualizarValorMoedas,
   aplicarContagem,
   limparContagem,
-  carregarVendasForma,
   confirmandoDiferenca,
   diferenca,
   erro,
   executarFechamento,
-  formaExpandida,
   handleFechar,
-  loadingVendas,
   mostrarContagem,
   mostrarDicasDiferenca,
   notas,
@@ -42,14 +39,12 @@ export default function ModalFecharCaixaContent({
   resumo,
   salvando,
   setConfirmandoDiferenca,
-  setFormaExpandida,
   setMostrarContagem,
   setMostrarDicasDiferenca,
   setObservacoes,
   setValorContado,
   sucesso,
   valorContado,
-  vendasDetalhe,
 }) {
   return (
     <>
@@ -184,14 +179,7 @@ export default function ModalFecharCaixaContent({
             </div>
 
             {/* 📊 Vendas por Forma de Pagamento - INFORMATIVO */}
-            <PaymentBreakdownPanel
-              carregarVendasForma={carregarVendasForma}
-              formaExpandida={formaExpandida}
-              loadingVendas={loadingVendas}
-              resumo={resumo}
-              setFormaExpandida={setFormaExpandida}
-              vendasDetalhe={vendasDetalhe}
-            />
+            <PaymentBreakdownPanel resumo={resumo} />
 
             {/* Mensagem de erro da API */}
             {erro && (

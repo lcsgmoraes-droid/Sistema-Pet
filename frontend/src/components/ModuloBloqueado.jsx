@@ -216,7 +216,13 @@ function getBeneficiosPorSecao(modulo, beneficios) {
    Componente principal
 --------------------------------------------------- */
 const ModuloBloqueado = ({ modulo, children }) => {
-  const { moduloAtivo, modulosAtivos, moduloBetaPublico, moduloForaOfertaPublica } = useModulos();
+  const {
+    assinaturaAtual,
+    moduloAtivo,
+    modulosAtivos,
+    moduloBetaPublico,
+    moduloForaOfertaPublica,
+  } = useModulos();
 
   // Registrar tentativa de acesso a módulo bloqueado (tracking leve)
   useEffect(() => {
@@ -236,6 +242,23 @@ const ModuloBloqueado = ({ modulo, children }) => {
   // Isso evita chamadas de API antes de confirmar que o tenant tem acesso.
   if (modulosAtivos === null) {
     return <div className="min-h-[240px]" aria-hidden="true" />;
+  }
+
+  if (assinaturaAtual?.acesso_operacional_ativo === false) {
+    return (
+      <div className="mx-auto max-w-2xl p-6 text-center">
+        <FiLock className="mx-auto h-8 w-8 text-rose-600 dark:text-rose-300" />
+        <h2 className="mt-4 text-xl font-bold text-slate-900 dark:text-slate-100">
+          Acesso suspenso pela administração
+        </h2>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          Entre em contato com a equipe CorePet para revisar a suspensão.
+        </p>
+        <Link to="/meu-plano" className="mt-4 inline-block font-semibold underline">
+          Ver meu plano
+        </Link>
+      </div>
+    );
   }
 
   if (moduloAtivo(modulo)) {

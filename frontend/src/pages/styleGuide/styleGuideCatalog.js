@@ -173,6 +173,13 @@ export const styleGuideCatalog = [
           'Substitui MetricCard/CompactMetricCard/PriorityCard do dashboard financeiro — tom (mesmo vocabulário de BotaoBase.variante) colore o ícone, "aoClicar" decide se vira botão ou div estática',
       },
       {
+        nome: "ResumoFaturamento",
+        status: "pronto",
+        arquivo: "components/v2/ResumoFaturamento/ResumoFaturamento.jsx",
+        descricao:
+          "Faturamento líquido por empresa ou caixa, conforme o escopo da composição do backend. No dashboard e fechamento usar mostrarDetalhes=false; expansão de quitação e vendas somente na auditoria do caixa. Aceita expansão controlada e modo escuro, sem recalcular métricas na tela.",
+      },
+      {
         nome: "EstadoVazio",
         status: "pronto",
         arquivo: "components/v2/EstadoVazio/EstadoVazio.jsx",

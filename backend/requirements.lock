@@ -36,7 +36,7 @@ brazilfiscalreport==1.1.0
     # via -r requirements.txt
 celery==5.6.3
     # via -r requirements.txt
-certifi==2026.6.17
+certifi==2026.10.19
     # via
     #   httpcore
     #   httpx
@@ -177,7 +177,7 @@ pdfplumber==0.11.10
     # via -r requirements.txt
 phonenumbers==9.0.39
     # via brazilfiscalreport
-pillow==12.3.0
+pillow==13.0.0
     # via
     #   -r requirements.txt
     #   fpdf2

@@ -1,12 +1,6 @@
 import { useState, useEffect } from "react";
 import { AlertCircle, X } from "lucide-react";
-import {
-  baixarPdfCaixa,
-  fecharCaixa,
-  obterResumoCaixa,
-  obterVendasCaixa,
-  validarCaixaAtual,
-} from "../api/caixa";
+import { baixarPdfCaixa, fecharCaixa, obterResumoCaixa, validarCaixaAtual } from "../api/caixa";
 import ModalFecharCaixaContent from "./caixa/ModalFecharCaixaContent";
 import ImpressaoTermicaCaixa from "./caixa/ImpressaoTermicaCaixa";
 import { atualizarObservacaoComContagem } from "../utils/caixaContagem";
@@ -21,9 +15,6 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
   const [sucesso, setSucesso] = useState(false);
   const [imprimirRelatorio, setImprimirRelatorio] = useState(false);
   const [mostrarContagem, setMostrarContagem] = useState(false);
-  const [formaExpandida, setFormaExpandida] = useState(null);
-  const [vendasDetalhe, setVendasDetalhe] = useState({});
-  const [loadingVendas, setLoadingVendas] = useState(null);
   const [confirmandoDiferenca, setConfirmandoDiferenca] = useState(false);
   const [mostrarDicasDiferenca, setMostrarDicasDiferenca] = useState(false);
   const [notas, setNotas] = useState({
@@ -37,24 +28,29 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
   });
 
   useEffect(() => {
-    carregarResumo();
+    let ativo = true;
+    setLoading(true);
+    setErro(null);
+    (async () => {
+      try {
+        await validarCaixaAtual(caixaId);
+        const data = await obterResumoCaixa(caixaId);
+        if (!ativo) return;
+        setResumo(data);
+        // A contagem deve ser preenchida por quem fecha o caixa.
+        setValorContado(0);
+      } catch (error) {
+        if (!ativo) return;
+        console.error("Erro ao carregar resumo:", error);
+        setErro("Não foi possível carregar os dados do caixa. Feche e tente novamente.");
+      } finally {
+        if (ativo) setLoading(false);
+      }
+    })();
+    return () => {
+      ativo = false;
+    };
   }, [caixaId]);
-
-  const carregarResumo = async () => {
-    try {
-      setErro(null);
-      await validarCaixaAtual(caixaId);
-      const data = await obterResumoCaixa(caixaId);
-      setResumo(data);
-      // Campo vazio — o funcionário deve contar e preencher manualmente
-      setValorContado(0);
-    } catch (error) {
-      console.error("Erro ao carregar resumo:", error);
-      setErro("Não foi possível carregar os dados do caixa. Feche e tente novamente.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const calcularDiferenca = () => {
     if (!resumo || valorContado === null || valorContado === undefined) return 0;
@@ -82,30 +78,6 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
 
   const atualizarValorMoedas = (valor) => {
     setNotas((prev) => ({ ...prev, moedas: valor }));
-  };
-
-  const carregarVendasForma = async (forma) => {
-    if (formaExpandida === forma) {
-      setFormaExpandida(null);
-      return;
-    }
-    setFormaExpandida(forma);
-    if (vendasDetalhe[forma]) return;
-    setLoadingVendas(forma);
-    try {
-      if (!sucesso) await validarCaixaAtual(caixaId);
-      const data = await obterVendasCaixa(caixaId, forma);
-      setVendasDetalhe((prev) => ({ ...prev, [forma]: data }));
-    } catch (err) {
-      console.error("Erro ao carregar vendas:", err);
-      setVendasDetalhe((prev) => ({ ...prev, [forma]: [] }));
-      setErro(
-        (prev) =>
-          prev || err.response?.data?.detail || err.message || "Erro ao carregar vendas do caixa.",
-      );
-    } finally {
-      setLoadingVendas(null);
-    }
   };
 
   const aplicarContagem = () => {
@@ -243,14 +215,11 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
           atualizarValorMoedas,
           aplicarContagem,
           limparContagem,
-          carregarVendasForma,
           confirmandoDiferenca,
           diferenca,
           erro,
           executarFechamento,
-          formaExpandida,
           handleFechar,
-          loadingVendas,
           mostrarContagem,
           mostrarDicasDiferenca,
           notas,
@@ -265,14 +234,12 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
           resumo,
           salvando,
           setConfirmandoDiferenca,
-          setFormaExpandida,
           setMostrarContagem,
           setMostrarDicasDiferenca,
           setObservacoes,
           setValorContado,
           sucesso,
           valorContado,
-          vendasDetalhe,
         }}
       />
       <ImpressaoTermicaCaixa

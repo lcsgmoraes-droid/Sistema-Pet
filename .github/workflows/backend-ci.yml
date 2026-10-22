@@ -631,6 +631,14 @@ jobs:
           tests/unit/test_ifood_orders_contract.py
           tests/unit/test_ifood_client_contract.py -q
 
+      - name: Faturamento reconciliation regression
+        run: |
+          pytest tests/unit/test_faturamento_composicao.py tests/unit/test_faturamento_superficies.py tests/unit/test_pdf_caixa_resumo.py -q
+
+      - name: Billing operational continuity regression
+        run: |
+          pytest tests/unit/test_plan_catalog_and_limits.py tests/unit/test_modulos_liberacao_temporaria_contract.py tests/unit/test_module_access_dependency.py tests/unit/test_custom_billing_offers.py tests/unit/test_asaas_billing.py tests/unit/test_ops_tenants_routes_contract.py -q
+
       - name: Multitenant hardening suite
         run: |
           pytest tests/multi_tenant -q --cov=app --cov-report=term --cov-report=xml

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { formatMoneyBRL } from "../../utils/formatters";
 import { useDadosCupomEmpresa } from "../../hooks/useDadosCupomEmpresa";
+import { criarResumoImpressaoCaixa } from "./caixaImpressaoResumo";
 
 const dataHora = (valor) => (valor ? new Date(valor).toLocaleString("pt-BR") : "—");
 
@@ -21,18 +22,10 @@ export default function ImpressaoTermicaCaixa({ documento, onAfterPrint }) {
   if (!documento) return null;
 
   const { movimento, resumo } = documento;
+  const impressao = resumo ? criarResumoImpressaoCaixa(resumo) : null;
   const linhas = resumo
     ? [
         ["Abertura", resumo.caixa.valor_abertura],
-        ["Total vendido", resumo.total_vendido],
-        ["Vendas no crediário", resumo.total_vendas_crediario ?? 0],
-        ["Total recebido", resumo.total_recebido],
-        ...Object.entries(resumo.vendas_por_forma_pagamento || {}).map(([forma, dados]) => [
-          ["crediario", "crediário", "boleto"].includes(forma.trim().toLocaleLowerCase("pt-BR"))
-            ? `${forma} (a prazo)`
-            : forma,
-          dados.total,
-        ]),
         ["Suprimentos", resumo.totais.suprimentos],
         ["Entradas em dinheiro", resumo.totais.vendas + resumo.totais.suprimentos],
         ["Sangrias", resumo.totais.sangrias],
@@ -107,6 +100,32 @@ export default function ImpressaoTermicaCaixa({ documento, onAfterPrint }) {
           <p>Abertura: {dataHora(resumo.caixa.data_abertura)}</p>
           <p>Fechamento: {dataHora(resumo.caixa.data_fechamento)}</p>
           <hr />
+          <h1>{impressao.tituloVendas}</h1>
+          {impressao.descricaoVendas && <p>{impressao.descricaoVendas}</p>}
+          {impressao.linhasVendas.map(([rotulo, valor]) => (
+            <div className="linha" key={rotulo}>
+              <span>{rotulo}</span>
+              <strong>{formatMoneyBRL(valor ?? 0)}</strong>
+            </div>
+          ))}
+          <hr />
+          <h1>{impressao.tituloRecebimentos}</h1>
+          {impressao.periodoRecebimentos && <p>Período: {impressao.periodoRecebimentos}</p>}
+          {impressao.linhasRecebimentos.map(([rotulo, valor]) => (
+            <div className="linha" key={rotulo}>
+              <span>{rotulo}</span>
+              <strong>{formatMoneyBRL(valor ?? 0)}</strong>
+            </div>
+          ))}
+          <h1>{impressao.tituloFormas}</h1>
+          {impressao.formas.map(([forma, dados]) => (
+            <div className="linha" key={forma}>
+              <span>{forma}</span>
+              <strong>{formatMoneyBRL(dados.total ?? 0)}</strong>
+            </div>
+          ))}
+          <hr />
+          <h1>Saldo físico do caixa</h1>
           {linhas.map(([rotulo, valor]) => (
             <div className="linha" key={rotulo}>
               <span>{rotulo}</span>
@@ -114,10 +133,7 @@ export default function ImpressaoTermicaCaixa({ documento, onAfterPrint }) {
             </div>
           ))}
           <hr />
-          <p>
-            Vendido e recebido são indicadores separados. Formas a prazo não entram no recebido.
-            Abertura e suprimentos não são vendas.
-          </p>
+          <p>{impressao.notaRecebimentos}</p>
           <div className="assinatura">
             ____________________________
             <br />

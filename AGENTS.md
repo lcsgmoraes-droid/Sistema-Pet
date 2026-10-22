@@ -27,6 +27,19 @@ feita nos momentos certos, sem virar repeticao a cada micro-etapa.
 - Antes de qualquer `git push origin main` ou comando no servidor de producao, pedir autorizacao explicita ao Lucas em portugues simples.
 - Seguir tambem `.github/assistant-rules.json`, `.github/copilot-instructions.md` e `docs/FLUXO_UNICO_DEV_PROD.md`.
 
+## Continuidade operacional e cobranca (2026-10-21)
+
+- Fim do teste, atraso, falta de pagamento ou evento do provedor de cobranca
+  devem gerar avisos graduais e acompanhamento, sem suspender automaticamente
+  vendas, modulos, recursos ou sessoes em uso.
+- Bloqueio comercial de uma empresa exige autorizacao explicita do Lucas,
+  registrada antes da acao administrativa. Usar o status cadastral da empresa
+  para essa decisao; `billing_status` registra a situacao financeira e nao e
+  autorizacao de bloqueio.
+- Preservar cobrancas, vencimentos, comprovantes e historico. Liberar acesso
+  nao significa quitar, perdoar ou marcar uma cobranca como paga.
+- Manter autenticacao, isolamento entre empresas e controles de seguranca.
+
 ## Controle direto do navegador
 
 - Para operar sites como Play Console, App Store Connect, Expo e o ERP, usar
