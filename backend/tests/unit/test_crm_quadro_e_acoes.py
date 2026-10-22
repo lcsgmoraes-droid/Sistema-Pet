@@ -110,7 +110,14 @@ def test_pets_do_tutor_aparecem_no_card(db):
     db.flush()
     cliente_id = db.query(Cliente.id).scalar()
     db.add(
-        Pet(tenant_id=TENANT, user_id=1, codigo="P1", cliente_id=cliente_id, nome="Rex")
+        Pet(
+            tenant_id=TENANT,
+            user_id=1,
+            codigo="P1",
+            especie="Cachorro",
+            cliente_id=cliente_id,
+            nome="Rex",
+        )
     )
     db.flush()
     acoes.criar_lead_manual(db, TENANT, cliente_id=cliente_id)
