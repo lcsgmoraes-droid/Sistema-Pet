@@ -339,6 +339,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 | Data | Mudança |
 |---|---|
+| 21/10/2026 | Protótipo versão 8: cor da origem do lead segue a diretriz (risco e prazo em amarelo, aniversário em rosa). |
 | 21/10/2026 | Protótipo versão 7: diretriz de cores de atenção aplicada e legenda de cores no Mapa do protótipo. |
 | 21/10/2026 | Protótipo versão 6: sem selo de código; só "Lead novo · sem cadastro"; nome do WhatsApp no card e número só na ficha. |
 | 21/10/2026 | Protótipo versão 5: indicação de lead novo ou cliente cadastrado no card e dados do cadastro na ficha. |

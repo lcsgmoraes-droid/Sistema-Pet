@@ -7,19 +7,19 @@
   --bg: #f4f6fa; --surface: #ffffff; --surface-2: #f8f9fc; --ink: #172033; --ink-2: #4a5670; --ink-3: #6b7790;
   --line: #dde3ee; --accent: #2554c7; --accent-ink: #ffffff; --accent-soft: #e6edfc;
   --ok: #17794a; --ok-soft: #e3f4ea; --warn: #8a5200; --warn-soft: #fdf0d8; --bad: #b3261e; --bad-soft: #fbe5e3;
-  --wa-bubble: #dcf5e4; --chat-bg: #efe9df; --ia: #6b3fb5; --ia-soft: #efe7fb; --attn: #b45309; --attn-ink: #ffffff;
+  --wa-bubble: #dcf5e4; --chat-bg: #efe9df; --ia: #6b3fb5; --ia-soft: #efe7fb; --attn: #b45309; --attn-ink: #ffffff; --pink: #b0306a; --pink-soft: #fbe6f0;
   --font: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #0f1522; --surface: #172033; --surface-2: #1b2640; --ink: #e8edf7; --ink-2: #b2bdd3; --ink-3: #93a0ba;
   --line: #2a3650; --accent: #6f95ff; --accent-ink: #0b1226; --accent-soft: #1c2c57;
   --ok: #55d08c; --ok-soft: #14301f; --warn: #f0b24f; --warn-soft: #382a0f; --bad: #ff8a80; --bad-soft: #3a1815;
-  --wa-bubble: #1d4a33; --chat-bg: #1b2430; --ia: #b99bf0; --ia-soft: #2a2145; --attn: #f0b24f; --attn-ink: #1b1200; color-scheme: dark; } }
+  --wa-bubble: #1d4a33; --chat-bg: #1b2430; --ia: #b99bf0; --ia-soft: #2a2145; --attn: #f0b24f; --attn-ink: #1b1200; --pink: #f58bb8; --pink-soft: #3d1a2b; color-scheme: dark; } }
 :root[data-theme="dark"] {
   --bg: #0f1522; --surface: #172033; --surface-2: #1b2640; --ink: #e8edf7; --ink-2: #b2bdd3; --ink-3: #93a0ba;
   --line: #2a3650; --accent: #6f95ff; --accent-ink: #0b1226; --accent-soft: #1c2c57;
   --ok: #55d08c; --ok-soft: #14301f; --warn: #f0b24f; --warn-soft: #382a0f; --bad: #ff8a80; --bad-soft: #3a1815;
-  --wa-bubble: #1d4a33; --chat-bg: #1b2430; --ia: #b99bf0; --ia-soft: #2a2145; --attn: #f0b24f; --attn-ink: #1b1200; color-scheme: dark; }
+  --wa-bubble: #1d4a33; --chat-bg: #1b2430; --ia: #b99bf0; --ia-soft: #2a2145; --attn: #f0b24f; --attn-ink: #1b1200; --pink: #f58bb8; --pink-soft: #3d1a2b; color-scheme: dark; }
 * { box-sizing: border-box; }
 body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 14px; line-height: 1.5; padding-block: 0 56px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
@@ -43,7 +43,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
 .pill { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 99px; font-size: .72rem; font-weight: 600; background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line); white-space: nowrap; }
 .pill.ok { background: var(--ok-soft); color: var(--ok); border-color: transparent; } .pill.warn { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
-.pill.bad { background: var(--bad-soft); color: var(--bad); border-color: transparent; } .pill.info { background: var(--accent-soft); color: var(--accent); border-color: transparent; } .pill.ia { background: var(--ia-soft); color: var(--ia); border-color: transparent; }
+.pill.bad { background: var(--bad-soft); color: var(--bad); border-color: transparent; } .pill.info { background: var(--accent-soft); color: var(--accent); border-color: transparent; } .pill.pink { background: var(--pink-soft); color: var(--pink); border-color: transparent; } .pill.ia { background: var(--ia-soft); color: var(--ia); border-color: transparent; }
 input[type=text], input[type=number], select, textarea { width: 100%; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; min-height: 38px; }
 textarea { min-height: 80px; resize: vertical; } label.f { display: block; font-size: .78rem; font-weight: 600; color: var(--ink-2); }
 label.f > input, label.f > select, label.f > textarea { margin-top: 3px; }
@@ -179,6 +179,8 @@ function loja(id) { return LOJAS.filter(function (l) { return l.id === id; })[0]
 function lead(id) { return LEADS.filter(function (l) { return l.id === id; })[0]; }
 function tagLoja(id) { var l = loja(id); return '<span class="loja"><span class="dot" style="background:' + l.cor + '"></span>' + esc(l.nome.replace("Pet Amigo ", "")) + "</span>"; }
 function money(v) { return "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2 }); }
+/* origem do lead: risco e prazo pedem atenção (amarelo); o resto só informa */
+var ORIGTOM = { "Sem comprar há 60+ dias": "warn", "VIP em risco": "warn", "Banho sem retorno": "warn", "Ração acabando": "warn", "Vacina vencendo": "warn", "Cashback a vencer": "warn", "Aniversário do pet": "pink", "WhatsApp espontâneo": "info" };
 var CONS = { ok: ["ok", "Autorizou mensagens"], sistema: ["warn", "Autorizou no sistema · falta confirmar"], nao: ["warn", "Sem autorização de mensagens"], saiu: ["bad", "Recusou mensagens automáticas"] };
 var CONSDICA = { ok: "Confirmou pelo WhatsApp que quer receber mensagens.", sistema: "Aceitou no sistema; falta a confirmação pelo WhatsApp.", nao: "Ainda não autorizou: mensagens automáticas e modelos ficam bloqueados.", saiu: "Respondeu SAIR: mensagens automáticas e modelos ficam bloqueados." };
 var EST = { ia: ["ia", "IA atendendo"], humano: ["info", "Humano atendendo"], aguardando: ["warn", "Aguardando atendente"], encerrada: ["", "Encerrada"] };
@@ -227,7 +229,7 @@ function cardLead(l) {
     '<button type="button" class="nm" data-act="abrir-lead" data-id="' + l.id + '">' + esc(l.tutor) + "</button>" +
     (l.cad ? '<p class="small">' + (l.pets.length ? l.pets.map(function (p) { return esc(p.n); }).join(", ") : "Sem pets cadastrados") + "</p>" : (l.semNome ? "" : '<p class="small">Nome do perfil do WhatsApp</p>')) +
     (l.cad ? "" : '<div class="row" style="margin-top:6px"><span class="pill warn" title="Ainda não está ligado a nenhuma pessoa cadastrada">Lead novo · sem cadastro</span></div>') +
-    '<div class="row" style="margin-top:6px"><span class="pill info">' + esc(l.origem) + "</span>" + (CONVS[l.conv].estado === "aguardando" || CONVS[l.conv].estado === "humano" ? '<span class="pill ' + EST[CONVS[l.conv].estado][0] + '">' + EST[CONVS[l.conv].estado][1] + "</span>" : "") + (l.consent === "ok" || l.consent === "sistema" ? "" : pillCons(l.consent)) + (consCfg(l) && consCfg(l).lead === "pausar" ? '<span class="pill">Pausado</span>' : "") + "</div>" +
+    '<div class="row" style="margin-top:6px"><span class="pill ' + (ORIGTOM[l.origem] || "info") + '">' + esc(l.origem) + "</span>" + (CONVS[l.conv].estado === "aguardando" || CONVS[l.conv].estado === "humano" ? '<span class="pill ' + EST[CONVS[l.conv].estado][0] + '">' + EST[CONVS[l.conv].estado][1] + "</span>" : "") + (l.consent === "ok" || l.consent === "sistema" ? "" : pillCons(l.consent)) + (consCfg(l) && consCfg(l).lead === "pausar" ? '<span class="pill">Pausado</span>' : "") + "</div>" +
     (consCfg(l) && consCfg(l).tarefa === "remover" ? '<p class="small" style="margin-top:6px">Sem tarefa de contato (regra da loja para quem recusa mensagens)</p>' : l.prox !== "—" ? '<p class="small" style="margin-top:6px' + (/hoje/.test(l.prox) ? ";color:var(--warn);font-weight:600" : "") + '">Próxima ação: ' + esc(l.prox) + "</p>" : "") +
     (l.valor ? '<p class="small">' + money(l.valor) + "</p>" : "") +
     '<div style="margin-top:8px;display:grid;gap:6px"><button type="button" class="btn pri sm full" data-act="abrir-conversa-card" data-id="' + l.id + '" aria-label="Conversa com ' + esc(l.tutor) + ' no WhatsApp"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="flex:none"><path d="M12 3a9 9 0 0 0-7.7 13.6L3 21l4.5-1.2A9 9 0 1 0 12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8.5c0 3.5 3 6.5 6.5 6.5l1-1.6-2-1-1 .8c-1-.5-2-1.5-2.5-2.5l.8-1-1-2z" fill="currentColor"/></svg>Conversa' + (CONVS[l.conv].nao ? ' <span class="badge">' + CONVS[l.conv].nao + "</span>" : "") + "</button>" +
