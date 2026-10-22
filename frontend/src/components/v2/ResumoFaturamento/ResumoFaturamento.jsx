@@ -4,6 +4,9 @@ import BotaoInteracao from "../BotaoInteracao/BotaoInteracao";
 import BotaoLink from "../BotaoLink/BotaoLink";
 import CartaoIndicador from "../CartaoIndicador/CartaoIndicador";
 import { formatMoneyBRL } from "../../../utils/formatters";
+import TotaisFormasPagamento from "./TotaisFormasPagamento.jsx";
+import AvisoPagamentoVenda from "./AvisoPagamentoVenda.jsx";
+import { diferencasPorVenda, pagamentoPrecisaConferencia } from "./pagamentosPresentation";
 import {
   formatarDataFaturamento,
   formulaFaturamento,
@@ -27,76 +30,7 @@ function LinhasValores({ linhas }) {
   );
 }
 
-export function TotaisFormasPagamento({ composicao }) {
-  const formas = composicao?.formas_pagamento;
-  const disponivel =
-    Array.isArray(formas) &&
-    composicao.valor_pago != null &&
-    Number.isFinite(Number(composicao.valor_pago)) &&
-    composicao.ajustes_formas_pagamento != null &&
-    Number.isFinite(Number(composicao.ajustes_formas_pagamento));
-  const ajuste = disponivel ? Number(composicao.ajustes_formas_pagamento) : 0;
-
-  return (
-    <section
-      aria-label="Pagamentos das vendas do período"
-      className="border-t border-slate-200 pt-3 dark:border-slate-700"
-    >
-      <h4 className="mb-2 text-sm font-bold text-slate-900 dark:text-white">
-        Pagamentos das vendas do período
-      </h4>
-      <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-        Pagamentos das mesmas vendas deste indicador, inclusive os realizados em outras datas ou
-        caixas. Créditos, cashback e crediário a receber aparecem separados na situação das vendas.
-      </p>
-      {!disponivel ? (
-        <p role="status" className="text-sm text-slate-500 dark:text-slate-400">
-          Os totais por forma de pagamento estão indisponíveis. Atualize o painel.
-        </p>
-      ) : (
-        <>
-          {formas.length === 0 && Number(composicao.valor_pago) === 0 && ajuste === 0 && (
-            <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
-              Nenhum pagamento registrado para as vendas do período.
-            </p>
-          )}
-          <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-            {formas.map((forma) => (
-              <div key={forma.forma_pagamento} className="flex items-start justify-between gap-3">
-                <dt className="text-slate-600 dark:text-slate-300">{forma.forma_pagamento}</dt>
-                <dd className="shrink-0 font-semibold tabular-nums text-slate-950 dark:text-white">
-                  {formatMoneyBRL(forma.total)}
-                </dd>
-              </div>
-            ))}
-            {ajuste !== 0 && (
-              <div className="flex items-start justify-between gap-3 sm:col-span-2">
-                <dt className="text-slate-600 dark:text-slate-300">
-                  Ajustes não atribuídos a uma forma
-                </dt>
-                <dd className="shrink-0 font-semibold tabular-nums text-slate-950 dark:text-white">
-                  {formatMoneyBRL(composicao.ajustes_formas_pagamento)}
-                </dd>
-              </div>
-            )}
-            <div className="flex items-start justify-between gap-3 border-t border-slate-200 pt-2 sm:col-span-2 dark:border-slate-700">
-              <dt className="font-bold text-slate-900 dark:text-white">Total pago</dt>
-              <dd className="shrink-0 font-bold tabular-nums text-slate-950 dark:text-white">
-                {formatMoneyBRL(composicao.valor_pago)}
-              </dd>
-            </div>
-          </dl>
-          {ajuste !== 0 && (
-            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-              Devoluções e diferenças entre os pagamentos registrados e o total quitado ficam
-              separadas quando a forma do ajuste não está identificada.
-            </p>
-          )}
-        </>
-      )}
-    </section>
-  );
-}
+export { TotaisFormasPagamento };
 
 export function DetalhesFaturamento({
   composicao,
@@ -107,8 +41,14 @@ export function DetalhesFaturamento({
   mostrarTotaisPorForma = false,
 }) {
   const [limite, setLimite] = useState(20);
+  const [somentePendencias, setSomentePendencias] = useState(false);
   if (!composicao) return null;
   const vendas = composicao.detalhes || [];
+  const diferencas = diferencasPorVenda(composicao);
+  const pendencias = vendas.filter((venda) =>
+    pagamentoPrecisaConferencia(venda, diferencas.get(venda.venda_id)),
+  );
+  const vendasListadas = somentePendencias ? pendencias : vendas;
 
   return (
     <section
@@ -153,12 +93,27 @@ export function DetalhesFaturamento({
         <h4 className="mb-2 text-sm font-bold text-slate-900 dark:text-white">
           Vendas que compõem o valor ({composicao.quantidade || 0})
         </h4>
+        {(pendencias.length > 0 || somentePendencias) && (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+            <p>{pendencias.length} venda(s) com pagamento a conferir.</p>
+            <BotaoInteracao
+              tamanho="pequeno"
+              aria-pressed={somentePendencias}
+              onClick={() => {
+                setSomentePendencias((atual) => !atual);
+                setLimite(20);
+              }}
+            >
+              {somentePendencias ? "Ver todas as vendas" : "Ver pagamentos a conferir"}
+            </BotaoInteracao>
+          </div>
+        )}
         <div className="max-h-96 space-y-2 overflow-y-auto" role="list">
-          {vendas.slice(0, limite).map((venda) => (
+          {vendasListadas.slice(0, limite).map((venda) => (
             <article
               key={venda.venda_id}
               role="listitem"
-              className={`rounded-lg p-3 ${classeVenda ? classeVenda(venda) : "border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"}`}
+              className={`rounded-lg p-3 ${pagamentoPrecisaConferencia(venda, diferencas.get(venda.venda_id)) ? "border border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-950/20" : classeVenda ? classeVenda(venda) : "border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"}`}
             >
               <div className="flex flex-wrap items-start justify-between gap-2 text-sm">
                 <div>
@@ -215,15 +170,20 @@ export function DetalhesFaturamento({
                   O valor pago considera a devolução. O histórico preserva os lançamentos originais.
                 </p>
               )}
+              <AvisoPagamentoVenda venda={venda} diferenca={diferencas.get(venda.venda_id)} />
               {renderAcoesVenda?.(venda)}
             </article>
           ))}
-          {vendas.length === 0 && (
-            <p className="text-sm text-slate-500 dark:text-slate-400">Nenhuma venda no período.</p>
+          {vendasListadas.length === 0 && (
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              {somentePendencias
+                ? "Nenhum pagamento a conferir nesta seleção."
+                : "Nenhuma venda no período."}
+            </p>
           )}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          {limite < vendas.length && (
+          {limite < vendasListadas.length && (
             <BotaoInteracao tamanho="pequeno" onClick={() => setLimite((atual) => atual + 20)}>
               Mostrar mais vendas
             </BotaoInteracao>
@@ -258,6 +218,10 @@ export default function ResumoFaturamento({
   const [aberto, setAberto] = useState(false);
   const expandidoAtual = expandido ?? aberto;
   const alternar = aoAlternarDetalhes || (() => setAberto((atual) => !atual));
+  const diferencas = diferencasPorVenda(composicao);
+  const pagamentosAConferir = (composicao?.detalhes || []).filter((venda) =>
+    pagamentoPrecisaConferencia(venda, diferencas.get(venda.venda_id)),
+  ).length;
 
   return (
     <div className="h-full space-y-3">
@@ -293,6 +257,11 @@ export default function ResumoFaturamento({
                   composicao.avisos.map((aviso) => <p key={aviso}>{aviso}</p>)
                 )}
               </div>
+            )}
+            {pagamentosAConferir > 0 && (
+              <p className="mt-2 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                {pagamentosAConferir} venda(s) com pagamento a conferir. Veja os detalhes.
+              </p>
             )}
             {mostrarDetalhes && (
               <div className="mt-3">

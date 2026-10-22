@@ -270,40 +270,110 @@ def _quitacao(venda, total, eventos, recebimentos_por_conta, espelhos):
     }
 
 
-def _formas_pagamento_vendas(detalhes):
-    """Resume a quitação deduplicada de todas as vendas, sem recortar a data do pagamento.
+def _agrupar_formas_pagamento(pagamentos):
+    por_forma = {}
+    for pagamento in pagamentos:
+        if pagamento["tipo"] != "pagamento":
+            continue
+        valor = moeda(pagamento["valor"])
+        if valor == ZERO:
+            continue
+        forma = _forma_pagamento_venda(pagamento["forma_pagamento"])
+        chave = normalizar(forma)
+        grupo = por_forma.setdefault(
+            chave,
+            {"forma_pagamento": forma, "total": ZERO, "quantidade": 0},
+        )
+        grupo["total"] += valor
+        grupo["quantidade"] += 1
+    return por_forma
 
-    O histórico preserva valores anteriores às devoluções. Quando não há uma
-    contrapartida com forma rastreável, a diferença para a quitação atual fica
-    explícita; não distribuir uma devolução entre dinheiro/cartão por suposição.
+
+def _serializar_formas_pagamento(por_forma):
+    return [
+        {**grupo, "total": float(grupo["total"])}
+        for _chave, grupo in sorted(por_forma.items())
+    ]
+
+
+def _formas_pagamento_vendas(detalhes):
+    """Resume pagamentos e identifica a venda de origem de cada diferença.
+
+    As formas são as dos pagamentos registrados, inclusive após uma redução
+    do total da venda. Elas não identificam, sozinhas, a forma de uma devolução
+    nem comprovam um reembolso do valor que excedeu o total atual.
     """
     por_forma = {}
     total_pago = ZERO
+    diferencas = []
+    resumo_diferencas = {}
     for venda in detalhes:
-        total_pago += moeda(venda["valor_pago"])
-        for pagamento in venda["pagamentos"]:
-            if pagamento["tipo"] != "pagamento":
-                continue
-            valor = moeda(pagamento["valor"])
-            if valor == ZERO:
-                continue
-            forma = _forma_pagamento_venda(pagamento["forma_pagamento"])
-            chave = normalizar(forma)
+        valor_pago = moeda(venda["valor_pago"])
+        total_pago += valor_pago
+        formas_venda = _agrupar_formas_pagamento(venda["pagamentos"])
+        total_venda_registrado = sum(
+            (grupo["total"] for grupo in formas_venda.values()), ZERO
+        )
+        for chave, grupo_venda in formas_venda.items():
             grupo = por_forma.setdefault(
                 chave,
-                {"forma_pagamento": forma, "total": ZERO, "quantidade": 0},
+                {
+                    "forma_pagamento": grupo_venda["forma_pagamento"],
+                    "total": ZERO,
+                    "quantidade": 0,
+                },
             )
-            grupo["total"] += valor
-            grupo["quantidade"] += 1
+            grupo["total"] += grupo_venda["total"]
+            grupo["quantidade"] += grupo_venda["quantidade"]
+        diferenca = valor_pago - total_venda_registrado
+        if diferenca == ZERO:
+            continue
+        if diferenca > ZERO:
+            motivo = "quitacao_sem_historico_correspondente"
+        elif moeda(venda.get("devolucoes")) > ZERO:
+            motivo = "devolucao"
+        else:
+            motivo = "pagamento_acima_total_venda"
+        diferencas.append(
+            {
+                campo: venda.get(campo)
+                for campo in (
+                    "venda_id",
+                    "numero_venda",
+                    "data_venda",
+                    "valor_pago",
+                    "descontos",
+                    "devolucoes",
+                    "total_vendas",
+                )
+            }
+            | {
+                "total_pagamentos_registrados": float(total_venda_registrado),
+                "diferenca": float(diferenca),
+                "formas_pagamento": _serializar_formas_pagamento(formas_venda),
+                "motivo": motivo,
+            }
+        )
+        grupo_motivo = resumo_diferencas.setdefault(
+            motivo, {"motivo": motivo, "diferenca": ZERO, "quantidade": 0}
+        )
+        grupo_motivo["diferenca"] += diferenca
+        grupo_motivo["quantidade"] += 1
     total_registrado = sum((grupo["total"] for grupo in por_forma.values()), ZERO)
     return {
         "criterio_formas_pagamento": "quitacao_das_vendas_selecionadas",
-        "formas_pagamento": [
-            {**grupo, "total": float(grupo["total"])}
-            for _chave, grupo in sorted(por_forma.items())
-        ],
+        "formas_pagamento": _serializar_formas_pagamento(por_forma),
         "total_formas_pagamento": float(total_registrado),
         "ajustes_formas_pagamento": float(total_pago - total_registrado),
+        "diferencas_pagamentos": sorted(
+            diferencas,
+            key=lambda v: (v["data_venda"] or "", v["venda_id"] or 0),
+            reverse=True,
+        ),
+        "resumo_diferencas_pagamentos": [
+            {**grupo, "diferenca": float(grupo["diferenca"])}
+            for _motivo, grupo in sorted(resumo_diferencas.items())
+        ],
     }
 
 

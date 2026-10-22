@@ -107,6 +107,11 @@ export const conferirItemCaixa = async (caixaId, dados) => {
   return response.data;
 };
 
+export const identificarPixCaixa = async (caixaId, dados) => {
+  const response = await api.post(`/caixas/${caixaId}/auditoria/pix`, dados);
+  return response.data;
+};
+
 /**
  * Obter resumo do caixa
  */

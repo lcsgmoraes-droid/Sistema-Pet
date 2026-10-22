@@ -250,9 +250,17 @@ def test_auditoria_completa_tem_consultas_limitadas_e_preserva_assinaturas(
         }
         for venda in esperados
     ]
-    assert resultado["pagamentos"] == [
-        com_conferencia(item) for item in pagamentos_esperados
-    ]
+    assert [
+        {campo: valor for campo, valor in item.items() if campo != "identificacao_pix"}
+        for item in resultado["pagamentos"]
+    ] == [com_conferencia(item) for item in pagamentos_esperados]
+    assert all(
+        item["identificacao_pix"]["estado"] == "nao_conferido"
+        and item["identificacao_pix"]["registro_id"] is None
+        and item["identificacao_pix"]["historico"] == []
+        and assinatura_item(item) == item["assinatura"]
+        for item in resultado["pagamentos"]
+    )
     assert resultado["resumo"]["total_vendido"] == quantidade * 10
     assert resultado["resumo"]["total_recebido"] == quantidade * 10
     assert resultado["movimentacoes"] == []

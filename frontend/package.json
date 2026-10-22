@@ -86,7 +86,7 @@
     "test:usuario-acesso-inicial": "node src/utils/usuarioAcessoInicial.test.mjs",
     "test:usuarios-pessoa-vinculo": "node scripts/test-usuarios-pessoa-vinculo.mjs",
     "preview": "vite preview",
-    "test:faturamento": "node --test src/components/v2/ResumoFaturamento/faturamentoPresentation.test.mjs src/components/v2/ResumoFaturamento/totaisFormasPagamento.test.mjs src/components/caixa/caixaImpressaoResumo.test.mjs src/utils/auditoriaCaixaUtils.test.mjs src/pages/dashboard/dashboardRefresh.test.mjs src/pages/dashboard/dashboardRefreshController.test.mjs src/utils/conferenciaFechamentoUtils.test.mjs src/components/caixa/ConferenciaCaixaItem.test.mjs src/components/caixa/useConferenciaFechamento.test.mjs src/components/caixa/ModalFecharCaixaConferencia.test.mjs && node scripts/test-dashboard-executive-layout.mjs"
+    "test:faturamento": "node --test src/components/v2/ResumoFaturamento/faturamentoPresentation.test.mjs src/components/v2/ResumoFaturamento/totaisFormasPagamento.test.mjs src/components/caixa/caixaImpressaoResumo.test.mjs src/utils/auditoriaCaixaUtils.test.mjs src/pages/dashboard/dashboardRefresh.test.mjs src/pages/dashboard/dashboardRefreshController.test.mjs src/pages/dashboard/dashboardPeriod.test.mjs src/pages/AlertasGestor.test.mjs src/utils/conferenciaFechamentoUtils.test.mjs src/components/caixa/ConferenciaCaixaItem.test.mjs src/components/caixa/IdentificacaoPixItem.test.mjs src/components/caixa/ModalFecharCaixaPix.test.mjs src/components/caixa/useConferenciaFechamento.test.mjs src/components/caixa/ModalFecharCaixaConferencia.test.mjs && node scripts/test-dashboard-executive-layout.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -31,6 +31,7 @@ import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
 import BotaoLink from "../../components/v2/BotaoLink/BotaoLink";
 import CartaoIndicador from "../../components/v2/CartaoIndicador/CartaoIndicador";
 import EstadoVazio from "../../components/v2/EstadoVazio/EstadoVazio";
+import InputPeriodo from "../../components/v2/InputPeriodo/InputPeriodo";
 import SeletorOpcoes from "../../components/v2/SeletorOpcoes/SeletorOpcoes";
 import ResumoFaturamento, {
   DetalhesFaturamento,
@@ -47,9 +48,14 @@ import {
   createEmptyManagementMetrics,
   getDashboardDetailPath,
   getExecutiveStatus,
-  getPeriodLabel,
 } from "../dashboard/dashboardOverview";
 import { iniciarAtualizacaoDashboard } from "../dashboard/dashboardRefresh";
+import {
+  chavePeriodoDashboard,
+  parametrosPeriodoDashboard,
+  rotuloPeriodoDashboard,
+  validarPeriodoDashboard,
+} from "../dashboard/dashboardPeriod";
 
 const PERIOD_OPTIONS = [
   { valor: 1, rotulo: "Hoje" },
@@ -58,6 +64,7 @@ const PERIOD_OPTIONS = [
   { valor: 30, rotulo: "30 dias" },
   { valor: 60, rotulo: "60 dias" },
   { valor: 90, rotulo: "90 dias" },
+  { valor: "personalizado", rotulo: "Período" },
 ];
 
 function formatDate(dateValue) {
@@ -92,9 +99,15 @@ export default function DashboardFinanceiro() {
   const requestIdRef = useRef(0);
   const loadedPeriodRef = useRef(null);
   const summaryPeriodRef = useRef(null);
+  const cashFlowPeriodRef = useRef(null);
+  const productsPeriodRef = useRef(null);
   const requestPendingRef = useRef(false);
   const abortControllerRef = useRef(null);
-  const [periodDays, setPeriodDays] = useState(30);
+  const [periodo, setPeriodo] = useState({ dias: 30 });
+  const [editarPeriodo, setEditarPeriodo] = useState(false);
+  const [rascunhoPeriodo, setRascunhoPeriodo] = useState({ inicio: "", fim: "" });
+  const [erroPeriodo, setErroPeriodo] = useState("");
+  const periodKey = chavePeriodoDashboard(periodo);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
@@ -115,25 +128,27 @@ export default function DashboardFinanceiro() {
       const controller = new AbortController();
       abortControllerRef.current = controller;
       requestPendingRef.current = true;
-      const mudouPeriodo = loadedPeriodRef.current !== periodDays;
+      const mudouPeriodo = loadedPeriodRef.current !== periodKey;
       if (mudouPeriodo) {
         setLoading(true);
         summaryPeriodRef.current = null;
+        cashFlowPeriodRef.current = null;
+        productsPeriodRef.current = null;
         setSummary(createEmptyDashboardSummary());
         setCashFlow([]);
         setTopProducts([]);
         setLastUpdate(null);
       } else if (!automatico) setRefreshing(true);
       const options = { signal: controller.signal };
+      const periodParams = parametrosPeriodoDashboard(periodo);
 
       const requests = [
         {
           key: "resumo financeiro",
           automatico: true,
-          consultar: () =>
-            api.get("/dashboard/resumo", { ...options, params: { periodo_dias: periodDays } }),
+          consultar: () => api.get("/dashboard/resumo", { ...options, params: periodParams }),
           aplicar: (data) => {
-            summaryPeriodRef.current = periodDays;
+            summaryPeriodRef.current = periodKey;
             setSummary(data);
             setLastUpdate(new Date());
           },
@@ -144,9 +159,12 @@ export default function DashboardFinanceiro() {
           consultar: () =>
             api.get("/dashboard/entradas-saidas", {
               ...options,
-              params: { periodo_dias: periodDays },
+              params: periodParams,
             }),
-          aplicar: (data) => setCashFlow(data || []),
+          aplicar: (data) => {
+            cashFlowPeriodRef.current = periodKey;
+            setCashFlow(data || []);
+          },
         },
         {
           key: "contas vencidas",
@@ -165,9 +183,12 @@ export default function DashboardFinanceiro() {
           consultar: () =>
             api.get("/dashboard/top-produtos", {
               ...options,
-              params: { periodo_dias: periodDays, limite: 5 },
+              params: { ...periodParams, limite: 5 },
             }),
-          aplicar: (data) => setTopProducts(data || []),
+          aplicar: (data) => {
+            productsPeriodRef.current = periodKey;
+            setTopProducts(data || []);
+          },
         },
         {
           key: "saldo bancário",
@@ -190,7 +211,7 @@ export default function DashboardFinanceiro() {
         }
       });
 
-      loadedPeriodRef.current = periodDays;
+      loadedPeriodRef.current = periodKey;
       setFailedBlocks((anteriores) => [
         ...anteriores.filter((key) => !requests.some((request) => request.key === key)),
         ...failed,
@@ -198,7 +219,7 @@ export default function DashboardFinanceiro() {
       setLoading(false);
       setRefreshing(false);
     },
-    [periodDays],
+    [periodo, periodKey],
   );
 
   useEffect(() => {
@@ -218,7 +239,7 @@ export default function DashboardFinanceiro() {
   const executiveStatus = useMemo(() => getExecutiveStatus(summary), [summary]);
   const statusIcon = executiveStatus.tone === "sucesso" ? CheckCircle2 : AlertCircle;
   const StatusIcon = statusIcon;
-  const periodLabel = getPeriodLabel(periodDays);
+  const periodLabel = rotuloPeriodoDashboard(periodo);
   const porRecebimento = summary?.visao_comercial === "recebimento";
   const composicaoVendas = summary?.composicao_vendas;
   const cashResult = Number(summary?.fluxo_periodo?.lucro || 0);
@@ -235,23 +256,71 @@ export default function DashboardFinanceiro() {
   const openManagementAssistant = () => {
     navigate("/ia/chat", {
       state: {
-        perguntaInicial: `Analise meu negócio nos últimos ${periodDays} dias: vendas, resultado de caixa, contas vencidas e riscos de clientes.`,
+        perguntaInicial: `Analise meu negócio no período ${periodLabel.toLowerCase()}: vendas, resultado de caixa, contas vencidas e riscos de clientes.`,
       },
     });
   };
 
-  if (loading || loadedPeriodRef.current !== periodDays) return <DashboardLoading />;
+  const selecionarPeriodo = (valor) => {
+    setErroPeriodo("");
+    if (valor === "personalizado") {
+      if (!editarPeriodo) {
+        setRascunhoPeriodo({
+          inicio: periodo.inicio || composicaoVendas?.data_inicio || "",
+          fim: periodo.fim || composicaoVendas?.data_fim || "",
+        });
+      }
+      setEditarPeriodo(true);
+      return;
+    }
+    setEditarPeriodo(false);
+    if (periodo.inicio || periodo.dias !== valor) setPeriodo({ dias: valor });
+  };
 
-  if (summaryPeriodRef.current !== periodDays) {
+  const aplicarPeriodo = () => {
+    const { erro } = validarPeriodoDashboard(rascunhoPeriodo);
+    setErroPeriodo(erro);
+    if (erro) return;
+    if (chavePeriodoDashboard(rascunhoPeriodo) !== periodKey) {
+      setPeriodo({ ...rascunhoPeriodo });
+    }
+  };
+
+  const seletorPeriodo = (
+    <SeletorOpcoes
+      rotulo="Período"
+      opcoes={PERIOD_OPTIONS}
+      valorSelecionado={editarPeriodo || periodo.inicio ? "personalizado" : periodo.dias}
+      aoSelecionar={selecionarPeriodo}
+    />
+  );
+  const filtroPeriodo = editarPeriodo ? (
+    <div className="mt-3 flex flex-col items-start gap-3 border-t border-slate-100 pt-3 dark:border-slate-800 sm:flex-row sm:items-center">
+      <div className="w-full sm:max-w-sm">
+        <InputPeriodo
+          id="dashboard-periodo-personalizado"
+          label="De / até"
+          value={rascunhoPeriodo}
+          onChange={(valor) => {
+            setRascunhoPeriodo(valor);
+            setErroPeriodo("");
+          }}
+          error={erroPeriodo}
+          help="Escolha até 90 dias, contando a data inicial e a final."
+        />
+      </div>
+      <BotaoInteracao onClick={aplicarPeriodo}>Aplicar período</BotaoInteracao>
+    </div>
+  ) : null;
+
+  if (loading || loadedPeriodRef.current !== periodKey) return <DashboardLoading />;
+
+  if (summaryPeriodRef.current !== periodKey) {
     return (
       <div className="min-h-full space-y-4 bg-slate-50 p-4 dark:bg-slate-950 sm:p-6">
         <h1 className="v2-titulo-pagina">Dashboard</h1>
-        <SeletorOpcoes
-          rotulo="Período"
-          opcoes={PERIOD_OPTIONS}
-          valorSelecionado={periodDays}
-          aoSelecionar={setPeriodDays}
-        />
+        {seletorPeriodo}
+        {filtroPeriodo}
         <div role="alert">
           <EstadoVazio
             icone={AlertCircle}
@@ -291,12 +360,7 @@ export default function DashboardFinanceiro() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <SeletorOpcoes
-              rotulo="Período"
-              opcoes={PERIOD_OPTIONS}
-              valorSelecionado={periodDays}
-              aoSelecionar={setPeriodDays}
-            />
+            {seletorPeriodo}
             <BotaoInteracao
               icon={HelpCircle}
               tamanho="pequeno"
@@ -319,6 +383,7 @@ export default function DashboardFinanceiro() {
             </BotaoInteracao>
           </div>
         </div>
+        {filtroPeriodo}
       </section>
 
       {failedBlocks.length > 0 && (
@@ -354,7 +419,7 @@ export default function DashboardFinanceiro() {
             detalhe={
               porRecebimento ? "Vendas e itens pela data da venda" : "Vendas e itens movimentados"
             }
-            aoClicar={() => navigate(getDashboardDetailPath("sales", periodDays))}
+            aoClicar={() => navigate(getDashboardDetailPath("sales", periodo))}
           >
             <p className="text-2xl font-bold leading-tight text-slate-950 dark:text-white">
               {formatQuantity(salesCount)} / {formatQuantity(unitsSold)}
@@ -378,7 +443,7 @@ export default function DashboardFinanceiro() {
               composicao={composicaoVendas}
               mostrarTotaisPorForma
               id="dashboard-detalhes-faturamento"
-              aoAbrirRelatorio={() => navigate(getDashboardDetailPath("sales", periodDays))}
+              aoAbrirRelatorio={() => navigate(getDashboardDetailPath("sales", periodo))}
             />
           </div>
         )}
@@ -409,7 +474,7 @@ export default function DashboardFinanceiro() {
               tom={cashResult >= 0 ? "sucesso" : "perigo"}
               titulo="Resultado de caixa"
               detalhe={`${formatMoneyBRL(indicators.inflows)} entrou · ${formatMoneyBRL(indicators.outflows)} saiu`}
-              aoClicar={() => navigate(getDashboardDetailPath("cashFlow", periodDays))}
+              aoClicar={() => navigate(getDashboardDetailPath("cashFlow", periodo))}
             >
               <p className="text-lg font-bold leading-tight text-slate-950 dark:text-white">
                 {formatMoneyBRL(cashResult)}
@@ -420,7 +485,7 @@ export default function DashboardFinanceiro() {
               tom="neutro"
               titulo="Ticket médio"
               detalhe={periodLabel}
-              aoClicar={() => navigate(getDashboardDetailPath("sales", periodDays))}
+              aoClicar={() => navigate(getDashboardDetailPath("sales", periodo))}
             >
               <p className="text-lg font-bold leading-tight text-slate-950 dark:text-white">
                 {formatMoneyBRL(
@@ -435,7 +500,7 @@ export default function DashboardFinanceiro() {
               tom="sucesso"
               titulo="Total a receber"
               detalhe="Valores ainda em aberto"
-              aoClicar={() => navigate(getDashboardDetailPath("receivableOpen", periodDays))}
+              aoClicar={() => navigate(getDashboardDetailPath("receivableOpen", periodo))}
             >
               <p className="text-lg font-bold leading-tight text-slate-950 dark:text-white">
                 {formatMoneyBRL(summary?.contas_receber?.total || 0)}
@@ -446,7 +511,7 @@ export default function DashboardFinanceiro() {
               tom="perigo"
               titulo="Total a pagar"
               detalhe="Compromissos ainda em aberto"
-              aoClicar={() => navigate(getDashboardDetailPath("payableOpen", periodDays))}
+              aoClicar={() => navigate(getDashboardDetailPath("payableOpen", periodo))}
             >
               <p className="text-lg font-bold leading-tight text-slate-950 dark:text-white">
                 {formatMoneyBRL(summary?.contas_pagar?.total || 0)}
@@ -470,7 +535,7 @@ export default function DashboardFinanceiro() {
                   ? "Priorize as cobranças mais antigas"
                   : "Nenhum valor vencido"
               }
-              aoClicar={() => navigate(getDashboardDetailPath("receivableOverdue", periodDays))}
+              aoClicar={() => navigate(getDashboardDetailPath("receivableOverdue", periodo))}
             >
               <p className="text-xl font-bold text-slate-900 dark:text-white">
                 {formatMoneyBRL(indicators.overdueReceivable)}
@@ -485,7 +550,7 @@ export default function DashboardFinanceiro() {
                   ? "Revise juros e fornecedores prioritários"
                   : "Nenhum valor vencido"
               }
-              aoClicar={() => navigate(getDashboardDetailPath("payableOverdue", periodDays))}
+              aoClicar={() => navigate(getDashboardDetailPath("payableOverdue", periodo))}
             >
               <p className="text-xl font-bold text-slate-900 dark:text-white">
                 {formatMoneyBRL(indicators.overduePayable)}
@@ -500,7 +565,7 @@ export default function DashboardFinanceiro() {
                   ? `${formatMoneyBRL(indicators.dueTodayReceivable)} a receber hoje`
                   : "Compromissos do dia, sem marcar como atraso"
               }
-              aoClicar={() => navigate(getDashboardDetailPath("payableDueToday", periodDays))}
+              aoClicar={() => navigate(getDashboardDetailPath("payableDueToday", periodo))}
             >
               <p className="text-xl font-bold text-slate-900 dark:text-white">
                 {formatMoneyBRL(indicators.dueTodayPayable)}
@@ -515,7 +580,7 @@ export default function DashboardFinanceiro() {
                   ? `${management.vips_inativos.impacto} em impacto estimado`
                   : "Nenhum VIP inativo há mais de 20 dias"
               }
-              aoClicar={() => navigate(getDashboardDetailPath("vipAtRisk", periodDays))}
+              aoClicar={() => navigate(getDashboardDetailPath("vipAtRisk", periodo))}
             >
               <p className="text-xl font-bold text-slate-900 dark:text-white">
                 {String(management?.vips_inativos?.quantidade || 0)}
@@ -532,7 +597,7 @@ export default function DashboardFinanceiro() {
                   ? "Sem compra há mais de 90 dias"
                   : "Nenhum cliente nessa condição"
               }
-              aoClicar={() => navigate(getDashboardDetailPath("inactiveCustomers", periodDays))}
+              aoClicar={() => navigate(getDashboardDetailPath("inactiveCustomers", periodo))}
             >
               <p className="text-xl font-bold text-slate-900 dark:text-white">
                 {String(management?.clientes_inativos?.quantidade || 0)}
@@ -550,7 +615,13 @@ export default function DashboardFinanceiro() {
               <p className="v2-subtitulo">Movimento diário · {periodLabel.toLowerCase()}</p>
             </div>
           </div>
-          {hasChartMovement ? (
+          {cashFlowPeriodRef.current !== periodKey ? (
+            <EstadoVazio
+              icone={AlertCircle}
+              titulo="Fluxo diário indisponível neste período"
+              descricao="Aguarde a próxima atualização ou tente novamente."
+            />
+          ) : hasChartMovement ? (
             <ResponsiveContainer width="100%" height={260}>
               <AreaChart data={cashFlow} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <defs>
@@ -615,7 +686,13 @@ export default function DashboardFinanceiro() {
             </div>
             <BotaoLink onClick={() => navigate("/produtos")}>Ver produtos</BotaoLink>
           </div>
-          {topProducts.length > 0 ? (
+          {productsPeriodRef.current !== periodKey ? (
+            <EstadoVazio
+              icone={AlertCircle}
+              titulo="Produtos indisponíveis neste período"
+              descricao="Aguarde a próxima atualização ou tente novamente."
+            />
+          ) : topProducts.length > 0 ? (
             <ol className="space-y-2">
               {topProducts.map((product, index) => (
                 <li
@@ -656,17 +733,17 @@ export default function DashboardFinanceiro() {
               {
                 label: "Clientes ativos",
                 value: management?.total_clientes || 0,
-                path: getDashboardDetailPath("activeCustomers", periodDays),
+                path: getDashboardDetailPath("activeCustomers", periodo),
               },
               {
                 label: "Novos promissores",
                 value: management?.oportunidades_novos?.quantidade || 0,
-                path: getDashboardDetailPath("promisingCustomers", periodDays),
+                path: getDashboardDetailPath("promisingCustomers", periodo),
               },
               {
                 label: "Sem WhatsApp",
                 value: management?.whatsapp_inativo?.quantidade || 0,
-                path: getDashboardDetailPath("customersWithoutWhatsapp", periodDays),
+                path: getDashboardDetailPath("customersWithoutWhatsapp", periodo),
               },
             ].map(({ label, value, path }) => (
               <button
@@ -698,14 +775,14 @@ export default function DashboardFinanceiro() {
                   key: "contas_receber",
                   label: "A receber",
                   personKey: "cliente",
-                  path: getDashboardDetailPath("receivableOverdue", periodDays),
+                  path: getDashboardDetailPath("receivableOverdue", periodo),
                   tone: "text-emerald-700 dark:text-emerald-300",
                 },
                 {
                   key: "contas_pagar",
                   label: "A pagar",
                   personKey: "fornecedor",
-                  path: getDashboardDetailPath("payableOverdue", periodDays),
+                  path: getDashboardDetailPath("payableOverdue", periodo),
                   tone: "text-rose-700 dark:text-rose-300",
                 },
               ].map((group) => (

@@ -11,6 +11,7 @@ from sqlalchemy import func, and_, or_
 from datetime import date, datetime, timedelta
 from typing import Optional
 import logging
+import re
 
 from .db import get_session
 from .auth.dependencies import get_current_user_and_tenant
@@ -82,6 +83,7 @@ router = APIRouter()
 router.include_router(ponto_equilibrio_router)
 
 DASHBOARD_OPEN_ACCOUNT_STATUSES = ("pendente", "parcial", "vencido", "vencida")
+DASHBOARD_MAX_DIAS_PERSONALIZADO = 90
 
 
 def _dashboard_fetchone(db: Session, sql: str, tenant_id, params=None):
@@ -96,6 +98,51 @@ def _intervalo_dias_calendario(periodo_dias: int, agora: datetime | None = None)
     inicio_periodo = inicio_hoje - timedelta(days=quantidade_dias - 1)
     fim_periodo = inicio_hoje + timedelta(days=1)
     return inicio_periodo, fim_periodo
+
+
+def _intervalo_dashboard(
+    periodo_dias: int,
+    data_inicio: str | None = None,
+    data_fim: str | None = None,
+    agora: datetime | None = None,
+):
+    """Valida o filtro antes das consultas, usando dias civis de Brasília."""
+    if data_inicio is None and data_fim is None:
+        return _intervalo_dias_calendario(periodo_dias, agora)
+    if data_inicio is None or data_fim is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Informe data_inicio e data_fim para o período personalizado.",
+        )
+
+    datas = []
+    for campo, valor in (("data_inicio", data_inicio), ("data_fim", data_fim)):
+        try:
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", valor):
+                raise ValueError
+            datas.append(date.fromisoformat(valor))
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=400,
+                detail=f"{campo} deve ser uma data válida em AAAA-MM-DD.",
+            ) from None
+    inicio, fim = datas
+    if inicio > fim:
+        raise HTTPException(
+            status_code=400, detail="A data inicial deve ser anterior ou igual à final."
+        )
+    if (fim - inicio).days + 1 > DASHBOARD_MAX_DIAS_PERSONALIZADO:
+        raise HTTPException(
+            status_code=400,
+            detail="O período personalizado deve ter no máximo 90 dias, incluindo as duas datas.",
+        )
+    if fim == date.max:
+        raise HTTPException(
+            status_code=400, detail="A data final está fora do intervalo permitido."
+        )
+    return datetime.combine(inicio, datetime.min.time()), datetime.combine(
+        fim + timedelta(days=1), datetime.min.time()
+    )
 
 
 def _classificar_data_vencimento_dashboard(
@@ -122,15 +169,19 @@ async def obter_resumo_dashboard(
     periodo_dias: int = Query(30, ge=1, le=366),
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
+    data_inicio: str | None = None,
+    data_fim: str | None = None,
 ):
     """
     Retorna resumo consolidado para o dashboard financeiro
     """
     current_user, tenant_id = user_and_tenant
+    agora = now_brasilia()
+    inicio_periodo, fim_periodo = _intervalo_dashboard(
+        periodo_dias, data_inicio, data_fim, agora
+    )
     try:
-        agora = now_brasilia()
         hoje = agora.date()
-        inicio_periodo, fim_periodo = _intervalo_dias_calendario(periodo_dias, agora)
 
         # ========================================
         # 1. SALDO ATUAL (Baseado em vendas pagas)
@@ -349,7 +400,9 @@ async def obter_resumo_dashboard(
                 "saidas": round(saidas_periodo, 2),
                 "lucro": round(lucro_periodo, 2),
             },
-            "periodo_dias": periodo_dias,
+            "periodo_dias": (fim_periodo - inicio_periodo).days,
+            "data_inicio": inicio_periodo.date().isoformat(),
+            "data_fim": (fim_periodo - timedelta(days=1)).date().isoformat(),
         }
 
     except Exception as e:
@@ -362,14 +415,17 @@ async def obter_entradas_saidas_por_dia(
     periodo_dias: int = Query(30, ge=0, le=366),
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
+    data_inicio: str | None = None,
+    data_fim: str | None = None,
 ):
     """
     Retorna entradas e saídas agrupadas por dia para gráfico
     """
     current_user, tenant_id = user_and_tenant
+    inicio_periodo, fim_periodo = _intervalo_dashboard(
+        periodo_dias, data_inicio, data_fim
+    )
     try:
-        inicio_periodo, fim_periodo = _intervalo_dias_calendario(periodo_dias)
-
         # Buscar vendas por dia
         vendas = (
             db.query(Venda)
@@ -406,7 +462,7 @@ async def obter_entradas_saidas_por_dia(
         dados_por_dia = {}
 
         # Inicializar todos os dias com zero
-        for i in range(max(periodo_dias, 1)):
+        for i in range((fim_periodo - inicio_periodo).days):
             data = (inicio_periodo + timedelta(days=i)).strftime("%Y-%m-%d")
             dados_por_dia[data] = {"data": data, "entradas": 0, "saidas": 0}
 
@@ -463,14 +519,17 @@ async def obter_vendas_por_dia(
     periodo_dias: int = Query(30, ge=0, le=366),
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
+    data_inicio: str | None = None,
+    data_fim: str | None = None,
 ):
     """
     Retorna vendas agrupadas por dia para gráfico
     """
     current_user, tenant_id = user_and_tenant
+    inicio_periodo, fim_periodo = _intervalo_dashboard(
+        periodo_dias, data_inicio, data_fim
+    )
     try:
-        inicio_periodo, fim_periodo = _intervalo_dias_calendario(periodo_dias)
-
         # Buscar vendas do período
         vendas = (
             db.query(
@@ -494,7 +553,7 @@ async def obter_vendas_por_dia(
         dados_por_dia = {}
 
         # Inicializar todos os dias com zero
-        for i in range(max(periodo_dias, 1)):
+        for i in range((fim_periodo - inicio_periodo).days):
             data = (inicio_periodo + timedelta(days=i)).strftime("%Y-%m-%d")
             dados_por_dia[data] = {"data": data, "quantidade": 0, "valor_total": 0}
 
@@ -815,20 +874,23 @@ async def obter_metricas_gerencial(
 
 @router.get("/dashboard/top-produtos")
 async def obter_top_produtos(
-    periodo_dias: int = 30,
+    periodo_dias: int = Query(30, ge=0, le=366),
     limite: int = 10,
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
+    data_inicio: str | None = None,
+    data_fim: str | None = None,
 ):
     """
     Retorna os produtos mais vendidos no período
     """
     current_user, tenant_id = user_and_tenant
+    inicio_periodo, fim_periodo = _intervalo_dashboard(
+        periodo_dias, data_inicio, data_fim
+    )
     try:
         from .vendas_models import VendaItem
         from .produtos_models import Produto
-
-        inicio_periodo, fim_periodo = _intervalo_dias_calendario(periodo_dias)
 
         # Buscar produtos mais vendidos
         top_produtos = (

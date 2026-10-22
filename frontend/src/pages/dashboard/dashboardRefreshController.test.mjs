@@ -13,6 +13,7 @@ const UI = {
   resumo: "ResumoFaturamento",
   detalhes: "DetalhesFaturamento",
   periodo: "SeletorOpcoes",
+  intervalo: "InputPeriodo",
   indisponivel: "EstadoVazio",
 };
 const vazio = () => {};
@@ -42,6 +43,7 @@ function respostaResumo(liquido, vendaIds, formas = [{ forma_pagamento: "Pix", t
 
 function preparar() {
   const consultas = [];
+  const navegacoes = [];
   const monitores = [];
   let agora = Date.parse("2026-10-22T12:00:00.000Z");
   class Relogio extends Date {
@@ -70,7 +72,15 @@ function preparar() {
     globals: { AbortController, Date: Relogio },
     mocks: new Map([
       ["../../api", padrao(api)],
-      ["react-router-dom", { useNavigate: () => vazio }],
+      [
+        "react-router-dom",
+        {
+          useNavigate:
+            () =>
+            (...args) =>
+              navegacoes.push(args),
+        },
+      ],
       ["lucide-react", {}],
       ["recharts", {}],
       ["../../hooks/useTour", { useTour: () => ({ iniciarTour: vazio }) }],
@@ -87,6 +97,7 @@ function preparar() {
       ["../../components/v2/CartaoIndicador/CartaoIndicador", padrao("CartaoIndicador")],
       ["../../components/v2/EstadoVazio/EstadoVazio", padrao(UI.indisponivel)],
       ["../../components/v2/SeletorOpcoes/SeletorOpcoes", padrao(UI.periodo)],
+      ["../../components/v2/InputPeriodo/InputPeriodo", padrao(UI.intervalo)],
       [
         "../../components/v2/ResumoFaturamento/ResumoFaturamento",
         { ...padrao(UI.resumo), DetalhesFaturamento: UI.detalhes },
@@ -106,11 +117,20 @@ function preparar() {
     ]),
   });
   const encontrar = (type) => elements(harness.tree).find((elemento) => elemento.type === type);
-  async function concluir(lote, resumo, { falharResumo = false } = {}) {
+  async function concluir(
+    lote,
+    resumo,
+    { falharResumo = false, falharGraficoProdutos = false } = {},
+  ) {
     for (const consulta of lote) {
       if (consulta.url === "/dashboard/resumo") {
         if (falharResumo) consulta.rejeitar(new Error("Resumo indisponivel"));
         else consulta.resolver({ data: resumo });
+      } else if (
+        falharGraficoProdutos &&
+        ["/dashboard/entradas-saidas", "/dashboard/top-produtos"].includes(consulta.url)
+      ) {
+        consulta.rejeitar(new Error("Bloco indisponivel"));
       } else if (consulta.url === "/dashboard/gerencial") {
         consulta.resolver({ data: createEmptyManagementMetrics() });
       } else if (consulta.url === "/dashboard/contas-vencidas") {
@@ -133,6 +153,18 @@ function preparar() {
     await harness.act(() => encontrar(UI.periodo).props.aoSelecionar(dias));
     return consultas.slice(inicio);
   }
+  async function editarIntervalo(inicio, fim) {
+    await harness.act(() => encontrar(UI.intervalo).props.onChange({ inicio, fim }));
+  }
+  async function aplicarIntervalo() {
+    const inicio = consultas.length;
+    const aplicar = elements(harness.tree).find(
+      (elemento) =>
+        elemento.type === "BotaoInteracao" && elementText(elemento) === "Aplicar período",
+    );
+    await harness.act(() => aplicar.props.onClick());
+    return consultas.slice(inicio);
+  }
   const horario = () => elementText(harness.tree).match(/Atualizado às\s+(\d{2}:\d{2})/)?.[1];
   function conferirIndisponivel() {
     assert.equal(encontrar(UI.resumo), undefined, "Nao deve apresentar faturamento antigo ou zero");
@@ -146,11 +178,14 @@ function preparar() {
   return {
     harness,
     consultas,
+    navegacoes,
     monitores,
     encontrar,
     concluir,
     atualizarAutomaticamente,
     selecionarPeriodo,
+    editarIntervalo,
+    aplicarIntervalo,
     horario,
     conferirIndisponivel,
     avancarMinuto() {
@@ -276,4 +311,161 @@ test("resposta antiga mesmo entregue apos abort nao substitui o periodo novo", a
     [11],
   );
   assert.equal(caso.horario(), horarioAtual);
+});
+
+test("rascunho e calendario incompleto nao consultam; aplicar usa as mesmas datas nos tres blocos", async () => {
+  const caso = preparar();
+  await caso.concluir(caso.consultas.slice(), respostaResumo(300, [30]));
+  const antes = caso.consultas.length;
+  assert.equal((await caso.selecionarPeriodo("personalizado")).length, 0);
+  await caso.editarIntervalo("2026-10-01", "");
+  assert.equal(caso.consultas.length, antes);
+  assert.equal((await caso.aplicarIntervalo()).length, 0);
+  assert.match(caso.encontrar(UI.intervalo).props.error, /data inicial e a data final/);
+  assert.equal(caso.encontrar(UI.resumo).props.composicao.faturamento_liquido, 300);
+  await caso.editarIntervalo("2026-10-01", "2026-10-07");
+  assert.equal(caso.consultas.length, antes);
+  const novas = await caso.aplicarIntervalo();
+  assert.equal(novas.length, 6);
+  const comerciais = novas.filter(
+    (c) => c.url !== "/dashboard/gerencial" && c.config.params?.data_inicio,
+  );
+  assert.equal(comerciais.length, 3);
+  for (const consulta of comerciais) {
+    assert.equal(consulta.config.params.data_inicio, "2026-10-01");
+    assert.equal(consulta.config.params.data_fim, "2026-10-07");
+    assert.equal(consulta.config.params.periodo_dias, undefined);
+  }
+  await caso.concluir(novas, respostaResumo(107, [107]));
+  assert.equal(caso.encontrar(UI.resumo).props.periodo, "01/10/2026 a 07/10/2026");
+  assert.equal(caso.encontrar(UI.periodo).props.valorSelecionado, "personalizado");
+  assert.equal(
+    (await caso.aplicarIntervalo()).length,
+    0,
+    "Reaplicar o mesmo intervalo nao duplica GET",
+  );
+});
+
+test("validacao bloqueia datas invertidas, invalidas e 91 dias, e aceita 90 inclusivos", async () => {
+  const caso = preparar();
+  await caso.concluir(caso.consultas.slice(), respostaResumo(300, [30]));
+  await caso.selecionarPeriodo("personalizado");
+  for (const [inicio, fim, mensagem] of [
+    ["2026-10-08", "2026-10-07", /posterior/],
+    ["2026-02-30", "2026-03-07", /datas válidas/],
+    ["2026-07-24", "2026-10-22", /até 90 dias/],
+  ]) {
+    await caso.editarIntervalo(inicio, fim);
+    assert.equal((await caso.aplicarIntervalo()).length, 0);
+    assert.match(caso.encontrar(UI.intervalo).props.error, mensagem);
+  }
+  await caso.editarIntervalo("2026-07-25", "2026-10-22");
+  const validas = await caso.aplicarIntervalo();
+  assert.equal(validas.length, 6);
+  await caso.concluir(validas, respostaResumo(90, [90]));
+  assert.equal(caso.encontrar(UI.resumo).props.periodo, "25/07/2026 a 22/10/2026");
+});
+
+test("intervalos com igual numero de dias descartam respostas antigas e preservam datas no auto refresh", async () => {
+  const caso = preparar();
+  await caso.concluir(caso.consultas.slice(), respostaResumo(300, [30]));
+  await caso.selecionarPeriodo("personalizado");
+  await caso.editarIntervalo("2026-10-01", "2026-10-07");
+  await caso.concluir(await caso.aplicarIntervalo(), respostaResumo(107, [107]));
+  await caso.harness.act(() => caso.encontrar(UI.resumo).props.aoAlternarDetalhes());
+  const antigas = await caso.atualizarAutomaticamente();
+  const monitorAntigo = caso.monitores.at(-1);
+  await caso.editarIntervalo("2026-10-08", "2026-10-14");
+  assert.equal(caso.consultas.at(-1), antigas.at(-1), "Alterar rascunho nao faz GET");
+  const novas = await caso.aplicarIntervalo();
+  assert.equal(monitorAntigo.encerrado, true);
+  assert.ok(antigas.every((consulta) => consulta.config.signal.aborted));
+  const atual = respostaResumo(814, [814]);
+  await caso.concluir(novas, atual);
+  await caso.concluir(antigas, respostaResumo(999, [999]));
+  assert.equal(caso.encontrar(UI.resumo).props.composicao, atual.composicao_vendas);
+  assert.equal(caso.encontrar(UI.resumo).props.periodo, "08/10/2026 a 14/10/2026");
+  const automaticas = await caso.atualizarAutomaticamente();
+  assert.equal(automaticas.length, 3);
+  assert.ok(automaticas.every((c) => c.config.params.data_inicio === "2026-10-08"));
+  assert.ok(automaticas.every((c) => c.config.params.data_fim === "2026-10-14"));
+  await caso.concluir(automaticas, respostaResumo(815, [814, 815]));
+  assert.equal(caso.encontrar(UI.resumo).props.expandido, true);
+  assert.equal(caso.encontrar(UI.detalhes).props.composicao.faturamento_liquido, 815);
+  assert.equal(caso.encontrar(UI.intervalo).props.value.inicio, "2026-10-08");
+});
+
+test("falha em novo intervalo nao reaproveita vendas, fluxo ou produtos de outro intervalo", async () => {
+  const caso = preparar();
+  await caso.concluir(caso.consultas.slice(), respostaResumo(300, [30]));
+  await caso.selecionarPeriodo("personalizado");
+  await caso.editarIntervalo("2026-09-01", "2026-09-07");
+  const novas = await caso.aplicarIntervalo();
+  await caso.concluir(novas, null, { falharResumo: true });
+  caso.conferirIndisponivel();
+  assert.equal(caso.encontrar(UI.intervalo).props.value.inicio, "2026-09-01");
+  const retry = await caso.atualizarAutomaticamente();
+  assert.ok(retry.every((c) => c.config.params.data_inicio === "2026-09-01"));
+  await caso.concluir(retry, respostaResumo(97, [97]));
+  assert.equal(caso.encontrar(UI.resumo).props.composicao.faturamento_liquido, 97);
+});
+
+test("grafico e ranking que falham no novo intervalo mostram indisponibilidade ate uma leitura valida", async () => {
+  const caso = preparar();
+  await caso.concluir(caso.consultas.slice(), respostaResumo(300, [30]));
+  await caso.selecionarPeriodo("personalizado");
+  await caso.editarIntervalo("2026-09-01", "2026-09-07");
+  await caso.concluir(await caso.aplicarIntervalo(), respostaResumo(97, [97]), {
+    falharGraficoProdutos: true,
+  });
+  const titulos = () => elements(caso.harness.tree).map((el) => el.props?.titulo);
+  assert.ok(titulos().includes("Fluxo diário indisponível neste período"));
+  assert.ok(titulos().includes("Produtos indisponíveis neste período"));
+  assert.ok(!titulos().includes("Sem movimento neste período"));
+  assert.ok(!titulos().includes("Sem produtos vendidos no período"));
+  await caso.concluir(await caso.atualizarAutomaticamente(), respostaResumo(97, [97]));
+  assert.ok(titulos().includes("Sem movimento neste período"));
+  assert.ok(titulos().includes("Sem produtos vendidos no período"));
+});
+
+test("links de relatorios e assistente recebem o intervalo aplicado, mesmo com outro rascunho", async () => {
+  const caso = preparar();
+  await caso.concluir(caso.consultas.slice(), respostaResumo(300, [30]));
+  await caso.selecionarPeriodo("personalizado");
+  await caso.editarIntervalo("2026-10-01", "2026-10-07");
+  await caso.concluir(await caso.aplicarIntervalo(), respostaResumo(107, [107]));
+  await caso.editarIntervalo("2026-10-08", "2026-10-14");
+  await caso.harness.act(() => {
+    elements(caso.harness.tree)
+      .find((el) => el.props?.titulo === "Pedidos / unidades")
+      .props.aoClicar();
+  });
+  assert.equal(
+    caso.navegacoes.at(-1)[0],
+    "/financeiro/vendas?data_inicio=2026-10-01&data_fim=2026-10-07",
+  );
+  await caso.harness.act(() => {
+    elements(caso.harness.tree)
+      .find((el) => el.props?.titulo === "Resultado de caixa")
+      .props.aoClicar();
+  });
+  assert.equal(
+    caso.navegacoes.at(-1)[0],
+    "/financeiro/fluxo-caixa?data_inicio=2026-10-01&data_fim=2026-10-07",
+  );
+  await caso.harness.act(() => {
+    elements(caso.harness.tree)
+      .find((el) => elementText(el) === "Analisar com IA")
+      .props.onClick();
+  });
+  assert.match(caso.navegacoes.at(-1)[1].state.perguntaInicial, /01\/10\/2026 a 07\/10\/2026/);
+  assert.doesNotMatch(caso.navegacoes.at(-1)[1].state.perguntaInicial, /últimos/);
+  const presets = await caso.selecionarPeriodo(7);
+  assert.equal(presets.length, 6);
+  assert.equal(caso.encontrar(UI.intervalo), undefined);
+  assert.ok(
+    presets
+      .filter((c) => c.config.params?.periodo_dias)
+      .every((c) => c.config.params.periodo_dias === 7),
+  );
 });

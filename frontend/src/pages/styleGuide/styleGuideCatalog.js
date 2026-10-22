@@ -182,9 +182,16 @@ export const styleGuideCatalog = [
       {
         nome: "TotaisFormasPagamento",
         status: "pronto",
-        arquivo: "components/v2/ResumoFaturamento/ResumoFaturamento.jsx",
+        arquivo: "components/v2/ResumoFaturamento/TotaisFormasPagamento.jsx",
         descricao:
-          "Export nomeado com os totais por forma das mesmas vendas do faturamento. Usa o agregado do backend, apresenta ajustes sem forma identificada separadamente e reconcilia com o total pago; não representa os recebimentos do caixa ou da data do pagamento.",
+          "Totais por forma das mesmas vendas do faturamento, agregados pelo backend. Mostra os pagamentos registrados, o total aplicado às vendas e a origem de cada diferença, com consulta da venda em outra aba. Disponível também como export nomeado em ResumoFaturamento; o escopo acompanha a data da venda.",
+      },
+      {
+        nome: "AvisoPagamentoVenda",
+        status: "pronto",
+        arquivo: "components/v2/ResumoFaturamento/AvisoPagamentoVenda.jsx",
+        descricao:
+          "Destaca pagamentos acima do valor da venda ou sem histórico completo no dashboard e no fechamento. Corrigir abre consulta no PDV em outra aba pelo procedimento normal.",
       },
       {
         nome: "EstadoVazio",

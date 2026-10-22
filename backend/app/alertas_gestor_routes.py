@@ -12,6 +12,13 @@ from sqlalchemy.orm import Session, raiseload
 from app.auth.dependencies import get_current_user_and_tenant
 from app.caixa.conferencia import instante_fechamento, instante_fechamento_sql, moeda
 from app.caixa_models import Caixa
+from app.caixa.pix_identificacao import (
+    AlteracaoIdentificacaoPixSchema,
+    IdentificacaoPixSchema,
+    carregar_historico_alertas_pix,
+    listar_pendencias_pix,
+    registrar_identificacao_pix,
+)
 from app.db import get_session
 from app.models import User, UserTenant
 from app.security.permissions_decorator import require_permission_dependency
@@ -103,7 +110,11 @@ def listar_alertas_gestor(
     data_inicio: date | None = None,
     data_fim: date | None = None,
     tipo: Literal[
-        "todos", "venda_justificada", "diferenca_abertura", "diferenca_fechamento"
+        "todos",
+        "venda_justificada",
+        "diferenca_abertura",
+        "diferenca_fechamento",
+        "pix_nao_identificado",
     ] = "todos",
     operador_id: int | None = None,
     pagina: int = Query(1, ge=1),
@@ -196,6 +207,8 @@ def listar_alertas_gestor(
                 }
             )
 
+    # Pix pendente continua visível até ser identificado, mesmo fora do período.
+    eventos.extend(listar_pendencias_pix(db, tenant_id))
     operadores = {evento["operador_id"]: evento["operador"] for evento in eventos}
     if operador_id is not None:
         eventos = [evento for evento in eventos if evento["operador_id"] == operador_id]
@@ -205,6 +218,7 @@ def listar_alertas_gestor(
             "venda_justificada",
             "diferenca_abertura",
             "diferenca_fechamento",
+            "pix_nao_identificado",
         )
     }
     if tipo != "todos":
@@ -213,14 +227,32 @@ def listar_alertas_gestor(
         key=lambda e: (datetime.fromisoformat(e["data"]), e["id"]), reverse=True
     )
     total = len(eventos)
+    itens = eventos[(pagina - 1) * por_pagina : pagina * por_pagina]
+    carregar_historico_alertas_pix(db, tenant_id, itens)
     return {
-        "itens": eventos[(pagina - 1) * por_pagina : pagina * por_pagina],
+        "itens": itens,
         "total": total,
         "pagina": pagina,
         "por_pagina": por_pagina,
         "resumo": resumo,
+        "aviso_pix": "Pix não identificados permanecem visíveis até a resolução, independentemente do período selecionado.",
         "operadores": [
             {"id": id_, "nome": nome}
             for id_, nome in sorted(operadores.items(), key=lambda par: par[1])
         ],
     }
+
+
+@router.post("/pix/{pagamento_id}/identificacao")
+def resolver_pix_gestor(
+    pagamento_id: int,
+    dados: AlteracaoIdentificacaoPixSchema,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    return registrar_identificacao_pix(
+        db,
+        user_and_tenant,
+        IdentificacaoPixSchema(pagamento_id=pagamento_id, **dados.model_dump()),
+        acesso_gerencial=True,
+    )
