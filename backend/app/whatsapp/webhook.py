@@ -27,6 +27,7 @@ from app.whatsapp.consent_service import (
     registrar_recusa,
 )
 from app.whatsapp.log_safety import mascarar_telefone
+from app.whatsapp.message_views import serializar_mensagem
 from app.whatsapp.usage_limits import LIMITE_DIARIO, avaliar_limites
 from app.whatsapp.tenant_context import whatsapp_tenant_context
 from app.whatsapp.customer_lookup import SITUACAO_AMBIGUO, resolver_tutor_por_telefone
@@ -623,18 +624,7 @@ async def _avisar_nova_mensagem(
         from app.whatsapp.websocket import emit_new_message
 
         await emit_new_message(
-            str(session.id),
-            {
-                "id": str(message.id),
-                "session_id": str(session.id),
-                "tipo": "recebida",
-                "sender_type": "customer",
-                "content": conteudo,
-                "conteudo": conteudo,
-                "timestamp": datetime.utcnow().isoformat(),
-                "read": False,
-            },
-            str(tenant_id),
+            str(session.id), serializar_mensagem(message), str(tenant_id)
         )
     except Exception as erro:
         logger.warning("Falha ao avisar nova mensagem em tempo real: %s", erro)

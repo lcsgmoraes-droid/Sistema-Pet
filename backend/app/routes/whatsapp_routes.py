@@ -56,8 +56,10 @@ async def get_ultimas_mensagens_cliente(
         Lista com as últimas mensagens do cliente
     """
     try:
-        from app.ia.aba6_aba9_models import MensagemWhatsApp, ConversaWhatsApp
         from app.models import Cliente
+        from app.whatsapp.lgpd_dados import sessoes_do_tutor
+        from app.whatsapp.message_views import serializar_para_historico_do_cliente
+        from app.whatsapp.models import WhatsAppMessage
 
         current_user, tenant_id = user_and_tenant
 
@@ -71,53 +73,24 @@ async def get_ultimas_mensagens_cliente(
         if not cliente:
             raise HTTPException(status_code=404, detail="Cliente não encontrado")
 
-        # Buscar conversas do cliente
-        conversas = (
-            db.query(ConversaWhatsApp)
-            .filter(
-                ConversaWhatsApp.cliente_id == cliente_id,
-                ConversaWhatsApp.tenant_id == tenant_id,
-            )
-            .all()
+        # Conversas do tutor (pelo vinculo e pelo telefone do cadastro).
+        conversas = sessoes_do_tutor(
+            db, tenant_id, cliente_id, [cliente.celular, cliente.telefone]
         )
-
         if not conversas:
-            # Cliente existe mas não tem conversas, retornar lista vazia
             return []
 
-        conversa_ids = [c.id for c in conversas]
-
-        # Buscar últimas mensagens dessas conversas
         mensagens = (
-            db.query(MensagemWhatsApp)
+            db.query(WhatsAppMessage)
             .filter(
-                MensagemWhatsApp.conversa_id.in_(conversa_ids),
-                MensagemWhatsApp.tenant_id == tenant_id,
+                WhatsAppMessage.session_id.in_([c.id for c in conversas]),
+                WhatsAppMessage.tenant_id == tenant_id,
             )
-            .order_by(MensagemWhatsApp.data_hora.desc())
-            .limit(limit)
+            .order_by(WhatsAppMessage.created_at.desc())
+            .limit(max(1, min(limit, 50)))
             .all()
         )
-
-        # Formatar resposta
-        resultado = []
-        for msg in mensagens:
-            resultado.append(
-                {
-                    "id": msg.id,
-                    "conversa_id": msg.conversa_id,
-                    "remetente": msg.remetente,
-                    "tipo": msg.tipo,
-                    "mensagem": msg.mensagem,
-                    "intencao_detectada": msg.intencao_detectada,
-                    "confianca_intencao": msg.confianca_intencao,
-                    "processada_por_ia": msg.processada_por_ia,
-                    "resposta_ia": msg.resposta_ia,
-                    "data_hora": msg.data_hora.isoformat() if msg.data_hora else None,
-                }
-            )
-
-        return resultado
+        return [serializar_para_historico_do_cliente(m) for m in mensagens]
 
     except HTTPException:
         raise

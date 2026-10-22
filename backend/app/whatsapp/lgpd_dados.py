@@ -22,7 +22,7 @@ from app.whatsapp.tenant_context import whatsapp_tenant_context
 CONTEUDO_REMOVIDO = "[conteudo removido a pedido do titular]"
 
 
-def _sessoes_do_tutor(db, tenant_id, cliente_id, telefones) -> list:
+def sessoes_do_tutor(db, tenant_id, cliente_id, telefones) -> list:
     telefones = [t for t in telefones if t]
     sessoes: dict[str, Any] = {}
 
@@ -76,7 +76,7 @@ def anonimizar_conversas_do_tutor(
     }
 
     with whatsapp_tenant_context(tenant_id):
-        for sessao in _sessoes_do_tutor(db, tenant_id, cliente_id, telefones):
+        for sessao in sessoes_do_tutor(db, tenant_id, cliente_id, telefones):
             anonimo = _anonimo(f"{sessao.id}:{sessao.phone_number}")
 
             for mensagem in db.query(WhatsAppMessage).filter(
@@ -135,7 +135,7 @@ def exportar_conversas_do_tutor(db, tenant_id, cliente_id, telefones) -> dict[st
     with whatsapp_tenant_context(tenant_id):
         conversas = []
         atendimentos = []
-        for sessao in _sessoes_do_tutor(db, tenant_id, cliente_id, telefones):
+        for sessao in sessoes_do_tutor(db, tenant_id, cliente_id, telefones):
             mensagens = (
                 db.query(WhatsAppMessage)
                 .filter(WhatsAppMessage.session_id == sessao.id)

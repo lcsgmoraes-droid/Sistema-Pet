@@ -9,7 +9,7 @@ from typing import Optional, Dict, Union
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, field_serializer
+from pydantic import BaseModel, Field, field_serializer
 
 from app.db import get_session as get_db
 from app.auth import get_current_user_and_tenant
@@ -74,12 +74,11 @@ class SessionResponse(BaseModel):
         from_attributes = True
 
 
-class MessageRequest(BaseModel):
+class AtendenteMensagem(BaseModel):
+    """Mensagem escrita pelo atendente na tela de atendimento."""
+
     session_id: str
-    tipo: str = "recebida"
-    texto: str
-    telefone: Optional[str] = None
-    query: Optional[str] = None
+    message: str = Field(min_length=1, max_length=4096)
 
 
 # Endpoints
@@ -337,55 +336,81 @@ def get_session_messages(
 
     _registrar_acesso_a_conversa(db, tenant_id, session_id, current_user)
 
-    return messages
+    from app.whatsapp.message_views import serializar_mensagem
+
+    return [serializar_mensagem(m) for m in messages]
 
 
 @router.post("/messages")
-async def process_message(
-    request: MessageRequest,
+async def enviar_mensagem_do_atendente(
+    request: AtendenteMensagem,
     user_and_tenant=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_db),
 ):
-    """Processar mensagem recebida do cliente"""
-    from app.whatsapp.models import WhatsAppMessage
-    import uuid
+    """O atendente responde ao tutor pelo WhatsApp (envio de verdade).
+
+    So vale para conversa com atendente humano; respeita quem recusou mensagens;
+    a mensagem sai pelo canal da loja e fica registrada com o autor.
+    """
+    from app.whatsapp.consent_service import pode_enviar_whatsapp
+    from app.whatsapp.message_views import serializar_mensagem
+    from app.whatsapp.models import WhatsAppSession
+    from app.whatsapp.sender import send_whatsapp_message
+    from app.whatsapp.webhook import atendimento_humano_ativo
+    from app.whatsapp.websocket import emit_new_message
 
     current_user, tenant_id = user_and_tenant
 
-    session_id = request.session_id
-    tipo = request.tipo
-    texto = request.texto
-
-    # Criar mensagem recebida
-    message = WhatsAppMessage(
-        id=str(uuid.uuid4()),
-        session_id=session_id,
-        tenant_id=tenant_id,
-        tipo=tipo,
-        conteudo=texto,
-        created_at=datetime.utcnow(),
+    sessao = (
+        db.query(WhatsAppSession)
+        .filter(
+            WhatsAppSession.id == request.session_id,
+            WhatsAppSession.tenant_id == tenant_id,
+        )
+        .first()
     )
+    if sessao is None:
+        raise HTTPException(status_code=404, detail="Conversa não encontrada")
 
-    db.add(message)
-    db.commit()
-    db.refresh(message)
+    if not atendimento_humano_ativo(sessao):
+        raise HTTPException(
+            status_code=409,
+            detail="Esta conversa está com a IA. Assuma o atendimento antes de responder.",
+        )
 
-    # Simular resposta da IA (simplificado para teste)
-    response_message = WhatsAppMessage(
-        id=str(uuid.uuid4()),
-        session_id=session_id,
-        tenant_id=tenant_id,
-        tipo="enviada",
-        conteudo=f"Obrigado pela mensagem: '{texto}'. Como posso ajudar?",
-        created_at=datetime.utcnow(),
+    texto = request.message.strip()
+    if not texto:
+        raise HTTPException(status_code=422, detail="Escreva a mensagem")
+
+    permitido, _motivo = pode_enviar_whatsapp(
+        db,
+        tenant_id,
+        sessao.phone_number,
+        sessao.cliente_id,
+        resposta_ao_tutor=True,
     )
+    if not permitido:
+        raise HTTPException(
+            status_code=403,
+            detail="O tutor recusou mensagens automáticas e a loja bloqueia o envio para quem recusou.",
+        )
 
-    db.add(response_message)
-    db.commit()
-    db.refresh(response_message)
+    enviada = await send_whatsapp_message(
+        db=db,
+        tenant_id=str(tenant_id),
+        session_id=sessao.id,
+        message=texto,
+        sent_by_user_id=current_user.id,
+    )
+    if enviada is None:
+        raise HTTPException(
+            status_code=502,
+            detail="Não foi possível enviar a mensagem pelo WhatsApp agora.",
+        )
 
-    return {
-        "id": str(response_message.id),
-        "texto": response_message.conteudo,
-        "tipo": response_message.tipo,
-    }
+    resposta = serializar_mensagem(enviada)
+    try:
+        await emit_new_message(str(sessao.id), resposta, str(tenant_id))
+    except Exception as erro:
+        logger.warning("Falha ao avisar mensagem enviada em tempo real: %s", erro)
+    return resposta

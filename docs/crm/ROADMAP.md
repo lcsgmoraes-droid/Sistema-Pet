@@ -155,7 +155,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 - [~] Limite de uso da IA por loja: **válvula de segurança provisória** (22/10/2026) de tokens por dia por loja, medida pelas respostas já gravadas (`backend/app/whatsapp/usage_limits.py`; padrão 1.000.000 tokens/dia, ajustável em `WHATSAPP_IA_DAILY_TOKEN_LIMIT`, 0 desliga). Ao atingir, a IA para e a conversa vai para a fila de atendimento humano com o aviso de espera. **Falta ligar ao saldo de créditos (tema T.1).**
 - [x] Limite de frequência por telefone (22/10/2026): acima de 15 mensagens em 10 minutos na mesma conversa, a IA para de responder em silêncio (ajustável em `WHATSAPP_IA_MAX_MESSAGES_PER_WINDOW` e `WHATSAPP_IA_WINDOW_MINUTES`). Limite por tutor (somando telefones) fica para quando o vínculo com cadastro for central (Etapa 1).
 - [ ] Destino da chave de IA de reserva compartilhada entre lojas: com a decisão de 21/10 (custo da IA é do CorePet), a chave da plataforma passa a ser a chave oficial e o consumo de cada loja é medido e limitado. `[?] DECIDIR` se a loja ainda pode usar chave própria e como a chave da plataforma é guardada (hoje é variável de ambiente).
-- [x] O controle de custo antigo (`ai/cost_control.py`: em memória, por processo e com identificador de loja inteiro) **não serve** e não foi ligado; foi substituído pela medição durável a partir das mensagens gravadas. Remoção do código antigo entra na limpeza da Etapa 0.8.
+- [x] O controle de custo antigo (`ai/cost_control.py`: em memória, por processo e com identificador de loja inteiro) **não serve** para o WhatsApp e não foi ligado; foi substituído pela medição durável a partir das mensagens gravadas. Ele continua sendo usado pelo motor de IA geral (`ai/engine.py`), fora do escopo do CRM.
 - [~] Medição por mensagem: modelo usado, tokens de entrada e saída **já são gravados** em cada resposta; falta o custo em créditos (tema T.1).
 
 **0.7 LGPD operacional e consentimento**
@@ -170,11 +170,11 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 - [ ] Prazo de retenção das conversas. `[?] DECIDIR`
 
 **0.8 Duplicidade e código morto**
-- [ ] Decidir o modelo de conversa definitivo e remover o paralelo sem uso.
-- [ ] Remover/ajustar código sem uso do bot e do envio em massa.
-- [ ] Consertar o envio de mensagem do atendente (hoje não envia e o contrato com a tela está quebrado).
-- [ ] Alinhar tela e API do chat (nomes de campos e respostas).
-- [ ] Testes de contrato entre tela e API.
+- [~] Modelo de conversa definitivo: `whatsapp_ia_sessions` e `whatsapp_ia_messages` (decisão de 22/10/2026). O histórico de WhatsApp da ficha do cliente passou a ler deles. O modelo paralelo (`ConversaWhatsApp` e `MensagemWhatsApp`, em `backend/app/ia/aba6_aba9_models.py`) não é mais lido nem escrito por nada; **remover as classes só depois de confirmar, no ensaio com a cópia do banco de produção, que as tabelas estão vazias.**
+- [~] Removidos (22/10/2026): envio em massa e notificação de entrega sem chamador em `sender.py` e o módulo de notificações simuladas (`notifications.py`, 475 linhas, sem uso). **Ainda a revisar**: módulos legados do bot (`ai_service.py`, `tools.py`, `tool_executor.py`, `context_manager.py`, `intents.py`, `templates.py`) que só aparecem em rotas de teste, o envio simulado de entrega (`services/whatsapp_service.py`, que devolve sucesso sem enviar) e o fluxo LGPD paralelo do WhatsApp (`DataDeletionRequest`).
+- [x] Envio de mensagem do atendente funciona de verdade (`POST /whatsapp/messages`): só em conversa com atendente humano (ou aguardando), respeita quem recusou mensagens, sai pelo canal da loja com o autor registrado, avisa os outros atendentes em tempo real e devolve erro claro se o provedor falhar. Não há mais resposta simulada. A regra da janela de 24h entra com o canal oficial (Etapa 4).
+- [x] Tela e API alinhadas: um formato único de mensagem (`backend/app/whatsapp/message_views.py`) para o chat, para o aviso em tempo real e para o histórico da ficha do cliente (que antes lia campos que a API não enviava).
+- [x] Testes de contrato entre tela e API (`backend/tests/unit/test_whatsapp_chat_do_atendente.py`: campos esperados pelo chat e pela ficha, corpo do envio, regras de envio e código removido).
 
 **0.9 Processamento confiável das mensagens**
 - [ ] Fila com nova tentativa para as mensagens recebidas (hoje a falha é perdida).
@@ -351,6 +351,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 | Data | Mudança |
 |---|---|
+| 22/10/2026 | Etapa 0.8 em grande parte concluída: envio do atendente funcionando, formato único de mensagem entre tela e API, histórico da ficha lendo do modelo definitivo e código morto removido; falta revisar o restante do legado do bot e remover o modelo paralelo após conferir o banco de produção. |
 | 22/10/2026 | Etapa 0.7 avançada (sem as decisões de consentimento e retenção): SAIR registrado e confirmado, quem recusou não recebe IA nem aviso, conversas entram no dossiê e na anonimização LGPD, leitura de mensagens auditada. |
 | 22/10/2026 | Etapa 0.6 em grande parte concluída: limite de frequência por telefone e válvula de segurança de tokens por dia por loja, medidos no banco; falta ligar ao saldo de créditos (T.1). |
 | 22/10/2026 | Etapa 0.5 concluída: canal interno com comparação segura e sem token de exemplo em produção, valores fixos removidos (n8n, compose de produção, webhook antigo), erro do teste de conexão sem vazamento, telefone mascarado nos logs e configuração protegida por permissão. Exige definir token forte no servidor antes da publicação. |
