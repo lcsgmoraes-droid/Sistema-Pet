@@ -4,6 +4,15 @@ import { fileURLToPath } from "node:url";
 import { createControllerHarness } from "../../../scripts/helpers/reactControllerHarness.mjs";
 
 const instante = (minuto) => `2026-10-20T19:${String(minuto).padStart(2, "0")}:00.000Z`;
+const custos = (extra = {}) => ({
+  commission_merchant_percent: 12,
+  commission_ifood_percent: 23,
+  payment_fee_percent: 3,
+  tax_percent: 4,
+  additional_unit_cost: 1,
+  target_margin_percent: 20,
+  ...extra,
+});
 const oferta = (preco = 150, minuto = 0, extra = {}) => ({
   product_id: 2,
   evaluated_at: instante(minuto),
@@ -13,6 +22,8 @@ const oferta = (preco = 150, minuto = 0, extra = {}) => ({
   effective_price: preco,
   promotion_active: false,
   pending: [],
+  simulation_costs: custos(),
+  simulation_costs_active: false,
   ...extra,
 });
 
@@ -205,6 +216,10 @@ test("duplo clique aplica uma vez e envia somente o preço específico", async (
   assert.equal(env.harness.tree.pronta, false);
   assert.equal(env.retomada.options.enabled, false);
   env.gravacoes[0].resolver({ data: {} });
+  await env.harness.settle();
+  env.ofertas.at(-1).resolver({
+    data: { items: [oferta(160, 1, { saved_specific_price: 160 })] },
+  });
   await Promise.all([primeira, segunda]);
   await env.harness.settle();
   assert.equal(env.aplicados.length, 1);
@@ -252,6 +267,10 @@ test("seguir regra da loja aplica null sem copiar outros campos", async () => {
   const aplicacao = env.harness.tree.aplicar();
   assert.deepEqual(env.gravacoes.at(-1).payload, { id: 2, preco_ifood: null });
   env.gravacoes.at(-1).resolver({ data: {} });
+  await env.harness.settle();
+  env.ofertas.at(-1).resolver({
+    data: { items: [oferta(100, 1, { saved_specific_price: null })] },
+  });
   await aplicacao;
   await env.harness.settle();
   assert.equal(env.aplicados.at(-1).saved_specific_price, null);
@@ -306,4 +325,232 @@ test("falha ao salvar conserva preço digitado, não confirma sucesso e relê of
   await env.concluirConsultas(oferta(150, 1), oferta(160, 1));
   assert.equal(env.harness.tree.pronta, true);
   assert.equal(env.harness.tree.alterado, true);
+});
+
+test("taxas temporárias preservam zero e null e são enviadas somente à simulação", async () => {
+  const env = preparar();
+  await env.concluirConsultas();
+  assert.equal(env.harness.tree.podeSimularCustos, true);
+  await env.harness.act(() => env.harness.tree.alterarModoCustos("temporarios"));
+  await env.harness.act(() => env.harness.tree.alterarCusto("commission_merchant_percent", 15));
+  await env.harness.act(() => env.harness.tree.alterarCusto("payment_fee_percent", 0));
+  await env.harness.act(() => env.harness.tree.alterarCusto("tax_percent", null));
+  await env.executarDebounce();
+  const rascunho = custos({
+    commission_merchant_percent: 15,
+    payment_fee_percent: 0,
+    tax_percent: null,
+  });
+  assert.deepEqual(env.simulacoes.at(-1).payload, {
+    product_id: 2,
+    preco_ifood: 150,
+    custos_simulados: rascunho,
+  });
+  env.simulacoes.at(-1).resolver({
+    data: oferta(150, 0, { simulation_costs: rascunho, simulation_costs_active: true }),
+  });
+  await env.harness.settle();
+  assert.deepEqual(env.harness.tree.custosSimulados, rascunho);
+  assert.equal(env.harness.tree.custosAtivos, true);
+  assert.equal(env.harness.tree.alterado, false, "alterar taxas não cria preço para aplicar");
+  assert.deepEqual(env.harness.tree.salvo.simulation_costs, custos());
+  assert.deepEqual(env.gravacoes, []);
+});
+
+test("resposta antiga de taxas não substitui os valores ou a margem mais recentes", async () => {
+  const env = preparar();
+  await env.concluirConsultas();
+  await env.harness.act(() => env.harness.tree.alterarModoCustos("temporarios"));
+  await env.harness.act(() => env.harness.tree.alterarCusto("tax_percent", 5));
+  await env.executarDebounce();
+  const anterior = env.simulacoes.at(-1);
+  await env.harness.act(() => env.harness.tree.alterarCusto("tax_percent", 8));
+  assert.equal(anterior.config.signal.aborted, true);
+  assert.equal(env.harness.tree.pronta, false);
+  assert.equal(env.harness.tree.resultado, null);
+  await env.executarDebounce();
+  env.simulacoes.at(-1).resolver({
+    data: oferta(150, 0, {
+      simulation_costs: custos({ tax_percent: 8 }),
+      simulation_costs_active: true,
+    }),
+  });
+  await env.harness.settle();
+  anterior.resolver({
+    data: oferta(150, 0, {
+      simulation_costs: custos({ tax_percent: 5 }),
+      simulation_costs_active: true,
+    }),
+  });
+  await env.harness.settle();
+  assert.equal(env.harness.tree.resultado.simulation_costs.tax_percent, 8);
+  assert.equal(env.harness.tree.custosSimulados.tax_percent, 8);
+  assert.equal(env.harness.tree.pronta, true);
+  assert.deepEqual(env.gravacoes, []);
+});
+
+test("promoção e reconsulta conservam taxas e preço temporários; restaurar taxas não muda preço", async () => {
+  const env = preparar();
+  await env.concluirConsultas();
+  await env.harness.act(() => env.harness.tree.alterarModoCustos("temporarios"));
+  await env.harness.act(() => env.harness.tree.alterarCusto("commission_ifood_percent", 26));
+  await env.harness.act(() => env.harness.tree.alterarValor(160));
+  await env.executarDebounce();
+  const simulada = oferta(120, 1, {
+    regular_price: 160,
+    promotion_active: true,
+    next_price_change_at: instante(2),
+    simulation_costs: custos({ commission_ifood_percent: 26 }),
+    simulation_costs_active: true,
+  });
+  env.simulacoes.at(-1).resolver({ data: simulada });
+  await env.harness.settle();
+  await env.harness.act(() => env.retomada.callback());
+  await env.concluirConsultas(oferta(120, 1), simulada);
+  assert.equal(env.harness.tree.custosSimulados.commission_ifood_percent, 26);
+  assert.equal(env.harness.tree.valor, 160);
+  await env.harness.update({ item: oferta(150, 2) });
+  assert.equal(env.harness.tree.custosSimulados.commission_ifood_percent, 26);
+  await env.harness.act(() => env.harness.tree.restaurarCustos());
+  await env.concluirConsultas(
+    oferta(150, 2),
+    oferta(160, 2, { simulation_costs: custos({ tax_percent: 7 }) }),
+  );
+  assert.deepEqual(env.simulacoes.at(-1).payload, { product_id: 2, preco_ifood: 160 });
+  assert.equal(env.harness.tree.custosAtivos, false);
+  assert.equal(env.harness.tree.custosSimulados.tax_percent, 7);
+  assert.equal(env.harness.tree.valor, 160);
+  await env.harness.act(() => env.harness.tree.alterarModoCustos("temporarios"));
+  assert.equal(env.harness.tree.custosSimulados.tax_percent, 7);
+  assert.equal(env.harness.tree.custosSimulados.commission_ifood_percent, 23);
+  assert.deepEqual(env.gravacoes, []);
+});
+
+test("alternar taxas da loja conserva rascunho e restaurar preço não apaga taxas", async () => {
+  const env = preparar();
+  await env.concluirConsultas();
+  await env.harness.act(() => env.harness.tree.alterarModoCustos("temporarios"));
+  await env.harness.act(() => env.harness.tree.alterarCusto("tax_percent", 9));
+  await env.harness.act(() => env.harness.tree.alterarValor(180));
+  await env.harness.act(() => env.harness.tree.alterarModoCustos("loja"));
+  await env.executarDebounce();
+  assert.equal(Object.hasOwn(env.simulacoes.at(-1).payload, "custos_simulados"), false);
+  await env.harness.act(() => env.harness.tree.alterarModoCustos("temporarios"));
+  assert.equal(env.harness.tree.custosSimulados.tax_percent, 9);
+  await env.harness.act(() => env.harness.tree.restaurar());
+  assert.equal(env.harness.tree.valor, 150);
+  assert.equal(env.harness.tree.custosSimulados.tax_percent, 9);
+  assert.equal(env.harness.tree.custosAtivos, true);
+});
+
+test("aplicar somente preço relê oferta canônica e não contamina catálogo com taxas hipotéticas", async () => {
+  const env = preparar();
+  await env.concluirConsultas();
+  await env.harness.act(() => env.harness.tree.alterarModoCustos("temporarios"));
+  await env.harness.act(() => env.harness.tree.alterarCusto("tax_percent", 1));
+  await env.harness.act(() => env.harness.tree.alterarValor(160));
+  await env.executarDebounce();
+  env.simulacoes.at(-1).resolver({
+    data: oferta(160, 1, {
+      simulation_costs: custos({ tax_percent: 1 }),
+      simulation_costs_active: true,
+      margins: { MERCHANT: { calculated: true, contribution: 99 } },
+    }),
+  });
+  await env.harness.settle();
+  const aplicacao = env.harness.tree.aplicar();
+  await env.harness.settle();
+  assert.deepEqual(env.gravacoes.at(-1).payload, { id: 2, preco_ifood: 160 });
+  env.gravacoes.at(-1).resolver({ data: {} });
+  await env.harness.settle();
+  assert.deepEqual(env.aplicados, []);
+  assert.equal(env.harness.tree.salvando, true);
+  const canonica = oferta(160, 2, {
+    saved_specific_price: 160,
+    simulation_costs: undefined,
+    simulation_costs_active: undefined,
+    margins: { MERCHANT: { calculated: true, contribution: 20 } },
+  });
+  env.ofertas.at(-1).resolver({ data: { items: [canonica] } });
+  await aplicacao;
+  await env.harness.settle();
+  assert.deepEqual(env.aplicados, [canonica]);
+  assert.equal(env.harness.tree.salvo.margins.MERCHANT.contribution, 20);
+  assert.equal(env.harness.tree.custosSimulados.tax_percent, 1);
+  assert.equal(env.harness.tree.custosAtivos, true);
+  assert.match(env.harness.tree.sucesso, /taxas.*não foram salvas/);
+});
+
+test("falha ao reler após PUT reconhece preço salvo e só confirma dados canônicos na recuperação", async () => {
+  const env = preparar();
+  await env.concluirConsultas();
+  await env.harness.act(() => env.harness.tree.alterarValor(160));
+  await env.executarDebounce();
+  env.simulacoes.at(-1).resolver({ data: oferta(160) });
+  await env.harness.settle();
+  const aplicacao = env.harness.tree.aplicar();
+  env.gravacoes.at(-1).resolver({ data: {} });
+  await env.harness.settle();
+  env.ofertas.at(-1).rejeitar(new Error("offline após gravação"));
+  await aplicacao;
+  await env.harness.settle();
+  assert.match(env.harness.tree.erroSalvar, /Preço salvo.*não foi possível atualizar/);
+  assert.equal(env.harness.tree.sucesso, "");
+  assert.equal(env.harness.tree.pronta, false);
+  assert.deepEqual(env.aplicados, []);
+  env.ofertas.at(-1).rejeitar(new Error("offline"));
+  await env.executarDebounce();
+  env.simulacoes.at(-1).resolver({ data: oferta(160) });
+  await env.harness.settle();
+  await env.harness.act(() => env.harness.tree.aplicar());
+  assert.equal(env.gravacoes.length, 1);
+  await env.harness.act(() => env.harness.tree.repetir());
+  const canonica = oferta(160, 2, { saved_specific_price: 160 });
+  await env.concluirConsultas(canonica);
+  assert.deepEqual(env.aplicados, [canonica]);
+  assert.equal(env.harness.tree.erroSalvar, "");
+  assert.equal(env.harness.tree.alterado, false);
+});
+
+test("acesso sem editar produtos pode experimentar taxas sem gravar", async () => {
+  const env = preparar({ podeEditar: false });
+  await env.concluirConsultas();
+  await env.harness.act(() => env.harness.tree.alterarModoCustos("temporarios"));
+  await env.harness.act(() => env.harness.tree.alterarCusto("tax_percent", 0));
+  await env.harness.act(() => env.harness.tree.alterarValor(180));
+  await env.executarDebounce();
+  assert.equal(env.simulacoes.at(-1).payload.custos_simulados.tax_percent, 0);
+  env.simulacoes.at(-1).resolver({ data: oferta(180, 1, { simulation_costs_active: true }) });
+  await env.harness.settle();
+  await env.harness.act(() => env.harness.tree.aplicar());
+  assert.deepEqual(env.gravacoes, []);
+});
+
+test("sem premissas na resposta não exibe editor nem envia taxas", async () => {
+  const env = preparar();
+  await env.concluirConsultas(oferta(150, 0, { simulation_costs: undefined }));
+  assert.equal(env.harness.tree.podeSimularCustos, false);
+  await env.harness.act(() => env.harness.tree.alterarModoCustos("temporarios"));
+  await env.harness.act(() => env.harness.tree.alterarCusto("tax_percent", 0));
+  await env.harness.act(() => env.harness.tree.alterarValor(180));
+  await env.executarDebounce();
+  assert.equal(env.harness.tree.custosAtivos, false);
+  assert.equal(Object.hasOwn(env.simulacoes.at(-1).payload, "custos_simulados"), false);
+});
+
+test("erro da simulação mantém taxas digitadas e reenvia rascunho no retry", async () => {
+  const env = preparar();
+  await env.concluirConsultas();
+  await env.harness.act(() => env.harness.tree.alterarModoCustos("temporarios"));
+  await env.harness.act(() => env.harness.tree.alterarCusto("tax_percent", 9));
+  await env.executarDebounce();
+  env.simulacoes.at(-1).rejeitar(new Error("offline"));
+  await env.harness.settle();
+  assert.equal(env.harness.tree.custosSimulados.tax_percent, 9);
+  assert.equal(env.harness.tree.pronta, false);
+  assert.match(env.harness.tree.erroSimulacao, /Não foi possível/);
+  await env.harness.act(() => env.harness.tree.repetir());
+  await env.executarDebounce();
+  assert.equal(env.simulacoes.at(-1).payload.custos_simulados.tax_percent, 9);
+  assert.deepEqual(env.gravacoes, []);
 });

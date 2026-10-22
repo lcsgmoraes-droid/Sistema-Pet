@@ -25,6 +25,7 @@ import {
   valorConhecido,
 } from "./ifoodPresentation";
 import IfoodStatus from "./IfoodStatus";
+import IfoodCustosSimulacao from "./IfoodCustosSimulacao";
 import useIfoodSimulacaoPreco from "./useIfoodSimulacaoPreco";
 
 const PARCELAS = [
@@ -78,7 +79,7 @@ export default function IfoodProdutoDetalhes({
           ) : null}
           {podeEditar && c.alterado ? (
             <BotaoSalva type="button" disabled={!c.pronta} loading={c.salvando} onClick={c.aplicar}>
-              Aplicar preço ao produto
+              {c.custosAtivos ? "Aplicar somente preço" : "Aplicar preço ao produto"}
             </BotaoSalva>
           ) : null}
         </div>
@@ -127,7 +128,9 @@ export default function IfoodProdutoDetalhes({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="v2-titulo-secao">Experimente outro preço</h3>
                 <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-800 dark:bg-blue-500/15 dark:text-blue-200">
-                  {c.alterado ? "Simulação não salva" : "Simulação dos valores atuais"}
+                  {c.alterado || c.custosAtivos
+                    ? "Simulação não salva"
+                    : "Simulação dos valores atuais"}
                 </span>
               </div>
               <InputRadio
@@ -140,7 +143,7 @@ export default function IfoodProdutoDetalhes({
                   { value: "regra_loja", label: "Seguir regra da loja" },
                   { value: "especifico", label: "Preço específico" },
                 ]}
-                help="Os custos, o estoque e as promoções continuam vindo do cadastro e das regras da loja."
+                help="O custo do produto, o estoque e as promoções continuam vindo do cadastro. As taxas podem ser experimentadas abaixo."
               />
               {c.modo === "especifico" ? (
                 <InputMoeda
@@ -177,6 +180,12 @@ export default function IfoodProdutoDetalhes({
                   produtos.
                 </p>
               ) : null}
+              {c.custosAtivos && c.alterado ? (
+                <p className="v2-texto-ajuda">
+                  Aplicar somente preço altera o preço do produto. As taxas temporárias e a margem
+                  desta simulação não são salvas nas regras da loja.
+                </p>
+              ) : null}
               {c.sucesso ? (
                 <p role="status" className="text-sm text-emerald-700 dark:text-emerald-300">
                   {c.sucesso}
@@ -188,6 +197,7 @@ export default function IfoodProdutoDetalhes({
                 </p>
               ) : null}
             </section>
+            <IfoodCustosSimulacao calculadora={c} produtoId={item.product_id} />
           </div>
           <div
             className="min-w-0 space-y-4"
@@ -263,6 +273,11 @@ export default function IfoodProdutoDetalhes({
 
                 <section className="space-y-3">
                   <h3 className="v2-titulo-secao">Contribuição estimada por unidade</h3>
+                  {c.resultado.simulation_costs_active ? (
+                    <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">
+                      Estimativa com taxas temporárias; as regras da loja continuam iguais.
+                    </p>
+                  ) : null}
                   {margem ? (
                     <>
                       {margem.calculated ? (
@@ -278,7 +293,10 @@ export default function IfoodProdutoDetalhes({
                           ) : null}
                           {valorConhecido(margem.target_percent) ? (
                             <p className="mt-1 text-xs">
-                              Meta da loja: {percentualIfood(margem.target_percent)}
+                              {c.resultado.simulation_costs_active
+                                ? "Meta simulada"
+                                : "Meta da loja"}
+                              : {percentualIfood(margem.target_percent)}
                               {margem.below_target ? " · abaixo da meta" : ""}
                             </p>
                           ) : null}

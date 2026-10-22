@@ -22,6 +22,9 @@ export default function useIfoodSimulacaoPreco(item, { podeEditar, onAplicado })
     precoEspecifico(item) === null ? "regra_loja" : "especifico",
   );
   const [valor, setValor] = useState(() => precoEspecifico(item) ?? item.regular_price ?? 0);
+  const [custosLoja, setCustosLoja] = useState(null);
+  const [rascunhoCustos, setRascunhoCustos] = useState(null);
+  const [usarCustosTemporarios, setUsarCustosTemporarios] = useState(false);
   const [consulta, setConsulta] = useState({
     chave: null,
     situacao: "carregando",
@@ -35,8 +38,10 @@ export default function useIfoodSimulacaoPreco(item, { podeEditar, onAplicado })
   const [erroSalvar, setErroSalvar] = useState("");
   const [sucesso, setSucesso] = useState("");
   const travaSalvar = useRef(false);
+  const confirmacaoPendente = useRef(null);
   const preco = modo === "especifico" ? valor : null;
-  const chave = `${item.product_id}:${preco === null ? "regra_loja" : preco}`;
+  const custosAtivos = Boolean(usarCustosTemporarios && custosLoja && rascunhoCustos);
+  const chave = JSON.stringify([item.product_id, preco, custosAtivos ? rascunhoCustos : null]);
   // Invalida no mesmo render da virada ou da nova oferta, antes do debounce.
   const pronta =
     consulta.chave === chave &&
@@ -88,6 +93,12 @@ export default function useIfoodSimulacaoPreco(item, { podeEditar, onAplicado })
         const atual = data.items?.find((produto) => produto.product_id === item.product_id);
         if (!atual) throw new Error("Produto não encontrado nesta loja.");
         setSalvo((anterior) => ofertaMaisRecente(anterior, atual));
+        if (confirmacaoPendente.current) {
+          confirmacaoPendente.current.onAplicado?.(atual);
+          confirmacaoPendente.current = null;
+          setErroSalvar("");
+          setSucesso("Preço aplicado ao cadastro. As taxas da simulação não foram salvas.");
+        }
       } catch (error) {
         if (ativo)
           setErroOferta(
@@ -119,10 +130,25 @@ export default function useIfoodSimulacaoPreco(item, { podeEditar, onAplicado })
     const timer = window.setTimeout(async () => {
       try {
         const response = await simularPrecoIfoodProduto(
-          { product_id: item.product_id, preco_ifood: preco },
+          {
+            product_id: item.product_id,
+            preco_ifood: preco,
+            ...(custosAtivos ? { custos_simulados: rascunhoCustos } : {}),
+          },
           { signal: abort.signal },
         );
-        if (ativo)
+        if (ativo) {
+          // Apenas uma resposta com as taxas reais pode atualizar a base do editor.
+          // Reconsultas, promoções e troca de modalidade preservam o rascunho.
+          if (!response.data.simulation_costs) {
+            setCustosLoja(null);
+          } else if (!custosAtivos) {
+            setCustosLoja((anterior) =>
+              JSON.stringify(anterior) === JSON.stringify(response.data.simulation_costs)
+                ? anterior
+                : response.data.simulation_costs,
+            );
+          }
           setConsulta({
             chave,
             revisao,
@@ -131,6 +157,7 @@ export default function useIfoodSimulacaoPreco(item, { podeEditar, onAplicado })
             resultado: response.data,
             erro: "",
           });
+        }
       } catch (error) {
         if (ativo)
           setConsulta((anterior) => ({
@@ -148,7 +175,16 @@ export default function useIfoodSimulacaoPreco(item, { podeEditar, onAplicado })
       abort.abort();
       window.clearTimeout(timer);
     };
-  }, [item.product_id, item.evaluated_at, preco, chave, revisao, salvando]);
+  }, [
+    item.product_id,
+    item.evaluated_at,
+    preco,
+    chave,
+    revisao,
+    salvando,
+    custosAtivos,
+    rascunhoCustos,
+  ]);
 
   function alterarModo(novoModo) {
     setModo(novoModo);
@@ -170,24 +206,61 @@ export default function useIfoodSimulacaoPreco(item, { podeEditar, onAplicado })
     setRevisao((atual) => atual + 1);
   }
 
+  function alterarModoCustos(novoModo) {
+    if (salvando || !custosLoja) return;
+    if (novoModo === "temporarios") {
+      setRascunhoCustos((anterior) => anterior || { ...custosLoja });
+      setUsarCustosTemporarios(true);
+    } else {
+      setUsarCustosTemporarios(false);
+    }
+    setSucesso("");
+  }
+
+  function alterarCusto(campo, novoValor) {
+    if (salvando || !custosAtivos || !Object.hasOwn(custosLoja, campo)) return;
+    setRascunhoCustos((anterior) => ({ ...anterior, [campo]: novoValor }));
+    setSucesso("");
+  }
+
+  function restaurarCustos() {
+    if (salvando) return;
+    setUsarCustosTemporarios(false);
+    setRascunhoCustos(null);
+    setSucesso("");
+    setRevisao((atual) => atual + 1);
+  }
+
   async function aplicar() {
     if (!podeEditar || !alterado || !pronta || travaSalvar.current) return;
     travaSalvar.current = true;
     setSalvando(true);
     setErroSalvar("");
     setSucesso("");
-    const resultadoAplicado = { ...consulta.resultado, saved_specific_price: preco };
+    let precoFoiSalvo = false;
     try {
       // Usa a mesma persistencia do cadastro. A simulacao nao altera produto,
       // custo, promocao, selecao ou pausa: somente esta acao salva o preco.
       await updateProduto(item.product_id, { preco_ifood: preco });
-      setSalvo(resultadoAplicado);
-      setSucesso(
-        "Preço aplicado ao cadastro do produto. A central e o cadastro usam o mesmo valor.",
-      );
-      onAplicado?.(resultadoAplicado);
+      precoFoiSalvo = true;
+      confirmacaoPendente.current = { onAplicado };
+      // Nunca promover a margem hipotética da calculadora a oferta salva.
+      const { data } = await getIfoodCatalogo({ product_id: item.product_id, limit: 1 });
+      const atualizado = data.items?.find((produto) => produto.product_id === item.product_id);
+      if (!atualizado) throw new Error("Produto não encontrado nesta loja.");
+      setSalvo((anterior) => ofertaMaisRecente(anterior, atualizado));
+      confirmacaoPendente.current = null;
+      onAplicado?.(atualizado);
+      setSucesso("Preço aplicado ao cadastro. As taxas da simulação não foram salvas.");
     } catch (error) {
-      setErroSalvar(mensagemErroIfood(error, "Não foi possível aplicar o preço ao produto."));
+      if (precoFoiSalvo) {
+        setErroSalvar(
+          "Preço salvo, mas não foi possível atualizar a oferta. Tente atualizar novamente.",
+        );
+        setErroOferta("A oferta salva precisa ser atualizada antes de aplicar outro preço.");
+      } else {
+        setErroSalvar(mensagemErroIfood(error, "Não foi possível aplicar o preço ao produto."));
+      }
     } finally {
       // A promocao pode ter virado durante o PUT; reconsultar antes de aplicar outra vez.
       setRevisao((atual) => atual + 1);
@@ -200,6 +273,9 @@ export default function useIfoodSimulacaoPreco(item, { podeEditar, onAplicado })
     salvo,
     modo,
     valor,
+    custosAtivos,
+    custosSimulados: custosAtivos ? rascunhoCustos : custosLoja,
+    podeSimularCustos: Boolean(custosLoja),
     alterado,
     pronta,
     salvando,
@@ -212,6 +288,9 @@ export default function useIfoodSimulacaoPreco(item, { podeEditar, onAplicado })
     alterarModo,
     alterarValor,
     restaurar,
+    alterarModoCustos,
+    alterarCusto,
+    restaurarCustos,
     aplicar,
     repetir: () => setRevisao((atual) => atual + 1),
   };

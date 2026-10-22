@@ -3,59 +3,17 @@ import { RefreshCw } from "lucide-react";
 import { salvarIfoodConfiguracao } from "../../api/ifood";
 import BotaoSalva from "../v2/BotaoSalva/BotaoSalva";
 import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
-import InputCheck from "../v2/InputCheck/InputCheck";
-import InputMoeda from "../v2/InputMoeda/InputMoeda";
 import InputPercentual from "../v2/InputPercentual/InputPercentual";
 import InputTexto from "../v2/InputTexto/InputTexto";
-import { mensagemErroIfood, valorConhecido } from "./ifoodPresentation";
-
-const CUSTOS = [
-  { key: "commission_merchant_percent", label: "Comissão · entrega própria" },
-  { key: "commission_ifood_percent", label: "Comissão · entrega iFood" },
-  { key: "payment_fee_percent", label: "Taxa de pagamento" },
-  { key: "tax_percent", label: "Tributos estimados" },
-  { key: "additional_unit_cost", label: "Despesa adicional por unidade", moeda: true },
-  { key: "target_margin_percent", label: "Meta de contribuição", max: 99.99 },
-];
+import { mensagemErroIfood } from "./ifoodPresentation";
+import IfoodCustosCampos, { IFOOD_CUSTOS } from "./IfoodCustosCampos";
 
 function assinaturaRegras(config) {
   return JSON.stringify([
     config.default_markup_percent ?? 0,
     config.stock_safety ?? 0,
-    ...CUSTOS.map(({ key }) => config[key] ?? null),
+    ...IFOOD_CUSTOS.map(({ key }) => config[key] ?? null),
   ]);
-}
-
-function CustoOpcional({ campo, disabled, onChange, value }) {
-  const conhecido = valorConhecido(value);
-  const CampoValor = campo.moeda ? InputMoeda : InputPercentual;
-  return (
-    <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-      <div className="flex items-start justify-between gap-3">
-        <p className="v2-texto font-medium">{campo.label}</p>
-        <InputCheck
-          id={`ifood-custo-${campo.key}`}
-          checked={conhecido}
-          disabled={disabled}
-          label={conhecido ? "Informado" : "Definir valor"}
-          onChange={(checked) => onChange(checked ? 0 : null)}
-        />
-      </div>
-      {conhecido ? (
-        <CampoValor
-          id={`ifood-valor-${campo.key}`}
-          label={campo.label}
-          disabled={disabled}
-          value={value}
-          onChange={onChange}
-          maxValue={campo.max}
-          help="Zero confirma que este custo não se aplica."
-        />
-      ) : (
-        <p className="v2-texto-ajuda mt-2">Não informado</p>
-      )}
-    </div>
-  );
 }
 
 export default function IfoodConfiguracao({ config, onSalvo, podeConfigurar }) {
@@ -90,7 +48,7 @@ export default function IfoodConfiguracao({ config, onSalvo, podeConfigurar }) {
       const payload = {
         default_markup_percent: Number(form.default_markup_percent ?? 0),
         stock_safety: estoque,
-        ...Object.fromEntries(CUSTOS.map(({ key }) => [key, form[key] ?? null])),
+        ...Object.fromEntries(IFOOD_CUSTOS.map(({ key }) => [key, form[key] ?? null])),
       };
       const response = await salvarIfoodConfiguracao(payload);
       onSalvo(response.data.config);
@@ -163,17 +121,11 @@ export default function IfoodConfiguracao({ config, onSalvo, podeConfigurar }) {
           help="Quantidade descontada do estoque livre, depois das reservas existentes."
         />
       </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {CUSTOS.map((campo) => (
-          <CustoOpcional
-            key={campo.key}
-            campo={campo}
-            disabled={!podeConfigurar || salvando}
-            value={form[campo.key]}
-            onChange={(valor) => atualizar(campo.key, valor)}
-          />
-        ))}
-      </div>
+      <IfoodCustosCampos
+        disabled={!podeConfigurar || salvando}
+        valores={form}
+        onChange={atualizar}
+      />
       <p className="v2-texto-ajuda">
         As taxas percentuais desta simulação incidem sobre o preço vigente do item. Entrega,
         embalagem por pedido, descontos financiados e mensalidade devem ser considerados na análise
