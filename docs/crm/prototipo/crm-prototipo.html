@@ -119,8 +119,10 @@ var LEADS = [
   { id: 5, tutor: "Aline Moura", tel: "(11) 95522-8800", loja: "c", etapa: "novo", origem: "Aniversário do pet", resp: "Sem responsável", valor: 90, prox: "Parabenizar a Pipoca · sábado", consent: "sistema", cad: true,
     pets: [{ n: "Pipoca", d: "Shih-tzu, aniversário dia 25" }], conv: 5,
     tl: [["10/10", "Venda", "Petisco dental · R$ 32,00"]], opp: ["Aniversário em 4 dias", "Cupom de aniversário disponível"] },
-  { id: 6, tutor: "(11) 94000-7788 (sem cadastro)", tel: "(11) 94000-7788", loja: "j", etapa: "novo", origem: "WhatsApp espontâneo", resp: "Sem responsável", valor: 0, prox: "Identificar o tutor", consent: "nao", cad: false,
+  { id: 6, tutor: "Fernanda 🐾", tel: "(11) 94000-7788", loja: "j", etapa: "novo", origem: "WhatsApp espontâneo", resp: "Sem responsável", valor: 0, prox: "Identificar o tutor", consent: "nao", cad: false,
     pets: [], conv: 6, tl: [["21/10", "Mensagem", "Primeira mensagem recebida"]], opp: ["Número desconhecido: vincular a um cadastro ou criar novo"] },
+  { id: 10, tutor: "Sem nome no WhatsApp", tel: "(11) 93888-1200", loja: "c", etapa: "novo", origem: "WhatsApp espontâneo", resp: "Sem responsável", valor: 0, prox: "Identificar o tutor", consent: "nao", cad: false, semNome: true,
+    pets: [], conv: 10, tl: [["21/10", "Mensagem", "Primeira mensagem recebida"]], opp: ["Sem nome no WhatsApp: pergunte o nome. O número fica registrado e entra no cadastro quando a pessoa for criada ou vinculada"] },
   { id: 7, tutor: "Henrique Alves", tel: "(11) 93321-9090", loja: "s", etapa: "oport", origem: "Banho sem retorno", resp: "Rafael", valor: 75, prox: "Oferecer pacote de 4 banhos · amanhã", consent: "nao", cad: true,
     pets: [{ n: "Bolt", d: "Border Collie, 2 anos, 19 kg" }], conv: 7,
     tl: [["01/09", "Banho", "Último banho · Bolt"], ["01/09", "Venda", "Banho e tosa · R$ 75,00"]], opp: ["50 dias sem banho", "Pacote de 4 banhos economiza 20%"] },
@@ -146,6 +148,7 @@ var CONVS = {
   4: { estado: "aguardando", janela: 1, nao: 2, resumo: "Roberto pediu os valores do plano de banho para 2 cães e disse estar insatisfeito com o último atendimento. Histórico: 2 compras acima de R$ 380 nos últimos 60 dias. Sugestão: oferecer desconto no plano combinado.", msgs: [m("tutor", "Quero saber o plano de banho dos dois, e já aviso que fiquei chateado da última vez", "16:40"), m("sis", "IA transferiu para atendimento humano: reclamação e pedido de valores.", "16:41")] },
   5: { estado: "ia", janela: 200, nao: 0, msgs: [m("sis", "Último contato do tutor há mais de 24 horas: mensagens só com modelo aprovado.", "")] },
   6: { estado: "ia", janela: 0, nao: 1, msgs: [m("tutor", "Olá, vocês fazem tosa higiênica?", "agora")] },
+  10: { estado: "ia", janela: 0, nao: 1, msgs: [m("tutor", "Bom dia, vocês vendem ração monoproteica?", "agora")] },
   7: { estado: "ia", janela: 300, nao: 0, msgs: [m("sis", "Sem consentimento registrado: nenhuma mensagem ativa será enviada.", "")] },
   8: { estado: "ia", janela: 6, nao: 0, msgs: [m("tutor", "Usei o cashback, obrigada!", "ontem"), m("ia", "Por nada, Sônia! Qualquer coisa estamos por aqui.", "ontem")] },
   9: { estado: "encerrada", janela: 99, nao: 0, msgs: [m("tutor", "Mudei de cidade, obrigado por tudo!", "15/10")] }
@@ -221,8 +224,8 @@ function cardLead(l) {
   var lj = loja(l.loja);
   return '<article class="card" draggable="true" data-id="' + l.id + '" style="--lc:' + lj.cor + '"><div class="row" style="justify-content:space-between">' + tagLoja(l.loja) + '<span class="small">' + esc(l.resp) + "</span></div>" +
     '<button type="button" class="nm" data-act="abrir-lead" data-id="' + l.id + '">' + esc(l.tutor) + "</button>" +
-    '<p class="small">' + (l.pets.length ? l.pets.map(function (p) { return esc(p.n); }).join(", ") : "Sem pet cadastrado") + "</p>" +
-    '<div class="row" style="margin-top:6px">' + (l.cad ? '<button type="button" class="pill ok" style="cursor:pointer" data-act="abrir-lead" data-id="' + l.id + '" title="Cliente já cadastrado. Clique para ver os dados do cadastro">Cliente · ' + (PES[l.id] ? PES[l.id].cod : "") + "</button>" : '<span class="pill warn" title="Ainda não está ligado a nenhuma pessoa cadastrada">Lead novo · sem cadastro</span>') + "</div>" +
+    (l.cad ? '<p class="small">' + (l.pets.length ? l.pets.map(function (p) { return esc(p.n); }).join(", ") : "Sem pets cadastrados") + "</p>" : (l.semNome ? "" : '<p class="small">Nome do perfil do WhatsApp</p>')) +
+    (l.cad ? "" : '<div class="row" style="margin-top:6px"><span class="pill warn" title="Ainda não está ligado a nenhuma pessoa cadastrada">Lead novo · sem cadastro</span></div>') +
     '<div class="row" style="margin-top:6px"><span class="pill info">' + esc(l.origem) + "</span>" + (CONVS[l.conv].estado === "aguardando" || CONVS[l.conv].estado === "humano" ? '<span class="pill ' + EST[CONVS[l.conv].estado][0] + '">' + EST[CONVS[l.conv].estado][1] + "</span>" : "") + (l.consent === "ok" || l.consent === "sistema" ? "" : pillCons(l.consent)) + (consCfg(l) && consCfg(l).lead === "pausar" ? '<span class="pill">Pausado</span>' : "") + "</div>" +
     (consCfg(l) && consCfg(l).tarefa === "remover" ? '<p class="small" style="margin-top:6px">Sem tarefa de contato (regra da loja para quem recusa mensagens)</p>' : l.prox !== "—" ? '<p class="small" style="margin-top:6px">Próxima ação: ' + esc(l.prox) + "</p>" : "") +
     (l.valor ? '<p class="small">' + money(l.valor) + "</p>" : "") +
@@ -245,10 +248,10 @@ function painelIdentidade(l) {
   }
   var d = PES[l.id] || {};
   function it(t, v) { return '<div><div class="small">' + t + '</div><div>' + esc(v) + "</div></div>"; }
-  return '<section class="panel"><header><h4>Cadastro do tutor</h4><span class="pill ok">Cliente · ' + esc(d.cod || "") + '</span></header><div class="grid" style="gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))">' +
+  return '<section class="panel"><header><h4>Cadastro do tutor</h4></header><div class="grid" style="gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))">' +
     it("CPF", d.cpf || "—") + it("E-mail", d.email || "—") + it("Endereço", d.end || "—") + it("Cliente desde", d.desde || "—") +
-    it("Compras", (d.n || 0) + " · " + money(d.total || 0)) + it("Ticket médio", money(d.ticket || 0)) + it("Cashback", money(d.cash || 0)) + it("Crédito", money(d.cred || 0)) + it("Pets", String(l.pets.length)) + it("Telefone", l.tel) + "</div>" +
-    '<div class="row" style="margin-top:10px"><button class="btn sm" type="button" data-act="toast" data-t="Abriria o cadastro completo na tela Pessoas (edição do cliente ' + esc(d.cod || "") + ')">Abrir cadastro completo</button></div>' +
+    it("Compras", (d.n || 0) + " · " + money(d.total || 0)) + it("Ticket médio", money(d.ticket || 0)) + it("Cashback", money(d.cash || 0)) + it("Crédito", money(d.cred || 0)) + it("Pets", String(l.pets.length)) + it("Telefone (do WhatsApp)", l.tel) + "</div>" +
+    '<div class="row" style="margin-top:10px"><button class="btn sm" type="button" data-act="toast" data-t="Abriria o cadastro completo na tela Pessoas">Abrir cadastro completo</button></div>' +
     '<p class="small" style="margin-top:6px">Os dados vêm do cadastro de Pessoas. Para corrigir algo, edite lá.</p></section>';
 }
 function viewDrawer() {
@@ -257,7 +260,7 @@ function viewDrawer() {
   var podeConv = st.tab !== "conversas";
   var dtab = podeConv ? st.dtab : "ficha";
   var abas = podeConv ? '<div class="row"><button class="chip" type="button" data-act="dtab" data-id="conversa" aria-pressed="' + (dtab === "conversa") + '">Conversa' + (c && c.nao ? ' <span class="badge">' + c.nao + "</span>" : "") + '</button><button class="chip" type="button" data-act="dtab" data-id="ficha" aria-pressed="' + (dtab === "ficha") + '">Ficha 360</button></div>' : "";
-  var cab = '<div class="row" style="justify-content:space-between"><h2>' + esc(l.tutor) + '</h2><button class="btn sm" type="button" data-act="fechar-lead">Fechar</button></div><div class="row">' + tagLoja(l.loja) + '<span class="pill">' + esc(l.tel) + "</span>" + pillCons(l.consent) + (l.cad ? "" : '<span class="pill warn">Sem cadastro</span>') + "</div>" + abas;
+  var cab = '<div class="row" style="justify-content:space-between"><h2>' + esc(l.tutor) + '</h2><button class="btn sm" type="button" data-act="fechar-lead">Fechar</button></div><div class="row">' + tagLoja(l.loja) + '<span class="pill">' + esc(l.tel) + "</span>" + pillCons(l.consent) + (l.cad ? "" : '<span class="pill warn">Lead novo · sem cadastro</span><span class="pill">' + (l.semNome ? "Sem nome no WhatsApp" : "Nome do perfil do WhatsApp") + "</span>") + "</div>" + abas;
   var corpo;
   if (dtab === "conversa") {
     corpo = '<section class="panel">' + painelConversa(l, c) + '</section><div class="row"><button class="btn sm" type="button" data-act="ir-conversa-aba" data-id="' + l.conv + '">Abrir na caixa de conversas</button></div>';
@@ -455,7 +458,7 @@ document.addEventListener("click", function (e) {
   else if (a === "ir-conversa") { st.tab = "conversas"; st.conv = +id; st.lead = null; }
   else if (a === "conv") st.conv = +id;
   else if (a === "novo-lead") { var nid = LEADS.length + 1; LEADS.unshift({ id: nid, tutor: "Novo lead " + nid, tel: "(11) 90000-000" + nid, loja: Object.keys(st.lojas).filter(function (k) { return st.lojas[k]; })[0], etapa: "novo", origem: "WhatsApp espontâneo", resp: "Sem responsável", valor: 0, prox: "Qualificar o lead", consent: "nao", cad: false, pets: [], conv: nid, tl: [[agora(), "Lead", "Criado manualmente"]], opp: [] }); CONVS[nid] = { estado: "ia", janela: 99, nao: 0, msgs: [m("sis", "Lead criado manualmente. Sem consentimento: apenas resposta ao tutor é permitida.", "")] }; toast("Lead criado na etapa Novo."); }
-  else if (a === "criar-cadastro") { var l0 = lead(+id); l0.cad = true; l0.tutor = "Novo tutor " + l0.id; PES[l0.id] = { cod: "C-" + (1500 + l0.id), cpf: "—", email: "—", end: "—", desde: "agora", n: 0, total: 0, ticket: 0, cash: 0, cred: 0 }; l0.tl.unshift([agora(), "Cadastro", "Cadastro criado a partir do lead"]); toast("Cadastro criado (simulado) e ligado ao lead."); }
+  else if (a === "criar-cadastro") { var l0 = lead(+id); l0.cad = true; l0.tutor = l0.semNome ? "Novo tutor" : l0.tutor; PES[l0.id] = { cod: "C-" + (1500 + l0.id), cpf: "—", email: "—", end: "—", desde: "agora", n: 0, total: 0, ticket: 0, cash: 0, cred: 0 }; l0.tl.unshift([agora(), "Cadastro", "Cadastro criado a partir do lead"]); toast("Cadastro criado (simulado) com o nome e o número do WhatsApp."); }
   else if (a === "vincular") { var l = lead(+id); l.cad = true; l.tutor = "Fernanda Ribeiro"; PES[l.id] = { cod: "C-0688", cpf: "***.402.118-**", email: "fernanda.r@email.com", end: "Rua Azul, 55 · Jardins", desde: "04/2022", n: 12, total: 1650, ticket: 138, cash: 9.5, cred: 0 }; l.pets = [{ n: "Toby", d: "Spitz, 3 anos" }]; l.opp = ["Cadastro vinculado: ofereça os serviços para o Toby"]; l.tl.unshift([agora(), "Cadastro", "Vinculado a Fernanda Ribeiro"]); toast("Lead vinculado a um cadastro existente (simulado)."); }
   else if (a === "assumir") { var c = CONVS[st.conv]; c.estado = "humano"; addMsg(st.conv, "sis", "Atendimento assumido por Marina. A IA não responde mais nesta conversa."); }
   else if (a === "devolver") { CONVS[st.conv].estado = "ia"; addMsg(st.conv, "sis", "Conversa devolvida à IA."); }
