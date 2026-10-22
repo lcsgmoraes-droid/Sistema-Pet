@@ -5,6 +5,7 @@ import { montarPayloadVenda } from "../utils/pdvVendaPayload";
 import { debugLog } from "../utils/debug";
 import { montarVendaPersistidaParaEdicao, salvarEdicaoVenda } from "../utils/pdvSalvarEdicaoVenda";
 import { mensagemCaixaIndisponivel } from "../utils/caixaAbertoMonitor";
+import { solicitarJustificativaPagamentoExcedente } from "../utils/pagamentoExcedenteEdicao";
 
 export function usePDVSalvarVenda({
   vendaAtual,
@@ -66,11 +67,20 @@ export function usePDVSalvarVenda({
           buscarPagamentos: async (vendaId) =>
             (await api.get(`/vendas/${vendaId}/pagamentos`)).data,
           finalizarVenda,
+          solicitarJustificativa: solicitarJustificativaPagamentoExcedente,
           onVendaPersistida: (persistida) =>
             setVendaAtual((prev) =>
               prev.id === persistida.id ? montarVendaPersistidaParaEdicao(prev, persistida) : prev,
             ),
         });
+
+        if (resultado.cancelada) {
+          if (resultado.alteracoesSalvas) {
+            toast("Alterações salvas. A venda continua aberta para revisar o excedente.");
+            carregarVendasRecentes();
+          }
+          return;
+        }
 
         debugLog("🚨 DEBUG - Payload sendo enviado:", {
           payload: payloadVenda,
@@ -129,7 +139,8 @@ export function usePDVSalvarVenda({
       const errorDetail =
         error.response?.data?.detail || error.response?.data?.message || "Erro ao salvar venda";
       console.error("❌ Detalhes do erro:", errorDetail);
-      toast.error(`Erro ao salvar venda: ${errorDetail}`);
+      const mensagem = typeof errorDetail === "string" ? errorDetail : errorDetail?.mensagem;
+      toast.error(`Erro ao salvar venda: ${mensagem || "Confira os dados e tente novamente."}`);
     } finally {
       setLoading(false);
     }

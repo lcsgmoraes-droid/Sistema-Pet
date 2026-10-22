@@ -59,6 +59,8 @@ export const finalizarVenda = async (vendaId, pagamentos, options = {}) => {
     motivo_liberacao_crediario: options.motivo_liberacao_crediario || null,
     nao_gerar_beneficios: Boolean(options.nao_gerar_beneficios),
     justificativa_nao_gerar_beneficios: options.justificativa_nao_gerar_beneficios || null,
+    justificativa_pagamento_excedente: options.justificativa_pagamento_excedente || null,
+    contexto_pagamento_excedente: options.contexto_pagamento_excedente || null,
     ...obterContextoRevisaoCaixa(),
   });
   return response.data;

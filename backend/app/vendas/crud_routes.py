@@ -18,6 +18,12 @@ from app.services.opportunity_background_processor import get_opportunity_proces
 from app.services.product_recurrence_protocols import obter_protocolo_ativo_do_produto
 from app.vendas.edicao_estoque import ajustar_estoque_edicao_venda
 from app.vendas.edicao_itens import atualizar_itens_venda_aberta
+from app.vendas.edicao_pagamentos import (
+    fotografar_pagamentos_edicao,
+    metadados_edicao_excedente,
+    validar_pagamentos_edicao,
+)
+from app.vendas.pagamento_excedente import registrar_excesso_pagamento
 from app.vendas.pagamento_entrega_previsto import (
     normalizar_pagamento_entrega_previsto,
     validar_valor_para_troco,
@@ -382,7 +388,13 @@ def atualizar_venda(
         )
 
     # Buscar venda
-    venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
+    venda = (
+        db.query(Venda)
+        .filter_by(id=venda_id, tenant_id=tenant_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
 
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
@@ -502,6 +514,16 @@ def atualizar_venda(
     )
     validar_valor_para_troco(previsto, saldo=totais["total"])
 
+    fotografia_pagamentos = fotografar_pagamentos_edicao(
+        db, venda=venda, tenant_id=tenant_id
+    )
+    excecao_pagamento = validar_pagamentos_edicao(
+        venda=venda, totais=totais, fotografia=fotografia_pagamentos, dados=dados
+    )
+    alteracao_excedente = metadados_edicao_excedente(
+        venda=venda, totais=totais, fotografia=fotografia_pagamentos
+    )
+
     logger.info(f"\n🔄 ATUALIZANDO VENDA {venda_id}:")
     logger.info(f"   funcionario_id recebido: {dados.funcionario_id}")
     logger.info(f"   funcionario_id anterior: {venda.funcionario_id}")
@@ -569,6 +591,20 @@ def atualizar_venda(
         resolucoes_produtos=resolucoes_produtos,
         saidas_ajuste=saidas_ajuste,
         db=db,
+    )
+
+    registrar_excesso_pagamento(
+        db,
+        venda=venda,
+        tenant_id=tenant_id,
+        usuario_id=current_user.id,
+        usuario_nome=getattr(current_user, "nome", None)
+        or getattr(current_user, "username", None)
+        or getattr(current_user, "email", None),
+        validacao=excecao_pagamento,
+        origem="edicao_venda",
+        pagamentos_antes=fotografia_pagamentos["pagamentos"],
+        alteracao_venda=alteracao_excedente,
     )
 
     db.commit()

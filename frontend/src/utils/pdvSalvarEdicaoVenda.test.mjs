@@ -121,6 +121,156 @@ test("erro do orquestrador permanece visivel e nao retorna sucesso de fechamento
   );
 });
 
+function erroExcedente(total = 109.9, recebido = 119.9) {
+  return {
+    response: {
+      status: 409,
+      data: {
+        detail: {
+          code: "PAGAMENTO_EXCEDENTE_REQUER_JUSTIFICATIVA",
+          excedente: Math.round((recebido - total) * 100) / 100,
+          contexto_pagamento_excedente: {
+            total_venda: total,
+            total_ja_pago: recebido,
+            total_novos_pagamentos: 0,
+            crediario_pendente: 0,
+          },
+        },
+      },
+    },
+  };
+}
+
+test("desconto em venda paga exige motivo e fotografia do servidor antes do PUT efetivo", async () => {
+  const { argumentos, chamadas } = dependencias({ total: 109.9, recebido: 119.9 });
+  const atualizarOriginal = argumentos.atualizarVenda;
+  const erro = erroExcedente();
+  let tentativas = 0;
+  argumentos.atualizarVenda = async (id, dados) => {
+    tentativas += 1;
+    if (tentativas === 1) throw erro;
+    return atualizarOriginal(id, dados);
+  };
+  let conferida;
+  argumentos.solicitarJustificativa = async (composicao) => {
+    conferida = composicao;
+    return "  Desconto autorizado após o recebimento do cartão.  ";
+  };
+  const resultado = await salvarEdicaoVenda(argumentos);
+  assert.equal(resultado.finalizada, true);
+  assert.equal(conferida.valorTotal, 109.9);
+  assert.equal(conferida.totalPagamentos, 119.9);
+  assert.equal(conferida.excedente, 10);
+  const motivo = chamadas[0].dados.justificativa_pagamento_excedente;
+  assert.equal(motivo, "Desconto autorizado após o recebimento do cartão.");
+  assert.deepEqual(
+    chamadas[0].dados.contexto_pagamento_excedente,
+    erro.response.data.detail.contexto_pagamento_excedente,
+  );
+  assert.equal(chamadas[2].opcoes.justificativa_pagamento_excedente, motivo);
+  assert.deepEqual(chamadas[2].pagamentos, []);
+});
+
+test("cancelar justificativa não persiste desconto nem finaliza ou limpa a edição", async () => {
+  const { argumentos, chamadas } = dependencias();
+  let tentativas = 0;
+  argumentos.atualizarVenda = async () => {
+    tentativas += 1;
+    throw erroExcedente();
+  };
+  argumentos.solicitarJustificativa = async () => null;
+  argumentos.onVendaPersistida = () => assert.fail("Não houve PUT efetivo");
+  const resultado = await salvarEdicaoVenda(argumentos);
+  assert.deepEqual(resultado, { cancelada: true, alteracoesSalvas: false });
+  assert.equal(tentativas, 1);
+  assert.equal(chamadas.length, 0);
+});
+
+test("motivo curto não autoriza repetir operação financeira", async () => {
+  const { argumentos } = dependencias();
+  let tentativas = 0;
+  argumentos.atualizarVenda = async () => {
+    tentativas += 1;
+    throw erroExcedente();
+  };
+  argumentos.solicitarJustificativa = async () => "ok";
+  await assert.rejects(salvarEdicaoVenda(argumentos), /10 e 1.000 caracteres/);
+  assert.equal(tentativas, 1);
+});
+
+test("mudança de valores concorrente pede nova confirmação sem reutilizar motivo anterior", async () => {
+  const { argumentos } = dependencias();
+  const fotografias = [];
+  const enviados = [];
+  const atualizarOriginal = argumentos.atualizarVenda;
+  argumentos.atualizarVenda = async (id, dados) => {
+    enviados.push(dados);
+    if (enviados.length === 1) throw erroExcedente();
+    if (enviados.length === 2) {
+      const erro = erroExcedente(100, 119.9);
+      erro.response.data.detail.code = "PAGAMENTO_EXCEDENTE_DESATUALIZADO";
+      throw erro;
+    }
+    return atualizarOriginal(id, dados);
+  };
+  argumentos.solicitarJustificativa = async (composicao) => {
+    fotografias.push(composicao.valorTotal);
+    return `Confirmo o excedente sobre o total ${composicao.valorTotal}.`;
+  };
+  await salvarEdicaoVenda(argumentos);
+  assert.deepEqual(fotografias, [109.9, 100]);
+  assert.equal(enviados[1].contexto_pagamento_excedente.total_venda, 109.9);
+  assert.equal(enviados[2].contexto_pagamento_excedente.total_venda, 100);
+  assert.notEqual(
+    enviados[1].justificativa_pagamento_excedente,
+    enviados[2].justificativa_pagamento_excedente,
+  );
+});
+
+test("excedente legado na refinalização pede motivo sem repetir PUT ou recebimentos", async () => {
+  const { argumentos, chamadas } = dependencias({ total: 109.9, recebido: 119.9 });
+  const finalizarOriginal = argumentos.finalizarVenda;
+  let tentativas = 0;
+  argumentos.finalizarVenda = async (id, pagamentos, opcoes) => {
+    tentativas += 1;
+    if (tentativas === 1) throw erroExcedente();
+    return finalizarOriginal(id, pagamentos, opcoes);
+  };
+  argumentos.solicitarJustificativa = async () => "Excedente antigo revisado pelo operador.";
+  const resultado = await salvarEdicaoVenda(argumentos);
+  assert.equal(resultado.finalizada, true);
+  assert.deepEqual(
+    chamadas.map((c) => c.metodo),
+    ["PUT", "GET", "POST_FINALIZAR"],
+  );
+  assert.deepEqual(chamadas[2].pagamentos, []);
+  assert.equal(chamadas[2].opcoes.contexto_pagamento_excedente.total_ja_pago, 119.9);
+});
+
+test("cancelar no fechamento mantém a venda persistida aberta para revisão", async () => {
+  const { argumentos, chamadas } = dependencias({ erroFechamento: erroExcedente() });
+  argumentos.solicitarJustificativa = async () => null;
+  const resultado = await salvarEdicaoVenda(argumentos);
+  assert.equal(resultado.cancelada, true);
+  assert.equal(resultado.alteracoesSalvas, true);
+  assert.equal(resultado.venda.status, "aberta");
+  assert.deepEqual(
+    chamadas.map((c) => c.metodo),
+    ["PUT", "GET", "POST_FINALIZAR"],
+  );
+});
+
+test("fotografia inválida não oferece exceção nem repete operação", async () => {
+  const { argumentos } = dependencias();
+  const erro = erroExcedente();
+  delete erro.response.data.detail.contexto_pagamento_excedente.total_ja_pago;
+  argumentos.atualizarVenda = async () => {
+    throw erro;
+  };
+  argumentos.solicitarJustificativa = async () => assert.fail("Fotografia incompleta");
+  await assert.rejects(salvarEdicaoVenda(argumentos), (e) => e === erro);
+});
+
 test("dois saves atualizam IDs do servidor sem misturar linhas do mesmo SKU nem origens de desconto", async () => {
   let estado = {
     id: 34,

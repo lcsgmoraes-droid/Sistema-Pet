@@ -542,10 +542,10 @@ def gerar_comissoes_venda(
                 # Proporção do pagamento em relação ao total da venda
                 total_venda_decimal = Decimal(str(venda["total"]))
                 if total_venda_decimal > 0:
-                    percentual_proporcional = (
-                        valor_pago_decimal / total_venda_decimal
-                    ) * Decimal("100")
-                    proporcao_pagamento = valor_pago_decimal / total_venda_decimal
+                    proporcao_pagamento = min(
+                        Decimal("1"), valor_pago_decimal / total_venda_decimal
+                    )
+                    percentual_proporcional = proporcao_pagamento * Decimal("100")
 
                     # Aplicar proporção na base de cálculo E na comissão
                     valor_base_calculo_final = (

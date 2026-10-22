@@ -115,6 +115,8 @@ async def finalizar_venda(
         motivo_liberacao_crediario=dados.motivo_liberacao_crediario,
         nao_gerar_beneficios=dados.nao_gerar_beneficios,
         justificativa_nao_gerar_beneficios=dados.justificativa_nao_gerar_beneficios,
+        justificativa_pagamento_excedente=dados.justificativa_pagamento_excedente,
+        contexto_pagamento_excedente=dados.contexto_pagamento_excedente,
     )
 
     # Log de sucesso

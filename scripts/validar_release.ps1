@@ -172,7 +172,14 @@ Invoke-GateStep 'Faturamento and cash audit reconciliation regression' $python @
     'tests/unit/test_pdf_caixa_resumo.py',
     'tests/unit/test_caixa_recebimentos_auditoria.py',
     'tests/unit/test_caixa_conferencia_estados.py',
-    'tests/unit/test_caixa_auditoria_performance.py', '-q'
+    'tests/unit/test_caixa_auditoria_performance.py',
+    'tests/unit/test_pagamento_excedente_finalizacao.py',
+    'tests/unit/test_venda_edicao_pagamentos.py',
+    'tests/unit/test_contas_receber_saldo_venda.py',
+    'tests/unit/test_venda_finalizacao_pagamentos.py',
+    'tests/unit/test_finalizacao_recebiveis_atomicidade.py',
+    'tests/unit/test_vendas_fechamento_edicao.py',
+    'tests/unit/test_vendas_comissao_reprocessamento_contract.py', '-q'
 ) $backend
 
 Invoke-GateStep 'Billing operational continuity regression' $python @(

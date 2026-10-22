@@ -675,13 +675,13 @@ test("dinheiro distingue recebido do aplicado e calcula troco mesmo sem valor de
   assert.equal(parcial.troco, null);
 });
 
-test("pix excedente nunca compoe valor aplicado e conserva valor recebido para revisao", () => {
+test("pix autorizado preserva valor integral e nao inventa troco nem trunca o recebimento", () => {
   const pagamento = montarPagamentoRecebido({
     formaPagamento: { id: 2, nome: "Pix", tipo: "pix" },
     valor: 29,
     valorRestante: 28.99,
   });
-  assert.equal(pagamento.valor, 28.99);
+  assert.equal(pagamento.valor, 29);
   assert.equal(pagamento.valor_recebido, 29);
   assert.equal(pagamento.troco, null);
 });
@@ -704,7 +704,9 @@ test("nao adiciona recebimento externo acima do restante, inclusive um centavo",
         bandeira: "Visa",
         operadora: { id: 4, max_parcelas: 12 },
       }),
-      "Valor excede o restante da venda (R$ 28,99). Ajuste o valor recebido antes de adicionar.",
+      ["crediario", "boleto"].includes(tipo)
+        ? "Valor excede o restante da venda (R$ 28,99). Ajuste o valor recebido antes de adicionar."
+        : "Valor excede o restante da venda (R$ 28,99). Revise o valor ou confirme a exceção com justificativa no painel antes de adicionar.",
     );
   }
   assert.equal(
@@ -864,7 +866,7 @@ test("monta itens e mensagem para confirmacao de estoque negativo", () => {
   );
 });
 
-test("monta pagamento de cartao com valor efetivo limitado ao restante", () => {
+test("monta pagamento de cartao integral para excecao explicita, sem troco", () => {
   const pagamento = montarPagamentoRecebido({
     formaPagamento: {
       id: 2,
@@ -887,7 +889,7 @@ test("monta pagamento de cartao com valor efetivo limitado ao restante", () => {
     forma_id: 2,
     forma_pagamento_id: 2,
     nome: "Credito",
-    valor: 100,
+    valor: 150,
     bandeira: "Visa",
     nsu_cartao: "123456",
     operadora_id: 7,
@@ -1193,7 +1195,7 @@ test("valida pagamento antes de adicionar", () => {
       valor: 179.9,
       valorRestante: 0,
     }),
-    "Esta venda já está totalmente paga",
+    "Esta venda já está totalmente paga. Remova ou revise um pagamento antes de adicionar outro.",
   );
 
   assert.equal(

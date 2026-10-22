@@ -3,6 +3,7 @@ import { X, CreditCard, CheckCircle, AlertCircle } from "lucide-react";
 import StatusMargemIndicador from "../StatusMargemIndicador";
 import ModalPagamentoResumoLateral from "../ModalPagamentoResumoLateral";
 import ModalPagamentoFormaPanel from "./ModalPagamentoFormaPanel";
+import ExcecaoPagamentoPanel from "./ExcecaoPagamentoPanel";
 
 export default function ModalPagamentoView({
   venda,
@@ -70,6 +71,9 @@ export default function ModalPagamentoView({
   bandeirasDisponiveis,
   parcelasDisponiveis,
   taxaCartaoSelecionada,
+  composicaoExcedente,
+  autorizacaoExcedente,
+  setAutorizacaoExcedente,
 }) {
   return (
     <>
@@ -132,6 +136,12 @@ export default function ModalPagamentoView({
 
               {/* Coluna Direita - Resumo */}
               <div className="space-y-6">
+                <ExcecaoPagamentoPanel
+                  composicao={composicaoExcedente}
+                  autorizacao={autorizacaoExcedente}
+                  onConfirmar={setAutorizacaoExcedente}
+                  disabled={loading}
+                />
                 <ModalPagamentoResumoLateral
                   venda={venda}
                   valorTotal={valorTotal}
