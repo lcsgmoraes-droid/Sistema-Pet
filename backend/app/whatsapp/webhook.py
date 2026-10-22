@@ -944,5 +944,23 @@ def _get_or_create_session_with_context(
     db.flush()
 
     logger.info(f"🆕 Nova sessão criada: {session.id}")
+    _registrar_lead_no_crm(db, tenant_id, phone)
 
     return session
+
+
+def _registrar_lead_no_crm(db: Session, tenant_id: str, phone: str) -> None:
+    """Lojas com o CRM ativo ganham o card do tutor na primeira conversa.
+
+    Nunca atrapalha o atendimento: qualquer falha so vai para o log.
+    """
+    try:
+        from app.crm.leads_service import identificar_ou_criar_lead
+        from app.security.module_access import tenant_has_active_module
+
+        if not tenant_has_active_module(db, str(tenant_id), "crm"):
+            return
+        with db.begin_nested():
+            identificar_ou_criar_lead(db, tenant_id, phone)
+    except Exception as erro:
+        logger.warning("Falha ao registrar o card do CRM: %s", type(erro).__name__)
