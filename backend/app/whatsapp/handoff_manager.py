@@ -9,11 +9,41 @@ from datetime import datetime
 from decimal import Decimal
 import logging
 
-from app.whatsapp.models_handoff import WhatsAppHandoff, WhatsAppAgent
+from app.whatsapp.models_handoff import (
+    HANDOFF_ATIVO,
+    HANDOFF_RESOLVIDO,
+    HANDOFF_STATUS_EM_ABERTO,
+    WhatsAppAgent,
+    WhatsAppHandoff,
+)
 from app.whatsapp.models import WhatsAppSession
 from app.whatsapp.sentiment import get_sentiment_analyzer
 
 logger = logging.getLogger(__name__)
+
+
+def sessao_assumida(session, agent) -> None:
+    """Conversa passa para o atendente: a IA para e o atendente fica registrado.
+
+    `WhatsAppSession.assigned_to` e o id do usuario (users.id), nao o id do
+    cadastro de atendente.
+    """
+    if session is None:
+        return
+    session.status = "human"
+    session.assigned_to = getattr(agent, "user_id", None)
+
+
+def sessao_encerrada(session, devolver_ao_bot: bool) -> None:
+    """Fim do atendimento humano: devolve a conversa ao bot ou a encerra."""
+    if session is None:
+        return
+    if devolver_ao_bot:
+        session.status = "bot"
+        session.assigned_to = None
+    else:
+        session.status = "closed"
+        session.closed_at = datetime.utcnow()
 
 
 class HandoffManager:
@@ -169,7 +199,7 @@ class HandoffManager:
         if not handoff:
             raise ValueError(f"Handoff {handoff_id} not found")
 
-        if handoff.status not in ["pending", "assigned"]:
+        if handoff.status not in HANDOFF_STATUS_EM_ABERTO:
             raise ValueError(
                 f"Handoff {handoff_id} cannot be assigned (status={handoff.status})"
             )
@@ -195,16 +225,13 @@ class HandoffManager:
         # Atribuir
         handoff.assigned_to = agent_id
         handoff.assigned_at = datetime.utcnow()
-        handoff.status = "assigned"
+        handoff.status = HANDOFF_ATIVO
 
         # Atualizar contador do agente
         agent.current_chats += 1
 
         # Atualizar sessão
-        session = handoff.session
-        if session:
-            session.status = "human"
-            session.assigned_to = agent_id
+        sessao_assumida(handoff.session, agent)
 
         self.db.commit()
         self.db.refresh(handoff)
@@ -238,7 +265,7 @@ class HandoffManager:
         if not handoff:
             raise ValueError("Handoff not found or not assigned to you")
 
-        handoff.status = "in_progress"
+        handoff.status = HANDOFF_ATIVO
         self.db.commit()
         self.db.refresh(handoff)
 
@@ -282,7 +309,7 @@ class HandoffManager:
             resolution_time = (datetime.utcnow() - handoff.created_at).total_seconds()
             handoff.resolution_time_seconds = int(resolution_time)
 
-        handoff.status = "resolved"
+        handoff.status = HANDOFF_RESOLVIDO
         handoff.resolved_at = datetime.utcnow()
         handoff.resolution_notes = resolution_notes
 
@@ -292,14 +319,7 @@ class HandoffManager:
             agent.current_chats -= 1
 
         # Atualizar sessão
-        session = handoff.session
-        if session:
-            if return_to_bot:
-                session.status = "bot"
-                session.assigned_to = None
-            else:
-                session.status = "closed"
-                session.closed_at = datetime.utcnow()
+        sessao_encerrada(handoff.session, devolver_ao_bot=return_to_bot)
 
         self.db.commit()
         self.db.refresh(handoff)
@@ -317,7 +337,7 @@ class HandoffManager:
             .filter(
                 WhatsAppHandoff.session_id == session_id,
                 WhatsAppHandoff.tenant_id == self.tenant_id,
-                WhatsAppHandoff.status.in_(["pending", "assigned", "in_progress"]),
+                WhatsAppHandoff.status.in_(HANDOFF_STATUS_EM_ABERTO),
             )
             .first()
         )

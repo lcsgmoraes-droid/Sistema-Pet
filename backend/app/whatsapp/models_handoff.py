@@ -22,6 +22,17 @@ from app.db import Base
 from app.base_models import TenantScoped
 
 
+# Estados oficiais do handoff (os mesmos que a tela do atendente usa).
+HANDOFF_PENDENTE = "pending"  # aguardando atendente
+HANDOFF_ATIVO = "active"  # atendente assumiu e esta atendendo
+HANDOFF_RESOLVIDO = "resolved"
+HANDOFF_CANCELADO = "cancelled"
+# O gerenciador antigo gravava "assigned" e "in_progress" para "em atendimento".
+# Registros antigos continuam validos: leitura tolera, escrita usa so "active".
+HANDOFF_STATUS_EM_ATENDIMENTO = (HANDOFF_ATIVO, "assigned", "in_progress")
+HANDOFF_STATUS_EM_ABERTO = (HANDOFF_PENDENTE,) + HANDOFF_STATUS_EM_ATENDIMENTO
+
+
 class WhatsAppAgent(TenantScoped, Base):
     """Atendentes humanos disponíveis para WhatsApp"""
 
@@ -88,10 +99,10 @@ class WhatsAppHandoff(TenantScoped, Base):
     # Status
     status = Column(String(50), default="pending")
     # pending (aguardando atendente)
-    # assigned (atribuído mas não iniciado)
-    # in_progress (atendente respondendo)
+    # active (atendente assumiu e esta atendendo)
     # resolved (resolvido)
     # cancelled (cliente saiu)
+    # Legado: "assigned" e "in_progress" equivalem a "active" (ver constantes).
 
     # Atendente
     assigned_to = Column(UUID(as_uuid=True), ForeignKey("whatsapp_agents.id"))

@@ -17,7 +17,14 @@ from datetime import UTC, datetime
 from app.db import get_session as get_db
 from app.auth.dependencies import get_current_user_and_tenant
 from app.models import User
+from app.whatsapp.handoff_manager import sessao_assumida, sessao_encerrada
 from app.whatsapp.models_handoff import (
+    HANDOFF_ATIVO,
+    HANDOFF_CANCELADO,
+    HANDOFF_PENDENTE,
+    HANDOFF_RESOLVIDO,
+    HANDOFF_STATUS_EM_ABERTO,
+    HANDOFF_STATUS_EM_ATENDIMENTO,
     WhatsAppAgent,
     WhatsAppHandoff,
     WhatsAppInternalNote,
@@ -257,7 +264,7 @@ async def delete_agent(
         .filter(
             and_(
                 WhatsAppHandoff.assigned_to == agent_id,
-                WhatsAppHandoff.status.in_(["pending", "active"]),
+                WhatsAppHandoff.status.in_(HANDOFF_STATUS_EM_ABERTO),
             )
         )
         .count()
@@ -299,7 +306,10 @@ async def list_handoffs(
         WhatsAppHandoff.tenant_id == current_user.tenant_id
     )
 
-    if status:
+    if status == HANDOFF_ATIVO:
+        # Inclui registros antigos gravados como "assigned" ou "in_progress".
+        query = query.filter(WhatsAppHandoff.status.in_(HANDOFF_STATUS_EM_ATENDIMENTO))
+    elif status:
         query = query.filter(WhatsAppHandoff.status == status)
 
     if priority:
@@ -397,7 +407,7 @@ async def assign_handoff(
     if not handoff:
         raise HTTPException(status_code=404, detail="Handoff not found")
 
-    if handoff.status not in ["pending", "active"]:
+    if handoff.status not in HANDOFF_STATUS_EM_ABERTO:
         raise HTTPException(
             status_code=400,
             detail=f"Cannot assign handoff with status: {handoff.status}",
@@ -427,7 +437,7 @@ async def assign_handoff(
         .filter(
             and_(
                 WhatsAppHandoff.assigned_to == agent.id,
-                WhatsAppHandoff.status == "active",
+                WhatsAppHandoff.status.in_(HANDOFF_STATUS_EM_ATENDIMENTO),
             )
         )
         .count()
@@ -441,9 +451,11 @@ async def assign_handoff(
 
     # Atribuir
     handoff.assigned_to = agent.id
-    handoff.status = "active"
+    handoff.status = HANDOFF_ATIVO
     handoff.assigned_at = datetime.now(UTC)
     agent.current_chats = active_count + 1
+    # A conversa passa para o atendente: a IA para de responder.
+    sessao_assumida(handoff.session, agent)
 
     # Atualizar status do agente
     if active_count + 1 >= agent.max_concurrent_chats:
@@ -493,9 +505,18 @@ async def resolve_handoff(
     if not handoff:
         raise HTTPException(status_code=404, detail="Handoff not found")
 
-    handoff.status = "resolved"
+    if handoff.status in (HANDOFF_RESOLVIDO, HANDOFF_CANCELADO):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Handoff already finished (status: {handoff.status})",
+        )
+
+    handoff.status = HANDOFF_RESOLVIDO
     handoff.resolved_at = datetime.now(UTC)
     handoff.resolution_notes = resolve_data.resolution_notes
+    # Fim do atendimento: devolve a conversa ao bot ou a encerra, por escolha
+    # explicita do atendente.
+    sessao_encerrada(handoff.session, devolver_ao_bot=resolve_data.return_to_bot)
 
     # Liberar capacidade do agente
     if handoff.assigned_to:
@@ -511,7 +532,7 @@ async def resolve_handoff(
                 .filter(
                     and_(
                         WhatsAppHandoff.assigned_to == agent.id,
-                        WhatsAppHandoff.status == "active",
+                        WhatsAppHandoff.status.in_(HANDOFF_STATUS_EM_ATENDIMENTO),
                         WhatsAppHandoff.id != handoff_id,
                     )
                 )
@@ -656,7 +677,7 @@ async def get_handoff_stats(
         .filter(
             and_(
                 WhatsAppHandoff.tenant_id == tenant_id,
-                WhatsAppHandoff.status == "pending",
+                WhatsAppHandoff.status == HANDOFF_PENDENTE,
             )
         )
         .count()
@@ -668,7 +689,7 @@ async def get_handoff_stats(
         .filter(
             and_(
                 WhatsAppHandoff.tenant_id == tenant_id,
-                WhatsAppHandoff.status == "active",
+                WhatsAppHandoff.status.in_(HANDOFF_STATUS_EM_ATENDIMENTO),
             )
         )
         .count()

@@ -119,12 +119,12 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 - [ ] Regras finas do aviso: usar o texto por loja (configurável), respeitar quem respondeu SAIR e o horário de atendimento. `[?] DECIDIR`
 
 **0.2 Atendimento humano: estados e devolução ao bot**
-- [ ] Unificar os estados do atendimento (hoje há dois vocabulários diferentes entre modelo, regra e tela).
-- [ ] Assumir um atendimento passa a mudar também o estado da conversa.
-- [ ] Encerrar devolve a conversa ao bot ou fecha, conforme escolha explícita do atendente.
-- [ ] Corrigir a atribuição ao atendente (tipo de identificador incompatível).
+- [x] Unificar os estados do atendimento (22/10/2026): vocabulário oficial `pending`, `active`, `resolved`, `cancelled` (constantes em `models_handoff.py`); registros antigos `assigned` e `in_progress` são tratados como `active` na leitura, sem migração de dados.
+- [x] Assumir um atendimento passa a mudar também o estado da conversa (rota e gerenciador usam o mesmo `sessao_assumida`).
+- [x] Encerrar devolve a conversa ao bot ou fecha, conforme escolha explícita do atendente (`return_to_bot` na rota de resolver; padrão: encerrar). Resolver duas vezes é recusado. A tela do atendente ganha a opção "devolver à IA" na migração do dashboard (Etapa 5).
+- [x] Corrigir a atribuição ao atendente: a conversa passa a guardar o id do usuário do atendente, não o id do cadastro de atendente.
 - [ ] Ligar a transferência por sentimento, repetição e tempo de espera (hoje existe e não é chamada). `[?] DECIDIR` quais regras valem.
-- [ ] Testes ponta a ponta: assumir, responder, resolver, devolver.
+- [x] Testes ponta a ponta: assumir, resolver, devolver e a IA parando e voltando (`backend/tests/unit/test_whatsapp_handoff_ciclo_atendimento.py`). Falta o teste de "responder" (o envio pelo atendente é a Etapa 0.8).
 
 **0.3 Tempo real (WebSocket) separado por loja**
 - [ ] Validar que o atendente da conexão pertence ao usuário e à loja.
@@ -351,6 +351,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 | Data | Mudança |
 |---|---|
+| 22/10/2026 | Etapa 0.2 concluída (exceto a ligação das regras por sentimento, repetição e tempo, que segue a decidir): estados unificados, assumir e resolver sincronizam a conversa, devolução ao bot por escolha. |
 | 22/10/2026 | Etapa 0.1 concluída: a IA não responde com atendimento humano ativo e o tutor que aguarda atendente recebe um aviso de espera (1 vez a cada 30 minutos). |
 | 22/10/2026 | Protótipo congelado; Fase 2 concluída; início da Fase 3 (Etapa 0.1). |
 | 21/10/2026 | Protótipo versão 11: painel de última ação e próximo passo em coluna única com formulários sob demanda; duplo clique no card abre a ficha 360. |

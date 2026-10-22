@@ -119,6 +119,9 @@ class WhatsAppHandoffResolve(BaseModel):
     """Resolver handoff"""
 
     resolution_notes: str = Field(..., min_length=1, max_length=2000)
+    # Escolha explicita do atendente ao encerrar: True devolve a conversa ao bot;
+    # False (padrao) encerra a conversa.
+    return_to_bot: bool = False
 
 
 # ==================== INTERNAL NOTES ====================
