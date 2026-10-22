@@ -177,12 +177,12 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 - [x] Testes de contrato entre tela e API (`backend/tests/unit/test_whatsapp_chat_do_atendente.py`: campos esperados pelo chat e pela ficha, corpo do envio, regras de envio e código removido).
 
 **0.9 Processamento confiável das mensagens**
-- [ ] Fila com nova tentativa para as mensagens recebidas (hoje a falha é perdida).
-- [ ] O processamento usa sessão de banco própria (hoje reutiliza a da requisição).
-- [ ] Tirar chamadas bloqueantes de dentro de rotas assíncronas.
-- [ ] O fluxo do n8n não deve segurar a requisição até a IA terminar.
+- [~] Nova tentativa para as mensagens recebidas (22/10/2026): se a IA falhar, tenta até 3 vezes com espera (2 s e 5 s); antes de repetir, confere se uma resposta já saiu (evita responder duas vezes); esgotadas as tentativas, a conversa vai para a fila de atendimento humano (motivo `falha_tecnica`) e o tutor recebe o aviso de espera. O erro da IA não aparece no resultado. **Fila durável** (sobrevive a reinício do servidor no meio do processamento) fica para a Etapa 4.8, junto da evolução da fila de envio.
+- [x] O processamento em segundo plano usa sessão de banco própria, sempre fechada, e nunca derruba a tarefa (`processar_mensagem_em_segundo_plano`).
+- [ ] Tirar chamadas bloqueantes de dentro de rotas assíncronas: **não feito**. As chamadas ao banco são curtas; a que mais pesa (cliente HTTP síncrono da ponte de dados do piloto, até 20 s) só roda quando a ponte remota está ligada. Tratar junto da ponte de dados do piloto. `[?] DECIDIR` se a ponte continua existindo depois do canal oficial.
+- [x] A entrada do orquestrador (n8n) responde "aceito" na hora e a IA processa em segundo plano; o atendimento humano de fallback (cliente pediu atendente) roda depois, na mesma sessão.
 - [ ] Suporte a mensagens que não são texto no canal oficial (áudio, imagem). `[?] DECIDIR` escopo.
-- [ ] Testes de falha e reprocessamento.
+- [x] Testes de falha e nova tentativa (`backend/tests/unit/test_whatsapp_processamento_confiavel.py`).
 
 ### Etapa 1 — Fundação do módulo CRM
 
@@ -351,6 +351,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 | Data | Mudança |
 |---|---|
+| 22/10/2026 | Etapa 0.9 em grande parte concluída: nova tentativa da IA com fallback para atendente, sessão de banco própria no segundo plano e entrada do n8n sem espera; falta a fila durável (Etapa 4.8) e as chamadas bloqueantes da ponte do piloto. |
 | 22/10/2026 | Etapa 0.8 em grande parte concluída: envio do atendente funcionando, formato único de mensagem entre tela e API, histórico da ficha lendo do modelo definitivo e código morto removido; falta revisar o restante do legado do bot e remover o modelo paralelo após conferir o banco de produção. |
 | 22/10/2026 | Etapa 0.7 avançada (sem as decisões de consentimento e retenção): SAIR registrado e confirmado, quem recusou não recebe IA nem aviso, conversas entram no dossiê e na anonimização LGPD, leitura de mensagens auditada. |
 | 22/10/2026 | Etapa 0.6 em grande parte concluída: limite de frequência por telefone e válvula de segurança de tokens por dia por loja, medidos no banco; falta ligar ao saldo de créditos (T.1). |

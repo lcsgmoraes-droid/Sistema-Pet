@@ -16,7 +16,7 @@ from typing import Literal, Optional
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import BackgroundTasks, APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from openai import OpenAI
@@ -24,7 +24,10 @@ from openai import OpenAI
 from app.config import _is_strict_runtime_environment
 from app.db import get_session
 from app.tenancy.context import clear_current_tenant, set_current_tenant
-from app.whatsapp.webhook import normalize_phone, process_incoming_message
+from app.whatsapp.webhook import (
+    normalize_phone,
+    processar_mensagem_em_segundo_plano,
+)
 from app.whatsapp.handoff_manager import HandoffManager
 from app.whatsapp.models import WhatsAppSession, TenantWhatsAppConfig
 
@@ -381,6 +384,7 @@ def _ensure_handoff_for_human_request(
 async def ingest_message(
     tenant_id: str,
     payload: InternalIngestRequest,
+    background_tasks: BackgroundTasks,
     x_internal_token: Optional[str] = Header(default=None, alias="X-Internal-Token"),
     db: Session = Depends(get_session),
 ):
@@ -397,7 +401,9 @@ async def ingest_message(
     tenant_uuid = _parse_tenant_uuid(tenant_id)
     set_current_tenant(tenant_uuid)
     try:
-        return await _ingest_message_inner(tenant_id, tenant_uuid, payload, db)
+        return await _ingest_message_inner(
+            tenant_id, tenant_uuid, payload, db, background_tasks
+        )
     finally:
         clear_current_tenant()
 
@@ -407,6 +413,7 @@ async def _ingest_message_inner(
     tenant_uuid: _uuid_mod.UUID,
     payload: InternalIngestRequest,
     db: Session,
+    background_tasks: BackgroundTasks,
 ):
     normalized_phone = normalize_phone(payload.phone)
     if not normalized_phone:
@@ -420,22 +427,23 @@ async def _ingest_message_inner(
     if not message_content:
         raise HTTPException(status_code=400, detail="Conteudo vazio")
 
-    await process_incoming_message(
+    # A IA responde em segundo plano: o orquestrador recebe a confirmacao na hora
+    # (antes ficava esperando a IA terminar). O fallback operacional abaixo cria
+    # o atendimento humano quando o cliente pedir um atendente, mesmo se a IA
+    # estiver indisponivel.
+    background_tasks.add_task(
+        processar_mensagem_em_segundo_plano,
         tenant_id=tenant_id,
         phone=normalized_phone,
         message_content=message_content,
         whatsapp_msg_id=payload.external_message_id,
-        db=db,
-    )
-
-    # Fallback operacional: cria handoff direto quando o cliente pedir humano,
-    # mesmo se o processor de IA estiver indisponivel.
-    _ensure_handoff_for_human_request(
-        db=db,
-        tenant_id=tenant_id,
-        tenant_uuid=tenant_uuid,
-        normalized_phone=normalized_phone,
-        message_content=message_content,
+        depois=lambda sessao_db: _ensure_handoff_for_human_request(
+            db=sessao_db,
+            tenant_id=tenant_id,
+            tenant_uuid=tenant_uuid,
+            normalized_phone=normalized_phone,
+            message_content=message_content,
+        ),
     )
 
     return InternalIngestResponse(

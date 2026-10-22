@@ -283,12 +283,11 @@ async def process_webhook_payload(
 
                     # Enfileirar processamento
                     background_tasks.add_task(
-                        process_incoming_message,
+                        processar_mensagem_em_segundo_plano,
                         tenant_id=tenant_id,
                         phone=phone,
                         message_content=text_content,
                         whatsapp_msg_id=whatsapp_msg_id,
-                        db=db,
                     )
 
                     processed += 1
@@ -337,6 +336,43 @@ def _duplicate_message_result(
         "whatsapp_message_id": provider_message_id,
         "message_id": existing.id,
     }
+
+
+async def processar_mensagem_em_segundo_plano(
+    tenant_id: str,
+    phone: str,
+    message_content: str,
+    whatsapp_msg_id: str | None,
+    depois=None,
+) -> None:
+    """Processa uma mensagem fora da requisicao, com a PROPRIA sessao de banco.
+
+    A sessao da requisicao e fechada quando a resposta HTTP sai; reaproveita-la
+    aqui era frágil. `depois(db)` roda apos o processamento, na mesma sessao.
+    Nunca levanta erro: falha nao pode quebrar a tarefa nem o servidor.
+    """
+    from app.db import SessionLocal
+
+    db = SessionLocal()
+    try:
+        await process_incoming_message(
+            tenant_id=tenant_id,
+            phone=phone,
+            message_content=message_content,
+            whatsapp_msg_id=whatsapp_msg_id,
+            db=db,
+        )
+        if depois is not None:
+            with whatsapp_tenant_context(tenant_id):
+                depois(db)
+    except Exception as erro:
+        logger.error("Falha no processamento em segundo plano: %s", type(erro).__name__)
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    finally:
+        db.close()
 
 
 async def process_incoming_message(
@@ -504,27 +540,10 @@ async def _process_incoming_message_with_context(
                 },
             }
 
-        # 4. Processar com IA
-        processor_result = None
-        try:
-            from app.whatsapp.processor import MessageProcessor
-
-            with whatsapp_tenant_context(tenant_id):
-                processor = MessageProcessor(db=db, tenant_id=tenant_id)
-                processor_result = await processor.process_message(
-                    session_id=session.id,
-                    message_id=message.id,
-                    message_content=message_content,
-                )
-
-            logger.info(
-                "✅ Processamento concluído: %s",
-                processor_result.get("action"),
-            )
-
-        except Exception as proc_error:
-            logger.error(f"Erro no processor (não-bloqueante): {proc_error}")
-            # Não falha se processor der erro
+        # 4. Processar com IA (com novas tentativas e, no fim, um atendente)
+        processor_result = await _processar_com_novas_tentativas(
+            db, tenant_id, session, message, message_content
+        )
 
         return {
             "status": "processed",
@@ -613,6 +632,111 @@ async def _bloquear_ia_por_limite(
         return await _avisar_espera_atendente(db, tenant_id, session)
     except Exception as erro:
         logger.warning("Falha ao enviar conversa para atendimento humano: %s", erro)
+        return False
+
+
+# Quantas vezes a IA tenta responder e quanto espera entre as tentativas.
+TENTATIVAS_DE_PROCESSAMENTO = 3
+ESPERAS_ENTRE_TENTATIVAS_SEGUNDOS = (2.0, 5.0)
+
+
+def _ja_respondeu(db: Session, session_id: str, desde) -> bool:
+    """True se ja saiu alguma resposta nesta conversa depois da mensagem do tutor."""
+    try:
+        return (
+            db.query(WhatsAppMessage)
+            .filter(
+                WhatsAppMessage.session_id == session_id,
+                WhatsAppMessage.tipo == "enviada",
+                WhatsAppMessage.created_at >= desde,
+            )
+            .first()
+            is not None
+        )
+    except Exception:
+        return False
+
+
+async def _processar_com_novas_tentativas(
+    db: Session, tenant_id: str, session: Any, message: Any, message_content: str
+) -> dict | None:
+    """Roda a IA; se falhar, tenta de novo com espera. Se esgotar, chama um atendente.
+
+    Antes de repetir, confere se uma resposta ja foi enviada (evita responder duas
+    vezes ao tutor quando a falha veio depois do envio).
+    """
+    import asyncio
+
+    for tentativa in range(1, TENTATIVAS_DE_PROCESSAMENTO + 1):
+        try:
+            from app.whatsapp.processor import MessageProcessor
+
+            with whatsapp_tenant_context(tenant_id):
+                processor = MessageProcessor(db=db, tenant_id=tenant_id)
+                resultado = await processor.process_message(
+                    session_id=session.id,
+                    message_id=message.id,
+                    message_content=message_content,
+                )
+            logger.info("✅ Processamento concluído: %s", resultado.get("action"))
+            return resultado
+        except Exception as erro:
+            logger.error(
+                "Falha no processamento da IA (tentativa %s/%s): %s",
+                tentativa,
+                TENTATIVAS_DE_PROCESSAMENTO,
+                type(erro).__name__,
+            )
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            if _ja_respondeu(db, session.id, message.created_at):
+                return {"action": "responded_before_failure"}
+            if tentativa < TENTATIVAS_DE_PROCESSAMENTO:
+                await asyncio.sleep(
+                    ESPERAS_ENTRE_TENTATIVAS_SEGUNDOS[
+                        min(tentativa - 1, len(ESPERAS_ENTRE_TENTATIVAS_SEGUNDOS) - 1)
+                    ]
+                )
+
+    aviso = await _encaminhar_falha_tecnica_para_atendente(db, tenant_id, session)
+    return {"action": "processing_failed_handoff", "waiting_notice_sent": aviso}
+
+
+async def _encaminhar_falha_tecnica_para_atendente(
+    db: Session, tenant_id: str, session: Any
+) -> bool:
+    """A IA nao conseguiu responder: um atendente assume e o tutor e avisado."""
+    try:
+        from app.whatsapp.handoff_manager import get_handoff_manager
+
+        gerente = get_handoff_manager(db, tenant_id)
+        if not gerente.get_active_handoff(session.id):
+            handoff = gerente.create_handoff(
+                session_id=session.id,
+                phone_number=session.phone_number,
+                reason="falha_tecnica",
+                priority="medium",
+                reason_details="A IA nao conseguiu responder: atendimento humano.",
+            )
+            from app.whatsapp.websocket import emit_new_handoff
+
+            await emit_new_handoff(
+                {
+                    "id": str(handoff.id),
+                    "session_id": str(session.id),
+                    "phone_number": handoff.phone_number,
+                    "reason": handoff.reason,
+                    "priority": handoff.priority,
+                    "status": handoff.status,
+                },
+                str(tenant_id),
+                db,
+            )
+        return await _avisar_espera_atendente(db, tenant_id, session)
+    except Exception as erro:
+        logger.warning("Falha ao encaminhar falha tecnica para atendente: %s", erro)
         return False
 
 
