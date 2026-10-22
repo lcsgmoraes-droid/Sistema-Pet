@@ -6,8 +6,17 @@
 | Branch | `codex/ifood-taxas-simulacao` |
 | Ambiente | DEV isolado `corepet-ifood-dev`, `http://127.0.0.1:18081` |
 | Escopo | Simular preço e contribuição com taxas descartáveis |
+| Executor / prioridade | Codex / P2 |
+| Risco | Médio: estimativa financeira e separação entre rascunho e dados salvos |
+| Domínios | Produto canônico e catálogo iFood |
 
-## Comportamento
+## 1. Necessidade e requisitos
+
+Lojistas precisam experimentar preços e taxas sem alterar o contrato cadastrado.
+Aceite: recalcular contribuição e pendências com premissas temporárias,
+restaurar as taxas salvas sem perder o preço em edição e preservar produto e
+regras. A simulação deve continuar disponível a quem pode visualizar produtos.
+Publicação remota e alteração do custo do produto estão fora deste escopo.
 
 A calculadora da central permite escolher entre as taxas salvas na loja e taxas
 temporárias: comissão de entrega própria, comissão de entrega iFood, pagamento,
@@ -15,12 +24,14 @@ tributos, despesa por unidade e meta opcional. Os campos usam componentes V2 e o
 mesmo editor de domínio das regras da loja. Valor desconhecido continua distinto
 de zero explicitamente informado.
 
+## 2. Regras de negócio e dados
+
 O preço, as taxas e a meta simulados ficam identificados na calculadora. Restaurar
 as taxas da loja preserva o preço digitado. Alternar modalidade, atualizar a oferta
 ou atravessar o início/fim da promoção preserva o rascunho de taxas. O custo do
 produto, o estoque, a promoção e o acréscimo continuam vindo do cadastro.
 
-## Persistência e acesso
+## 3. Arquitetura e integrações
 
 `POST /integracoes/ifood/catalogo/produto/simular-preco` aceita o objeto opcional
 fechado `custos_simulados`, limitado aos seis campos de rentabilidade. Campo
@@ -33,13 +44,21 @@ executar DML/commit ou abrir cliente do iFood. Mantém `produtos.visualizar` e o
 isolamento entre empresas. Não é necessária permissão de editar configurações
 para experimentar taxas.
 
+## 4. Segurança e privacidade
+
+Usa autenticação e tenant da sessão existente; IDs de outra empresa retornam 404.
+Não cria dados pessoais, novos segredos, permissões ou logs financeiros. As taxas
+descartáveis existem somente na requisição e na memória da calculadora, sem
+retenção em banco ou armazenamento do navegador. Respostas antigas são canceladas
+e não podem liberar aplicação de um preço ainda não recalculado.
+
 Aplicar preço continua sendo uma ação separada e autorizada por `produtos.editar`.
 O PUT envia somente `preco_ifood`; depois é consultada a oferta canônica para
 atualizar a central. Margens e pendências hipotéticas nunca viram oferta salva.
 Se a gravação funcionar e a consulta falhar, a mensagem reconhece o salvamento e
 bloqueia nova aplicação até recuperar a oferta.
 
-## Validação técnica
+## 5. Desenvolvimento e qualidade
 
 - 102 testes backend iFood aprovados, incluindo ausência de gravação/envio com
   provedor habilitado, configuração ausente, empresa, leitura sem edição,
@@ -62,7 +81,7 @@ bloqueia nova aplicação até recuperar a oferta.
   R$ 61,50/41%. A comparação HTTP posterior à edição visual também foi idêntica.
   Nenhum botão de aplicar preço ou salvar regras foi acionado.
 
-## Operação
+## 6. Ambientes e homologação
 
 Não há migration ou mudança de dependências. A preparação usa somente o DEV
 isolado existente na porta 18081 e seus dados fictícios. Produção e seus dados
@@ -78,3 +97,37 @@ reaberta nessa versão, sem modificar os dados fictícios.
 Revisão técnica independente sem bugs acionáveis. O aceite de negócio em DEV
 deve anteceder uma futura solicitação de publicação. O envio de anúncios ao
 iFood continua fora desta entrega.
+
+Registro de homologação: [cenários e resultados](../homologacoes/2026-10-21-taxas-temporarias-ifood.md).
+
+## 7. Publicação e rollback
+
+Entrega de frontend/backend, sem migration. Base `a3a8ff475`, branch identificada
+na tabela. Uma publicação futura exige revisão do PR, release-check e autorização
+explícita; o backend deve aceitar o payload novo antes da nova interface entrar.
+Smoke futuro: saúde, simulação e configuração canônica intacta. Reverter código e
+imagens anteriores se taxas hipotéticas aparecerem no catálogo salvo; não há
+dado novo persistido para migrar ou apagar. Nenhuma publicação feita nesta tarefa.
+
+## 8. Observabilidade e sustentação
+
+A calculadora identifica taxas temporárias, meta simulada e oferta salva. Erros
+de consulta permitem tentar novamente e mantêm rascunhos; aplicação fica bloqueada
+sem oferta confiável. O indicador de sucesso é contribuição/memória coerentes
+com as premissas enquanto GETs canônicos continuam idênticos. Como alternativa,
+usar as taxas salvas da loja. Persistência inesperada deve interromper o aceite.
+
+## 9. Mudança, comunicação e treinamento
+
+A ajuda contextual explica taxa desconhecida, zero explícito, meta opcional,
+restauração e aplicação somente do preço. Demonstração em DEV ao Lucas antes da
+liberação aos lojistas; não há alteração na rotina de cadastro geral nem manual
+externo a atualizar. Orientar o usuário a confirmar condições reais do contrato
+antes de salvar regras da loja por sua tela própria.
+
+## 10. Fechamento
+
+Critérios técnicos, evidências, isolamento, documentação, homologação,
+observabilidade e rollback registrados. Sem segredos ou artefatos locais no PR.
+Decisão técnica: aprovado para revisão em DEV. Pendente somente aceite de negócio
+do Lucas antes de uma eventual solicitação de produção, sem prazo imposto.
