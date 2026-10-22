@@ -9,6 +9,7 @@ import {
   FiGift,
   FiGlobe,
   FiHome,
+  FiMessageCircle,
   FiPackage,
   FiSettings,
   FiShield,
@@ -296,6 +297,14 @@ export function createLayoutMenuItems({ lembretesCount = 0, orcamentosGrupoAtivo
           permission: "clientes.visualizar",
         },
       ],
+    },
+    {
+      path: "/crm",
+      icon: FiMessageCircle,
+      iconKey: "message-circle",
+      label: "CRM",
+      modulo: "crm",
+      permission: "crm.visualizar",
     },
     {
       path: "/ecommerce",

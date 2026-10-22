@@ -49,6 +49,7 @@ MODULOS_PREMIUM = frozenset(
         "campanhas",
         "comissoes",
         "compras",
+        "crm",
         "ecommerce",
         "entregas",
         "financeiro_erp",
@@ -64,8 +65,11 @@ MODULOS_PREMIUM = frozenset(
 
 # Bling/webhooks e emissao fiscal seguem disponiveis apenas para tenants
 # explicitamente configurados. Nao entram na vitrine publica nem no piloto Beta.
-MODULOS_FORA_DA_OFERTA_PUBLICA = frozenset(["bling", "fiscal"])
-MODULOS_CONTRATACAO_SEPARADA = frozenset(["fiscal"])
+# O CRM (relacionamento com o tutor) nasce fora da oferta publica: planos e preco
+# ainda nao foram definidos (ver docs/crm/ROADMAP.md), entao so entra para lojas
+# habilitadas explicitamente.
+MODULOS_FORA_DA_OFERTA_PUBLICA = frozenset(["bling", "fiscal", "crm"])
+MODULOS_CONTRATACAO_SEPARADA = frozenset(["fiscal", "crm"])
 MODULOS_BETA_PUBLICOS = frozenset(MODULOS_PREMIUM - MODULOS_FORA_DA_OFERTA_PUBLICA)
 MODULOS_TRIAL_COMPLETO = frozenset(MODULOS_PREMIUM - MODULOS_FORA_DA_OFERTA_PUBLICA)
 

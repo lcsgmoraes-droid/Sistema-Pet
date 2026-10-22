@@ -186,9 +186,9 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 ### Etapa 1 — Fundação do módulo CRM
 
-- [ ] 1.1 Registrar o módulo "crm" no back e no front (lista de módulos premium, informações do módulo, tela de módulo bloqueado, menu, rotas protegidas).
+- [x] 1.1 Módulo "crm" registrado no back e no front (módulos premium, informações do módulo, menu "CRM", rota `/crm` protegida por módulo e permissão, página inicial provisória). Nasce **fora da oferta pública e de contratação separada**: não entra em beta, teste completo nem planos "todos os módulos" — só para lojas habilitadas explicitamente, até a decisão 1.2.
 - [ ] 1.2 Entrada em planos e preço do módulo. `[?] DECIDIR` (avulso ou dentro de planos).
-- [ ] 1.3 Permissões do CRM (visualizar, atender, gerenciar leads, configurar, ver todas as lojas) e **backfill** para quem hoje usa o WhatsApp, sem bloquear ninguém. Ajustar o teste de contrato do catálogo de permissões.
+- [x] 1.3 Permissões `crm.visualizar`, `crm.atender`, `crm.leads`, `crm.configurar`, `crm.todas_lojas` (migração `zzzzl20261022a1`). **Backfill** sem bloquear ninguém: perfis com `ia.whatsapp` ganham visualizar/atender/leads; configurar só se também administram (`usuarios.manage` ou `configuracoes.editar`); `todas_lojas` não é concedida sozinha. Perfil padrão Gerente das lojas novas já nasce com todas. Teste de contrato do catálogo ajustado para somar as migrações.
 - [ ] 1.4 Modelo de dados: funil, etapa (configurável), lead, movimentação de etapa (histórico), interação, responsável. Todos por loja, com isolamento.
 - [ ] 1.5 **Multi-loja:** o CRM é por loja; o usuário com acesso a mais de uma loja escolhe quais ver. Contrato de dados com a loja em cada registro e filtro por lojas permitidas.
 - [ ] 1.6 Serviço de identificação do tutor (usa o serviço da Etapa 0.4); regra de número desconhecido vira lead sem cadastro.
@@ -353,6 +353,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 |---|---|
 | 22/10/2026 | Etapa 0.9 em grande parte concluída: nova tentativa da IA com fallback para atendente, sessão de banco própria no segundo plano e entrada do n8n sem espera; falta a fila durável (Etapa 4.8) e as chamadas bloqueantes da ponte do piloto. |
 | 22/10/2026 | Etapa 0.8 em grande parte concluída: envio do atendente funcionando, formato único de mensagem entre tela e API, histórico da ficha lendo do modelo definitivo e código morto removido; falta revisar o restante do legado do bot e remover o modelo paralelo após conferir o banco de produção. |
+| 22/10/2026 | Etapa 1.1 e 1.3: módulo CRM registrado (fora da oferta pública), menu/rota/página provisória e permissões próprias com liberação automática para quem já usa o WhatsApp. |
 | 22/10/2026 | Etapa 0.7 avançada (sem as decisões de consentimento e retenção): SAIR registrado e confirmado, quem recusou não recebe IA nem aviso, conversas entram no dossiê e na anonimização LGPD, leitura de mensagens auditada. |
 | 22/10/2026 | Etapa 0.6 em grande parte concluída: limite de frequência por telefone e válvula de segurança de tokens por dia por loja, medidos no banco; falta ligar ao saldo de créditos (T.1). |
 | 22/10/2026 | Etapa 0.5 concluída: canal interno com comparação segura e sem token de exemplo em produção, valores fixos removidos (n8n, compose de produção, webhook antigo), erro do teste de conexão sem vazamento, telefone mascarado nos logs e configuração protegida por permissão. Exige definir token forte no servidor antes da publicação. |

@@ -13,6 +13,7 @@ const CATEGORY_LABELS = {
   cadastros: "Cadastros",
   clientes: "Clientes",
   compras: "Compras",
+  crm: "CRM",
   configuracoes: "Configuracoes",
   entregas: "Entregas",
   estoque: "Estoque",

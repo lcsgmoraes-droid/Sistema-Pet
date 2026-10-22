@@ -28,13 +28,14 @@ export const MODULOS_PREMIUM = [
   "ia_avancada",
   "entregas",
   "campanhas",
+  "crm",
   "whatsapp",
   "ecommerce",
   "app_mobile",
   "marketplaces",
 ];
 
-export const MODULOS_FORA_DA_OFERTA_PUBLICA = ["bling", "fiscal"];
+export const MODULOS_FORA_DA_OFERTA_PUBLICA = ["bling", "fiscal", "crm"];
 export const MODULOS_BETA_PUBLICOS = MODULOS_PREMIUM.filter(
   (modulo) => !MODULOS_FORA_DA_OFERTA_PUBLICA.includes(modulo),
 );
@@ -162,6 +163,18 @@ export const MODULOS_INFO = {
       "Segmentação de clientes",
       "Relatórios de engajamento",
       "Notificações automáticas pelo app",
+    ],
+  },
+  crm: {
+    nome: "CRM",
+    descricao:
+      "Relacionamento com o tutor: funil de leads, ficha completa do cliente e atendimento por WhatsApp com IA.",
+    preco: 0,
+    recursos: [
+      "Funil de leads em quadro (Kanban)",
+      "Ficha 360 do tutor e dos pets",
+      "Conversas de WhatsApp com atendente e IA",
+      "Mensagens automáticas de relacionamento",
     ],
   },
   whatsapp: {

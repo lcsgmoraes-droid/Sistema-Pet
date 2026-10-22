@@ -3,6 +3,7 @@ import ProtectedRoute from "../../components/ProtectedRoute";
 import {
   AlertasRacao,
   ChatIA,
+  CrmPage,
   DashEntregasFinanceiro,
   EntregasAbertas,
   HistoricoEntregas,
@@ -42,6 +43,16 @@ export function createDeliveryAiRoutes() {
           <ModuleGate modulo="financeiro_erp">
             <ChatIA />
           </ModuleGate>
+        }
+      />
+      <Route
+        path="crm"
+        element={
+          <ProtectedRoute permission="crm.visualizar">
+            <ModuleGate modulo="crm">
+              <CrmPage />
+            </ModuleGate>
+          </ProtectedRoute>
         }
       />
       <Route

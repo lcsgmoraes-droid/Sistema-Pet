@@ -11,6 +11,11 @@ MIGRATION = (
     / "versions"
     / "zxd20260826a1_seed_permission_catalog.py"
 )
+# Migrations posteriores que acrescentam permissoes ao catalogo (snapshot historico
+# acima + estas). Cada uma precisa definir PERMISSION_CATALOG.
+EXTRA_MIGRATIONS = (
+    ROOT / "backend" / "alembic" / "versions" / "zzzzl20261022a1_permissoes_crm.py",
+)
 APP_ROOT = ROOT / "backend" / "app"
 DEFAULT_ROLES = APP_ROOT / "services" / "default_roles_service.py"
 PERMISSION_PATTERN = re.compile(
@@ -19,7 +24,14 @@ PERMISSION_PATTERN = re.compile(
 
 
 def _catalog() -> dict[str, str]:
-    tree = ast.parse(MIGRATION.read_text(encoding="utf-8"))
+    catalog = _catalog_of(MIGRATION)
+    for extra in EXTRA_MIGRATIONS:
+        catalog.update(_catalog_of(extra))
+    return catalog
+
+
+def _catalog_of(path: Path) -> dict[str, str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
     assignment = next(
         node
         for node in tree.body
@@ -69,20 +81,23 @@ def test_permission_catalog_covers_default_roles_and_protected_routes():
 
 def test_permission_catalog_has_unique_codes_and_meaningful_descriptions():
     catalog = _catalog()
-    source = MIGRATION.read_text(encoding="utf-8")
-    catalog_literal = ast.literal_eval(
-        next(
-            node.value
-            for node in ast.parse(source).body
-            if isinstance(node, ast.Assign)
-            and any(
-                isinstance(target, ast.Name) and target.id == "PERMISSION_CATALOG"
-                for target in node.targets
+    total_declarado = 0
+    for path in (MIGRATION, *EXTRA_MIGRATIONS):
+        total_declarado += len(
+            ast.literal_eval(
+                next(
+                    node.value
+                    for node in ast.parse(path.read_text(encoding="utf-8")).body
+                    if isinstance(node, ast.Assign)
+                    and any(
+                        isinstance(target, ast.Name) and target.id == "PERMISSION_CATALOG"
+                        for target in node.targets
+                    )
+                )
             )
         )
-    )
 
-    assert len(catalog) == len(catalog_literal)
+    assert len(catalog) == total_declarado
     assert all("." in code for code in catalog)
     assert all(len(description.strip()) >= 8 for description in catalog.values())
 
