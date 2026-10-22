@@ -27,7 +27,13 @@ function LinhasValores({ linhas }) {
   );
 }
 
-export function DetalhesFaturamento({ composicao, id, aoAbrirRelatorio }) {
+export function DetalhesFaturamento({
+  composicao,
+  id,
+  aoAbrirRelatorio,
+  renderAcoesVenda,
+  classeVenda,
+}) {
   const [limite, setLimite] = useState(20);
   if (!composicao) return null;
   const vendas = composicao.detalhes || [];
@@ -79,7 +85,7 @@ export function DetalhesFaturamento({ composicao, id, aoAbrirRelatorio }) {
             <article
               key={venda.venda_id}
               role="listitem"
-              className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
+              className={`rounded-lg p-3 ${classeVenda ? classeVenda(venda) : "border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"}`}
             >
               <div className="flex flex-wrap items-start justify-between gap-2 text-sm">
                 <div>
@@ -136,6 +142,7 @@ export function DetalhesFaturamento({ composicao, id, aoAbrirRelatorio }) {
                   O valor pago considera a devolução. O histórico preserva os lançamentos originais.
                 </p>
               )}
+              {renderAcoesVenda?.(venda)}
             </article>
           ))}
           {vendas.length === 0 && (
@@ -169,6 +176,8 @@ export default function ResumoFaturamento({
   detalhesId,
   aoAbrirRelatorio,
   mostrarDetalhes = true,
+  renderAcoesVenda,
+  classeVenda,
 }) {
   const idGerado = useId();
   const id = detalhesId || `faturamento-${idGerado}`;
@@ -233,7 +242,13 @@ export default function ResumoFaturamento({
         )}
       </CartaoIndicador>
       {mostrarDetalhes && expandidoAtual && !detalhesFora && (
-        <DetalhesFaturamento composicao={composicao} id={id} aoAbrirRelatorio={aoAbrirRelatorio} />
+        <DetalhesFaturamento
+          composicao={composicao}
+          id={id}
+          aoAbrirRelatorio={aoAbrirRelatorio}
+          renderAcoesVenda={renderAcoesVenda}
+          classeVenda={classeVenda}
+        />
       )}
     </div>
   );

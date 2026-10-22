@@ -117,7 +117,11 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
         ? "Salvando..."
         : item.conferido
           ? "Conferido"
-          : "Conferir"}
+          : item.estado_conferencia === "divergencia"
+            ? "Com divergência"
+            : item.conferencia_alterada
+              ? "Pendente — confira novamente"
+              : "Conferir"}
     </div>
   );
   const caixa = auditoria?.resumo?.caixa;
@@ -462,7 +466,11 @@ export default function ModalAuditoriaCaixa({ caixaId, onClose }) {
                         {evento.dados.tipo_item && (
                           <p className="text-sm">
                             {evento.dados.tipo_item} #{evento.dados.item_id}:{" "}
-                            {evento.dados.conferido ? "conferido" : "conferência retirada"}
+                            {evento.dados.estado === "divergencia"
+                              ? "divergência apontada"
+                              : evento.dados.conferido
+                                ? "conferido"
+                                : "pendente de conferência"}
                           </p>
                         )}
                         {snapshot && (

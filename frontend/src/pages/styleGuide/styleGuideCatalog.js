@@ -177,7 +177,7 @@ export const styleGuideCatalog = [
         status: "pronto",
         arquivo: "components/v2/ResumoFaturamento/ResumoFaturamento.jsx",
         descricao:
-          "Faturamento líquido por empresa ou caixa, conforme o escopo da composição do backend. No dashboard e fechamento usar mostrarDetalhes=false; expansão de quitação e vendas somente na auditoria do caixa. Aceita expansão controlada e modo escuro, sem recalcular métricas na tela.",
+          "Faturamento líquido por empresa ou caixa, conforme o escopo da composição do backend. Detalhes expansíveis de vendas e formas de quitação no dashboard, fechamento e auditoria do caixa. Aceita expansão controlada, detalhes em largura total e modo escuro, sem recalcular métricas na tela.",
       },
       {
         nome: "EstadoVazio",

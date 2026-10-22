@@ -165,6 +165,16 @@ Invoke-GateStep 'Backend format' $ruff @(
     'format', '--check', '.', '--exclude', 'alembic/versions'
 ) $backend
 
+Invoke-GateStep 'Faturamento and cash audit reconciliation regression' $python @(
+    '-m', 'pytest',
+    'tests/unit/test_faturamento_composicao.py',
+    'tests/unit/test_faturamento_superficies.py',
+    'tests/unit/test_pdf_caixa_resumo.py',
+    'tests/unit/test_caixa_recebimentos_auditoria.py',
+    'tests/unit/test_caixa_conferencia_estados.py',
+    'tests/unit/test_caixa_auditoria_performance.py', '-q'
+) $backend
+
 Invoke-GateStep 'Billing operational continuity regression' $python @(
     '-m', 'pytest',
     'tests/unit/test_plan_catalog_and_limits.py',
