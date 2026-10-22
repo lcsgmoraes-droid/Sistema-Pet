@@ -38,6 +38,11 @@ export function createControllerHarness(
     previous.length === next.length &&
     previous.every((value, i) => Object.is(value, next[i]));
   const hooks = {
+    useId() {
+      const slot = index++;
+      if (!slots[slot]) slots[slot] = { value: `controller-id-${slot}` };
+      return slots[slot].value;
+    },
     useState(initial) {
       const slot = index++;
       if (!slots[slot])

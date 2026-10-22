@@ -95,8 +95,10 @@ export const reabrirCaixa = async (caixaId, motivo) => {
   return response.data;
 };
 
-export const obterAuditoriaCaixa = async (caixaId) => {
-  const response = await api.get(`/caixas/${caixaId}/auditoria`);
+export const obterAuditoriaCaixa = async (caixaId, opcoes = {}) => {
+  const response = await api.get(`/caixas/${caixaId}/auditoria`, {
+    ...(opcoes.signal ? { signal: opcoes.signal } : {}),
+  });
   return response.data;
 };
 

@@ -25,6 +25,7 @@ export default function ModalFecharCaixaContent({
   aplicarContagem,
   limparContagem,
   confirmandoDiferenca,
+  conferencia,
   diferenca,
   erro,
   executarFechamento,
@@ -46,6 +47,9 @@ export default function ModalFecharCaixaContent({
   sucesso,
   valorContado,
 }) {
+  const operacaoEmAndamento = Boolean(
+    salvando || conferencia?.salvando || conferencia?.atualizando,
+  );
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -179,7 +183,7 @@ export default function ModalFecharCaixaContent({
             </div>
 
             {/* 📊 Vendas por Forma de Pagamento - INFORMATIVO */}
-            <PaymentBreakdownPanel resumo={resumo} />
+            <PaymentBreakdownPanel resumo={resumo} conferencia={conferencia} />
 
             {/* Mensagem de erro da API */}
             {erro && (
@@ -252,7 +256,7 @@ export default function ModalFecharCaixaContent({
                   <button
                     type="button"
                     onClick={() => setConfirmandoDiferenca(false)}
-                    disabled={salvando}
+                    disabled={operacaoEmAndamento}
                     className="flex-1 px-4 py-3 border-2 border-amber-300 text-amber-700 rounded-lg hover:bg-amber-100 font-semibold transition-colors disabled:opacity-50"
                   >
                     Voltar e corrigir
@@ -260,7 +264,7 @@ export default function ModalFecharCaixaContent({
                   <button
                     type="button"
                     onClick={executarFechamento}
-                    disabled={salvando}
+                    disabled={operacaoEmAndamento}
                     className="flex-1 px-4 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
                   >
                     {salvando ? (
@@ -282,7 +286,7 @@ export default function ModalFecharCaixaContent({
                 <button
                   type="button"
                   onClick={onClose}
-                  disabled={salvando}
+                  disabled={operacaoEmAndamento}
                   className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancelar
@@ -290,7 +294,7 @@ export default function ModalFecharCaixaContent({
                 <button
                   onClick={handleFechar}
                   disabled={
-                    salvando ||
+                    operacaoEmAndamento ||
                     valorContado === null ||
                     valorContado === undefined ||
                     valorContado === ""

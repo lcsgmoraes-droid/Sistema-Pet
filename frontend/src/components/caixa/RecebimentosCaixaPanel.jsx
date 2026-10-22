@@ -11,6 +11,8 @@ export default function RecebimentosCaixaPanel({
   composicao,
   mostrarDetalhes = true,
   somenteDetalhes = false,
+  renderAcoesLancamento,
+  classeLancamento,
 }) {
   const [expandido, setExpandido] = useState(false);
   const [formaSelecionada, setFormaSelecionada] = useState(null);
@@ -159,7 +161,7 @@ export default function RecebimentosCaixaPanel({
                 {composicao.detalhes_creditos.map((credito) => (
                   <div
                     key={credito.id}
-                    className="border-t border-slate-200 pt-2 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300"
+                    className={`text-xs text-slate-600 dark:text-slate-300 ${classeLancamento ? `rounded-lg p-3 ${classeLancamento(credito)}` : "border-t border-slate-200 pt-2 dark:border-slate-700"}`}
                   >
                     <p>
                       Venda #{credito.numero_venda || credito.venda_id} · {credito.forma_pagamento}
@@ -168,6 +170,7 @@ export default function RecebimentosCaixaPanel({
                       {formatMoneyBRL(credito.valor)} ·{" "}
                       {formatarDataFaturamento(credito.data_recebimento)}
                     </p>
+                    {renderAcoesLancamento?.(credito)}
                   </div>
                 ))}
               </div>
@@ -203,7 +206,7 @@ export default function RecebimentosCaixaPanel({
               <div
                 key={`${pagamento.tipo}-${pagamento.id}-${indice}`}
                 role="listitem"
-                className="rounded-lg border border-slate-200 bg-white p-3 text-xs dark:border-slate-700 dark:bg-slate-900"
+                className={`rounded-lg p-3 text-xs ${classeLancamento ? classeLancamento(pagamento) : "border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"}`}
               >
                 <div className="flex justify-between gap-2 text-slate-900 dark:text-white">
                   <strong>
@@ -221,6 +224,7 @@ export default function RecebimentosCaixaPanel({
                 <p className="mt-1 text-slate-500 dark:text-slate-400">
                   Venda de {formatarDataFaturamento(pagamento.data_venda)}
                 </p>
+                {renderAcoesLancamento?.(pagamento)}
               </div>
             ))}
           </div>

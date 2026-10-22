@@ -632,8 +632,14 @@ jobs:
           tests/unit/test_ifood_client_contract.py -q
 
       - name: Faturamento reconciliation regression
-        run: |
-          pytest tests/unit/test_faturamento_composicao.py tests/unit/test_faturamento_superficies.py tests/unit/test_pdf_caixa_resumo.py -q
+        run: >-
+          python -m pytest
+          tests/unit/test_faturamento_composicao.py
+          tests/unit/test_faturamento_superficies.py
+          tests/unit/test_pdf_caixa_resumo.py
+          tests/unit/test_caixa_recebimentos_auditoria.py
+          tests/unit/test_caixa_conferencia_estados.py
+          tests/unit/test_caixa_auditoria_performance.py -q
 
       - name: Billing operational continuity regression
         run: |

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Calculator, Printer, Receipt, X } from "lucide-react";
+import { Calculator, Printer, Receipt, RefreshCw, X } from "lucide-react";
 import { formatBRL, formatMoneyBRL } from "../../utils/formatters";
 import CurrencyInput from "../CurrencyInput";
 import ImpressaoResumoCaixa from "./ImpressaoResumoCaixa";
@@ -7,6 +7,12 @@ import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
 import ResumoFaturamento from "../v2/ResumoFaturamento/ResumoFaturamento";
 import { periodoFaturamento } from "../v2/ResumoFaturamento/faturamentoPresentation";
 import RecebimentosCaixaPanel from "./RecebimentosCaixaPanel";
+import ConferenciaCaixaItem from "./ConferenciaCaixaItem";
+import {
+  classeConferenciaCaixa,
+  localizarLancamentoConferencia,
+  localizarVendaConferencia,
+} from "../../utils/conferenciaFechamentoUtils";
 
 export function CashCountPanel({
   aplicarContagem,
@@ -237,7 +243,7 @@ export function CashCountPanel({
   );
 }
 
-export function PaymentBreakdownPanel({ resumo }) {
+export function PaymentBreakdownPanel({ resumo, conferencia }) {
   const [imprimindo, setImprimindo] = useState(false);
   const itensResumo = [
     ["Valor de abertura", resumo.caixa.valor_abertura],
@@ -247,6 +253,31 @@ export function PaymentBreakdownPanel({ resumo }) {
     ["Despesas", resumo.totais.despesas],
   ];
   const periodo = periodoFaturamento(resumo.vendas_periodo);
+  const conferenciaOcupada = Boolean(
+    conferencia?.ocupado || conferencia?.salvando || conferencia?.atualizando,
+  );
+  const conferenciaBloqueada = Boolean(
+    conferencia?.bloqueado || conferenciaOcupada || !conferencia?.auditoria,
+  );
+  const localizarVenda = (venda) => localizarVendaConferencia(conferencia?.auditoria, venda);
+  const localizarLancamento = (lancamento) =>
+    localizarLancamentoConferencia(conferencia?.auditoria, lancamento);
+  const renderizarConferencia = (referencia, registro, tipoPadrao) => {
+    const tipo = referencia?.tipo || tipoPadrao;
+    const item = referencia?.item;
+    return (
+      <ConferenciaCaixaItem
+        key={`${tipo}:${item?.id ?? registro.id ?? registro.venda_id}:${item?.assinatura || "sem-assinatura"}`}
+        item={item}
+        tipo={tipo}
+        vendaId={registro.venda_id ?? (tipo === "venda" ? registro.id : null)}
+        salvando={Boolean(conferencia?.salvando)}
+        bloqueado={conferenciaBloqueada}
+        onSalvar={conferencia?.salvar}
+        onAbrirVenda={conferencia?.abrirVenda}
+      />
+    );
+  };
 
   return (
     <section className="space-y-4" aria-label="Vendas e recebimentos do fechamento">
@@ -258,13 +289,70 @@ export function PaymentBreakdownPanel({ resumo }) {
           Imprimir
         </BotaoInteracao>
       </div>
+      {conferencia && (
+        <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              Confira cada venda e recebimento nos detalhes. Pendências e divergências ficam
+              registradas e não impedem o fechamento.
+            </p>
+            <BotaoInteracao
+              tamanho="pequeno"
+              icon={RefreshCw}
+              loading={Boolean(conferencia.atualizando)}
+              disabled={conferenciaOcupada || typeof conferencia.atualizar !== "function"}
+              onClick={() => conferencia.atualizar()}
+            >
+              Atualizar conferência
+            </BotaoInteracao>
+          </div>
+          <p role="status" className="text-xs text-slate-600 dark:text-slate-300">
+            {conferencia.salvando
+              ? "Salvando a conferência. Aguarde antes de fechar o caixa."
+              : conferencia.atualizando
+                ? "Atualizando vendas e recebimentos. Aguarde antes de conferir ou fechar o caixa."
+                : conferencia.auditoria && !conferencia.bloqueado
+                  ? conferencia.erro
+                    ? "Confira os dados atualizados antes de tentar novamente."
+                    : "Conferência atualizada. As marcações registram responsável, data e observação."
+                  : "Atualize os dados antes de continuar a conferência."}
+          </p>
+          {conferencia.erro && (
+            <p role="alert" className="text-xs font-semibold text-red-700 dark:text-red-300">
+              {conferencia.erro}
+            </p>
+          )}
+        </div>
+      )}
       <ResumoFaturamento
         key={periodo}
         composicao={resumo.vendas_periodo}
         titulo={`Vendas de ${periodo}`}
         mostrarDetalhes={true}
+        classeVenda={
+          conferencia ? (venda) => classeConferenciaCaixa(localizarVenda(venda)?.item) : undefined
+        }
+        renderAcoesVenda={
+          conferencia
+            ? (venda) => renderizarConferencia(localizarVenda(venda), venda, "venda")
+            : undefined
+        }
       />
-      <RecebimentosCaixaPanel composicao={resumo.composicao_recebimentos} mostrarDetalhes={true} />
+      <RecebimentosCaixaPanel
+        composicao={resumo.composicao_recebimentos}
+        mostrarDetalhes={true}
+        classeLancamento={
+          conferencia
+            ? (lancamento) => classeConferenciaCaixa(localizarLancamento(lancamento)?.item)
+            : undefined
+        }
+        renderAcoesLancamento={
+          conferencia
+            ? (lancamento) =>
+                renderizarConferencia(localizarLancamento(lancamento), lancamento, "pagamento")
+            : undefined
+        }
+      />
       <div className="grid grid-cols-2 gap-2">
         {itensResumo.map(([titulo, valor]) => (
           <div
