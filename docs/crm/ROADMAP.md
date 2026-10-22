@@ -113,8 +113,8 @@ Objetivo: fechar a ideia das telas e dos contratos antes de escrever código de 
 Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem testes que provam a correção.
 
 **0.1 Bot não pode responder durante atendimento humano**
-- [ ] Barrar o bot quando a conversa está com humano ou aguardando humano.
-- [ ] Teste: mensagem nova do tutor em conversa com humano não gera resposta da IA.
+- [x] Barrar o bot quando a conversa está com humano ou aguardando humano (22/10/2026: `atendimento_humano_ativo` em `backend/app/whatsapp/webhook.py`; vale também para a entrada do n8n, que usa a mesma função).
+- [x] Teste: mensagem nova do tutor em conversa com humano não gera resposta da IA (`backend/tests/unit/test_whatsapp_ia_pausa_atendimento_humano.py`).
 - [ ] Definir o que acontece com mensagens recebidas enquanto aguarda atendente (aviso ao tutor? fila?). `[?] DECIDIR`
 
 **0.2 Atendimento humano: estados e devolução ao bot**
@@ -341,10 +341,16 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 | Convivência e migração dos envios atuais | Etapas 1, 5 e 7 |
 | Implantação por lojas | Etapa 8 |
 
+## Notas de ambiente de desenvolvimento
+
+- Testes do backend: o Docker local pode estar desligado e o Python global não tem as dependências. Foi usado um ambiente virtual isolado fora do projeto (instalando `backend/requirements.txt`) e a execução de `tests/unit -k whatsapp`. Rodar poucos arquivos isolados pode falhar na inicialização dos modelos (problema que já existia); rodar o conjunto resolve.
+- Alguns testes unitários exigem `pypdf`, que não está no `requirements.txt` (já existia; fora do escopo do CRM).
+
 ## Histórico de mudanças deste documento
 
 | Data | Mudança |
 |---|---|
+| 22/10/2026 | Etapa 0.1 (parte principal) concluída: a IA não responde com atendimento humano ativo; falta decidir o aviso ao tutor que aguarda atendente. |
 | 22/10/2026 | Protótipo congelado; Fase 2 concluída; início da Fase 3 (Etapa 0.1). |
 | 21/10/2026 | Protótipo versão 11: painel de última ação e próximo passo em coluna única com formulários sob demanda; duplo clique no card abre a ficha 360. |
 | 21/10/2026 | Protótipo versão 10: cabeçalho do painel fixo; registrar última ação e agendar próximo passo com data, hora e responsável; cores de atenção para passo atrasado, de hoje ou ausente. |

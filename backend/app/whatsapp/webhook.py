@@ -426,6 +426,24 @@ async def _process_incoming_message_with_context(
 
         logger.info(f"✅ Mensagem salva: session={session.id}")
 
+        # CRM etapa 0.1: com atendimento humano ativo ou aguardando, a IA nao
+        # responde. A mensagem ja foi salva para o atendente ver.
+        if atendimento_humano_ativo(session):
+            logger.info(
+                "IA pausada (atendimento humano): session=%s status=%s",
+                session.id,
+                session.status,
+            )
+            return {
+                "status": "processed",
+                "whatsapp_message_id": provider_message_id,
+                "message_id": message.id,
+                "processor_result": {
+                    "action": "skipped_human_handling",
+                    "session_status": session.status,
+                },
+            }
+
         # 4. Processar com IA
         processor_result = None
         try:
@@ -464,6 +482,15 @@ async def _process_incoming_message_with_context(
 # ============================================================================
 # HELPERS
 # ============================================================================
+
+
+# Estados de sessao em que a IA nao deve responder (atendente humano no comando).
+STATUS_ATENDIMENTO_HUMANO = ("human", "waiting_human")
+
+
+def atendimento_humano_ativo(session: Any) -> bool:
+    """True quando a conversa esta com humano ou aguardando um atendente."""
+    return getattr(session, "status", None) in STATUS_ATENDIMENTO_HUMANO
 
 
 def normalize_phone(phone: str) -> str:
