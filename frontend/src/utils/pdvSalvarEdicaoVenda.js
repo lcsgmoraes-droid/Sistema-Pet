@@ -1,6 +1,7 @@
 import { obterTotalRecebidoExistente } from "../components/modalPagamentoUtils.js";
 import { normalizarDescontosVenda, obterDescontoItem } from "./pdvDescontosUtils.js";
 import { arredondarDinheiro } from "./pdvCarrinhoItensUtils.js";
+import { executarComJustificativaPagamento } from "./pagamentoExcedenteEdicao.js";
 
 function preservarMetodoDesconto(item, anteriores) {
   const anterior = anteriores.get(item.item_id_anterior ?? item.id) || anteriores.get(item.id);
@@ -60,8 +61,14 @@ export async function salvarEdicaoVenda({
   buscarPagamentos,
   finalizarVenda,
   onVendaPersistida,
+  solicitarJustificativa,
 }) {
-  const atualizada = await atualizarVenda(vendaAtual.id, payloadVenda);
+  const edicao = await executarComJustificativaPagamento({
+    operacao: (autorizacao) => atualizarVenda(vendaAtual.id, { ...payloadVenda, ...autorizacao }),
+    solicitarJustificativa,
+  });
+  if (edicao.cancelada) return { cancelada: true, alteracoesSalvas: false };
+  const atualizada = edicao.resultado;
   await onVendaPersistida?.(atualizada);
   const resumo = await buscarPagamentos(vendaAtual.id);
   const recebido = obterTotalRecebidoExistente(resumo);
@@ -70,12 +77,22 @@ export async function salvarEdicaoVenda({
   if (recebido > 0 && arredondarDinheiro(recebido) >= arredondarDinheiro(total)) {
     // Uma venda reaberta devolveu estoque e beneficios. Fechar pelo mesmo
     // orquestrador do pagamento reaplica esses efeitos sem cobrar de novo.
-    const resultado = await finalizarVenda(vendaAtual.id, [], {
-      cupom_code: payloadVenda.cupom_code,
-      cupom_discount_applied: payloadVenda.cupom_discount_applied,
-      nao_gerar_beneficios: Boolean(atualizada.nao_gerar_beneficios),
-      justificativa_nao_gerar_beneficios: atualizada.justificativa_nao_gerar_beneficios || null,
+    const fechamento = await executarComJustificativaPagamento({
+      solicitarJustificativa,
+      autorizacaoInicial: edicao.autorizacao,
+      operacao: (autorizacao) =>
+        finalizarVenda(vendaAtual.id, [], {
+          cupom_code: payloadVenda.cupom_code,
+          cupom_discount_applied: payloadVenda.cupom_discount_applied,
+          nao_gerar_beneficios: Boolean(atualizada.nao_gerar_beneficios),
+          justificativa_nao_gerar_beneficios: atualizada.justificativa_nao_gerar_beneficios || null,
+          ...autorizacao,
+        }),
     });
+    if (fechamento.cancelada) {
+      return { cancelada: true, alteracoesSalvas: true, venda: atualizada, recebido };
+    }
+    const resultado = fechamento.resultado;
     return { venda: resultado.venda || atualizada, recebido, finalizada: true };
   }
 

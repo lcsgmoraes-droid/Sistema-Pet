@@ -270,9 +270,20 @@ def test_rota_preserva_total_pago_e_expoe_recebido_real_para_reabertura(monkeypa
         VendaPagamento(id=1, valor=40, forma_pagamento="PIX", status="pendente"),
         VendaPagamento(id=2, valor=20, forma_pagamento="PIX", status="pendente"),
     ]
+    monkeypatch.setattr(
+        pagamentos_routes,
+        "snapshot_pagamentos_excedente",
+        lambda *_: {
+            "total_ja_pago": Decimal("60.00"),
+            "recebido_monetario": Decimal("60.00"),
+            "creditos_utilizados": Decimal("0.00"),
+            "crediario_pendente": Decimal("0.00"),
+        },
+    )
     consulta_venda, consulta_pagamentos = MagicMock(), MagicMock()
-    consulta_venda.filter_by.return_value.first.return_value = venda
-    consulta_pagamentos.filter_by.return_value.order_by.return_value.all.return_value = pagamentos
+    consulta_venda.options.return_value = consulta_venda
+    consulta_venda.filter_by.return_value.populate_existing.return_value.first.return_value = venda
+    consulta_pagamentos.filter_by.return_value.order_by.return_value.populate_existing.return_value.all.return_value = pagamentos
     db = MagicMock()
     db.query.side_effect = [consulta_venda, consulta_pagamentos]
 

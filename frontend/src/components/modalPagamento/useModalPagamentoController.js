@@ -6,6 +6,12 @@ import { formatMoneyBRL } from "../../utils/formatters";
 import { useModulos } from "../../contexts/ModulosContext";
 import { useModalPagamentoActions } from "./useModalPagamentoActions";
 import {
+  comporExcedentePagamento,
+  excecaoPagamentoAutorizada,
+  usarContextoExcedenteServidor,
+  validarTiposPagamentoExcedente,
+} from "./modalPagamentoExcedente";
+import {
   calcularBeneficiosCampanhaPreview,
   calcularFaixasParcelamento,
   calcularCustoTotalItensVenda,
@@ -21,6 +27,7 @@ import {
   montarFallbackSimulacaoParcelamento,
   montarFormasPagamentoAnalise,
   montarPagamentoSimuladoParcelamento,
+  montarPagamentoRecebido,
   montarPagamentosMargem,
   montarPayloadAnaliseMargem,
   normalizarResultadoSimulacaoParcelamento,
@@ -44,15 +51,28 @@ export default function useModalPagamentoController({
   onConfirmar,
   onVendaAtualizada,
 }) {
-  const [vendaPersistida, setVendaPersistida] = useState(null);
+  const [persistencia, setPersistencia] = useState(null);
+  const chaveVendaOriginal = JSON.stringify([
+    vendaOriginal.id,
+    vendaOriginal.total,
+    vendaOriginal.desconto_valor,
+    vendaOriginal.desconto_venda_valor,
+    vendaOriginal.cupom_code,
+    vendaOriginal.cupom_discount_applied,
+    vendaOriginal.itens,
+  ]);
+  const setVendaPersistida = useCallback(
+    (dados) => setPersistencia({ chave: chaveVendaOriginal, dados }),
+    [chaveVendaOriginal],
+  );
   const venda = useMemo(
     () => ({
       ...vendaOriginal,
-      ...vendaPersistida,
+      ...(persistencia?.chave === chaveVendaOriginal ? persistencia.dados : null),
       cliente: vendaOriginal.cliente,
       entrega: vendaOriginal.entrega,
     }),
-    [vendaOriginal, vendaPersistida],
+    [vendaOriginal, persistencia, chaveVendaOriginal],
   );
   const { moduloAtivo } = useModulos();
   const moduloCampanhasAtivo = moduloAtivo("campanhas");
@@ -73,7 +93,10 @@ export default function useModalPagamentoController({
   const [numeroParcelas, setNumeroParcelas] = useState(1);
   const [valorRecebido, setValorRecebido] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [, setLoadingPagamentos] = useState(false);
+  const [loadingPagamentos, setLoadingPagamentos] = useState(Boolean(venda.id));
+  const [erroPagamentosExistentes, setErroPagamentosExistentes] = useState(false);
+  const [autorizacaoExcedente, setAutorizacaoExcedente] = useState(null);
+  const [contextoExcedenteServidor, setContextoExcedenteServidor] = useState(null);
   const [erro, setErro] = useState("");
   const [totalPagoExistente, setTotalPagoExistente] = useState(0);
   const [mostrarPerguntaNFe, setMostrarPerguntaNFe] = useState(false);
@@ -256,26 +279,39 @@ export default function useModalPagamentoController({
 
   // Buscar pagamentos existentes da venda
   useEffect(() => {
+    let ativo = true;
     const buscarPagamentos = async () => {
-      if (!venda.id) return; // Se venda não foi criada ainda, não há pagamentos
+      if (!venda.id) {
+        setLoadingPagamentos(false);
+        setErroPagamentosExistentes(false);
+        setPagamentosExistentes([]);
+        setTotalPagoExistente(0);
+        return;
+      }
 
       setLoadingPagamentos(true);
+      setErroPagamentosExistentes(false);
       try {
         const response = await api.get(`/vendas/${venda.id}/pagamentos`);
+        if (!ativo) return;
         setPagamentosExistentes(response.data.pagamentos || []);
         setTotalPagoExistente(obterTotalRecebidoExistente(response.data));
       } catch (error) {
+        if (!ativo) return;
         console.error("Erro ao buscar pagamentos:", error);
-        // Não mostrar erro se a venda ainda não existe
-        if (error.response?.status !== 404) {
-          setErro("Erro ao carregar pagamentos existentes");
-        }
+        setErroPagamentosExistentes(true);
+        setErro(
+          "Não foi possível conferir os pagamentos já registrados. Feche e abra o recebimento para tentar novamente.",
+        );
       } finally {
-        setLoadingPagamentos(false);
+        if (ativo) setLoadingPagamentos(false);
       }
     };
 
     buscarPagamentos();
+    return () => {
+      ativo = false;
+    };
   }, [venda.id, venda.status]); // Recarregar quando status mudar também
 
   // Scroll automático quando opções de parcelamento aparecem
@@ -358,6 +394,41 @@ export default function useModalPagamentoController({
     totalPagoExistente,
     valorRecebido,
   });
+  const candidatoExcedente =
+    formaPagamentoSelecionada &&
+    valorRestante > 0 &&
+    Number(valorRecebido) > 0 &&
+    !["dinheiro", "cashback", "credito_cliente", "crediario", "boleto"].includes(
+      formaPagamentoSelecionada.tipo,
+    )
+      ? montarPagamentoRecebido({
+          formaPagamento: formaPagamentoSelecionada,
+          valor: valorRecebido,
+          valorRestante,
+          bandeira,
+          nsuCartao,
+          operadora: operadoraSelecionada,
+          numeroParcelas,
+        })
+      : null;
+  const composicaoExcedente = usarContextoExcedenteServidor(
+    comporExcedentePagamento({
+      valorTotal,
+      totalPagoExistente,
+      pagamentos: candidatoExcedente ? [...pagamentos, candidatoExcedente] : pagamentos,
+    }),
+    contextoExcedenteServidor,
+  );
+  const composicaoFinalizacao = usarContextoExcedenteServidor(
+    comporExcedentePagamento({ valorTotal, totalPagoExistente, pagamentos }),
+    contextoExcedenteServidor,
+  );
+  const erroTiposExcedente = validarTiposPagamentoExcedente({
+    valorTotal,
+    totalPagoExistente,
+    pagamentos,
+  });
+  const pagamentosDisponiveis = !loadingPagamentos && !erroPagamentosExistentes;
   const saldoCreditoDisponivel = calcularSaldoBeneficioDisponivel({
     saldo: venda.cliente?.credito,
     pagamentos,
@@ -697,6 +768,12 @@ export default function useModalPagamentoController({
     handleFinalizar,
     removerPagamento,
   } = useModalPagamentoActions({
+    bloqueado: loading || !pagamentosDisponiveis,
+    autorizacaoExcedente,
+    setAutorizacaoExcedente,
+    composicaoFinalizacao,
+    setContextoExcedenteServidor,
+    setErroPagamentosExistentes,
     bandeira,
     corParcelamentoAtual,
     cupomParaFinalizar,
@@ -804,7 +881,10 @@ export default function useModalPagamentoController({
       recompraPrevista,
       pagamentosExistentes,
       pagamentos,
-      loading,
+      loading: loading || loadingPagamentos,
+      composicaoExcedente: erroTiposExcedente ? null : composicaoExcedente,
+      autorizacaoExcedente,
+      setAutorizacaoExcedente,
       excluirPagamentoExistente,
       removerPagamento,
       statusMargem,
@@ -823,11 +903,16 @@ export default function useModalPagamentoController({
       erroJustificativa,
       setErroJustificativa,
       setErro,
-      erro,
+      erro: erro || erroTiposExcedente,
       adicionarPagamento,
       mostrarBotaoAdicionarRodape,
       handleFinalizar,
-      podeConfirmarFinalizacao,
+      podeConfirmarFinalizacao:
+        podeConfirmarFinalizacao &&
+        !erroTiposExcedente &&
+        pagamentosDisponiveis &&
+        (composicaoFinalizacao.excedente === 0 ||
+          excecaoPagamentoAutorizada(composicaoFinalizacao, autorizacaoExcedente)),
     },
   };
 }

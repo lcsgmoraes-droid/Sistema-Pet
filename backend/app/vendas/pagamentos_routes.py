@@ -4,13 +4,14 @@ import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.audit_log import log_action
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
+from app.services.venda_descontos import moeda
 from app.vendas.routes_common import _validar_tenant_e_obter_usuario
-from app.vendas.status_pagamento import calcular_resumo_pagamento_venda
+from app.vendas.pagamento_excedente import snapshot_pagamentos_excedente
 from app.vendas_models import Venda, VendaPagamento
 
 router = APIRouter()
@@ -109,42 +110,58 @@ def listar_pagamentos_venda(
     """Lista todos os pagamentos de uma venda"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
-    venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
+    venda = (
+        db.query(Venda)
+        .options(selectinload(Venda.pagamentos), selectinload(Venda.contas_receber))
+        .filter_by(id=venda_id, tenant_id=tenant_id)
+        .populate_existing()
+        .first()
+    )
 
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
 
     pagamentos = (
         db.query(VendaPagamento)
-        .filter_by(venda_id=venda.id)
+        .filter_by(venda_id=venda.id, tenant_id=tenant_id)
         .order_by(VendaPagamento.data_pagamento)
+        .populate_existing()
         .all()
     )
 
-    resumo_pagamento = calcular_resumo_pagamento_venda(
-        total=venda.total,
-        contas_receber=venda.contas_receber,
-        pagamentos=pagamentos,
-    )
+    total = moeda(venda.total)
+    recebido = monetario = beneficios = crediario = moeda(0)
+    status_pagamento = "cancelado"
     if str(venda.status or "").strip().lower() in {"cancelada", "cancelado"}:
-        resumo_pagamento.update(
-            valor_pago=0,
-            total_recebido=0,
-            valor_restante=0,
-            status_pagamento="cancelado",
+        total_pago = valor_restante = moeda(0)
+    else:
+        fotografia = snapshot_pagamentos_excedente(db, venda, tenant_id)
+        recebido = fotografia["total_ja_pago"]
+        monetario = fotografia["recebido_monetario"]
+        beneficios = fotografia["creditos_utilizados"]
+        crediario = fotografia["crediario_pendente"]
+        total_pago = min(recebido, total)
+        valor_restante = max(total - total_pago, moeda(0))
+        status_pagamento = (
+            "pago"
+            if valor_restante == 0
+            else "parcial"
+            if total_pago > 0
+            else "em_aberto"
         )
-    total_pago = float(resumo_pagamento["valor_pago"])
-    valor_restante = float(resumo_pagamento["valor_restante"])
 
     return {
         "venda_id": venda.id,
         "numero_venda": venda.numero_venda,
-        "total_venda": float(venda.total),
-        "total_pago": total_pago,
-        "total_recebido": float(resumo_pagamento["total_recebido"]),
-        "valor_restante": valor_restante,
+        "total_venda": float(total),
+        "total_pago": float(total_pago),
+        "total_recebido": float(recebido),
+        "recebido_monetario": float(monetario),
+        "creditos_utilizados": float(beneficios),
+        "crediario_pendente": float(crediario),
+        "valor_restante": float(valor_restante),
         "status": venda.status,
-        "status_pagamento": resumo_pagamento["status_pagamento"],
+        "status_pagamento": status_pagamento,
         "pagamentos": [p.to_dict() for p in pagamentos],
     }
 

@@ -186,7 +186,7 @@ def cenario(monkeypatch, tenant_context):
         )
         db.commit()
 
-        def finalizar(valor=None, db_session=None):
+        def finalizar(valor=None, db_session=None, **opcoes):
             return finalizacao.finalizar_venda(
                 venda_id=1,
                 pagamentos=[]
@@ -199,6 +199,7 @@ def cenario(monkeypatch, tenant_context):
                 tenant_id=tenant,
                 db=db_session or db,
                 processar_baixa_estoque_item=lambda **kw: [],
+                **opcoes,
             )
 
         yield SimpleNamespace(db=db, venda=venda, tenant=tenant, finalizar=finalizar)
@@ -269,12 +270,18 @@ def test_duas_baixas_parciais_criam_apenas_recebimentos_novos(cenario):
     )
 
 
-def test_reducao_abaixo_do_valor_pago_refinaliza_sem_repetir_recebimento(cenario):
+def test_reducao_abaixo_do_pago_exige_justificativa_e_nao_repete_recebimento(cenario):
     cenario.finalizar(135)
     cenario.venda.status = "aberta"
     cenario.venda.total = Decimal("20")
     cenario.db.commit()
-    resultado = cenario.finalizar()
+    with pytest.raises(HTTPException) as erro:
+        cenario.finalizar()
+    assert erro.value.status_code == 409
+    resultado = cenario.finalizar(
+        justificativa_pagamento_excedente="Desconto concedido após o recebimento original",
+        contexto_pagamento_excedente=erro.value.detail["contexto_pagamento_excedente"],
+    )
     assert cenario.venda.status == "finalizada"
     assert cenario.db.query(VendaPagamento).count() == 1
     assert cenario.db.query(ContaReceber).count() == 1
@@ -688,15 +695,15 @@ def test_complemento_centavo_baixa_conta_parcial_legada_sem_duplicar(cenario):
     cenario.venda.subtotal = Decimal("1.00")
     cenario.venda.status = "baixa_parcial"
     cenario.db.get(LancamentoManual, 1).valor = Decimal("0.01")
-    cenario.db.add(
-        VendaPagamento(
-            tenant_id=cenario.tenant,
-            venda_id=1,
-            forma_pagamento_id=1,
-            forma_pagamento="PIX",
-            valor=Decimal("0.99"),
-        )
+    pagamento = VendaPagamento(
+        tenant_id=cenario.tenant,
+        venda_id=1,
+        forma_pagamento_id=1,
+        forma_pagamento="PIX",
+        valor=Decimal("0.99"),
     )
+    cenario.db.add(pagamento)
+    cenario.db.flush()
     conta = ContaReceber(
         tenant_id=cenario.tenant,
         venda_id=1,
@@ -710,6 +717,7 @@ def test_complemento_centavo_baixa_conta_parcial_legada_sem_duplicar(cenario):
         user_id=1,
         data_emissao=date.today(),
         data_vencimento=date.today(),
+        observacoes=f"[venda_pagamento:{pagamento.id}]",
     )
     cenario.db.add(conta)
     cenario.db.flush()
@@ -721,6 +729,7 @@ def test_complemento_centavo_baixa_conta_parcial_legada_sem_duplicar(cenario):
             data_recebimento=date.today(),
             forma_pagamento_id=1,
             user_id=1,
+            observacoes=f"[venda_pagamento:{pagamento.id}]",
         )
     )
     cenario.db.commit()

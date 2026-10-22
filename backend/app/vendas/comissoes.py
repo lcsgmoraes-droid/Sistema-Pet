@@ -29,7 +29,7 @@ def _listar_pagamentos_venda_para_comissao(db: Session, venda_id: int, tenant_id
     ).fetchall()
 
 
-def _pagamentos_liquidos_para_comissao(pagamentos):
+def _pagamentos_liquidos_para_comissao(pagamentos, *, total_venda=None):
     """Compensa o lote sem renumerar as parcelas históricas da comissão."""
     saldos_lotes = {}
     registros = []
@@ -50,12 +50,22 @@ def _pagamentos_liquidos_para_comissao(pagamentos):
             )
         registros.append((parcela, pagamento, valor, chave_lote))
 
+    disponivel = (
+        max(Decimal(str(total_venda)), Decimal("0"))
+        if total_venda is not None
+        else None
+    )
     for parcela, pagamento, valor, chave_lote in registros:
         if valor <= 0:
             continue
         if chave_lote is not None:
             valor = min(valor, max(saldos_lotes[chave_lote], Decimal("0")))
             saldos_lotes[chave_lote] -= valor
+        # O recebimento pode ter excedente justificado. A comissão é da venda,
+        # com teto compartilhado entre todas as parcelas, sem alterar o banco.
+        if disponivel is not None:
+            valor = min(valor, disponivel)
+            disponivel -= valor
         if valor > 0:
             yield parcela, pagamento, valor
 
@@ -130,7 +140,7 @@ def _gerar_comissoes_pendentes_venda(
             (
                 (parcela, pagamento, valor)
                 for parcela, pagamento, valor in _pagamentos_liquidos_para_comissao(
-                    todos_pagamentos
+                    todos_pagamentos, total_venda=venda.total
                 )
                 if parcela not in parcelas_com_comissao and pagamento[0] not in tentados
             ),

@@ -3,8 +3,56 @@ import importlib.util
 from decimal import Decimal
 from types import SimpleNamespace
 
+import pytest
+
 from app import vendas_routes
 from app.vendas import comissoes as vendas_comissoes
+
+
+@pytest.mark.parametrize(
+    "valores,geradas,esperados",
+    [
+        (["119.90"], set(), [Decimal("109.90")]),
+        (["60.00", "60.00"], set(), [Decimal("60.00"), Decimal("49.90")]),
+        (["60.00", "60.00"], {1}, [Decimal("49.90")]),
+    ],
+)
+def test_recebimento_excedente_nao_amplia_comissao_nem_recomissiona_parcela(
+    monkeypatch, valores, geradas, esperados
+):
+    venda = SimpleNamespace(id=123, funcionario_id=77, total=Decimal("109.90"))
+    registros = [
+        (10 + indice, "Cartao de credito", Decimal(valor), None)
+        for indice, valor in enumerate(valores)
+    ]
+    chamadas = []
+    monkeypatch.setattr(
+        vendas_comissoes, "_bloquear_venda_para_comissao", lambda *_: venda
+    )
+    monkeypatch.setattr(
+        vendas_comissoes, "_listar_pagamentos_venda_para_comissao", lambda *_: registros
+    )
+    monkeypatch.setattr(
+        vendas_comissoes, "_parcelas_com_comissao_funcionario", lambda *_: geradas
+    )
+
+    def gerar(**dados):
+        chamadas.append(dados)
+        return {"success": True, "total_comissao": 0}
+
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "app.comissoes_service",
+        SimpleNamespace(gerar_comissoes_venda=gerar),
+    )
+    vendas_comissoes._gerar_comissoes_pendentes_venda(
+        db=None, venda=venda, tenant_id="tenant-a", trigger="test-excedente"
+    )
+    assert [item["valor_pago"] for item in chamadas] == esperados
+    assert [item["parcela_numero"] for item in chamadas] == [
+        indice for indice in range(1, len(valores) + 1) if indice not in geradas
+    ]
+    assert [item[2] for item in registros] == [Decimal(valor) for valor in valores]
 
 
 def test_vendas_comissoes_module_expoe_helpers_de_reprocessamento():
@@ -27,7 +75,7 @@ def test_vendas_schemas_module_expoe_schemas_usadas_pelo_router():
 
 def test_gerar_comissoes_pendentes_ignora_parcelas_ja_geradas(monkeypatch):
     chamadas = []
-    venda = SimpleNamespace(id=123, funcionario_id=77)
+    venda = SimpleNamespace(id=123, funcionario_id=77, total=75)
     monkeypatch.setattr(
         vendas_comissoes,
         "_bloquear_venda_para_comissao",
@@ -76,7 +124,7 @@ def test_gerar_comissoes_pendentes_ignora_parcelas_ja_geradas(monkeypatch):
 
 
 def test_geracao_rele_pagamentos_sob_lock_apos_commit_de_cada_comissao(monkeypatch):
-    venda = SimpleNamespace(id=123, funcionario_id=77)
+    venda = SimpleNamespace(id=123, funcionario_id=77, total=75)
     ordem = []
     chamadas = []
     pagamentos = [
