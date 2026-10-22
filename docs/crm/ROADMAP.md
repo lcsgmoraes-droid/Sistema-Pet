@@ -41,6 +41,8 @@ Centralização de código · zero redundância · boas práticas (DDD, SOLID) p
 | 21/10 | **O CRM é por loja.** Usuário com permissão para mais de uma loja vê as lojas dele no CRM: cada card indica claramente a loja e há filtro fácil para ver tudo ou lojas específicas. | Lucas |
 | 21/10 | **Custo da IA e das mensagens fica com o CorePet.** Venda por **pacotes de créditos** consumidos pelo cliente, na mesma lógica de tokens dos modelos de IA. Detalhes da cobrança ficam para mais adiante. | Lucas |
 | 21/10 | Lembretes continua como central operacional interna; o CRM é a camada de relacionamento. | Lucas |
+| 21/10 | **Vocabulário:** "Cliente inativo" vira **"Sem comprar há 60+ dias"** (origem do lead) e a automação passa a se chamar **"Reativação de cliente"**; os estados de consentimento passam a usar a palavra "mensagens": **Autorizou mensagens**, **Autorizou no sistema · falta confirmar**, **Sem autorização de mensagens**, **Recusou mensagens automáticas** (antes "Cancelou (SAIR)"). Botão do card: **"Conversa"** com o ícone do WhatsApp, ocupando a largura do card, pois nem sempre é o ato de conversar. | Lucas |
+| 21/10 | **Cada loja configura o que acontece quando o tutor recusa ou não autorizou mensagens:** conversa iniciada pelo atendente (bloquear ou só responder), lead no funil (manter, pausar, mover para Perdido) e tarefas de contato por outros meios (manter ou remover). Mensagens automáticas e modelos ficam sempre bloqueados. | Lucas |
 | 21/10 | **A conversa também se acessa pelo card do Kanban:** botão "Conversar" (com contador de não lidas e estado do atendimento) abre a conversa num painel lateral sobre o quadro, sem perder filtros; o painel tem abas Conversa e Ficha 360. | Lucas |
 
 ## Visão geral das fases e etapas
@@ -150,6 +152,8 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 **0.7 LGPD operacional e consentimento**
 - [ ] Consentimento verificado em todo envio (bot, automações e atendimento ativo).
 - [ ] Palavra SAIR (e variações) bloqueia na hora e fica registrada.
+- [ ] **Configuração por situação (decisão de 21/10):** para "recusou mensagens" e "ainda não autorizou", cada loja escolhe: conversa iniciada pelo atendente (bloquear ou só responder dentro da janela), lead no funil (manter, pausar, mover para Perdido com motivo) e tarefas de contato por outros meios (manter ou remover). Padrões seguros: bloquear, manter, manter. Mensagens automáticas e modelos nunca são liberados.
+- [ ] Revisar o vocabulário dos estados de consentimento em todo o sistema (Autorizou mensagens, Autorizou no sistema, Sem autorização, Recusou mensagens automáticas). `[?] DECIDIR` se o termo "SAIR" aparece ao usuário final.
 - [ ] Exclusão, exportação e anonimização passam a executar de verdade (hoje são casca).
 - [ ] Auditoria de acesso a dados do tutor no atendimento.
 - [ ] **Decidir a melhor forma de solicitar o consentimento** (aceite no cadastro/PDV, mensagem de confirmação pelo WhatsApp, ou os dois). `[?] DECIDIR` — proposta inicial: aceite registrado no sistema + confirmação com botão no WhatsApp.
@@ -326,6 +330,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 | Data | Mudança |
 |---|---|
+| 21/10/2026 | Protótipo versão 3: novo vocabulário, botão "Conversa" com ícone do WhatsApp, configuração por situação do consentimento (Configurações da loja > Consentimento). |
 | 21/10/2026 | Protótipo versão 2: conversa acessível pelo card do Kanban (painel lateral com abas Conversa e Ficha 360). |
 | 21/10/2026 | Protótipo versão 1 e contratos conceituais criados; itens P.1 a P.8 concluídos. |
 | 21/10/2026 | Criação do roadmap detalhado: fases 1 a 3, Etapas 0 a 8 e temas transversais, com as decisões de 19/10 e 21/10 registradas. |

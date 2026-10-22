@@ -37,7 +37,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .badge { background: var(--accent); color: var(--accent-ink); border-radius: 99px; font-size: .7rem; padding: 0 7px; font-weight: 700; min-width: 20px; text-align: center; }
 .btn { border: 1px solid var(--line); background: var(--surface); padding: 7px 13px; border-radius: 8px; font-weight: 600; min-height: 38px; }
 .btn.pri { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); } .btn.sm { min-height: 32px; padding: 3px 10px; font-size: .78rem; } .btn[disabled] { opacity: .5; cursor: not-allowed; }
-.btn.bad { color: var(--bad); }
+.btn.bad { color: var(--bad); } .btn.full { width: 100%; display: flex; justify-content: center; align-items: center; gap: 6px; }
 .chip { border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: 4px 12px; font-size: .8rem; font-weight: 600; min-height: 34px; display: inline-flex; align-items: center; gap: 6px; }
 .chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
@@ -60,7 +60,7 @@ label.f > input, label.f > select, label.f > textarea { margin-top: 3px; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-bottom: 8px; cursor: grab; border-left: 4px solid var(--lc, var(--line)); }
 .card:active { cursor: grabbing; } .card .nm { font-weight: 650; background: none; border: 0; padding: 0; text-align: left; color: var(--ink); }
 .loja { display: inline-flex; gap: 5px; align-items: center; font-size: .72rem; font-weight: 700; color: var(--ink-2); }
-.card select { width: auto; min-height: 32px; padding: 2px 6px; font-size: .75rem; }
+.card select { width: 100%; min-height: 32px; padding: 2px 6px; font-size: .75rem; }
 /* conversas */
 .inbox { display: grid; grid-template-columns: 300px minmax(0, 1fr) 280px; gap: 12px; align-items: start; }
 @media (max-width: 1000px) { .inbox { grid-template-columns: 1fr; } }
@@ -101,13 +101,13 @@ var LOJAS = [
 ];
 var ETAPAS = [{ id: "novo", n: "Novo" }, { id: "contato", n: "Em contato" }, { id: "oport", n: "Oportunidade" }, { id: "neg", n: "Negociação" }, { id: "ganho", n: "Ganho" }, { id: "perdido", n: "Perdido" }];
 var RESP = ["Marina", "Rafael", "Bianca", "Sem responsável"];
-var ORIGENS = ["Ração acabando", "Vacina vencendo", "Aniversário do pet", "Cliente inativo", "Cashback a vencer", "VIP em risco", "WhatsApp espontâneo", "Banho sem retorno"];
+var ORIGENS = ["Ração acabando", "Vacina vencendo", "Aniversário do pet", "Sem comprar há 60+ dias", "Cashback a vencer", "VIP em risco", "WhatsApp espontâneo", "Banho sem retorno"];
 var LEADS = [
   { id: 1, tutor: "Camila Duarte", tel: "(11) 99876-1122", loja: "c", etapa: "novo", origem: "Ração acabando", resp: "Marina", valor: 189, prox: "Oferecer ração 15 kg · amanhã", consent: "ok", cad: true,
     pets: [{ n: "Mel", d: "Golden, 4 anos, 28 kg" }], conv: 1,
     tl: [["20/10", "Venda", "Ração Premium Adultos 15 kg · R$ 189,00"], ["02/10", "Banho", "Banho e tosa · Mel"], ["14/09", "Vacina", "V10 aplicada · Mel"]],
     opp: ["Ração acaba em ~6 dias (28 kg, 15 kg a cada 38 dias)", "Banho recorrente vence em 10 dias"] },
-  { id: 2, tutor: "Paulo Lima", tel: "(11) 97777-0000", loja: "c", etapa: "contato", origem: "Cliente inativo", resp: "Rafael", valor: 320, prox: "Ligar e perguntar sobre a Nina · hoje", consent: "saiu", cad: true,
+  { id: 2, tutor: "Paulo Lima", tel: "(11) 97777-0000", loja: "c", etapa: "contato", origem: "Sem comprar há 60+ dias", resp: "Rafael", valor: 320, prox: "Ligar e perguntar sobre a Nina · hoje", consent: "saiu", cad: true,
     pets: [{ n: "Nina", d: "Gata SRD, 7 anos, 4 kg" }], conv: 2,
     tl: [["09/10", "Mensagem", "Respondeu SAIR"], ["12/07", "Venda", "Areia sanitária 12 kg · R$ 74,00"]], opp: ["73 dias sem comprar", "Cashback R$ 18,40 expira em 12 dias"] },
   { id: 3, tutor: "Juliana Prado", tel: "(11) 98111-3344", loja: "j", etapa: "oport", origem: "Vacina vencendo", resp: "Bianca", valor: 140, prox: "Agendar reforço V10 · quarta", consent: "ok", cad: true,
@@ -126,7 +126,7 @@ var LEADS = [
     tl: [["01/09", "Banho", "Último banho · Bolt"], ["01/09", "Venda", "Banho e tosa · R$ 75,00"]], opp: ["50 dias sem banho", "Pacote de 4 banhos economiza 20%"] },
   { id: 8, tutor: "Sônia Ferraz", tel: "(11) 92233-5566", loja: "c", etapa: "ganho", origem: "Cashback a vencer", resp: "Bianca", valor: 214, prox: "—", consent: "ok", cad: true,
     pets: [{ n: "Frida", d: "Pug, 5 anos, 9 kg" }], conv: 8, tl: [["20/10", "Venda", "Compra com cashback · R$ 214,00"]], opp: [] },
-  { id: 9, tutor: "Tiago Nunes", tel: "(11) 91212-3434", loja: "j", etapa: "perdido", origem: "Cliente inativo", resp: "Marina", valor: 0, prox: "—", consent: "ok", cad: true,
+  { id: 9, tutor: "Tiago Nunes", tel: "(11) 91212-3434", loja: "j", etapa: "perdido", origem: "Sem comprar há 60+ dias", resp: "Marina", valor: 0, prox: "—", consent: "ok", cad: true,
     pets: [{ n: "Max", d: "Pastor Alemão, 8 anos" }], conv: 9, tl: [["15/10", "Mensagem", "Disse que mudou de cidade"]], opp: [], perda: "Mudou de cidade" }
 ];
 var CONVS = {
@@ -146,12 +146,12 @@ var AUTO = [
   { id: "racao", nome: "Ração acabando", gat: "7 dias antes do fim previsto da ração", modelo: "racao_acabando_v1", cat: "Utilidade", meta: "Aprovado", txt: "Olá, {{1}}! A ração da {{2}} deve acabar em cerca de {{3}} dias. Quer que a {{4}} separe um pacote?", ex: ["Camila", "Mel", "6", "Pet Amigo Centro"], on: { c: true, j: true, s: false }, origem: "Ração acabando" },
   { id: "vac", nome: "Vacina vencendo", gat: "7 dias antes da próxima dose", modelo: "vacina_vencendo_v1", cat: "Utilidade", meta: "Aprovado", txt: "Olá, {{1}}! A vacina {{2}} do {{3}} vence em {{4}} dias. Quer agendar o reforço?", ex: ["Juliana", "V10", "Thor", "3"], on: { c: false, j: true, s: false }, origem: "Vacina vencendo" },
   { id: "med", nome: "Fim de medicação", gat: "No último dia do tratamento prescrito", modelo: "medicacao_fim_v1", cat: "Utilidade", meta: "Em análise", txt: "Olá, {{1}}! O tratamento do {{2}} termina hoje. Como ele está? Responda aqui se precisar de ajuda.", ex: ["Juliana", "Thor"], on: { c: false, j: false, s: false }, origem: "" },
-  { id: "inat", nome: "Cliente inativo", gat: "60 dias sem compra", modelo: "reativacao_v1", cat: "Marketing", meta: "Aprovado", txt: "Olá, {{1}}! Sentimos falta de você e da {{2}}. Temos novidades na {{3}}. Quer ver?", ex: ["Paulo", "Nina", "Pet Amigo Centro"], on: { c: true, j: false, s: false }, origem: "Cliente inativo" }
+  { id: "inat", nome: "Reativação de cliente", gat: "60 dias sem compra", modelo: "reativacao_v1", cat: "Marketing", meta: "Aprovado", txt: "Olá, {{1}}! Sentimos falta de você e da {{2}}. Temos novidades na {{3}}. Quer ver?", ex: ["Paulo", "Nina", "Pet Amigo Centro"], on: { c: true, j: false, s: false }, origem: "Sem comprar há 60+ dias" }
 ];
 var st = {
   tab: "kanban", dtab: "ficha", lojas: { c: true, j: true, s: true }, resp: "Todos", origem: "Todas", busca: "", lead: null, conv: 3, nota: false,
   saldo: 4820, extrato: [["19/10", "Pacote 5.000 créditos", "+5.000"], ["20/10", "Respostas da IA (38)", "-114"], ["20/10", "Mensagens com modelo (33)", "-66"]],
-  cfgTab: "canal", opsTab: "lojas", freq: 1, silencio: true, ia: { pedido: false, agenda: true, cupom: false }, digitando: false, tom: "Amigável"
+  cfgTab: "canal", opsTab: "lojas", cons: { saiu: { ativa: "bloquear", lead: "manter", tarefa: "manter" }, nao: { ativa: "bloquear", lead: "manter", tarefa: "manter" } }, freq: 1, silencio: true, ia: { pedido: false, agenda: true, cupom: false }, digitando: false, tom: "Amigável"
 };
 var USER_LOJAS = ["c", "j", "s"];
 var TABS = [["kanban", "Kanban"], ["conversas", "Conversas"], ["auto", "Automações"], ["cfg", "Configurações da loja"], ["ops", "OPS (equipe CorePet)"], ["mapa", "Mapa do protótipo"]];
@@ -165,9 +165,11 @@ function loja(id) { return LOJAS.filter(function (l) { return l.id === id; })[0]
 function lead(id) { return LEADS.filter(function (l) { return l.id === id; })[0]; }
 function tagLoja(id) { var l = loja(id); return '<span class="loja"><span class="dot" style="background:' + l.cor + '"></span>' + esc(l.nome.replace("Pet Amigo ", "")) + "</span>"; }
 function money(v) { return "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2 }); }
-var CONS = { ok: ["ok", "Consentimento confirmado"], sistema: ["info", "Aceitou no sistema"], nao: ["warn", "Sem consentimento"], saiu: ["bad", "Cancelou (SAIR)"] };
+var CONS = { ok: ["ok", "Autorizou mensagens"], sistema: ["info", "Autorizou no sistema · falta confirmar"], nao: ["warn", "Sem autorização de mensagens"], saiu: ["bad", "Recusou mensagens automáticas"] };
+var CONSDICA = { ok: "Confirmou pelo WhatsApp que quer receber mensagens.", sistema: "Aceitou no sistema; falta a confirmação pelo WhatsApp.", nao: "Ainda não autorizou: mensagens automáticas e modelos ficam bloqueados.", saiu: "Respondeu SAIR: mensagens automáticas e modelos ficam bloqueados." };
 var EST = { ia: ["ia", "IA atendendo"], humano: ["info", "Humano atendendo"], aguardando: ["warn", "Aguardando atendente"], encerrada: ["", "Encerrada"] };
-function pillCons(c) { return '<span class="pill ' + CONS[c][0] + '">' + CONS[c][1] + "</span>"; }
+function pillCons(c) { return '<span class="pill ' + CONS[c][0] + '" title="' + CONSDICA[c] + '">' + CONS[c][1] + "</span>"; }
+function consCfg(l) { return (l.consent === "saiu" || l.consent === "nao") ? st.cons[l.consent] : null; }
 function lojasVisiveis() { return LEADS.filter(function (l) { return st.lojas[l.loja] && USER_LOJAS.indexOf(l.loja) >= 0; }); }
 function agora() { var d = new Date(); return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); }
 function cobrar(n, motivo) { st.saldo -= n; st.extrato.unshift([agora(), motivo, "-" + n]); }
@@ -210,10 +212,10 @@ function cardLead(l) {
   return '<article class="card" draggable="true" data-id="' + l.id + '" style="--lc:' + lj.cor + '"><div class="row" style="justify-content:space-between">' + tagLoja(l.loja) + '<span class="small">' + esc(l.resp) + "</span></div>" +
     '<button type="button" class="nm" data-act="abrir-lead" data-id="' + l.id + '">' + esc(l.tutor) + "</button>" +
     '<p class="small">' + (l.pets.length ? l.pets.map(function (p) { return esc(p.n); }).join(", ") : "Sem pet cadastrado") + "</p>" +
-    '<div class="row" style="margin-top:6px"><span class="pill info">' + esc(l.origem) + "</span>" + (CONVS[l.conv].estado === "aguardando" || CONVS[l.conv].estado === "humano" ? '<span class="pill ' + EST[CONVS[l.conv].estado][0] + '">' + EST[CONVS[l.conv].estado][1] + "</span>" : "") + (l.consent === "ok" || l.consent === "sistema" ? "" : '<span class="pill ' + CONS[l.consent][0] + '">' + CONS[l.consent][1] + "</span>") + "</div>" +
-    (l.prox !== "—" ? '<p class="small" style="margin-top:6px">Próxima ação: ' + esc(l.prox) + "</p>" : "") +
+    '<div class="row" style="margin-top:6px"><span class="pill info">' + esc(l.origem) + "</span>" + (CONVS[l.conv].estado === "aguardando" || CONVS[l.conv].estado === "humano" ? '<span class="pill ' + EST[CONVS[l.conv].estado][0] + '">' + EST[CONVS[l.conv].estado][1] + "</span>" : "") + (l.consent === "ok" || l.consent === "sistema" ? "" : pillCons(l.consent)) + (consCfg(l) && consCfg(l).lead === "pausar" ? '<span class="pill">Pausado</span>' : "") + "</div>" +
+    (consCfg(l) && consCfg(l).tarefa === "remover" ? '<p class="small" style="margin-top:6px">Sem tarefa de contato (regra da loja para quem recusa mensagens)</p>' : l.prox !== "—" ? '<p class="small" style="margin-top:6px">Próxima ação: ' + esc(l.prox) + "</p>" : "") +
     (l.valor ? '<p class="small">' + money(l.valor) + "</p>" : "") +
-    '<div class="row" style="margin-top:8px"><button type="button" class="btn pri sm" data-act="abrir-conversa-card" data-id="' + l.id + '" aria-label="Conversar com ' + esc(l.tutor) + '">Conversar' + (CONVS[l.conv].nao ? ' <span class="badge" style="background:var(--surface);color:var(--accent)">' + CONVS[l.conv].nao + "</span>" : "") + "</button>" +
+    '<div style="margin-top:8px;display:grid;gap:6px"><button type="button" class="btn pri sm full" data-act="abrir-conversa-card" data-id="' + l.id + '" aria-label="Conversa com ' + esc(l.tutor) + ' no WhatsApp"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="flex:none"><path d="M12 3a9 9 0 0 0-7.7 13.6L3 21l4.5-1.2A9 9 0 1 0 12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8.5c0 3.5 3 6.5 6.5 6.5l1-1.6-2-1-1 .8c-1-.5-2-1.5-2.5-2.5l.8-1-1-2z" fill="currentColor"/></svg>Conversa' + (CONVS[l.conv].nao ? ' <span class="badge" style="background:var(--surface);color:var(--accent)">' + CONVS[l.conv].nao + "</span>" : "") + "</button>" +
     '<select data-act="mover" data-id="' + l.id + '" aria-label="Mover ' + esc(l.tutor) + ' para outra etapa">' + ETAPAS.map(function (e) { return '<option value="' + e.id + '"' + (e.id === l.etapa ? " selected" : "") + ">" + (e.id === l.etapa ? "Etapa: " : "Mover: ") + e.n + "</option>"; }).join("") + "</select></div></article>";
 }
 function moverLead(id, etapa) {
@@ -272,7 +274,7 @@ function painelConversa(l, c) {
     var quem = x.de === "ia" ? "IA · " : x.de === "eu" ? "Atendente · " : x.de === "nota" ? "Nota interna · " : "";
     return '<div class="msg ' + cls + '">' + quem + esc(x.txt) + (x.w ? '<span class="w">' + x.w + "</span>" : "") + "</div>";
   }).join("") + (st.digitando ? '<div class="msg ia">IA digitando…</div>' : "");
-  var fora = c.janela >= 24, bloq = l.consent === "saiu";
+  var fora = c.janela >= 24, bloq = l.consent === "saiu" && st.cons.saiu.ativa === "bloquear", soResp = l.consent === "saiu" && !bloq;
   var topo = '<div class="row" style="justify-content:space-between;margin-bottom:8px"><div><h3>' + esc(l.tutor.split(" (")[0]) + '</h3><div class="row">' + tagLoja(l.loja) + '<span class="pill ' + EST[c.estado][0] + '">' + EST[c.estado][1] + "</span>" + pillCons(l.consent) +
     (fora ? '<span class="pill warn">Fora da janela de 24h</span>' : '<span class="pill ok">Janela aberta · ' + (24 - c.janela) + "h</span>") + "</div></div><div class=\"row\">" +
     (c.estado === "ia" ? '<button class="btn sm" type="button" data-act="assumir">Assumir atendimento</button>' : "") +
@@ -282,10 +284,10 @@ function painelConversa(l, c) {
   var resumo = c.resumo && c.estado === "aguardando" ? '<div class="note warn" style="margin-bottom:8px"><b>Resumo da IA para quem assume:</b> ' + esc(c.resumo) + "</div>" : "";
   var avisoIA = c.estado === "ia" ? '<div class="note" style="margin-top:8px">A IA responde sozinha. Se o tutor pedir atendente, reclamar ou os créditos acabarem, a conversa vai para a fila humana.</div>' : "";
   var composer;
-  if (bloq) composer = '<div class="note bad" style="margin-top:8px">O tutor cancelou o recebimento (SAIR). Nenhuma mensagem pode ser enviada.</div>';
-  else if (c.estado === "encerrada") composer = '<div class="note" style="margin-top:8px">Conversa encerrada. Uma nova mensagem do tutor reabre o atendimento.</div>';
+  if (bloq) composer = '<div class="note bad" style="margin-top:8px">O tutor recusou mensagens automáticas (SAIR) e a loja configurou bloquear também a conversa iniciada pelo atendente. Veja Configurações da loja > Consentimento.</div>';
+  else if (c.estado === "encerrada") composer = '<div class="note" style="margin-top:8px">Conversa encerrada. Uma nova mensagem do tutor reabre o atendimento.</div><div class="row" style="margin-top:8px"><button class="btn sm" type="button" data-act="sim-tutor">Simular mensagem do tutor</button></div>';
   else if (c.estado !== "humano") composer = avisoIA + '<div class="row" style="margin-top:8px"><button class="btn sm" type="button" data-act="sim-tutor">Simular mensagem do tutor</button><button class="btn sm" type="button" data-act="modelo" data-id="' + l.id + '">Enviar modelo aprovado</button></div>';
-  else composer = '<div style="margin-top:8px;display:grid;gap:6px">' + (fora ? '<div class="note warn">Fora da janela de 24h: só modelo aprovado. Texto livre fica desabilitado.</div>' : "") +
+  else composer = '<div style="margin-top:8px;display:grid;gap:6px">' + (soResp ? '<div class="note warn">O tutor recusou mensagens automáticas. Pela regra da loja, responda apenas ao que ele escrever, dentro da janela de 24h. Modelos ficam bloqueados.</div>' : "") + (fora ? '<div class="note warn">Fora da janela de 24h: só modelo aprovado. Texto livre fica desabilitado.</div>' : "") +
     '<textarea id="txt" aria-label="Mensagem" placeholder="' + (fora ? "Texto livre indisponível" : "Escreva a resposta") + '"' + (fora ? " disabled" : "") + '></textarea><div class="row"><button class="btn pri sm" type="button" data-act="enviar"' + (fora ? " disabled" : "") + '>Enviar</button><button class="btn sm" type="button" data-act="modelo" data-id="' + l.id + '">Enviar modelo aprovado</button><button class="btn sm" type="button" data-act="nota">Nota interna</button><button class="btn sm" type="button" data-act="sim-tutor">Simular mensagem do tutor</button></div></div>';
   return topo + resumo + '<div class="chat" id="chat">' + bolhas + "</div>" + composer;
 }
@@ -307,7 +309,7 @@ function simTutor() {
   if (c.estado === "encerrada") { c.estado = "ia"; }
   addMsg(st.conv, "tutor", texto); c.janela = 0;
   if (c.estado === "ia") {
-    if (l.consent === "saiu") { return render(); }
+    if (l.consent === "saiu") { c.estado = "aguardando"; addMsg(st.conv, "sis", "Tutor recusou mensagens automáticas: a IA não responde. O atendimento humano decide."); return render(); }
     if (st.saldo <= 0) { c.estado = "aguardando"; addMsg(st.conv, "sis", "Créditos esgotados: a IA parou e a conversa foi para a fila humana."); return render(); }
     st.digitando = true; render();
     var cid = st.conv;
@@ -363,7 +365,7 @@ function viewCfg() {
   } else if (st.cfgTab === "funil") {
     b = '<section class="panel"><header><h3>Etapas do funil</h3><span class="small">A loja nomeia e ordena. Ganho e Perdido são finais.</span></header>' + ETAPAS.map(function (e, i) { return '<label class="f" style="margin-bottom:8px">Etapa ' + (i + 1) + '<input type="text" data-act="renomear" data-i="' + i + '" value="' + esc(e.n) + '"' + '></label>'; }).join("") + '<button class="btn sm" type="button" data-act="toast" data-t="Nova etapa criada (simulado)">Adicionar etapa</button></section>';
   } else if (st.cfgTab === "cons") {
-    b = '<div class="grid g2"><section class="panel"><header><h3>Como o consentimento é pedido</h3></header><ol class="steps"><li><span class="n">1</span><span>Aceite no cadastro ou no PDV, com texto, usuário e data.</span></li><li><span class="n">2</span><span>Mensagem de confirmação pelo WhatsApp com botão.</span></li><li><span class="n">3</span><span>O toque no botão vira a segunda prova. SAIR cancela na hora.</span></li></ol><div class="note warn" style="margin-top:10px"><b>A decidir (Etapa 0.7):</b> a forma final de pedir o aceite e o que fazer com os tutores atuais.</div></section>' +
+    b = '<div class="grid g2"><section class="panel"><header><h3>Como o consentimento é pedido</h3></header><ol class="steps"><li><span class="n">1</span><span>Aceite no cadastro ou no PDV, com texto, usuário e data.</span></li><li><span class="n">2</span><span>Mensagem de confirmação pelo WhatsApp com botão.</span></li><li><span class="n">3</span><span>O toque no botão vira a segunda prova. SAIR cancela na hora.</span></li></ol><div class="note warn" style="margin-top:10px"><b>A decidir (Etapa 0.7):</b> a forma final de pedir o aceite e o que fazer com os tutores atuais.</div></section>' + '<section class="panel" style="grid-column:1/-1"><header><h3>O que fazer quando o tutor não quer ou não autorizou mensagens</h3><span class="small">Cada loja escolhe. Mensagens automáticas e modelos ficam sempre bloqueados.</span></header><div class="grid g2">' + consBloco("saiu", "Quando o tutor responde SAIR") + consBloco("nao", "Quando o tutor ainda não autorizou") + "</div></section>" +
       '<section class="panel"><header><h3>Situação dos tutores</h3></header>' + ["ok", "sistema", "nao", "saiu"].map(function (k) { var n = LEADS.filter(function (l) { return l.consent === k; }).length; return '<p class="row" style="justify-content:space-between;margin:6px 0">' + pillCons(k) + "<b>" + n + "</b></p>"; }).join("") + "</section></div>";
   } else if (st.cfgTab === "ia") {
     b = '<div class="grid g2"><section class="panel"><header><h3>Atendimento por IA</h3></header><label class="f">Tom de voz<select id="tom">' + ["Amigável", "Formal", "Descontraído"].map(function (t) { return "<option" + (st.tom === t ? " selected" : "") + ">" + t + "</option>"; }).join("") + "</select></label>" +
@@ -378,6 +380,14 @@ function viewCfg() {
   return nav + b;
 }
 
+function consBloco(sit, titulo) {
+  var c = st.cons[sit];
+  function sel(k, opcoes) { return '<label class="f" style="margin-top:8px">' + opcoes.t + '<select data-act="cons" data-s="' + sit + '" data-k="' + k + '">' + opcoes.o.map(function (x) { return '<option value="' + x[0] + '"' + (c[k] === x[0] ? " selected" : "") + ">" + x[1] + "</option>"; }).join("") + "</select></label>"; }
+  return '<div class="note" style="border-color:var(--line);background:var(--surface-2)"><h4>' + titulo + "</h4>" +
+    sel("ativa", { t: "Conversa iniciada pelo atendente", o: [["bloquear", "Bloquear"], ["resp", "Permitir só para responder ao que o tutor escrever"]] }) +
+    sel("lead", { t: "Lead no funil", o: [["manter", "Manter na etapa atual"], ["pausar", "Marcar como pausado"]].concat(sit === "saiu" ? [["perdido", "Mover para Perdido (motivo: recusou mensagens)"]] : []) }) +
+    sel("tarefa", { t: "Tarefas de contato por outros meios (ligação, presencial)", o: [["manter", "Manter"], ["remover", "Remover"]] }) + "</div>";
+}
 /* ================= OPS ================= */
 function viewOps() {
   var tabs = [["lojas", "Lojas e números"], ["modelos", "Modelos aprovados"], ["pacotes", "Pacotes de créditos"], ["prov", "Provedor"]];
@@ -441,6 +451,11 @@ document.addEventListener("change", function (e) {
   if (!a && ["fresp", "forig", "freq", "sil", "tom"].indexOf(t.id) < 0) return;
   if (a === "mover") return moverLead(+t.dataset.id, t.value);
   if (a === "auto-on") { AUTO[+t.dataset.i].on[t.dataset.l] = t.checked; toast(AUTO[+t.dataset.i].nome + ": " + (t.checked ? "ligada" : "desligada") + " em " + loja(t.dataset.l).nome + "."); }
+  else if (a === "cons") {
+    var cc = st.cons[t.dataset.s]; cc[t.dataset.k] = t.value;
+    if (t.dataset.k === "lead" && t.value === "perdido") { var n = 0; LEADS.slice().forEach(function (l) { if (l.consent === "saiu" && l.etapa !== "perdido" && l.etapa !== "ganho") { n++; l.perda = "Recusou mensagens"; moverLead(l.id, "perdido"); } }); toast("Regra salva. " + n + " lead(s) movido(s) para Perdido."); }
+    else toast("Regra salva e aplicada nos cards.");
+  }
   else if (a === "ia-perm") { st.ia[t.dataset.k] = t.checked; toast("Preferência salva."); }
   else if (a === "renomear") { ETAPAS[+t.dataset.i].n = t.value; }
   else if (t.id === "fresp") st.resp = t.value; else if (t.id === "forig") st.origem = t.value;

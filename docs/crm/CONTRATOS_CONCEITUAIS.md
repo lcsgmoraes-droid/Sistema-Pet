@@ -26,6 +26,10 @@ Descrevem dados e regras como o protótipo (`prototipo/crm-prototipo.html`) as s
 
 **Janela de 24h:** dentro dela o atendente escreve texto livre; fora dela só modelo aprovado.
 
+**Vocabulário do consentimento (usar em todas as telas):** Autorizou mensagens · Autorizou no sistema (falta confirmar pelo WhatsApp) · Sem autorização de mensagens · Recusou mensagens automáticas. "Sem comprar há 60+ dias" é a origem do lead e "Reativação de cliente" é a automação.
+
+**Regra por situação (configurável por loja):** quando o tutor recusou ou ainda não autorizou, a loja escolhe (1) se o atendente pode iniciar conversa ou só responder dentro da janela, (2) o que fazer com o lead (manter, pausar, mover para Perdido com motivo), (3) se tarefas de contato por outros meios (ligação, presencial) continuam. Mensagens automáticas e modelos ficam sempre bloqueados. Padrões: bloquear, manter, manter. Se o tutor recusou e escreve de novo, a IA não responde e o atendimento humano decide.
+
 **Consentimento:** sem consentimento ou com SAIR não sai mensagem ativa (modelo ou automação). SAIR bloqueia qualquer envio. Responder a uma mensagem que o próprio tutor iniciou segue a regra da janela.
 
 **Automação:** só dispara se a loja ligou, o tutor consentiu, o limite por tutor não foi atingido, está fora do horário de silêncio e há créditos. O disparo cai na conversa e na linha do tempo do lead e consome créditos pela categoria do modelo.
