@@ -40,7 +40,7 @@ Descrevem dados e regras como o protótipo (`prototipo/crm-prototipo.html`) as s
 
 **Conversa pelo card:** o card do Kanban abre a conversa do lead num painel lateral (mesmo componente da caixa de conversas); o contador de não lidas e o estado (aguardando, humano) aparecem no card.
 
-**Lead sem cadastro:** número desconhecido vira lead sem tutor e pode ser vinculado a um cadastro existente.
+**Lead e cadastro:** o lead pode estar ligado a uma pessoa já cadastrada (tela Pessoas) ou não. O card mostra "Lead novo · sem cadastro" ou "Cliente · código". Com cadastro, os dados da pessoa (contato, endereço, compras, ticket, cashback, crédito, pets) vêm do cadastro e aparecem na ficha, com atalho para abrir o cadastro completo; edições são feitas no cadastro, não no lead. Sem cadastro, só temos telefone e conversa; a ficha oferece vincular a um cadastro existente ou criar um. Em aberto: um lead por tutor ou por oportunidade; regra de vínculo automático; grupo de lojas.
 
 ## O que o protótipo ainda não decide
 

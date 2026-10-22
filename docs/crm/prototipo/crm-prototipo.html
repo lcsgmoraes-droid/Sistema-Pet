@@ -129,6 +129,16 @@ var LEADS = [
   { id: 9, tutor: "Tiago Nunes", tel: "(11) 91212-3434", loja: "j", etapa: "perdido", origem: "Sem comprar há 60+ dias", resp: "Marina", valor: 0, prox: "—", consent: "ok", cad: true,
     pets: [{ n: "Max", d: "Pastor Alemão, 8 anos" }], conv: 9, tl: [["15/10", "Mensagem", "Disse que mudou de cidade"]], opp: [], perda: "Mudou de cidade" }
 ];
+var PES = {
+  1: { cod: "C-1042", cpf: "***.482.917-**", email: "camila.d@gmail.com", end: "Rua das Acácias, 120 · Centro", desde: "03/2023", n: 18, total: 3420, ticket: 190, cash: 18.4, cred: 0 },
+  2: { cod: "C-0877", cpf: "***.310.552-**", email: "paulo.lima@email.com", end: "Av. Brasil, 905 · Centro", desde: "11/2021", n: 9, total: 1180, ticket: 131, cash: 18.4, cred: 0 },
+  3: { cod: "C-1310", cpf: "***.771.204-**", email: "ju.prado@email.com", end: "Al. dos Ipês, 44 · Jardins", desde: "05/2024", n: 7, total: 980, ticket: 140, cash: 0, cred: 25 },
+  4: { cod: "C-0412", cpf: "***.095.668-**", email: "roberto.salles@email.com", end: "Rua Verde, 310 · Jardins", desde: "02/2020", n: 41, total: 15800, ticket: 385, cash: 62, cred: 0 },
+  5: { cod: "C-1188", cpf: "***.230.419-**", email: "aline.moura@email.com", end: "Rua Pará, 78 · Centro", desde: "08/2024", n: 4, total: 310, ticket: 78, cash: 0, cred: 0 },
+  7: { cod: "C-1402", cpf: "***.558.103-**", email: "henrique.a@email.com", end: "Shopping Center, loja 12", desde: "09/2025", n: 3, total: 225, ticket: 75, cash: 0, cred: 0 },
+  8: { cod: "C-0955", cpf: "***.664.290-**", email: "sonia.f@email.com", end: "Rua Lima, 15 · Centro", desde: "01/2022", n: 22, total: 4100, ticket: 186, cash: 0, cred: 0 },
+  9: { cod: "C-0231", cpf: "***.120.777-**", email: "tiago.n@email.com", end: "(mudou de cidade)", desde: "06/2020", n: 30, total: 6900, ticket: 230, cash: 0, cred: 0 }
+};
 var CONVS = {
   1: { estado: "ia", janela: 3, nao: 0, msgs: [m("tutor", "Oi! Vocês têm a ração da Mel de 15 kg?", "09:12"), m("ia", "Oi, Camila! Temos sim a Premium Adultos 15 kg por R$ 189,00. Quer que eu separe uma para retirada hoje?", "09:12")] },
   2: { estado: "encerrada", janela: 99, nao: 0, msgs: [m("sis", "Tutor respondeu SAIR em 09/10. Envios bloqueados.", "09/10")] },
@@ -212,6 +222,7 @@ function cardLead(l) {
   return '<article class="card" draggable="true" data-id="' + l.id + '" style="--lc:' + lj.cor + '"><div class="row" style="justify-content:space-between">' + tagLoja(l.loja) + '<span class="small">' + esc(l.resp) + "</span></div>" +
     '<button type="button" class="nm" data-act="abrir-lead" data-id="' + l.id + '">' + esc(l.tutor) + "</button>" +
     '<p class="small">' + (l.pets.length ? l.pets.map(function (p) { return esc(p.n); }).join(", ") : "Sem pet cadastrado") + "</p>" +
+    '<div class="row" style="margin-top:6px">' + (l.cad ? '<button type="button" class="pill ok" style="cursor:pointer" data-act="abrir-lead" data-id="' + l.id + '" title="Cliente já cadastrado. Clique para ver os dados do cadastro">Cliente · ' + (PES[l.id] ? PES[l.id].cod : "") + "</button>" : '<span class="pill warn" title="Ainda não está ligado a nenhuma pessoa cadastrada">Lead novo · sem cadastro</span>') + "</div>" +
     '<div class="row" style="margin-top:6px"><span class="pill info">' + esc(l.origem) + "</span>" + (CONVS[l.conv].estado === "aguardando" || CONVS[l.conv].estado === "humano" ? '<span class="pill ' + EST[CONVS[l.conv].estado][0] + '">' + EST[CONVS[l.conv].estado][1] + "</span>" : "") + (l.consent === "ok" || l.consent === "sistema" ? "" : pillCons(l.consent)) + (consCfg(l) && consCfg(l).lead === "pausar" ? '<span class="pill">Pausado</span>' : "") + "</div>" +
     (consCfg(l) && consCfg(l).tarefa === "remover" ? '<p class="small" style="margin-top:6px">Sem tarefa de contato (regra da loja para quem recusa mensagens)</p>' : l.prox !== "—" ? '<p class="small" style="margin-top:6px">Próxima ação: ' + esc(l.prox) + "</p>" : "") +
     (l.valor ? '<p class="small">' + money(l.valor) + "</p>" : "") +
@@ -227,6 +238,19 @@ function moverLead(id, etapa) {
 }
 
 /* ================= Ficha 360 ================= */
+function painelIdentidade(l) {
+  if (!l.cad) {
+    return '<section class="panel"><header><h4>Lead sem cadastro</h4><span class="pill warn">Lead novo</span></header><p class="muted">Este contato ainda não está ligado a nenhuma pessoa cadastrada. Temos só o telefone e o que foi dito na conversa.</p>' +
+      '<div class="row" style="margin-top:10px"><button class="btn pri sm" type="button" data-act="vincular" data-id="' + l.id + '">Vincular a cadastro existente</button><button class="btn sm" type="button" data-act="criar-cadastro" data-id="' + l.id + '">Criar cadastro</button></div></section>';
+  }
+  var d = PES[l.id] || {};
+  function it(t, v) { return '<div><div class="small">' + t + '</div><div>' + esc(v) + "</div></div>"; }
+  return '<section class="panel"><header><h4>Cadastro do tutor</h4><span class="pill ok">Cliente · ' + esc(d.cod || "") + '</span></header><div class="grid" style="gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))">' +
+    it("CPF", d.cpf || "—") + it("E-mail", d.email || "—") + it("Endereço", d.end || "—") + it("Cliente desde", d.desde || "—") +
+    it("Compras", (d.n || 0) + " · " + money(d.total || 0)) + it("Ticket médio", money(d.ticket || 0)) + it("Cashback", money(d.cash || 0)) + it("Crédito", money(d.cred || 0)) + it("Pets", String(l.pets.length)) + it("Telefone", l.tel) + "</div>" +
+    '<div class="row" style="margin-top:10px"><button class="btn sm" type="button" data-act="toast" data-t="Abriria o cadastro completo na tela Pessoas (edição do cliente ' + esc(d.cod || "") + ')">Abrir cadastro completo</button></div>' +
+    '<p class="small" style="margin-top:6px">Os dados vêm do cadastro de Pessoas. Para corrigir algo, edite lá.</p></section>';
+}
 function viewDrawer() {
   if (!st.lead) return "";
   var l = lead(st.lead), c = CONVS[l.conv];
@@ -241,7 +265,7 @@ function viewDrawer() {
     var pets = l.pets.length ? l.pets.map(function (p) { return '<li><b>' + esc(p.n) + '</b> <span class="muted">' + esc(p.d) + "</span></li>"; }).join("") : '<li class="muted">Nenhum pet. Ao vincular ao cadastro, os pets aparecem aqui.</li>';
     var tl = l.tl.map(function (t) { return '<li><span class="d">' + t[0] + '</span><span><b>' + t[1] + "</b> · " + esc(t[2]) + "</span></li>"; }).join("");
     var opp = l.opp.length ? l.opp.map(function (o) { return '<li class="note" style="margin-bottom:6px">' + esc(o) + "</li>"; }).join("") : '<li class="small">Sem oportunidades no momento.</li>';
-    corpo = '<div class="row">' + (podeConv ? '<button class="btn pri sm" type="button" data-act="dtab" data-id="conversa">Abrir conversa</button>' : '<button class="btn pri sm" type="button" data-act="ir-conversa" data-id="' + l.conv + '">Abrir conversa</button>') + (l.cad ? "" : '<button class="btn sm" type="button" data-act="vincular" data-id="' + l.id + '">Vincular a cadastro</button>') +
+    corpo = painelIdentidade(l) + '<div class="row">' + (podeConv ? '<button class="btn pri sm" type="button" data-act="dtab" data-id="conversa">Abrir conversa</button>' : '<button class="btn pri sm" type="button" data-act="ir-conversa" data-id="' + l.conv + '">Abrir conversa</button>') + 
       '<select aria-label="Etapa" data-act="mover" data-id="' + l.id + '" style="width:auto">' + ETAPAS.map(function (e) { return '<option value="' + e.id + '"' + (e.id === l.etapa ? " selected" : "") + ">" + e.n + "</option>"; }).join("") + "</select></div>" +
       '<section class="panel"><header><h4>Oportunidades sugeridas</h4><span class="small">com o motivo de cada uma</span></header><ul style="list-style:none;padding:0;margin:0">' + opp + "</ul></section>" +
       '<section class="panel"><header><h4>Pets</h4></header><ul style="margin:0;padding-left:18px">' + pets + "</ul></section>" +
@@ -431,7 +455,8 @@ document.addEventListener("click", function (e) {
   else if (a === "ir-conversa") { st.tab = "conversas"; st.conv = +id; st.lead = null; }
   else if (a === "conv") st.conv = +id;
   else if (a === "novo-lead") { var nid = LEADS.length + 1; LEADS.unshift({ id: nid, tutor: "Novo lead " + nid, tel: "(11) 90000-000" + nid, loja: Object.keys(st.lojas).filter(function (k) { return st.lojas[k]; })[0], etapa: "novo", origem: "WhatsApp espontâneo", resp: "Sem responsável", valor: 0, prox: "Qualificar o lead", consent: "nao", cad: false, pets: [], conv: nid, tl: [[agora(), "Lead", "Criado manualmente"]], opp: [] }); CONVS[nid] = { estado: "ia", janela: 99, nao: 0, msgs: [m("sis", "Lead criado manualmente. Sem consentimento: apenas resposta ao tutor é permitida.", "")] }; toast("Lead criado na etapa Novo."); }
-  else if (a === "vincular") { var l = lead(+id); l.cad = true; l.tutor = "Fernanda Ribeiro"; l.pets = [{ n: "Toby", d: "Spitz, 3 anos" }]; l.opp = ["Cadastro vinculado: ofereça os serviços para o Toby"]; l.tl.unshift([agora(), "Cadastro", "Vinculado a Fernanda Ribeiro"]); toast("Lead vinculado a um cadastro existente (simulado)."); }
+  else if (a === "criar-cadastro") { var l0 = lead(+id); l0.cad = true; l0.tutor = "Novo tutor " + l0.id; PES[l0.id] = { cod: "C-" + (1500 + l0.id), cpf: "—", email: "—", end: "—", desde: "agora", n: 0, total: 0, ticket: 0, cash: 0, cred: 0 }; l0.tl.unshift([agora(), "Cadastro", "Cadastro criado a partir do lead"]); toast("Cadastro criado (simulado) e ligado ao lead."); }
+  else if (a === "vincular") { var l = lead(+id); l.cad = true; l.tutor = "Fernanda Ribeiro"; PES[l.id] = { cod: "C-0688", cpf: "***.402.118-**", email: "fernanda.r@email.com", end: "Rua Azul, 55 · Jardins", desde: "04/2022", n: 12, total: 1650, ticket: 138, cash: 9.5, cred: 0 }; l.pets = [{ n: "Toby", d: "Spitz, 3 anos" }]; l.opp = ["Cadastro vinculado: ofereça os serviços para o Toby"]; l.tl.unshift([agora(), "Cadastro", "Vinculado a Fernanda Ribeiro"]); toast("Lead vinculado a um cadastro existente (simulado)."); }
   else if (a === "assumir") { var c = CONVS[st.conv]; c.estado = "humano"; addMsg(st.conv, "sis", "Atendimento assumido por Marina. A IA não responde mais nesta conversa."); }
   else if (a === "devolver") { CONVS[st.conv].estado = "ia"; addMsg(st.conv, "sis", "Conversa devolvida à IA."); }
   else if (a === "encerrar") { CONVS[st.conv].estado = "encerrada"; addMsg(st.conv, "sis", "Atendimento encerrado."); }
