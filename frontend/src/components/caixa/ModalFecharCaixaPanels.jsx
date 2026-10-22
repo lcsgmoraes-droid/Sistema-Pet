@@ -262,9 +262,9 @@ export function PaymentBreakdownPanel({ resumo }) {
         key={periodo}
         composicao={resumo.vendas_periodo}
         titulo={`Vendas de ${periodo}`}
-        mostrarDetalhes={false}
+        mostrarDetalhes={true}
       />
-      <RecebimentosCaixaPanel composicao={resumo.composicao_recebimentos} mostrarDetalhes={false} />
+      <RecebimentosCaixaPanel composicao={resumo.composicao_recebimentos} mostrarDetalhes={true} />
       <div className="grid grid-cols-2 gap-2">
         {itensResumo.map(([titulo, valor]) => (
           <div

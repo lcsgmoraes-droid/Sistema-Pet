@@ -58,6 +58,16 @@ export function createControllerHarness(
       if (!slots[slot]) slots[slot] = { current: initial };
       return slots[slot];
     },
+    useMemo(calculate, dependencies) {
+      const slot = index++;
+      if (!sameDependencies(slots[slot]?.dependencies, dependencies)) {
+        slots[slot] = { dependencies, value: calculate() };
+      }
+      return slots[slot].value;
+    },
+    useCallback(callback, dependencies) {
+      return hooks.useMemo(() => callback, dependencies);
+    },
     useEffect(effect, dependencies) {
       const slot = index++;
       if (!sameDependencies(slots[slot]?.dependencies, dependencies)) {

@@ -32,7 +32,9 @@ import BotaoLink from "../../components/v2/BotaoLink/BotaoLink";
 import CartaoIndicador from "../../components/v2/CartaoIndicador/CartaoIndicador";
 import EstadoVazio from "../../components/v2/EstadoVazio/EstadoVazio";
 import SeletorOpcoes from "../../components/v2/SeletorOpcoes/SeletorOpcoes";
-import ResumoFaturamento from "../../components/v2/ResumoFaturamento/ResumoFaturamento";
+import ResumoFaturamento, {
+  DetalhesFaturamento,
+} from "../../components/v2/ResumoFaturamento/ResumoFaturamento";
 import { TONS_BADGE } from "../../components/v2/utils/tons";
 import { useTour } from "../../hooks/useTour";
 import { useTheme } from "../../theme/ThemeContext";
@@ -47,6 +49,7 @@ import {
   getExecutiveStatus,
   getPeriodLabel,
 } from "../dashboard/dashboardOverview";
+import { iniciarAtualizacaoDashboard } from "../dashboard/dashboardRefresh";
 
 const PERIOD_OPTIONS = [
   { valor: 1, rotulo: "Hoje" },
@@ -87,7 +90,10 @@ export default function DashboardFinanceiro() {
   const { isDark } = useTheme();
   const { iniciarTour } = useTour("dashboard", tourDashboard, { delay: 2000 });
   const requestIdRef = useRef(0);
-  const hasLoadedRef = useRef(false);
+  const loadedPeriodRef = useRef(null);
+  const summaryPeriodRef = useRef(null);
+  const requestPendingRef = useRef(false);
+  const abortControllerRef = useRef(null);
   const [periodDays, setPeriodDays] = useState(30);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -99,63 +105,113 @@ export default function DashboardFinanceiro() {
   const [overdueAccounts, setOverdueAccounts] = useState({ contas_receber: [], contas_pagar: [] });
   const [topProducts, setTopProducts] = useState([]);
   const [bankBalance, setBankBalance] = useState(null);
+  const [detalhesAbertos, setDetalhesAbertos] = useState(false);
 
-  const loadDashboard = useCallback(async () => {
-    const requestId = ++requestIdRef.current;
-    if (hasLoadedRef.current) setRefreshing(true);
-    else setLoading(true);
+  const loadDashboard = useCallback(
+    async ({ automatico = false } = {}) => {
+      if (automatico && requestPendingRef.current) return;
+      const requestId = ++requestIdRef.current;
+      abortControllerRef.current?.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      requestPendingRef.current = true;
+      const mudouPeriodo = loadedPeriodRef.current !== periodDays;
+      if (mudouPeriodo) {
+        setLoading(true);
+        summaryPeriodRef.current = null;
+        setSummary(createEmptyDashboardSummary());
+        setCashFlow([]);
+        setTopProducts([]);
+        setLastUpdate(null);
+      } else if (!automatico) setRefreshing(true);
+      const options = { signal: controller.signal };
 
-    const requests = [
-      {
-        key: "resumo financeiro",
-        promise: api.get("/dashboard/resumo", { params: { periodo_dias: periodDays } }),
-      },
-      {
-        key: "fluxo diário",
-        promise: api.get("/dashboard/entradas-saidas", { params: { periodo_dias: periodDays } }),
-      },
-      {
-        key: "contas vencidas",
-        promise: api.get("/dashboard/contas-vencidas", { params: { limite: 5 } }),
-      },
-      { key: "clientes", promise: api.get("/dashboard/gerencial") },
-      {
-        key: "produtos",
-        promise: api.get("/dashboard/top-produtos", {
-          params: { periodo_dias: periodDays, limite: 5 },
-        }),
-      },
-      { key: "saldo bancário", promise: api.get("/contas-bancarias/resumo/saldos") },
-    ];
+      const requests = [
+        {
+          key: "resumo financeiro",
+          automatico: true,
+          consultar: () =>
+            api.get("/dashboard/resumo", { ...options, params: { periodo_dias: periodDays } }),
+          aplicar: (data) => {
+            summaryPeriodRef.current = periodDays;
+            setSummary(data);
+            setLastUpdate(new Date());
+          },
+        },
+        {
+          key: "fluxo diário",
+          automatico: true,
+          consultar: () =>
+            api.get("/dashboard/entradas-saidas", {
+              ...options,
+              params: { periodo_dias: periodDays },
+            }),
+          aplicar: (data) => setCashFlow(data || []),
+        },
+        {
+          key: "contas vencidas",
+          consultar: () =>
+            api.get("/dashboard/contas-vencidas", { ...options, params: { limite: 5 } }),
+          aplicar: setOverdueAccounts,
+        },
+        {
+          key: "clientes",
+          consultar: () => api.get("/dashboard/gerencial", options),
+          aplicar: setManagement,
+        },
+        {
+          key: "produtos",
+          automatico: true,
+          consultar: () =>
+            api.get("/dashboard/top-produtos", {
+              ...options,
+              params: { periodo_dias: periodDays, limite: 5 },
+            }),
+          aplicar: (data) => setTopProducts(data || []),
+        },
+        {
+          key: "saldo bancário",
+          consultar: () => api.get("/contas-bancarias/resumo/saldos", options),
+          aplicar: (data) => setBankBalance(Number(data?.total_geral || 0)),
+          falhou: () => setBankBalance(null),
+        },
+      ].filter((request) => !automatico || request.automatico);
 
-    const results = await Promise.allSettled(requests.map((request) => request.promise));
-    if (requestId !== requestIdRef.current) return;
+      const results = await Promise.allSettled(requests.map((request) => request.consultar()));
+      if (requestId !== requestIdRef.current) return;
+      requestPendingRef.current = false;
 
-    const failed = [];
-    results.forEach((result, index) => {
-      if (result.status === "rejected") failed.push(requests[index].key);
-    });
+      const failed = [];
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") requests[index].aplicar(result.value.data);
+        else {
+          failed.push(requests[index].key);
+          requests[index].falhou?.();
+        }
+      });
 
-    if (results[0].status === "fulfilled") setSummary(results[0].value.data);
-    if (results[1].status === "fulfilled") setCashFlow(results[1].value.data || []);
-    if (results[2].status === "fulfilled") setOverdueAccounts(results[2].value.data);
-    if (results[3].status === "fulfilled") setManagement(results[3].value.data);
-    if (results[4].status === "fulfilled") setTopProducts(results[4].value.data || []);
-    if (results[5].status === "fulfilled") {
-      setBankBalance(Number(results[5].value.data?.total_geral || 0));
-    } else {
-      setBankBalance(null);
-    }
-
-    hasLoadedRef.current = true;
-    setFailedBlocks(failed);
-    setLastUpdate(new Date());
-    setLoading(false);
-    setRefreshing(false);
-  }, [periodDays]);
+      loadedPeriodRef.current = periodDays;
+      setFailedBlocks((anteriores) => [
+        ...anteriores.filter((key) => !requests.some((request) => request.key === key)),
+        ...failed,
+      ]);
+      setLoading(false);
+      setRefreshing(false);
+    },
+    [periodDays],
+  );
 
   useEffect(() => {
-    loadDashboard();
+    void loadDashboard();
+    const pararAtualizacao = iniciarAtualizacaoDashboard({
+      atualizar: () => loadDashboard({ automatico: true }),
+    });
+    return () => {
+      pararAtualizacao();
+      requestIdRef.current += 1;
+      abortControllerRef.current?.abort();
+      requestPendingRef.current = false;
+    };
   }, [loadDashboard]);
 
   const indicators = useMemo(() => calculateDashboardIndicators(summary), [summary]);
@@ -184,7 +240,31 @@ export default function DashboardFinanceiro() {
     });
   };
 
-  if (loading) return <DashboardLoading />;
+  if (loading || loadedPeriodRef.current !== periodDays) return <DashboardLoading />;
+
+  if (summaryPeriodRef.current !== periodDays) {
+    return (
+      <div className="min-h-full space-y-4 bg-slate-50 p-4 dark:bg-slate-950 sm:p-6">
+        <h1 className="v2-titulo-pagina">Dashboard</h1>
+        <SeletorOpcoes
+          rotulo="Período"
+          opcoes={PERIOD_OPTIONS}
+          valorSelecionado={periodDays}
+          aoSelecionar={setPeriodDays}
+        />
+        <div role="alert">
+          <EstadoVazio
+            icone={AlertCircle}
+            titulo="Não foi possível carregar o resultado do período"
+            descricao="Os valores estão indisponíveis. Uma nova consulta será feita automaticamente."
+          />
+        </div>
+        <BotaoInteracao icon={RefreshCw} onClick={loadDashboard} loading={refreshing}>
+          Tentar novamente
+        </BotaoInteracao>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-full space-y-5 bg-slate-50 p-4 dark:bg-slate-950 sm:p-6">
@@ -205,6 +285,9 @@ export default function DashboardFinanceiro() {
                 {lastUpdate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
               </span>
             )}
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Vendas: atualização automática a cada 30 s
+            </span>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -259,7 +342,10 @@ export default function DashboardFinanceiro() {
           <ResumoFaturamento
             composicao={composicaoVendas}
             periodo={periodLabel}
-            mostrarDetalhes={false}
+            expandido={detalhesAbertos}
+            aoAlternarDetalhes={() => setDetalhesAbertos((atual) => !atual)}
+            detalhesFora
+            detalhesId="dashboard-detalhes-faturamento"
           />
           <CartaoIndicador
             icone={ShoppingBag}
@@ -286,6 +372,15 @@ export default function DashboardFinanceiro() {
             </p>
           </CartaoIndicador>
         </div>
+        {detalhesAbertos && (
+          <div className="mt-4">
+            <DetalhesFaturamento
+              composicao={composicaoVendas}
+              id="dashboard-detalhes-faturamento"
+              aoAbrirRelatorio={() => navigate(getDashboardDetailPath("sales", periodDays))}
+            />
+          </div>
+        )}
       </section>
 
       <section id="tour-financeiro" className="space-y-4">
