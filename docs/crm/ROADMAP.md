@@ -143,13 +143,13 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 - [x] Testes com formatos reais de telefone, ambiguidade e vínculo antigo (`test_whatsapp_customer_lookup.py` e `test_whatsapp_vinculo_telefone_migracao_e_conferencia.py`).
 
 **0.5 Segredos e exposição de dados**
-- [ ] Token interno do orquestrador: por loja ou por integração, comparação segura, nunca com valor padrão.
-- [ ] Remover valores padrão de desenvolvimento do fluxo n8n (loja e token fixos).
-- [ ] Remover ou corrigir o webhook antigo com token fixo.
-- [ ] Não devolver erro interno ao usuário no teste de conexão.
-- [ ] Tirar telefone e resultados de ferramentas dos logs (ou mascarar).
-- [ ] Revisar quem pode ler e alterar a configuração do WhatsApp (permissão específica, não só estar logado).
-- [ ] Testes de segurança dos contratos.
+- [x] Token interno do orquestrador (22/10/2026): comparação em tempo constante; em produção/homologação o canal recusa tokens de exemplo (503); `WHATSAPP_ORCHESTRATOR_ALLOWED_TENANTS` (opcional) limita as lojas que o token alcança (403 fora da lista); sem token configurado o canal fica indisponível. `[?] DECIDIR` se a lista de lojas passa a ser obrigatória e se o token vira por loja (hoje é um token para o canal).
+- [x] Removidos os valores padrão do fluxo n8n (loja e token fixos) e o token padrão do `docker-compose.prod.yml`. **Antes da próxima publicação: definir um token forte em `WHATSAPP_ORCHESTRATOR_INTERNAL_TOKEN` no servidor e no piloto, senão o canal interno (piloto WAHA/n8n e ponte de dados) responde indisponível.**
+- [x] Webhook antigo: o token de verificação vem de `WHATSAPP_WEBHOOK_VERIFY_TOKEN` (sem token configurado, recusa) e a comparação é segura.
+- [x] Teste de conexão não devolve erro interno nem a resposta crua do provedor.
+- [x] Telefone mascarado nos logs (`mascarar_telefone`) e resultados de ferramentas fora dos logs do atendimento.
+- [x] Criar, alterar, apagar e testar a configuração do WhatsApp exigem uma destas permissões: `ia.whatsapp`, `configuracoes.editar` ou `usuarios.manage`. Ler a configuração continua só exigindo estar na loja (a tela não recebe segredos). `[?] DECIDIR` uma permissão própria da política de permissões por tela (ver roadmap geral).
+- [x] Testes de segurança e contrato (`backend/tests/unit/test_whatsapp_seguranca_canal_interno_e_config.py`).
 
 **0.6 Custo e abuso**
 - [ ] Limite de uso da IA por loja ligado ao **saldo de créditos** (ver tema T.1).
@@ -351,6 +351,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 | Data | Mudança |
 |---|---|
+| 22/10/2026 | Etapa 0.5 concluída: canal interno com comparação segura e sem token de exemplo em produção, valores fixos removidos (n8n, compose de produção, webhook antigo), erro do teste de conexão sem vazamento, telefone mascarado nos logs e configuração protegida por permissão. Exige definir token forte no servidor antes da publicação. |
 | 22/10/2026 | Etapa 0.4 concluída (exceto a decisão de como tratar ambiguidade na tela): serviço único telefone → tutor, vínculo antigo validado, telefone de 40 caracteres (migração nova) e script de conferência. |
 | 22/10/2026 | Etapa 0.3 concluída (exceto escala com mais de uma instância, que segue a decidir): tempo real separado por loja, conexão só para o atendente da própria loja com o módulo contratado, eventos de mensagem nova e de nova fila passam a ser emitidos. |
 | 22/10/2026 | Etapa 0.2 concluída (exceto a ligação das regras por sentimento, repetição e tempo, que segue a decidir): estados unificados, assumir e resolver sincronizam a conversa, devolução ao bot por escolha. |

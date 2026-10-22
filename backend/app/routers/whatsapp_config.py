@@ -11,6 +11,8 @@ import logging
 
 from app.db import get_session as get_db
 from app.auth.dependencies import get_current_user_and_tenant
+from app.security.permissions_service import check_permission
+from app.tenancy.context import set_current_tenant
 from app.whatsapp.models import TenantWhatsAppConfig
 from app.whatsapp.schemas import (
     TenantWhatsAppConfigBase,
@@ -25,6 +27,33 @@ router = APIRouter(prefix="/whatsapp/config", tags=["WhatsApp Config"])
 
 async def _tenant_whatsapp_config(user_and_tenant=Depends(get_current_user_and_tenant)):
     return user_and_tenant[1]
+
+
+# Quem pode criar, alterar, apagar e testar a configuracao do WhatsApp.
+PERMISSOES_CONFIGURAR_WHATSAPP = (
+    "ia.whatsapp",
+    "configuracoes.editar",
+    "usuarios.manage",
+)
+
+
+async def _exigir_permissao_configurar_whatsapp(
+    db: Session = Depends(get_db),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+) -> None:
+    """Barra quem nao pode configurar o WhatsApp (alem de estar logado na loja)."""
+    usuario, tenant_id = user_and_tenant
+    set_current_tenant(tenant_id)
+    for permissao in PERMISSOES_CONFIGURAR_WHATSAPP:
+        try:
+            check_permission(db, usuario.id, permissao, tenant_id, current_user=usuario)
+            return
+        except HTTPException:
+            continue
+    raise HTTPException(
+        status_code=403,
+        detail="Permissao negada: configurar o WhatsApp",
+    )
 
 
 def _has_configured_secret(value: Optional[str]) -> bool:
@@ -85,7 +114,11 @@ def get_whatsapp_config(
 # ============================================================================
 
 
-@router.post("", response_model=TenantWhatsAppConfigResponse)
+@router.post(
+    "",
+    dependencies=[Depends(_exigir_permissao_configurar_whatsapp)],
+    response_model=TenantWhatsAppConfigResponse,
+)
 def create_whatsapp_config(
     data: TenantWhatsAppConfigBase,  # Alterado de Create para Base (não precisa tenant_id)
     tenant_id=Depends(_tenant_whatsapp_config),
@@ -124,7 +157,11 @@ def create_whatsapp_config(
 # ============================================================================
 
 
-@router.put("", response_model=TenantWhatsAppConfigResponse)
+@router.put(
+    "",
+    dependencies=[Depends(_exigir_permissao_configurar_whatsapp)],
+    response_model=TenantWhatsAppConfigResponse,
+)
 def update_whatsapp_config(
     data: TenantWhatsAppConfigUpdate,
     tenant_id=Depends(_tenant_whatsapp_config),
@@ -161,7 +198,7 @@ def update_whatsapp_config(
 # ============================================================================
 
 
-@router.delete("")
+@router.delete("", dependencies=[Depends(_exigir_permissao_configurar_whatsapp)])
 def delete_whatsapp_config(
     tenant_id=Depends(_tenant_whatsapp_config), db: Session = Depends(get_db)
 ):
@@ -190,7 +227,9 @@ def delete_whatsapp_config(
 # ============================================================================
 
 
-@router.post("/test-webhook")
+@router.post(
+    "/test-webhook", dependencies=[Depends(_exigir_permissao_configurar_whatsapp)]
+)
 async def test_webhook_connection(
     tenant_id=Depends(_tenant_whatsapp_config), db: Session = Depends(get_db)
 ):
@@ -221,15 +260,20 @@ async def test_webhook_connection(
             to=config.phone_number, message="Teste de conexao WhatsApp - CorePet"
         )
 
+        _ = response  # a resposta crua do provedor nao volta para a tela
         return {
             "status": "success",
             "message": "Mensagem de teste enviada",
-            "whatsapp_response": response,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Erro no teste: {e}")
-        raise HTTPException(status_code=500, detail=f"Erro ao testar conexão: {str(e)}")
+        logger.error("Erro no teste de conexao WhatsApp: %s", type(e).__name__)
+        raise HTTPException(
+            status_code=500,
+            detail="Nao foi possivel testar a conexao. Confira a chave e o numero configurados.",
+        )
 
 
 # ============================================================================

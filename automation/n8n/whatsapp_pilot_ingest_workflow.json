@@ -126,7 +126,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ ($env.BACKEND_INTERNAL_BASE_URL || 'http://petshop-dev-backend:8000') + '/internal/whatsapp-orchestrator/' + ($env.BACKEND_TENANT_ID || '7be8dad7-8956-4758-b7bc-855a5259fe2b') + '/ingest' }}",
+        "url": "={{ ($env.BACKEND_INTERNAL_BASE_URL || 'http://petshop-dev-backend:8000') + '/internal/whatsapp-orchestrator/' + $env.BACKEND_TENANT_ID + '/ingest' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -136,7 +136,7 @@
             },
             {
               "name": "X-Internal-Token",
-              "value": "={{$env.BACKEND_INTERNAL_TOKEN || 'dev_whatsapp_internal_token'}}"
+              "value": "={{$env.BACKEND_INTERNAL_TOKEN}}"
             }
           ]
         },

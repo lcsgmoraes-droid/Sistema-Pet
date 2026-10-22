@@ -6,6 +6,7 @@ Seguranca por token interno dedicado.
 """
 
 import os
+import secrets
 import io
 import asyncio
 import base64
@@ -20,6 +21,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from openai import OpenAI
 
+from app.config import _is_strict_runtime_environment
 from app.db import get_session
 from app.tenancy.context import clear_current_tenant, set_current_tenant
 from app.whatsapp.webhook import normalize_phone, process_incoming_message
@@ -232,7 +234,26 @@ def _is_explicit_human_request(message_content: str) -> bool:
     return any(trigger in text for trigger in triggers)
 
 
-def _validate_internal_token(x_internal_token: Optional[str]) -> None:
+# Valores publicos de exemplo: em producao/homologacao o canal interno recusa.
+TOKENS_INTERNOS_DE_EXEMPLO = {
+    "dev_whatsapp_internal_token",
+    "trocar_token_interno",
+    "changeme",
+    "change-me",
+    "token",
+    "test",
+}
+
+
+def _tenants_permitidos_canal_interno() -> set[str]:
+    """Lojas que o token interno pode acessar (opcional; vazio = sem restricao)."""
+    bruto = os.getenv("WHATSAPP_ORCHESTRATOR_ALLOWED_TENANTS") or ""
+    return {item.strip().lower() for item in bruto.split(",") if item.strip()}
+
+
+def _validate_internal_token(
+    x_internal_token: Optional[str], tenant_id: Optional[str] = None
+) -> None:
     expected_token = (os.getenv("WHATSAPP_ORCHESTRATOR_INTERNAL_TOKEN") or "").strip()
 
     if not expected_token:
@@ -241,10 +262,32 @@ def _validate_internal_token(x_internal_token: Optional[str]) -> None:
             detail="Canal interno indisponivel: token interno nao configurado",
         )
 
-    if not x_internal_token or x_internal_token.strip() != expected_token:
+    if (
+        _is_strict_runtime_environment()
+        and expected_token.lower() in TOKENS_INTERNOS_DE_EXEMPLO
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Canal interno indisponivel: token interno inseguro",
+        )
+
+    if not x_internal_token or not secrets.compare_digest(
+        x_internal_token.strip().encode("utf-8"), expected_token.encode("utf-8")
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token interno invalido",
+        )
+
+    permitidos = _tenants_permitidos_canal_interno()
+    if (
+        permitidos
+        and tenant_id is not None
+        and str(tenant_id).strip().lower() not in permitidos
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Loja nao autorizada neste canal interno",
         )
 
 
@@ -349,7 +392,7 @@ async def ingest_message(
     2. Normaliza audio/imagem para texto.
     3. Reaproveita processamento padrao ja existente do WhatsApp Agent.
     """
-    _validate_internal_token(x_internal_token)
+    _validate_internal_token(x_internal_token, tenant_id)
 
     tenant_uuid = _parse_tenant_uuid(tenant_id)
     set_current_tenant(tenant_uuid)

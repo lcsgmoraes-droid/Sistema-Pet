@@ -385,7 +385,7 @@ class AIService:
                         tool_name=function_name, arguments=function_args
                     )
 
-                    logger.info(f"Resultado da tool {function_name}: {tool_result}")
+                    logger.info(f"Tool {function_name} executada")
 
                     # Adicionar resultado nas mensagens
                     messages.append(

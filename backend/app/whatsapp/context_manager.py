@@ -7,6 +7,7 @@ from typing import List, Dict, Optional, Any
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
+from app.whatsapp.log_safety import mascarar_telefone
 from app.whatsapp.models import WhatsAppSession, WhatsAppMessage
 from app.whatsapp.intents import IntentType
 from app.whatsapp.tenant_context import whatsapp_tenant_context
@@ -146,7 +147,9 @@ class ContextManager:
 
             # Verificar se expirou
             if context.is_expired(self._cleanup_interval_minutes):
-                logger.info(f"Contexto expirado para {phone_number}, criando novo")
+                logger.info(
+                    f"Contexto expirado para {mascarar_telefone(phone_number)}, criando novo"
+                )
                 del self._contexts[cache_key]
             else:
                 return context
@@ -268,7 +271,7 @@ class ContextManager:
         cache_key = f"{tenant_id}:{phone_number}"
         if cache_key in self._contexts:
             del self._contexts[cache_key]
-            logger.info(f"Contexto removido para {phone_number}")
+            logger.info(f"Contexto removido para {mascarar_telefone(phone_number)}")
 
     def cleanup_expired_contexts(self):
         """Remove contextos expirados do cache"""

@@ -334,7 +334,7 @@ class WhatsAppAIFlowMixin:
                 **arguments,
             )
 
-            logger.info(f"✅ Function {function_name} executada: {result}")
+            logger.info(f"✅ Function {function_name} executada")
             return result
 
         except Exception as e:

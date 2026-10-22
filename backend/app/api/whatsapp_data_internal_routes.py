@@ -182,7 +182,7 @@ def get_catalog_data(
     """Consulta produtos do tenant, sem executar qualquer gravação."""
     from app.produtos_models import Categoria, Produto
 
-    _validate_internal_token(x_internal_token)
+    _validate_internal_token(x_internal_token, tenant_id)
     tenant_uuid = _parse_tenant_uuid(tenant_id)
     set_current_tenant(tenant_uuid)
     try:
@@ -265,7 +265,7 @@ def get_customer_context_data(
     """Consulta cliente e histórico necessário ao atendimento, sem gravar."""
     from app.models import Cliente
 
-    _validate_internal_token(x_internal_token)
+    _validate_internal_token(x_internal_token, tenant_id)
     tenant_uuid = _parse_tenant_uuid(tenant_id)
     set_current_tenant(tenant_uuid)
     try:
@@ -318,7 +318,7 @@ def get_store_context_data(
     from app.models import Tenant
     from app.whatsapp.models import TenantWhatsAppConfig
 
-    _validate_internal_token(x_internal_token)
+    _validate_internal_token(x_internal_token, tenant_id)
     tenant_uuid = _parse_tenant_uuid(tenant_id)
     set_current_tenant(tenant_uuid)
     try:
@@ -360,7 +360,7 @@ def preview_order_data(
     db: Session = Depends(get_session),
 ):
     """Valida itens e calcula o resumo real sem criar venda ou baixar estoque."""
-    _validate_internal_token(x_internal_token)
+    _validate_internal_token(x_internal_token, tenant_id)
     tenant_uuid = _parse_tenant_uuid(tenant_id)
     set_current_tenant(tenant_uuid)
     try:
@@ -386,7 +386,7 @@ def create_order_data(
     db: Session = Depends(get_session),
 ):
     """Cria uma única venda em aberto após a confirmação explícita do cliente."""
-    _validate_internal_token(x_internal_token)
+    _validate_internal_token(x_internal_token, tenant_id)
     _validate_internal_write_token(x_internal_write_token)
     if not idempotency_key or len(idempotency_key) < 16:
         raise HTTPException(

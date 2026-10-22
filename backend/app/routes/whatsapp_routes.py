@@ -2,6 +2,9 @@
 Rotas WhatsApp - Configuração, Webhook, Testes
 """
 
+import os
+import secrets
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional, Dict, Any
@@ -166,10 +169,16 @@ async def webhook(
 
     # Verificação do webhook (GET)
     if hub_mode and hub_verify_token:
-        if hub_mode == "subscribe" and hub_verify_token == "meu_token_secreto":
+        esperado = (os.getenv("WHATSAPP_WEBHOOK_VERIFY_TOKEN") or "").strip()
+        if (
+            hub_mode == "subscribe"
+            and esperado
+            and secrets.compare_digest(
+                hub_verify_token.encode("utf-8"), esperado.encode("utf-8")
+            )
+        ):
             return int(hub_challenge)
-        else:
-            raise HTTPException(status_code=403, detail="Token inválido")
+        raise HTTPException(status_code=403, detail="Token inválido")
 
     # Processar mensagem (POST)
     # TODO: Implementar processamento de webhook

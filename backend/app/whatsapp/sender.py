@@ -13,6 +13,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 from sqlalchemy.orm import Session
 
+from app.whatsapp.log_safety import mascarar_telefone
 from app.utils.correlation import current_correlation_id
 from app.whatsapp.models import TenantWhatsAppConfig, WhatsAppSession, WhatsAppMessage
 from app.whatsapp.tenant_context import whatsapp_tenant_context
@@ -517,7 +518,7 @@ async def _send_bulk_messages_with_context(
             success += 1
 
         except Exception as e:
-            logger.error(f"Erro ao enviar para {phone}: {e}")
+            logger.error(f"Erro ao enviar para {mascarar_telefone(phone)}: {e}")
             failed += 1
 
     logger.info(f"📤 Bulk send: {success} enviados, {failed} falharam")

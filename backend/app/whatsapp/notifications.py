@@ -6,6 +6,7 @@ Envia mensagens automáticas para clientes (entregas, lembretes, promoções)
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
+from app.whatsapp.log_safety import mascarar_telefone
 import logging
 
 logger = logging.getLogger(__name__)
@@ -239,7 +240,7 @@ class NotificationManager:
 
             # TODO: Integrar com provedor WhatsApp (360dialog, Twilio)
             # Por enquanto, apenas loga
-            logger.info(f"Enviando notificação '{tipo}' para {telefone}")
+            logger.info(f"Enviando notificação '{tipo}' para {mascarar_telefone(telefone)}")
             logger.info(f"Mensagem: {mensagem}")
 
             # Mock: sucesso

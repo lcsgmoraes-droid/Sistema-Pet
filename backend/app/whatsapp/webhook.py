@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 
 from app.db import get_session as get_db
 from app.whatsapp.models import TenantWhatsAppConfig, WhatsAppSession, WhatsAppMessage
+from app.whatsapp.log_safety import mascarar_telefone
 from app.whatsapp.tenant_context import whatsapp_tenant_context
 from app.whatsapp.customer_lookup import SITUACAO_AMBIGUO, resolver_tutor_por_telefone
 
@@ -365,7 +366,11 @@ async def _process_incoming_message_with_context(
     5. [PRÓXIMO SPRINT] Enviar resposta
     """
     try:
-        logger.info(f"📨 Processando mensagem: tenant={tenant_id}, phone={phone}")
+        logger.info(
+            "📨 Processando mensagem: tenant=%s, phone=%s",
+            tenant_id,
+            mascarar_telefone(phone),
+        )
 
         provider_message_id = _normalize_provider_message_id(whatsapp_msg_id)
         existing = _find_message_by_provider_id(
