@@ -10,12 +10,12 @@ from sqlalchemy.orm import Session
 from app.db import get_session
 from app.platform_auth import require_platform_admin
 from app.platform_auth_models import PlatformAdmin
-from app.services.ops_tenant_log_service import listar_historico
 from app.services.ops_lojas_modulos_service import (
     OpsLojaError,
     alterar_modulo,
     listar_lojas,
 )
+from app.services.ops_tenant_log_service import listar_historico
 
 router = APIRouter(prefix="/admin/lojas", tags=["Admin - Lojas e módulos"])
 

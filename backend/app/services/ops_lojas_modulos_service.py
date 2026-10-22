@@ -11,7 +11,7 @@ desliga por aqui: a resposta informa de onde ele vem.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -52,7 +52,7 @@ class OpsLojaError(Exception):
 
 
 def _agora() -> datetime:
-    return datetime.now(tz=timezone.utc)
+    return datetime.now(tz=UTC)
 
 
 def _assinaturas_ativas(db: Session, tenant_id: UUID) -> list[AssinaturaModulo]:

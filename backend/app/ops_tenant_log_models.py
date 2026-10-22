@@ -18,7 +18,11 @@ class OpsTenantChangeLog(Base):
         Index("ix_ops_tenant_change_log_data", "criado_em"),
     )
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
     tenant_id = Column(UUID(as_uuid=True), nullable=False)
     criado_em = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
