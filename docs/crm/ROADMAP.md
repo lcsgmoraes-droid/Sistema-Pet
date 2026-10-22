@@ -42,6 +42,7 @@ Centralização de código · zero redundância · boas práticas (DDD, SOLID) p
 | 21/10 | **Custo da IA e das mensagens fica com o CorePet.** Venda por **pacotes de créditos** consumidos pelo cliente, na mesma lógica de tokens dos modelos de IA. Detalhes da cobrança ficam para mais adiante. | Lucas |
 | 21/10 | Lembretes continua como central operacional interna; o CRM é a camada de relacionamento. | Lucas |
 | 21/10 | **Vocabulário:** "Cliente inativo" vira **"Sem comprar há 60+ dias"** (origem do lead) e a automação passa a se chamar **"Reativação de cliente"**; os estados de consentimento passam a usar a palavra "mensagens": **Autorizou mensagens**, **Autorizou no sistema · falta confirmar**, **Sem autorização de mensagens**, **Recusou mensagens automáticas** (antes "Cancelou (SAIR)"). Botão do card: **"Conversa"** com o ícone do WhatsApp, ocupando a largura do card, pois nem sempre é o ato de conversar. | Lucas |
+| 21/10 | **Mudança de etapa no Kanban só por arrastar e soltar** (sem menu no card). A ficha do tutor mantém o campo de etapa como caminho alternativo, por ora. | Lucas |
 | 21/10 | **Cada loja configura o que acontece quando o tutor recusa ou não autorizou mensagens:** conversa iniciada pelo atendente (bloquear ou só responder), lead no funil (manter, pausar, mover para Perdido) e tarefas de contato por outros meios (manter ou remover). Mensagens automáticas e modelos ficam sempre bloqueados. | Lucas |
 | 21/10 | **A conversa também se acessa pelo card do Kanban:** botão "Conversar" (com contador de não lidas e estado do atendimento) abre a conversa num painel lateral sobre o quadro, sem perder filtros; o painel tem abas Conversa e Ficha 360. | Lucas |
 
@@ -191,7 +192,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 - [ ] 2.1 Funil padrão e etapas configuráveis pela loja (nome, ordem, cor, final ganho ou perdido). `[?] DECIDIR` etapas iniciais.
 - [ ] 2.2 Tela do quadro (v2): colunas, cartões, contagem e valor por coluna, estados vazio, carregando e erro.
-- [ ] 2.3 Arrastar e soltar entre colunas (com alternativa por teclado e por menu), gravando o histórico de movimentação.
+- [ ] 2.3 Arrastar e soltar entre colunas, gravando o histórico de movimentação. Decisão de 21/10: sem menu de etapa no card. `[?] DECIDIR` como atender teclado e celular (o arrastar nativo do navegador não funciona por toque): usar biblioteca já instalada que suporta toque e teclado, ou manter o campo de etapa na ficha.
 - [ ] 2.4 Cartão do lead: tutor, pets, última compra, origem, responsável, próxima ação, **identificação clara da loja** (nome e marca visual).
 - [ ] 2.5 **Filtro de lojas:** ver tudo ou lojas específicas, limitado às lojas que o usuário pode acessar; lembrar a última escolha.
 - [ ] 2.6 Criação manual de lead (com busca de tutor existente).
@@ -330,6 +331,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 
 | Data | Mudança |
 |---|---|
+| 21/10/2026 | Protótipo versão 4: menu de etapa removido do card; mudança só por arrastar e soltar. |
 | 21/10/2026 | Protótipo versão 3: novo vocabulário, botão "Conversa" com ícone do WhatsApp, configuração por situação do consentimento (Configurações da loja > Consentimento). |
 | 21/10/2026 | Protótipo versão 2: conversa acessível pelo card do Kanban (painel lateral com abas Conversa e Ficha 360). |
 | 21/10/2026 | Protótipo versão 1 e contratos conceituais criados; itens P.1 a P.8 concluídos. |

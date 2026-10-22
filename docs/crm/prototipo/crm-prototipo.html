@@ -216,7 +216,7 @@ function cardLead(l) {
     (consCfg(l) && consCfg(l).tarefa === "remover" ? '<p class="small" style="margin-top:6px">Sem tarefa de contato (regra da loja para quem recusa mensagens)</p>' : l.prox !== "—" ? '<p class="small" style="margin-top:6px">Próxima ação: ' + esc(l.prox) + "</p>" : "") +
     (l.valor ? '<p class="small">' + money(l.valor) + "</p>" : "") +
     '<div style="margin-top:8px;display:grid;gap:6px"><button type="button" class="btn pri sm full" data-act="abrir-conversa-card" data-id="' + l.id + '" aria-label="Conversa com ' + esc(l.tutor) + ' no WhatsApp"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="flex:none"><path d="M12 3a9 9 0 0 0-7.7 13.6L3 21l4.5-1.2A9 9 0 1 0 12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8.5c0 3.5 3 6.5 6.5 6.5l1-1.6-2-1-1 .8c-1-.5-2-1.5-2.5-2.5l.8-1-1-2z" fill="currentColor"/></svg>Conversa' + (CONVS[l.conv].nao ? ' <span class="badge" style="background:var(--surface);color:var(--accent)">' + CONVS[l.conv].nao + "</span>" : "") + "</button>" +
-    '<select data-act="mover" data-id="' + l.id + '" aria-label="Mover ' + esc(l.tutor) + ' para outra etapa">' + ETAPAS.map(function (e) { return '<option value="' + e.id + '"' + (e.id === l.etapa ? " selected" : "") + ">" + (e.id === l.etapa ? "Etapa: " : "Mover: ") + e.n + "</option>"; }).join("") + "</select></div></article>";
+    "</div></article>";
 }
 function moverLead(id, etapa) {
   var l = lead(id); if (!l || l.etapa === etapa) return;
