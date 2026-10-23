@@ -725,6 +725,10 @@ def finalizar_venda(
             contas_criadas_ids=contas_criadas_ids,
         )
 
+        # SessionLocal preserva o cache no commit. A resposta precisa recarregar
+        # os pagamentos e recebiveis gravados, em vez da fotografia anterior.
+        db.expire(venda, ["pagamentos", "contas_receber"])
+
         # Preparar retorno
         return {
             "venda": {
