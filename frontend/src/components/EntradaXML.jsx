@@ -18,6 +18,7 @@ import EntradaXmlResultadoLoteModal from "./entrada-xml/EntradaXmlResultadoLoteM
 import EntradaXmlSefazPanels from "./entrada-xml/EntradaXmlSefazPanels";
 import EntradaXmlVisualizacaoNotaModal from "./entrada-xml/EntradaXmlVisualizacaoNotaModal";
 import useEntradaXmlConferencia from "./entrada-xml/useEntradaXmlConferencia";
+import useEntradaXmlConfirmacaoPack from "./entrada-xml/useEntradaXmlConfirmacaoPack";
 import useEntradaXmlHistoricoPrecos from "./entrada-xml/useEntradaXmlHistoricoPrecos";
 import useEntradaXmlProdutos from "./entrada-xml/useEntradaXmlProdutos";
 import useEntradaXmlRateio from "./entrada-xml/useEntradaXmlRateio";
@@ -196,6 +197,31 @@ const EntradaXML = () => {
     toast,
   });
 
+  const {
+    confirmarPackItem,
+    invalidarConfirmacaoPackItem,
+    limparConfirmacoesPack,
+    obterConfirmacaoPackItem,
+    pendenciaConfirmacaoPack,
+    validarConfirmacoesPack,
+  } = useEntradaXmlConfirmacaoPack({ multiplicadoresPack, toast });
+
+  useEffect(() => {
+    limparConfirmacoesPack();
+    setMultiplicadoresPack({});
+  }, [notaSelecionada?.id]);
+
+  const validarPackAntesDeProcessar = (nota) => {
+    const mesmaNota = notaSelecionada?.id === nota.id;
+    if (validarConfirmacoesPack(nota, mesmaNota ? multiplicadoresPack : {})) return true;
+
+    if (!mesmaNota) aplicarNotaSelecionada(nota);
+    setFiltroItensNota("todos");
+    setMostrarVisualizacao(false);
+    setMostrarDetalhes(true);
+    return false;
+  };
+
   const abrirDetalhes = async (notaId, { abrirConferencia = false } = {}) => {
     try {
       const response = await api.get(`/notas-entrada/${notaId}`);
@@ -209,6 +235,7 @@ const EntradaXML = () => {
       setMostrarCamposConferencia(abrirConferencia || temDivergenciaConferencia);
       setFiltroItensNota(temDivergenciaConferencia ? "divergencias" : "todos");
       setMultiplicadoresPack({}); // limpar overrides manuais ao abrir nova nota
+      limparConfirmacoesPack();
     } catch {
       toast.error("Erro ao carregar detalhes da nota");
     }
@@ -293,6 +320,7 @@ const EntradaXML = () => {
     setMostrarVisualizacao,
     setNotaSelecionada,
     toast,
+    validarPackAntesDeProcessar,
   });
 
   const {
@@ -529,6 +557,7 @@ const EntradaXML = () => {
         calcularConferenciaItem={calcularConferenciaItem}
         carregarPreviewProcessamento={carregarPreviewProcessamento}
         conferenciaItens={conferenciaItens}
+        confirmarPackItem={confirmarPackItem}
         conferenciaObservacaoGeral={conferenciaObservacaoGeral}
         criandoPendenciaFornecedor={criandoPendenciaFornecedor}
         criarTodosProdutosNaoVinculados={criarTodosProdutosNaoVinculados}
@@ -549,6 +578,7 @@ const EntradaXML = () => {
         itensComDivergenciaDetalhe={itensComDivergenciaDetalhe}
         itensExibidosNota={itensExibidosNota}
         itensNotaDetalhe={itensNotaDetalhe}
+        invalidarConfirmacaoPackItem={invalidarConfirmacaoPackItem}
         loading={loading}
         metaConferenciaAtual={metaConferenciaAtual}
         mostrarCamposConferencia={mostrarCamposConferencia}
@@ -556,8 +586,10 @@ const EntradaXML = () => {
         navigate={navigate}
         notaSelecionada={notaSelecionada}
         obterConfiguracaoPackItem={obterConfiguracaoPackItem}
+        obterConfirmacaoPackItem={obterConfirmacaoPackItem}
         obterCustoAquisicaoItem={obterCustoAquisicaoItem}
         quantidadesOnline={quantidadesOnline}
+        pendenciaConfirmacaoPack={pendenciaConfirmacaoPack}
         resultadosBuscaProduto={resultadosBuscaProduto}
         resumoConferenciaAtual={resumoConferenciaAtual}
         reverterNota={reverterNota}

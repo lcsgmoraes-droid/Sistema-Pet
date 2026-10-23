@@ -199,6 +199,107 @@ test("recibo em dinheiro imprime valor recebido e troco com clareza", () => {
   assert.match(recibo, /TROCO:\s+R\$ 10,00/);
 });
 
+for (const cenario of [
+  {
+    total: 14,
+    recebido: 20,
+    troco: 6,
+    totalTexto: "14,00",
+    recebidoTexto: "20,00",
+    trocoTexto: "6,00",
+  },
+  {
+    total: 17.5,
+    recebido: 50,
+    troco: 32.5,
+    totalTexto: "17,50",
+    recebidoTexto: "50,00",
+    trocoTexto: "32,50",
+  },
+]) {
+  for (const temEntrega of [false, true]) {
+    test(`recibo de R$ ${cenario.totalTexto} pago com R$ ${cenario.recebidoTexto} mostra troco com resumo explicito ${temEntrega ? "e entrega" : "sem entrega"}`, () => {
+      const recibo = montarCupomVenda({
+        ...vendaBase,
+        subtotal: cenario.total,
+        total: cenario.total,
+        valor_pago: cenario.total,
+        valor_restante: 0,
+        status_pagamento: "pago",
+        tem_entrega: temEntrega,
+        itens: [
+          {
+            produto_nome: "KG - QUIRELA",
+            quantidade: cenario.total / 3.5,
+            preco_unitario: 3.5,
+            subtotal: cenario.total,
+          },
+        ],
+        pagamentos: [
+          {
+            forma_pagamento: "Dinheiro",
+            forma_pagamento_tipo: "dinheiro",
+            valor: cenario.total,
+            valor_recebido: cenario.recebido,
+            troco: cenario.troco,
+          },
+        ],
+      });
+
+      assert.match(recibo, new RegExp(`Dinheiro\\s+R\\$ ${cenario.recebidoTexto}`));
+      assert.match(recibo, new RegExp(`VALOR PAGO:\\s+R\\$ ${cenario.totalTexto}`));
+      assert.match(recibo, new RegExp(`TROCO:\\s+R\\$ ${cenario.trocoTexto}`));
+      assert.match(recibo, /STATUS: PAGO/);
+      assert.doesNotMatch(recibo, /VALOR A RECEBER:|PAGAMENTO NA ENTREGA \(PENDENTE\)/);
+    });
+  }
+}
+
+test("recibo parcial preserva o saldo confirmado sem declarar a venda paga", () => {
+  const recibo = montarCupomVenda({
+    ...vendaBase,
+    subtotal: 17.5,
+    total: 17.5,
+    valor_pago: 5,
+    valor_restante: 12.5,
+    status_pagamento: "parcial",
+    tem_entrega: true,
+    pagamentos: [
+      {
+        forma_pagamento: "Dinheiro",
+        forma_pagamento_tipo: "dinheiro",
+        valor: 5,
+        valor_recebido: 5,
+        troco: 0,
+      },
+    ],
+  });
+
+  assert.match(recibo, /VALOR PAGO:\s+R\$ 5,00/);
+  assert.match(recibo, /VALOR A RECEBER:\s+R\$ 12,50/);
+  assert.doesNotMatch(recibo, /STATUS: PAGO|^TROCO:/m);
+});
+
+test("dinheiro previsto para entrega mostra troco a levar sem registrar pagamento", () => {
+  const recibo = montarCupomVenda({
+    ...vendaBase,
+    subtotal: 17.5,
+    total: 17.5,
+    valor_pago: 0,
+    valor_restante: 17.5,
+    status_pagamento: "em_aberto",
+    tem_entrega: true,
+    pagamentos: [],
+    pagamento_entrega_previsto: { forma: "dinheiro", valor_para_troco: 50 },
+  });
+
+  assert.match(recibo, /PAGAMENTO NA ENTREGA \(PENDENTE\)/);
+  assert.match(recibo, /DINHEIRO NA ENTREGA\s+R\$ 17,50/);
+  assert.match(recibo, /CLIENTE PAGA COM:\s+R\$ 50,00/);
+  assert.match(recibo, /LEVAR TROCO:\s+R\$ 32,50/);
+  assert.doesNotMatch(recibo, /VALOR PAGO:|STATUS: PAGO|^PAGAMENTOS$/m);
+});
+
 test("recibo de venda parcial mostra o cashback e o valor que falta receber", () => {
   const recibo = montarCupomVenda(
     {
