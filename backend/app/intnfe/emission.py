@@ -37,7 +37,11 @@ from app.intnfe.rejection_diagnostics import (
     rejection_diagnostics,
 )
 from app.produtos_estoque_models import EstoqueMovimentacao, ProdutoLote
-from app.services.venda_descontos import ratear_centavos, ratear_descontos_venda
+from app.services.venda_descontos import (
+    bruto_compativel_com_quantidade,
+    ratear_centavos,
+    ratear_descontos_venda,
+)
 from app.services.xml_contabilidade_hook import tentar_enfileirar_documento
 from app.vendas.fiscal_status import sincronizar_venda_apos_cancelamento_fiscal
 from app.utils.timezone import as_brasilia_naive
@@ -131,6 +135,12 @@ def _legacy_quantity_rounding(venda, item, gross):
         == quantity
         and _money(previous_quantity * unit_price) == gross
     )
+
+
+def _quantity_rounding(venda, item, gross):
+    if getattr(venda, "desconto_venda_valor", None) is not None:
+        return bruto_compativel_com_quantidade(item, gross)
+    return _legacy_quantity_rounding(venda, item, gross)
 
 
 def _legacy_aggregate_gross(venda):
@@ -864,7 +874,7 @@ def build_payload(db, tenant, connection, venda, document_type):
             raise DirectEmissionError(
                 f"Produto {item.produto.nome}: confira quantidade, preço e desconto."
             )
-        if abs(gross - calculated_gross) > CENT and not _legacy_quantity_rounding(
+        if abs(gross - calculated_gross) > CENT and not _quantity_rounding(
             venda, item, gross
         ):
             raise DirectEmissionError(
@@ -1098,7 +1108,7 @@ def local_document_details(db, tenant, venda):
             and gross != calculated_gross
             and (
                 abs(gross - calculated_gross) <= CENT
-                or _legacy_quantity_rounding(venda, sale_item, gross)
+                or _quantity_rounding(venda, sale_item, gross)
             )
         ):
             fiscal_unit_price = (gross / quantity).quantize(

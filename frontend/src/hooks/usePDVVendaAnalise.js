@@ -8,6 +8,7 @@ function montarItensAnalise(itens = []) {
     quantidade: item.quantidade,
     preco_venda: item.preco_unitario || item.preco_venda,
     desconto_item: item.desconto_valor ?? item.desconto_item ?? 0,
+    subtotal: item.subtotal,
     custo: item.custo,
   }));
 }

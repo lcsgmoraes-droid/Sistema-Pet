@@ -65,6 +65,7 @@ def analisar_venda(
             "produto_id": item.produto_id,
             "quantidade": item.quantidade,
             "preco_unitario": item.preco_venda,
+            "subtotal": item.subtotal,
             "desconto_item": item.desconto_item,
         }
         for item in dados.items
@@ -286,6 +287,8 @@ def analisar_venda(
                         {
                             "quantidade": item.quantidade,
                             "preco_unitario": item.preco_venda,
+                            "subtotal": item.subtotal,
+                            "desconto_item": item.desconto_item,
                         }
                     )
                     desconto_item = descontos_por_item[id(item)]
