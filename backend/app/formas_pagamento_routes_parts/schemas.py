@@ -28,6 +28,7 @@ class ItemAnaliseVenda(BaseModel):
     produto_id: int
     quantidade: float
     preco_venda: float
+    subtotal: Optional[float] = Field(default=None, ge=0)
     desconto_item: float = Field(default=0, ge=0)
     custo: Optional[float] = None
 
@@ -64,12 +65,14 @@ class AnaliseVendaRequest(BaseModel):
                     {
                         "quantidade": item.quantidade,
                         "preco_unitario": item.preco_venda,
+                        "subtotal": item.subtotal,
                         "desconto_item": item.desconto_item,
                     }
                 )
                 item.quantidade = normalizado["quantidade"]
                 item.preco_venda = normalizado["preco_unitario"]
                 item.desconto_item = normalizado["desconto_item"]
+                item.subtotal = normalizado["subtotal"]
         return self
 
 

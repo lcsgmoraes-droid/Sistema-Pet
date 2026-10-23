@@ -710,6 +710,10 @@ export function montarItensAnaliseMargem(itens = []) {
     produto_id: item.produto_id,
     quantidade: item.quantidade,
     preco_venda: item.preco_unitario || item.preco_venda || 0,
+    ...(item.subtotal != null ? { subtotal: item.subtotal } : {}),
+    ...(item.desconto_valor != null || item.desconto_item != null
+      ? { desconto_item: item.desconto_valor ?? item.desconto_item }
+      : {}),
     custo: item.custo || null,
   }));
 }
@@ -765,6 +769,12 @@ export function montarPagamentosMargem({ pagamentosExistentes = [], pagamentos =
 export function montarPayloadAnaliseMargem({ venda = {}, formasPagamento = [] }) {
   return {
     items: montarItensAnaliseMargem(venda.itens || []),
+    ...(venda.desconto_venda_valor != null
+      ? {
+          desconto_venda_valor: venda.desconto_venda_valor,
+          cupom_discount_applied: venda.cupom_discount_applied ?? null,
+        }
+      : {}),
     formas_pagamento: formasPagamento,
     desconto: venda.desconto_valor || 0,
     taxa_entrega: venda.entrega?.taxa_entrega_total || 0,

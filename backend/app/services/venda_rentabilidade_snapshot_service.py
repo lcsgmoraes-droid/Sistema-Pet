@@ -11,7 +11,11 @@ from app.financeiro_models import FormaPagamento
 from app.models import Cliente
 from app.produtos_models import EstoqueMovimentacao
 from app.utils.timezone import now_brasilia
-from app.services.venda_descontos import ratear_descontos_venda, resumo_descontos_venda
+from app.services.venda_descontos import (
+    bruto_item,
+    ratear_descontos_venda,
+    resumo_descontos_venda,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -532,7 +536,7 @@ def build_venda_rentabilidade_snapshot(
     contrato_descontos = getattr(venda, "desconto_venda_valor", None) is not None
     venda_bruta = _round_money(
         sum(
-            _as_float(item.quantidade) * _as_float(item.preco_unitario)
+            float(bruto_item(item))
             for item in list(getattr(venda, "itens", []) or [])
         )
         if contrato_descontos
@@ -549,7 +553,7 @@ def build_venda_rentabilidade_snapshot(
     for item in list(getattr(venda, "itens", []) or []):
         quantidade = _as_float(getattr(item, "quantidade", 0))
         preco_unitario = _as_float(getattr(item, "preco_unitario", 0))
-        subtotal_item = _round_money(quantidade * preco_unitario)
+        subtotal_item = float(bruto_item(item))
         custo_unitario = _resolve_custo_unitario_item(item, estoque_custos_por_produto)
         custo_item = _round_money(custo_unitario * quantidade)
 

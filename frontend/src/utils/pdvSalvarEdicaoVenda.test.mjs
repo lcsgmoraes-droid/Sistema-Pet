@@ -6,6 +6,34 @@ import { recalcularSubtotalItem } from "./pdvCarrinhoItensUtils.js";
 import { recalcularVendaComDescontos } from "./pdvDescontosUtils.js";
 
 const venda = { id: 34, total: 165, status: "aberta" };
+
+test("salvar valor informado preserva metodo percentual calculado sobre o bruto exato", () => {
+  const anterior = {
+    id: 34,
+    itens: [
+      { id: 50, venda_id: 34, tipo_desconto_aplicado: "percentual", desconto_percentual: 10 },
+    ],
+  };
+  const sincronizada = montarVendaPersistidaParaEdicao(anterior, {
+    id: 34,
+    desconto_venda_valor: 0,
+    total: 20,
+    subtotal: 20,
+    itens: [
+      {
+        id: 50,
+        venda_id: 34,
+        quantidade: 1.709,
+        preco_unitario: 13,
+        desconto_item: 2.22,
+        subtotal: 20,
+      },
+    ],
+  });
+  assert.equal(sincronizada.itens[0].tipo_desconto_aplicado, "percentual");
+  assert.equal(sincronizada.itens[0].desconto_percentual, 10);
+  assert.equal(sincronizada.itens[0].subtotal, 20);
+});
 const payload = {
   itens: [
     { produto_id: 1, desconto_item: 20, subtotal: 80 },

@@ -3,6 +3,8 @@ import { debugLog } from "../utils/debug";
 import {
   colocarItemProdutoNoTopo,
   obterPrecoVendaPDV,
+  normalizarQuantidadePDV,
+  recalcularItemPorSubtotal,
   recalcularSubtotalItem,
 } from "../utils/pdvCarrinhoItensUtils";
 import { sugerirProtocoloRecorrencia } from "../utils/pdvProtocolosRecorrencia";
@@ -112,9 +114,18 @@ export function usePDVCarrinhoItens({
 
   const atualizarQuantidadeItem = (index, novaQuantidade) => {
     const novosItens = vendaAtual.itens.map((item, itemIndex) =>
-      itemIndex === index ? recalcularSubtotalItem(item, novaQuantidade) : item,
+      itemIndex === index && normalizarQuantidadePDV(novaQuantidade) !== Number(item.quantidade)
+        ? recalcularSubtotalItem(item, novaQuantidade)
+        : item,
     );
 
+    recalcularTotais(novosItens);
+  };
+
+  const atualizarSubtotalItem = (index, novoSubtotal) => {
+    const novosItens = vendaAtual.itens.map((item, itemIndex) =>
+      itemIndex === index ? recalcularItemPorSubtotal(item, novoSubtotal) : item,
+    );
     recalcularTotais(novosItens);
   };
 
@@ -179,6 +190,7 @@ export function usePDVCarrinhoItens({
     atualizarPetDoItem,
     atualizarProtocoloDoItem,
     atualizarQuantidadeItem,
+    atualizarSubtotalItem,
     copiarCodigoProdutoCarrinho,
     removerItem,
     toggleKitExpansion,

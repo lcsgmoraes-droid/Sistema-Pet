@@ -1045,6 +1045,32 @@ test("monta itens e payload para analise de margem", () => {
   );
 });
 
+test("analise do pagamento preserva valor digitado e origens dos descontos", () => {
+  const payload = montarPayloadAnaliseMargem({
+    venda: {
+      itens: [
+        { produto_id: 1, quantidade: 1.538, preco_unitario: 13, subtotal: 19, desconto_valor: 1 },
+      ],
+      desconto_venda_valor: 2,
+      cupom_discount_applied: 1,
+      desconto_valor: 4,
+    },
+  });
+  assert.deepEqual(payload.items, [
+    {
+      produto_id: 1,
+      quantidade: 1.538,
+      preco_venda: 13,
+      subtotal: 19,
+      desconto_item: 1,
+      custo: null,
+    },
+  ]);
+  assert.equal(payload.desconto_venda_valor, 2);
+  assert.equal(payload.cupom_discount_applied, 1);
+  assert.equal(payload.desconto, 4);
+});
+
 test("monta pagamentos de margem ignorando cashback novo", () => {
   const pagamentos = montarPagamentosMargem({
     pagamentosExistentes: [{ id: 1, valor: 20 }],

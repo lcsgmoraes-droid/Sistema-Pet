@@ -11,9 +11,8 @@
 import { useRef, useState } from "react";
 import CurrencyInput from "./CurrencyInput";
 import { formatBRL } from "../utils/formatters";
-import { calcularQuantidadePorSubtotal } from "../utils/pdvCarrinhoItensUtils";
 
-export default function SubtotalInput({ subtotal, precoUnitario, onQuantidadeChange, disabled }) {
+export default function SubtotalInput({ subtotal, precoUnitario, onSubtotalChange, disabled }) {
   const [valorDigitado, setValorDigitado] = useState(subtotal ?? 0);
   const [editando, setEditando] = useState(false);
   const cancelarEdicaoRef = useRef(false);
@@ -26,12 +25,10 @@ export default function SubtotalInput({ subtotal, precoUnitario, onQuantidadeCha
   };
 
   const handleBlur = () => {
-    const novaQuantidade = calcularQuantidadePorSubtotal(valorDigitado, precoUnitario);
-    if (!cancelarEdicaoRef.current && novaQuantidade !== null) {
-      onQuantidadeChange(novaQuantidade);
+    if (!cancelarEdicaoRef.current && valorDigitado > 0 && precoUnitario > 0) {
+      onSubtotalChange(valorDigitado);
     }
-    // Exibe o subtotal calculado com o peso que sera salvo, mesmo quando a
-    // quantidade nao mudou (ex.: digitar 29,00 novamente para o mesmo peso).
+    // O subtotal informado e preservado; somente o peso usa tres casas.
     setEditando(false);
   };
 

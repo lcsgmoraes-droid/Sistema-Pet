@@ -1,6 +1,8 @@
 from copy import deepcopy
 from types import SimpleNamespace
 
+import pytest
+
 from app.dre_canais.base import _snapshot_pronto
 from app.services.venda_rentabilidade_snapshot_service import (
     SNAPSHOT_VERSION,
@@ -323,3 +325,56 @@ def test_snapshot_preserva_taxa_aplicada_na_venda_mesmo_se_cadastro_mudar():
 
     assert snapshot["taxa_cartao"] == 2.99
     assert snapshot["venda_liquida"] == 97.01
+
+
+@pytest.mark.parametrize(
+    "desconto_item, desconto_venda, cupom", [(0, 0, 0), (1, 2, 1)]
+)
+def test_snapshot_preserva_valor_digitado_com_peso_arredondado_e_descontos(
+    desconto_item, desconto_venda, cupom
+):
+    item = SimpleNamespace(
+        produto_id=10,
+        quantidade=1.538,
+        preco_unitario=13,
+        subtotal=20 - desconto_item,
+        desconto_item=desconto_item,
+        produto=SimpleNamespace(nome="Racao a granel", preco_custo=5),
+    )
+    venda = SimpleNamespace(
+        id=128,
+        status="finalizada",
+        subtotal=item.subtotal,
+        desconto_valor=desconto_item + desconto_venda + cupom,
+        desconto_venda_valor=desconto_venda,
+        taxa_entrega=0,
+        valor_taxa_entregador=0,
+        cupom_code="CUPOM" if cupom else None,
+        cupom_discount_applied=cupom,
+        itens=[item],
+        pagamentos=[],
+    )
+
+    snapshot = build_venda_rentabilidade_snapshot(
+        venda,
+        db=SimpleNamespace(query=lambda *_args, **_kwargs: None),
+        tenant_id="tenant-qa",
+        impostos_percentual=0,
+        formas_pagamento_map={},
+        custo_campanha=cupom,
+        cupom_desconto=cupom,
+        comissao_total=0,
+        estoque_custos_por_produto={},
+    )
+
+    liquido = 20 - desconto_item - desconto_venda - cupom
+    assert snapshot["venda_bruta"] == 20
+    assert snapshot["venda_liquida"] == liquido
+    assert snapshot["custo_produtos"] == 7.69
+    assert snapshot["lucro"] == pytest.approx(liquido - 7.69)
+    linha = snapshot["itens"][0]
+    assert linha["venda_bruta"] == 20
+    assert linha["desconto"] == desconto_item + desconto_venda
+    assert linha["campanha"] == cupom
+    assert linha["valor_liquido"] == liquido
+    assert linha["lucro"] == snapshot["lucro"]

@@ -68,6 +68,7 @@ export function usePDVPageComposition({
   atualizarPetDoItem,
   atualizarProtocoloDoItem,
   atualizarQuantidadeItem,
+  atualizarSubtotalItem,
   handleBuscarProdutoChange,
   handleBuscarProdutoFocus,
   handleBuscarProdutoKeyDown,
@@ -280,6 +281,7 @@ export function usePDVPageComposition({
     onAtualizarPetItem: atualizarPetDoItem,
     onAtualizarProtocoloItem: atualizarProtocoloDoItem,
     onAtualizarQuantidadeItem: atualizarQuantidadeItem,
+    onAtualizarSubtotalItem: atualizarSubtotalItem,
     onAtualizarPrevisaoFimRacao: (itemIndex, previsao) =>
       setVendaAtual((prev) => ({
         ...prev,

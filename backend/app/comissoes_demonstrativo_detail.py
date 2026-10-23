@@ -6,6 +6,7 @@ from app.comissoes_demonstrativo_calculo import (
     montar_demonstrativo_calculo_comissao,
     round_money,
 )
+from app.services.venda_descontos import bruto_item
 
 
 def montar_detalhe_comissao_snapshot(r: Any) -> Dict[str, Any]:
@@ -23,8 +24,17 @@ def montar_detalhe_comissao_snapshot(r: Any) -> Dict[str, Any]:
         else None
     )
     valor_bruto_item = (
-        round_money(preco_unitario_item * quantidade_item)
-        if preco_unitario_item is not None and quantidade_item
+        float(
+            bruto_item(
+                {
+                    "quantidade": quantidade_item,
+                    "preco_unitario": preco_unitario_item,
+                    "subtotal": r.get("item_subtotal"),
+                    "desconto_item": r.get("item_desconto") or 0,
+                }
+            )
+        )
+        if preco_unitario_item is not None and quantidade_item > 0
         else round_money(valor_venda)
     )
     desconto_total_item = max(round_money(valor_bruto_item - valor_venda), 0.0)

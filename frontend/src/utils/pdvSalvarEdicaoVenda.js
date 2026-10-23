@@ -1,6 +1,6 @@
 import { obterTotalRecebidoExistente } from "../components/modalPagamentoUtils.js";
 import { normalizarDescontosVenda, obterDescontoItem } from "./pdvDescontosUtils.js";
-import { arredondarDinheiro } from "./pdvCarrinhoItensUtils.js";
+import { arredondarDinheiro, obterSubtotalBrutoItem } from "./pdvCarrinhoItensUtils.js";
 import { executarComJustificativaPagamento } from "./pagamentoExcedenteEdicao.js";
 
 function preservarMetodoDesconto(item, anteriores) {
@@ -11,7 +11,7 @@ function preservarMetodoDesconto(item, anteriores) {
     return { ...item, tipo_desconto_aplicado: "valor" };
   }
   const percentual = Number(anterior.desconto_percentual);
-  const bruto = arredondarDinheiro(Number(item.preco_unitario || 0) * Number(item.quantidade || 0));
+  const bruto = obterSubtotalBrutoItem(item);
   const esperado = arredondarDinheiro((bruto * percentual) / 100);
   if (
     anterior.tipo_desconto_aplicado === "percentual" &&

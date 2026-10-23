@@ -82,6 +82,7 @@ export default function PDVMainArea(props) {
     onAtualizarPetItem,
     onAtualizarProtocoloItem,
     onAtualizarQuantidadeItem,
+    onAtualizarSubtotalItem,
     onAtualizarPrevisaoFimRacao,
     onBuscarProdutoChange,
     onBuscarProdutoFocus,
@@ -274,6 +275,7 @@ export default function PDVMainArea(props) {
             onAtualizarPetItem={onAtualizarPetItem}
             onAtualizarProtocoloItem={onAtualizarProtocoloItem}
             onAtualizarQuantidadeItem={onAtualizarQuantidadeItem}
+            onAtualizarSubtotalItem={onAtualizarSubtotalItem}
             onAtualizarPrevisaoFimRacao={onAtualizarPrevisaoFimRacao}
             onBuscarProdutoChange={onBuscarProdutoChange}
             onBuscarProdutoFocus={onBuscarProdutoFocus}

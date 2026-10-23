@@ -26,11 +26,9 @@ export default function PDVDescontoItemModal({
     return null;
   }
 
-  const totalBruto = arredondarDinheiro(itemEditando.preco * itemEditando.quantidade);
-  const descontoCalculado = recalcularItemComPrecoEDesconto(
-    itemEditando,
-    itemEditando,
-  ).desconto_valor;
+  const itemCalculado = recalcularItemComPrecoEDesconto(itemEditando, itemEditando);
+  const descontoCalculado = itemCalculado.desconto_valor;
+  const totalBruto = arredondarDinheiro(itemCalculado.subtotal + descontoCalculado);
   const percentualEquivalente =
     itemEditando.tipoDesconto === "percentual"
       ? itemEditando.descontoPercentual

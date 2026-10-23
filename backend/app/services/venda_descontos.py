@@ -41,11 +41,40 @@ def quantidade_venda(valor: Any) -> Decimal:
     return quantidade
 
 
+def bruto_compativel_com_quantidade(item: Any, bruto: Any) -> bool:
+    """Prova que o valor informado gera o mesmo peso persistido em gramas.
+
+    A conversao inversa permite cobrar o valor digitado sem inventar desconto
+    ou aumentar a precisao do estoque. Subtotais arbitrarios nao sao aceitos:
+    a quantidade obtida do valor precisa coincidir apos arredondar para gramas.
+    """
+    quantidade = quantidade_venda(_campo(item, "quantidade", 0))
+    preco = moeda(_campo(item, "preco_unitario", 0))
+    bruto = moeda(bruto)
+    return (
+        preco > ZERO
+        and bruto > ZERO
+        and (bruto / preco).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+        == quantidade
+    )
+
+
 def bruto_item(item: Any) -> Decimal:
     quantidade = quantidade_venda(_campo(item, "quantidade", 0))
     preco = moeda(_campo(item, "preco_unitario", 0))
     if preco < 0:
         raise ValueError("Confira a quantidade e o preco dos itens da venda.")
+    subtotal = _campo(item, "subtotal")
+    if subtotal is not None:
+        subtotal = moeda(subtotal)
+        desconto = moeda(_campo(item, "desconto_item", 0))
+        informado = subtotal + desconto
+        if (
+            subtotal >= ZERO
+            and desconto >= ZERO
+            and bruto_compativel_com_quantidade(item, informado)
+        ):
+            return informado
     return moeda(quantidade * preco)
 
 
