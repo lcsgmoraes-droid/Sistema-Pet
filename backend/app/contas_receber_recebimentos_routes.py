@@ -244,21 +244,28 @@ async def registrar_recebimentos_lote(
                 quitar=True,
                 config=config,
             )
-            db.add(
-                Recebimento(
-                    conta_receber_id=conta.id,
-                    forma_pagamento_id=lote.forma_pagamento_id,
-                    valor_recebido=valor_baixa,
-                    data_recebimento=lote.data_recebimento,
-                    observacoes=lote.observacoes,
-                    user_id=current_user.id,
-                    tenant_id=tenant_id,
-                )
+            novo_recebimento = Recebimento(
+                conta_receber_id=conta.id,
+                forma_pagamento_id=lote.forma_pagamento_id,
+                valor_recebido=valor_baixa,
+                data_recebimento=lote.data_recebimento,
+                observacoes=lote.observacoes,
+                user_id=current_user.id,
+                tenant_id=tenant_id,
             )
+            db.add(novo_recebimento)
+            db.flush()
             resultados.append(
                 {
                     "conta_id": conta.id,
                     "valor_recebido": float(valor_baixa),
+                    "recebimento": {
+                        "id": novo_recebimento.id,
+                        "valor": float(novo_recebimento.valor_recebido),
+                        "data": novo_recebimento.data_recebimento.isoformat(),
+                        "forma_pagamento_id": novo_recebimento.forma_pagamento_id,
+                        "observacoes": novo_recebimento.observacoes,
+                    },
                     "juros_aplicados": (
                         float(calculo["valor_juros_calculado"])
                         if lote.aplicar_encargos_automaticos

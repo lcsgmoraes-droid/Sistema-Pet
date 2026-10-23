@@ -73,9 +73,12 @@ def pagar(caso, registro, valor, **extras):
     )
 
 
-def lote(caso, registros):
+def lote(caso, registros, **extras):
     dados = RecebimentoLoteCreate(
-        conta_ids=[c.id for c in registros], data_recebimento=DIA, forma_pagamento_id=1
+        conta_ids=[c.id for c in registros],
+        data_recebimento=DIA,
+        forma_pagamento_id=1,
+        **extras,
     )
     return asyncio.run(
         rotas.registrar_recebimentos_lote.__wrapped__(dados, None, caso.db, caso.auth)
@@ -130,8 +133,45 @@ def test_lote_soma_duas_contas_da_mesma_venda_e_e_atomico(caso):
 
 def test_lote_duas_contas_da_mesma_venda_aceita_total_correto(caso):
     primeira, segunda = conta(caso, 60), conta(caso, 40)
-    assert lote(caso, [segunda, primeira])["valor_total"] == 100
-    assert caso.db.query(Recebimento).count() == 2
+    resultado = lote(caso, [segunda, primeira], observacoes="Pagamento no balcão")
+    assert resultado["valor_total"] == 100
+    recebimentos = {r.conta_receber_id: r for r in caso.db.query(Recebimento).all()}
+    assert len(recebimentos) == 2
+    assert [item["conta_id"] for item in resultado["itens"]] == [
+        segunda.id,
+        primeira.id,
+    ]
+    for item in resultado["itens"]:
+        salvo = recebimentos[item["conta_id"]]
+        assert item["recebimento"] == {
+            "id": salvo.id,
+            "valor": float(salvo.valor_recebido),
+            "data": DIA.isoformat(),
+            "forma_pagamento_id": 1,
+            "observacoes": "Pagamento no balcão",
+        }
+        assert salvo.tenant_id == caso.tenant
+
+
+def test_lote_falha_no_segundo_recibo_reverte_todas_as_baixas(caso):
+    primeira, segunda = conta(caso, 60), conta(caso, 40)
+
+    def falhar_no_segundo(_mapper, _connection, recebimento):
+        if recebimento.conta_receber_id == segunda.id:
+            raise RuntimeError("Falha ao gravar o segundo recibo")
+
+    event.listen(Recebimento, "before_insert", falhar_no_segundo)
+    try:
+        with pytest.raises(RuntimeError, match="segundo recibo"):
+            lote(caso, [primeira, segunda])
+    finally:
+        event.remove(Recebimento, "before_insert", falhar_no_segundo)
+
+    caso.db.refresh(primeira)
+    caso.db.refresh(segunda)
+    assert primeira.valor_recebido == segunda.valor_recebido == 0
+    assert primeira.status == segunda.status == "pendente"
+    assert caso.db.query(Recebimento).count() == 0
 
 
 def test_lote_com_conta_invalida_nao_altera_a_primeira(caso):
