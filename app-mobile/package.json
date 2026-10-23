@@ -66,6 +66,9 @@
   },
   "private": true,
   "overrides": {
+    "@expo/cli": {
+      "zod": "4.6.6"
+    },
     "babel-plugin-module-resolver": {
       ".": "$babel-plugin-module-resolver",
       "glob": "13.0.6"
