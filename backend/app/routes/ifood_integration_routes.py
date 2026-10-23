@@ -309,7 +309,7 @@ def _catalog_response(
 ) -> dict[str, Any]:
     eligible = [item for item in items if item.eligible]
     rejected = [item for item in items if not item.eligible]
-    selected = rejected if only_issues else items
+    selected = rejected if only_issues else eligible + rejected
     error_counts = Counter(error for item in rejected for error in item.errors)
     warning_counts = Counter(warning for item in items for warning in item.warnings)
     return {
