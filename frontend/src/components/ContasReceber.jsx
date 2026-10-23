@@ -92,7 +92,8 @@ const ContasReceber = () => {
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
   const [contasSelecionadas, setContasSelecionadas] = useState(() => new Set());
   const [calculoEncargos, setCalculoEncargos] = useState(null);
-  const [comprovanteRecebimento, setComprovanteRecebimento] = useState(null);
+  const [comprovantesRecebimento, setComprovantesRecebimento] = useState([]);
+  const [perguntarImpressao, setPerguntarImpressao] = useState(false);
   const [formasPagamento, setFormasPagamento] = useState([]);
   const [contasBancarias, setContasBancarias] = useState([]);
 
@@ -173,9 +174,9 @@ const ContasReceber = () => {
     }
   }, [busca]);
 
-  const carregarDados = async () => {
+  const carregarDados = async ({ mostrarLoading = true } = {}) => {
     try {
-      setLoading(true);
+      if (mostrarLoading) setLoading(true);
       const token = getAccessToken();
       const headers = { Authorization: `Bearer ${token}` };
       const contasRes = await api.get(
@@ -191,7 +192,7 @@ const ContasReceber = () => {
       console.error("Erro ao carregar dados:", error);
       toast.error("Erro ao carregar contas a receber");
     } finally {
-      setLoading(false);
+      if (mostrarLoading) setLoading(false);
     }
   };
 
@@ -378,7 +379,7 @@ const ContasReceber = () => {
         dadosRecebimento,
       );
 
-      setComprovanteRecebimento(
+      setComprovantesRecebimento([
         montarDadosComprovanteRecebimento({
           conta: contaSelecionada,
           formasPagamento,
@@ -395,11 +396,12 @@ const ContasReceber = () => {
           },
           saldoRestante: response.data?.saldo_restante,
         }),
-      );
+      ]);
+      setPerguntarImpressao(true);
 
       toast.success("Recebimento registrado com sucesso!");
       setMostrarModalRecebimento(false);
-      carregarDados();
+      void carregarDados({ mostrarLoading: false });
     } catch (error) {
       console.error("Erro ao registrar recebimento:", error);
       toast.error(error.response?.data?.detail || "Erro ao registrar recebimento");
@@ -442,10 +444,23 @@ const ContasReceber = () => {
         ...dadosRecebimentoLote,
         conta_ids: contasSelecionadasDetalhes.map((conta) => conta.id),
       });
+      setComprovantesRecebimento(
+        safeArray(response.data?.itens).map((item) =>
+          montarDadosComprovanteRecebimento({
+            conta: contasSelecionadasDetalhes.find(
+              (conta) => Number(conta.id) === Number(item.conta_id),
+            ),
+            formasPagamento,
+            recebimento: item.recebimento,
+            saldoRestante: 0,
+          }),
+        ),
+      );
+      setPerguntarImpressao(true);
       toast.success(response.data?.message || "Parcelas recebidas com sucesso!");
       setMostrarModalRecebimentoLote(false);
       setContasSelecionadas(new Set());
-      await carregarDados();
+      void carregarDados({ mostrarLoading: false });
     } catch (error) {
       console.error("Erro ao receber parcelas em lote:", error);
       toast.error(error.response?.data?.detail || "Erro ao receber parcelas selecionadas");
@@ -453,14 +468,15 @@ const ContasReceber = () => {
   };
 
   const emitirComprovanteHistorico = (recebimento) => {
-    setComprovanteRecebimento(
+    setComprovantesRecebimento([
       montarDadosComprovanteRecebimento({
         conta: contaSelecionada,
         detalhes: detalhesCompletos,
         formasPagamento,
         recebimento,
       }),
-    );
+    ]);
+    setPerguntarImpressao(false);
   };
 
   const formatarData = (data) => {
@@ -842,8 +858,9 @@ const ContasReceber = () => {
         setMostrarDetalhes={setMostrarDetalhes}
       />
       <ComprovanteRecebimentoModal
-        comprovante={comprovanteRecebimento}
-        onClose={() => setComprovanteRecebimento(null)}
+        comprovantes={comprovantesRecebimento}
+        perguntarImpressao={perguntarImpressao}
+        onClose={() => setComprovantesRecebimento([])}
       />
     </div>
   );
