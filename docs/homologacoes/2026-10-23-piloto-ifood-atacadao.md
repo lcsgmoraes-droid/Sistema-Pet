@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Data | 23/10/2026, horário de Brasília |
-| Situação | Conexão de produção validada e SKU piloto Pronto para envio; empresa desativada; correção da prévia implementada e testada somente em DEV, revisão final e conferência visual pendentes |
+| Situação | Conexão de produção validada e SKU piloto Pronto para envio; empresa desativada; correção da prévia aprovada no gate, revisão e visual DEV, ainda não aplicada em produção |
 | Escopo | Jornada de implantação e conferência do SKU `018631.1` |
 | CorePet | Empresa Atacadão das Rações Pet |
 | iFood | Loja Atacadão das Rações Avenida Brasil |
@@ -35,9 +35,10 @@ originais ficam fora do Git.
 | Credenciais do aplicativo | Produção | Manutenção autorizada executada, sem deploy de código por essa ação |
 | Autorização e conexão do ERP | Produção | Autorização concluída e teste de conexão bem-sucedido; configuração da empresa desativada |
 | Seleção do piloto | Produção | Somente intenção local do SKU salva; nenhum anúncio enviado |
-| Correção de código da prévia | DEV | Implementada com testes automatizados aprovados; revisão e checks finais em andamento |
-| Conferência visual da prévia corrigida | Ainda não concluída | Não foi comprovada na interface com a correção |
+| Correção de código da prévia | DEV | Implementada; testes focados, gate completo e revisão independente aprovados |
+| Conferência visual da prévia corrigida | DEV isolado, dados fictícios | Produto apto no início da prévia e selecionado, mesmo após catálogo grande de rejeitados |
 | Publicação da correção da prévia | Produção | Não aplicada |
+| Integração financeira | Ainda não implementada | Financial e apuração posterior das cobranças continuam pendentes |
 
 ## Observações confirmadas até o momento
 
@@ -185,11 +186,38 @@ originais ficam fora do Git.
     **91 testes iFood passaram**, incluindo oito casos novos e doze casos no
     arquivo de contratos alterado. A cobertura inclui catálogo grande, limites,
     filtro, resultado vazio e ordem dos grupos.
-35. Revisão e checks finais ainda estão em andamento. A correção da prévia
-    **não foi aplicada em produção nem conferida visualmente na interface**.
-    A manutenção de credenciais e o teste de conexão de produção já concluídos
-    não devem ser confundidos com essa correção de código ainda restrita ao DEV.
-    Nenhum anúncio foi enviado.
+35. A revisão técnica independente terminou **sem achados** e as verificações
+    de lint e formato Ruff passaram. O gate completo **FLUXO_UNICO release-check**
+    terminou com **exit 0**, no commit `d42fbfacb`: 274 testes de faturamento,
+    131 de billing, 91 iFood, 203 root, 769 multitenant, 58 frontend iFood e 104
+    mobile, com os skips esperados registrados pelo gate (6/2/22). Lint, formato,
+    build, auditorias e typecheck mobile passaram. No mesmo commit
+    `d42fbfacb`, os **11 checks do PR 1549 foram aprovados**.
+36. A conferência visual foi realizada no **DEV isolado da porta 18083**, com
+    empresa e produtos fictícios. O catálogo continha 61 produtos: 60 rejeitados
+    antes de um único apto, identificado na massa fictícia como produto 61. Na
+    prévia com limite de 50, o apto apareceu primeiro e selecionado. As consultas
+    de API com limites 1, 50 e 200 e o filtro `only_issues` também passaram.
+37. O dry-run legado retornou **403** para o usuário fictício sem a flag global
+    `is_admin`. Não foram alteradas permissões para contornar essa proteção.
+    O DEV usou credenciais vazias, flags iFood desabilitadas e rede interna;
+    nenhuma operação externa foi executada.
+38. A correção da prévia **ainda não foi aplicada em produção**. A manutenção de
+    credenciais e o teste de conexão de produção já concluídos são etapas
+    distintas da correção de código validada em DEV. Nenhum anúncio foi enviado.
+39. Após a dúvida do usuário sobre taxas e resultado financeiro, ficou
+    registrada uma pendência separada: a integração atual não utiliza
+    **Financial**. A documentação oficial confirma o módulo para Groceries e
+    sua homologação em processo separado dos módulos operacionais. A proposta
+    futura é distinguir estimativa antes da venda de apuração depois, reunindo
+    cobranças efetivas do iFood e os custos correspondentes do ERP. Nada dessa
+    apuração foi implementado ou validado neste piloto, e nenhum dado financeiro
+    privado foi copiado.
+40. Foi consultado **somente em leitura** o Financeiro de setembro no Portal do
+    Parceiro. A consulta permitiu distinguir componentes de comissão, pagamento,
+    promoção custeada pela loja e taxas cobradas ao consumidor, sem reproduzir
+    valores neste documento. Isso comprova a disponibilidade **manual no Portal**,
+    não o recebimento desses dados por API no CorePet.
 
 ## Registro incremental da jornada
 
@@ -226,13 +254,16 @@ originais ficam fora do Git.
 | Conferir orientação de rentabilidade | Central do iFood | Taxas desconhecidas mantêm uma orientação e contribuição Não calculada | Consulta | Nenhuma contribuição estimada comprovada |
 | Conferir prévia de um item | Configurações → Integrações → iFood → Conferir produtos | Contador indica um pronto; lista limitada sem SKU piloto e com seleção desabilitada | Consulta; nenhum envio de produto | Problema na ordem entre limite e prioridade dos aptos; correção em DEV |
 | Corrigir prévia | DEV, branch codex/ifood-piloto-publicacao | Produtos aptos antes do limite, preservando grupos e filtro de pendências | Somente código DEV; nenhuma aplicação em produção | Implementado; 91 testes iFood aprovados, incluindo oito novos e doze no arquivo alterado |
-| Revisar e concluir checks da correção | DEV | Revisão e checks finais em andamento | Nenhum envio | Pendente de conclusão |
-| Conferir visualmente a prévia corrigida | Interface com a correção | Ainda não realizada | Não executado | Não confundir com teste de conexão já validado em produção |
+| Revisar e concluir checks da correção | DEV e PR 1549, commit d42fbfacb | Revisão independente sem achados, Ruff, gate completo e 11 checks do PR aprovados | Nenhum envio | Concluído; release-check exit 0 |
+| Conferir visualmente a prévia corrigida | DEV isolado 18083, empresa fictícia | Único apto apareceu primeiro e selecionado na prévia de 50, após 60 rejeitados na massa | Somente dados fictícios e rede interna | Comprovado; APIs de limites 1/50/200 e filtro only_issues também aprovadas |
+| Conferir limite de permissão do dry-run | DEV isolado, usuário fictício | Dry-run legado negado com 403 por ausência da flag global is_admin | Permissões preservadas; nenhum envio | Não tratado como dry-run concluído nem como falha da correção da prévia |
 | Publicar correção da prévia | Produção | Ainda não aplicada | Não executado | Produção mantém a limitação observada; sem envio de anúncios |
 | Vincular produto existente | Fluxo ainda em validação | Nenhum vínculo criado | Não executado | Pendente |
 | Solicitar envio de um item | Fluxo ainda em validação | Nenhuma solicitação enviada | Não executado | Pendente |
 | Conferir publicação | CorePet, Portal e canal iFood | Nenhuma publicação conferida neste piloto | Não executado | Pendente |
 | Validar estoque integrado | CorePet e iFood | Nenhum ciclo de atualização conferido | Não executado | Pendente |
+| Planejar apuração financeira | Integração futura Financial | Separar estimativa de contribuição e apuração das cobranças efetivas com custos ERP | Nenhuma implementação ou cópia de dados financeiros privados | Pendente; exige escopo, implementação e homologação próprios |
+| Consultar financeiro manual | Portal do Parceiro → Financeiro, setembro | Componentes de comissão, pagamento, promoção da loja e taxas ao consumidor distinguidos | Somente leitura; valores não reproduzidos | Disponibilidade manual comprovada; nenhuma integração Financial por API no CorePet |
 
 ## Inventário de evidências locais
 
@@ -248,6 +279,7 @@ originais ficam fora do Git.
 | `2026-10-23-ifood-credentials-maintenance.jsonl` | Registro operacional da manutenção, fora do Git | Diagnóstico e manutenção autorizados, sem valores de credenciais | Registro restrito; conteúdo não reproduzido neste documento |
 | `2026-10-23-ifood-corepet-conexao-validada.png` | Captura da navegação assistida, fora do Git | Selo e mensagem de conexão validada após a correção | Evidência operacional; revisar e anonimizar antes de qualquer uso público |
 | `2026-10-23-ifood-sku018631-pronto-local.png` | Captura da navegação assistida, fora do Git | SKU piloto selecionado localmente e Pronto para envio | Evidência operacional; revisar e anonimizar antes de qualquer uso público |
+| `2026-10-23-ifood-previa-prioridade-dev.png` | Captura da conferência visual no DEV isolado, fora do Git | Produto fictício apto priorizado e selecionado na prévia limitada | Dados fictícios; sem credenciais ou envio externo |
 
 As demais observações foram relatadas durante a navegação assistida. Nenhum
 nome de captura é considerado existente sem o arquivo correspondente. Acrescentar
@@ -293,8 +325,10 @@ arquivos originais neste repositório.
   contribuição.
 - [x] Implementar e testar em DEV a priorização de produtos aptos antes do
   limite, preservando grupos e filtro de pendências; 91 testes iFood aprovados.
-- [ ] Concluir revisão e checks finais da correção da prévia.
-- [ ] Conferir visualmente a prévia usando a versão corrigida.
+- [x] Concluir revisão independente, lint/formato e gate completo da correção,
+  aprovado no commit d42fbfacb, com os 11 checks do PR 1549 aprovados.
+- [x] Conferir visualmente a prévia corrigida no DEV isolado e com dados
+  fictícios, preservando as permissões e sem operação externa.
 - [ ] Publicar a correção da prévia somente após as validações e autorização
   aplicáveis; nenhuma aplicação em produção até este registro.
 - [ ] Confirmar as permissões e a homologação efetivas do módulo necessário ao
@@ -309,6 +343,33 @@ arquivos originais neste repositório.
 - [ ] Distinguir solicitação aceita de publicação conferida.
 - [ ] Validar estoque e demais rotinas em etapas próprias antes de automatizar
   os itens já publicados.
+- [ ] Definir o escopo de Financial e a apuração posterior das cobranças do
+  iFood com os custos ERP, sem confundir essa etapa futura com a margem estimada.
+
+## Pendência de integração financeira
+
+O piloto operacional atual não inclui o módulo **Financial**. A autorização do
+aplicativo e a preparação de catálogo não comprovam acesso a conciliação,
+taxas efetivas ou repasses. As taxas ainda desconhecidas não foram preenchidas
+com valores inventados.
+
+A consulta somente leitura ao Financeiro de setembro no Portal permitiu separar
+os componentes de comissão, pagamento, promoção custeada pela loja e cobranças
+ao consumidor. Nenhum valor é reproduzido aqui. A consulta manual não é evidência
+de importação, conciliação ou apuração automática pelo CorePet.
+
+As referências oficiais consultadas em 23/10/2026 confirmam Financial para
+Groceries e homologação separada dos módulos operacionais:
+
+- [Categorias e módulos disponíveis](https://developer.ifood.com.br/en-US/docs/getting-started/homologation/categories).
+- [Homologação do módulo Financial](https://developer.ifood.com.br/en-US/docs/food/guides/modules/financial/homologation).
+
+A proposta registrada é **contribuição estimada antes da venda** e **apuração
+depois da venda**, combinando cobranças efetivas do iFood com os custos ERP
+correspondentes, sem duplicar componentes ou tratar repasse como margem. Essa
+proposta exige definição e validação próprias; não constitui funcionalidade
+entregue neste piloto. Nenhum valor financeiro real ou extrato privado foi
+incluído neste documento.
 
 ## Aprendizados para a Central de Ajuda
 

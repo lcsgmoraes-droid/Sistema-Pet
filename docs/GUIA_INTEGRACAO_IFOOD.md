@@ -206,11 +206,11 @@ Antes do primeiro envio, a prévia deverá identificar um único produto, a loja
 a situação de vínculo, os campos que serão enviados e os valores antes e depois.
 As informações que não fazem parte do teste devem ser preservadas.
 
-**Prévia ainda em validação.** A conexão bem-sucedida já foi observada em
-produção, mas a correção da listagem da prévia foi implementada e testada somente
-em DEV. A conferência visual da correção e sua aplicação em produção ainda não
-foram concluídas. Este rascunho não apresenta o preparo da prévia nem o envio
-como etapas finalizadas e não fornece passos de publicação ainda não validados.
+**Prévia corrigida e conferida somente em DEV.** A conexão bem-sucedida já foi
+observada em produção. A correção da listagem passou nos testes, na revisão e
+na conferência visual com dados fictícios, mas ainda não foi aplicada em
+produção. Este rascunho não apresenta a prévia de produção nem o envio como
+etapas finalizadas e não fornece passos de publicação ainda não validados.
 
 Para um item novo, confirme antes que ele realmente não existe no catálogo.
 Para um item publicado, conclua a correspondência antes de atualizar. O piloto
@@ -241,6 +241,28 @@ como status na interface atual.
 Depois da primeira publicação validada, poderão ser testados estoque, pausa,
 reativação e promoções. A entrada de pedidos e a baixa de estoque por venda
 também exigem validação própria antes de serem consideradas automáticas.
+
+## Contribuição estimada e apuração financeira futura
+
+A integração atual não consulta o módulo **Financial** do iFood. A contribuição
+da calculadora é uma estimativa com as premissas informadas; não é a conferência
+das taxas efetivamente cobradas ou do repasse.
+
+Os dados financeiros podem ser consultados manualmente no Portal do Parceiro.
+Essa disponibilidade no Portal não significa que o CorePet já os receba por API
+ou os inclua automaticamente na apuração.
+
+A documentação oficial prevê **Financial** para Groceries e exige sua
+homologação separada dos módulos operacionais. Essa é uma etapa própria de
+integração, ainda pendente no CorePet. [Categorias e módulos do
+iFood](https://developer.ifood.com.br/en-US/docs/getting-started/homologation/categories),
+[homologação de
+Financial](https://developer.ifood.com.br/en-US/docs/food/guides/modules/financial/homologation).
+
+A proposta para uma fase futura é separar **estimativa antes da venda** de
+**apuração depois da venda**, combinando as cobranças efetivas do iFood com os
+custos correspondentes do ERP. Essa apuração ainda não está implementada nem
+validada; este guia não apresenta ações para executá-la.
 
 ## Teste inicial e checklist
 
