@@ -3,10 +3,12 @@
  * Cada modulo tem preview interativo + argumentos de ROI para converter.
  */
 import { useEffect } from "react";
+import { RefreshCw, WifiOff } from "lucide-react";
 import { FiCheckCircle, FiHelpCircle, FiLock, FiMessageCircle, FiTrendingUp } from "react-icons/fi";
 import { Link } from "react-router-dom";
 import { MODULOS_INFO, useModulos } from "../contexts/ModulosContext";
 import { PREVIEWS } from "./moduloBloqueado/ModuloBloqueadoPreviews";
+import BotaoInteracao from "./v2/BotaoInteracao/BotaoInteracao";
 
 const WHATSAPP_NUMERO = "5518997401641";
 
@@ -218,6 +220,9 @@ function getBeneficiosPorSecao(modulo, beneficios) {
 const ModuloBloqueado = ({ modulo, children }) => {
   const {
     assinaturaAtual,
+    erroCarregamento,
+    carregandoModulos,
+    carregarModulos,
     moduloAtivo,
     modulosAtivos,
     moduloBetaPublico,
@@ -226,7 +231,7 @@ const ModuloBloqueado = ({ modulo, children }) => {
 
   // Registrar tentativa de acesso a módulo bloqueado (tracking leve)
   useEffect(() => {
-    if (modulosAtivos !== null && !moduloAtivo(modulo)) {
+    if (!erroCarregamento && modulosAtivos !== null && !moduloAtivo(modulo)) {
       // Evento local — pode ser expandido para analytics no futuro
       try {
         const tentativas = JSON.parse(sessionStorage.getItem("modulos_tentativas") || "{}");
@@ -236,13 +241,7 @@ const ModuloBloqueado = ({ modulo, children }) => {
         // Silencioso — não bloqueia a UI
       }
     }
-  }, [modulo, moduloAtivo, modulosAtivos]);
-
-  // Enquanto carrega status dos modulos, nao monta filhos premium.
-  // Isso evita chamadas de API antes de confirmar que o tenant tem acesso.
-  if (modulosAtivos === null) {
-    return <div className="min-h-[240px]" aria-hidden="true" />;
-  }
+  }, [erroCarregamento, modulo, moduloAtivo, modulosAtivos]);
 
   if (assinaturaAtual?.acesso_operacional_ativo === false) {
     return (
@@ -259,6 +258,29 @@ const ModuloBloqueado = ({ modulo, children }) => {
         </Link>
       </div>
     );
+  }
+
+  if (erroCarregamento && !moduloAtivo(modulo)) {
+    return (
+      <div className="mx-auto max-w-2xl p-6 text-center" role="status">
+        <WifiOff className="mx-auto h-8 w-8 text-slate-500 dark:text-slate-400" />
+        <h2 className="mt-4 text-xl font-bold text-slate-900 dark:text-slate-100">
+          Não foi possível confirmar o acesso
+        </h2>
+        <p className="mt-2 mb-4 text-sm text-slate-600 dark:text-slate-300">
+          Não conseguimos consultar os recursos da empresa. Tente novamente em instantes.
+        </p>
+        <BotaoInteracao icon={RefreshCw} loading={carregandoModulos} onClick={carregarModulos}>
+          Tentar novamente
+        </BotaoInteracao>
+      </div>
+    );
+  }
+
+  // Enquanto carrega status dos modulos, nao monta filhos premium.
+  // Isso evita chamadas de API antes de confirmar que o tenant tem acesso.
+  if (modulosAtivos === null) {
+    return <div className="min-h-[240px]" aria-hidden="true" />;
   }
 
   if (moduloAtivo(modulo)) {

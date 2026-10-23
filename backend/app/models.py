@@ -643,6 +643,10 @@ class Tenant(Base):
     trial_ends_at = Column(DateTime(timezone=True), nullable=True)
     subscription_activated_at = Column(DateTime(timezone=True), nullable=True)
     subscription_source = Column(String(50), nullable=False, server_default="manual")
+    # Concessao operacional explicita; nao representa pagamento nem altera o trial.
+    manual_full_access = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     billing_provider_environment = Column(String(20), nullable=True)
     billing_provider_customer_id = Column(String(80), nullable=True, index=True)
     billing_provider_subscription_id = Column(String(80), nullable=True, index=True)

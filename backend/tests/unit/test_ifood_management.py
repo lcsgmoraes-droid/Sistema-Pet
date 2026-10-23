@@ -675,14 +675,18 @@ def test_ifood_existing_revision_merges_with_current_main_without_reapplying_it(
     alembic_config = Config(str(backend / "alembic.ini"))
     alembic_config.set_main_option("script_location", str(backend / "alembic"))
     script = ScriptDirectory.from_config(alembic_config)
-    assert script.get_heads() == ["zzzzm20261020a1"]
+    heads = script.get_heads()
+    assert len(heads) == 1
+    assert "zzzzm20261020a1" in {
+        revision.revision for revision in script.walk_revisions(head=heads[0])
+    }
     assert script.get_revision("zzzzg20261019a1").down_revision == "zzzzf20261019a1"
     assert script.get_revision("zzzzl20261020a1").down_revision == "zzzzk20261020a1"
     assert script.get_revision("zzzzm20261020a1").down_revision == (
         "zzzzg20261019a1",
         "zzzzl20261020a1",
     )
-    steps = script._upgrade_revs("head", "zzzzg20261019a1")
+    steps = script._upgrade_revs("zzzzm20261020a1", "zzzzg20261019a1")
     revisions = {step.revision.revision for step in steps}
     assert revisions == {
         "zzzzh20261019a1",
@@ -707,7 +711,9 @@ def test_ifood_existing_revision_merges_with_current_main_without_reapplying_it(
                 revisions_on_disk.append(ast.literal_eval(node.value))
     assert len(revisions_on_disk) == len(set(revisions_on_disk))
     # Um banco com g+k ja aplicados ainda precisa do DDL fiscal l, uma vez.
-    steps = script._upgrade_revs("head", ("zzzzg20261019a1", "zzzzk20261020a1"))
+    steps = script._upgrade_revs(
+        "zzzzm20261020a1", ("zzzzg20261019a1", "zzzzk20261020a1")
+    )
     assert [step.revision.revision for step in steps] == [
         "zzzzl20261020a1",
         "zzzzm20261020a1",

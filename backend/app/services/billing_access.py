@@ -23,6 +23,13 @@ def operational_access_allowed(tenant: object) -> bool:
     return status in {"active", "ativo"}
 
 
+def manual_full_access_allowed(tenant: object) -> bool:
+    """Concessao sem vencimento; suspensao cadastral continua soberana."""
+    return getattr(
+        tenant, "manual_full_access", False
+    ) is True and operational_access_allowed(tenant)
+
+
 def trial_access_preserved(tenant: object, now: datetime | None = None) -> bool:
     """O fim do teste encaminha revisao, sem retirar recursos em uso."""
     if not operational_access_allowed(tenant):

@@ -54,6 +54,15 @@ function getStatusInfo(assinatura) {
     };
   }
 
+  if (assinatura?.acesso_completo_manual === true) {
+    return {
+      label: "Acesso completo liberado",
+      tone: "emerald",
+      icon: ShieldCheck,
+      text: "A equipe CorePet liberou o acesso completo, sem vencimento de acesso. Cobranças e pagamentos continuam registrados separadamente.",
+    };
+  }
+
   if (assinatura?.acesso_completo_durante_trial) {
     return {
       label: "Experiencia completa em andamento",
@@ -183,7 +192,8 @@ export default function MeuPlano() {
     "Olá! Quero escolher meu plano do CorePet após o período de acesso completo.",
   );
   const msgBeta = encodeURIComponent("Olá! Quero ajuda para escolher meu plano do CorePet.");
-  const emTrial = Boolean(assinaturaAtual?.acesso_completo_durante_trial);
+  const acessoCompletoManual = assinaturaAtual?.acesso_completo_manual === true;
+  const emTrial = !acessoCompletoManual && Boolean(assinaturaAtual?.acesso_completo_durante_trial);
   const podeContratarNfse = ["veterinario", "banho_tosa"].some((modulo) =>
     (modulosAtivos || []).includes(modulo),
   );
@@ -240,8 +250,9 @@ export default function MeuPlano() {
             <p className="text-sm font-bold uppercase text-emerald-700">Assinatura</p>
             <h1 className="mt-1 text-2xl font-extrabold text-slate-950 md:text-3xl">Meu Plano</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-              A contratação inicial é assistida: você conhece todo o CorePet por 30 dias e nossa
-              equipe ajuda a escolher o melhor plano para continuar.
+              {acessoCompletoManual
+                ? "Sua empresa tem acesso completo liberado pela equipe CorePet, sem vencimento de acesso. Os dados de cobrança continuam disponíveis nesta página."
+                : "A contratação inicial é assistida: você conhece todo o CorePet por 30 dias e nossa equipe ajuda a escolher o melhor plano para continuar."}
             </p>
           </div>
           <button
@@ -268,7 +279,11 @@ export default function MeuPlano() {
                   {statusInfo.label}
                 </span>
                 <h2 className="mt-4 text-xl font-extrabold text-slate-950">
-                  {emTrial ? "Experiência CorePet Completa" : planoAtual || "Plano contratado"}
+                  {acessoCompletoManual
+                    ? "Acesso completo por liberação manual"
+                    : emTrial
+                      ? "Experiência CorePet Completa"
+                      : planoAtual || "Plano contratado"}
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{statusInfo.text}</p>
               </div>
@@ -283,17 +298,23 @@ export default function MeuPlano() {
                 <p className="mt-1 text-lg font-bold text-slate-950">{planoAtual || "basico"}</p>
               </div>
               <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-bold uppercase text-slate-500">Trial</p>
+                <p className="text-xs font-bold uppercase text-slate-500">
+                  {acessoCompletoManual ? "Acesso" : "Trial"}
+                </p>
                 <p className="mt-1 text-lg font-bold text-slate-950">
-                  {diasRestantes == null
-                    ? `${trialPadrao?.dias || 30} dias`
-                    : `${diasRestantes} dia(s)`}
+                  {acessoCompletoManual
+                    ? "Completo"
+                    : diasRestantes == null
+                      ? `${trialPadrao?.dias || 30} dias`
+                      : `${diasRestantes} dia(s)`}
                 </p>
               </div>
               <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-bold uppercase text-slate-500">Fim do trial</p>
+                <p className="text-xs font-bold uppercase text-slate-500">
+                  {acessoCompletoManual ? "Validade do acesso" : "Fim do trial"}
+                </p>
                 <p className="mt-1 text-lg font-bold text-slate-950">
-                  {formatDate(assinaturaAtual?.trial_fim)}
+                  {acessoCompletoManual ? "Sem vencimento" : formatDate(assinaturaAtual?.trial_fim)}
                 </p>
               </div>
             </div>
@@ -338,7 +359,9 @@ export default function MeuPlano() {
               <p className="mt-2 text-xs leading-5 text-slate-500">
                 {hasCustomOffer
                   ? "Esta empresa possui uma condicao comercial personalizada aceita. Fale com a equipe CorePet para alterar o pacote."
-                  : "O primeiro vencimento respeita o fim dos seus 30 dias de experiencia completa."}
+                  : acessoCompletoManual
+                    ? "A liberação de acesso não altera vencimentos nem substitui a contratação do plano."
+                    : "O primeiro vencimento respeita o fim dos seus 30 dias de experiencia completa."}
               </p>
             </div>
 
@@ -490,20 +513,29 @@ export default function MeuPlano() {
               <div>
                 <h2 className="font-bold text-slate-950">Pagamento seguro pelo Asaas</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  O pagamento acontece na pagina protegida do Asaas. Boleto, Pix e as opcoes
-                  disponiveis ficam fora do CorePet, e a liberacao ocorre automaticamente apos a
-                  confirmacao.
+                  {acessoCompletoManual
+                    ? "O pagamento acontece na página protegida do Asaas. Boleto, Pix e as opções disponíveis ficam fora do CorePet. A liberação manual de acesso não altera os registros de cobrança."
+                    : "O pagamento acontece na pagina protegida do Asaas. Boleto, Pix e as opcoes disponiveis ficam fora do CorePet, e a liberacao ocorre automaticamente apos a confirmacao."}
                 </p>
               </div>
             </div>
             <div className="mt-5 rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
               <p className="font-semibold text-slate-800">Como funciona</p>
-              <ol className="mt-3 space-y-2">
-                <li>1. Criar a empresa e receber 30 dias completos.</li>
-                <li>2. Conhecer os módulos com acompanhamento humano.</li>
-                <li>3. Escolher o plano ideal com nossa equipe.</li>
-                <li>4. Pagar com seguranca e ter a liberacao automatica.</li>
-              </ol>
+              {acessoCompletoManual ? (
+                <ol className="mt-3 space-y-2">
+                  <li>1. O acesso completo foi liberado pela equipe CorePet.</li>
+                  <li>2. A liberação não tem vencimento de acesso.</li>
+                  <li>3. Cobranças e comprovantes continuam registrados.</li>
+                  <li>4. Nossa equipe ajuda na escolha do plano.</li>
+                </ol>
+              ) : (
+                <ol className="mt-3 space-y-2">
+                  <li>1. Criar a empresa e receber 30 dias completos.</li>
+                  <li>2. Conhecer os módulos com acompanhamento humano.</li>
+                  <li>3. Escolher o plano ideal com nossa equipe.</li>
+                  <li>4. Pagar com seguranca e ter a liberacao automatica.</li>
+                </ol>
+              )}
             </div>
           </aside>
         </section>
@@ -553,13 +585,18 @@ export default function MeuPlano() {
         <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-sm font-bold uppercase text-violet-700">Experiência completa</p>
+              <p className="text-sm font-bold uppercase text-violet-700">
+                {acessoCompletoManual ? "Módulos liberados" : "Experiência completa"}
+              </p>
               <h2 className="mt-1 text-xl font-extrabold text-slate-950">
-                Conheça os módulos antes de escolher
+                {acessoCompletoManual
+                  ? "Acesso completo para sua operação"
+                  : "Conheça os módulos antes de escolher"}
               </h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                Durante os primeiros 30 dias, os módulos do CorePet ficam liberados para você
-                descobrir quais realmente geram valor para sua operação.
+                {acessoCompletoManual
+                  ? "Os módulos incluídos na liberação manual permanecem disponíveis sem vencimento de acesso."
+                  : "Durante os primeiros 30 dias, os módulos do CorePet ficam liberados para você descobrir quais realmente geram valor para sua operação."}
               </p>
             </div>
             <a
@@ -587,7 +624,7 @@ export default function MeuPlano() {
                   </p>
                   <p className="mt-3 inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">
                     <Sparkles className="h-3 w-3" />
-                    Incluído nos 30 dias
+                    {acessoCompletoManual ? "Incluído no acesso completo" : "Incluído nos 30 dias"}
                   </p>
                 </article>
               );

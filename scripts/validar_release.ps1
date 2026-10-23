@@ -190,10 +190,14 @@ Invoke-GateStep 'Billing operational continuity regression' $python @(
     'tests/unit/test_module_access_dependency.py',
     'tests/unit/test_custom_billing_offers.py',
     'tests/unit/test_asaas_billing.py',
-    'tests/unit/test_ops_tenants_routes_contract.py', '-q'
+    'tests/unit/test_ops_tenants_routes_contract.py',
+    'tests/unit/test_manual_full_access.py', '-q'
 ) $backend
 Invoke-GateStep 'Billing notices regression' $node @(
     'src/utils/billingNotice.test.mjs'
+) $frontend
+Invoke-GateStep 'Module access refresh regression' $node @(
+    '--test', 'src/contexts/ModulosContext.test.mjs'
 ) $frontend
 Invoke-GateStep 'Tenant suspension authorization regression' $node @(
     'src/pages/opsTenantsUtils.test.mjs'

@@ -8,12 +8,34 @@
  *   pessoas, pets, produtos, estoque, PDV, vendas/financeiro de vendas,
  *   usuarios, configuracoes essenciais e cadastros essenciais.
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { api } from "../services/api";
 import { getAccessToken } from "../auth/tokenStorage";
 import { useAuth } from "./AuthContext";
 
 const ModulosContext = createContext();
+
+function escopoAcesso(user) {
+  if (!user?.id || !getAccessToken()) return null;
+  try {
+    const tenantId = JSON.parse(localStorage.getItem("selectedTenant") || "null")?.id;
+    const tenantDoUsuario = user.tenant?.id || user.tenant_id;
+    if (!tenantId || (tenantDoUsuario && String(tenantDoUsuario) !== String(tenantId))) {
+      return null;
+    }
+    return `${user.id}:${tenantId}`;
+  } catch {
+    return null;
+  }
+}
 
 export const MODULOS_PREMIUM = [
   "compras",
@@ -216,6 +238,11 @@ export const MODULOS_INFO = {
 
 export const ModulosProvider = ({ children }) => {
   const { user } = useAuth();
+  const userAtual = useRef(user);
+  userAtual.current = user;
+  const requisicaoAtual = useRef(0);
+  const escopoAtual = escopoAcesso(user);
+  const [escopoConfirmado, setEscopoConfirmado] = useState(null);
   const [modulosAtivos, setModulosAtivos] = useState(null); // null = carregando
   const [erroCarregamento, setErroCarregamento] = useState(false);
   const [carregandoModulos, setCarregandoModulos] = useState(false);
@@ -227,11 +254,23 @@ export const ModulosProvider = ({ children }) => {
   const [assinaturaAtual, setAssinaturaAtual] = useState(null);
   const [trialPadrao, setTrialPadrao] = useState(null);
 
+  useEffect(() => {
+    // Uma troca encerra a confirmacao anterior, mesmo se voltarmos a ela depois.
+    // Renovar o token mantendo usuario e empresa nao altera este escopo.
+    setEscopoConfirmado(null);
+  }, [escopoAtual]);
+
   const carregarModulos = useCallback(async () => {
+    const requisicao = ++requisicaoAtual.current;
+    const escopoConsultado = escopoAcesso(user);
+    const consultaAtual = () =>
+      requisicao === requisicaoAtual.current &&
+      escopoAcesso(userAtual.current) === escopoConsultado;
     if (!user) {
       // Sem usuario logado: mantem estado de carregamento para evitar
       // liberar modulos premium durante a hidratacao da sessao.
       setModulosAtivos(null);
+      setEscopoConfirmado(null);
       setErroCarregamento(false);
       setCarregandoModulos(false);
       setModulosBetaPublicos(MODULOS_BETA_PUBLICOS);
@@ -241,10 +280,9 @@ export const ModulosProvider = ({ children }) => {
       setTrialPadrao(null);
       return;
     }
-    const token = getAccessToken();
-    const selectedTenant = localStorage.getItem("selectedTenant");
-    if (!token || !selectedTenant) {
+    if (!escopoConsultado) {
       setModulosAtivos([]);
+      setEscopoConfirmado(null);
       setErroCarregamento(true);
       setCarregandoModulos(false);
       setModulosBetaPublicos(MODULOS_BETA_PUBLICOS);
@@ -258,14 +296,20 @@ export const ModulosProvider = ({ children }) => {
     setCarregandoModulos(true);
     try {
       const response = await api.get("/modulos/status");
+      if (!consultaAtual()) return;
       const modulosApi = response.data?.modulos_ativos;
-      if (!Array.isArray(modulosApi)) {
+      const tenantDaResposta = response.data?.tenant_id;
+      if (
+        !Array.isArray(modulosApi) ||
+        (tenantDaResposta && `${user.id}:${tenantDaResposta}` !== escopoConsultado)
+      ) {
         throw new Error("Resposta de módulos inválida");
       }
       const modulosBetaApi = response.data?.modulos_beta;
       const modulosForaOfertaApi = response.data?.modulos_fora_oferta_publica;
 
       setModulosAtivos(modulosApi);
+      setEscopoConfirmado(escopoConsultado);
       setErroCarregamento(false);
       setPlanoAtual(response.data?.plano || "basico");
       setAssinaturaAtual(response.data?.assinatura || null);
@@ -276,17 +320,20 @@ export const ModulosProvider = ({ children }) => {
       setModulosForaOfertaPublica(
         Array.isArray(modulosForaOfertaApi) ? modulosForaOfertaApi : MODULOS_FORA_DA_OFERTA_PUBLICA,
       );
-    } catch {
-      // Fail-closed: se não conseguir confirmar o plano, não libera premium.
-      setModulosAtivos([]);
+    } catch (error) {
+      if (!consultaAtual()) return;
+      // Uma indisponibilidade nao revoga acesso ja confirmado neste escopo.
+      // Negacao explicita da API descarta a confirmacao; o backend segue soberano.
+      if ([401, 403].includes(error.response?.status)) {
+        setModulosAtivos([]);
+        setEscopoConfirmado(null);
+        setPlanoAtual(null);
+        setAssinaturaAtual(null);
+        setTrialPadrao(null);
+      }
       setErroCarregamento(true);
-      setModulosBetaPublicos(MODULOS_BETA_PUBLICOS);
-      setModulosForaOfertaPublica(MODULOS_FORA_DA_OFERTA_PUBLICA);
-      setPlanoAtual(null);
-      setAssinaturaAtual(null);
-      setTrialPadrao(null);
     } finally {
-      setCarregandoModulos(false);
+      if (consultaAtual()) setCarregandoModulos(false);
     }
   }, [user]);
 
@@ -321,13 +368,16 @@ export const ModulosProvider = ({ children }) => {
     };
   }, [assinaturaAtual?.status, carregarModulos, user]);
 
+  const acessoConfirmado = Boolean(escopoAtual && escopoAtual === escopoConfirmado);
+  const modulosConfirmados = acessoConfirmado ? modulosAtivos : null;
+
   const moduloAtivo = useCallback(
     (modulo) => {
-      if (modulosAtivos === null) return !user;
+      if (modulosConfirmados === null) return !user;
       if (!MODULOS_PREMIUM.includes(modulo)) return true;
-      return modulosAtivos.includes(modulo);
+      return modulosConfirmados.includes(modulo);
     },
-    [modulosAtivos, user],
+    [modulosConfirmados, user],
   );
 
   const moduloBetaPublico = useCallback(
@@ -342,12 +392,12 @@ export const ModulosProvider = ({ children }) => {
 
   const value = useMemo(
     () => ({
-      modulosAtivos,
+      modulosAtivos: modulosConfirmados,
       erroCarregamento,
       carregandoModulos,
-      planoAtual,
-      assinaturaAtual,
-      trialPadrao,
+      planoAtual: acessoConfirmado ? planoAtual : null,
+      assinaturaAtual: acessoConfirmado ? assinaturaAtual : null,
+      trialPadrao: acessoConfirmado ? trialPadrao : null,
       modulosBetaPublicos,
       modulosForaOfertaPublica,
       moduloAtivo,
@@ -356,7 +406,8 @@ export const ModulosProvider = ({ children }) => {
       carregarModulos,
     }),
     [
-      modulosAtivos,
+      modulosConfirmados,
+      acessoConfirmado,
       erroCarregamento,
       carregandoModulos,
       planoAtual,

@@ -12,8 +12,9 @@ export function buildBillingNotice(assinatura) {
 
   const status = assinatura.status_efetivo || assinatura.status;
   const etapa = assinatura.avisos_cobranca?.etapa;
+  const acessoCompletoManual = assinatura.acesso_completo_manual === true;
 
-  if (status === "expired" || assinatura.trial_expirado) {
+  if (!acessoCompletoManual && (status === "expired" || assinatura.trial_expirado)) {
     return {
       label: "Período de teste encerrado",
       tone: "amber",
@@ -58,7 +59,7 @@ export function buildBillingNotice(assinatura) {
   }
 
   const dias = assinatura.dias_restantes_trial;
-  if (status === "trial" && Number.isInteger(dias) && dias <= 7) {
+  if (!acessoCompletoManual && status === "trial" && Number.isInteger(dias) && dias <= 7) {
     return {
       label: "Seu período de teste está terminando",
       tone: "blue",
