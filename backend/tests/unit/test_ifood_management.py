@@ -620,6 +620,220 @@ def test_price_calculator_keeps_existing_promotion_effective_after_reload(api):
     assert saved["effective_price"] == 90 and saved["promotion_active"]
 
 
+def test_temporary_costs_change_only_simulation_even_when_provider_is_enabled(
+    api, monkeypatch
+):
+    from app.config import settings
+    from app.routes import ifood_integration_routes as routes
+
+    saved_costs = vars(config())
+    api.db.add(
+        IfoodMerchantConfig(
+            tenant_id=api.tenant,
+            merchant_id=str(uuid4()),
+            active=True,
+            status="connected",
+            **saved_costs,
+        )
+    )
+    api.first.preco_ifood = 100
+    api.db.commit()
+    api.state["admin"] = False
+    api.state["denied_permissions"] = {"produtos.editar", "configuracoes.editar"}
+    monkeypatch.setattr(settings, "IFOOD_CATALOG_WRITE_ENABLED", True)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Simulacao temporaria nao pode gravar nem chamar o iFood")
+
+    monkeypatch.setattr(routes, "_client", forbidden)
+    monkeypatch.setattr(api.db, "commit", forbidden)
+    writes = []
+    event.listen(
+        api.engine,
+        "before_cursor_execute",
+        lambda _conn, _cursor, statement, *_: (
+            writes.append(statement)
+            if statement.lstrip().upper().startswith(("INSERT", "UPDATE", "DELETE"))
+            else None
+        ),
+    )
+    temporary = dict(
+        commission_merchant_percent=15,
+        commission_ifood_percent=25,
+        payment_fee_percent=3,
+        tax_percent=4,
+        additional_unit_cost=1,
+        target_margin_percent=80,
+    )
+    response = api.client.post(
+        "/integracoes/ifood/catalogo/produto/simular-preco",
+        json={
+            "product_id": api.first.id,
+            "preco_ifood": 150,
+            "custos_simulados": temporary,
+        },
+    )
+    assert response.status_code == 200, response.text
+    simulated = response.json()
+    assert simulated["simulation_costs"] == temporary
+    assert simulated["simulation_costs_active"] is True
+    assert simulated["margins"]["MERCHANT"]["contribution"] == 56
+    assert simulated["margins"]["IFOOD"]["contribution"] == 41
+    assert simulated["margins"]["MERCHANT"]["below_target"]
+    assert any(p["code"] == "margem_abaixo_meta" for p in simulated["pending"])
+    assert simulated["saved_specific_price"] == 100
+    assert not api.db.dirty and writes == []
+    api.db.expire_all()
+    saved = api.client.get("/integracoes/ifood/catalogo/gestao").json()
+    assert saved["items"][0]["regular_price"] == 100
+    assert saved["items"][0]["margins"]["MERCHANT"]["contribution"] == 20
+    assert not any(key.startswith("simulation_") for key in saved["items"][0])
+    assert all(saved["config"][field] == value for field, value in saved_costs.items())
+    assert api.first.preco_custo == 60 and api.first.estoque_atual == 10
+    assert writes == []
+
+
+@pytest.mark.parametrize("costs", [None, {}])
+def test_absent_or_empty_temporary_costs_use_saved_premises(api, costs):
+    saved = vars(config())
+    api.db.add(IfoodMerchantConfig(tenant_id=api.tenant, **saved))
+    api.db.commit()
+    response = api.client.post(
+        "/integracoes/ifood/catalogo/produto/simular-preco",
+        json={
+            "product_id": api.first.id,
+            "preco_ifood": 150,
+            "custos_simulados": costs,
+        },
+    )
+    assert response.status_code == 200, response.text
+    simulated = response.json()
+    assert simulated["simulation_costs_active"] is False
+    assert simulated["simulation_costs"] == {
+        field: value
+        for field, value in saved.items()
+        if field not in ("default_markup_percent", "stock_safety")
+    }
+    assert simulated["margins"]["MERCHANT"]["contribution"] == 61.5
+
+
+def test_partial_temporary_costs_distinguish_unknown_from_explicit_zero(api):
+    api.db.add(IfoodMerchantConfig(tenant_id=api.tenant, **vars(config())))
+    api.db.commit()
+    route = "/integracoes/ifood/catalogo/produto/simular-preco"
+    payload = dict(product_id=api.first.id, preco_ifood=100)
+    zero = api.client.post(
+        route,
+        json=payload | {"custos_simulados": {"payment_fee_percent": 0}},
+    ).json()
+    assert zero["simulation_costs_active"]
+    assert zero["simulation_costs"]["payment_fee_percent"] == 0
+    assert zero["simulation_costs"]["commission_merchant_percent"] == 10
+    assert zero["margins"]["MERCHANT"]["contribution"] == 22
+    unknown = api.client.post(
+        route,
+        json=payload | {"custos_simulados": {"payment_fee_percent": None}},
+    ).json()
+    assert unknown["simulation_costs"]["payment_fee_percent"] is None
+    assert not unknown["margins"]["MERCHANT"]["calculated"]
+    assert unknown["margins"]["MERCHANT"]["missing"] == ["Taxa de pagamento"]
+    assert any(p["code"] == "margem_incompleta" for p in unknown["pending"])
+    api.db.expire_all()
+    assert api.db.query(IfoodMerchantConfig).one().payment_fee_percent == 2
+
+
+def test_temporary_costs_work_without_creating_config_and_preserve_tenant_boundary(api):
+    route = "/integracoes/ifood/catalogo/produto/simular-preco"
+    costs = dict(
+        commission_merchant_percent=0,
+        commission_ifood_percent=0,
+        payment_fee_percent=0,
+        tax_percent=0,
+        additional_unit_cost=0,
+    )
+    payload = dict(product_id=api.first.id, preco_ifood=100, custos_simulados=costs)
+    simulated = api.client.post(route, json=payload)
+    assert simulated.status_code == 200, simulated.text
+    item = simulated.json()
+    assert item["margins"]["MERCHANT"]["contribution"] == 40
+    assert item["margins"]["IFOOD"]["contribution"] == 40
+    assert item["simulation_costs"] == costs | {"target_margin_percent": None}
+    assert not any(p["code"] == "margem_incompleta" for p in item["pending"])
+    assert api.db.query(IfoodMerchantConfig).count() == 0
+    assert (
+        api.client.post(route, json=payload | {"product_id": api.other.id}).status_code
+        == 404
+    )
+    api.state["denied_permissions"] = {"produtos.visualizar"}
+    assert api.client.post(route, json=payload).status_code == 403
+    assert api.db.query(IfoodMerchantConfig).count() == 0
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("commission_merchant_percent", -1),
+        ("commission_ifood_percent", 100.01),
+        ("payment_fee_percent", "NaN"),
+        ("payment_fee_percent", "Infinity"),
+        ("tax_percent", "-Infinity"),
+        ("additional_unit_cost", -0.01),
+        ("additional_unit_cost", 1000000.01),
+        ("target_margin_percent", 100),
+        ("stock_safety", 1),
+        ("default_markup_percent", 1),
+        ("preco_custo", 1),
+        ("merchant_id", "outro"),
+        ("active", True),
+    ],
+)
+def test_invalid_temporary_costs_cannot_override_non_cost_fields_or_persist(
+    api, field, value
+):
+    response = api.client.post(
+        "/integracoes/ifood/catalogo/produto/simular-preco",
+        json={
+            "product_id": api.first.id,
+            "preco_ifood": 150,
+            "custos_simulados": {field: value},
+        },
+    )
+    assert response.status_code == 422, response.text
+    assert api.db.query(IfoodMerchantConfig).count() == 0
+    assert not api.db.dirty
+    assert api.first.preco_custo == 60 and api.first.preco_ifood is None
+
+
+def test_temporary_costs_allow_boundaries_and_promotion_stays_from_saved_product(api):
+    api.first.preco_ifood = 100
+    api.first.preco_ifood_promo = 90
+    api.db.commit()
+    response = api.client.post(
+        "/integracoes/ifood/catalogo/produto/simular-preco",
+        json={
+            "product_id": api.first.id,
+            "preco_ifood": 150,
+            "custos_simulados": {
+                "commission_merchant_percent": 100,
+                "commission_ifood_percent": 100,
+                "payment_fee_percent": 100,
+                "tax_percent": 100,
+                "additional_unit_cost": 1000000,
+                "target_margin_percent": 99.99,
+            },
+        },
+    )
+    assert response.status_code == 200, response.text
+    item = response.json()
+    assert item["promotion_active"] and item["effective_price"] == 90
+    assert item["regular_price"] == 150 and item["saved_specific_price"] == 100
+    assert item["margins"]["MERCHANT"]["contribution"] == -1000240
+    assert item["margins"]["MERCHANT"]["below_target"]
+    api.db.expire_all()
+    assert api.first.preco_ifood == 100 and api.first.preco_ifood_promo == 90
+    assert api.db.query(IfoodMerchantConfig).count() == 0
+
+
 def test_price_calculator_uses_component_cost_and_reserved_stock_for_virtual_kit(
     api, monkeypatch
 ):

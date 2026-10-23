@@ -39,9 +39,7 @@ from app.security.permissions_decorator import (
 router = APIRouter(prefix="/integracoes/ifood", tags=["iFood"])
 
 
-class IfoodCatalogSettings(BaseModel):
-    default_markup_percent: float = Field(default=0, ge=-50, le=300)
-    stock_safety: float = Field(default=0, ge=0, le=1000000)
+class IfoodMarginSettings(BaseModel):
     commission_merchant_percent: float | None = Field(
         default=None, ge=0, le=100, allow_inf_nan=False
     )
@@ -58,6 +56,16 @@ class IfoodCatalogSettings(BaseModel):
     target_margin_percent: float | None = Field(
         default=None, ge=0, le=99.99, allow_inf_nan=False
     )
+
+
+class IfoodCatalogSettings(IfoodMarginSettings):
+    default_markup_percent: float = Field(default=0, ge=-50, le=300)
+    stock_safety: float = Field(default=0, ge=0, le=1000000)
+
+
+class IfoodSimulationCosts(IfoodMarginSettings):
+    # Apenas premissas de rentabilidade, sem estoque, preco ou operacao externa.
+    model_config = ConfigDict(extra="forbid")
 
 
 class IfoodCatalogConfigPayload(IfoodCatalogSettings):
@@ -108,6 +116,7 @@ class IfoodPriceSimulationPayload(BaseModel):
 
     product_id: int = Field(gt=0)
     preco_ifood: float | None = Field(ge=0, le=MAX_IFOOD_MONEY, allow_inf_nan=False)
+    custos_simulados: IfoodSimulationCosts | None = None
 
 
 def _utcnow() -> datetime:
@@ -522,13 +531,29 @@ def simulate_ifood_product_price(
     user_and_tenant=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session),
 ):
-    """Simula somente o preco: custo, estoque, oferta e promocao vem do ERP."""
+    """Simula preco e premissas em memoria; nunca altera as regras da loja."""
     _, tenant_id = user_and_tenant
     config = _get_config(db, tenant_id)
+    overrides = (
+        body.custos_simulados.model_dump(exclude_unset=True)
+        if body.custos_simulados is not None
+        else {}
+    )
+    costs = {
+        field: overrides.get(field, getattr(config, field, None))
+        for field in MARGIN_CONFIG_FIELDS
+    }
+    # Nao atribuir valores ao ORM: ate um autoflush posterior poderia gravar
+    # taxas temporarias. Estoque e acrescimo permanecem os da loja selecionada.
+    simulation_config = SimpleNamespace(
+        default_markup_percent=getattr(config, "default_markup_percent", 0),
+        stock_safety=getattr(config, "stock_safety", 0),
+        **costs,
+    )
     items = _management_items(
         db,
         tenant_id,
-        config,
+        simulation_config,
         product_ids=[body.product_id],
         price_overrides={body.product_id: body.preco_ifood},
     )
@@ -536,7 +561,11 @@ def simulate_ifood_product_price(
         raise HTTPException(
             status_code=404, detail="Produto não encontrado nesta loja."
         )
-    return items[0]
+    return {
+        **items[0],
+        "simulation_costs": costs,
+        "simulation_costs_active": bool(overrides),
+    }
 
 
 @router.post("/catalogo/produto/preview")
