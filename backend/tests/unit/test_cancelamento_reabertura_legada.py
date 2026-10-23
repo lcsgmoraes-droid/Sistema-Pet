@@ -10,7 +10,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.campaigns import coupon_service, loyalty_service, sale_reopening_service
-from app.campaigns.models import Coupon
+from app.campaigns.models import Coupon, LoyaltyStamp
 from app.financeiro_models import ContaReceber, Recebimento
 from app.models import AuditLog
 from app.services.business_audit_service import log_business_event
@@ -119,22 +119,41 @@ def test_cancelar_legado_rejeita_alteracao_persistida_apos_reabrir(legado, alter
 
 
 @pytest.mark.parametrize(
-    "beneficio",
+    "beneficio,valor",
     [
-        "commissions_removed",
-        "coupon_reversal",
-        "loyalty_void",
-        "quick_repurchase_coupons_voided",
-        "cashback_expenses_cancelled",
+        ("commissions_removed", 1),
+        ("coupon_reversal", {"redemptions_voided": 1}),
+        ("coupon_reversal", {"loyalty_rewards_reversed": 1}),
+        ("coupon_reversal", {"regular_coupons_restored": 1}),
+        ("coupon_reversal", {"efeito_desconhecido": 1}),
+        (
+            "loyalty_void",
+            {"affected_campaigns": 1, "stamps_voided": 1, "rewards_revoked": 0},
+        ),
+        (
+            "loyalty_void",
+            {"affected_campaigns": 1, "stamps_voided": 0, "rewards_revoked": 1},
+        ),
+        (
+            "loyalty_void",
+            {
+                "affected_campaigns": 1,
+                "stamps_voided": 0,
+                "rewards_revoked": 0,
+                "efeito_desconhecido": 1,
+            },
+        ),
+        ("quick_repurchase_coupons_voided", 1),
+        ("cashback_expenses_cancelled", 1),
     ],
 )
-def test_cancelar_legado_rejeita_reabertura_que_removeu_beneficios(legado, beneficio):
+def test_cancelar_legado_rejeita_reabertura_que_removeu_beneficios(
+    legado, beneficio, valor
+):
     _reabrir(legado)
     evento = _evento(legado)
     dados = json.loads(evento.new_value)
-    dados["metadata"][beneficio] = (
-        {"removed": 1} if beneficio in {"coupon_reversal", "loyalty_void"} else 1
-    )
+    dados["metadata"][beneficio] = valor
     evento.new_value = json.dumps(dados)
     legado.db.commit()
     with pytest.raises(HTTPException, match="benefícios ou comissões"):
@@ -208,6 +227,115 @@ def test_cancelar_reabertura_antiga_intacta_sem_inventar_data_ou_pagamento(legad
     assert (
         json.loads(auditoria.new_value)["metadata"]["original_finalization_date_known"]
         is False
+    )
+
+
+@pytest.mark.parametrize(
+    "auditoria_antiga", [False, True], ids=["com_snapshot", "sem_snapshot_demo"]
+)
+def test_campanha_consultada_sem_estorno_permite_cancelar_e_preserva_historico(
+    legado, monkeypatch, auditoria_antiga
+):
+    # Formatos reais retornados por reverse_coupon_redemptions_for_sale e
+    # void_loyalty_stamps_for_sale no caso reportado pela demo: uma campanha
+    # consultada, sem estornar carimbos, recompensas ou cupons nessa reabertura.
+    cupom_sem_estorno = {
+        "redemptions_voided": 0,
+        "loyalty_rewards_reversed": 0,
+        "regular_coupons_restored": 0,
+    }
+    fidelidade_sem_estorno = {
+        "affected_campaigns": 1,
+        "stamps_voided": 0,
+        "rewards_revoked": 0,
+    }
+    monkeypatch.setattr(
+        coupon_service,
+        "reverse_coupon_redemptions_for_sale",
+        lambda *a, **kw: dict(cupom_sem_estorno),
+    )
+    monkeypatch.setattr(
+        loyalty_service,
+        "void_loyalty_stamps_for_sale",
+        lambda *a, **kw: dict(fidelidade_sem_estorno),
+    )
+
+    def nao_refinalizar(**kwargs):
+        pytest.fail("Cancelar edição não deve recalcular benefícios ou comissões")
+
+    monkeypatch.setattr(VendaService, "finalizar_venda", nao_refinalizar)
+    monkeypatch.setattr(
+        status_routes, "_gerar_comissoes_pendentes_venda", nao_refinalizar
+    )
+
+    # Os 24 carimbos da venda já foram estornados em 02/10. Os dois carimbos
+    # válidos de outra venda também devem permanecer exatamente como estavam.
+    LoyaltyStamp.__table__.create(legado.db.get_bind())
+    estorno_antigo = datetime(2026, 10, 2, 18, tzinfo=timezone.utc)
+    legado.db.execute(
+        LoyaltyStamp.__table__.insert(),
+        [
+            {
+                "id": indice,
+                "tenant_id": legado.tenant,
+                "customer_id": 42,
+                "campaign_id": 1,
+                "venda_id": 1 if indice <= 24 else 2,
+                "stamp_index": indice if indice <= 24 else indice - 24,
+                "stamp_value_snapshot": Decimal("100"),
+                "is_manual": False,
+                "created_at": datetime(2026, 10, 2, 17, tzinfo=timezone.utc),
+                "voided_at": estorno_antigo if indice <= 24 else None,
+                "voided_origin": "automatic" if indice <= 24 else None,
+                "notes": "Estorno histórico anterior à reabertura"
+                if indice <= 24
+                else "Outra venda",
+            }
+            for indice in range(1, 27)
+        ],
+    )
+    legado.db.commit()
+
+    def historico_carimbos():
+        return legado.db.execute(
+            LoyaltyStamp.__table__.select().order_by(LoyaltyStamp.id)
+        ).all()
+
+    historico_anterior = historico_carimbos()
+    assert _reabrir(legado) == {"status": "aberta"}
+    evento = _evento(legado)
+    dados = json.loads(evento.new_value)
+    assert dados["metadata"]["coupon_reversal"] == cupom_sem_estorno
+    assert dados["metadata"]["loyalty_void"] == fidelidade_sem_estorno
+    if auditoria_antiga:
+        # Reproduz o contrato anterior ao snapshot, como o evento real da demo.
+        for campo in (
+            "legacy_restoration",
+            "quick_repurchase_coupons_voided",
+            "cashback_expenses_cancelled",
+        ):
+            dados["metadata"].pop(campo)
+        evento.new_value = json.dumps(dados)
+        legado.venda.updated_at = restauracao._horario_auditoria(evento.timestamp)
+        legado.db.commit()
+
+    assert _cancelar(legado) == {"success": True, "status": "finalizada"}
+    assert legado.venda.data_finalizacao == (
+        None if auditoria_antiga else datetime(2026, 10, 2, 14, 30)
+    )
+    for model in (VendaPagamento, ContaReceber, Recebimento):
+        assert legado.db.query(model).count() == 0
+    assert historico_carimbos() == historico_anterior
+    carimbos = legado.db.query(LoyaltyStamp).all()
+    assert sum(carimbo.voided_at is not None for carimbo in carimbos) == 24
+    assert sum(carimbo.voided_at is None for carimbo in carimbos) == 2
+    cancelamento = (
+        legado.db.query(AuditLog)
+        .filter_by(action="business.sale.reopening_cancelled")
+        .one()
+    )
+    assert (
+        json.loads(cancelamento.new_value)["metadata"]["reopened_audit_id"] == evento.id
     )
 
 
