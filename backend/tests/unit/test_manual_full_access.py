@@ -370,7 +370,12 @@ def test_migration_defaults_existing_tenants_to_false_and_is_single_head(monkeyp
     spec.loader.exec_module(migration)
     config = Config()
     config.set_main_option("script_location", str(backend / "alembic"))
-    assert ScriptDirectory.from_config(config).get_heads() == [migration.revision]
+    script = ScriptDirectory.from_config(config)
+    heads = script.get_heads()
+    assert len(heads) == 1
+    assert migration.revision in {
+        revision.revision for revision in script.walk_revisions(head=heads[0])
+    }
     engine = create_engine("sqlite://")
     with engine.begin() as connection:
         connection.execute(text("CREATE TABLE tenants (id TEXT PRIMARY KEY)"))
