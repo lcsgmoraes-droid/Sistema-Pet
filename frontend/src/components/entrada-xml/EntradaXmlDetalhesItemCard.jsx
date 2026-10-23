@@ -1,5 +1,9 @@
+import { useEffect, useRef } from "react";
+import { Check } from "lucide-react";
 import CardFiscal from "../CardFiscal";
 import ActionButton from "../ui/ActionButton";
+import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
+import InputTexto from "../v2/InputTexto/InputTexto";
 
 function EntradaXmlDetalhesItemCard({
   acaoConferenciaOpcoes,
@@ -10,6 +14,7 @@ function EntradaXmlDetalhesItemCard({
   buscandoProduto,
   calcularConferenciaItem,
   conferenciaItens,
+  confirmarPackItem,
   desvincularProduto,
   detectarDivergencias,
   filtroProduto,
@@ -17,12 +22,15 @@ function EntradaXmlDetalhesItemCard({
   formatarValorFiscal,
   getConfiancaBadge,
   item,
+  invalidarConfirmacaoPackItem,
   mostrarCamposConferencia,
   multiplicadoresPack,
   notaSelecionada,
   obterConfiguracaoPackItem,
+  obterConfirmacaoPackItem,
   obterCustoAquisicaoItem,
   quantidadesOnline,
+  pendenciaConfirmacaoPack,
   resultadosBuscaProduto,
   salvarQuantidadeOnlineItem,
   setFiltroProduto,
@@ -36,6 +44,30 @@ function EntradaXmlDetalhesItemCard({
   const temDivergencia = divergencias.length > 0;
   const itemAjustado = aplicarMultiplicadorPackAoItem(item, multiplicadoresPack);
   const packConfig = obterConfiguracaoPackItem(item, multiplicadoresPack);
+  const confirmacaoPack = obterConfirmacaoPackItem(notaSelecionada, item);
+  const packRef = useRef(null);
+  const botaoOkRef = useRef(null);
+  const destacarPack =
+    confirmacaoPack.necessaria &&
+    !confirmacaoPack.confirmada &&
+    pendenciaConfirmacaoPack?.notaId === notaSelecionada.id &&
+    pendenciaConfirmacaoPack?.itemId === item.id;
+
+  useEffect(() => {
+    if (!destacarPack || !packRef.current) return;
+    const reduzirMovimento = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    packRef.current.scrollIntoView({
+      behavior: reduzirMovimento ? "auto" : "smooth",
+      block: "center",
+    });
+    botaoOkRef.current?.focus({ preventScroll: true });
+    if (reduzirMovimento) return;
+    const animacao = packRef.current.animate([{ opacity: 1 }, { opacity: 0.45 }, { opacity: 1 }], {
+      duration: 650,
+      iterations: 3,
+    });
+    return () => animacao.cancel();
+  }, [destacarPack, pendenciaConfirmacaoPack]);
   const conferenciaItem = calcularConferenciaItem(item, conferenciaItens[item.id]);
   const mostrarTratativaItem =
     mostrarCamposConferencia &&
@@ -114,7 +146,12 @@ function EntradaXmlDetalhesItemCard({
 
           {/* Pack / Caixa: multiplicador manual ou auto-detectado */}
           {notaSelecionada.status === "pendente" && (
-            <div className="mt-2 border-t border-slate-200 pt-2">
+            <div
+              ref={packRef}
+              className={`mt-2 scroll-m-4 border-t border-slate-200 pt-2 ${
+                destacarPack ? "rounded-lg p-2 ring-2 ring-red-500 dark:ring-red-400" : ""
+              }`}
+            >
               <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
                 <span className="text-gray-600 text-xs font-semibold">Pack (unid./caixa):</span>
                 <div className="flex items-center gap-1.5 flex-wrap justify-end">
@@ -136,25 +173,52 @@ function EntradaXmlDetalhesItemCard({
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="1"
-                  max="200"
-                  value={packConfig.multiplicador}
-                  onChange={(e) => {
-                    const v = Math.max(1, Math.min(200, Number.parseInt(e.target.value) || 1));
-                    setMultiplicadoresPack((prev) => ({ ...prev, [item.id]: v }));
-                  }}
-                  className={`w-20 px-2 py-1 border-2 rounded text-sm text-right font-semibold focus:ring-2 ${
-                    packConfig.overrideManual
-                      ? "border-blue-400 bg-blue-50 text-blue-900 focus:ring-blue-500"
-                      : packConfig.sugestaoAutomaticaDiferenteDoPadrao
-                        ? "border-amber-400 bg-amber-50 text-amber-900 focus:ring-amber-500"
-                        : "border-blue-300 focus:ring-blue-500"
-                  }`}
-                />
+                <div className="w-24">
+                  <InputTexto
+                    id={`pack-${item.id}`}
+                    placeholder="Unid./caixa"
+                    inputMode="numeric"
+                    alinhamentoTexto="direita"
+                    value={packConfig.multiplicador}
+                    onChange={(valor) => {
+                      const v = Math.max(1, Math.min(200, Number.parseInt(valor, 10) || 1));
+                      invalidarConfirmacaoPackItem(notaSelecionada.id, item.id);
+                      setMultiplicadoresPack((prev) => ({ ...prev, [item.id]: v }));
+                    }}
+                  />
+                </div>
                 <span className="text-xs text-gray-500">unid. por caixa</span>
+                {confirmacaoPack.necessaria && (
+                  <BotaoInteracao
+                    ref={botaoOkRef}
+                    tamanho="pequeno"
+                    icon={Check}
+                    aria-label={`Dar OK no rateio de ${item.descricao}`}
+                    aria-pressed={confirmacaoPack.confirmada}
+                    aria-describedby={`confirmacao-pack-${item.id}`}
+                    onClick={() => confirmarPackItem(notaSelecionada, item)}
+                  >
+                    OK
+                  </BotaoInteracao>
+                )}
               </div>
+              {confirmacaoPack.necessaria && (
+                <p
+                  id={`confirmacao-pack-${item.id}`}
+                  role={destacarPack ? "alert" : undefined}
+                  className={`mt-1 text-xs font-semibold ${
+                    confirmacaoPack.confirmada
+                      ? "text-emerald-700 dark:text-emerald-400"
+                      : destacarPack
+                        ? "text-red-700 dark:text-red-400"
+                        : "text-amber-800 dark:text-amber-300"
+                  }`}
+                >
+                  {confirmacaoPack.confirmada
+                    ? "Rateio conferido."
+                    : "Confira as unidades por caixa e dê OK no rateio para avançar."}
+                </p>
+              )}
               {(packConfig.sugestaoAutomaticaDiferenteDoPadrao || packConfig.overrideManual) && (
                 <div
                   className={`mt-1.5 rounded p-2 text-xs space-y-0.5 border ${
@@ -174,7 +238,9 @@ function EntradaXmlDetalhesItemCard({
                   </div>
                   <div>
                     💰 Custo unit.:{" "}
-                    <strong>R$ {obterCustoAquisicaoItem(itemAjustado).toFixed(4)}</strong>
+                    <strong>
+                      R$ {formatarValorFiscal(obterCustoAquisicaoItem(itemAjustado), 4)}
+                    </strong>
                   </div>
                 </div>
               )}

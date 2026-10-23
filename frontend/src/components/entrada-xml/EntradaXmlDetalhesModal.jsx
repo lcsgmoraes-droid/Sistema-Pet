@@ -19,6 +19,7 @@ function EntradaXmlDetalhesModal({
   calcularConferenciaItem,
   carregarPreviewProcessamento,
   conferenciaItens,
+  confirmarPackItem,
   conferenciaObservacaoGeral,
   criandoPendenciaFornecedor,
   criarTodosProdutosNaoVinculados,
@@ -39,6 +40,7 @@ function EntradaXmlDetalhesModal({
   itensComDivergenciaDetalhe,
   itensExibidosNota,
   itensNotaDetalhe,
+  invalidarConfirmacaoPackItem,
   loading,
   metaConferenciaAtual,
   mostrarCamposConferencia,
@@ -46,8 +48,10 @@ function EntradaXmlDetalhesModal({
   navigate,
   notaSelecionada,
   obterConfiguracaoPackItem,
+  obterConfirmacaoPackItem,
   obterCustoAquisicaoItem,
   quantidadesOnline,
+  pendenciaConfirmacaoPack,
   resultadosBuscaProduto,
   resumoConferenciaAtual,
   reverterNota,
@@ -284,6 +288,8 @@ function EntradaXmlDetalhesModal({
                       buscandoProduto={buscandoProduto}
                       calcularConferenciaItem={calcularConferenciaItem}
                       conferenciaItens={conferenciaItens}
+                      confirmarPackItem={confirmarPackItem}
+                      invalidarConfirmacaoPackItem={invalidarConfirmacaoPackItem}
                       desvincularProduto={desvincularProduto}
                       detectarDivergencias={detectarDivergencias}
                       filtroProduto={filtroProduto}
@@ -294,8 +300,10 @@ function EntradaXmlDetalhesModal({
                       multiplicadoresPack={multiplicadoresPack}
                       notaSelecionada={notaSelecionada}
                       obterConfiguracaoPackItem={obterConfiguracaoPackItem}
+                      obterConfirmacaoPackItem={obterConfirmacaoPackItem}
                       obterCustoAquisicaoItem={obterCustoAquisicaoItem}
                       quantidadesOnline={quantidadesOnline}
+                      pendenciaConfirmacaoPack={pendenciaConfirmacaoPack}
                       resultadosBuscaProduto={resultadosBuscaProduto}
                       salvarQuantidadeOnlineItem={salvarQuantidadeOnlineItem}
                       setFiltroProduto={setFiltroProduto}
