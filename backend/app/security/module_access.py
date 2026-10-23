@@ -74,6 +74,7 @@ def _load_active_modules(
         _planos_segmento_tenant(tenant),
         liberar_trial_completo=_trial_completo_ativo(tenant, agora),
         acesso_liberado=assinatura_resumo["acesso_operacional_ativo"],
+        liberar_completo_manual=assinatura_resumo["acesso_completo_manual"],
     )
 
 
@@ -86,7 +87,10 @@ def _load_active_entitlements(
         return []
 
     assinatura = _assinatura_resumo_tenant(tenant, agora)
-    if assinatura["acesso_completo_durante_trial"]:
+    if (
+        assinatura["acesso_completo_manual"]
+        or assinatura["acesso_completo_durante_trial"]
+    ):
         return sorted(ALL_PUBLIC_ENTITLEMENTS)
     if not assinatura["acesso_operacional_ativo"]:
         # Suspensao cadastral administrativa, independente da cobranca.

@@ -38,6 +38,9 @@ export function createControllerHarness(
     previous.length === next.length &&
     previous.every((value, i) => Object.is(value, next[i]));
   const hooks = {
+    createContext(value) {
+      return { Provider: "context-provider", value };
+    },
     useId() {
       const slot = index++;
       if (!slots[slot]) slots[slot] = { value: `controller-id-${slot}` };

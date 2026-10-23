@@ -79,7 +79,7 @@ jobs:
 
       - name: Billing notices and suspension authorization regression
         working-directory: frontend
-        run: node src/utils/billingNotice.test.mjs && node src/pages/opsTenantsUtils.test.mjs
+        run: node src/utils/billingNotice.test.mjs && node src/pages/opsTenantsUtils.test.mjs && node --test src/contexts/ModulosContext.test.mjs
 
       - name: Frontend production build
         working-directory: frontend

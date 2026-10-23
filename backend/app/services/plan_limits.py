@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Tenant, UserSession
 from app.services.billing_access import (
+    manual_full_access_allowed,
     operational_access_allowed,
     trial_access_preserved,
 )
@@ -73,7 +74,7 @@ def enforce_monthly_sales_limit(
     if tenant is None:
         return
     _require_operational_access(tenant)
-    if _trial_is_active(tenant, now):
+    if manual_full_access_allowed(tenant) or _trial_is_active(tenant, now):
         return
 
     plan = get_plan(getattr(tenant, "plan", None))
@@ -131,7 +132,7 @@ def enforce_simultaneous_session_limit(
 
     now = now_utc or datetime.now(timezone.utc)
     _require_operational_access(tenant)
-    if _trial_is_active(tenant, now):
+    if manual_full_access_allowed(tenant) or _trial_is_active(tenant, now):
         return 0
 
     plan = get_plan(getattr(tenant, "plan", None))

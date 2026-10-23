@@ -22,6 +22,7 @@ from app.services.business_audit_service import (
 )
 from app.services.billing_access import (
     billing_warning_state,
+    manual_full_access_allowed,
     normalize_billing_status,
     operational_access_allowed,
     overdue_grace_state,
@@ -158,6 +159,7 @@ def _assinatura_resumo_tenant(tenant: Tenant, agora: datetime) -> dict:
         "status": status_raw,
         "status_efetivo": status_efetivo,
         "acesso_operacional_ativo": acesso_operacional_ativo,
+        "acesso_completo_manual": manual_full_access_allowed(tenant),
         "bloqueio_automatico": False,
         "avisos_cobranca": billing_warning_state(
             tenant, data_brasilia, effective_status=status_efetivo
@@ -237,11 +239,11 @@ def _resolver_modulos_ativos(
     planos: tuple[str | None, ...] = (),
     liberar_trial_completo: bool = False,
     acesso_liberado: bool = True,
+    liberar_completo_manual: bool = False,
 ) -> list[str]:
     """Une as 3 fontes de modulo liberado (manual, AssinaturaModulo, planos de
-    segmento). Quando `acesso_liberado` e False (cobranca com problema), nenhuma
-    das 3 fontes libera nada — so o trial completo (ortogonal a billing) segue
-    valendo. `planos` e a lista dos ate-3 codigos de segmento do tenant
+    segmento). Suspensao cadastral interrompe todas as fontes, incluindo trial
+    e concessao FULL manual. `planos` sao os ate-3 codigos de segmento do tenant
     (plan_pet/plan_vet/plan_grooming), filtrando os vazios.
     """
     modulos_do_tenant: set[str] = set()
@@ -269,7 +271,7 @@ def _resolver_modulos_ativos(
             if plano_catalogo:
                 modulos_do_tenant.update(plano_catalogo.modules)
 
-    if liberar_trial_completo and acesso_liberado:
+    if (liberar_trial_completo or liberar_completo_manual) and acesso_liberado:
         modulos_do_tenant.update(MODULOS_TRIAL_COMPLETO)
 
     return sorted(modulo for modulo in modulos_do_tenant if modulo in MODULOS_PREMIUM)
@@ -382,11 +384,13 @@ def get_modulos_status(
         planos_segmento,
         liberar_trial_completo=_trial_completo_ativo(tenant, agora),
         acesso_liberado=acesso_liberado,
+        liberar_completo_manual=assinatura_resumo["acesso_completo_manual"],
     )
 
     planos_catalogo = _planos_catalogo_segmento(tenant)
     plano_catalogo = planos_catalogo[0] if planos_catalogo else None
     trial_completo = assinatura_resumo["acesso_completo_durante_trial"]
+    acesso_completo = trial_completo or assinatura_resumo["acesso_completo_manual"]
     plano_ativo = acesso_liberado
     recursos_trial = sorted(
         {recurso for plano in PLAN_CATALOG.values() for recurso in plano.entitlements}
@@ -397,7 +401,7 @@ def get_modulos_status(
     entitlements_legado = _entitlements_plano_legado(planos_segmento)
     recursos_ativos = (
         recursos_trial
-        if trial_completo
+        if acesso_completo
         else sorted(entitlements_catalogo | entitlements_legado)
         if plano_ativo
         else []
@@ -428,7 +432,7 @@ def get_modulos_status(
     }
     limites_aplicados = (
         {"vendas_mensais": None, "acessos_simultaneos": None}
-        if trial_completo
+        if acesso_completo
         else limites_apos_trial
     )
 
