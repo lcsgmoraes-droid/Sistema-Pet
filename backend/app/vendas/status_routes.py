@@ -69,6 +69,12 @@ def reabrir_venda(
 
     # Guardar status anterior para log
     status_anterior = venda.status
+    from app.vendas.cancelamento_reabertura import (
+        preparar_restauracao_legada,
+        registrar_estado_reaberto,
+    )
+
+    restauracao_legada = preparar_restauracao_legada(db, venda, tenant_id)
 
     # ============================================================================
     # 🧹 CANCELAR/REMOVER COMISSÕES EXISTENTES
@@ -163,7 +169,9 @@ def reabrir_venda(
         venda_id=venda.id,
         reason="Venda reaberta para edicao",
     )
-    void_quick_repurchase_coupons_for_sale(db, tenant_id=tenant_id, venda_id=venda.id)
+    quick_coupons_voided = void_quick_repurchase_coupons_for_sale(
+        db, tenant_id=tenant_id, venda_id=venda.id
+    )
     remover_pagamentos_cashback_venda(db, tenant_id=tenant_id, venda_id=venda.id)
     if venda.cliente_id:
         reverse_cashback_for_sale(
@@ -172,10 +180,24 @@ def reabrir_venda(
             sale_id=venda.id,
             customer_id=venda.cliente_id,
         )
-    cancelar_despesas_cashback_venda(
+    cashback_expenses_cancelled = cancelar_despesas_cashback_venda(
         db, tenant_id=tenant_id, numero_venda=venda.numero_venda
     )
 
+    metadata = build_sale_reopened_metadata(
+        venda=venda,
+        previous_status=status_anterior,
+        commissions_removed=comissoes_removidas,
+        coupon_reversal=coupon_reversal_result,
+        loyalty_void=loyalty_void_result,
+    )
+    metadata.update(
+        legacy_restoration=registrar_estado_reaberto(
+            db, venda, tenant_id, restauracao_legada
+        ),
+        quick_repurchase_coupons_voided=quick_coupons_voided,
+        cashback_expenses_cancelled=cashback_expenses_cancelled,
+    )
     log_business_event(
         db=db,
         tenant_id=tenant_id,
@@ -184,13 +206,7 @@ def reabrir_venda(
         entity_type="vendas",
         entity_id=venda.id,
         old_value={"status": status_anterior},
-        metadata=build_sale_reopened_metadata(
-            venda=venda,
-            previous_status=status_anterior,
-            commissions_removed=comissoes_removidas,
-            coupon_reversal=coupon_reversal_result,
-            loyalty_void=loyalty_void_result,
-        ),
+        metadata=metadata,
         details=f"Venda #{venda.id} reaberta para edicao",
         commit=False,
     )
@@ -258,6 +274,11 @@ def atualizar_status_venda(
         # PATCH: fechar precisa reaplicar cupons e benefícios, sem novo pagamento.
         if status_anterior == "finalizada":
             return {"success": True, "status": "finalizada"}
+        if status_data.get("cancelar_reabertura") is True:
+            from app.vendas.cancelamento_reabertura import restaurar_reabertura_legada
+
+            if restaurar_reabertura_legada(db, venda, tenant_id, current_user.id):
+                return {"success": True, "status": "finalizada"}
         if venda.tem_entrega and not venda.entregador_id:
             raise HTTPException(
                 status_code=400,
