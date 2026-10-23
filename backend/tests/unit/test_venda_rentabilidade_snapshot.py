@@ -327,9 +327,7 @@ def test_snapshot_preserva_taxa_aplicada_na_venda_mesmo_se_cadastro_mudar():
     assert snapshot["venda_liquida"] == 97.01
 
 
-@pytest.mark.parametrize(
-    "desconto_item, desconto_venda, cupom", [(0, 0, 0), (1, 2, 1)]
-)
+@pytest.mark.parametrize("desconto_item, desconto_venda, cupom", [(0, 0, 0), (1, 2, 1)])
 def test_snapshot_preserva_valor_digitado_com_peso_arredondado_e_descontos(
     desconto_item, desconto_venda, cupom
 ):

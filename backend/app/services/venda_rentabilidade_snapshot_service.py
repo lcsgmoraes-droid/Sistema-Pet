@@ -535,10 +535,7 @@ def build_venda_rentabilidade_snapshot(
     desconto_cupom_reclassificado = min(cupom_desconto, desconto_bruto)
     contrato_descontos = getattr(venda, "desconto_venda_valor", None) is not None
     venda_bruta = _round_money(
-        sum(
-            float(bruto_item(item))
-            for item in list(getattr(venda, "itens", []) or [])
-        )
+        sum(float(bruto_item(item)) for item in list(getattr(venda, "itens", []) or []))
         if contrato_descontos
         else _as_float(getattr(venda, "subtotal", 0)) + desconto_bruto
     )
