@@ -191,7 +191,13 @@ def restaurar_reabertura_legada(db, venda, tenant_id, user_id):
     if (
         metadata.get("commissions_removed") != 0
         or any((metadata.get("coupon_reversal") or {}).values())
-        or any((metadata.get("loyalty_void") or {}).values())
+        # Campanhas consultadas podem ter apenas carimbos já estornados.
+        # Esse contador não significa que a reabertura retirou benefícios.
+        or any(
+            valor
+            for campo, valor in (metadata.get("loyalty_void") or {}).items()
+            if campo != "affected_campaigns"
+        )
         or metadata.get("quick_repurchase_coupons_voided", 0)
         or metadata.get("cashback_expenses_cancelled", 0)
         or _tem_beneficios_vinculados(db, venda, tenant_id)
