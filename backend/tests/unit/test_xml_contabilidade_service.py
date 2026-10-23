@@ -16,6 +16,7 @@ from app.services import xml_contabilidade_service as service
 from app.services import xml_contabilidade_documentos as documentos
 from app.tenancy.context import tenant_context
 from app.vendas_models import Venda
+from app.intnfe.estorno_models import IntNFeEstorno
 from app.xml_contabilidade_models import (
     XmlContabilidadeConfig,
     XmlContabilidadeEnvio,
@@ -72,6 +73,7 @@ def fila(monkeypatch):
     XmlContabilidadeEvento.__table__.create(engine)
     XmlContabilidadeMonitor.__table__.create(engine)
     Venda.__table__.create(engine)
+    IntNFeEstorno.__table__.create(engine)
     BlingNotaFiscalCache.__table__.create(engine)
     monkeypatch.setattr(service, "_agora", lambda: NOW)
     with tenant_context(tenant), Session(engine, expire_on_commit=False) as session:

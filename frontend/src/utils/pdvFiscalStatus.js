@@ -27,6 +27,10 @@ const CAMPOS_FISCAIS_VENDA = [
   "nfe_cancelamento_motivo",
   "nfe_cancelamento_solicitado_em",
   "pendencia_fiscal_cancelamento",
+  "nfe_estorno_status",
+  "nfe_estorno_numero",
+  "nfe_estorno_serie",
+  "nfe_estorno_protocolo",
 ];
 
 const STATUS_FISCAL = {
@@ -155,6 +159,8 @@ export function temNotaFiscalAtiva(venda = {}) {
 }
 
 export function obterPendenciaCancelamentoFiscal(venda = {}) {
+  // O backend só encerra esta pendência após validar a regularização fiscal.
+  if (venda.pendencia_fiscal_cancelamento === false) return null;
   if (!temNotaFiscalAtiva(venda)) return null;
   const status = normalizar(venda.nfe_cancelamento_status || venda.cancelamento_status);
   if (

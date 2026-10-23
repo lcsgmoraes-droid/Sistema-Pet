@@ -124,7 +124,21 @@ def campos_cancelamento(venda):
         else None,
         "cancelamento_solicitado": status == "solicitado",
         "pendencia_fiscal_cancelamento": pendencia,
+        **campos_estorno(venda),
     }
+
+
+def campos_estorno(venda):
+    campos = {}
+    for nome, tipo in (
+        ("status", str),
+        ("numero", int),
+        ("serie", int),
+        ("protocolo", str),
+    ):
+        valor = getattr(venda, f"nfe_estorno_{nome}", None)
+        campos[f"nfe_estorno_{nome}"] = valor if type(valor) is tipo else None
+    return campos
 
 
 def campos_cancelamento_com_aliases(venda):

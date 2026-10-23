@@ -38,11 +38,24 @@ class IntNFeError(Exception):
 
 def _safe_validation_errors(payload):
     """Extrai somente mensagens curtas de validação e oculta dados identificáveis."""
-    if not isinstance(payload, dict) or not isinstance(payload.get("erros"), list):
+    if not isinstance(payload, dict):
         return []
 
+    messages = list(payload["erros"]) if isinstance(payload.get("erros"), list) else []
+    # ASP.NET devolve falhas de binding/Required como ProblemDetails em
+    # `errors`, um mapa de campo -> mensagens, em vez de `erros: [...]`.
+    if isinstance(payload.get("errors"), dict):
+        for field, errors in list(payload["errors"].items())[:12]:
+            if not isinstance(field, str) or not re.fullmatch(
+                r"[\w.$\[\]-]{1,100}", field
+            ):
+                continue
+            for error in (errors if isinstance(errors, list) else [errors])[:4]:
+                if isinstance(error, str):
+                    messages.append(f"{field}: {error}")
+
     safe = []
-    for raw in payload["erros"][:12]:
+    for raw in messages[:12]:
         if not isinstance(raw, str):
             continue
         message = re.sub(r"[\x00-\x1f\x7f]+", " ", raw).strip()
