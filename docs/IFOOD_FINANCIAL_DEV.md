@@ -464,3 +464,22 @@ oficial neste documento sem link verificado no portal.
   sete verificações negativas em memória passaram, preservando o hash original.
   Os novos testes do Portal integram os gates de CI e release. Não houve nova
   migração, importação do arquivo real no ERP ou alteração de produção.
+
+### Preparação para publicação do código (2026-10-23)
+
+Após a autorização do responsável para deploy, foi identificado que o bloqueio
+mobile acima vinha da ausência de `app-mobile/node_modules` neste worktree. A
+correção de node-forge e sua verificação por hash já estavam versionadas. A
+instalação canônica com `npm ci` executou o `postinstall`, sem alterar o lockfile,
+Expo, runtime ou binários. O backport foi comprovado, os seis testes específicos
+passaram e a auditoria mobile aprovou a instalação.
+
+O `FLUXO_UNICO.bat release-check` completo passou após essa preparação, incluindo
+104 testes mobile. O contrato OpenAPI também passou a documentar os conflitos
+409 e os demais erros comuns em todas as dez operações Financial; o comportamento
+das consultas e seus bloqueios de ambiente foram preservados.
+
+Publicar este código não habilita Financial real. A leitura continua restrita a
+DEV/homologação e depende da validação e permissão do iFood antes de uma entrega
+operacional em produção. Nenhuma massa sintética ou arquivo real de teste deve
+ser transportado ao banco de produção durante o deploy.

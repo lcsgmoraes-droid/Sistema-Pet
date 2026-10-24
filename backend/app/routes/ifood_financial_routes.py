@@ -34,7 +34,21 @@ from app.integrations.ifood.reconciliation import (
 from app.security.permissions_decorator import require_permission
 from app.security import permissions_service
 
-router = APIRouter(prefix="/integracoes/ifood/financeiro", tags=["iFood Financial DEV"])
+router = APIRouter(
+    prefix="/integracoes/ifood/financeiro",
+    tags=["iFood Financial DEV"],
+    responses={
+        401: {"description": "Autenticação necessária."},
+        403: {"description": "Permissão insuficiente para esta empresa."},
+        404: {"description": "Evidência financeira não encontrada nesta empresa."},
+        409: {
+            "description": "Ambiente, vínculo da loja ou habilitação incompatível com a consulta Financial."
+        },
+        422: {"description": "Período, identificação ou dados financeiros inválidos."},
+        429: {"description": "Limite de consultas do iFood atingido."},
+        502: {"description": "Não foi possível concluir a consulta ao iFood."},
+    },
+)
 
 
 class FinancialPeriod(BaseModel):
