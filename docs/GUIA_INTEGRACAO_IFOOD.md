@@ -206,11 +206,18 @@ Antes do primeiro envio, a prévia deverá identificar um único produto, a loja
 a situação de vínculo, os campos que serão enviados e os valores antes e depois.
 As informações que não fazem parte do teste devem ser preservadas.
 
-**Prévia corrigida e conferida somente em DEV.** A conexão bem-sucedida já foi
-observada em produção. A correção da listagem passou nos testes, na revisão e
-na conferência visual com dados fictícios, mas ainda não foi aplicada em
-produção. Este rascunho não apresenta a prévia de produção nem o envio como
-etapas finalizadas e não fornece passos de publicação ainda não validados.
+**Prévia corrigida e conferida em produção.** Depois de validar a conexão:
+
+1. Use **Conferir produtos** na integração iFood.
+2. Confira os contadores e localize o produto piloto entre os itens aptos,
+   apresentados antes dos produtos com impedimentos na lista limitada.
+3. Confira que a opção do piloto está habilitada e selecionada e que os demais
+   itens não foram incluídos por engano.
+4. Mantenha a integração desativada enquanto revisa o piloto. Conferir a prévia
+   não publica o produto.
+
+O vínculo, o envio e o estoque automático continuam pendentes de validação.
+Este rascunho não fornece passos de publicação ainda não executados.
 
 Para um item novo, confirme antes que ele realmente não existe no catálogo.
 Para um item publicado, conclua a correspondência antes de atualizar. O piloto
@@ -251,6 +258,12 @@ das taxas efetivamente cobradas ou do repasse.
 Os dados financeiros podem ser consultados manualmente no Portal do Parceiro.
 Essa disponibilidade no Portal não significa que o CorePet já os receba por API
 ou os inclua automaticamente na apuração.
+
+Conferir a **comissão contratada** para prever a contribuição é diferente de
+consultar a **cobrança efetiva** pela integração Financial. A publicação no módulo
+Item não devolve uma cotação de comissão ou taxas: ela recebe os dados do produto
+para processamento. Essa distinção deve ser preservada ao calcular a estimativa.
+[Endpoints do módulo Item](https://developer.ifood.com.br/en-US/docs/groceries/guides/modules/item/endpoints).
 
 A documentação oficial prevê **Financial** para Groceries e exige sua
 homologação separada dos módulos operacionais. Essa é uma etapa própria de
