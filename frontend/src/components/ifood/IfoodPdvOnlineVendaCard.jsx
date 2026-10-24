@@ -24,7 +24,7 @@ export default function IfoodPdvOnlineVendaCard({ venda, onUpdated }) {
       );
       if (currentSale.current === saleId) {
         setMessage("Venda concluída. Estoque baixado e repasse a conciliar.");
-        await onUpdated?.();
+        await onUpdated?.(saleId);
       }
     } catch (error) {
       if (currentSale.current === saleId) {

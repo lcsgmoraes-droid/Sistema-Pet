@@ -113,6 +113,13 @@ Nao se presume receita da loja ou repasse pelo total cobrado do consumidor.
 Fora do escopo ou com modo desconhecido, a UI bloqueia cobranca manual; somente
 um resumo habilitado com `payment_mode=offline` libera o dinheiro presencial.
 
+**Limite dos relatorios gerais:** essas telas ainda nao consideram o repasse
+`awaiting_financial` como uma condicao propria de margem pendente. Seus totais e
+margens nao foram homologados para este piloto online e nao podem justificar
+ampliacao para outros produtos/lojas ou producao. A referencia desta etapa e o
+resumo do pedido com margem/repasse pendentes do Financial; o financeiro geral
+nao e alterado por esta entrega.
+
 Ao finalizar a venda no PDV, o fluxo normal faz a baixa FIFO dos lotes e encerra
 a reserva na mesma transacao. Repeticoes e concorrencia nao podem executar outra
 baixa. Cancelar a venda antes da finalizacao somente libera a reserva, sem

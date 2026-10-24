@@ -89,6 +89,72 @@ function orderDetailsElement(harness) {
   return elements(harness.tree).find((item) => typeof item.type === "function");
 }
 
+const checkout = {
+  items_total: 65,
+  delivery_fee: 8.9,
+  ifood_service_fee: 1.99,
+  operational_total: 73.9,
+  customer_total: 75.89,
+};
+
+async function renderListAndDetails(value) {
+  const env = prepare({ initial: Promise.resolve({ data: { orders: [value] } }), detail: value });
+  await env.harness.settle();
+  const listText = elementText(env.harness.tree);
+  const details = await selectOrder(env);
+  const detailHarness = createControllerHarness(file, {
+    exportName: "OrderDetails",
+    mocks: env.mocks,
+    props: details.props,
+  });
+  await detailHarness.settle();
+  return [listText, elementText(detailHarness.tree)];
+}
+
+test("lista e cabecalho online usam total do consumidor comprovado sem modificar total legado", async () => {
+  const value = {
+    ...order,
+    total: 65,
+    pdv_bridge: { ...bridge, payment_mode: "online", checkout },
+  };
+  const before = structuredClone(value);
+  for (const text of await renderListAndDetails(value)) {
+    assert.match(text, /Total do consumidor/);
+    assert.match(text, /75,89/);
+    assert.doesNotMatch(text, /65,00|73,90/);
+  }
+  assert.deepEqual(value, before);
+});
+
+test("checkout online invalido nao apresenta subtotal legado como total; offline conserva exibição", async () => {
+  for (const invalid of [
+    undefined,
+    {},
+    { ...checkout, customer_total: null },
+    { ...checkout, customer_total: "" },
+    { ...checkout, customer_total: true },
+    { ...checkout, customer_total: -1 },
+    { ...checkout, customer_total: 65 },
+    { ...checkout, operational_total: 65 },
+  ]) {
+    for (const text of await renderListAndDetails({
+      ...order,
+      total: 65,
+      pdv_bridge: { ...bridge, payment_mode: "online", checkout: invalid },
+    })) {
+      assert.match(text, /Total do consumidor/);
+      assert.match(text, /Não informado/);
+      assert.doesNotMatch(text, /65,00|75,89|0,00/);
+    }
+  }
+  for (const summary of [undefined, { ...bridge, payment_mode: "offline", checkout }]) {
+    for (const text of await renderListAndDetails({ ...order, total: 65, pdv_bridge: summary })) {
+      assert.match(text, /65,00/);
+      assert.doesNotMatch(text, /Total do consumidor|75,89/);
+    }
+  }
+});
+
 test("conclusao online local nao depende de operacoes externas e trava o duplo clique", async () => {
   const response = pending();
   const online = {

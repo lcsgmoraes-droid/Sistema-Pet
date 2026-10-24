@@ -19,6 +19,36 @@ function money(value) {
   return formatMoneyBRL(value);
 }
 
+function orderDisplayTotal(order) {
+  if (order.pdv_bridge?.payment_mode !== "online") {
+    return { label: "Total", formatted: money(order.total), online: false };
+  }
+  const checkout = order.pdv_bridge.checkout || {};
+  const amounts = [
+    "items_total",
+    "delivery_fee",
+    "ifood_service_fee",
+    "operational_total",
+    "customer_total",
+  ].map((key) => {
+    const raw = checkout[key];
+    if (!["number", "string"].includes(typeof raw) || String(raw).trim() === "") return null;
+    const value = Number(raw);
+    return Number.isFinite(value) && value >= 0 ? Math.round(value * 100) : null;
+  });
+  const [items, delivery, service, operational, customer] = amounts;
+  const valid =
+    amounts.every((value) => value !== null) &&
+    items > 0 &&
+    operational === items + delivery &&
+    customer === operational + service;
+  return {
+    label: "Total do consumidor",
+    formatted: valid ? money(customer / 100) : "Não informado",
+    online: true,
+  };
+}
+
 function dateTime(value) {
   if (!value) return "Não informado";
   return new Date(value).toLocaleString("pt-BR");
@@ -98,6 +128,7 @@ export function OrderDetails({
   const items = values(payload.bag?.items || payload.items);
   const controlsDisabled = !actionsEnabled || Boolean(action);
   const pickingItemsDisabled = controlsDisabled || Boolean(order.pdv_bridge?.sale_id);
+  const displayTotal = orderDisplayTotal(order);
 
   useEffect(() => {
     setQuantities(
@@ -130,8 +161,8 @@ export function OrderDetails({
           <p>{order.customer_name || payload.customer?.name || "Não informado"}</p>
         </div>
         <div>
-          <p className="text-xs uppercase text-slate-500">Total</p>
-          <p>{money(order.total)}</p>
+          <p className="text-xs uppercase text-slate-500">{displayTotal.label}</p>
+          <p>{displayTotal.formatted}</p>
         </div>
         <div>
           <p className="text-xs uppercase text-slate-500">Recebido</p>
@@ -584,36 +615,42 @@ export default function IfoodPedidosPanel({ enabled: externalEnabled, onMessage 
         </p>
       ) : orders.length ? (
         <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {orders.map((order) => (
-            <div
-              key={order.ifood_order_id}
-              className={`rounded-lg border p-3 text-sm dark:text-slate-100 ${selectedId === order.ifood_order_id ? "border-red-400 bg-red-50 dark:bg-red-950/30" : "border-slate-200 dark:border-slate-800"}`}
-            >
-              <BotaoInteracao
-                aria-pressed={selectedId === order.ifood_order_id}
-                disabled={Boolean(action)}
-                larguraTotal
-                onClick={() => selectOrder(order.ifood_order_id)}
-                tamanho="pequeno"
+          {orders.map((order) => {
+            const displayTotal = orderDisplayTotal(order);
+            return (
+              <div
+                key={order.ifood_order_id}
+                className={`rounded-lg border p-3 text-sm dark:text-slate-100 ${selectedId === order.ifood_order_id ? "border-red-400 bg-red-50 dark:bg-red-950/30" : "border-slate-200 dark:border-slate-800"}`}
               >
-                Ver pedido #{order.display_id || order.ifood_order_id.slice(0, 8)}
-              </BotaoInteracao>
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-medium">
-                  #{order.display_id || order.ifood_order_id.slice(0, 8)}
-                </span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[11px] ${statusClass(order.status)}`}
+                <BotaoInteracao
+                  aria-pressed={selectedId === order.ifood_order_id}
+                  disabled={Boolean(action)}
+                  larguraTotal
+                  onClick={() => selectOrder(order.ifood_order_id)}
+                  tamanho="pequeno"
                 >
-                  {order.status}
-                </span>
+                  Ver pedido #{order.display_id || order.ifood_order_id.slice(0, 8)}
+                </BotaoInteracao>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">
+                    #{order.display_id || order.ifood_order_id.slice(0, 8)}
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[11px] ${statusClass(order.status)}`}
+                  >
+                    {order.status}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  {order.order_type} · {order.order_timing}
+                </p>
+                <p className="mt-2 font-medium">
+                  {displayTotal.online ? `${displayTotal.label}: ` : ""}
+                  {displayTotal.formatted}
+                </p>
               </div>
-              <p className="mt-1 text-xs text-slate-500">
-                {order.order_type} · {order.order_timing}
-              </p>
-              <p className="mt-2 font-medium">{money(order.total)}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <p className="mt-4 text-sm text-slate-500">Nenhum pedido de teste recebido ainda.</p>

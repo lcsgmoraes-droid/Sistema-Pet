@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import * as fiscalStatus from "../../utils/pdvFiscalStatus.js";
 import {
   createControllerHarness,
   elements,
@@ -16,7 +17,7 @@ const bridge = {
   sale_id: 42,
   ifood_order_id: "test-order",
 };
-function prepare(summary = bridge, post) {
+function prepare(summary = bridge, post, reload) {
   const calls = [],
     updates = [];
   const harness = createControllerHarness(
@@ -24,7 +25,10 @@ function prepare(summary = bridge, post) {
     {
       props: {
         venda: { id: 42, canal: "ifood", ifood_pdv_pilot: summary },
-        onUpdated: () => updates.push(42),
+        onUpdated: async (saleId) => {
+          updates.push(saleId);
+          await reload?.(saleId);
+        },
       },
       mocks: new Map([
         [
@@ -81,4 +85,95 @@ test("piloto desativado nao permite cobranca manual e bloqueio servidor nao fing
   await env.harness.act(() => card.props.onFinalizeOnline());
   assert.match(elementText(env.harness.tree), /Sacola mudou/);
   assert.deepEqual(env.updates, []);
+});
+
+test("conclusao passa ID real ao carregador do PDV e relê venda finalizada e reserva encerrada", async () => {
+  const requests = [],
+    alerts = [],
+    sales = [];
+  const finalized = {
+    id: 42,
+    status: "finalizada",
+    canal: "ifood",
+    subtotal: 65,
+    total: 73.9,
+    tem_entrega: true,
+    entrega: { taxa_entrega_total: 8.9 },
+    itens: [{ produto_id: 1, quantidade: 1, preco_unitario: 65, subtotal: 65 }],
+    ifood_pdv_pilot: {
+      ...bridge,
+      status: "sold",
+      can_finalize_online: false,
+      stock_decreased: true,
+      reserved_quantity: 0,
+    },
+  };
+  const loader = createControllerHarness(
+    fileURLToPath(new URL("../../hooks/usePDVVendaCarregamento.js", import.meta.url)),
+    {
+      exportName: "usePDVVendaCarregamento",
+      props: {
+        setVendaAtual: (sale) => sales.push(sale),
+        setLoading() {},
+        setModoVisualizacao() {},
+        sincronizarComissaoDaVenda: async () => {},
+        sincronizarEntregadorDaVenda: async () => {},
+      },
+      mocks: new Map([
+        [
+          "../api",
+          {
+            __esModule: true,
+            default: {
+              get: async (url) => {
+                requests.push(url);
+                return {
+                  data: {
+                    pagamentos: [{ forma_pagamento: "iFood online", valor: 73.9 }],
+                    total_recebido: 73.9,
+                  },
+                };
+              },
+            },
+          },
+        ],
+        ["../api/clientes", {}],
+        [
+          "../api/vendas",
+          {
+            buscarVendaComSituacaoFiscal: async (saleId) => {
+              assert.equal(saleId, 42);
+              requests.push(`/vendas/${saleId}`);
+              return finalized;
+            },
+          },
+        ],
+        ["../utils/debug", { debugLog() {} }],
+        ["../utils/pdvFiscalStatus", fiscalStatus],
+        ["../services/corepetDialog", {}],
+      ]),
+      globals: { alert: (message) => alerts.push(message), console: { error() {} } },
+    },
+  );
+  const env = prepare(
+    bridge,
+    async () => ({ data: { pdv_bridge: finalized.ifood_pdv_pilot } }),
+    loader.tree.carregarVendaEspecifica,
+  );
+  const card = elements(env.harness.tree).find((node) => node.type === "IfoodPedidoPdvPilot");
+  await env.harness.act(() => card.props.onFinalizeOnline());
+  assert.deepEqual(env.calls, [
+    "/integracoes/ifood/pedidos/test-order/piloto-pdv/finalizar-online",
+  ]);
+  assert.deepEqual(requests, ["/vendas/42", "/vendas/42/pagamentos"]);
+  assert.deepEqual(alerts, []);
+  assert.equal(sales.length, 1);
+  assert.equal(sales[0].status, "finalizada");
+  assert.equal(sales[0].ifood_pdv_pilot.status, "sold");
+  assert.equal(sales[0].ifood_pdv_pilot.reserved_quantity, 0);
+  assert.equal(sales[0].ifood_pdv_pilot.stock_decreased, true);
+  await env.harness.update({ venda: sales[0] });
+  const refreshed = elements(env.harness.tree).find((node) => node.type === "IfoodPedidoPdvPilot");
+  assert.equal(refreshed.props.bridge.can_finalize_online, false);
+  assert.equal(refreshed.props.bridge.stock_decreased, true);
 });
