@@ -1,5 +1,6 @@
 /* global process, localStorage, window, navigator, DOMException, history, PopStateEvent */
 import { expect, test } from "@playwright/test";
+import { execFileSync } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 import { fileURLToPath, URL } from "node:url";
 
@@ -20,6 +21,7 @@ const produtoForaDaPagina = {
   id: 42099,
   nome: "Brinquedo sintético QA & diversão",
   codigo: "QA-FORA-DA-PAGINA",
+  imagem_principal: "/uploads/qa-compartilhamento.svg",
   descricao: "Produto de teste que não aparece na primeira página do catálogo.",
 };
 
@@ -66,6 +68,7 @@ async function prepararLoja(page, { compartilhar = "sucesso", clipboard = true }
             name: "Loja Compartilhamento QA",
             ecommerce_slug: slug,
             ecommerce_ativo: true,
+            logo_url: "/uploads/qa-loja.svg",
           },
         });
       }
@@ -94,6 +97,10 @@ async function prepararLoja(page, { compartilhar = "sucesso", clipboard = true }
       return route.fulfill({ status: 404, json: { detail: "API não simulada neste teste." } });
     },
   );
+  await page.route("**/uploads/qa-*.svg", (route) => route.fulfill({
+    contentType: "image/svg+xml",
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="orange"/></svg>',
+  }));
   return { consultasDetalhe };
 }
 
@@ -115,6 +122,15 @@ function conferirLinkProduto(valor, produtoId) {
   return url;
 }
 
+function conferirLinkCompartilhamento(valor, produtoId) {
+  const url = new URL(valor);
+  expect(url.origin).toBe(new URL(baseURL).origin);
+  expect(url.pathname).toBe(`/api/ecommerce/compartilhar/produtos/${produtoId}`);
+  expect([...url.searchParams.entries()]).toEqual([["tenant", slug]]);
+  expect(url.hash).toBe("");
+  return url;
+}
+
 test("link direto abre produto fora da página atual e continua correto após atualizar", async ({
   page,
 }) => {
@@ -124,7 +140,7 @@ test("link direto abre produto fora da página atual e continua correto após at
   expect(consultasDetalhe.every((url) => url.searchParams.get("tenant") === slug)).toBe(true);
   expect(consultasDetalhe.every((url) => url.searchParams.get("canal") === "ecommerce")).toBe(true);
   conferirLinkProduto(await page.locator('link[rel="canonical"]').getAttribute("href"), 42099);
-  conferirLinkProduto(await page.locator('meta[property="og:url"]').getAttribute("content"), 42099);
+  conferirLinkCompartilhamento(await page.locator('meta[property="og:url"]').getAttribute("content"), 42099);
 
   await page.reload();
   await expect(
@@ -151,6 +167,41 @@ test("trocar o produto ou remover o parâmetro pela navegação sincroniza os de
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
+test("prévia usa foto do produto, volta à loja e restaura metadados ao sair", async ({ page }) => {
+  await prepararLoja(page);
+  await page.goto("/login");
+  const titleOriginal = await page.title();
+  const descriptionOriginal = await page.locator('meta[name="description"]').getAttribute("content");
+  const navigate = (caminho) => page.evaluate((destino) => {
+    history.pushState({}, "", destino);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }, caminho);
+  await navigate(`/${slug}?produto=${produtoForaDaPagina.id}`);
+  await expect(page.getByRole("dialog").getByRole("heading", {
+    name: produtoForaDaPagina.nome,
+  })).toBeVisible();
+  const image = page.locator('meta[property="og:image"]');
+  const twitterImage = page.locator('meta[name="twitter:image"]');
+  await expect(image).toHaveAttribute("content", `${new URL(baseURL).origin}${produtoForaDaPagina.imagem_principal}`);
+  await expect(twitterImage).toHaveAttribute("content", `${new URL(baseURL).origin}${produtoForaDaPagina.imagem_principal}`);
+  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", new RegExp(produtoForaDaPagina.nome));
+  await navigate(`/${slug}?produto=${produtoCatalogo.id}`);
+  await expect(page.getByRole("dialog").getByRole("heading", {
+    name: produtoCatalogo.nome,
+  })).toBeVisible();
+  await expect(image).toHaveAttribute("content", `${new URL(baseURL).origin}/uploads/qa-loja.svg`);
+  await navigate(`/${slug}`);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "Loja Compartilhamento QA | Loja online");
+  await expect(image).toHaveAttribute("content", `${new URL(baseURL).origin}/uploads/qa-loja.svg`);
+  await navigate("/login");
+  await expect(page).toHaveTitle(titleOriginal);
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", descriptionOriginal);
+  await expect(image).toHaveCount(0);
+  await expect(twitterImage).toHaveCount(0);
+  await expect(page.locator('link[rel="canonical"]')).toHaveCount(0);
+});
+
 test("abrir, copiar e fechar produto preserva a loja identificada por tenant", async ({ page }) => {
   await prepararLoja(page);
   await page.goto(`/ecommerce?tenant=${slug}`);
@@ -162,7 +213,7 @@ test("abrir, copiar e fechar produto preserva a loja identificada por tenant", a
 
   await modal.getByRole("button", { name: /Copiar link/i }).click();
   await expect.poll(() => page.evaluate(() => window.__copiasQA.length)).toBe(1);
-  conferirLinkProduto(await page.evaluate(() => window.__copiasQA[0]), produtoCatalogo.id);
+  conferirLinkCompartilhamento(await page.evaluate(() => window.__copiasQA[0]), produtoCatalogo.id);
   await modal.getByRole("button", { name: "Fechar detalhes do produto" }).click();
   await expect(modal).toHaveCount(0);
   expect(new URL(page.url()).searchParams.get("tenant")).toBe(slug);
@@ -181,14 +232,49 @@ test("WhatsApp e compartilhamento nativo usam nome e link do produto selecionado
   const mensagem = whatsapp.searchParams.get("text");
   expect(mensagem).toContain(produtoForaDaPagina.nome);
   const linkNaMensagem = mensagem.match(/https?:\/\/\S+/)?.[0];
-  conferirLinkProduto(linkNaMensagem, produtoForaDaPagina.id);
+  conferirLinkCompartilhamento(linkNaMensagem, produtoForaDaPagina.id);
 
   await modal.getByRole("button", { name: "Compartilhar", exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__compartilhamentosQA.length)).toBe(1);
   const dados = await page.evaluate(() => window.__compartilhamentosQA[0]);
   expect(`${dados.title || ""} ${dados.text || ""}`).toContain(produtoForaDaPagina.nome);
-  conferirLinkProduto(dados.url, produtoForaDaPagina.id);
+  conferirLinkCompartilhamento(dados.url, produtoForaDaPagina.id);
   expect(await page.evaluate(() => window.__copiasQA)).toEqual([]);
+});
+
+test("link recebido usa HTML do servidor e abre o produto correspondente", async ({ page }) => {
+  await prepararLoja(page);
+  const modal = await abrirProduto(page);
+  await modal.getByRole("button", { name: /Copiar link/i }).click();
+  await expect.poll(() => page.evaluate(() => window.__copiasQA.length)).toBe(1);
+  const sharedUrl = await page.evaluate(() => window.__copiasQA[0]);
+  conferirLinkCompartilhamento(sharedUrl, produtoForaDaPagina.id);
+  // Reutiliza o renderizador real do backend com dados sintéticos e sem banco/API.
+  const source = execFileSync(process.env.PYTHON || "python", [
+    "-c",
+    [
+      "import json, sys",
+      "from types import SimpleNamespace",
+      "from app.services.ecommerce_product_share import render_product_share_html",
+      "payload = json.loads(sys.argv[1])",
+      "print(render_product_share_html(SimpleNamespace(**payload['tenant']), payload['product'], payload['base_url']))",
+    ].join("\n"),
+    JSON.stringify({
+      tenant: { id: "00000000-0000-4000-8000-000000000001", name: "Loja Compartilhamento QA", ecommerce_slug: slug },
+      product: produtoForaDaPagina,
+      base_url: new URL(baseURL).origin,
+    }),
+  ], {
+    cwd: fileURLToPath(new URL("../../../backend/", import.meta.url)),
+    encoding: "utf8",
+    env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+  });
+  await page.route(sharedUrl, (route) => route.fulfill({ contentType: "text/html", body: source }));
+  await page.goto(sharedUrl);
+  await expect(page.getByRole("dialog").getByRole("heading", {
+    name: produtoForaDaPagina.nome,
+  })).toBeVisible();
+  conferirLinkProduto(page.url(), produtoForaDaPagina.id);
 });
 
 test("cancelar o compartilhamento nativo não copia nem mostra erro", async ({ page }) => {
@@ -207,7 +293,7 @@ test("sem compartilhamento nem clipboard o link aparece para cópia manual", asy
   const campoLink = modal.getByRole("textbox");
   await expect(campoLink).toBeVisible();
   await expect(campoLink).toHaveAttribute("readonly", "");
-  conferirLinkProduto(await campoLink.inputValue(), produtoForaDaPagina.id);
+  conferirLinkCompartilhamento(await campoLink.inputValue(), produtoForaDaPagina.id);
   await expect(modal.getByText("Link copiado!", { exact: true })).toHaveCount(0);
 });
 

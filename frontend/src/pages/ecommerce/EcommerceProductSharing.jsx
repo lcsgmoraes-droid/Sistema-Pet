@@ -3,20 +3,26 @@ import { Link, MessageCircle, Share2 } from "lucide-react";
 import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
 import InputTexto from "../../components/v2/InputTexto/InputTexto";
 import LinkPadrao from "../../components/v2/LinkPadrao/LinkPadrao";
-import { buildProductWhatsappUrl, copyProductUrl, shareProductUrl } from "./ecommerceProductLinks";
+import {
+  buildProductShareUrl,
+  buildProductWhatsappUrl,
+  copyProductUrl,
+  shareProductUrl,
+} from "./ecommerceProductLinks";
 
 export default function EcommerceProductSharing({ product, url }) {
   const [message, setMessage] = useState("");
   const [showManualLink, setShowManualLink] = useState(false);
+  const shareUrl = buildProductShareUrl(url);
 
   async function copyLink() {
-    const copied = await copyProductUrl(url);
+    const copied = await copyProductUrl(shareUrl);
     setShowManualLink(!copied);
     setMessage(copied ? "Link do produto copiado!" : "Selecione e copie o link abaixo.");
   }
 
   async function shareLink() {
-    const result = await shareProductUrl(product, url);
+    const result = await shareProductUrl(product, shareUrl);
     if (result === "fallback") await copyLink();
   }
 
@@ -26,7 +32,7 @@ export default function EcommerceProductSharing({ product, url }) {
         <BotaoInteracao icon={Share2} onClick={shareLink} tamanho="pequeno">
           Compartilhar
         </BotaoInteracao>
-        <LinkPadrao href={buildProductWhatsappUrl(product, url)} novaJanela>
+        <LinkPadrao href={buildProductWhatsappUrl(product, shareUrl)} novaJanela>
           <MessageCircle size={16} aria-hidden="true" /> WhatsApp
         </LinkPadrao>
         <BotaoInteracao icon={Link} onClick={copyLink} tamanho="pequeno">
@@ -42,7 +48,7 @@ export default function EcommerceProductSharing({ product, url }) {
         <InputTexto
           label="Link do produto"
           readOnly
-          value={url}
+          value={shareUrl}
           onFocus={(event) => event.target.select()}
         />
       )}
