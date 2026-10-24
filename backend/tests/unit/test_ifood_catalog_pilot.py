@@ -15,6 +15,7 @@ from app.ifood_catalog_models import (
 )
 from app.ifood_integration_models import IfoodMerchantConfig
 from app.integrations.ifood.client import IfoodClientError
+from app.integrations.ifood.catalog import item_description_text
 from app.produtos_catalogo_models import Produto
 from app.routes import ifood_catalog_pilot_routes as routes
 from app.tenancy.context import tenant_context
@@ -662,3 +663,112 @@ def test_unique_binding_barcode_constraint_rejects_two_products_of_same_store(se
     with pytest.raises(IntegrityError):
         s.db.flush()
     s.db.rollback()
+
+
+@pytest.mark.parametrize(
+    "source,expected",
+    [
+        (
+            '<h2 style="color:red">Ração &amp; cuidado</h2><p class="editor">Cães <strong>adultos</strong>.<br>Água fresca.</p>',
+            "Ração & cuidado\n\nCães adultos.\nÁgua fresca.",
+        ),
+        (
+            "<p>Primeiro parágrafo.</p><div>Segundo parágrafo.</div>",
+            "Primeiro parágrafo.\n\nSegundo parágrafo.",
+        ),
+        (
+            "<ul><li><p>Frango &amp; arroz</p></li><li><p>Vitaminas</p></li></ul>",
+            "• Frango & arroz\n• Vitaminas",
+        ),
+        (
+            "<ol><li>Abra a embalagem</li><li>Sirva</li></ol>",
+            "1. Abra a embalagem\n2. Sirva",
+        ),
+        (
+            "<p>Até &lt;5 kg e &gt;2 kg; &#231; e &#xE3;.</p>",
+            "Até <5 kg e >2 kg; ç e ã.",
+        ),
+        (
+            '<p>Antes</p><script>segredo;document.write("texto")</script><style>.classe{color:red}</style><p>Depois</p>',
+            "Antes\n\nDepois",
+        ),
+        ("<script>não exportar</script><style>nem isso</style>", ""),
+        ("<p><br></p><div>&nbsp; &#160;</div><!-- comentario -->", ""),
+        ("<div><custom>Acentuação</custom></div>", "Acentuação"),
+        ("2 < 3 e 5 > 4; peso <5 kg.", "2 < 3 e 5 > 4; peso <5 kg."),
+        ("x<y e y>z", "x<y e y>z"),
+        ("Dose A<B e C>D.", "Dose A<B e C>D."),
+        ("<p>Dose A<B e C>D.</p>", "Dose A<B e C>D."),
+        ("<!-- somente comentario -->", ""),
+        ("<ul><li></li></ul>", ""),
+        ("<ol><li><p><br></p></li></ol>", ""),
+        ("<p>1.</p>", "1."),
+        (
+            "Texto simples\n\nCom parágrafos e acentuação.",
+            "Texto simples\n\nCom parágrafos e acentuação.",
+        ),
+        ("Ração &amp; água&nbsp;fresca", "Ração & água fresca"),
+        ('<p>Ração <span class="x">com</span> arroz</p>', "Ração com arroz"),
+    ],
+)
+def test_item_description_exports_legible_text(source, expected):
+    assert item_description_text(source) == expected
+
+
+def test_rich_description_normalized_only_in_create_payload_and_source_unchanged(setup):
+    s = setup
+    source = '<h2 style="font-weight:bold">Produto fictício</h2><p class="editor">Alimento &amp; cuidado.<br>Água fresca.</p>'
+    s.first.descricao_completa = source
+    s.db.commit()
+    link(s, "new")
+    result = prepare(s, "create")
+    assert result["eligible"]
+    assert (
+        result["payload"]["details"]["description"]
+        == "Produto fictício\n\nAlimento & cuidado.\nÁgua fresca."
+    )
+    s.db.expire_all()
+    assert s.first.descricao_completa == source
+    assert not s.calls and s.db.query(IfoodCatalogSubmission).count() == 0
+
+
+def test_empty_full_html_falls_back_to_readable_short_description(setup):
+    s = setup
+    s.first.descricao_completa = "<p><br></p>"
+    s.first.descricao_curta = "<p>Descrição curta &amp; legível.</p>"
+    s.db.commit()
+    link(s, "new")
+    result = prepare(s, "create")
+    assert result["eligible"]
+    assert result["payload"]["details"]["description"] == "Descrição curta & legível."
+    item = s.client.get("/integracoes/ifood/catalogo/gestao").json()["items"][0]
+    assert "descricao" not in {pending["code"] for pending in item["pending"]}
+
+
+def test_empty_html_is_a_description_pending_in_management_and_preparation(setup):
+    s = setup
+    s.first.descricao_completa = "<p><br></p><style>.vazio{}</style>"
+    s.first.descricao_curta = "<script>não é descrição</script><p>&nbsp;</p>"
+    s.db.commit()
+    link(s, "new")
+    result = prepare(s, "create")
+    assert not result["eligible"]
+    assert result["payload"]["details"]["description"] is None
+    assert "content_missing" in {pending["code"] for pending in result["pending"]}
+    item = s.client.get("/integracoes/ifood/catalogo/gestao").json()["items"][0]
+    assert "descricao" in {pending["code"] for pending in item["pending"]}
+
+
+def test_stock_only_patch_omits_even_rich_description(setup):
+    s = setup
+    source = '<h2 style="color:red">Descrição fictícia</h2><script>ignorar</script>'
+    s.first.descricao_completa = source
+    s.db.commit()
+    link(s)
+    result = prepare(s, fields=["stock"])
+    assert result["eligible"] and result["payload"] == {
+        "barcode": EAN,
+        "inventory": {"stock": 10},
+    }
+    assert "details" not in result["payload"]
+    assert s.first.descricao_completa == source and not s.calls
