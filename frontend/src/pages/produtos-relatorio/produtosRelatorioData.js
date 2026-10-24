@@ -6,8 +6,42 @@ export function criarFiltrosPadrao() {
     data_inicio: dataInicioPorDias(30),
     data_fim: hojeIso(),
     tipo_movimentacao: "",
+    quantidade_operador: "",
+    quantidade_valor: "",
     page_size: ITENS_POR_PAGINA_INICIAL,
     produto_id: "",
+  };
+}
+
+export function validarFiltroQuantidade(filtros) {
+  if (!filtros.quantidade_operador) return "";
+  const valor = String(filtros.quantidade_valor ?? "").trim();
+  if (
+    !/^(?:\d+(?:[.,]\d{1,3})?|[.,]\d{1,3})$/.test(valor) ||
+    !Number.isFinite(Number(valor.replace(",", "."))) ||
+    Number(valor.replace(",", ".")) <= 0
+  ) {
+    return "Informe uma quantidade maior que zero, com até 3 casas decimais. Ex.: 1 ou 0,5.";
+  }
+  return "";
+}
+
+export function montarParamsQuantidade(filtros) {
+  if (!filtros.quantidade_operador) return {};
+  return {
+    quantidade_operador: filtros.quantidade_operador,
+    quantidade_valor: String(filtros.quantidade_valor).trim().replace(",", "."),
+  };
+}
+
+export function montarParamsProdutoVendas(filtros, pagina, pageSize) {
+  return {
+    produto_id: filtros.produto_id,
+    data_inicio: filtros.data_inicio,
+    data_fim: filtros.data_fim,
+    page: pagina,
+    page_size: pageSize,
+    ...montarParamsQuantidade(filtros),
   };
 }
 
@@ -16,6 +50,7 @@ export function montarParamsMovimentacoes(filtros, pagina, extra = {}) {
     page: pagina,
     page_size: Number(filtros.page_size) || ITENS_POR_PAGINA_INICIAL,
     ...extra,
+    ...montarParamsQuantidade(filtros),
   };
 
   if (filtros.data_inicio) params.data_inicio = filtros.data_inicio;

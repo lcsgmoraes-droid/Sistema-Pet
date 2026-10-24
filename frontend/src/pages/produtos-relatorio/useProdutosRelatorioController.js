@@ -15,7 +15,9 @@ import {
   criarDadosMovimentacoesVazios,
   criarFiltrosPadrao,
   montarParamsMovimentacoes,
+  montarParamsProdutoVendas,
   normalizarDadosMovimentacoes,
+  validarFiltroQuantidade,
 } from "./produtosRelatorioData";
 import { dataInicioPorDias, extrairListaProdutos, hojeIso } from "./produtosRelatorioFormatters";
 
@@ -26,6 +28,7 @@ export default function useProdutosRelatorioController() {
   const [periodoSelecionado, setPeriodoSelecionado] = useState("30dias");
   const [filtrosForm, setFiltrosForm] = useState(filtrosPadrao);
   const [filtrosAplicados, setFiltrosAplicados] = useState(filtrosPadrao);
+  const [erroQuantidade, setErroQuantidade] = useState("");
   const [produtoSelecionado, setProdutoSelecionado] = useState(null);
   const [buscaProduto, setBuscaProduto] = useState("");
   const [sugestoesProdutos, setSugestoesProdutos] = useState([]);
@@ -64,13 +67,9 @@ export default function useProdutosRelatorioController() {
   const carregarResumoProduto = useCallback(async (filtros, pagina) => {
     try {
       setLoadingResumoProduto(true);
-      const response = await getRelatorioProdutoVendas({
-        produto_id: filtros.produto_id,
-        data_inicio: filtros.data_inicio,
-        data_fim: filtros.data_fim,
-        page: pagina,
-        page_size: ITENS_HISTORICO_VENDAS,
-      });
+      const response = await getRelatorioProdutoVendas(
+        montarParamsProdutoVendas(filtros, pagina, ITENS_HISTORICO_VENDAS),
+      );
       setDadosProduto(response?.data || null);
     } catch (error) {
       console.error("Erro ao carregar resumo do produto:", error);
@@ -139,6 +138,9 @@ export default function useProdutosRelatorioController() {
   const aplicarFiltros = useCallback(
     (event) => {
       if (event) event.preventDefault();
+      const erro = validarFiltroQuantidade(filtrosForm);
+      setErroQuantidade(erro);
+      if (erro) return;
 
       const novosFiltros = {
         ...filtrosForm,
@@ -154,6 +156,7 @@ export default function useProdutosRelatorioController() {
   );
 
   const atualizarFiltro = useCallback((campo, valor) => {
+    if (campo.startsWith("quantidade_")) setErroQuantidade("");
     setFiltrosForm((prev) => ({
       ...prev,
       [campo]: valor,
@@ -170,6 +173,11 @@ export default function useProdutosRelatorioController() {
 
   const handlePeriodoChange = useCallback(
     (periodo) => {
+      if (periodo.dias) {
+        const erro = validarFiltroQuantidade(filtrosForm);
+        setErroQuantidade(erro);
+        if (erro) return;
+      }
       setPeriodoSelecionado(periodo.value);
 
       if (!periodo.dias) return;
@@ -233,6 +241,7 @@ export default function useProdutosRelatorioController() {
 
   const limparFiltros = useCallback(() => {
     const filtrosLimpos = criarFiltrosPadrao();
+    setErroQuantidade("");
 
     setPeriodoSelecionado("30dias");
     setProdutoSelecionado(null);
@@ -357,6 +366,8 @@ export default function useProdutosRelatorioController() {
     buscaRef,
     periodoSelecionado,
     filtrosForm,
+    filtrosAplicados,
+    erroQuantidade,
     produtoSelecionado,
     buscaProduto,
     sugestoesProdutos,
