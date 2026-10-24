@@ -2,6 +2,7 @@
 
 from decimal import Decimal
 from typing import Any
+from .catalog import product_description_text
 
 from app.integrations.ifood.pricing import (
     decimal_value,
@@ -231,10 +232,7 @@ def build_management_item(
             "recomendacao",
             "imagem_principal",
         )
-    if not (
-        getattr(product, "descricao_completa", None)
-        or getattr(product, "descricao_curta", None)
-    ):
+    if not product_description_text(product):
         add(
             "descricao",
             "Adicione uma descrição do produto.",

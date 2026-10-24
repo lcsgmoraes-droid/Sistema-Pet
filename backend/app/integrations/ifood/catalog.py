@@ -6,11 +6,152 @@ from dataclasses import dataclass, replace
 from collections import Counter
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
+from html import unescape
+from html.parser import HTMLParser
 from typing import Any, Iterable
 from urllib.parse import urljoin, urlparse
 from .pricing import resolve_ifood_prices
 
 _MONEY = Decimal("0.01")
+
+
+class _DescriptionTextParser(HTMLParser):
+    """Extrai texto do editor sem transportar HTML para o modulo Item."""
+
+    blocks = frozenset(
+        {
+            "p",
+            "div",
+            "section",
+            "article",
+            "header",
+            "footer",
+            "blockquote",
+            "pre",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "dl",
+            "dt",
+            "dd",
+            "table",
+            "tr",
+        }
+    )
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+        self.hidden = None
+        self.markup = False
+        self.opened = set()
+        self.lists = []
+        self.item_depth = 0
+        self.inline_opened = {}
+        self.item_starts = []
+
+    def handle_starttag(self, tag, attrs):
+        self.opened.add(tag)
+        self.markup |= tag in self.blocks | {
+            "br",
+            "ul",
+            "ol",
+            "li",
+            "script",
+            "style",
+            "img",
+            "hr",
+        }
+        if self.hidden:
+            return
+        if tag in {"script", "style"}:
+            self.hidden = tag
+        elif tag == "br":
+            self.parts.append("\n")
+        elif tag in {"ul", "ol"}:
+            self.parts.append("\n")
+            self.lists.append([tag, 0])
+        elif tag == "li":
+            self.item_depth += 1
+            self.item_starts.append(len(self.parts))
+            prefix = "• "
+            if self.lists and self.lists[-1][0] == "ol":
+                self.lists[-1][1] += 1
+                prefix = f"{self.lists[-1][1]}. "
+            self.parts.append("\n" + prefix)
+        elif tag == "p" and self.item_depth:
+            self.parts.append(" ")
+        elif tag in self.blocks:
+            self.parts.append("\n\n")
+        elif tag in {"td", "th"}:
+            self.parts.append(" ")
+        elif tag not in {"img", "hr"}:
+            # Um comparador como A<B e C>D nao deve perder texto. Somente
+            # remover o token inline quando existir o respectivo fechamento.
+            self.inline_opened.setdefault(tag, []).append(len(self.parts))
+            self.parts.append(self.get_starttag_text())
+
+    def handle_endtag(self, tag):
+        self.markup |= tag in self.opened
+        if self.hidden:
+            if tag == self.hidden:
+                self.hidden = None
+            return
+        if tag in {"ul", "ol"}:
+            if self.lists and self.lists[-1][0] == tag:
+                self.lists.pop()
+            self.parts.append("\n")
+        elif tag == "li":
+            self.item_depth = max(0, self.item_depth - 1)
+            if self.item_starts:
+                start = self.item_starts.pop()
+                if not "".join(self.parts[start + 1 :]).strip():
+                    self.parts[start] = ""
+        elif tag == "p" and self.item_depth:
+            self.parts.append(" ")
+        elif tag in self.blocks:
+            self.parts.append("\n\n")
+        elif self.inline_opened.get(tag):
+            self.parts[self.inline_opened[tag].pop()] = ""
+
+    def handle_comment(self, data):
+        self.markup = True
+
+    def handle_data(self, data):
+        if self.hidden or not data:
+            return
+        # Whitespace de formatacao do HTML nao junta palavras de tags inline.
+        self.parts.append(
+            (" " if data[0].isspace() else "")
+            + " ".join(data.split())
+            + (" " if data[-1].isspace() else "")
+        )
+
+
+def item_description_text(value: Any) -> str:
+    """Texto legivel de exportacao. Nao altera nem reinterpreta o cadastro."""
+    raw = str(value or "").strip()
+    parser = _DescriptionTextParser()
+    parser.feed(raw)
+    parser.close()
+    if not parser.markup:
+        # Preserva texto simples, inclusive comparacoes como x<y e 2 > 1.
+        return unescape(raw).replace("\xa0", " ").strip()
+    lines = []
+    for line in "".join(parser.parts).splitlines():
+        text = " ".join(line.split())
+        if text or (lines and lines[-1]):
+            lines.append(text)
+    return "\n".join(lines).strip()
+
+
+def product_description_text(product: Any) -> str:
+    return item_description_text(
+        getattr(product, "descricao_completa", None)
+    ) or item_description_text(getattr(product, "descricao_curta", None))
 
 
 @dataclass(frozen=True)
@@ -233,11 +374,7 @@ def build_catalog_item(
 
     stock_field = "ifood_available_stock" if source == "ifood" else "estoque_atual"
     stock = max(0.0, _number(getattr(product, stock_field, 0)) - stock_safety)
-    description = str(
-        getattr(product, "descricao_completa", None)
-        or getattr(product, "descricao_curta", None)
-        or ""
-    ).strip()
+    description = product_description_text(product)
     categorization = {
         "department": _related_name(product, "departamento"),
         "category": _related_name(product, "categoria"),
