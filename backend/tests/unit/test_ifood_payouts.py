@@ -617,8 +617,88 @@ def test_first_request_failure_is_cached_before_repeating_post(scope):
     result = advance_reconciliation(db, tenant, MERCHANT, "2025-03", 1, client, now=now)
     assert result["job"]["next_retry_after_seconds"] >= 60
     assert not result["imported"]
+    assert result["job"]["error_code"] == "rate_limited"
     db.commit()
     advance_reconciliation(
         db, tenant, MERCHANT, "2025-03", 1, client, now=now + timedelta(seconds=1)
     )
     assert client.created == 1
+
+
+@pytest.mark.parametrize(
+    "reason,expected",
+    [
+        ("no_financial_entries", "no_financial_entries"),
+        ("provider_job_error", "provider_job_error"),
+        ("https://PRIVATE.example.test?secret=PRIVATE", "provider_job_error"),
+        (None, "provider_job_error"),
+    ],
+)
+def test_terminal_provider_error_has_safe_reason_not_empty_statement_or_zero(
+    scope, reason, expected
+):
+    db, tenant = scope
+    client = ProviderJob()
+
+    def terminal(merchant, request, competence):
+        client.checked += 1
+        return dict(
+            merchant_id=merchant,
+            competence=competence,
+            request_id=request,
+            status="error",
+            error_code=reason,
+            errorMessage="PRIVATE customer@example.test https://signed.example.test?secret=PRIVATE",
+        )
+
+    client.get_reconciliation = terminal
+    now = datetime(2025, 3, 4, tzinfo=timezone.utc)
+    advance_reconciliation(db, tenant, MERCHANT, "2025-03", 1, client, now=now)
+    result = advance_reconciliation(
+        db, tenant, MERCHANT, "2025-03", 1, client, now=now + timedelta(seconds=5)
+    )
+    db.commit()
+    assert result["job"]["status"] == "error" and not result["imported"]
+    assert result["job"]["error_code"] == expected
+    message = result["job"]["last_error"]
+    assert "saldo zero" in message and "conciliação concluída" in message
+    assert MERCHANT not in message and "PRIVATE" not in message
+    assert "@" not in message and "http" not in message
+    assert db.query(IfoodPayoutSnapshot).filter_by(kind="statement").count() == 0
+    db.expire_all()
+    cached = get_reconciliation_status(db, tenant, MERCHANT, "2025-03")
+    assert cached["job"]["error_code"] == expected
+    assert (
+        cached["job"]["last_error"] == db.query(IfoodReconciliationJob).one().last_error
+    )
+    advance_reconciliation(
+        db, tenant, MERCHANT, "2025-03", 1, client, now=now + timedelta(days=1)
+    )
+    assert client.created == client.checked == 1
+
+
+@pytest.mark.parametrize(
+    "legacy_message", [None, "PRIVATE email@example.test https://secret.example.test"]
+)
+def test_cached_legacy_terminal_error_is_safe_and_does_not_invent_a_cause(
+    scope, legacy_message
+):
+    db, tenant = scope
+    db.add(
+        IfoodReconciliationJob(
+            tenant_id=tenant,
+            merchant_id=MERCHANT,
+            mode="homologation",
+            competence="2025-03",
+            status="error",
+            attempts=1,
+            imported=False,
+            actor_id=1,
+            last_error=legacy_message,
+        )
+    )
+    db.flush()
+    result = get_reconciliation_status(db, tenant, MERCHANT, "2025-03")
+    assert result["job"]["status"] == "error"
+    assert result["job"]["error_code"] == "provider_job_error"
+    assert not result["imported"] and "PRIVATE" not in result["job"]["last_error"]

@@ -5,6 +5,7 @@ import math
 
 from app.ifood_payout_models import IfoodReconciliationJob
 from app.integrations.ifood.client import IfoodClientError
+from app.integrations.ifood.financial_client import RECONCILIATION_ERROR_MESSAGES
 from app.integrations.ifood.financial import (
     MODE,
     IfoodFinancialError,
@@ -37,13 +38,26 @@ def job_view(job, *, now=None):
         if job.next_check_at
         else 0
     )
+    code = next(
+        (
+            key
+            for key, message in RECONCILIATION_ERROR_MESSAGES.items()
+            if message == job.last_error
+        ),
+        None,
+    )
+    if job.status == "error" and code is None:
+        code = "provider_job_error"
+    elif job.last_error and code is None:
+        code = "consultation_failed"
     return {
         "job": {
             "id": job.id,
             "status": job.status,
             "competence": job.competence,
             "last_checked_at": _iso(job.last_checked_at),
-            "last_error": job.last_error,
+            "last_error": RECONCILIATION_ERROR_MESSAGES[code] if code else None,
+            "error_code": code,
             "next_retry_after_seconds": delay,
         },
         "imported": job.imported,
@@ -85,7 +99,12 @@ def advance_reconciliation(
         if getattr(error, "status_code", None) == 429:
             delay = max(60, delay)
         job.next_check_at = now + timedelta(seconds=delay)
-        job.last_error = "Não foi possível concluir esta consulta; evidência anterior preservada. Aguarde para tentar novamente."
+        code = (
+            "rate_limited"
+            if getattr(error, "status_code", None) == 429
+            else "consultation_failed"
+        )
+        job.last_error = RECONCILIATION_ERROR_MESSAGES[code]
         db.flush()
         return job_view(job, now=now)
 
@@ -170,7 +189,13 @@ def advance_reconciliation(
             return failed(exc)
         job.imported = True
     job.status = status
-    job.last_error = None
+    code = response.get("error_code") if status == "error" else None
+    if status == "error":
+        if code not in {"no_financial_entries", "provider_job_error"}:
+            code = "provider_job_error"
+        job.last_error = RECONCILIATION_ERROR_MESSAGES[code]
+    else:
+        job.last_error = None
     job.attempts += 1
     job.last_checked_at = now
     delay = min(300, 5 * (2 ** min(job.attempts, 6)))

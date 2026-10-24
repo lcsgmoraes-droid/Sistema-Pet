@@ -126,3 +126,41 @@ test("cartões e estado inicial recebem os ícones obrigatórios dos componentes
   const empty = elements(env.harness.tree).find((item) => item.type === "EstadoVazio");
   assert.ok(empty.props.icone);
 });
+
+test("erro terminal mostra motivo seguro e orientação, preserva títulos e não confirma banco", async () => {
+  const env = setup();
+  const titulos = [env.title, { ...env.title, id: "second-title", amount: "-7.20" }];
+  env.controller.relatorio.titles = titulos;
+  env.controller.relatorio.summary.matched_titles = 2;
+  env.controller.job = {
+    status: "error",
+    competence: "2025-08",
+    last_error:
+      "O iFood não disponibilizou dados financeiros para esta competência de homologação.",
+  };
+  await env.harness.update({ ativo: true });
+  const alerts = elements(env.harness.tree).filter((item) => item.props?.role === "alert");
+  assert.equal(alerts.length, 1);
+  assert.match(elementText(alerts[0]), /não disponibilizou dados financeiros/);
+  assert.match(elementText(alerts[0]), /acompanhamento automático foi encerrado/);
+  assert.match(elementText(alerts[0]), /Confira a competência e o motivo/);
+  assert.match(elementText(alerts[0]), /contribuições já importados foram preservados/);
+  assert.match(elementText(alerts[0]), /banco continua não conferido/);
+  assert.equal(
+    elements(env.harness.tree).find((item) => item.type === "DataTable").props.data,
+    titulos,
+  );
+  const detail = await env.detail();
+  assert.match(elementText(detail), /recebimento no banco não conferido/);
+});
+
+test("erro sem motivo mantém mensagem honesta sem sugerir saldo ou margem zero", async () => {
+  const env = setup();
+  env.controller.job = { status: "error", competence: "2025-08", last_error: null };
+  await env.harness.update({ ativo: true });
+  assert.match(
+    elementText(env.harness.tree),
+    /O arquivo de conciliação não foi processado pelo iFood/,
+  );
+  assert.doesNotMatch(elementText(env.harness.tree), /saldo zero|margem zero|Arquivo processado/);
+});

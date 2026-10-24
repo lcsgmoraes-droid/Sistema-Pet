@@ -217,7 +217,7 @@ Invoke-GateStep 'Backend iFood safety contracts' $python @(
     'tests/unit/test_ifood_financial.py', 'tests/unit/test_ifood_financial_client.py',
     'tests/unit/test_ifood_financial_routes.py', 'tests/unit/test_ifood_contract_reference.py',
     'tests/unit/test_ifood_financial_costs.py', 'tests/unit/test_ifood_payouts.py',
-    'tests/unit/test_ifood_financial_statement.py', '-q'
+    'tests/unit/test_ifood_financial_statement.py', 'tests/unit/test_ifood_portal_statement.py', '-q'
 ) $backend
 
 if ($Nivel -eq 'rapido') {

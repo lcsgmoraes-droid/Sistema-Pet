@@ -292,6 +292,15 @@ Os custos manuais continuam separados e versionados; não são sobrescritos pela
    resolve essa pendência. Erro terminal ou conflito sem solicitação conhecida
    exige conferência; o sistema não gera solicitações repetidas para contornar isso.
 
+Se aparecer que o iFood não encontrou lançamentos, a geração do arquivo falhou
+para aquela loja e competência. Isso não significa saldo zero. O acompanhamento
+automático termina e os dados anteriores são preservados; confira o motivo antes
+de uma nova consulta. Em homologação, pode ser necessário solicitar ao iFood uma
+massa de testes válida.
+
+Um extrato baixado no Portal do Parceiro tem formato próprio. Sua conferência
+separada não substitui o arquivo gerado pela API nem confirma o crédito no banco.
+
 Abrir a tela ou consultar os dados locais não chama o iFood. Nenhuma dessas
 ações publica anúncios nem marca caixa, banco ou contabilidade como conciliados.
 O roteiro técnico e as limitações estão em [Financial em DEV](IFOOD_FINANCIAL_DEV.md).

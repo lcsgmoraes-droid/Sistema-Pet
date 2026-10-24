@@ -298,6 +298,75 @@ def test_reconciliation_pending_and_provider_error_do_not_become_ready_or_zero(s
         result = api.get_reconciliation(MERCHANT, REQUEST_ID, MONTH)
     assert result["status"] == status and result["download_url"] is None
     assert "private details" not in repr(result)
+    assert result["error_code"] == ("provider_job_error" if status == "error" else None)
+
+
+@pytest.mark.parametrize(
+    "field,detail",
+    [
+        (
+            "errorMessage",
+            f"File generation failed: No financial entries exist for merchant {MERCHANT} in the requested time frame.",
+        ),
+        (
+            "message",
+            "No financial entries found for the specified merchant and competence.",
+        ),
+    ],
+)
+def test_documented_no_entries_examples_return_only_local_allowlisted_reason(
+    field, detail
+):
+    body = dict(id=REQUEST_ID, merchantId=MERCHANT, competence=MONTH, status="error")
+    body[field] = detail
+    with authenticated(lambda _: httpx.Response(200, json=body)) as api:
+        result = api.get_reconciliation(MERCHANT, REQUEST_ID, MONTH)
+    assert result["status"] == "error" and result["download_url"] is None
+    assert result["error_code"] == "no_financial_entries"
+    assert "errorMessage" not in result and "message" not in result
+    assert detail not in repr(result)
+
+
+@pytest.mark.parametrize(
+    "detail",
+    [
+        "No financial entries exist. customer@example.test https://private.example.test/file?secret=PRIVATE",
+        f"File generation failed: No financial entries exist for merchant {uuid4()} in the requested time frame.",
+        f"File generation failed: No financial entries exist for merchant {MERCHANT} in the requested time frame. email@example.test",
+        {"secret": "PRIVATE"},
+        "PRIVATE" * 1000,
+        None,
+        "Limit exceeded for PRIVATE merchant",  # No undocumented substring heuristic.
+    ],
+)
+def test_unknown_or_sensitive_job_details_remain_generic_and_are_never_copied(detail):
+    body = dict(
+        id=REQUEST_ID,
+        merchantId=MERCHANT,
+        competence=MONTH,
+        status="error",
+        errorMessage=detail,
+    )
+    with authenticated(lambda _: httpx.Response(200, json=body)) as api:
+        result = api.get_reconciliation(MERCHANT, REQUEST_ID, MONTH)
+    assert result["error_code"] == "provider_job_error"
+    assert "PRIVATE" not in repr(result) and "@" not in repr(result)
+    assert "private.example" not in repr(result)
+    assert result["download_url"] is None and "errorMessage" not in result
+
+
+def test_conflicting_error_message_fields_do_not_claim_known_no_entries_reason():
+    body = dict(
+        id=REQUEST_ID,
+        merchantId=MERCHANT,
+        competence=MONTH,
+        status="error",
+        errorMessage="No financial entries found for the specified merchant and competence.",
+        message="Unrecognized failure PRIVATE",
+    )
+    with authenticated(lambda _: httpx.Response(200, json=body)) as api:
+        result = api.get_reconciliation(MERCHANT, REQUEST_ID, MONTH)
+    assert result["error_code"] == "provider_job_error"
 
 
 @pytest.mark.parametrize("field", ["downloadPath", "filePath"])

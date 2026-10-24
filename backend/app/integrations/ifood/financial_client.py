@@ -23,6 +23,53 @@ MAX_DOWNLOAD_BYTES = 8_000_000
 # generic S3 host, production bucket, IP address, or caller-supplied allowlist.
 STATEMENT_HOSTS = frozenset({"payout-platform-api-files-sandbox.s3.amazonaws.com"})
 JOB_STATES = frozenset({"created", "enqueue", "processed", "error"})
+RECONCILIATION_ERROR_MESSAGES = {
+    "no_financial_entries": (
+        "O iFood não encontrou lançamentos financeiros para esta loja e período. "
+        "A geração falhou; isso não confirma saldo zero nem conciliação concluída."
+    ),
+    "provider_job_error": (
+        "O iFood informou falha na geração do arquivo. Nenhum arquivo foi importado; "
+        "isso não confirma saldo zero nem conciliação concluída."
+    ),
+    "rate_limited": (
+        "O limite de consultas do iFood foi atingido. Aguarde o prazo indicado para "
+        "tentar novamente; a evidência anterior foi preservada."
+    ),
+    "consultation_failed": (
+        "Não foi possível concluir esta consulta; evidência anterior preservada. "
+        "Aguarde para tentar novamente."
+    ),
+}
+
+
+def _job_error_code(body, merchant):
+    """Classificacao local de exemplos oficiais exatos; nunca ecoa texto livre.
+
+    Nao ha enum errorCode documentado no job. As duas mensagens conhecidas
+    aparecem em exemplos da Reference; a variante com ID deve citar a loja
+    cujo escopo ja foi validado. Causas diferentes permanecem genericas.
+    """
+    messages = [
+        body[key] for key in ("errorMessage", "message") if body.get(key) is not None
+    ]
+    if not messages:
+        return "provider_job_error"
+    known = "No financial entries found for the specified merchant and competence."
+    identified = (
+        r"File generation failed: No financial entries exist for merchant "
+        + re.escape(merchant)
+        + r" in the requested time frame\."
+    )
+    for message in messages:
+        if not isinstance(message, str) or len(message) > 1024:
+            return "provider_job_error"
+        message = message.strip()
+        if message.casefold() != known.casefold() and not re.fullmatch(
+            identified, message, flags=re.IGNORECASE
+        ):
+            return "provider_job_error"
+    return "no_financial_entries"
 
 
 def _merchant(value):
@@ -373,6 +420,9 @@ class IfoodFinancialClient(IfoodClient):
             request_id=request_id,
             status=body["status"],
             download_url=url,
+            error_code=_job_error_code(body, merchant)
+            if body["status"] == "error"
+            else None,
         )
 
     def download_statement(self, url):

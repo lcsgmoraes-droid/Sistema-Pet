@@ -300,6 +300,91 @@ resultado é erro terminal do job, não arquivo vazio, saldo zero ou ciclo compl
 de conciliação homologado. A evidência técnica sanitizada permanece fora do Git;
 nenhuma URL privada, resposta bruta protegida ou credencial foi copiada para este guia.
 
+### Diagnóstico da geração sem lançamentos (2026-10-23)
+
+A consulta original foi aceita com HTTP 202; uma nova leitura do mesmo request ID
+confirmou HTTP 200, `status: error` e a causa documentada de ausência de lançamentos
+para a loja e competência solicitadas (08/2025). A identidade da loja de testes é
+diferente do recebedor da massa fixa de 28 Financial Events. Esses eventos não
+comprovam que existam lançamentos na loja que solicitou o arquivo. Settlements
+também retornou sem títulos para 09/2026 e 01–22/10/2026. Não foram criadas novas
+solicitações para contornar o erro nem modificados IDs, datas ou regras de escopo.
+
+A [FAQ oficial, questão sobre pedidos de teste](https://developer.ifood.com.br/pt-BR/support/faq/#concilia%C3%A7%C3%A3o---%C3%A9-poss%C3%ADvel-testar-a-api-de-financial-com-pedidos-de-teste)
+informa que esse uso do Financial ainda não é suportado. Isso não equivale a
+afirmar que toda massa estática inexiste: a homologação usa exemplos, mas as fontes
+consultadas não fornecem uma competência/loja específica com CSV atual baixável.
+O único endereço do exemplo `processed` na Reference foi assinado em 07/08/2025
+por 86400 segundos e está vencido; ele não foi alterado nem tratado como arquivo válido.
+
+O cliente agora reconhece apenas as mensagens exatas documentadas de falta de
+lançamentos e devolve `error_code: no_financial_entries`. Textos desconhecidos
+ficam como `provider_job_error`; HTTP 429 e demais falhas de consulta têm códigos
+locais separados e mantêm o backoff. O motivo apresentado e persistido usa texto
+estático em português, sem ecoar mensagens livres, IDs, URLs privadas ou dados
+pessoais do provedor. Erros antigos sem causa preservada recebem explicação
+genérica; não se inventa uma razão retroativa.
+
+A interface mostra o motivo, informa que o acompanhamento automático terminou e
+preserva os repasses, custos e contribuições anteriores. A falha continua sem
+arquivo importado e não comprova saldo zero nem recebimento no banco.
+
+Um extrato obtido no Portal do Parceiro é uma origem distinta da geração On-demand
+da API. A validação de um arquivo do Portal deve manter o original, o hash, a loja,
+a cobertura declarada e a origem explícita; não comprova um job `processed` nem
+autoriza misturar os valores com a massa de homologação de outra loja.
+
+### Validação controlada de um extrato oficial do Portal
+
+Foi obtido, pela interface autenticada do Portal, um extrato V2 em CSV. A Central
+de Downloads declarou cobertura de 07 a 13/09/2026, embora o filtro de exportação
+tenha sido preparado para setembro. A conferência usou somente a cobertura
+declarada no relatório disponível, sem ampliar sua abrangência por suposição.
+O navegador salvou o download com nome UUID, e não com o nome descritivo exibido
+no Portal. As duas cópias geradas pelos cliques foram identificadas por metadados
+recentes e tinham o mesmo SHA256; o original foi preservado em pasta protegida,
+fora do repositório. Não foi necessário acessar históricos, caches ou banco do
+navegador para encontrar o arquivo.
+
+O arquivo usa vírgula, UTF-8, 38 colunas e nomes como `merchant_id`,
+`data_do_faturamento` e `valor_total_do_repasse`. Isso difere do CSV V3 do
+On-demand, que usa outro delimitador e contrato. A validação é feita por
+`app.integrations.ifood.portal_statement.validate_portal_statement`, sem alterar
+o parser V3 nem permitir a importação do Portal como se fosse um job da API.
+
+Na execução real no container DEV isolado, todas as 15 linhas corresponderam à
+loja, competência e cobertura verificadas. Os dois totais por título fecharam
+com diferença zero, somando apenas as 13 linhas com impacto no repasse. As duas
+linhas sem impacto permaneceram separadas. O relatório contém SHA256 dos bytes
+originais, fonte `ifood_partner_portal_v2`, cobertura declarada, contagens e
+totais; não inclui nomes de loja/clientes, CNPJ ou dados bancários livres.
+
+Foram testadas, em memória e sem modificar o original, loja/competência/cobertura
+incorretas, repetição de lançamento, diferença de um centavo, célula vazia acima
+do limite e linha em branco com quantidade incorreta de colunas. Todas foram
+recusadas ou marcadas para revisão, conforme o caso. A execução não fez chamadas
+externas nem gravou em tabelas do ERP. O arquivo real e a prova detalhada continuam
+protegidos e fora do Git; os testes versionados usam somente dados sintéticos.
+
+O resultado é **consistência interna do arquivo**. Continuam pendentes o cruzamento
+com Financial Events/Settlements da mesma loja e apuração, a confirmação bancária
+e os custos necessários à margem. Datas de pagamento presentes no Portal não
+quitam recebíveis ou caixa. O extrato não fornece `id_saldo` ou datas explícitas
+de apuração Financial; a cobertura de exportação não substitui esses dados.
+
+### Solicitação técnica ao iFood
+
+Com autorização explícita do responsável, foi enviado o chamado **35302661** em
+23/10/2026, às 22:46. O detalhe confirmou o status **Em análise** e a classificação
+**Dúvidas ou Informações → Dúvida Técnica - API → Dúvida sobre API - Financial**.
+O acompanhamento fica em [Minhas solicitações](https://developer.ifood.com.br/pt-BR/developer/tickets).
+
+A solicitação pede uma loja/competência de testes com lançamentos disponíveis,
+um fluxo válido de geração/download e esclarecimento da relação de `id_saldo`
+com os títulos. Foram enviados somente identificadores técnicos de homologação
+e o erro necessário ao diagnóstico, sem anexos, credenciais ou o extrato real.
+Esse chamado técnico não inicia nem comprova a homologação Financial.
+
 Antes de apresentar Financial como integração completa:
 
 - Ampliar a validação oficial de homologação além da captura Financial Events já
@@ -365,7 +450,7 @@ oficial neste documento sem link verificado no portal.
   trouxe CMV histórico 48 e contribuição 20,60 / 25,75%; o CMV manual permaneceu
   nulo e sua versão foi preservada. Trata-se de fixture de teste, sem venda real
   do Atacadão e sem comprovar o ciclo oficial de repasses do iFood.
-- Gate atual: 369 testes iFood aprovados; smoke raiz 203 aprovados / 2 ignorados,
+- Gate da ampliação anterior: 369 testes iFood aprovados; smoke raiz 203 aprovados / 2 ignorados,
   hardening multitenant 769 aprovados / 22 ignorados. Lint, formatação, build,
   importação do backend e auditorias de dependências backend/frontend passaram.
   O gate completo foi interrompido na auditoria mobile por
@@ -373,3 +458,9 @@ oficial neste documento sem link verificado no portal.
   é idêntico ao de `origin/main` (`36949c33f6e6bc2a9e62722cf21319bf47aaacf0`);
   nenhuma dependência mobile foi alterada nesta entrega. Portanto o gate completo
   não deve ser apresentado como aprovado nem como autorização para produção.
+- Após o diagnóstico do job e o validador separado do Portal: **435 testes backend
+  iFood** e **103 testes frontend iFood/produto** aprovados. Ruff, ESLint, Prettier
+  e build passaram. A validação do extrato oficial no container DEV isolado e
+  sete verificações negativas em memória passaram, preservando o hash original.
+  Os novos testes do Portal integram os gates de CI e release. Não houve nova
+  migração, importação do arquivo real no ERP ou alteração de produção.

@@ -316,9 +316,15 @@ export default function IfoodRepasses({ ativo = false, status, periodoSugerido =
             : "Nenhuma solicitação local para esta competência."}
         </p>
         {c.job?.status === "error" ? (
-          <p role="alert" className="v2-texto text-red-700 dark:text-red-300">
-            O arquivo não foi processado. Confira a solicitação antes de tentar novamente.
-          </p>
+          <div role="alert" className="space-y-1 v2-texto text-red-700 dark:text-red-300">
+            <p className="font-semibold">Não foi possível concluir a conciliação</p>
+            <p>{c.job.last_error || "O arquivo de conciliação não foi processado pelo iFood."}</p>
+            <p className="v2-texto-ajuda">
+              O acompanhamento automático foi encerrado. Confira a competência e o motivo informado
+              antes de consultar novamente. Os repasses, custos e contribuições já importados foram
+              preservados. O recebimento no banco continua não conferido.
+            </p>
+          </div>
         ) : null}
         {c.job?.status === "conflict" ? (
           <p role="status" className="v2-texto text-amber-800 dark:text-amber-200">
@@ -326,7 +332,7 @@ export default function IfoodRepasses({ ativo = false, status, periodoSugerido =
             automático foi pausado; confira a solicitação antes de tentar novamente.
           </p>
         ) : null}
-        {c.job?.last_error ? (
+        {c.job?.last_error && c.job.status !== "error" ? (
           <p role="status" className="v2-texto text-amber-800 dark:text-amber-200">
             {c.job.last_error}
           </p>

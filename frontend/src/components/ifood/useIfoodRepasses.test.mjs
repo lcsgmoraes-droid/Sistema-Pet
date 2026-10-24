@@ -241,3 +241,59 @@ test("conflito normalizado sem identificador não dispara nova solicitação aut
   assert.equal(env.requests.job.length, 1);
   assert.equal(env.harness.tree.job.status, "conflict");
 });
+
+test("erro terminal encerra polling e mantém relatório, competência e títulos importados", async () => {
+  const env = setup({ canSync: true });
+  const importado = {
+    ...report,
+    titles: [
+      {
+        id: "repasse",
+        amount: "91.00",
+        reconciliation_status: "matched",
+        bank_status: "not_checked",
+      },
+      {
+        id: "boleto",
+        amount: "-7.20",
+        reconciliation_status: "matched",
+        bank_status: "not_checked",
+      },
+    ],
+  };
+  await env.load(importado);
+  await env.harness.act(() => env.harness.tree.iniciarConciliacao());
+  await env.answerJob(pending());
+  await env.fire();
+  await env.answerJob({
+    imported: false,
+    job: {
+      competence: "2025-08",
+      status: "error",
+      last_error: "Não há arquivo financeiro disponível nesta competência de homologação.",
+    },
+  });
+  assert.equal(env.harness.tree.seguindo, false);
+  assert.equal(env.timers.size, 0);
+  assert.equal(env.harness.tree.relatorio, importado);
+  assert.equal(env.harness.tree.relatorio.titles.length, 2);
+  assert.equal(env.harness.tree.competence, "2025-08");
+  assert.match(env.harness.tree.job.last_error, /homologação/);
+  await env.harness.update({ enabled: false });
+  await env.harness.update({ enabled: true });
+  env.requests.status.at(-1).resolve({
+    data: {
+      imported: false,
+      job: {
+        competence: "2025-08",
+        status: "error",
+        last_error: "Não há arquivo financeiro disponível nesta competência de homologação.",
+      },
+    },
+  });
+  await env.harness.settle();
+  assert.equal(env.requests.job.length, 2);
+  assert.equal(env.timers.size, 0);
+  assert.equal(env.harness.tree.relatorio, importado);
+  assert.equal(env.harness.tree.relatorio.titles[0].bank_status, "not_checked");
+});
