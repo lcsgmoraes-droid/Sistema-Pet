@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Data | 23/10/2026, horário de Brasília |
-| Situação | Conexão de produção validada e SKU piloto Pronto para envio; empresa desativada; correção da prévia aprovada no gate, revisão e visual DEV, ainda não aplicada em produção |
+| Situação | Conexão e prévia corrigida validadas em produção; SKU piloto selecionado; integração da empresa desativada, sem anúncio enviado; vínculo e estoque automático pendentes |
 | Escopo | Jornada de implantação e conferência do SKU `018631.1` |
 | CorePet | Empresa Atacadão das Rações Pet |
 | iFood | Loja Atacadão das Rações Avenida Brasil |
@@ -37,7 +37,8 @@ originais ficam fora do Git.
 | Seleção do piloto | Produção | Somente intenção local do SKU salva; nenhum anúncio enviado |
 | Correção de código da prévia | DEV | Implementada; testes focados, gate completo e revisão independente aprovados |
 | Conferência visual da prévia corrigida | DEV isolado, dados fictícios | Produto apto no início da prévia e selecionado, mesmo após catálogo grande de rejeitados |
-| Publicação da correção da prévia | Produção | Não aplicada |
+| Publicação da correção da prévia | Produção | PR 1549 integrado e deploy oficial concluído em a75cba5a1 |
+| Conferência da prévia após deploy | Produção | SKU piloto primeiro, selecionado e único habilitado; conexão revalidada e integração da empresa desativada |
 | Integração financeira | Ainda não implementada | Financial e apuração posterior das cobranças continuam pendentes |
 
 ## Observações confirmadas até o momento
@@ -202,9 +203,9 @@ originais ficam fora do Git.
     `is_admin`. Não foram alteradas permissões para contornar essa proteção.
     O DEV usou credenciais vazias, flags iFood desabilitadas e rede interna;
     nenhuma operação externa foi executada.
-38. A correção da prévia **ainda não foi aplicada em produção**. A manutenção de
-    credenciais e o teste de conexão de produção já concluídos são etapas
-    distintas da correção de código validada em DEV. Nenhum anúncio foi enviado.
+38. Antes do deploy registrado adiante, a correção da prévia estava validada
+    somente em DEV. A manutenção de credenciais foi uma etapa operacional
+    distinta da posterior publicação de código. Nenhum anúncio foi enviado.
 39. Após a dúvida do usuário sobre taxas e resultado financeiro, ficou
     registrada uma pendência separada: a integração atual não utiliza
     **Financial**. A documentação oficial confirma o módulo para Groceries e
@@ -218,6 +219,24 @@ originais ficam fora do Git.
     promoção custeada pela loja e taxas cobradas ao consumidor, sem reproduzir
     valores neste documento. Isso comprova a disponibilidade **manual no Portal**,
     não o recebimento desses dados por API no CorePet.
+41. O **PR 1549 foi integrado** e o deploy oficial terminou com **exit 0**, da
+    baseline `7fed` para o commit `a75cba5a1`. A baseline já continha outra
+    correção publicada separadamente, fora desta entrega. O gate completo passou
+    em `552fc9b11`, e os oito checks obrigatórios do commit `a75cba5a1` foram
+    aprovados. O status oficial mostrou os cinco serviços saudáveis, a API com
+    saúde OK e o watchdog saudável.
+42. Após o deploy, a conferência em uma nova aba autenticada, na empresa correta,
+    mostrou **7.145 produtos, um apto e 7.144 com impedimentos**. A prévia de 50
+    opções exibiu **somente uma habilitada**, com o **SKU `018631.1` primeiro e
+    selecionado**. A opção de ativar a integração permaneceu desmarcada, e
+    **Testar conexão** confirmou novamente **Loja localizada e conexão validada
+    no iFood.** Não houve POST/PATCH de catálogo, reset, polling ou anúncio
+    enviado.
+43. Na pendência financeira, foi distinguida a consulta da **comissão contratada
+    para previsão** das **cobranças efetivas via Financial**. A publicação no
+    módulo Item recebe dados de produto e não retorna cotação de comissão ou
+    taxas. Nenhuma taxa real, informação bancária ou dado de pedido é incluído
+    neste registro.
 
 ## Registro incremental da jornada
 
@@ -250,14 +269,15 @@ originais ficam fora do Git.
 | Encerrar transporte temporário | Manutenção autorizada | Chave privada, payload criptografado e pasta temporária removidos; backup protegido fora do Git | Limpeza dos artefatos temporários da manutenção | Nenhum segredo em mídias ou no Git |
 | Tentar selecionar produto na central | Central do iFood | Atualização não concluída durante deploy externo; recarga posterior confirmou Selecionados: 0 | Nenhuma seleção confirmada ou produto salvo até esse ponto | Preparação do SKU continua |
 | Validar conexão após correção | Empresa correta → Configurações → Integrações → iFood → Testar conexão | Selo Conexão validada e mensagem Loja localizada e conexão validada no iFood. | Consulta de conexão bem-sucedida; sem envio de anúncio | Comprovado; opção de ativação da empresa segue desmarcada |
-| Selecionar somente o piloto | Central do iFood → Selecionar para iFood | SKU 018631.1 selecionado; confirmação Produto selecionado, contador 1 e status Pronto para envio | Somente intenção local salva; demais campos preservados | Concluído; empresa segue desativada e nada enviado ao iFood |
+| Selecionar somente o piloto | Central do iFood → Selecionar para iFood | SKU 018631.1 selecionado; confirmação Produto selecionado, contador 1 e status Pronto para envio | Somente intenção local salva; demais campos preservados | Concluído; integração da empresa segue desativada e nada enviado ao iFood |
 | Conferir orientação de rentabilidade | Central do iFood | Taxas desconhecidas mantêm uma orientação e contribuição Não calculada | Consulta | Nenhuma contribuição estimada comprovada |
-| Conferir prévia de um item | Configurações → Integrações → iFood → Conferir produtos | Contador indica um pronto; lista limitada sem SKU piloto e com seleção desabilitada | Consulta; nenhum envio de produto | Problema na ordem entre limite e prioridade dos aptos; correção em DEV |
-| Corrigir prévia | DEV, branch codex/ifood-piloto-publicacao | Produtos aptos antes do limite, preservando grupos e filtro de pendências | Somente código DEV; nenhuma aplicação em produção | Implementado; 91 testes iFood aprovados, incluindo oito novos e doze no arquivo alterado |
+| Conferir prévia inicial | Configurações → Integrações → iFood → Conferir produtos | Contador indicava um pronto; lista limitada sem SKU piloto e com seleção desabilitada | Consulta; nenhum envio de produto | Problema inicial, posteriormente corrigido no deploy registrado abaixo |
+| Implementar correção da prévia em DEV | DEV, branch codex/ifood-piloto-publicacao | Produtos aptos antes do limite, preservando grupos e filtro de pendências | Implementação e testes antes do deploy registrado abaixo | 91 testes iFood aprovados, incluindo oito novos e doze no arquivo alterado |
 | Revisar e concluir checks da correção | DEV e PR 1549, commit d42fbfacb | Revisão independente sem achados, Ruff, gate completo e 11 checks do PR aprovados | Nenhum envio | Concluído; release-check exit 0 |
 | Conferir visualmente a prévia corrigida | DEV isolado 18083, empresa fictícia | Único apto apareceu primeiro e selecionado na prévia de 50, após 60 rejeitados na massa | Somente dados fictícios e rede interna | Comprovado; APIs de limites 1/50/200 e filtro only_issues também aprovadas |
 | Conferir limite de permissão do dry-run | DEV isolado, usuário fictício | Dry-run legado negado com 403 por ausência da flag global is_admin | Permissões preservadas; nenhum envio | Não tratado como dry-run concluído nem como falha da correção da prévia |
-| Publicar correção da prévia | Produção | Ainda não aplicada | Não executado | Produção mantém a limitação observada; sem envio de anúncios |
+| Publicar correção da prévia | Produção, a75cba5a1 | PR 1549 integrado e deploy oficial exit 0, após gate 552fc9b11 e oito checks obrigatórios aprovados | Código publicado; nenhum envio de produto | Cinco serviços saudáveis; API e watchdog OK |
+| Conferir prévia e conexão após deploy | Produção, empresa correta | SKU piloto primeiro, selecionado e único habilitado na prévia de 50; conexão revalidada | Consulta; integração da empresa desativada | Comprovado; sem POST/PATCH de catálogo, reset, polling ou anúncio |
 | Vincular produto existente | Fluxo ainda em validação | Nenhum vínculo criado | Não executado | Pendente |
 | Solicitar envio de um item | Fluxo ainda em validação | Nenhuma solicitação enviada | Não executado | Pendente |
 | Conferir publicação | CorePet, Portal e canal iFood | Nenhuma publicação conferida neste piloto | Não executado | Pendente |
@@ -280,6 +300,7 @@ originais ficam fora do Git.
 | `2026-10-23-ifood-corepet-conexao-validada.png` | Captura da navegação assistida, fora do Git | Selo e mensagem de conexão validada após a correção | Evidência operacional; revisar e anonimizar antes de qualquer uso público |
 | `2026-10-23-ifood-sku018631-pronto-local.png` | Captura da navegação assistida, fora do Git | SKU piloto selecionado localmente e Pronto para envio | Evidência operacional; revisar e anonimizar antes de qualquer uso público |
 | `2026-10-23-ifood-previa-prioridade-dev.png` | Captura da conferência visual no DEV isolado, fora do Git | Produto fictício apto priorizado e selecionado na prévia limitada | Dados fictícios; sem credenciais ou envio externo |
+| `2026-10-23-ifood-previa-producao-sku018631.png` | Captura da conferência após deploy, fora do Git | SKU piloto primeiro e selecionado na prévia corrigida de produção | Evidência operacional; revisar e anonimizar antes de qualquer uso público |
 
 As demais observações foram relatadas durante a navegação assistida. Nenhum
 nome de captura é considerado existente sem o arquivo correspondente. Acrescentar
@@ -329,8 +350,10 @@ arquivos originais neste repositório.
   aprovado no commit d42fbfacb, com os 11 checks do PR 1549 aprovados.
 - [x] Conferir visualmente a prévia corrigida no DEV isolado e com dados
   fictícios, preservando as permissões e sem operação externa.
-- [ ] Publicar a correção da prévia somente após as validações e autorização
-  aplicáveis; nenhuma aplicação em produção até este registro.
+- [x] Publicar a correção da prévia pelo deploy oficial após as validações e
+  autorização aplicáveis; produção no commit a75cba5a1.
+- [x] Conferir em produção a prioridade e a seleção do SKU piloto, revalidar a
+  conexão e manter a integração da empresa desativada, sem enviar produtos.
 - [ ] Confirmar as permissões e a homologação efetivas do módulo necessário ao
   envio, sem inferi-las dos campos selecionados.
 - [ ] Esclarecer o papel operacional da integração preexistente Bling PDV
@@ -363,6 +386,10 @@ Groceries e homologação separada dos módulos operacionais:
 
 - [Categorias e módulos disponíveis](https://developer.ifood.com.br/en-US/docs/getting-started/homologation/categories).
 - [Homologação do módulo Financial](https://developer.ifood.com.br/en-US/docs/food/guides/modules/financial/homologation).
+
+A comissão contratada serve como premissa da previsão; a cobrança efetiva exige
+a conferência financeira posterior. Publicar pelo módulo Item não fornece uma
+cotação de comissão ou taxas. [Endpoints oficiais do módulo Item](https://developer.ifood.com.br/en-US/docs/groceries/guides/modules/item/endpoints).
 
 A proposta registrada é **contribuição estimada antes da venda** e **apuração
 depois da venda**, combinando cobranças efetivas do iFood com os custos ERP
