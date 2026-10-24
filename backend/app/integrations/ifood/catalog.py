@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from collections import Counter
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Iterable
@@ -287,8 +288,26 @@ def build_catalog_preview(
     stock_safety: float,
     public_base_url: str,
     now: datetime | None = None,
+    duplicate_identifiers: set[str] | None = None,
 ) -> list[IfoodCatalogItem]:
-    return [
+    products = list(products)
+    counts = Counter(
+        str(
+            getattr(p, "codigo_barras", None)
+            or getattr(p, "gtin_ean", None)
+            or getattr(p, "codigo", "")
+            or ""
+        )
+        .strip()
+        .casefold()
+        for p in products
+    )
+    duplicates = (
+        duplicate_identifiers
+        if duplicate_identifiers is not None
+        else {key for key, count in counts.items() if count > 1}
+    )
+    items = [
         build_catalog_item(
             product,
             source=source,
@@ -298,4 +317,28 @@ def build_catalog_preview(
             now=now,
         )
         for product in products
+    ]
+    if source != "ifood":
+        return items
+    return [
+        replace(
+            item,
+            eligible=False,
+            payload=None,
+            errors=(
+                *item.errors,
+                "Identificador duplicado em outro produto da empresa.",
+            ),
+        )
+        if str(
+            getattr(product, "codigo_barras", None)
+            or getattr(product, "gtin_ean", None)
+            or getattr(product, "codigo", "")
+            or ""
+        )
+        .strip()
+        .casefold()
+        in duplicates
+        else item
+        for product, item in zip(products, items, strict=True)
     ]

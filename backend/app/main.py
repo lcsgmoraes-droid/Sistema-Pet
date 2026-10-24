@@ -35,6 +35,7 @@ import app.idempotency_models  # noqa: F401 - modelo de idempotência
 import app.ecommerce_analytics_models  # noqa: F401 - funil anonimo do ecommerce
 import app.ecommerceai_integration_models  # noqa: F401 - integracao CorePet <-> EcommerceAI
 import app.ifood_integration_models  # noqa: F401 - integracao CorePet <-> iFood
+import app.ifood_catalog_models  # noqa: F401 - piloto Item por produto
 import app.ifood_order_models  # noqa: F401 - pedidos e eventos do iFood
 import app.ifood_financial_models  # noqa: F401 - evidencias Financial segregadas
 import app.ifood_financial_cost_models  # noqa: F401 - vinculos historicos auditados

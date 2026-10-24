@@ -304,6 +304,11 @@ def api(monkeypatch):
         ProdutoKitComponente,
     )
     from app.pedido_integrado_item_models import PedidoIntegradoItem
+    from app.ifood_catalog_models import (
+        IfoodCatalogLink,
+        IfoodCatalogConfirmation,
+        IfoodCatalogSubmission,
+    )
     import app.pedido_integrado_models  # noqa: F401
     from app.security import permissions_decorator
 
@@ -321,6 +326,9 @@ def api(monkeypatch):
                 Departamento,
                 IfoodMerchantConfig,
                 IfoodMarginRulesRevision,
+                IfoodCatalogLink,
+                IfoodCatalogConfirmation,
+                IfoodCatalogSubmission,
                 PedidoIntegradoItem,
                 ProdutoKitComponente,
             )

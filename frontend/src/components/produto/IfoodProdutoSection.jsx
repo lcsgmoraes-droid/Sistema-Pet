@@ -11,6 +11,7 @@ import InputRadio from "../v2/InputRadio/InputRadio";
 import LinkPadrao from "../v2/LinkPadrao/LinkPadrao";
 import PromocaoFields from "./PromocaoFields";
 import IfoodPremissasOrigem from "../ifood/IfoodPremissasOrigem";
+import IfoodPublicacaoProduto from "../ifood/IfoodPublicacaoProduto";
 import { serializarDataHoraIfood } from "./ifoodProdutoDates";
 
 const STATUS = {
@@ -413,6 +414,7 @@ export default function IfoodProdutoSection({ formData, handleChange, imagens = 
         Salvar mantém a intenção de venda e as pendências no CorePet. A publicação no iFood é uma
         ação separada.
       </p>
+      <IfoodPublicacaoProduto productId={formData.id} draft={formData} imagens={imagens} />
     </div>
   );
 }
