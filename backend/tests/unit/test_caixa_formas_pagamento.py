@@ -132,9 +132,11 @@ def test_cartoes_do_mesmo_tipo_mantem_totais_separados(formas_loja):
     assert composicao["por_forma_pagamento"]["Crédito Stone"]["total"] == 90
     assert composicao["por_forma_pagamento"]["Crédito Itaú"]["total"] == 70
     assert "cartao_credito" not in composicao["por_forma_pagamento"]
-    assert sum(
-        dados["total"] for dados in composicao["por_forma_pagamento"].values()
-    ) == composicao["total_recebido"] == 220
+    assert (
+        sum(dados["total"] for dados in composicao["por_forma_pagamento"].values())
+        == composicao["total_recebido"]
+        == 220
+    )
 
 
 def test_detalhes_filtram_forma_cadastrada_sem_incluir_outros_pix(formas_loja):
@@ -209,18 +211,24 @@ def test_nome_por_id_respeita_tenant_e_preserva_fallback_legado(formas_loja):
         ],
     )
     assert nomes == {caso.formas["Pix Stone"].id: "Pix Stone"}
-    assert nome_forma_pagamento(
-        SimpleNamespace(
-            forma_pagamento_id=caso.formas["Pix Stone"].id,
-            forma_pagamento="PIX",
-        ),
-        nomes,
-    ) == "Pix Stone"
-    for forma_id in (None, id_estrangeiro, id_inexistente):
-        assert nome_forma_pagamento(
-            SimpleNamespace(forma_pagamento_id=forma_id, forma_pagamento="PIX"),
+    assert (
+        nome_forma_pagamento(
+            SimpleNamespace(
+                forma_pagamento_id=caso.formas["Pix Stone"].id,
+                forma_pagamento="PIX",
+            ),
             nomes,
-        ) == "PIX"
+        )
+        == "Pix Stone"
+    )
+    for forma_id in (None, id_estrangeiro, id_inexistente):
+        assert (
+            nome_forma_pagamento(
+                SimpleNamespace(forma_pagamento_id=forma_id, forma_pagamento="PIX"),
+                nomes,
+            )
+            == "PIX"
+        )
 
     estrangeiro = adicionar_pagamento(caso, None, 11, forma_id=id_estrangeiro)
     inexistente = adicionar_pagamento(caso, None, 12, forma_id=id_inexistente)
@@ -248,9 +256,7 @@ def test_nome_personalizado_nao_muda_natureza_do_recebimento(formas_loja):
         caso.formas[nome] = forma
     caso.db.flush()
     pix = adicionar_pagamento(caso, "Pix Cashback parceiro", 10)
-    beneficio = adicionar_pagamento(
-        caso, "Benefício fidelidade", 12, tipo="cashback"
-    )
+    beneficio = adicionar_pagamento(caso, "Benefício fidelidade", 12, tipo="cashback")
 
     composicao = consultar_resumo(caso)["composicao_recebimentos"]
     assert composicao["total_recebido"] == 70
