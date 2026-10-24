@@ -3,6 +3,10 @@
 from sqlalchemy import and_, func, or_
 
 from app.caixa.conferencia import FORMAS_PAGAMENTO_A_PRAZO, moeda
+from app.caixa.formas_pagamento import (
+    carregar_nomes_formas_pagamento,
+    nome_forma_pagamento,
+)
 from app.caixa_models import MovimentacaoCaixa
 from app.vendas_models import Venda, VendaPagamento
 
@@ -83,6 +87,7 @@ def resumir_pagamentos_vendas_caixa(db, *, caixa_id, tenant_id):
     grupos = (
         db.query(
             VendaPagamento.forma_pagamento,
+            VendaPagamento.forma_pagamento_id,
             VendaPagamento.caixa_id.is_(None).label("sem_caixa"),
             func.count(VendaPagamento.id).label("quantidade"),
             func.sum(VendaPagamento.valor).label("total"),
@@ -95,13 +100,27 @@ def resumir_pagamentos_vendas_caixa(db, *, caixa_id, tenant_id):
             VendaPagamento.tenant_id == tenant_id,
             filtro_pagamentos_validos(),
         )
-        .group_by(VendaPagamento.forma_pagamento, VendaPagamento.caixa_id.is_(None))
+        .group_by(
+            VendaPagamento.forma_pagamento,
+            VendaPagamento.forma_pagamento_id,
+            VendaPagamento.caixa_id.is_(None),
+        )
         .order_by(VendaPagamento.forma_pagamento)
         .all()
     )
+    nomes = carregar_nomes_formas_pagamento(
+        db,
+        tenant_id=tenant_id,
+        forma_ids=[grupo.forma_pagamento_id for grupo in grupos],
+    )
     por_forma = {}
     sem_caixa = {"quantidade": 0, "total": 0.0, "por_forma_pagamento": {}}
-    for forma, sem_vinculo, quantidade, total in grupos:
+    total_crediario = moeda(0)
+    for grupo in grupos:
+        forma, _forma_id, sem_vinculo, quantidade, total = grupo
+        if forma.strip().casefold() in {"crediario", "crediário"}:
+            total_crediario += moeda(total)
+        forma = nome_forma_pagamento(grupo, nomes)
         destinos = [por_forma]
         if sem_vinculo:
             destinos.append(sem_caixa["por_forma_pagamento"])
@@ -114,16 +133,7 @@ def resumir_pagamentos_vendas_caixa(db, *, caixa_id, tenant_id):
             item["quantidade"] += int(quantidade)
             item["total"] = float(moeda(item["total"]) + moeda(total))
     return {
-        "total_vendas_crediario": float(
-            sum(
-                (
-                    moeda(item["total"])
-                    for forma, item in por_forma.items()
-                    if forma.strip().casefold() in {"crediario", "crediário"}
-                ),
-                moeda(0),
-            )
-        ),
+        "total_vendas_crediario": float(total_crediario),
         "pagamentos_vendas_por_forma_pagamento": por_forma,
         "pagamentos_vendas_sem_caixa": sem_caixa,
     }
