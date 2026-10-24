@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.ifood_integration_models import IfoodMerchantConfig
@@ -212,6 +213,18 @@ def upsert_ifood_order(
         order.last_event_at = event_at
     if payload and not stale:
         order.payload = payload
+        if settings.IFOOD_PDV_PILOT_ENABLED:
+            from .pdv_pilot import pilot_order_display_total
+
+            try:
+                pilot_total = pilot_order_display_total(order)
+            except HTTPException:
+                # Fora do contrato estrito do piloto, mantem a leitura legada.
+                pass
+            else:
+                # Virtual Bag separa itens e frete. A validacao tambem exige
+                # pagamento exato e taxas zeradas antes de exibir a soma.
+                order.total = float(pilot_total)
     return order
 
 

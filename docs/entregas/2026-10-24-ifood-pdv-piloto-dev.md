@@ -8,7 +8,7 @@
 | Data | 2026-10-24 |
 | Responsável de negócio | Lucas |
 | Executor técnico | Codex |
-| Issue/PR | PR da branch `codex/ifood-preservar-cadastro-na-pausa`; número a registrar na abertura |
+| Issue/PR | PR #1561, branch `codex/ifood-preservar-cadastro-na-pausa` |
 | Prioridade | P2 |
 | Risco | Alto: reserva, baixa FIFO, pagamentos e isolamento entre empresas |
 | Domínios afetados | Integração iFood, PDV, vendas, estoque e caixa |
@@ -33,15 +33,19 @@ ensaio sintético não substitui o aceite de um pedido oficial da loja de testes
 
 O piloto fica desligado por padrão e exige DEV, tenant, loja de testes, pedido
 exato e SKU autorizados. O payload precisa declarar `test=true`, um item de uma
-unidade fixa, EAN correspondente, preço positivo e dinheiro presencial. São
-aceitos retirada ou entrega com frete e taxas adicionais comprovados como zero.
-Condições desconhecidas ou divergentes impedem a importação/finalização.
+unidade fixa, EAN correspondente, preço positivo e dinheiro presencial no valor
+total exato. São aceitos retirada ou entrega com frete explicitamente informado
+e não negativo, sem taxas adicionais, descontos ou cupons. O total deve ser igual
+ao item mais o frete: R$ 65,00 + R$ 8,90 = R$ 73,90. Condições desconhecidas ou
+divergentes impedem a importação/finalização.
 
 `IfoodOrder` mantém a origem; `ifood_pdv_bridges` liga pedido, produto, venda e
 reserva. A reserva usa `PedidoIntegradoItem`, sem inventar um ID Bling. A venda
 permanece aberta até a finalização explícita. Baixa FIFO e encerramento da
 reserva pertencem à mesma transação; unicidade, bloqueios e validação da sacola
-protegem contra duplicação e alteração posterior da origem.
+protegem contra duplicação e alteração posterior da origem. O hash da evidência
+inclui frete e total; a reserva e a baixa FIFO continuam limitadas a uma unidade
+do produto, independentemente do valor do frete.
 
 A migration `zzzzt20261024a1`, filha de `zzzzs20261023a1`, cria a ponte com
 unicidade, chaves estrangeiras compostas por tenant e RLS, e permite
@@ -101,10 +105,14 @@ Validações executadas nesta tarefa:
   aprovado em PostgreSQL local dedicado, incluindo concorrência entre conexões,
   RLS, chaves compostas, sacola alterada e baixa FIFO única.
 - `FLUXO_UNICO.bat release-check`: entrada oficial com Git limpo e gate completo
-  aprovados na fonte final `ae3356755`, já integrada à base atual. Foram aprovados
+  aprovados na fonte `ae3356755`, anterior à ampliação para frete positivo e já
+  integrada à base atual. Foram aprovados
   632 testes backend iFood, 248 frontend, 769 multiempresa e as demais suítes,
   builds e auditorias. Os 15 cenários PostgreSQL passaram juntos nessa fonte.
-  O CI remoto do PR ainda precisa ser conferido.
+  O delta de frete positivo está em validação; o gate anterior não comprova sua
+  aprovação final. Os testes focados do frontend já preservam frete, total,
+  ausência de entregador local e finalização sem PUT. O gate final e o CI remoto
+  do PR #1561 ainda precisam ser conferidos.
 
 O schema descartável do ensaio PostgreSQL não comprova a execução de toda a
 cadeia histórica do Alembic. A migration nova e suas restrições foram exercidas;
@@ -133,8 +141,10 @@ reservas de 4 para 3, disponível 27, um pagamento, um movimento e lote FIFO de
 
 O pedido **oficial permanece pendente**. Após identificar a loja de testes já
 configurada pelo suporte, apenas o SKU `018631.1` foi enviado e aceito com HTTP
-202. Isso não comprova disponibilidade para compra nem recebimento de pedido;
-falta concluir o acesso do consumidor e gerar o pedido oficial.
+202, ficando visível ao consumidor por R$ 65,00, com entrega de R$ 8,90. A
+tentativa de adicionar ao carrinho foi recusada com HTTP 431; não houve pedido
+oficial criado ou recebido. A ampliação local para esse frete está em validação
+e não resolve nem comprova a compra no provedor.
 
 ## 7. Publicação e rollback
 
@@ -199,7 +209,8 @@ posterior de publicação; não anunciar a ponte como operação de produção p
 Decisão técnica: **aprovado com pendências para revisão do piloto DEV**. Não é
 aceite de operação contínua, de pedido oficial concluído ou de produção.
 
-Pendências: Codex e Lucas devem concluir o pedido oficial assim que o acesso à
+Pendências: Codex e Lucas devem concluir o pedido oficial assim que a compra na
 loja de testes pelo consumidor estiver disponível e registrar a evidência. O
-responsável pelo PR deve confirmar o gate/CI final antes da conclusão da revisão.
+responsável pelo PR deve confirmar o delta de frete e o gate/CI final antes da
+conclusão da revisão.
 Não há prazo de liberação de produção definido nesta entrega.

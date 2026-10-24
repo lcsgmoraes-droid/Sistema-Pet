@@ -548,6 +548,17 @@ def delivery_without_charges(payload):
     return payload
 
 
+def delivery_with_freight(payload, cents=890):
+    payload = delivery_without_charges(payload)
+    payload["operationMode"]["delivery"]["prices"] = {
+        "grossValue": {"value": cents, "currency": "BRL"},
+        "discount": {"value": 0, "currency": "BRL"},
+        "netValue": {"value": cents, "currency": "BRL"},
+    }
+    payload["payment"]["methods"][0]["amount"]["value"] = 6500 + cents
+    return payload
+
+
 def test_takeout_official_hyphen_alias_has_same_evidence(source_order):
     original = validate_pilot_payload(source_order)
     source_order.payload["operationMode"]["type"] = "TAKE-OUT"
@@ -556,7 +567,7 @@ def test_takeout_official_hyphen_alias_has_same_evidence(source_order):
     assert alias["evidence_hash"] == original["evidence_hash"]
 
 
-def test_delivery_accepts_only_explicit_free_shipping_and_no_fees(source_order):
+def test_delivery_accepts_explicit_free_shipping_and_no_fees(source_order):
     source_order.payload = delivery_without_charges(source_order.payload)
     assert validate_pilot_payload(source_order)["operation_type"] == "DELIVERY"
     assert validate_pilot_payload(source_order)["price"] == Decimal(65)
@@ -605,7 +616,7 @@ def test_delivery_accepts_only_explicit_free_shipping_and_no_fees(source_order):
         lambda p: p.update(benefit=[]),
     ],
 )
-def test_delivery_nonzero_unknown_cost_or_nested_benefit_is_rejected(
+def test_delivery_inconsistent_unknown_cost_or_nested_benefit_is_rejected(
     source_order, change
 ):
     source_order.payload = delivery_without_charges(source_order.payload)
@@ -613,6 +624,189 @@ def test_delivery_nonzero_unknown_cost_or_nested_benefit_is_rejected(
     with pytest.raises(HTTPException) as exc:
         validate_pilot_payload(source_order)
     assert exc.value.status_code == 409
+
+
+def test_delivery_preserves_merchandise_freight_and_full_cash_total(source_order):
+    source_order.payload = delivery_with_freight(source_order.payload)
+    result = validate_pilot_payload(source_order)
+    assert result["price"] == Decimal("65")
+    assert result["shipping_price"] == Decimal("8.90")
+    assert result["total"] == Decimal("73.90")
+    assert result["quantity"] == 1
+    assert result["operation_type"] == "DELIVERY"
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        lambda p: p["operationMode"]["delivery"]["prices"]["grossValue"].update(
+            value=-890
+        ),
+        lambda p: p["operationMode"]["delivery"]["prices"]["grossValue"].update(
+            value=890.1
+        ),
+        lambda p: p["operationMode"]["delivery"]["prices"]["grossValue"].update(
+            value=True
+        ),
+        lambda p: p["operationMode"]["delivery"]["prices"]["grossValue"].update(
+            value="NaN"
+        ),
+        lambda p: p["operationMode"]["delivery"]["prices"]["grossValue"].update(
+            value=9999999999
+        ),
+        lambda p: p["operationMode"]["delivery"]["prices"]["grossValue"].update(
+            currency="USD"
+        ),
+        lambda p: p["operationMode"]["delivery"]["prices"]["discount"].update(value=1),
+        lambda p: p["operationMode"]["delivery"]["prices"]["netValue"].update(
+            value=889
+        ),
+        lambda p: p["payment"]["methods"][0]["amount"].update(value=6500),
+        lambda p: p["payment"]["methods"][0]["amount"].update(value=7390.1),
+        lambda p: p["bag"]["prices"]["grossValue"].update(value=7390),
+    ],
+)
+def test_delivery_freight_must_reconcile_without_guessing_costs(source_order, change):
+    source_order.payload = delivery_with_freight(source_order.payload)
+    change(source_order.payload)
+    with pytest.raises(HTTPException) as exc:
+        validate_pilot_payload(source_order)
+    assert exc.value.status_code == 409
+
+
+def test_delivery_cash_total_reserves_only_item_and_is_displayed_in_panel(pilot_db):
+    from app.integrations.ifood.orders import order_detail, upsert_ifood_order
+
+    c = pilot_db
+    order = upsert_ifood_order(
+        c.db,
+        tenant_id=c.tenant_id,
+        merchant_id=c.order.merchant_id,
+        order_id=c.order.ifood_order_id,
+        payload=delivery_with_freight(c.order.payload),
+        event_status="PLACED",
+    )
+    assert order_detail(order)["total"] == 73.90
+    for _ in range(2):
+        import_pdv_pilot(
+            c.db,
+            tenant_id=c.tenant_id,
+            order_id=order.ifood_order_id,
+            actor_id=c.user_id,
+        )
+    sale = c.db.query(Venda).one()
+    bridge = c.db.query(IfoodPdvBridge).one()
+    assert sale.subtotal == bridge.unit_price == Decimal("65")
+    assert sale.taxa_entrega == Decimal("8.90")
+    assert sale.total == Decimal("73.90")
+    assert sale.tem_entrega is True and sale.tipo_retirada is None
+    assert sale.entregador_id is None and sale.cliente_id is None
+    assert sale.itens[0].quantidade == bridge.quantity == 1
+    assert (
+        EstoqueReservaService.quantidade_reservada_produto(c.db, c.tenant_id, c.product)
+        == 4
+    )
+    assert is_pilot_external_delivery(c.db, sale) is True
+    with pytest.raises(HTTPException):
+        prepare_pilot_finalization(
+            c.db, sale, [{"forma_pagamento": "Dinheiro", "valor": 65}]
+        )
+    assert (
+        prepare_pilot_finalization(
+            c.db, sale, [{"forma_pagamento": "Dinheiro", "valor": Decimal("73.90")}]
+        )
+        is bridge
+    )
+    assert c.product.estoque_atual == 31 and c.control.estoque_atual == 19
+
+
+@pytest.mark.parametrize("state", ["CONCLUDED", "CANCELLED"])
+def test_delivery_terminal_refresh_keeps_full_display_total_without_new_reserve(
+    pilot_db, state
+):
+    from app.integrations.ifood.orders import upsert_ifood_order
+
+    c = pilot_db
+    order = upsert_ifood_order(
+        c.db,
+        tenant_id=c.tenant_id,
+        merchant_id=c.order.merchant_id,
+        order_id=c.order.ifood_order_id,
+        payload=delivery_with_freight(c.order.payload),
+        event_status=state,
+    )
+    assert order.total == 73.90 and order.status == state
+    with pytest.raises(HTTPException):
+        import_pdv_pilot(
+            c.db,
+            tenant_id=c.tenant_id,
+            order_id=order.ifood_order_id,
+            actor_id=c.user_id,
+        )
+    assert c.db.query(IfoodPdvBridge).count() == c.db.query(Venda).count() == 0
+    assert c.product.estoque_atual == 31
+
+
+@pytest.mark.parametrize("allowed", ["disabled", "other_tenant"])
+def test_delivery_total_override_never_changes_nonpilot_legacy_reading(
+    pilot_db, monkeypatch, allowed
+):
+    from app.integrations.ifood.orders import upsert_ifood_order
+
+    c = pilot_db
+    if allowed == "disabled":
+        monkeypatch.setattr(settings, "IFOOD_PDV_PILOT_ENABLED", False)
+    else:
+        monkeypatch.setattr(settings, "IFOOD_PDV_PILOT_TENANT_ID", str(uuid4()))
+    order = upsert_ifood_order(
+        c.db,
+        tenant_id=c.tenant_id,
+        merchant_id=c.order.merchant_id,
+        order_id=c.order.ifood_order_id,
+        payload=delivery_with_freight(c.order.payload),
+        event_status="PLACED",
+    )
+    assert order.total == 65
+    assert c.db.query(IfoodPdvBridge).count() == c.db.query(Venda).count() == 0
+
+
+@pytest.mark.parametrize(
+    "field,value", [("subtotal", 64), ("taxa_entrega", 0), ("total", 65)]
+)
+def test_delivery_cannot_finalize_after_local_total_or_freight_edit(
+    pilot_db, field, value
+):
+    c = pilot_db
+    c.order.payload = delivery_with_freight(c.order.payload)
+    import_pdv_pilot(
+        c.db, tenant_id=c.tenant_id, order_id=c.order.ifood_order_id, actor_id=c.user_id
+    )
+    sale = c.db.query(Venda).one()
+    setattr(sale, field, value)
+    with pytest.raises(HTTPException):
+        prepare_pilot_finalization(
+            c.db, sale, [{"forma_pagamento": "Dinheiro", "valor": Decimal("73.90")}]
+        )
+    assert c.db.query(IfoodPdvBridge).one().status == "reserved"
+    assert c.product.estoque_atual == 31
+
+
+def test_changed_provider_freight_and_cash_total_invalidate_reserved_snapshot(pilot_db):
+    c = pilot_db
+    c.order.payload = delivery_with_freight(c.order.payload)
+    import_pdv_pilot(
+        c.db, tenant_id=c.tenant_id, order_id=c.order.ifood_order_id, actor_id=c.user_id
+    )
+    sale = c.db.query(Venda).one()
+    bridge = c.db.query(IfoodPdvBridge).one()
+    c.order.payload = delivery_with_freight(c.order.payload, cents=990)
+    assert validate_pilot_payload(c.order)["evidence_hash"] != bridge.evidence_hash
+    with pytest.raises(HTTPException):
+        prepare_pilot_finalization(
+            c.db, sale, [{"forma_pagamento": "Dinheiro", "valor": Decimal("74.90")}]
+        )
+    assert sale.taxa_entrega == Decimal("8.90") and sale.total == Decimal("73.90")
+    assert bridge.status == "reserved" and c.product.estoque_atual == 31
 
 
 def test_delivery_keeps_true_mode_without_creating_local_driver_or_shipping_charge(

@@ -71,7 +71,15 @@ test("resposta tardia do entregador padrao nao altera venda DELIVERY do iFood", 
     { canal: "loja_fisica", tem_entrega: false, entregador_id: null },
     request.promise,
   );
-  const ifood = { id: 42, canal: "ifood", tem_entrega: true, entregador_id: null };
+  const ifood = {
+    id: 42,
+    canal: "ifood",
+    tem_entrega: true,
+    entregador_id: null,
+    subtotal: 65,
+    total: 73.9,
+    entrega: { taxa_entrega_total: 8.9 },
+  };
   env.setSale(ifood);
   await env.harness.update({ vendaAtual: ifood });
   request.resolve({ data: { items: [courier] } });
@@ -81,6 +89,8 @@ test("resposta tardia do entregador padrao nao altera venda DELIVERY do iFood", 
   assert.equal(env.harness.tree.custoOperacionalEntrega, 0);
   assert.equal(env.sale(), ifood);
   assert.equal(ifood.tem_entrega, true);
+  assert.equal(env.sale().entrega.taxa_entrega_total, 8.9);
+  assert.equal(env.sale().total, 73.9);
   assert.deepEqual(env.writes, []);
   assert.deepEqual(env.requests, ["/clientes/"]);
 });

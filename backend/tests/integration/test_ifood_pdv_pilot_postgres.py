@@ -7,6 +7,7 @@ ifood_pdv_test. Cada execucao cria e remove somente seu schema aleatorio.
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 import os
 from pathlib import Path
 import re
@@ -149,6 +150,22 @@ def _virtual_bag(order_id, merchant_id):
             ]
         },
     }
+
+
+def _virtual_bag_with_real_delivery_fee(order_id, merchant_id):
+    payload = _virtual_bag(order_id, merchant_id)
+    payload["operationMode"] = {
+        "type": "DELIVERY",
+        "delivery": {
+            "prices": {
+                "grossValue": {"value": 890, "currency": "BRL"},
+                "discount": {"value": 0, "currency": "BRL"},
+                "netValue": {"value": 890, "currency": "BRL"},
+            }
+        },
+    }
+    payload["payment"]["methods"][0]["amount"]["value"] = 7390
+    return payload
 
 
 def _configure(monkeypatch, c):
@@ -507,7 +524,14 @@ def _state(c):
         }
 
 
-def _finalize(c, sale_id, barrier=None, fail_after_real_stock=False, stock_gate=None):
+def _finalize(
+    c,
+    sale_id,
+    barrier=None,
+    fail_after_real_stock=False,
+    stock_gate=None,
+    payment_amount=65,
+):
     from app.tenancy.context import tenant_context
     from app.vendas.finalizacao import finalizar_venda
     from app.vendas.estoque_baixa import processar_baixa_estoque_item
@@ -530,7 +554,7 @@ def _finalize(c, sale_id, barrier=None, fail_after_real_stock=False, stock_gate=
             barrier.wait(timeout=15)
         return finalizar_venda(
             venda_id=sale_id,
-            pagamentos=[{"forma_pagamento": "Dinheiro", "valor": 65}],
+            pagamentos=[{"forma_pagamento": "Dinheiro", "valor": payment_amount}],
             user_id=c.user_id,
             user_nome="Operador PG",
             tenant_id=c.tenant_id,
@@ -752,6 +776,191 @@ def test_takeout_alias_and_zero_fee_delivery_keep_one_fifo_decrease_and_marker(
             .one()
         )
         assert is_pilot_external_delivery(db, sale) is False
+    assert _protected(c) == c.control_before
+
+
+@pytest.mark.parametrize("fail_after_fifo", [False, True])
+def test_real_delivery_fee_preserves_item_total_payment_and_one_stock_decrease(
+    pilot, fail_after_fifo
+):
+    from app.ifood_order_models import IfoodOrder, IfoodPdvBridge
+    from app.integrations.ifood.orders import upsert_ifood_order
+    from app.integrations.ifood.pdv_pilot import is_pilot_external_delivery
+    from app.tenancy.context import tenant_context
+    from app.vendas_models import Venda, VendaItem, VendaPagamento
+
+    c = pilot
+    payload = _virtual_bag_with_real_delivery_fee(c.order_id, c.merchant_id)
+    with tenant_context(c.tenant_id), Session(c.engine) as db:
+        order = upsert_ifood_order(
+            db,
+            tenant_id=c.tenant_id,
+            merchant_id=c.merchant_id,
+            order_id=c.order_id,
+            payload=payload,
+            event_status="PLACED",
+        )
+        assert Decimal(str(order.total)) == Decimal("73.90")
+        db.commit()
+    sale_id = _import(c)
+    assert _import(c) == sale_id
+    reserved_state = _state(c)
+    assert (
+        reserved_state["physical"],
+        reserved_state["reserved"],
+        reserved_state["sales"],
+        reserved_state["bridges"],
+        reserved_state["movements"],
+    ) == (31, 4, 1, 1, 0)
+    with tenant_context(c.tenant_id), Session(c.engine) as db:
+        sale = (
+            db.query(Venda)
+            .filter(Venda.tenant_id == c.tenant_id, Venda.id == sale_id)
+            .one()
+        )
+        item = (
+            db.query(VendaItem)
+            .filter(VendaItem.tenant_id == c.tenant_id, VendaItem.venda_id == sale_id)
+            .one()
+        )
+        bridge = (
+            db.query(IfoodPdvBridge)
+            .filter(
+                IfoodPdvBridge.tenant_id == c.tenant_id,
+                IfoodPdvBridge.sale_id == sale_id,
+            )
+            .one()
+        )
+        assert sale.tem_entrega is True and sale.entregador_id is None
+        assert sale.subtotal == Decimal("65.00")
+        assert sale.taxa_entrega == Decimal("8.90")
+        assert sale.total == Decimal("73.90")
+        assert item.quantidade == 1 and item.preco_unitario == item.subtotal == Decimal(
+            "65.00"
+        )
+        assert bridge.quantity == 1 and bridge.unit_price == Decimal("65.00")
+        assert is_pilot_external_delivery(db, sale) is True
+    # O pagamento cobre a composicao real, sem ignorar o frete nem embuti-lo
+    # no preco do unico produto ou em uma segunda unidade.
+    with pytest.raises(HTTPException) as underpaid:
+        _finalize(c, sale_id, payment_amount=65)
+    assert underpaid.value.status_code == 409
+    assert _state(c) == reserved_state
+    if fail_after_fifo:
+        with pytest.raises(HTTPException) as rollback:
+            _finalize(c, sale_id, payment_amount=73.90, fail_after_real_stock=True)
+        assert rollback.value.status_code == 500
+        assert _state(c) == reserved_state
+
+    result = _finalize(c, sale_id, payment_amount=73.90)
+    assert result["venda"]["status"] == "finalizada"
+    assert result["venda"]["total"] == result["venda"]["total_pago"] == 73.90
+    final = _state(c)
+    assert (
+        final["physical"],
+        final["reserved"],
+        final["lots"],
+        final["movements"],
+        final["payments"],
+    ) == (30, 3, [9, 8, 7, 6], 1, 1)
+    assert (
+        final["bridge_status"] == "sold"
+        and final["reserve_sold"]
+        and final["stock_decreased"]
+    )
+    with tenant_context(c.tenant_id), Session(c.engine) as db:
+        payment = (
+            db.query(VendaPagamento)
+            .filter(
+                VendaPagamento.tenant_id == c.tenant_id,
+                VendaPagamento.venda_id == sale_id,
+            )
+            .one()
+        )
+        sale = (
+            db.query(Venda)
+            .filter(Venda.tenant_id == c.tenant_id, Venda.id == sale_id)
+            .one()
+        )
+        assert payment.valor == Decimal("73.90")
+        mirrored_order = (
+            db.query(IfoodOrder)
+            .filter(
+                IfoodOrder.tenant_id == c.tenant_id,
+                IfoodOrder.ifood_order_id == c.order_id,
+            )
+            .one()
+        )
+        assert Decimal(str(mirrored_order.total)) == Decimal("73.90")
+        assert (
+            sale.subtotal == Decimal("65.00")
+            and sale.taxa_entrega == Decimal("8.90")
+            and sale.total == Decimal("73.90")
+        )
+    assert _import(c) == sale_id
+    with pytest.raises(HTTPException):
+        _finalize(c, sale_id, payment_amount=73.90)
+    assert _state(c) == final
+    assert _protected(c) == c.control_before
+
+
+def test_real_delivery_fee_display_stays_faithful_after_terminal_event_without_new_sale(
+    pilot,
+):
+    from app.integrations.ifood.orders import upsert_ifood_order
+    from app.integrations.ifood.pdv_pilot import import_pdv_pilot
+    from app.tenancy.context import tenant_context
+
+    c = pilot
+    payload = _virtual_bag_with_real_delivery_fee(c.order_id, c.merchant_id)
+    with tenant_context(c.tenant_id), Session(c.engine) as db:
+        order = upsert_ifood_order(
+            db,
+            tenant_id=c.tenant_id,
+            merchant_id=c.merchant_id,
+            order_id=c.order_id,
+            payload=payload,
+            event_status="PLACED",
+        )
+        db.commit()
+        assert Decimal(str(order.total)) == Decimal("73.90")
+        upsert_ifood_order(
+            db,
+            tenant_id=c.tenant_id,
+            merchant_id=c.merchant_id,
+            order_id=c.order_id,
+            payload={},
+            event_status="CANCELLED",
+        )
+        db.commit()
+        # Uma releitura posterior continua exibindo itens+frete, mas nao pode
+        # ressuscitar o pedido ou criar reserva retroativa por causa do total.
+        refreshed = upsert_ifood_order(
+            db,
+            tenant_id=c.tenant_id,
+            merchant_id=c.merchant_id,
+            order_id=c.order_id,
+            payload=payload,
+            event_status="CONFIRMED",
+        )
+        db.commit()
+        assert refreshed.status == "CANCELLED"
+        assert Decimal(str(refreshed.total)) == Decimal("73.90")
+        with pytest.raises(HTTPException) as cancelled:
+            import_pdv_pilot(
+                db, tenant_id=c.tenant_id, order_id=c.order_id, actor_id=c.user_id
+            )
+        assert cancelled.value.status_code == 409
+        db.rollback()
+    state = _state(c)
+    assert (
+        state["physical"],
+        state["reserved"],
+        state["sales"],
+        state["bridges"],
+        state["movements"],
+        state["payments"],
+    ) == (31, 3, 0, 0, 0, 0)
     assert _protected(c) == c.control_before
 
 

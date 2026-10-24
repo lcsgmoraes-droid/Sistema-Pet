@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import * as fiscalStatus from "../utils/pdvFiscalStatus.js";
+import { recalcularVendaComDescontos } from "../utils/pdvDescontosUtils.js";
+import { montarPayloadVenda } from "../utils/pdvVendaPayload.js";
+import { montarPayloadAnaliseMargem } from "../components/modalPagamentoUtils.js";
 import { createControllerHarness } from "../../scripts/helpers/reactControllerHarness.mjs";
 
 function pendente() {
@@ -180,4 +183,44 @@ test("abrir pedido DELIVERY iFood conserva modalidade, canal e ausencia de entre
   assert.equal(env.publicadas[0].tem_entrega, true);
   assert.equal(env.publicadas[0].entregador_id, null);
   assert.deepEqual(env.entregadores, [null]);
+});
+
+test("pedido iFood preserva frete positivo e total ao abrir pelo vinculo ou pela lista", async () => {
+  for (const abrir of ["carregarVendaEspecifica", "reabrirVenda"]) {
+    const env = preparar();
+    const resolve = env.prepararVenda(42);
+    const origem = {
+      canal: "ifood",
+      status: "aberta",
+      cliente_id: null,
+      tem_entrega: true,
+      entregador_id: null,
+      taxa_entrega: 8.9,
+      entrega: { taxa_entrega_total: 8.9, taxa_loja: 0, taxa_entregador: 0 },
+      subtotal: 65,
+      total: 73.9,
+      desconto_valor: 0,
+      desconto_venda_valor: 0,
+      itens: [{ produto_id: 1, quantidade: 1, preco_unitario: 65, subtotal: 65 }],
+    };
+    const antes = structuredClone(origem);
+    const loading = env.harness.tree[abrir](abrir === "reabrirVenda" ? { id: 42 } : 42);
+    resolve(origem);
+    await loading;
+
+    const venda = env.publicadas[0];
+    assert.equal(venda.canal, "ifood");
+    assert.equal(venda.tem_entrega, true);
+    assert.equal(venda.entregador_id, null);
+    assert.equal(venda.subtotal, 65);
+    assert.equal(venda.entrega.taxa_entrega_total, 8.9);
+    assert.equal(venda.total, 73.9);
+    assert.equal(recalcularVendaComDescontos(venda).total, 73.9);
+    assert.equal(montarPayloadVenda(venda).taxa_entrega, 8.9);
+    assert.equal(montarPayloadAnaliseMargem({ venda }).taxa_entrega, 8.9);
+    assert.deepEqual(venda.itens, origem.itens);
+    assert.deepEqual(origem, antes);
+    assert.equal(env.publicadas.length, 1);
+    assert.deepEqual(env.alertas, []);
+  }
 });

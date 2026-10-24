@@ -55,10 +55,11 @@ de teste**. Essa acao nao confirma, separa ou entrega o pedido no iFood.
 aprovado, com uma reserva, uma baixa FIFO, um pagamento e reimportacao sem
 duplicacao. O bloqueio inicial **Merchant without setup configured** foi
 contornado ao identificar a loja de testes ja configurada pelo suporte. Nessa
-loja, o envio somente do SKU `018631.1` foi aceito com HTTP 202; essa resposta nao
-comprova disponibilidade para compra. O pedido oficial permanece **pendente** de
-acesso a loja pelo consumidor e de sua realizacao. Nao foi comprovado o
-recebimento de pedido oficial; o resultado sintetico nao substitui essa etapa.
+loja, o envio somente do SKU `018631.1` foi aceito com HTTP 202 e o produto ficou
+visivel ao consumidor por R$ 65,00. A compra e o recebimento do pedido oficial
+permanecem **pendentes**; visualizar o produto nao comprova criacao de pedido. O
+resultado sintetico nao substitui essa etapa. A ampliacao para frete positivo
+esta em validacao local e nao representa homologacao oficial concluida.
 
 O piloto exige todas as configuracoes abaixo, inicialmente vazias/desligadas:
 
@@ -73,15 +74,21 @@ continuam recusados mesmo se a flag for ligada. O payload da Orders Virtual Bag
 precisa declarar `test=true`, a mesma loja e pedido, um unico item de uma unidade
 fixa do SKU autorizado e o mesmo EAN. Neste primeiro ensaio, sao aceitos somente
 retirada (`TAKEOUT`/`TAKE-OUT`) ou entrega (`DELIVERY`) com frete explicitamente
-zero, dinheiro presencial, preco positivo e total igual ao item, sem cupom,
-desconto ou taxas adicionais. Pagamento online, misto, cartao, pesagem variavel,
-itens adicionais e dados desconhecidos sao bloqueados antes de reservar.
+informado e nao negativo, dinheiro presencial no valor total exato e preco do
+item positivo, sem cupom, desconto ou taxas adicionais. O total deve ser igual
+ao item mais o frete: R$ 65,00 + R$ 8,90 = R$ 73,90, por exemplo. Pagamento
+online, misto, cartao, pesagem variavel, itens adicionais e dados desconhecidos
+sao bloqueados antes de reservar.
 
 A importacao cria uma venda aberta do canal `ifood` e uma reserva pelo mesmo
 `PedidoIntegradoItem` utilizado nas demais integracoes. O pedido local tem
 `pedido_bling_id=NULL`: ele nao e um pedido Bling. O vinculo auditavel em
 `ifood_pdv_bridges` une o pedido iFood, a reserva, o produto e a venda. Repetir a
 importacao retorna o vinculo existente, sem criar nova venda ou reserva.
+
+O hash da evidencia vincula tambem frete e total. Divergencia nesses valores
+impede reaproveitar a validacao anterior. O frete nao aumenta a quantidade
+reservada nem a baixa FIFO: ambas continuam restritas a uma unidade do produto.
 
 Ao finalizar a venda no PDV, o fluxo normal faz a baixa FIFO dos lotes e encerra
 a reserva na mesma transacao. Repeticoes e concorrencia nao podem executar outra
@@ -100,8 +107,9 @@ emissao manual continua sujeita as permissoes e regras fiscais da empresa.
 Em entrega, a venda conserva `tem_entrega=True`, sem entregador local, e a tela
 mostra **Entrega acompanhada pelo iFood**. A dispensa do entregador no finalizador
 exige o vinculo DEV valido e permissao de venda na empresa; nao se aplica aos
-outros canais. O valor de frete e as taxas da sacola precisam estar comprovados
-como zero. Valores desconhecidos ou nao suportados continuam bloqueados.
+outros canais. O valor de frete precisa estar explicitamente informado e ser
+nao negativo; taxas adicionais continuam proibidas. Frete desconhecido, total
+divergente ou outras condicoes nao suportadas continuam bloqueados.
 
 ### Roteiro de validacao
 

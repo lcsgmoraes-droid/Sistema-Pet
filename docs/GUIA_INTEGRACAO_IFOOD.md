@@ -325,16 +325,18 @@ recebimento de vendas no PDV de produção.
 interface com dados fictícios, passou: uma reserva, uma venda, uma baixa FIFO e
 um pagamento, sem duplicação ao repetir a importação. A dificuldade inicial de
 configuração foi contornada ao identificar a loja de testes já configurada pelo
-suporte. O iFood aceitou o envio somente do SKU `018631.1` nessa loja; isso ainda
-não comprova sua disponibilidade para compra. O pedido oficial continua
-**pendente**, pois falta concluir o acesso à loja pelo consumidor e realizar o
-pedido. O resultado sintético não substitui essa etapa.
+suporte. Somente o SKU `018631.1` foi preparado nessa loja e ficou visível ao
+consumidor por R$ 65,00. A compra oficial continua **pendente**: visualizar o
+produto ainda não comprova a criação nem o recebimento de um pedido. O resultado
+sintético não substitui essa etapa.
 
 1. Com a equipe de implantação, confirme a empresa, a loja de testes, o pedido
    autorizado e o único produto do piloto. Neste primeiro ensaio, o pedido deve
    ter uma unidade do SKU 018631.1, para retirada ou entrega com frete
-   comprovadamente zero, pagamento presencial em dinheiro e sem cupom, desconto
-   ou taxas adicionais.
+   explicitamente informado, igual ou maior que zero, e sem cupom, desconto ou
+   taxas adicionais. O pagamento presencial em dinheiro deve corresponder ao
+   total exato do item mais o frete: por exemplo, R$ 65,00 + R$ 8,90 = R$ 73,90.
+   A reserva e a baixa continuam sendo de uma unidade do produto.
 2. No DEV, abra **Configurações → Integrações → iFood → Pedidos para
    homologação**. Confira o pedido e os dados da sacola. Receber o pedido no
    painel ainda não reserva estoque nem cria uma venda.

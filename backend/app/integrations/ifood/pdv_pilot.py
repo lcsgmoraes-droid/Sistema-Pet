@@ -51,28 +51,45 @@ def _decimal(value) -> Decimal:
     return result
 
 
-def _zero_money(value, field: str):
+def _money(value, field: str) -> Decimal:
     money = _object(value, field)
-    if money.get("currency", "BRL") != "BRL" or _decimal(money.get("value")) != 0:
-        _blocked(
-            "Este piloto aceita somente frete e taxas explicitamente zerados em reais."
-        )
+    cents = _decimal(money.get("value"))
+    if (
+        money.get("currency", "BRL") != "BRL"
+        or cents < 0
+        or cents > Decimal("9999999999")
+        or cents != cents.to_integral_value()
+    ):
+        _blocked("O piloto exige valores nao negativos em centavos de reais (BRL).")
+    return cents / 100
 
 
-def _pilot_operation(payload: dict) -> str:
+def _zero_money(value, field: str):
+    if _money(value, field) != 0:
+        _blocked("Este piloto aceita somente taxas e descontos explicitamente zerados.")
+
+
+def _pilot_operation(payload: dict) -> tuple[str, Decimal]:
     operation = _object(payload.get("operationMode"), "operationMode")
     mode = operation.get("type")
     if mode in {"TAKEOUT", "TAKE-OUT"}:
-        return "TAKEOUT"
+        return "TAKEOUT", Decimal(0)
     if mode != "DELIVERY":
         _blocked("A modalidade do pedido nao e suportada pelo piloto DEV.")
     delivery = _object(operation.get("delivery"), "operationMode.delivery")
     prices = _object(delivery.get("prices"), "operationMode.delivery.prices")
-    _zero_money(prices.get("grossValue"), "operationMode.delivery.prices.grossValue")
-    for key in ("discount", "netValue"):
-        if key in prices:
-            _zero_money(prices[key], f"operationMode.delivery.prices.{key}")
-    return "DELIVERY"
+    shipping = _money(
+        prices.get("grossValue"), "operationMode.delivery.prices.grossValue"
+    )
+    if "discount" in prices:
+        _zero_money(prices["discount"], "operationMode.delivery.prices.discount")
+    if (
+        "netValue" in prices
+        and _money(prices["netValue"], "operationMode.delivery.prices.netValue")
+        != shipping
+    ):
+        _blocked("O frete liquido diverge do frete bruto; confira a cobranca do iFood.")
+    return "DELIVERY", shipping
 
 
 def _validate_pilot_fees_and_benefits(payload: dict, bag: dict):
@@ -137,6 +154,20 @@ def _scope(order: IfoodOrder):
 def validate_pilot_payload(order: IfoodOrder) -> dict:
     """Contrato Groceries Virtual Bag; desconhecidos falham sem movimentacao."""
     _scope(order)
+    if str(order.status or "").upper() not in _ACTIVE_STATUSES:
+        _blocked(
+            "Pedido encerrado, cancelado ou com estado desconhecido nao pode criar reserva retroativa."
+        )
+    return _validated_pilot_values(order)
+
+
+def pilot_order_display_total(order: IfoodOrder) -> Decimal:
+    """Exibe valores conferidos mesmo apos encerrar, sem autorizar movimentacao."""
+    _scope(order)
+    return _validated_pilot_values(order)["total"]
+
+
+def _validated_pilot_values(order: IfoodOrder) -> dict:
     payload = _object(order.payload, "pedido")
     if payload.get("test") is not True:
         _blocked("Somente pedidos oficiais marcados test=true podem entrar neste DEV.")
@@ -147,11 +178,7 @@ def validate_pilot_payload(order: IfoodOrder) -> dict:
         _blocked("A loja do pedido diverge da loja de teste autorizada.")
     if str(payload.get("id") or "") != order.ifood_order_id:
         _blocked("O identificador da sacola diverge do pedido autorizado.")
-    if str(order.status or "").upper() not in _ACTIVE_STATUSES:
-        _blocked(
-            "Pedido encerrado, cancelado ou com estado desconhecido nao pode criar reserva retroativa."
-        )
-    operation_type = _pilot_operation(payload)
+    operation_type, shipping_price = _pilot_operation(payload)
     bag = _object(payload.get("bag"), "bag")
     _validate_pilot_fees_and_benefits(payload, bag)
     items = bag.get("items")
@@ -180,20 +207,12 @@ def validate_pilot_payload(order: IfoodOrder) -> dict:
     gross_value = _object(
         _object(bag.get("prices"), "bag.prices").get("grossValue"), "grossValue"
     )
-    if any(
-        value.get("currency", "BRL") != "BRL" for value in (unit_value, gross_value)
-    ):
-        _blocked("O piloto aceita valores somente em reais (BRL).")
-    price = _decimal(unit_value.get("value")) / 100
-    gross = _decimal(gross_value.get("value")) / 100
-    if (
-        price <= 0
-        or price > Decimal("99999999.99")
-        or price != price.quantize(Decimal(".01"))
-        or gross != price
-    ):
+    price = _money(unit_value, "unitValue")
+    gross = _money(gross_value, "grossValue")
+    total = gross + shipping_price
+    if price <= 0 or gross != price or total > Decimal("99999999.99"):
         _blocked(
-            "Este piloto exige preco unitario positivo e total igual ao item, sem desconto ou frete."
+            "Este piloto exige preco unitario positivo e subtotal igual ao unico item, sem desconto."
         )
     methods = _object(payload.get("payment"), "payment").get("methods")
     if not isinstance(methods, list) or len(methods) != 1:
@@ -209,14 +228,12 @@ def validate_pilot_payload(order: IfoodOrder) -> dict:
                 "Este piloto aceita somente dinheiro presencial; online, cartao, misto ou desconhecido esta bloqueado."
             )
         payment_amount = _object(method.get("amount"), "payment.amount")
-        if payment_amount.get("currency", "BRL") != "BRL":
-            _blocked("O pagamento do piloto precisa estar em reais (BRL).")
-        amount = _decimal(payment_amount.get("value")) / 100
+        amount = _money(payment_amount, "payment.amount")
         if amount <= 0:
             _blocked("Valor de pagamento presencial invalido.")
         total_payment += amount
-    if total_payment != gross:
-        _blocked("O pagamento do pedido precisa corresponder ao total da sacola.")
+    if total_payment != total:
+        _blocked("O pagamento precisa corresponder aos itens mais o frete do pedido.")
     evidence = {
         "order_id": order.ifood_order_id,
         "merchant_id": order.merchant_id,
@@ -225,6 +242,8 @@ def validate_pilot_payload(order: IfoodOrder) -> dict:
         "sku": PILOT_SKU,
         "quantity": "1",
         "price": str(price.quantize(Decimal(".01"))),
+        "shipping_price": str(shipping_price.quantize(Decimal(".01"))),
+        "total": str(total.quantize(Decimal(".01"))),
         "type": operation_type,
         "payment": methods,
     }
@@ -235,6 +254,8 @@ def validate_pilot_payload(order: IfoodOrder) -> dict:
         "ean": ean,
         "quantity": Decimal(1),
         "price": price,
+        "shipping_price": shipping_price,
+        "total": total,
         "operation_type": operation_type,
         "evidence_hash": evidence_hash,
     }
@@ -487,14 +508,14 @@ def import_pdv_pilot(db, *, tenant_id, order_id: str, actor_id: int) -> IfoodOrd
         vendedor_id=actor_id,
         user_id=actor_id,
         subtotal=validated["price"],
-        total=validated["price"],
+        total=validated["total"],
         desconto_valor=0,
         desconto_venda_valor=0,
         desconto_percentual=0,
         canal="ifood",
         status="aberta",
         tem_entrega=validated["operation_type"] == "DELIVERY",
-        taxa_entrega=0,
+        taxa_entrega=validated["shipping_price"],
         tipo_retirada="proprio" if validated["operation_type"] == "TAKEOUT" else None,
         status_entrega="pendente",
         nao_gerar_beneficios=True,
@@ -687,12 +708,13 @@ def prepare_pilot_finalization(db, sale, pagamentos, *, cupom_code=None):
         or _decimal(items[0].quantidade) != 1
         or _decimal(items[0].preco_unitario) != bridge.unit_price
         or _decimal(items[0].subtotal) != bridge.unit_price
-        or _decimal(sale.total) != bridge.unit_price
+        or _decimal(sale.subtotal) != bridge.unit_price
+        or _decimal(sale.total) != validated["total"]
         or bool(sale.tem_entrega) != (validated["operation_type"] == "DELIVERY")
         or (
             validated["operation_type"] == "DELIVERY" and sale.tipo_retirada is not None
         )
-        or _decimal(sale.taxa_entrega or 0) != 0
+        or _decimal(sale.taxa_entrega or 0) != validated["shipping_price"]
         or sale.entregador_id is not None
         or cupom_code
         or sale.cupom_code
@@ -713,7 +735,7 @@ def prepare_pilot_finalization(db, sale, pagamentos, *, cupom_code=None):
     if (
         len(pagamentos or []) != 1
         or sum((_decimal(p.get("valor")) for p in pagamentos), Decimal(0))
-        != bridge.unit_price
+        != validated["total"]
         or str(pagamentos[0].get("forma_pagamento") or "").strip().lower()
         not in {"cash", "dinheiro"}
     ):

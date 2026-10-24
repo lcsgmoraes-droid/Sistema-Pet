@@ -212,6 +212,45 @@ test("DELIVERY iFood finaliza a venda existente sem PUT, entregador local ou dup
   assert.equal(c.alteracoes.Erro, "");
 });
 
+test("DELIVERY iFood com frete positivo recebe o total exato sem sobrescrever a venda", async () => {
+  const venda = {
+    ...baseVenda,
+    canal: "ifood",
+    tem_entrega: true,
+    entregador_id: null,
+    subtotal: 65,
+    total: 73.9,
+    entrega: { taxa_entrega_total: 8.9, taxa_loja: 0, taxa_entregador: 0 },
+    itens: [{ produto_id: 1, quantidade: 1, preco_unitario: 65, subtotal: 65 }],
+  };
+  const antes = structuredClone(venda);
+  const c = preparar({
+    props: {
+      venda,
+      pagamentos: [montar(dinheiro, 73.9, 73.9)],
+      formaPagamentoSelecionada: dinheiro,
+      valorRecebido: 73.9,
+      valorRestante: 73.9,
+    },
+    finalizar: async (id, pagamentos) => ({
+      id,
+      status: "finalizada",
+      total: 73.9,
+      tem_entrega: true,
+      pagamentos,
+    }),
+  });
+  await c.h.act(() => Promise.all([c.h.tree.handleFinalizar(), c.h.tree.handleFinalizar()]));
+  assert.deepEqual(c.chamadas.persistir, []);
+  assert.equal(c.chamadas.finalizar.length, 1);
+  assert.equal(c.chamadas.finalizar[0].id, 12);
+  assert.equal(c.chamadas.finalizar[0].pagamentos.length, 1);
+  assert.equal(c.chamadas.finalizar[0].pagamentos[0].valor, 73.9);
+  assert.equal(c.chamadas.finalizar[0].pagamentos[0].valor_recebido, 73.9);
+  assert.deepEqual(venda, antes);
+  assert.equal(c.alteracoes.Erro, "");
+});
+
 test("cartao119,90 com saldo109,90 e bloqueado sem justificativa; excecao preserva integral sem troco", async () => {
   const venda = { ...baseVenda, total: 109.9, desconto_valor: 10, desconto_venda_valor: 10 };
   const c = preparar({ props: { venda, valorRestante: 109.9 } });
