@@ -213,7 +213,9 @@ Invoke-GateStep 'Frontend iFood and product regression tests' $npm @('run', 'tes
 Invoke-GateStep 'Backend iFood safety contracts' $python @(
     '-m', 'pytest', 'tests/unit/test_ifood_management.py',
     'tests/unit/test_ifood_catalog_contract.py', 'tests/unit/test_ifood_routes_contract.py',
-    'tests/unit/test_ifood_orders_contract.py', 'tests/unit/test_ifood_client_contract.py', '-q'
+    'tests/unit/test_ifood_orders_contract.py', 'tests/unit/test_ifood_client_contract.py',
+    'tests/unit/test_ifood_financial.py', 'tests/unit/test_ifood_financial_client.py',
+    'tests/unit/test_ifood_financial_routes.py', 'tests/unit/test_ifood_contract_reference.py', '-q'
 ) $backend
 
 if ($Nivel -eq 'rapido') {

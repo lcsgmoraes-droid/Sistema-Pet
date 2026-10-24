@@ -158,7 +158,9 @@ function VendaFinanceira({ order, c }) {
           </p>
           {order.pending?.length || order.contribution?.missing?.length ? (
             <p className="v2-texto text-amber-800 dark:text-amber-200">
-              {[...(order.pending || []), ...(order.contribution?.missing || [])].join(" · ")}
+              {[
+                ...new Set([...(order.pending || []), ...(order.contribution?.missing || [])]),
+              ].join(" · ")}
             </p>
           ) : null}
           <p className="v2-texto-ajuda">
