@@ -652,6 +652,7 @@ jobs:
           tests/unit/test_faturamento_superficies.py
           tests/unit/test_pdf_caixa_resumo.py
           tests/unit/test_caixa_recebimentos_auditoria.py
+          tests/unit/test_caixa_formas_pagamento.py
           tests/unit/test_caixa_conferencia_estados.py
           tests/unit/test_caixa_auditoria_performance.py
           tests/unit/test_pagamento_excedente_finalizacao.py

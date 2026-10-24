@@ -20,6 +20,10 @@ from app.caixa.recebimentos import (
     filtro_recebimentos_dinheiro_caixa,
     resumir_pagamentos_vendas_caixa,
 )
+from app.caixa.formas_pagamento import (
+    carregar_nomes_formas_pagamento,
+    nome_forma_pagamento,
+)
 from app.caixa.auditoria import registrar_evento_caixa, snapshot_caixa
 from app.caixa.auditoria_routes import router as auditoria_router
 from app.utils.timezone import now_brasilia
@@ -645,6 +649,7 @@ def obter_resumo_caixa(
         db.query(
             data_da_venda.label("data_venda"),
             VendaPagamento.forma_pagamento,
+            VendaPagamento.forma_pagamento_id,
             func.count(VendaPagamento.id).label("quantidade"),
             func.sum(VendaPagamento.valor).label("total"),
         )
@@ -658,8 +663,13 @@ def obter_resumo_caixa(
         )
     )
     pagamentos_por_data = pagamentos_query.group_by(
-        data_da_venda, VendaPagamento.forma_pagamento
+        data_da_venda, VendaPagamento.forma_pagamento, VendaPagamento.forma_pagamento_id
     ).all()
+    nomes_formas = carregar_nomes_formas_pagamento(
+        db,
+        tenant_id=tenant_id,
+        forma_ids=[pagamento.forma_pagamento_id for pagamento in pagamentos_por_data],
+    )
 
     vendas_por_forma = {}
     recebimentos_por_data_venda = {}
@@ -693,7 +703,9 @@ def obter_resumo_caixa(
             valor_recebimento_dinheiro(mov),
             "lançamento",
         )
-    for data_venda, forma, quantidade, total in pagamentos_por_data:
+    for pagamento in pagamentos_por_data:
+        data_venda, _forma, _forma_id, quantidade, total = pagamento
+        forma = nome_forma_pagamento(pagamento, nomes_formas)
         somar_recebimento(data_venda, forma, quantidade, total, "pagamento")
 
     total_vendido = (
@@ -705,7 +717,10 @@ def obter_resumo_caixa(
         )
         .scalar()
     )
-    indicadores = indicadores_vendas_recebimentos(total_vendido, vendas_por_forma)
+    # A consulta já excluiu os planos pelo tipo; os nomes abaixo são do cadastro.
+    indicadores = indicadores_vendas_recebimentos(
+        total_vendido, vendas_por_forma, excluir_planos=False
+    )
     composicoes = montar_composicoes_caixa(
         db, caixa=caixa, tenant_id=tenant_id, movimentacoes=movimentacoes
     )
@@ -865,6 +880,11 @@ def listar_vendas_caixa(
             )
             .all()
         )
+        nomes_formas = carregar_nomes_formas_pagamento(
+            db,
+            tenant_id=tenant_id,
+            forma_ids=[pagamento.forma_pagamento_id for pagamento in pagamentos_caixa],
+        )
         dinheiro_caixa = (
             db.query(MovimentacaoCaixa)
             .filter(
@@ -878,7 +898,13 @@ def listar_vendas_caixa(
                 {
                     "id": pagamento.id,
                     "tipo": "pagamento",
-                    "forma_pagamento": pagamento.forma_pagamento,
+                    "forma_pagamento": nome_forma_pagamento(pagamento, nomes_formas),
+                    **(
+                        {"forma_pagamento_tipo": pagamento.forma_pagamento}
+                        if nome_forma_pagamento(pagamento, nomes_formas)
+                        != pagamento.forma_pagamento
+                        else {}
+                    ),
                     "valor": float(moeda(pagamento.valor)),
                     "data_recebimento": pagamento.data_pagamento.isoformat()
                     if pagamento.data_pagamento
@@ -967,10 +993,15 @@ def listar_vendas_caixa(
             Venda.tenant_id == tenant_id,
             VendaPagamento.tenant_id == tenant_id,
             VendaPagamento.valor != 0,
-            VendaPagamento.forma_pagamento == forma_pagamento,
+            func.lower(func.trim(VendaPagamento.forma_pagamento)) != "dinheiro",
         )
         .order_by(VendaPagamento.data_pagamento.desc())
         .all()
+    )
+    nomes_formas = carregar_nomes_formas_pagamento(
+        db,
+        tenant_id=tenant_id,
+        forma_ids=[pagamento.forma_pagamento_id for pagamento in pagamentos],
     )
     return [
         {
@@ -994,6 +1025,7 @@ def listar_vendas_caixa(
             else None,
         }
         for pagamento in pagamentos
+        if nome_forma_pagamento(pagamento, nomes_formas) == forma_pagamento
     ]
 
 

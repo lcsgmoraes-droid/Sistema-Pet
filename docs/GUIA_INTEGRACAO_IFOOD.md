@@ -323,10 +323,12 @@ recebimento de vendas no PDV de produção.
 
 **Validação desta etapa em 24/10/2026:** o ensaio local **sintético**, feito pela
 interface com dados fictícios, passou: uma reserva, uma venda, uma baixa FIFO e
-um pagamento, sem duplicação ao repetir a importação. O teste pela loja de testes
-do iFood continua **pendente**: o provedor retornou HTTP 400, **Merchant without
-setup configured**. Esse resultado local não comprova recebimento de um pedido
-oficial do iFood.
+um pagamento, sem duplicação ao repetir a importação. A dificuldade inicial de
+configuração foi contornada ao identificar a loja de testes já configurada pelo
+suporte. O iFood aceitou o envio somente do SKU `018631.1` nessa loja; isso ainda
+não comprova sua disponibilidade para compra. O pedido oficial continua
+**pendente**, pois falta concluir o acesso à loja pelo consumidor e realizar o
+pedido. O resultado sintético não substitui essa etapa.
 
 1. Com a equipe de implantação, confirme a empresa, a loja de testes, o pedido
    autorizado e o único produto do piloto. Neste primeiro ensaio, o pedido deve

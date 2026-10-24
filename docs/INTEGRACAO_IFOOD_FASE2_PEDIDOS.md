@@ -53,9 +53,12 @@ de teste**. Essa acao nao confirma, separa ou entrega o pedido no iFood.
 
 **Estado da validacao em 24/10/2026:** ensaio local **sintetico** pela interface
 aprovado, com uma reserva, uma baixa FIFO, um pagamento e reimportacao sem
-duplicacao. O teste pela loja oficial de testes do iFood permanece **pendente**:
-HTTP 400, **Merchant without setup configured**. Nao foi comprovado o recebimento
-de pedido oficial; o resultado sintetico nao substitui essa etapa.
+duplicacao. O bloqueio inicial **Merchant without setup configured** foi
+contornado ao identificar a loja de testes ja configurada pelo suporte. Nessa
+loja, o envio somente do SKU `018631.1` foi aceito com HTTP 202; essa resposta nao
+comprova disponibilidade para compra. O pedido oficial permanece **pendente** de
+acesso a loja pelo consumidor e de sua realizacao. Nao foi comprovado o
+recebimento de pedido oficial; o resultado sintetico nao substitui essa etapa.
 
 O piloto exige todas as configuracoes abaixo, inicialmente vazias/desligadas:
 

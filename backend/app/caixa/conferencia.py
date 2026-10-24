@@ -68,12 +68,15 @@ def totais_dinheiro(valor_abertura, movimentacoes) -> dict:
     return {campo: float(valor) for campo, valor in totais.items()}
 
 
-def indicadores_vendas_recebimentos(total_vendido, pagamentos_por_forma: dict) -> dict:
+def indicadores_vendas_recebimentos(
+    total_vendido, pagamentos_por_forma: dict, *, excluir_planos=True
+) -> dict:
     """Separa venda registrada de pagamento imediato, sem contar crédito a prazo."""
     recebimentos = {
         forma: dados
         for forma, dados in pagamentos_por_forma.items()
-        if forma.strip().casefold() not in FORMAS_PAGAMENTO_A_PRAZO
+        if not excluir_planos
+        or forma.strip().casefold() not in FORMAS_PAGAMENTO_A_PRAZO
     }
     return {
         "total_vendido": float(moeda(total_vendido)),

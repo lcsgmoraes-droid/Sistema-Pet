@@ -479,9 +479,12 @@ def compor_recebimentos(eventos, *, data_inicio, data_fim):
     detalhes_creditos = []
     for evento in eventos:
         valor = moeda(evento["valor"])
-        if normalizar(evento["forma_pagamento"]) in {"crediario", "boleto"}:
+        # A classificação financeira usa o tipo original; o nome cadastrado
+        # identifica cada opção da loja, inclusive em devoluções e estornos.
+        tipo_forma = evento.get("forma_pagamento_tipo") or evento["forma_pagamento"]
+        if normalizar(tipo_forma) in {"crediario", "boleto"}:
             continue
-        if eh_beneficio(evento["forma_pagamento"]):
+        if eh_beneficio(tipo_forma):
             beneficios += valor
             if valor != ZERO:
                 detalhes_creditos.append({**evento, "tipo": "beneficio"})

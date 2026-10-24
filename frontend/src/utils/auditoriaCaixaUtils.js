@@ -35,7 +35,10 @@ export function pagamentosVendaAuditoria(venda = {}) {
 }
 
 export function naturezaQuitacaoAuditoria(item = {}) {
-  const forma = chaveFormaAuditoria(item);
+  const forma = chaveFormaAuditoria({
+    ...item,
+    forma_pagamento: item.forma_pagamento_tipo || item.forma_pagamento,
+  });
   if (forma.includes("cashback") || (forma.includes("credito") && forma.includes("cliente"))) {
     return "Crédito ou benefício — sem entrada de dinheiro";
   }
