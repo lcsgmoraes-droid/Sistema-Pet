@@ -6,6 +6,7 @@ import {
   sincronizarIfoodFinanceiro,
 } from "../../api/ifood";
 import { mensagemErroIfood } from "./ifoodPresentation";
+import { periodoFinanceiroValido } from "./ifoodFinanceiroNavigation";
 
 const CAMPOS_CUSTOS = ["revenue", "cmv", "tax", "other_costs"];
 const VAZIO = { revenue: null, cmv: null, tax: null, other_costs: null, source_note: "" };
@@ -23,8 +24,10 @@ function periodoInicial() {
   return { inicio: dia, fim: dia };
 }
 
-export default function useIfoodFinanceiro({ enabled = false } = {}) {
-  const [periodo, setPeriodo] = useState(periodoInicial);
+export default function useIfoodFinanceiro({ enabled = false, periodoSugerido = null } = {}) {
+  const [periodo, setPeriodo] = useState(() =>
+    periodoFinanceiroValido(periodoSugerido) ? { ...periodoSugerido } : periodoInicial(),
+  );
   const [status, setStatus] = useState(null);
   const [relatorio, setRelatorio] = useState(null);
   const [carregando, setCarregando] = useState(false);
@@ -37,7 +40,7 @@ export default function useIfoodFinanceiro({ enabled = false } = {}) {
   const [erroCustos, setErroCustos] = useState("");
   const trava = useRef(false);
   const montado = useRef(true);
-  const periodoValido = Boolean(periodo.inicio && periodo.fim && periodo.inicio <= periodo.fim);
+  const periodoValido = periodoFinanceiroValido(periodo);
   const params = { begin_date: periodo.inicio, end_date: periodo.fim };
 
   useEffect(() => {

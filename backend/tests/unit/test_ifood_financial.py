@@ -57,6 +57,53 @@ def financial_event(name="ORDER_PAYMENT", value="91.00", **changes):
     return result
 
 
+def test_homologation_human_charge_label_is_preserved_but_not_classified(db):
+    tenant = store(db)
+    report = imported(
+        db,
+        tenant,
+        financial_event(
+            "Cobrança Pacote Anúncios",
+            "-12",
+            description="Pacote de anúncios",
+            trigger="SINGLE_OCCURRENCE",
+            reference=None,
+        ),
+    )
+    assert report["unallocated_events"][0]["name"] == "Cobrança Pacote Anúncios"
+    assert report["unallocated_events"][0]["amount"] == "-12.00"
+    assert report["summary"]["transfer_impact"] == "-12.00"
+    assert report["summary"]["unallocated_events"] == 1
+
+
+def test_observed_order_concluded_trigger_is_recognized_without_changing_unknown_guards(
+    db,
+):
+    tenant = store(db)
+    imported(
+        db,
+        tenant,
+        *[
+            financial_event(name, value, trigger="ORDER_CONCLUDED")
+            for name, value in (
+                ("ORDER_PAYMENT", "96"),
+                ("ORDER_COMMISSION", "-6"),
+                ("PAYMENT_TRANSACTION_FEE", "-3"),
+            )
+        ],
+    )
+    result = costs(db, tenant, revenue="100", cmv="60", tax="4", other_costs="1")
+    assert result["contribution"]["calculated"]
+    assert result["contribution"]["amount"] == "26.00"
+
+
+@pytest.mark.parametrize("label", ["\nunsafe", "x" * 101, "", "  "])
+def test_event_labels_reject_controls_empty_and_overlong_values(db, label):
+    tenant = store(db)
+    with pytest.raises(IfoodFinancialError):
+        imported(db, tenant, financial_event(label))
+
+
 def pages(*events, size=100):
     chunks = [
         events[index : index + size] for index in range(0, len(events), size)

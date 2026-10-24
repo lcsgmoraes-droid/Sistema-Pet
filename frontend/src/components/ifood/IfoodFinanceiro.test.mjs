@@ -138,6 +138,31 @@ test("taxa observada usa base e percentual do evento, sem inferir taxa contratua
   );
 });
 
+test("eventos conhecidos mostram nome português e código secundário sem renomear desconhecidos", async () => {
+  const env = setup();
+  const table = elements(await env.detail()).find((item) => item.type === "DataTable");
+  const nome = table.props.columns.find((item) => item.key === "name");
+  for (const [code, label] of [
+    ["ORDER_PAYMENT", "Pagamento do pedido"],
+    ["ORDER_COMMISSION", "Comissão iFood"],
+    ["PAYMENT_TRANSACTION_FEE", "Taxa de pagamento"],
+    ["IFOOD_SUBSIDY", "Subsídio do iFood"],
+    ["STORE_SUBSIDY", "Promoção da loja"],
+  ]) {
+    const result = nome.render({ name: code, description: "Descrição original do provedor" });
+    const paragraphs = elements(result).filter((item) => item.type === "p");
+    assert.equal(elementText(paragraphs[0]), label);
+    assert.equal(elementText(paragraphs[1]), code);
+    assert.match(elementText(result), /Descrição original do provedor/);
+  }
+  const desconhecido = nome.render({ name: "FUTURE_EVENT", trigger: "ORDER_CONCLUDED" });
+  assert.equal(
+    elementText(elements(desconhecido).find((item) => item.type === "p")),
+    "FUTURE_EVENT",
+  );
+  assert.match(elementText(desconhecido), /ORDER_CONCLUDED/);
+});
+
 test("pagamento recebido pela loja e impacto no repasse permanecem separados", async () => {
   const env = setup();
   const table = elements(await env.detail()).find((item) => item.type === "DataTable");

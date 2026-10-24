@@ -183,13 +183,41 @@ depende de `IFOOD_FINANCIAL_READ_ENABLED`, desabilitado por padrão (`false`), e
 não habilitá-las para executar este roteiro. Não inserir tokens ou segredos em
 capturas, documentos, exemplos ou commits.
 
-Nenhuma credencial real foi configurada em DEV durante esta implementação. A consulta
-real ainda depende da configuração protegida e do acesso Financial; os testes locais
-não declaram essa integração homologada nem acesso real validado.
+As credenciais do aplicativo **Teste (C)** foram usadas em uma consulta controlada ao
+Financial oficial com o cabeçalho de homologação. Nenhuma credencial de produção foi
+copiada para DEV. O backend do ambiente isolado continua sem credenciais e com a
+leitura externa desabilitada; o botão da interface não executa uma consulta externa.
+
+### Resposta oficial de homologação observada
+
+Em 2026-10-23, a autenticação do aplicativo de teste e a consulta retornaram 28 eventos.
+O provedor entregou uma massa fixa de **01 a 03/08/2025**, com recebedor próprio,
+mesmo quando a requisição usava a loja de teste acessível ao aplicativo. A validação
+normal recusou associar esses lançamentos à loja solicitada. Não foi criada exceção
+para aceitar eventos de outra loja ou trocar as datas do provedor.
+
+A resposta foi sanitizada e importada localmente na empresa **DEV iFood Homologacao
+Oficial**, com a identidade e o período do próprio conjunto de homologação. A fonte
+permanece `ifood_financial_events`, modo `homologation`; essa importação é uma captura
+controlada da resposta oficial, não uma sincronização da loja real pelo botão da tela.
+Os três lançamentos sem pedido e os tipos ainda não classificados permanecem visíveis
+e impedem a contribuição de parecer concluída. A massa sintética da outra empresa
+DEV continua separada.
+
+A resposta também confirmou nomes humanos de lançamento e o gatilho
+`ORDER_CONCLUDED`. O parser preserva o nome do lançamento ainda não classificado,
+mantém a descrição restrita aos códigos permitidos e não copia documentos do
+recebedor. A compatibilidade de enum não elimina as pendências de conciliação.
+
+Esses testes validam o cliente e a importação de homologação. A consulta das cobranças
+efetivas do Atacadão ainda exige o módulo Financial no aplicativo de produção,
+homologação própria e autorização correspondente da loja; não está liberada por esta
+entrega.
 
 Antes de apresentar Financial como integração completa:
 
-- Validar as respostas reais de homologação e compará-las às fixtures de teste.
+- Ampliar a validação oficial de homologação além da captura Financial Events já
+  conferida, cobrindo paginação, atualizações, erros e os demais módulos financeiros.
 - Implementar e validar Sales, arquivo Reconciliation, acompanhamento On-demand,
   Settlements e Anticipation conforme os recursos exigidos na homologação.
 - Tratar 409 de On-demand reutilizando `requestId`, além de expiração do arquivo,
@@ -211,3 +239,21 @@ deve repetir `valor_transacao` em cada linha de um mesmo título.
 Os exemplos da documentação são evidência de contrato para testes locais, não
 comprovantes de vendas da loja. Nenhuma collection Postman foi declarada como
 oficial neste documento sem link verificado no portal.
+
+## Validação registrada em DEV
+
+- 180 testes backend e 78 testes frontend aprovados; lint, formatação e build aprovados.
+- Migrações aplicadas em PostgreSQL novo. Prova de RLS com role temporária
+  `NOLOGIN NOSUPERUSER NOBYPASSRLS`: nas quatro tabelas novas, leitura isolada
+  por empresa, zero linhas sem contexto e inserção cruzada recusada. A FK
+  tenant/snapshot também recusou associação cruzada; a transação da prova foi revertida.
+- Na interface, o cenário sintético com receita 100, CMV 60, tributos 4, outros 1,
+  comissão 6 e pagamento 3 resultou em contribuição 26 e 26%, com custos versão 1.
+- Pagamento direto à loja ficou separado do impacto no repasse. Falhas de consulta
+  e gravação preservaram os dados e os rascunhos; trocar de aba preservou a edição
+  não salva das regras contratuais.
+- A captura oficial de homologação foi importada em empresa DEV própria: 28 eventos,
+  5 pedidos, 3 lançamentos sem pedido. Nenhuma contribuição foi inventada com custo
+  desconhecido; nenhuma tabela operacional foi modificada pela importação financeira.
+- O link `?aba=financeiro&inicio=2025-08-01&fim=2025-08-03` apenas abre a consulta
+  local na janela oficial. A URL não concede permissão nem dispara sincronização.

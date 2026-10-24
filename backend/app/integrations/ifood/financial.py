@@ -26,6 +26,7 @@ SOURCE = "ifood_financial_events"
 SOURCES = {SOURCE, "synthetic"}
 FEE_NAMES = {"ORDER_COMMISSION", "PAYMENT_TRANSACTION_FEE"}
 KNOWN_NAMES = FEE_NAMES | {"ORDER_PAYMENT", "IFOOD_SUBSIDY", "STORE_SUBSIDY"}
+CONCLUDED_TRIGGERS = {"SALE_CONCLUDED", "ORDER_CONCLUDED"}
 MONEY_FIELDS = ("revenue", "cmv", "tax", "other_costs")
 TOTAL_FIELDS = (
     "registered_payments",
@@ -133,6 +134,22 @@ def _code(value, *, required=True):
     raise IfoodFinancialError("Evento com identificação técnica inválida.")
 
 
+def _event_label(value, *, required=True):
+    # Official homologation includes human names such as package charges in
+    # Portuguese. Keep them as unclassified evidence rather than discarding the
+    # entire window. Enum fields (trigger, product, payment) remain strict.
+    if (
+        isinstance(value, str)
+        and 1 <= len(value.strip()) <= 100
+        and value.isprintable()
+        and re.fullmatch(r"[\w ./()-]+", value)
+    ):
+        return value.strip()
+    if not required and value is None:
+        return None
+    raise IfoodFinancialError("Nome ou descrição do lançamento financeiro inválido.")
+
+
 def _timestamp(value):
     if value is None:
         return None
@@ -194,7 +211,7 @@ def _sanitize_event(raw, merchant, begin, end):
         raise IfoodFinancialError("Evento sem valor financeiro confirmado.")
     amount = _money(amount.get("value"))
     result = {
-        "name": _code(raw.get("name")),
+        "name": _event_label(raw.get("name")),
         "description": _code(raw.get("description"), required=False),
         "product": _code(raw.get("product"), required=False),
         "trigger": _code(raw.get("trigger")),
@@ -389,7 +406,7 @@ def _order_view(order_id, events, costs, *, unallocated=False, multiple_windows=
         )
     if any(event.name not in KNOWN_NAMES for event in events):
         pending.append("Há tipos de evento ainda não classificados neste pedido.")
-    if any(event.trigger != "SALE_CONCLUDED" for event in events):
+    if any(event.trigger not in CONCLUDED_TRIGGERS for event in events):
         pending.append(
             "Há apuração provisória, ajuste ou cancelamento a conferir neste pedido."
         )

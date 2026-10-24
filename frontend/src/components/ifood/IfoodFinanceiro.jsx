@@ -28,6 +28,13 @@ const CUSTOS = [
   ["tax", "Tributos desta venda"],
   ["other_costs", "Outros custos desta venda"],
 ];
+const NOMES_EVENTOS = {
+  ORDER_PAYMENT: "Pagamento do pedido",
+  ORDER_COMMISSION: "Comissão iFood",
+  PAYMENT_TRANSACTION_FEE: "Taxa de pagamento",
+  IFOOD_SUBSIDY: "Subsídio do iFood",
+  STORE_SUBSIDY: "Promoção da loja",
+};
 
 function dataFinanceira(value) {
   if (!value) return "Não informado";
@@ -56,7 +63,14 @@ const eventColumns = [
     header: "Evento",
     render: (event) => (
       <div>
-        <p className="font-medium">{event.name || "Não informado"}</p>
+        <p className="font-medium">
+          {Object.hasOwn(NOMES_EVENTOS, event.name)
+            ? NOMES_EVENTOS[event.name]
+            : event.name || "Não informado"}
+        </p>
+        {Object.hasOwn(NOMES_EVENTOS, event.name) ? (
+          <p className="v2-texto-ajuda">{event.name}</p>
+        ) : null}
         <p className="v2-texto-ajuda">{event.description || event.trigger || ""}</p>
       </div>
     ),
@@ -247,8 +261,8 @@ function VendaFinanceira({ order, c }) {
   );
 }
 
-export default function IfoodFinanceiro({ ativo = false }) {
-  const c = useIfoodFinanceiro({ enabled: ativo });
+export default function IfoodFinanceiro({ ativo = false, periodoSugerido = null }) {
+  const c = useIfoodFinanceiro({ enabled: ativo, periodoSugerido });
   const [detalhe, setDetalhe] = useState(null);
   const report = c.relatorio;
   const order = report?.orders?.find((item) => item.order_id === detalhe);
@@ -308,7 +322,7 @@ export default function IfoodFinanceiro({ ativo = false }) {
             value={c.periodo}
             onChange={c.alterarPeriodo}
             disabled={c.ocupado}
-            error={!c.periodoValido ? "Escolha as duas datas em ordem crescente." : ""}
+            error={!c.periodoValido ? "Escolha um período válido de 1 a 33 dias." : ""}
           />
         </div>
         <BotaoInteracao

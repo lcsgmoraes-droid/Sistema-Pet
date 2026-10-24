@@ -23,7 +23,7 @@ function deferred() {
   });
   return { promise, resolve, reject };
 }
-function setup(enabled = true) {
+function setup(enabled = true, periodoSugerido = null) {
   const requests = { status: [], report: [], sync: [], costs: [] };
   const request = (type, payload, config) => {
     const result = deferred();
@@ -33,7 +33,7 @@ function setup(enabled = true) {
   const harness = createControllerHarness(
     fileURLToPath(new URL("./useIfoodFinanceiro.js", import.meta.url)),
     {
-      props: { enabled },
+      props: { enabled, periodoSugerido },
       mocks: new Map([
         [
           "../../api/ifood",
@@ -62,6 +62,45 @@ test("aba inativa não faz consulta nem usa dados fictícios", () => {
   assert.equal(env.harness.tree.relatorio, null);
   assert.equal(env.requests.report.length, 0);
   assert.equal(env.requests.sync.length, 0);
+});
+
+test("período sugerido válido consulta somente dados locais e não substitui edição posterior", async () => {
+  const env = setup(true, { inicio: "2025-08-01", fim: "2025-08-03" });
+  assert.deepEqual(env.requests.report[0].payload, {
+    begin_date: "2025-08-01",
+    end_date: "2025-08-03",
+  });
+  assert.equal(env.requests.sync.length, 0);
+  await env.load();
+  await env.harness.act(() => env.harness.tree.abrirCustos("sale-a"));
+  await env.harness.act(() => env.harness.tree.alterarCusto("cmv", 17));
+  const periodoEditado = { inicio: "2025-08-05", fim: "2025-08-06" };
+  await env.harness.act(() => env.harness.tree.alterarPeriodo(periodoEditado));
+  await env.harness.update({
+    enabled: false,
+    periodoSugerido: { inicio: "2026-01-01", fim: "2026-01-02" },
+  });
+  await env.harness.update({ enabled: true });
+  assert.deepEqual(env.harness.tree.periodo, periodoEditado);
+  assert.equal(env.harness.tree.rascunho.cmv, 17);
+  assert.equal(env.requests.sync.length, 0);
+});
+
+test("períodos editados inválidos e acima de 33 dias não consultam nem sincronizam", async () => {
+  const env = setup();
+  await env.load();
+  const consultas = env.requests.report.length;
+  for (const periodo of [
+    { inicio: "2025-02-30", fim: "2025-03-01" },
+    { inicio: "2025-08-01", fim: "2025-09-03" },
+    { inicio: "2025-08-03", fim: "2025-08-01" },
+  ]) {
+    await env.harness.act(() => env.harness.tree.alterarPeriodo(periodo));
+    assert.equal(env.harness.tree.periodoValido, false);
+    await env.harness.act(() => env.harness.tree.sincronizar());
+    assert.equal(env.requests.report.length, consultas);
+    assert.equal(env.requests.sync.length, 0);
+  }
 });
 
 test("falha inicial não fabrica relatório ou mock de eventos", async () => {

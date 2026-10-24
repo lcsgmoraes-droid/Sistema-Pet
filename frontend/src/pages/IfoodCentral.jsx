@@ -34,6 +34,7 @@ import IfoodConfiguracao from "../components/ifood/IfoodConfiguracao";
 import IfoodProdutoDetalhes from "../components/ifood/IfoodProdutoDetalhes";
 import IfoodStatus from "../components/ifood/IfoodStatus";
 import IfoodFinanceiro from "../components/ifood/IfoodFinanceiro";
+import { lerLinkFinanceiro } from "../components/ifood/ifoodFinanceiroNavigation";
 import {
   IFOOD_FILTROS,
   IFOOD_MODALIDADES,
@@ -64,7 +65,12 @@ export default function IfoodCentral() {
         (permission) => permission === "*" || permission === "relatorios.financeiro",
       ),
     );
-  const [aba, setAba] = useState("catalogo");
+  const [periodoLinkFinanceiro] = useState(() =>
+    lerLinkFinanceiro(typeof window === "undefined" ? "" : window.location?.search),
+  );
+  const [aba, setAba] = useState(() =>
+    podeVerFinanceiro && periodoLinkFinanceiro ? "financeiro" : "catalogo",
+  );
   const [busca, setBusca] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [filtro, setFiltro] = useState("todos");
@@ -503,7 +509,11 @@ export default function IfoodCentral() {
       </div>
       {podeVerFinanceiro ? (
         <div hidden={aba !== "financeiro"}>
-          <IfoodFinanceiro key={user?.tenant_id || user?.id} ativo={aba === "financeiro"} />
+          <IfoodFinanceiro
+            key={user?.tenant_id || user?.id}
+            ativo={aba === "financeiro"}
+            periodoSugerido={periodoLinkFinanceiro}
+          />
         </div>
       ) : null}
       {aba === "financeiro" && !podeVerFinanceiro ? (
