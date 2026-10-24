@@ -69,6 +69,7 @@ export default function useProdutosNovoCarregamento({
   setGranelVinculos,
 }) {
   const produtoRequestRef = useRef(0);
+  const fiscalCarregadoRef = useRef(null);
 
   const carregarOpcoesRacao = async (requestAindaAtiva) => {
     try {
@@ -140,23 +141,29 @@ export default function useProdutosNovoCarregamento({
         : await api.get(`/produtos/${produto.id}/fiscal`);
 
       if (requestAindaAtiva()) {
+        const tributacao = {
+          origem: data.origem,
+          herdado_da_empresa: data.herdado_da_empresa,
+          origem_mercadoria: data.origem_mercadoria ?? "0",
+          ncm: data.ncm ?? "",
+          cest: data.cest ?? "",
+          cfop: data.cfop ?? data.cfop_venda ?? "",
+          cst_icms: data.cst_icms ?? "",
+          icms_aliquota: data.icms_aliquota ?? "",
+          icms_st: data.icms_st ?? false,
+          pis_cst: data.pis_cst ?? "",
+          pis_aliquota: data.pis_aliquota ?? "",
+          cofins_cst: data.cofins_cst ?? "",
+          cofins_aliquota: data.cofins_aliquota ?? "",
+        };
+        fiscalCarregadoRef.current = {
+          id: produto.id,
+          tipo_produto: produto.tipo_produto,
+          tributacao,
+        };
         setFormData((prev) => ({
           ...prev,
-          tributacao: {
-            origem: data.origem,
-            herdado_da_empresa: data.herdado_da_empresa,
-            origem_mercadoria: data.origem_mercadoria ?? "0",
-            ncm: data.ncm ?? "",
-            cest: data.cest ?? "",
-            cfop: data.cfop ?? data.cfop_venda ?? "",
-            cst_icms: data.cst_icms ?? "",
-            icms_aliquota: data.icms_aliquota ?? "",
-            icms_st: data.icms_st ?? false,
-            pis_cst: data.pis_cst ?? "",
-            pis_aliquota: data.pis_aliquota ?? "",
-            cofins_cst: data.cofins_cst ?? "",
-            cofins_aliquota: data.cofins_aliquota ?? "",
-          },
+          tributacao,
         }));
       }
     } catch (error) {
@@ -166,6 +173,7 @@ export default function useProdutosNovoCarregamento({
 
   const carregarProduto = async () => {
     const requestId = ++produtoRequestRef.current;
+    fiscalCarregadoRef.current = null;
     const requestAindaAtiva = () => produtoRequestRef.current === requestId;
     const auxiliares = carregarDadosAuxiliares(requestAindaAtiva);
 
@@ -229,7 +237,7 @@ export default function useProdutosNovoCarregamento({
         ativo: produto.ativo ?? true,
         situacao: produto.situacao ?? true,
         estoque_minimo: produto.estoque_minimo || "",
-        estoque_maximo: produto.estoque_maximo || "",
+        estoque_maximo: produto.estoque_maximo ?? "",
         participa_sugestao_compra: produto.participa_sugestao_compra ?? true,
         controle_lote: produto.controle_lote ?? true,
         margem,
@@ -477,6 +485,21 @@ export default function useProdutosNovoCarregamento({
   };
 
   const salvarFiscal = async (produto) => {
+    if (isEdicao) {
+      const fiscalCarregado = fiscalCarregadoRef.current;
+      if (!fiscalCarregado || String(fiscalCarregado.id) !== String(produto.id)) {
+        throw new Error("Recarregue o produto para conferir os dados fiscais antes de salvar.");
+      }
+      // Defaults de exibição não devem virar uma personalização fiscal ao salvar outra aba.
+      if (
+        fiscalCarregado.tipo_produto === produto.tipo_produto &&
+        Object.entries(fiscalCarregado.tributacao).every(([campo, valor]) =>
+          Object.is(formData.tributacao?.[campo], valor),
+        )
+      ) {
+        return;
+      }
+    }
     const payload = {
       origem_mercadoria: formData.tributacao.origem_mercadoria,
       ncm: formData.tributacao.ncm,
@@ -496,6 +519,11 @@ export default function useProdutosNovoCarregamento({
     } else {
       await api.put(`/produtos/${produto.id}/fiscal`, payload);
     }
+    fiscalCarregadoRef.current = {
+      id: produto.id,
+      tipo_produto: produto.tipo_produto,
+      tributacao: { ...formData.tributacao },
+    };
   };
 
   useEffect(() => {

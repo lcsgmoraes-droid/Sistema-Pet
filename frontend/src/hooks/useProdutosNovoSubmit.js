@@ -91,7 +91,7 @@ export default function useProdutosNovoSubmit({
       fecharPreviewPrecosCompostos();
     } catch (error) {
       console.error("Erro ao salvar produto:", error);
-      alert(error.response?.data?.detail || "Erro ao salvar produto");
+      alert(error.response?.data?.detail || error.message || "Erro ao salvar produto");
     } finally {
       setSalvando(false);
     }
@@ -226,7 +226,9 @@ export default function useProdutosNovoSubmit({
         estoque_minimo:
           !produtoEhServico && formData.estoque_minimo ? parseInt(formData.estoque_minimo) : 0,
         estoque_maximo:
-          !produtoEhServico && formData.estoque_maximo ? parseInt(formData.estoque_maximo) : null,
+          !produtoEhServico && formData.estoque_maximo !== "" && formData.estoque_maximo != null
+            ? parseInt(formData.estoque_maximo)
+            : null,
         participa_sugestao_compra:
           produtoEhServico || produtoEhGranel
             ? false
@@ -331,7 +333,7 @@ export default function useProdutosNovoSubmit({
       navigate("/produtos");
     } catch (error) {
       console.error("Erro ao salvar produto:", error);
-      alert(error.response?.data?.detail || "Erro ao salvar produto");
+      alert(error.response?.data?.detail || error.message || "Erro ao salvar produto");
     } finally {
       setSalvando(false);
     }
