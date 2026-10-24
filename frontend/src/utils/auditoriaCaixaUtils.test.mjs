@@ -37,6 +37,22 @@ test("histórico identifica benefícios e planos sem tratar cartão de crédito 
   assert.equal(naturezaQuitacaoAuditoria({ forma_pagamento: "PIX" }), "");
 });
 
+test("nome cadastrado identifica a forma sem alterar sua natureza financeira", () => {
+  const pix = { forma_pagamento: "Pix Cashback parceiro", forma_pagamento_tipo: "PIX" };
+  const beneficio = { forma_pagamento: "Benefício fidelidade", forma_pagamento_tipo: "cashback" };
+  assert.equal(naturezaQuitacaoAuditoria(pix), "");
+  assert.match(naturezaQuitacaoAuditoria(beneficio), /sem entrada de dinheiro/);
+  assert.equal(chaveFormaAuditoria(pix), "pix cashback parceiro");
+  assert.equal(chaveFormaAuditoria(beneficio), "beneficio fidelidade");
+  assert.match(
+    naturezaQuitacaoAuditoria({
+      forma_pagamento: "Prazo da loja",
+      forma_pagamento_tipo: "Crediário",
+    }),
+    /não é recebimento/,
+  );
+});
+
 test("auditoria percorre todas as vendas com no máximo 25 por página sem perder referências", () => {
   const registros = Array.from({ length: 72 }, (_, id) => ({ id, assinatura: `assinatura-${id}` }));
   const paginas = [1, 2, 3].map((pagina) => paginarAuditoria(registros, pagina));

@@ -7,6 +7,10 @@ from sqlalchemy import or_
 from sqlalchemy.orm import joinedload, selectinload
 
 from app.caixa.conferencia import instante_fechamento, moeda, valor_recebimento_dinheiro
+from app.caixa.formas_pagamento import (
+    carregar_nomes_formas_pagamento,
+    nome_forma_pagamento,
+)
 from app.caixa.recebimentos import filtro_pagamentos_caixa
 from app.financeiro_models import Recebimento
 from app.services.faturamento_composicao import (
@@ -153,6 +157,11 @@ def montar_composicoes_caixa(db, *, caixa, tenant_id, movimentacoes):
         )
         .all()
     )
+    nomes_formas = carregar_nomes_formas_pagamento(
+        db,
+        tenant_id=tenant_id,
+        forma_ids=[pagamento.forma_pagamento_id for pagamento, *_ in pagamentos],
+    )
     entradas_dinheiro = [
         m
         for m in movimentacoes
@@ -201,7 +210,8 @@ def montar_composicoes_caixa(db, *, caixa, tenant_id, movimentacoes):
                 "numero_venda": numero,
                 "data_venda": data_local(data),
                 "data_recebimento": data_local(pagamento.data_pagamento),
-                "forma_pagamento": pagamento.forma_pagamento,
+                "forma_pagamento": nome_forma_pagamento(pagamento, nomes_formas),
+                "forma_pagamento_tipo": pagamento.forma_pagamento,
                 "valor": float(valor),
                 "tipo": "estorno" if valor < 0 else "pagamento",
             }
