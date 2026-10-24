@@ -34,13 +34,12 @@ test("link de prévia identifica produto e loja sem carregar dados da sessão", 
   const expected = "https://corepet.com.br/api/ecommerce/compartilhar/produtos/42?tenant=pet-amigo";
   assert.equal(buildProductShareUrl("https://corepet.com.br/pet-amigo?produto=42"), expected);
   assert.equal(
-    buildProductShareUrl("https://corepet.com.br/ecommerce?tenant=pet-amigo&produto=42&token=privado&view=checkout#carrinho"),
+    buildProductShareUrl(
+      "https://corepet.com.br/ecommerce?tenant=pet-amigo&produto=42&token=privado&view=checkout#carrinho",
+    ),
     expected,
   );
-  assert.equal(
-    buildProductShareUrl("https://corepet.com.br/pet-amigo/?produto=42"),
-    expected,
-  );
+  assert.equal(buildProductShareUrl("https://corepet.com.br/pet-amigo/?produto=42"), expected);
   const tenantId = "12345678-1234-4123-8123-123456789012";
   assert.equal(
     buildProductShareUrl(`https://corepet.com.br/ecommerce?tenant=${tenantId}&produto=99`),
@@ -57,7 +56,8 @@ test("link de prévia não transforma navegação sem produto ou loja válida", 
     "https://corepet.com.br/pet-amigo?produto=42%2Foutro",
     "https://corepet.com.br/%E0%A4%A?produto=42",
     "endereço inválido",
-  ]) assert.equal(buildProductShareUrl(url), url);
+  ])
+    assert.equal(buildProductShareUrl(url), url);
 });
 
 test("WhatsApp inclui nome com acentos e URL exata do produto", () => {

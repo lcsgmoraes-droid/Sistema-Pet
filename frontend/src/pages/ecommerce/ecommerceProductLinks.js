@@ -17,7 +17,8 @@ export function buildProductShareUrl(productUrl) {
     const product = new URL(productUrl);
     const productId = product.searchParams.get("produto");
     const pathTenant = product.pathname.match(/^\/([^/]+)\/?$/)?.[1];
-    const tenant = product.searchParams.get("tenant") ||
+    const tenant =
+      product.searchParams.get("tenant") ||
       (pathTenant !== "ecommerce" ? decodeURIComponent(pathTenant || "") : "");
     if (!/^[1-9]\d*$/.test(productId || "") || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(tenant)) {
       return productUrl;

@@ -60,16 +60,32 @@ export default function useEcommerceSeo({
     });
     ensureMeta('meta[property="og:type"]', { property: "og:type", content: "website" });
     ensureMeta('meta[property="og:url"]', { property: "og:url", content: shareUrl });
-    ensureMeta('meta[property="og:image"]', image ? { property: "og:image", content: image } : null);
-    ensureMeta('meta[property="og:image:alt"]', image ? {
-      property: "og:image:alt", content: selectedProduct?.nome || storeDisplayName,
-    } : null);
+    ensureMeta(
+      'meta[property="og:image"]',
+      image ? { property: "og:image", content: image } : null,
+    );
+    ensureMeta(
+      'meta[property="og:image:alt"]',
+      image
+        ? {
+            property: "og:image:alt",
+            content: selectedProduct?.nome || storeDisplayName,
+          }
+        : null,
+    );
     ensureMeta('meta[name="twitter:card"]', {
-      name: "twitter:card", content: image ? "summary_large_image" : "summary",
+      name: "twitter:card",
+      content: image ? "summary_large_image" : "summary",
     });
     ensureMeta('meta[name="twitter:title"]', { name: "twitter:title", content: title });
-    ensureMeta('meta[name="twitter:description"]', { name: "twitter:description", content: description });
-    ensureMeta('meta[name="twitter:image"]', image ? { name: "twitter:image", content: image } : null);
+    ensureMeta('meta[name="twitter:description"]', {
+      name: "twitter:description",
+      content: description,
+    });
+    ensureMeta(
+      'meta[name="twitter:image"]',
+      image ? { name: "twitter:image", content: image } : null,
+    );
     ensureMeta('link[rel="canonical"]', {
       tag: "link",
       rel: "canonical",
