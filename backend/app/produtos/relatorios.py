@@ -3,14 +3,40 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Optional
 
+from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.promocoes_venda_utils import detectar_promocao_por_preco_vendido
 from app.produtos.core import _produto_sku_value
 from app.produtos_models import EstoqueMovimentacao
 from app.vendas_models import Venda, VendaItem
+
+
+def _filtros_quantidade_relatorio(coluna, operador, valor) -> list:
+    """Compara cada item/movimento, sem confundir saídas negativas com peso menor."""
+    if operador is None and valor is None:
+        return []
+    if operador not in {"acima_de", "abaixo_de", "igual_a"} or valor is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Informe a comparação e a quantidade para filtrar.",
+        )
+    quantidade = Decimal(str(valor))
+    if not quantidade.is_finite() or quantidade <= 0:
+        raise HTTPException(
+            status_code=422,
+            detail="A quantidade do filtro deve ser maior que zero.",
+        )
+    magnitude = func.abs(coluna)
+    if operador == "acima_de":
+        return [magnitude > quantidade]
+    if operador == "abaixo_de":
+        return [magnitude < quantidade]
+    return [magnitude == quantidade]
 
 
 def _parse_relatorio_datetime(
