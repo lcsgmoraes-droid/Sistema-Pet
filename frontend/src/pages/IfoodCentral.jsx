@@ -5,6 +5,7 @@ import {
   CheckSquare,
   ChevronLeft,
   ChevronRight,
+  DollarSign,
   ListFilter,
   Package,
   Pencil,
@@ -32,6 +33,8 @@ import SeletorOpcoes from "../components/v2/SeletorOpcoes/SeletorOpcoes";
 import IfoodConfiguracao from "../components/ifood/IfoodConfiguracao";
 import IfoodProdutoDetalhes from "../components/ifood/IfoodProdutoDetalhes";
 import IfoodStatus from "../components/ifood/IfoodStatus";
+import IfoodFinanceiro from "../components/ifood/IfoodFinanceiro";
+import { lerLinkFinanceiro } from "../components/ifood/ifoodFinanceiroNavigation";
 import {
   IFOOD_FILTROS,
   IFOOD_MODALIDADES,
@@ -55,7 +58,19 @@ export default function IfoodCentral() {
       ),
     );
   const [podeConfigurar, setPodeConfigurar] = useState(false);
-  const [aba, setAba] = useState("catalogo");
+  const podeVerFinanceiro =
+    isAdminRole(user) ||
+    Boolean(
+      user?.permissions?.some(
+        (permission) => permission === "*" || permission === "relatorios.financeiro",
+      ),
+    );
+  const [periodoLinkFinanceiro] = useState(() =>
+    lerLinkFinanceiro(typeof window === "undefined" ? "" : window.location?.search),
+  );
+  const [aba, setAba] = useState(() =>
+    podeVerFinanceiro && periodoLinkFinanceiro ? "financeiro" : "catalogo",
+  );
   const [busca, setBusca] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [filtro, setFiltro] = useState("todos");
@@ -318,19 +333,24 @@ export default function IfoodCentral() {
             Prepare o catálogo da loja, confira os preços e resolva as pendências.
           </p>
         </div>
-        <BotaoInteracao
-          icon={RefreshCw}
-          loading={carregando}
-          onClick={() => setRevisao((atual) => atual + 1)}
-        >
-          Atualizar
-        </BotaoInteracao>
+        {aba !== "financeiro" ? (
+          <BotaoInteracao
+            icon={RefreshCw}
+            loading={carregando}
+            onClick={() => setRevisao((atual) => atual + 1)}
+          >
+            Atualizar
+          </BotaoInteracao>
+        ) : null}
       </div>
-      <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
+      <div
+        hidden={aba === "financeiro"}
+        className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200"
+      >
         Esta central prepara o catálogo no CorePet. Selecionar produtos ou aplicar preços não
         publica alterações no iFood.
       </div>
-      {erro ? (
+      {erro && aba !== "financeiro" ? (
         <p
           role="alert"
           className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200"
@@ -338,54 +358,56 @@ export default function IfoodCentral() {
           {erro}
         </p>
       ) : null}
-      {mensagem ? (
+      {mensagem && aba !== "financeiro" ? (
         <p role="status" className="text-sm text-emerald-700 dark:text-emerald-300">
           {mensagem}
         </p>
       ) : null}
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        {[
-          {
-            titulo: "Produtos",
-            valor: resumo.total,
-            icone: Package,
-            filtro: "todos",
-            tom: "neutro",
-          },
-          {
-            titulo: "Selecionados",
-            valor: resumo.selected,
-            icone: ShoppingBag,
-            filtro: "selecionados",
-            tom: "informativo",
-          },
-          {
-            titulo: "Com pendências",
-            valor: resumo.issues,
-            icone: AlertTriangle,
-            filtro: "pendencias",
-            tom: "atencao",
-          },
-          {
-            titulo: "Sem estoque",
-            valor: resumo.out_of_stock,
-            icone: ListFilter,
-            filtro: "sem_estoque",
-            tom: "atencao",
-          },
-        ].map((card) => (
-          <CartaoIndicador
-            key={card.filtro}
-            titulo={card.titulo}
-            icone={card.icone}
-            tom={card.tom}
-            aoClicar={() => filtrar(card.filtro)}
-          >
-            <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
-              {Number(card.valor || 0).toLocaleString("pt-BR")}
-            </p>
-          </CartaoIndicador>
-        ))}
+      <div hidden={aba === "financeiro"}>
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          {[
+            {
+              titulo: "Produtos",
+              valor: resumo.total,
+              icone: Package,
+              filtro: "todos",
+              tom: "neutro",
+            },
+            {
+              titulo: "Selecionados",
+              valor: resumo.selected,
+              icone: ShoppingBag,
+              filtro: "selecionados",
+              tom: "informativo",
+            },
+            {
+              titulo: "Com pendências",
+              valor: resumo.issues,
+              icone: AlertTriangle,
+              filtro: "pendencias",
+              tom: "atencao",
+            },
+            {
+              titulo: "Sem estoque",
+              valor: resumo.out_of_stock,
+              icone: ListFilter,
+              filtro: "sem_estoque",
+              tom: "atencao",
+            },
+          ].map((card) => (
+            <CartaoIndicador
+              key={card.filtro}
+              titulo={card.titulo}
+              icone={card.icone}
+              tom={card.tom}
+              aoClicar={() => filtrar(card.filtro)}
+            >
+              <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                {Number(card.valor || 0).toLocaleString("pt-BR")}
+              </p>
+            </CartaoIndicador>
+          ))}
+        </div>
       </div>
       <AbasNavegacao
         ariaLabel="Central do iFood"
@@ -394,9 +416,12 @@ export default function IfoodCentral() {
         abas={[
           { id: "catalogo", label: "Catálogo e pendências", icon: Package },
           { id: "configuracao", label: "Preços e custos da loja", icon: Settings },
+          ...(podeVerFinanceiro
+            ? [{ id: "financeiro", label: "Financeiro", icon: DollarSign }]
+            : []),
         ]}
       />
-      {aba === "configuracao" ? (
+      <div hidden={aba !== "configuracao"}>
         <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 md:p-6">
           {config ? (
             <IfoodConfiguracao
@@ -413,7 +438,8 @@ export default function IfoodCentral() {
             </p>
           )}
         </div>
-      ) : (
+      </div>
+      <div hidden={aba !== "catalogo"}>
         <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <div className="grid items-start gap-3 md:grid-cols-[minmax(220px,1fr)_minmax(220px,0.65fr)]">
             <InputTexto
@@ -480,7 +506,21 @@ export default function IfoodCentral() {
             </div>
           </div>
         </div>
-      )}
+      </div>
+      {podeVerFinanceiro ? (
+        <div hidden={aba !== "financeiro"}>
+          <IfoodFinanceiro
+            key={user?.tenant_id || user?.id}
+            ativo={aba === "financeiro"}
+            periodoSugerido={periodoLinkFinanceiro}
+          />
+        </div>
+      ) : null}
+      {aba === "financeiro" && !podeVerFinanceiro ? (
+        <p role="status" className="v2-texto-ajuda">
+          Seu acesso atual não permite consultar o financeiro do iFood.
+        </p>
+      ) : null}
       {detalhe ? (
         <IfoodProdutoDetalhes
           key={detalhe.product_id}

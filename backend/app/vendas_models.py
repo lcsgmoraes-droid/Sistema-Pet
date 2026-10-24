@@ -38,6 +38,7 @@ class Venda(BaseTenantModel):
 
     __tablename__ = "vendas"
     __table_args__ = (
+        Index("ux_vendas_tenant_id", "tenant_id", "id", unique=True),
         Index(
             "ux_vendas_tenant_numero_venda", "tenant_id", "numero_venda", unique=True
         ),

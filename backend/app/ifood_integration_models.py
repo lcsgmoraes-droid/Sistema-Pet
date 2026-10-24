@@ -3,9 +3,12 @@
 from sqlalchemy import (
     Boolean,
     Column,
+    Date,
     DateTime,
     Float,
     Index,
+    Integer,
+    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -40,9 +43,23 @@ class IfoodMerchantConfig(BaseTenantModel):
     tax_percent = Column(Float, nullable=True)
     additional_unit_cost = Column(Float, nullable=True)
     target_margin_percent = Column(Float, nullable=True)
+    # Proveniencia declarada pela loja; nunca preenchida a partir de medias
+    # dos pedidos nem confundida com validacao automatica do contrato pelo iFood.
+    rates_reference = Column(String(240), nullable=True)
+    rates_valid_from = Column(Date, nullable=True)
     status = Column(String(32), nullable=False, default="draft")
     last_connection_check_at = Column(DateTime(timezone=True), nullable=True)
     last_catalog_sync_at = Column(DateTime(timezone=True), nullable=True)
     last_orders_poll_at = Column(DateTime(timezone=True), nullable=True)
     last_orders_error = Column(Text, nullable=True)
     last_error = Column(Text, nullable=True)
+
+
+class IfoodMarginRulesRevision(BaseTenantModel):
+    """Historico das premissas locais, independente das cobrancas do provedor."""
+
+    __tablename__ = "ifood_margin_rules_revisions"
+    merchant_id = Column(String(36), nullable=True)
+    actor_id = Column(Integer, nullable=False)
+    # Numeros serializados como strings decimais; ausencia preservada como NULL.
+    values = Column(JSON, nullable=False)

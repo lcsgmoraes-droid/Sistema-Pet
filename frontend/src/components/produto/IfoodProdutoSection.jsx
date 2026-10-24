@@ -10,6 +10,7 @@ import InputMoeda from "../v2/InputMoeda/InputMoeda";
 import InputRadio from "../v2/InputRadio/InputRadio";
 import LinkPadrao from "../v2/LinkPadrao/LinkPadrao";
 import PromocaoFields from "./PromocaoFields";
+import IfoodPremissasOrigem from "../ifood/IfoodPremissasOrigem";
 import { serializarDataHoraIfood } from "./ifoodProdutoDates";
 
 const STATUS = {
@@ -337,6 +338,7 @@ export default function IfoodProdutoSection({ formData, handleChange, imagens = 
             </div>
           </dl>
 
+          <IfoodPremissasOrigem margem={margem} />
           {!margem?.calculated ? (
             <div className="space-y-1 text-sm text-slate-600 dark:text-slate-300">
               <p>

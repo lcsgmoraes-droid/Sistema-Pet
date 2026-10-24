@@ -4,6 +4,7 @@ import { salvarIfoodConfiguracao } from "../../api/ifood";
 import BotaoSalva from "../v2/BotaoSalva/BotaoSalva";
 import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
 import InputCheck from "../v2/InputCheck/InputCheck";
+import InputData from "../v2/InputData/InputData";
 import InputMoeda from "../v2/InputMoeda/InputMoeda";
 import InputPercentual from "../v2/InputPercentual/InputPercentual";
 import InputTexto from "../v2/InputTexto/InputTexto";
@@ -23,6 +24,8 @@ function assinaturaRegras(config) {
     config.default_markup_percent ?? 0,
     config.stock_safety ?? 0,
     ...CUSTOS.map(({ key }) => config[key] ?? null),
+    config.rates_reference ?? null,
+    config.rates_valid_from ?? null,
   ]);
 }
 
@@ -91,6 +94,8 @@ export default function IfoodConfiguracao({ config, onSalvo, podeConfigurar }) {
         default_markup_percent: Number(form.default_markup_percent ?? 0),
         stock_safety: estoque,
         ...Object.fromEntries(CUSTOS.map(({ key }) => [key, form[key] ?? null])),
+        rates_reference: form.rates_reference?.trim() || null,
+        rates_valid_from: form.rates_valid_from || null,
       };
       const response = await salvarIfoodConfiguracao(payload);
       onSalvo(response.data.config);
@@ -173,6 +178,25 @@ export default function IfoodConfiguracao({ config, onSalvo, podeConfigurar }) {
             onChange={(valor) => atualizar(campo.key, valor)}
           />
         ))}
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <InputTexto
+          id="ifood-contrato-referencia"
+          label="Referência das taxas do contrato"
+          value={form.rates_reference ?? ""}
+          onChange={(valor) => atualizar("rates_reference", valor)}
+          disabled={!podeConfigurar || salvando}
+          maxLength={240}
+          help="Ex.: condições comerciais consultadas no Portal do Parceiro. Não informe credenciais."
+        />
+        <InputData
+          id="ifood-contrato-vigencia"
+          label="Taxas vigentes desde"
+          value={form.rates_valid_from ?? ""}
+          onChange={(valor) => atualizar("rates_valid_from", valor)}
+          disabled={!podeConfigurar || salvando}
+          help="Vigência informada pela loja; o Financial não altera estas taxas automaticamente."
+        />
       </div>
       <p className="v2-texto-ajuda">
         As taxas percentuais desta simulação incidem sobre o preço vigente do item. Entrega,

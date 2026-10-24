@@ -25,6 +25,7 @@ import {
   valorConhecido,
 } from "./ifoodPresentation";
 import IfoodStatus from "./IfoodStatus";
+import IfoodPremissasOrigem from "./IfoodPremissasOrigem";
 import useIfoodSimulacaoPreco from "./useIfoodSimulacaoPreco";
 
 const PARCELAS = [
@@ -333,6 +334,7 @@ export default function IfoodProdutoDetalhes({
                     mensalidade ou benefícios financiados pela loja. O cenário não altera a
                     logística contratada.
                   </p>
+                  <IfoodPremissasOrigem margem={margem} />
                   {podeConfigurar ? (
                     <BotaoInteracao icon={Settings} disabled={c.salvando} onClick={onConfigurar}>
                       Conferir taxas e regras da loja

@@ -44,6 +44,11 @@ import app.variacao_config_fiscal_models  # variacao_config_fiscal (top-level, s
 import app.produtos_models
 import app.vendas_models
 import app.vendas_devolucoes_models
+import app.ifood_integration_models
+import app.ifood_order_models
+import app.ifood_financial_models
+import app.ifood_financial_cost_models
+import app.ifood_payout_models
 import app.caixa_models
 import app.financeiro_models
 import app.financeiro.models_imobilizado

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Literal
 from types import SimpleNamespace
 from uuid import UUID
@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.auth.dependencies import get_current_user_and_tenant
 from app.config import settings
 from app.db import get_session
-from app.ifood_integration_models import IfoodMerchantConfig
+from app.ifood_integration_models import IfoodMarginRulesRevision, IfoodMerchantConfig
 from app.integrations.ifood import (
     IfoodClient,
     IfoodClientError,
@@ -40,6 +40,23 @@ router = APIRouter(prefix="/integracoes/ifood", tags=["iFood"])
 
 
 class IfoodCatalogSettings(BaseModel):
+    rates_reference: str | None = Field(default=None, max_length=240)
+    rates_valid_from: date | None = None
+
+    @field_validator("rates_reference")
+    @classmethod
+    def normalize_rates_reference(cls, value):
+        return value.strip() or None if value is not None else None
+
+    @field_validator("rates_valid_from")
+    @classmethod
+    def current_contract_only(cls, value):
+        if value and value > date.today():
+            raise ValueError(
+                "Informe a vigencia das taxas atuais; agendamento de contrato ainda nao disponivel."
+            )
+        return value
+
     default_markup_percent: float = Field(default=0, ge=-50, le=300)
     stock_safety: float = Field(default=0, ge=0, le=1000000)
     commission_merchant_percent: float | None = Field(
@@ -189,8 +206,35 @@ def _config_view(config: IfoodMerchantConfig | None) -> dict[str, Any]:
         "last_orders_poll_at": config.last_orders_poll_at if config else None,
         "last_orders_error": config.last_orders_error if config else None,
         "last_error": config.last_error if config else None,
+        "rates_reference": getattr(config, "rates_reference", None),
+        "rates_valid_from": getattr(config, "rates_valid_from", None),
         **{field: getattr(config, field, None) for field in MARGIN_CONFIG_FIELDS},
     }
+
+
+def _record_margin_rules(
+    db: Session, config: IfoodMerchantConfig, actor_id: int
+) -> None:
+    values = {
+        field: str(getattr(config, field))
+        if getattr(config, field, None) is not None
+        else None
+        for field in MARGIN_CONFIG_FIELDS
+    }
+    values.update(
+        rates_reference=config.rates_reference,
+        rates_valid_from=config.rates_valid_from.isoformat()
+        if config.rates_valid_from
+        else None,
+    )
+    db.add(
+        IfoodMarginRulesRevision(
+            tenant_id=config.tenant_id,
+            merchant_id=config.merchant_id,
+            actor_id=actor_id,
+            values=values,
+        )
+    )
 
 
 def _products(
@@ -397,6 +441,12 @@ def save_ifood_config(
         )
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(config, field, value)
+    if set(body.model_fields_set) & {
+        *MARGIN_CONFIG_FIELDS,
+        "rates_reference",
+        "rates_valid_from",
+    }:
+        _record_margin_rules(db, config, current_user.id)
     if "merchant_id" in body.model_fields_set or "active" in body.model_fields_set:
         config.status = "ready" if config.merchant_id else "draft"
         config.last_error = None
@@ -427,11 +477,12 @@ def save_ifood_catalog_config(
     db: Session = Depends(get_session),
 ):
     """Premissas locais da loja; nao altera vinculo, ativacao ou flags externas."""
-    _, tenant_id = user_and_tenant
+    current_user, tenant_id = user_and_tenant
     config = _get_config(db, tenant_id, create=True)
     assert config is not None
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(config, field, value)
+    _record_margin_rules(db, config, current_user.id)
     db.commit()
     db.refresh(config)
     return {"config": _config_view(config)}

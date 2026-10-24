@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     IFOOD_ORDER_OPERATIONS_ENABLED: bool = False
     IFOOD_ORDER_POLLING_ENABLED: bool = False
     IFOOD_ORDER_POLLING_INTERVAL_SECONDS: int = 30
+    # Leitura Financial em DEV, independente de catalogo/pedidos; sempre envia
+    # x-request-homologation:true. Nao habilita consultas financeiras em producao.
+    IFOOD_FINANCIAL_READ_ENABLED: bool = False
 
     # Imagens de produtos
     PRODUCT_IMAGE_STORAGE_BACKEND: str = "local"  # local | s3
