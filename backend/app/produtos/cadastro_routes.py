@@ -844,7 +844,14 @@ def atualizar_produto(
             processar_alteracoes_inerentes,
         )
 
-        processar_alteracoes_inerentes(produto, dados_recebidos, db, current_user.id)
+        campos_inerentes_alterados = {
+            key: getattr(produto, key)
+            for key in dados_recebidos
+            if key in INHERENT_FIELDS and antes_historico[key] != getattr(produto, key)
+        }
+        processar_alteracoes_inerentes(
+            produto, campos_inerentes_alterados, db, current_user.id
+        )
 
         db.commit()
         db.refresh(produto)
