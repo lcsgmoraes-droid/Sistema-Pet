@@ -17,6 +17,7 @@ export default function ProdutosRelatorioPage() {
       <ProdutosRelatorioFiltros
         periodoSelecionado={relatorio.periodoSelecionado}
         filtrosForm={relatorio.filtrosForm}
+        erroQuantidade={relatorio.erroQuantidade}
         produtoSelecionado={relatorio.produtoSelecionado}
         buscaProduto={relatorio.buscaProduto}
         sugestoesProdutos={relatorio.sugestoesProdutos}
@@ -35,6 +36,33 @@ export default function ProdutosRelatorioPage() {
         onLimparProduto={relatorio.limparProduto}
         onLimparFiltros={relatorio.limparFiltros}
       />
+
+      {relatorio.filtrosAplicados.quantidade_operador && (
+        <div
+          className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-sm text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-100"
+          role="status"
+        >
+          <p className="font-semibold">
+            Quantidade filtrada:{" "}
+            {
+              { acima_de: "acima de", abaixo_de: "abaixo de", igual_a: "igual a" }[
+                relatorio.filtrosAplicados.quantidade_operador
+              ]
+            }{" "}
+            {formatarQuantidade(
+              String(relatorio.filtrosAplicados.quantidade_valor).replace(",", "."),
+            )}{" "}
+            {relatorio.dadosProduto?.produto?.unidade ||
+              relatorio.produtoSelecionado?.unidade ||
+              "(unidade do produto)"}{" "}
+            por item vendido ou movimentação.
+          </p>
+          <p className="mt-1">
+            Totais, vendas, gráfico e exportação seguem este filtro. O estoque atual é o saldo
+            total; a cobertura estimada considera apenas as vendas filtradas.
+          </p>
+        </div>
+      )}
 
       <ProdutosRelatorioProdutoPanel
         produtoSelecionado={relatorio.produtoSelecionado}
