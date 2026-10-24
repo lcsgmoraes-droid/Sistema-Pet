@@ -9,8 +9,10 @@ from alembic.operations import Operations
 import pytest
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.schema import CreateTable
 
 from app.db import Base
+from app.ifood_financial_cost_models import IfoodFinancialSaleLink
 from app.ifood_financial_models import (
     IfoodFinancialEvent,
     IfoodFinancialOrderCosts,
@@ -97,6 +99,34 @@ def test_observed_order_concluded_trigger_is_recognized_without_changing_unknown
     assert result["contribution"]["amount"] == "26.00"
 
 
+@pytest.mark.parametrize("value", [123, "000123", "123456789012345678"])
+def test_balance_identifier_is_preserved_as_technical_evidence(db, value):
+    tenant = store(db)
+    imported(
+        db,
+        tenant,
+        financial_event(period={"beginDate": BEGIN, "endDate": END, "idSaldo": value}),
+    )
+    with tenant_context(tenant):
+        event = db.query(IfoodFinancialEvent).one()
+    assert event.evidence["period"]["idSaldo"] == str(value)
+
+
+@pytest.mark.parametrize(
+    "value", [True, 1.5, "1.0", "id@email.test", "1234567890123456789", -1]
+)
+def test_invalid_balance_identifier_does_not_enter_evidence(db, value):
+    tenant = store(db)
+    with pytest.raises(IfoodFinancialError, match="saldo"):
+        imported(
+            db,
+            tenant,
+            financial_event(
+                period={"beginDate": BEGIN, "endDate": END, "idSaldo": value}
+            ),
+        )
+
+
 @pytest.mark.parametrize("label", ["\nunsafe", "x" * 101, "", "  "])
 def test_event_labels_reject_controls_empty_and_overlong_values(db, label):
     tenant = store(db)
@@ -132,6 +162,13 @@ def db():
         ],
     )
     session = sessionmaker(bind=engine)()
+    # Esta fixture nao vincula ERP; constraints da FK sao testadas na suite costs.
+    with engine.begin() as connection:
+        connection.execute(
+            CreateTable(
+                IfoodFinancialSaleLink.__table__, include_foreign_key_constraints=[]
+            )
+        )
     yield session
     session.close()
     engine.dispose()

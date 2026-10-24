@@ -9,12 +9,12 @@ function diaIso(value) {
     : null;
 }
 
-export function periodoFinanceiroValido(periodo) {
+export function periodoFinanceiroValido(periodo, limiteDias = 33) {
   const inicio = diaIso(periodo?.inicio);
   const fim = diaIso(periodo?.fim);
   if (inicio === null || fim === null) return false;
   const dias = (fim - inicio) / DIA_MS + 1;
-  return dias >= 1 && dias <= 33;
+  return dias >= 1 && dias <= limiteDias;
 }
 
 // Apenas sugere a apresentação inicial. A URL não concede acesso nem sincroniza eventos.

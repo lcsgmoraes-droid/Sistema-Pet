@@ -14,6 +14,10 @@ import ModalPadrao from "../v2/ModalPadrao/ModalPadrao";
 import { useEscapeToClose } from "../../utils/modalEscape";
 import { moedaIfood, percentualIfood, valorConhecido } from "./ifoodPresentation";
 import useIfoodFinanceiro from "./useIfoodFinanceiro";
+import useIfoodVinculoVenda from "./useIfoodVinculoVenda";
+import IfoodCustosHistoricos from "./IfoodCustosHistoricos";
+import IfoodRepasses from "./IfoodRepasses";
+import { dataFinanceira } from "./ifoodFinanceiroPresentation";
 
 const TOTAIS = [
   ["registered_payments", "Recebimentos registrados"],
@@ -35,17 +39,6 @@ const NOMES_EVENTOS = {
   IFOOD_SUBSIDY: "Subsídio do iFood",
   STORE_SUBSIDY: "Promoção da loja",
 };
-
-function dataFinanceira(value) {
-  if (!value) return "Não informado";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value.split("-").reverse().join("/");
-  const data = new Date(value);
-  return Number.isNaN(data.getTime())
-    ? "Não informado"
-    : data.toLocaleString("pt-BR", {
-        timeZone: "America/Sao_Paulo",
-      });
-}
 
 function Contribuicao({ contribution }) {
   return contribution?.calculated ? (
@@ -124,19 +117,20 @@ const eventColumns = [
   },
 ];
 
-function VendaFinanceira({ order, c }) {
+function VendaFinanceira({ order, c, vinculo }) {
   const editar = c.pedido === order.order_id;
-  const podeSalvar = Boolean(c.status?.can_edit_costs);
-  useEscapeToClose({ onClose: () => c.fecharDetalhe(), disabled: c.ocupado });
+  const podeSalvar = Boolean(c.status?.can_edit_costs && !vinculo.ocupado);
+  const ocupado = c.ocupado || vinculo.ocupado;
+  useEscapeToClose({ onClose: () => c.fecharDetalhe(), disabled: ocupado });
   return (
     <ModalPadrao
       titulo={`Eventos da venda · ${order.order_id}`}
       tamanho="ampla"
       onFechar={() => {
-        if (!c.ocupado) c.fecharDetalhe();
+        if (!ocupado) c.fecharDetalhe();
       }}
       rodape={
-        <BotaoCancelar disabled={c.ocupado} onClick={c.fecharDetalhe}>
+        <BotaoCancelar disabled={ocupado} onClick={c.fecharDetalhe}>
           Fechar
         </BotaoCancelar>
       }
@@ -152,7 +146,9 @@ function VendaFinanceira({ order, c }) {
           emptyMessage="Nenhum evento vinculado a esta venda."
         />
         <section className="space-y-2">
-          <h3 className="v2-titulo-secao">Contribuição com custos informados</h3>
+          <h3 className="v2-titulo-secao">
+            {order.contribution?.label || "Contribuição com custos informados"}
+          </h3>
           <p>
             <Contribuicao contribution={order.contribution} />
           </p>
@@ -167,7 +163,8 @@ function VendaFinanceira({ order, c }) {
             Cálculo fornecido pelo servidor com os eventos e custos informados desta venda.
             Recebimentos e subsídios não são somados novamente. Não representa lucro final nem
             confirmação de recebimento bancário. Custos manuais são informados pelo usuário para o
-            pedido inteiro. O vínculo automático com custos ERP é uma etapa seguinte.
+            pedido inteiro. O CMV histórico é utilizado quando comprovado e sem CMV manual
+            informado.
           </p>
           {order.manual_costs ? (
             <p className="v2-texto-ajuda">
@@ -180,8 +177,12 @@ function VendaFinanceira({ order, c }) {
             <p className="v2-texto-ajuda">Nenhuma versão de custos informada para esta venda.</p>
           )}
         </section>
+        <IfoodCustosHistoricos order={order} vinculo={vinculo} />
         {c.status?.can_edit_costs && !editar ? (
-          <BotaoInteracao onClick={() => c.abrirCustos(order.order_id, order.manual_costs)}>
+          <BotaoInteracao
+            disabled={vinculo.ocupado}
+            onClick={() => c.abrirCustos(order.order_id, order.manual_costs)}
+          >
             Informar custos desta venda
           </BotaoInteracao>
         ) : null}
@@ -197,7 +198,9 @@ function VendaFinanceira({ order, c }) {
             <p className="v2-texto-ajuda">
               Salvar cria uma versão auditável; não modifica os eventos do iFood, as regras da loja
               ou o cadastro dos produtos. Todos os valores são totais do pedido, não por unidade.
-              Desconhecido permanece sem informar; zero confirma que aquele custo não se aplica.
+              Desconhecido permanece sem informar; zero confirma que aquele custo não se aplica. CMV
+              sem informar permite usar o histórico comprovado da venda vinculada. CMV manual,
+              inclusive zero, substitui o automático apenas no cálculo desta venda.
             </p>
             <p className="v2-texto-ajuda">
               Receita da loja antes das taxas inclui os créditos e subsídios devidos à loja, com os
@@ -268,6 +271,12 @@ export default function IfoodFinanceiro({ ativo = false, periodoSugerido = null 
   const [detalhe, setDetalhe] = useState(null);
   const report = c.relatorio;
   const order = report?.orders?.find((item) => item.order_id === detalhe);
+  const vinculo = useIfoodVinculoVenda({
+    enabled: ativo,
+    orderId: detalhe,
+    canEdit: Boolean(c.status?.can_edit_costs && !c.ocupado),
+    onVinculado: c.atualizarPedido,
+  });
   const sintetico = report?.metadata?.source === "synthetic";
   const columns = [
     {
@@ -283,8 +292,19 @@ export default function IfoodFinanceiro({ ativo = false, periodoSugerido = null 
     })),
     {
       key: "contribution",
-      header: "Contribuição com custos informados",
-      render: (item) => <Contribuicao contribution={item.contribution} />,
+      header: "Contribuição da venda",
+      render: (item) => (
+        <div>
+          <Contribuicao contribution={item.contribution} />
+          <p className="v2-texto-ajuda">
+            {item.effective_cmv_source === "erp_original_stock_out"
+              ? "CMV histórico ERP"
+              : item.effective_cmv_source === "manual"
+                ? "CMV manual"
+                : "CMV pendente"}
+          </p>
+        </div>
+      ),
     },
     {
       key: "acoes",
@@ -309,11 +329,13 @@ export default function IfoodFinanceiro({ ativo = false, periodoSugerido = null 
             : "Consulta de eventos financeiros de homologação. Os valores não confirmam recebimento bancário."}
         </p>
         <p className="v2-texto-ajuda">
-          Sales, conciliação e repasses completos são etapas seguintes. Esta entrega consulta
-          somente eventos e custos informados.
+          Eventos, títulos de repasse e custos desta venda são conferidos separadamente. Sales e a
+          confirmação de recebimento no banco são etapas seguintes.
         </p>
         {report?.imported ? (
-          <p className="text-sm font-semibold">Eventos importados · conciliação pendente</p>
+          <p className="text-sm font-semibold">
+            Eventos importados · recebimento bancário não conferido
+          </p>
         ) : null}
       </div>
       <div className="flex flex-wrap items-end gap-3">
@@ -422,13 +444,15 @@ export default function IfoodFinanceiro({ ativo = false, periodoSugerido = null 
           descricao="Confira o estado da integração e tente consultar o período novamente."
         />
       ) : null}
+      <IfoodRepasses ativo={ativo} status={c.status} periodoSugerido={periodoSugerido} />
       {order ? (
         <VendaFinanceira
           order={order}
+          vinculo={vinculo}
           c={{
             ...c,
             fecharDetalhe: () => {
-              if (!c.ocupado) {
+              if (!c.ocupado && !vinculo.ocupado) {
                 c.fecharCustos();
                 setDetalhe(null);
               }

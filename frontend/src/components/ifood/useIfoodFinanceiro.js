@@ -129,6 +129,19 @@ export default function useIfoodFinanceiro({ enabled = false, periodoSugerido = 
     setErroCustos("");
   }
 
+  function atualizarPedido(atualizado) {
+    setRelatorio((atual) =>
+      atual
+        ? {
+            ...atual,
+            orders: atual.orders.map((order) =>
+              order.order_id === atualizado.order_id ? { ...order, ...atualizado } : order,
+            ),
+          }
+        : atual,
+    );
+  }
+
   async function salvarCustos() {
     if (!pedido || trava.current || !enabled || !status?.can_edit_costs) return;
     if (rascunho.source_note.trim().length < 5 || rascunho.source_note.trim().length > 1000) {
@@ -161,16 +174,7 @@ export default function useIfoodFinanceiro({ enabled = false, periodoSugerido = 
         source_note: rascunho.source_note.trim(),
       });
       if (montado.current) {
-        setRelatorio((atual) =>
-          atual
-            ? {
-                ...atual,
-                orders: atual.orders.map((order) =>
-                  order.order_id === pedido ? { ...order, ...response.data } : order,
-                ),
-              }
-            : atual,
-        );
+        atualizarPedido(response.data);
         setPedido(null);
         setSucesso("Versão dos custos desta venda salva. Os eventos do iFood foram preservados.");
         setRevisao((atual) => atual + 1);
@@ -203,6 +207,7 @@ export default function useIfoodFinanceiro({ enabled = false, periodoSugerido = 
     erroCustos,
     abrirCustos,
     salvarCustos,
+    atualizarPedido,
     alterarCusto: (campo, valor) => setRascunho((atual) => ({ ...atual, [campo]: valor })),
     fecharCustos: () => {
       if (!trava.current) setPedido(null);

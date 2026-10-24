@@ -43,7 +43,7 @@
     "test:oferta-publica-navigation": "node src/pages/ofertas/ofertaPublicaNavigation.test.mjs",
     "test:bling-oauth-reconnect": "node scripts/test-bling-oauth-reconnect.mjs",
     "test:app-routes-refactor": "node scripts/test-app-routes-refactor.mjs",
-    "test:ifood": "node --test src/utils/ifoodPromotionRefresh.test.mjs src/components/ifood/useIfoodSimulacaoPreco.test.mjs src/components/ifood/useIfoodFinanceiro.test.mjs src/components/ifood/IfoodFinanceiro.test.mjs src/components/ifood/IfoodCentralFinanceiro.test.mjs src/components/produto/ifoodProdutoDates.test.mjs src/pages/produtosFormUtils.test.mjs src/utils/produtoMargem.test.mjs src/utils/produtoRecorrencia.test.mjs scripts/helpers/reactControllerHarness.test.mjs",
+    "test:ifood": "node --test src/utils/ifoodPromotionRefresh.test.mjs src/components/ifood/useIfoodSimulacaoPreco.test.mjs src/components/ifood/useIfoodFinanceiro.test.mjs src/components/ifood/IfoodFinanceiro.test.mjs src/components/ifood/IfoodCentralFinanceiro.test.mjs src/components/ifood/useIfoodRepasses.test.mjs src/components/ifood/IfoodRepasses.test.mjs src/components/ifood/useIfoodVinculoVenda.test.mjs src/components/ifood/IfoodCustosHistoricos.test.mjs src/components/produto/ifoodProdutoDates.test.mjs src/pages/produtosFormUtils.test.mjs src/utils/produtoMargem.test.mjs src/utils/produtoRecorrencia.test.mjs scripts/helpers/reactControllerHarness.test.mjs",
     "test:lgpd-operacional-refactor": "node scripts/test-lgpd-operacional-refactor.mjs",
     "test:ponto-equilibrio-refactor": "node scripts/test-ponto-equilibrio-refactor.mjs",
     "test:comissoes-refactor": "node scripts/test-comissoes-refactor.mjs",

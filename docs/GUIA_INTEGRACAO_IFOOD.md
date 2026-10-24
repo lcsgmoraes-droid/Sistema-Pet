@@ -242,27 +242,59 @@ Depois da primeira publicação validada, poderão ser testados estoque, pausa,
 reativação e promoções. A entrada de pedidos e a baixa de estoque por venda
 também exigem validação própria antes de serem consideradas automáticas.
 
-## Contribuição estimada e apuração financeira futura
+## Financeiro em DEV: custo histórico e repasses
 
-A integração atual não consulta o módulo **Financial** do iFood. A contribuição
-da calculadora é uma estimativa com as premissas informadas; não é a conferência
-das taxas efetivamente cobradas ou do repasse.
+A calculadora continua sendo uma previsão com as premissas da loja. A aba
+**Financeiro**, disponível nesta entrega somente em DEV/homologação, separa essa
+estimativa dos eventos e títulos retornados pelo módulo Financial. Isso ainda
+não libera a consulta das cobranças reais do Atacadão nem conclui a homologação
+Financial de produção. A aprovação dos módulos operacionais não substitui a
+[homologação Financial](https://developer.ifood.com.br/en-US/docs/food/guides/modules/financial/homologation).
 
-Os dados financeiros podem ser consultados manualmente no Portal do Parceiro.
-Essa disponibilidade no Portal não significa que o CorePet já os receba por API
-ou os inclua automaticamente na apuração.
+### Usar o custo original de uma venda
 
-A documentação oficial prevê **Financial** para Groceries e exige sua
-homologação separada dos módulos operacionais. Essa é uma etapa própria de
-integração, ainda pendente no CorePet. [Categorias e módulos do
-iFood](https://developer.ifood.com.br/en-US/docs/getting-started/homologation/categories),
-[homologação de
-Financial](https://developer.ifood.com.br/en-US/docs/food/guides/modules/financial/homologation).
+1. Em DEV, abra **Central do iFood → Financeiro**, escolha o período dos eventos
+   importados e use **Conferir venda** no pedido escolhido.
+2. No bloco de custos históricos, pesquise o **Número ou ID da venda ERP** e
+   confira a mesma venda no ERP. A busca não seleciona automaticamente por
+   valor, data, cliente ou produto.
+3. Selecione a venda, registre a justificativa, marque a confirmação de que ela
+   corresponde ao pedido e use **Confirmar vínculo com venda ERP**. A associação
+   é local e auditada; ela não cria venda, caixa, recebível ou baixa de estoque.
+4. Confira o CMV histórico total e os comprovantes das linhas. Só são aceitas
+   vendas da mesma empresa, do canal iFood, finalizadas e sem cancelamento ou
+   devolução, com custo original comprovado em todos os itens.
+5. Se o CMV manual ficar **Não informado**, a contribuição usa automaticamente
+   esse custo histórico. Um CMV manual informado, inclusive zero, tem prioridade
+   explícita. Receita, tributos e outros custos ainda precisam ser conhecidos
+   e justificados; o CMV histórico sozinho não completa a contribuição.
 
-A proposta para uma fase futura é separar **estimativa antes da venda** de
-**apuração depois da venda**, combinando as cobranças efetivas do iFood com os
-custos correspondentes do ERP. Essa apuração ainda não está implementada nem
-validada; este guia não apresenta ações para executá-la.
+O custo atual do produto não completa uma prova antiga ausente. Alterações nos
+itens ou em seus comprovantes após a confirmação, devolução e cancelamento
+geram pendência. A confirmação precisa ser feita com cuidado: o sistema não
+reatribui o vínculo nem reutiliza a mesma venda para outro pedido silenciosamente.
+Os custos manuais continuam separados e versionados; não são sobrescritos pela leitura.
+
+### Conferir repasses do provedor
+
+1. No bloco **Repasses**, escolha o período e se deseja consultar por apuração
+   ou por data prevista de pagamento. A competência do arquivo de conciliação
+   é escolhida separadamente.
+2. Use **Conferir repasse** para revisar tipo, valor, situação e pendências.
+   Repasse, boleto e retenção são tipos distintos. Um título conferido no
+   provedor continua com recebimento bancário não conferido.
+3. Quando a consulta externa estiver habilitada em DEV, use **Consultar arquivo
+   de conciliação** para solicitar e acompanhar o arquivo mensal. O sistema
+   conserva a solicitação, respeita o intervalo entre tentativas e usa o arquivo
+   completo já importado. Falhas preservam a evidência anterior.
+4. Se o arquivo trouxer somente `id_saldo`, sem relação documentada com um
+   título, o vínculo permanece pendente. Coincidência de datas ou valores não
+   resolve essa pendência. Erro terminal ou conflito sem solicitação conhecida
+   exige conferência; o sistema não gera solicitações repetidas para contornar isso.
+
+Abrir a tela ou consultar os dados locais não chama o iFood. Nenhuma dessas
+ações publica anúncios nem marca caixa, banco ou contabilidade como conciliados.
+O roteiro técnico e as limitações estão em [Financial em DEV](IFOOD_FINANCIAL_DEV.md).
 
 ## Teste inicial e checklist
 

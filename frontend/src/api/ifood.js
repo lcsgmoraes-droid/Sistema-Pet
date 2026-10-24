@@ -31,3 +31,31 @@ export const salvarIfoodCustosPedido = (orderId, payload, config = {}) =>
     payload,
     config,
   );
+
+export const getIfoodRepasses = (params, config = {}) =>
+  api.get("/integracoes/ifood/financeiro/repasses", { ...config, params });
+
+export const sincronizarIfoodRepasses = (payload, config = {}) =>
+  api.post("/integracoes/ifood/financeiro/repasses/sincronizar", payload, config);
+
+export const getIfoodConciliacaoStatus = (params, config = {}) =>
+  api.get("/integracoes/ifood/financeiro/conciliacao/status", { ...config, params });
+
+export const sincronizarIfoodConciliacao = (payload, config = {}) =>
+  api.post("/integracoes/ifood/financeiro/conciliacao/sincronizar", payload, config);
+
+export const getIfoodVendasCandidatas = (orderId, params, config = {}) =>
+  api.get(
+    `/integracoes/ifood/financeiro/pedidos/${encodeURIComponent(orderId)}/vendas-candidatas`,
+    {
+      ...config,
+      params,
+    },
+  );
+
+export const vincularIfoodVenda = (orderId, payload, config = {}) =>
+  api.put(
+    `/integracoes/ifood/financeiro/pedidos/${encodeURIComponent(orderId)}/vinculo-venda`,
+    payload,
+    config,
+  );

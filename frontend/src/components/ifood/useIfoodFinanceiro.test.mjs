@@ -210,6 +210,28 @@ test("capacidades do servidor bloqueiam sync mas permitem custos com Financial d
   assert.equal(env.harness.tree.pedido, "sale-a");
 });
 
+test("vínculo histórico atualiza ordem e contribuição sem substituir custos manuais em edição", async () => {
+  const env = setup();
+  await env.load();
+  await env.harness.act(() => env.harness.tree.abrirCustos("sale-a"));
+  await env.harness.act(() => env.harness.tree.alterarCusto("cmv", 47));
+  await env.harness.act(() =>
+    env.harness.tree.alterarCusto("source_note", "Rascunho ainda não salvo"),
+  );
+  const atualizado = {
+    order_id: "sale-a",
+    historical_cost: { status: "verified", cmv: "60.00" },
+    effective_cmv: "60.00",
+    effective_cmv_source: "erp_original_stock_out",
+    contribution: { calculated: true, amount: "26.00" },
+  };
+  await env.harness.act(() => env.harness.tree.atualizarPedido(atualizado));
+  assert.equal(env.harness.tree.relatorio.orders[0].effective_cmv_source, "erp_original_stock_out");
+  assert.equal(env.harness.tree.relatorio.orders[0].contribution.amount, "26.00");
+  assert.equal(env.harness.tree.rascunho.cmv, 47);
+  assert.equal(env.harness.tree.rascunho.source_note, "Rascunho ainda não salvo");
+});
+
 test("falha de status retira capacidades e sincronização falha sem apagar custos", async () => {
   const env = setup();
   await env.load();

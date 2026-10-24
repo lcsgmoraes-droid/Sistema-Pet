@@ -633,6 +633,9 @@ jobs:
           tests/unit/test_ifood_financial.py
           tests/unit/test_ifood_financial_client.py
           tests/unit/test_ifood_financial_routes.py
+          tests/unit/test_ifood_financial_costs.py
+          tests/unit/test_ifood_payouts.py
+          tests/unit/test_ifood_financial_statement.py
           tests/unit/test_ifood_contract_reference.py -q
 
       - name: Faturamento reconciliation regression

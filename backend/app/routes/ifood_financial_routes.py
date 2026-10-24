@@ -2,8 +2,9 @@
 
 from datetime import date
 from decimal import Decimal
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -18,6 +19,17 @@ from app.integrations.ifood.financial import (
     get_financial_report,
     import_financial_pages,
     record_order_costs,
+    get_financial_order,
+)
+from app.integrations.ifood.financial_costs import link_order_sale, list_linkable_sales
+from app.integrations.ifood.payouts import (
+    get_payout_report,
+    import_settlements,
+    payout_period,
+)
+from app.integrations.ifood.reconciliation import (
+    advance_reconciliation,
+    get_reconciliation_status,
 )
 from app.security.permissions_decorator import require_permission
 from app.security import permissions_service
@@ -29,6 +41,21 @@ class FinancialPeriod(BaseModel):
     model_config = ConfigDict(extra="forbid")
     begin_date: date
     end_date: date
+
+
+class PayoutPeriod(FinancialPeriod):
+    basis: Literal["calculation", "payment"] = "calculation"
+
+
+class ReconciliationMonth(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    competence: str = Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")
+
+
+class SaleLink(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    venda_id: int = Field(gt=0, strict=True)
+    source_note: str = Field(min_length=5, max_length=1000)
 
 
 Money = Decimal | None
@@ -106,6 +133,7 @@ def _read_status(db, tenant_id, user):
         mode="homologation",
         homologation_only=True,
         can_sync=enabled and creds and merchant and can_edit,
+        can_sync_payouts=enabled and creds and merchant and can_edit,
         can_edit_costs=can_edit,
         merchant_configured=merchant,
         credentials_configured=creds,
@@ -216,3 +244,152 @@ def costs(
     except IfoodFinancialError as exc:
         db.rollback()
         raise HTTPException(exc.status_code, str(exc)) from exc
+
+
+@router.get("/pedidos/{order_id}/vendas-candidatas")
+@require_permission("relatorios.financeiro")
+@require_permission("configuracoes.editar")
+def sale_candidates(
+    order_id: str,
+    busca: str = Query(default="", max_length=100),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    _require_dev()
+    _, tenant = user_and_tenant
+    try:
+        merchant = _merchant(db, tenant)
+        get_financial_order(db, tenant, merchant, order_id)
+        return list_linkable_sales(db, tenant, merchant, search=busca)
+    except IfoodFinancialError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
+
+
+@router.put("/pedidos/{order_id}/vinculo-venda")
+@require_permission("relatorios.financeiro")
+@require_permission("configuracoes.editar")
+def link_sale(
+    order_id: str,
+    body: SaleLink,
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    _require_dev()
+    user, tenant = user_and_tenant
+    try:
+        merchant = _merchant(db, tenant)
+        link_order_sale(
+            db, tenant, merchant, order_id, body.venda_id, body.source_note, user.id
+        )
+        result = get_financial_order(db, tenant, merchant, order_id)
+        db.commit()
+        return result
+    except IfoodFinancialError as exc:
+        db.rollback()
+        raise HTTPException(exc.status_code, str(exc)) from exc
+
+
+@router.get("/repasses")
+@require_permission("relatorios.financeiro")
+def payouts(
+    begin_date: date,
+    end_date: date,
+    basis: Literal["calculation", "payment"] = "calculation",
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    _require_dev()
+    _, tenant = user_and_tenant
+    try:
+        return get_payout_report(
+            db, tenant, _merchant(db, tenant), begin_date, end_date, basis
+        )
+    except IfoodFinancialError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
+
+
+def _financial_client():
+    return IfoodFinancialClient(
+        client_id=settings.IFOOD_CLIENT_ID,
+        client_secret=settings.IFOOD_CLIENT_SECRET,
+        base_url=settings.IFOOD_API_BASE_URL,
+        timeout_seconds=settings.IFOOD_REQUEST_TIMEOUT_SECONDS,
+    )
+
+
+def _require_sync(db, tenant, user):
+    if not _read_status(db, tenant, user)["can_sync_payouts"]:
+        raise HTTPException(
+            409, "A consulta externa Financial ainda nao esta habilitada em DEV."
+        )
+
+
+@router.post("/repasses/sincronizar")
+@require_permission("relatorios.financeiro")
+@require_permission("configuracoes.editar")
+def sync_payouts(
+    body: PayoutPeriod,
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    _require_dev()
+    user, tenant = user_and_tenant
+    _require_sync(db, tenant, user)
+    try:
+        begin, end = payout_period(body.begin_date, body.end_date, body.basis)
+        merchant = _merchant(db, tenant)
+        with _financial_client() as client:
+            payload = client.fetch_settlements(merchant, begin, end, body.basis)
+        result = import_settlements(
+            db, tenant, merchant, begin, end, payload, user.id, body.basis
+        )
+        db.commit()
+        return result
+    except IfoodFinancialError as exc:
+        db.rollback()
+        raise HTTPException(exc.status_code, str(exc)) from exc
+    except IfoodClientError as exc:
+        db.rollback()
+        raise HTTPException(429 if exc.status_code == 429 else 502, str(exc)) from exc
+
+
+@router.get("/conciliacao/status")
+@require_permission("relatorios.financeiro")
+def reconciliation_status(
+    competence: str = Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    _require_dev()
+    _, tenant = user_and_tenant
+    try:
+        return get_reconciliation_status(db, tenant, _merchant(db, tenant), competence)
+    except IfoodFinancialError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
+
+
+@router.post("/conciliacao/sincronizar")
+@require_permission("relatorios.financeiro")
+@require_permission("configuracoes.editar")
+def sync_reconciliation(
+    body: ReconciliationMonth,
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    _require_dev()
+    user, tenant = user_and_tenant
+    _require_sync(db, tenant, user)
+    try:
+        merchant = _merchant(db, tenant)
+        with _financial_client() as client:
+            result = advance_reconciliation(
+                db, tenant, merchant, body.competence, user.id, client
+            )
+        db.commit()
+        return result
+    except IfoodFinancialError as exc:
+        db.rollback()
+        raise HTTPException(exc.status_code, str(exc)) from exc
+    except IfoodClientError as exc:
+        db.rollback()
+        raise HTTPException(429 if exc.status_code == 429 else 502, str(exc)) from exc

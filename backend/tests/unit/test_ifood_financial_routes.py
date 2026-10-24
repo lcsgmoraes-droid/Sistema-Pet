@@ -6,17 +6,20 @@ from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+from sqlalchemy.schema import CreateTable
 from sqlalchemy.pool import StaticPool
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.config import settings
 from app.db import Base, get_session
+from app.ifood_financial_cost_models import IfoodFinancialSaleLink
 from app.ifood_financial_models import (
     IfoodFinancialEvent,
     IfoodFinancialOrderCosts,
     IfoodFinancialSnapshot,
 )
 from app.ifood_integration_models import IfoodMerchantConfig
+from app.ifood_payout_models import IfoodPayoutSnapshot, IfoodReconciliationJob
 from app.integrations.ifood.client import IfoodClientError
 from app.routes import ifood_financial_routes as routes
 from app.security import permissions_decorator, permissions_service
@@ -37,9 +40,17 @@ def api(monkeypatch):
                 IfoodFinancialSnapshot,
                 IfoodFinancialEvent,
                 IfoodFinancialOrderCosts,
+                IfoodPayoutSnapshot,
+                IfoodReconciliationJob,
             )
         ],
     )
+    with engine.begin() as connection:
+        connection.execute(
+            CreateTable(
+                IfoodFinancialSaleLink.__table__, include_foreign_key_constraints=[]
+            )
+        )
     db = Session(engine)
     tenant, other = uuid4(), uuid4()
     merchant, other_merchant = str(uuid4()), str(uuid4())
@@ -79,6 +90,52 @@ def api(monkeypatch):
 
         def __exit__(self, *_args):
             pass
+
+        def fetch_settlements(self, mid, begin, end, basis):
+            state["calls"] += 1
+            if state["fail"]:
+                raise IfoodClientError(
+                    "Acesso Financial recusado.", status_code=state["fail"]
+                )
+            return dict(
+                merchantId=mid,
+                beginDate=str(begin),
+                endDate=str(end),
+                balance="91",
+                settlements=[
+                    dict(
+                        startDateCalculation=str(begin),
+                        endDateCalculation=str(end),
+                        closingItems=[
+                            dict(
+                                id="title-1",
+                                type="REPASSE",
+                                amount="91",
+                                status="SUCCEED",
+                                paymentDate=str(end),
+                            )
+                        ],
+                    )
+                ],
+            )
+
+        def create_reconciliation(self, mid, competence):
+            state["calls"] += 1
+            return dict(
+                merchant_id=mid,
+                competence=competence,
+                request_id="request-1",
+                status="created",
+            )
+
+        def get_reconciliation(self, mid, request_id, competence):
+            state["calls"] += 1
+            return dict(
+                merchant_id=mid,
+                competence=competence,
+                request_id=request_id,
+                status="enqueue",
+            )
 
         def fetch_financial_pages(self, mid, begin, end):
             state["calls"] += 1
@@ -256,3 +313,107 @@ def test_cost_body_rejects_invalid_money(api, value):
         json={"cmv": value, "source_note": "Ficticio DEV"},
     )
     assert result.status_code == 422
+
+
+def new_requests(api):
+    return [
+        lambda: api.client.get(BASE + "/repasses", params=PERIOD),
+        lambda: api.client.post(BASE + "/repasses/sincronizar", json=PERIOD),
+        lambda: api.client.get(
+            BASE + "/conciliacao/status", params={"competence": "2026-10"}
+        ),
+        lambda: api.client.post(
+            BASE + "/conciliacao/sincronizar", json={"competence": "2026-10"}
+        ),
+        lambda: api.client.get(BASE + "/pedidos/dev-sale-1/vendas-candidatas"),
+        lambda: api.client.put(
+            BASE + "/pedidos/dev-sale-1/vinculo-venda",
+            json={"venda_id": 1, "source_note": "Confirmação DEV"},
+        ),
+    ]
+
+
+def test_new_surfaces_are_all_dev_only(api, monkeypatch):
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+    assert [request().status_code for request in new_requests(api)] == [409] * 6
+    assert api.state["calls"] == 0
+
+
+def test_new_surfaces_require_financial_permission(api):
+    api.state["denied"].add("relatorios.financeiro")
+    assert [request().status_code for request in new_requests(api)] == [403] * 6
+    assert api.state["calls"] == 0
+
+
+def test_new_mutations_require_edit_permission(api):
+    api.state["denied"].add("configuracoes.editar")
+    requests = new_requests(api)
+    assert [requests[i]().status_code for i in (1, 3, 4, 5)] == [403] * 4
+    assert requests[0]().status_code == requests[2]().status_code == 200
+    assert not api.client.get(BASE + "/status").json()["can_sync_payouts"]
+    assert api.state["calls"] == 0
+
+
+def test_payout_import_job_cache_and_scope_do_not_enable_ifood_operations(api):
+    result = api.client.post(BASE + "/repasses/sincronizar", json=PERIOD)
+    assert result.status_code == 200, result.text
+    assert result.json()["titles"][0]["bank_status"] == "not_checked"
+    assert result.json()["titles"][0]["reconciliation_status"] == "pending"
+    month = {"competence": "2026-10"}
+    first = api.client.post(BASE + "/conciliacao/sincronizar", json=month)
+    assert first.status_code == 200, first.text
+    assert first.json()["job"]["status"] == "created"
+    assert (
+        api.client.post(BASE + "/conciliacao/sincronizar", json=month).json()["job"][
+            "id"
+        ]
+        == first.json()["job"]["id"]
+    )
+    assert api.state["calls"] == 2
+    assert api.client.get(BASE + "/conciliacao/status", params=month).status_code == 200
+    assert api.state["calls"] == 2
+    api.state["tenant"] = api.other
+    assert not api.client.get(BASE + "/repasses", params=PERIOD).json()["imported"]
+    assert (
+        api.client.get(BASE + "/conciliacao/status", params=month).json()["job"] is None
+    )
+    assert (
+        not settings.IFOOD_CATALOG_WRITE_ENABLED
+        and not settings.IFOOD_ORDER_OPERATIONS_ENABLED
+    )
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        dict(tenant_id="other"),
+        dict(merchant_id="other"),
+        dict(mode="production"),
+        dict(download_url="https://localhost"),
+    ],
+)
+def test_provider_scope_and_download_cannot_be_supplied_by_user(api, extra):
+    assert (
+        api.client.post(BASE + "/repasses/sincronizar", json=PERIOD | extra).status_code
+        == 422
+    )
+    assert (
+        api.client.post(
+            BASE + "/conciliacao/sincronizar", json={"competence": "2026-10"} | extra
+        ).status_code
+        == 422
+    )
+    assert api.state["calls"] == 0
+
+
+def test_failed_payout_refresh_keeps_prior_snapshot_and_financial_session(api):
+    first = api.client.post(BASE + "/repasses/sincronizar", json=PERIOD).json()
+    api.state["fail"] = 403
+    assert (
+        api.client.post(BASE + "/repasses/sincronizar", json=PERIOD).status_code == 502
+    )
+    assert api.client.get(BASE + "/repasses", params=PERIOD).json() == first
+    api.state["fail"] = 429
+    assert (
+        api.client.post(BASE + "/repasses/sincronizar", json=PERIOD).status_code == 429
+    )

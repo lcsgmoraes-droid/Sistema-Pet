@@ -151,3 +151,292 @@ def test_refuses_invalid_target_or_window_before_network(merchant, begin, end):
 
     with client(handler) as api, pytest.raises(IfoodClientError):
         api.fetch_financial_pages(merchant, begin, end)
+
+
+REQUEST_ID = str(uuid4())
+MONTH = "2025-08"
+SIGNED_URL = "https://payout-platform-api-files-sandbox.s3.amazonaws.com/reconciliacao-externa/on-demand/test.csv.gz?X-Amz-Signature=private-example"
+
+
+def authenticated(handler):
+    def transport(request):
+        if "oauth/token" in request.url.path:
+            return httpx.Response(
+                200, json={"accessToken": "private-test-token", "expiresIn": 3600}
+            )
+        return handler(request)
+
+    return client(transport)
+
+
+def settlement_body():
+    return dict(
+        merchantId=MERCHANT,
+        beginDate=str(BEGIN),
+        endDate=str(END),
+        balance=0,
+        settlements=[
+            dict(
+                startDateCalculation=str(BEGIN),
+                endDateCalculation=str(END),
+                closingItems=[
+                    dict(
+                        id="111",
+                        type="REPASSE",
+                        amount=12.34,
+                        status="SUCCEED",
+                        paymentDate="2026-11-04",
+                    ),
+                    dict(id="112", type="BOLETO", amount=-12.34, status="PENDING"),
+                ],
+            ),
+            dict(id="113", type="REGISTRO_RECEBIVEIS", amount=0, status="SUCCEED"),
+        ],
+    )
+
+
+@pytest.mark.parametrize(
+    "basis,prefix", [("calculation", "Calculation"), ("payment", "Payment")]
+)
+def test_settlements_uses_real_query_names_and_preserves_titles_without_summing(
+    basis, prefix
+):
+    def handler(request):
+        assert request.method == "GET"
+        assert request.url.path == f"/financial/v3.0/merchants/{MERCHANT}/settlements"
+        assert dict(request.url.params) == {
+            f"begin{prefix}Date": str(BEGIN),
+            f"end{prefix}Date": str(END),
+        }
+        assert request.headers["x-request-homologation"] == "true"
+        return httpx.Response(200, json=[settlement_body()])
+
+    with authenticated(handler) as api:
+        body = api.fetch_settlements(MERCHANT, BEGIN, END, basis)
+    assert body["balance"] == "0.00"
+    assert body["settlements"][0]["closingItems"][1]["amount"] == "-12.34"
+    assert body["settlements"][1]["amount"] == "0.00"
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        dict(merchantId=str(uuid4())),
+        dict(beginDate="2026-10-01"),
+        dict(balance=None),
+        dict(consolidatedMerchants=[str(uuid4())]),
+        dict(settlements=[{}]),
+        dict(
+            settlements=[dict(id="x", type="REPASSE", status="SUCCEED", amount="NaN")]
+        ),
+    ],
+)
+def test_settlements_rejects_other_store_incomplete_scope_and_invalid_amounts(changes):
+    with authenticated(
+        lambda _: httpx.Response(200, json=settlement_body() | changes)
+    ) as api:
+        with pytest.raises(IfoodClientError):
+            api.fetch_settlements(MERCHANT, BEGIN, END)
+
+
+@pytest.mark.parametrize("code", [200, 202])
+def test_create_reconciliation_uses_documented_post_body_and_accepts_202(code):
+    def handler(request):
+        import json
+
+        assert request.method == "POST"
+        assert (
+            request.url.path
+            == f"/financial/v3.0/merchants/{MERCHANT}/reconciliation/on-demand"
+        )
+        assert json.loads(request.content) == {"competence": MONTH}
+        assert request.headers["x-request-homologation"] == "true"
+        return httpx.Response(
+            code, json=dict(merchantId=MERCHANT, competence=MONTH, requestId=REQUEST_ID)
+        )
+
+    with authenticated(handler) as api:
+        result = api.create_reconciliation(MERCHANT, MONTH)
+    assert result == dict(
+        merchant_id=MERCHANT,
+        competence=MONTH,
+        request_id=REQUEST_ID,
+        status="created",
+        download_url=None,
+    )
+
+
+def test_conflict_never_invents_a_request_id_or_repeats_post():
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(409, json={"message": "private-test-secret"})
+
+    with authenticated(handler) as api:
+        result = api.create_reconciliation(MERCHANT, MONTH)
+    assert result["status"] == "conflict" and result["request_id"] is None
+    assert len(requests) == 1 and "private-test" not in repr(result)
+
+
+@pytest.mark.parametrize("status", ["created", "enqueue", "error"])
+def test_reconciliation_pending_and_provider_error_do_not_become_ready_or_zero(status):
+    def handler(request):
+        assert request.url.path.endswith(f"/reconciliation/on-demand/{REQUEST_ID}")
+        return httpx.Response(
+            200,
+            json=dict(
+                id=REQUEST_ID,
+                merchantId=MERCHANT,
+                competence=MONTH,
+                status=status,
+                errorMessage="private details",
+            ),
+        )
+
+    with authenticated(handler) as api:
+        result = api.get_reconciliation(MERCHANT, REQUEST_ID, MONTH)
+    assert result["status"] == status and result["download_url"] is None
+    assert "private details" not in repr(result)
+
+
+@pytest.mark.parametrize("field", ["downloadPath", "filePath"])
+def test_processed_file_accepts_both_verified_reference_url_fields(field):
+    body = dict(
+        id=REQUEST_ID, merchantId=MERCHANT, competence=MONTH, status="processed"
+    )
+    body[field] = SIGNED_URL
+    with authenticated(lambda _: httpx.Response(200, json=body)) as api:
+        assert (
+            api.get_reconciliation(MERCHANT, REQUEST_ID, MONTH)["download_url"]
+            == SIGNED_URL
+        )
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        dict(merchantId=str(uuid4())),
+        dict(id=str(uuid4())),
+        dict(competence="2025-07"),
+        dict(status="unknown"),
+        dict(status="processed"),
+        dict(
+            status="processed",
+            filePath=SIGNED_URL,
+            downloadPath=SIGNED_URL + "different",
+        ),
+    ],
+)
+def test_job_scope_and_completion_must_be_unequivocal(changes):
+    body = (
+        dict(id=REQUEST_ID, merchantId=MERCHANT, competence=MONTH, status="created")
+        | changes
+    )
+    with (
+        authenticated(lambda _: httpx.Response(200, json=body)) as api,
+        pytest.raises(IfoodClientError),
+    ):
+        api.get_reconciliation(MERCHANT, REQUEST_ID, MONTH)
+
+
+def test_downloader_is_separate_from_api_session_and_does_not_send_auth_or_cookies():
+    content = b"competencia;loja_id;valor;impacto_no_repasse\n"
+
+    def handler(request):
+        assert (
+            request.method == "GET"
+            and request.url.host == "payout-platform-api-files-sandbox.s3.amazonaws.com"
+        )
+        assert (
+            "authorization" not in request.headers and "cookie" not in request.headers
+        )
+        assert "x-request-homologation" not in request.headers
+        return httpx.Response(200, stream=httpx.ByteStream(content))
+
+    with client(handler) as api:
+        api._client.headers["Authorization"] = "private-api-secret"
+        api._client.cookies.set("private-cookie", "private-value")
+        assert api.download_statement(SIGNED_URL) == content
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://payout-platform-api-files-sandbox.s3.amazonaws.com/reconciliacao-externa/on-demand/test.csv",
+        "https://127.0.0.1/reconciliacao-externa/on-demand/test.csv",
+        "https://payout-platform-api-files-sandbox.s3.amazonaws.com.evil.example/reconciliacao-externa/on-demand/test.csv",
+        "https://payout-platform-api-files-sandbox.s3.amazonaws.com:8443/reconciliacao-externa/on-demand/test.csv",
+        "https://user:password@payout-platform-api-files-sandbox.s3.amazonaws.com/reconciliacao-externa/on-demand/test.csv",
+        "https://payout-platform-api-files-sandbox.s3.amazonaws.com/other/test.csv",
+        "https://payout-platform-api-files-sandbox.s3.amazonaws.com/reconciliacao-externa/on-demand/../test.csv",
+        SIGNED_URL + "#fragment",
+    ],
+)
+def test_download_rejects_unverified_hosts_url_confusion_and_path_traversal_before_network(
+    url,
+):
+    with (
+        client(lambda _: pytest.fail("Blocked URL made a network call")) as api,
+        pytest.raises(IfoodClientError) as caught,
+    ):
+        api.download_statement(url)
+    assert url not in str(caught.value)
+
+
+@pytest.mark.parametrize("code", [301, 302, 307, 403])
+def test_download_never_follows_redirects_or_reveals_signed_url(code):
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(code, headers={"Location": "http://127.0.0.1/private"})
+
+    with client(handler) as api, pytest.raises(IfoodClientError) as caught:
+        api.download_statement(SIGNED_URL)
+    assert len(calls) == 1 and "private-example" not in str(caught.value)
+
+
+def test_download_limits_stream_bytes_and_sanitizes_network_error(monkeypatch):
+    from app.integrations.ifood import financial_client as module
+
+    monkeypatch.setattr(module, "MAX_DOWNLOAD_BYTES", 3)
+    with (
+        client(lambda _: httpx.Response(200, stream=httpx.ByteStream(b"1234"))) as api,
+        pytest.raises(IfoodClientError),
+    ):
+        api.download_statement(SIGNED_URL)
+
+    def handler(request):
+        raise httpx.ConnectError("private-example signed url", request=request)
+
+    with client(handler) as api, pytest.raises(IfoodClientError) as caught:
+        api.download_statement(SIGNED_URL)
+    assert (
+        "private-example" not in str(caught.value) and caught.value.__suppress_context__
+    )
+
+
+def test_signed_url_is_not_written_to_httpx_info_logs_and_filter_is_removed(caplog):
+    import logging
+
+    logger = logging.getLogger("httpx")
+    original = list(logger.filters)
+    with caplog.at_level(logging.INFO, logger="httpx"):
+        with client(
+            lambda _: httpx.Response(200, stream=httpx.ByteStream(b"csv"))
+        ) as api:
+            assert api.download_statement(SIGNED_URL) == b"csv"
+    assert "private-example" not in caplog.text
+    assert logger.filters == original
+
+
+def test_buffered_transport_download_is_bounded_too():
+    with client(lambda _: httpx.Response(200, content=b"csv")) as api:
+        assert api.download_statement(SIGNED_URL) == b"csv"
+
+
+def test_settlement_ninety_day_inclusive_limit_is_checked_before_network():
+    with client(lambda _: pytest.fail("Invalid period made a network call")) as api:
+        with pytest.raises(IfoodClientError):
+            api.fetch_settlements(MERCHANT, date(2025, 1, 1), date(2025, 4, 1))

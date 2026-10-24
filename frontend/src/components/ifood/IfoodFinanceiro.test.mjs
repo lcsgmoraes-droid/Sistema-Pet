@@ -100,6 +100,9 @@ function setup(extra = {}) {
         ],
         ["../../utils/modalEscape", { useEscapeToClose() {} }],
         ["./useIfoodFinanceiro", stub(() => controller)],
+        ["./useIfoodVinculoVenda", stub(() => ({ ocupado: false, sales: [], podeEditar: false }))],
+        ["./IfoodCustosHistoricos", stub("IfoodCustosHistoricos")],
+        ["./IfoodRepasses", stub("IfoodRepasses")],
         [
           "./ifoodPresentation",
           {
@@ -131,10 +134,13 @@ test("taxa observada usa base e percentual do evento, sem inferir taxa contratua
   assert.match(elementText(billing), /80,00/);
   assert.match(elementText(billing), /1.50%/);
   assert.match(elementText(detail), /Homologação iFood/);
-  assert.match(elementText(env.harness.tree), /Eventos importados · conciliação pendente/);
   assert.match(
     elementText(env.harness.tree),
-    /Sales, conciliação e repasses completos são etapas seguintes/,
+    /Eventos importados · recebimento bancário não conferido/,
+  );
+  assert.match(
+    elementText(env.harness.tree),
+    /Sales e a confirmação de recebimento no banco são etapas seguintes/,
   );
 });
 

@@ -225,6 +225,15 @@ def _sanitize_event(raw, merchant, begin, end):
         "amount": {"value": _text(amount)},
         "receiver": sanitized_receiver,
     }
+    balance_id = period.get("idSaldo")
+    if balance_id is not None:
+        if (
+            isinstance(balance_id, bool)
+            or not isinstance(balance_id, (str, int))
+            or not re.fullmatch(r"[0-9]{1,18}", str(balance_id))
+        ):
+            raise IfoodFinancialError("Identificação técnica do saldo inválida.")
+        result["period"]["idSaldo"] = str(balance_id)
     if raw.get("dateTime") is not None:
         result["dateTime"] = _timestamp(raw["dateTime"])
     competence = raw.get("competence")
@@ -393,7 +402,15 @@ def _totals(events):
     return {key: _text(value) for key, value in result.items()}
 
 
-def _order_view(order_id, events, costs, *, unallocated=False, multiple_windows=False):
+def _order_view(
+    order_id,
+    events,
+    costs,
+    *,
+    unallocated=False,
+    multiple_windows=False,
+    historical_cost=None,
+):
     totals, pending = _totals(events), []
     names = {event.name for event in events}
     if "ORDER_COMMISSION" not in names:
@@ -419,6 +436,23 @@ def _order_view(order_id, events, costs, *, unallocated=False, multiple_windows=
             "Pedido possui lançamentos em outros períodos; conciliação necessária."
         )
     values = {field: getattr(costs, field) if costs else None for field in MONEY_FIELDS}
+    cmv_source = "manual" if values["cmv"] is not None else None
+    if (
+        cmv_source is None
+        and historical_cost
+        and historical_cost["status"] == "verified"
+        and historical_cost["cmv"] is not None
+    ):
+        values["cmv"] = Decimal(historical_cost["cmv"])
+        cmv_source = "erp_original_stock_out"
+    # Uma prova vinculada que se tornou invalida nao e ocultada por um valor
+    # manual. Cancelamento/devolucao/mudanca de itens exigem conciliacao.
+    if (
+        historical_cost
+        and historical_cost.get("link")
+        and historical_cost["status"] != "verified"
+    ):
+        pending.extend(historical_cost["missing"])
     labels = {
         "revenue": "Receita da loja antes das taxas",
         "cmv": "CMV da venda",
@@ -426,12 +460,18 @@ def _order_view(order_id, events, costs, *, unallocated=False, multiple_windows=
         "other_costs": "Outros custos da venda",
     }
     missing = [label for field, label in labels.items() if values[field] is None]
+    if values["cmv"] is None and historical_cost:
+        missing.extend(
+            message for message in historical_cost["missing"] if message not in pending
+        )
     missing.extend(pending)
     contribution = {
         "calculated": False,
         "amount": None,
         "percent": None,
-        "label": LABEL,
+        "label": "Contribuição com CMV histórico e custos informados"
+        if cmv_source == "erp_original_stock_out"
+        else LABEL,
         "missing": missing,
     }
     if not missing:
@@ -460,6 +500,9 @@ def _order_view(order_id, events, costs, *, unallocated=False, multiple_windows=
         "events": [_event_view(event) for event in events],
         "totals": totals,
         "manual_costs": _costs_view(costs),
+        "historical_cost": historical_cost,
+        "effective_cmv": _text(values["cmv"]),
+        "effective_cmv_source": cmv_source,
         "contribution": contribution,
         "pending": pending,
     }
@@ -548,6 +591,9 @@ def get_financial_report(
             .all()
         ):
             order_windows[order_id].add(snapshot_id)
+    from .financial_costs import get_historical_costs_for_orders
+
+    historical = get_historical_costs_for_orders(db, tenant, merchant, groups, mode)
     report["orders"] = [
         _order_view(
             order_id,
@@ -555,6 +601,7 @@ def get_financial_report(
             costs.get(order_id),
             unallocated=bool(unallocated),
             multiple_windows=len(order_windows[order_id]) > 1,
+            historical_cost=historical[order_id],
         )
         for order_id, entries in groups.items()
     ]
@@ -661,6 +708,60 @@ def import_financial_pages(
     return get_financial_report(db, tenant, merchant, begin, end, mode)
 
 
+def get_financial_order(db, tenant_id, merchant_id, order_id, mode=MODE):
+    """Compoe todos lancamentos ativos; nao grava custos nem mistura empresas."""
+    tenant, merchant = _scope(db, tenant_id, merchant_id, mode)
+    if not isinstance(order_id, str) or not REFERENCE_ID.fullmatch(order_id):
+        raise IfoodFinancialError("Pedido financeiro inválido.")
+    active_ids = (
+        _snapshot_query(db, tenant, merchant, mode)
+        .filter(IfoodFinancialSnapshot.active.is_(True))
+        .with_entities(IfoodFinancialSnapshot.id)
+    )
+    events = (
+        db.query(IfoodFinancialEvent)
+        .filter(
+            IfoodFinancialEvent.tenant_id == tenant,
+            IfoodFinancialEvent.snapshot_id.in_(active_ids),
+            IfoodFinancialEvent.order_id == order_id,
+        )
+        .order_by(IfoodFinancialEvent.id)
+        .all()
+    )
+    if not events:
+        raise IfoodFinancialError(
+            "Pedido não encontrado nos extratos desta loja.", status_code=404
+        )
+    cost = (
+        _costs_query(db, tenant, merchant, mode)
+        .filter(IfoodFinancialOrderCosts.order_id == order_id)
+        .order_by(IfoodFinancialOrderCosts.version.desc())
+        .first()
+    )
+    snapshots = {event.snapshot_id for event in events}
+    unallocated = (
+        db.query(IfoodFinancialEvent.id)
+        .filter(
+            IfoodFinancialEvent.tenant_id == tenant,
+            IfoodFinancialEvent.snapshot_id.in_(snapshots),
+            IfoodFinancialEvent.order_id.is_(None),
+        )
+        .first()
+        is not None
+    )
+    from .financial_costs import get_order_historical_cost
+
+    historical = get_order_historical_cost(db, tenant, merchant, order_id, mode)
+    return _order_view(
+        order_id,
+        events,
+        cost,
+        unallocated=unallocated,
+        multiple_windows=len(snapshots) > 1,
+        historical_cost=historical,
+    )
+
+
 def record_order_costs(
     db: Session, tenant_id, merchant_id, order_id, data, actor_id, mode=MODE
 ):
@@ -681,25 +782,8 @@ def record_order_costs(
     }
     try:
         _scope(db, tenant, merchant, mode, lock=True)
-        active_ids = (
-            _snapshot_query(db, tenant, merchant, mode)
-            .filter(IfoodFinancialSnapshot.active.is_(True))
-            .with_entities(IfoodFinancialSnapshot.id)
-        )
-        events = (
-            db.query(IfoodFinancialEvent)
-            .filter(
-                IfoodFinancialEvent.tenant_id == tenant,
-                IfoodFinancialEvent.snapshot_id.in_(active_ids),
-                IfoodFinancialEvent.order_id == order_id,
-            )
-            .order_by(IfoodFinancialEvent.id)
-            .all()
-        )
-        if not events:
-            raise IfoodFinancialError(
-                "Pedido não encontrado nos extratos desta loja.", status_code=404
-            )
+        # Confirma existencia/escopo antes de versionar qualquer dado manual.
+        get_financial_order(db, tenant, merchant, order_id, mode)
         previous = (
             _costs_query(db, tenant, merchant, mode)
             .filter(IfoodFinancialOrderCosts.order_id == order_id)
@@ -718,28 +802,8 @@ def record_order_costs(
         )
         db.add(cost)
         db.flush()
-        snapshots = {event.snapshot_id for event in events}
-        unallocated = (
-            db.query(IfoodFinancialEvent.id)
-            .filter(
-                IfoodFinancialEvent.tenant_id == tenant,
-                IfoodFinancialEvent.snapshot_id.in_(snapshots),
-                IfoodFinancialEvent.order_id.is_(None),
-            )
-            .first()
-            is not None
-        )
-        result = _order_view(
-            order_id,
-            events,
-            cost,
-            unallocated=unallocated,
-            multiple_windows=len(snapshots) > 1,
-        )
+        result = get_financial_order(db, tenant, merchant, order_id, mode)
     except Exception:
         db.rollback()
         raise
-    return {
-        key: result[key]
-        for key in ("order_id", "manual_costs", "contribution", "pending")
-    }
+    return result

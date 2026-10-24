@@ -1,8 +1,8 @@
 # iFood Financial — validação em DEV
 
-Data: 2026-10-23. Estágio 1: leitura de **Financial Events V3 em homologação**,
-histórico de consultas e contribuição por pedido com custos informados pela loja.
-Esta documentação registra a implementação inicial; não declara homologação
+Data: 2026-10-23. DEV: **Financial Events V3 em homologação**, CMV histórico ERP
+por vínculo confirmado, títulos de repasse e arquivo de conciliação On-demand.
+Esta documentação registra a implementação em DEV; não declara homologação
 Financial concluída nem disponibilidade financeira em produção.
 
 ## Escopo desta entrega
@@ -13,10 +13,17 @@ Financial concluída nem disponibilidade financeira em produção.
 - Exibir taxas observadas e valores ainda não classificados, mantendo pendências visíveis.
 - Informar receita, CMV, tributos e outros custos **do pedido inteiro**, com fonte e histórico.
 - Manter a previsão por contrato separada das cobranças observadas por pedido.
+- Confirmar uma vez o vínculo exato com uma venda ERP e buscar seu CMV original
+  automaticamente nas leituras seguintes, sem copiar custos no formulário manual.
+- Guardar versões dos títulos de Settlements e do arquivo mensal Reconciliation.
+- Conferir os valores do provedor por identificação documentada, mantendo as
+  diferenças e as relações ainda não comprovadas como pendências.
 
 Não há publicação de anúncios nesta jornada. Ela também não cria venda no PDV,
 recebível, recebimento, movimento de caixa, baixa de estoque ou conciliação bancária.
-Os custos ERP ainda não são vinculados automaticamente ao pedido financeiro.
+O vínculo inicial com a venda exige confirmação explícita: a Venda ainda não tem
+um identificador externo iFood canônico. Depois dessa confirmação, o CMV comprovado
+é lido automaticamente; não há busca por coincidência de valor, data ou cliente.
 
 ## Como conferir pela interface
 
@@ -37,7 +44,8 @@ concedido pelo iFood. O botão informa quando a consulta não está liberada.
 4. Use **Conferir venda** para abrir os detalhes de um pedido. Confira evento, valor com sinal, base de cálculo,
    percentual observado, recebedor do pagamento, impacto no repasse e previsão
    informada. Esses dados não comprovam crédito na conta bancária.
-5. Selecione **Informar custos desta venda** e preencha os totais do pedido, quando
+5. Para usar o custo original ERP, siga **Vincular a venda ERP** abaixo. Selecione
+   **Informar custos desta venda** e preencha os totais conhecidos do pedido, quando
    conhecidos. Registre a fonte e a justificativa. Salvar cria uma versão local
    auditável; não altera o iFood nem os custos dos produtos.
 6. Para simular vendas futuras, use as taxas e a referência de contrato nas regras
@@ -46,6 +54,71 @@ concedido pelo iFood. O botão informa quando a consulta não está liberada.
 
 Os rótulos finais devem ser conferidos junto da validação visual da versão DEV.
 Não converter este documento em uma promessa de acesso em produção antes do aceite.
+
+### Vincular a venda ERP e usar o CMV histórico
+
+1. Abra **Conferir venda** no pedido correto. No bloco de custos históricos, procure
+   pelo **Número ou ID da venda ERP**. A busca lista candidatos e não escolhe uma venda.
+2. Confira o número no ERP. A venda precisa pertencer à mesma empresa e ao canal
+   `ifood`, estar finalizada e não ter cancelamento ou devolução. Todos os itens
+   precisam ter comprovante original de baixa compatível com seus IDs e quantidades.
+3. Selecione a venda encontrada, informe **Fonte e justificativa do vínculo** e marque
+   **Conferi que o pedido e a venda ERP correspondem à mesma venda**. Só então use
+   **Confirmar vínculo com venda ERP**. Essa ação grava uma associação local auditada;
+   não cria nem finaliza venda, não baixa estoque e não envia anúncio.
+4. Confira o CMV total e os comprovantes de cada linha. O custo exibido por item é o
+   **total daquela linha**, com a quantidade já considerada. O custo atual do produto
+   e o snapshot reprocessável de rentabilidade não são usados como substitutos.
+5. Se o CMV manual estiver **Não informado**, a contribuição usa o CMV histórico
+   comprovado. Um CMV manual explicitamente informado, inclusive zero, tem prioridade
+   e permanece identificado como manual. Alterar essa escolha cria uma nova versão
+   dos custos informados; o histórico e os comprovantes originais são preservados.
+
+O vínculo não é reatribuído silenciosamente e uma mesma venda não prova dois pedidos.
+O manifesto da confirmação permite detectar inclusão, remoção ou alteração de itens
+e de suas provas depois do vínculo. Inconsistência, cancelamento ou devolução deixa
+o custo automático e a contribuição pendentes de conferência, mesmo havendo um CMV
+manual. Vendas antigas sem comprovante original permanecem pendentes; não completar
+essas provas com o custo atual. A confirmação inicial não recupera itens que já
+tenham sido removidos antes dela: o operador precisa conferir a venda correspondente.
+
+### Repasses e arquivo de conciliação
+
+1. No bloco **Repasses**, escolha o período e a base da consulta: **Apuração** ou
+   **Data prevista de pagamento**. A janela local aceita de 1 a 90 dias. Use
+   **Consultar repasses no iFood** somente com leitura externa habilitada em DEV.
+2. Abra **Conferir repasse** e confira tipo, situação no iFood, valor com sinal,
+   apuração e previsão de pagamento. Repasse, boleto e retenção são apresentados
+   por tipo; não somar esses títulos como se todos fossem receita ou crédito bancário.
+3. Informe separadamente a **Competência da conciliação (AAAA-MM)** e use
+   **Consultar arquivo de conciliação**. A competência do arquivo não é o período
+   do pedido nem a data de pagamento. A preparação assíncrona mantém o request ID
+   original e acompanha o estado sem criar uma nova solicitação a cada clique.
+4. Após a importação completa, confira títulos pendentes, divergentes e valores
+   conferidos entre as fontes do provedor. Conferir o provedor não marca recebimento
+   bancário, recebível, caixa ou contabilidade como conciliados.
+
+A conciliação do título usa somente o `titulo` legado quando o arquivo o fornece.
+O campo `id_saldo` substitui uma coluna descontinuada, mas não é o ID de título.
+Sem relação documentada entre saldo e título, o saldo continua separado e pendente,
+mesmo que datas ou valores coincidam. Não inventar esse vínculo. A soma do arquivo
+considera `valor` apenas nas linhas com impacto no repasse, com seus sinais; o
+`valor_transacao` repetido não é somado em cada linha.
+
+Para uma conferência completa, são necessários o mesmo título, totais consistentes,
+arquivo fechado, competências que cubram a apuração e eventos da janela exata. Todos
+os eventos do snapshot entram na soma; subperíodos, datas incompatíveis, arquivos
+incompletos ou diferença de centavos impedem marcar como conferido. A evidência
+sintética nunca comprova título de fonte oficial.
+
+Consultar o estado local ou abrir a tela não chama o iFood. O acompanhamento externo
+respeita o intervalo persistido no backend, de 5 segundos até 5 minutos; falhas mantêm
+a evidência anterior e também gravam intervalo de nova tentativa. Após 429, o mínimo
+é 60 segundos. Arquivo importado usa cache, sem novo download automático. Conflito
+409 sem request ID conhecido e erro terminal ficam pendentes de intervenção; não
+há tentativa de inventar ID nem um ciclo de novas solicitações. O endereço assinado
+do arquivo não é persistido, exibido ou enviado aos logs; o download usa somente
+o host de homologação verificado, com limites de tamanho e expansão.
 
 ### Como preencher receita e custos
 
@@ -80,12 +153,12 @@ na Reference é `https://merchant-api.ifood.com.br/financial/v3.0`.
 
 | Método | Caminho relativo ao servidor Financial V3 | Situação nesta entrega |
 | --- | --- | --- |
-| GET | `/merchants/{merchantId}/financial-events` | Único recurso externo implementado nesta etapa. |
+| GET | `/merchants/{merchantId}/financial-events` | Cliente e importação por janela completa implementados em homologação. |
 | GET | `/merchants/{merchantId}/sales` | Caminho e schema consultados; implementação e semântica de faturamento pendentes. |
-| GET | `/merchants/{merchantId}/settlements` | Caminho confirmado; integração e conciliação pendentes. |
+| GET | `/merchants/{merchantId}/settlements` | Cliente, snapshots por janela e conferência do provedor implementados em DEV. |
 | GET | `/merchants/{merchantId}/anticipations` | Caminho confirmado; integração pendente. |
-| POST | `/merchants/{merchantId}/reconciliation/on-demand` | Caminho confirmado; geração e tratamento do arquivo pendentes. |
-| GET | `/merchants/{merchantId}/reconciliation/on-demand/{requestId}` | Caminho confirmado; acompanhamento e arquivo pendentes. |
+| POST | `/merchants/{merchantId}/reconciliation/on-demand` | Solicitação persistida por empresa/loja/competência em DEV. |
+| GET | `/merchants/{merchantId}/reconciliation/on-demand/{requestId}` | Acompanhamento com backoff/cache, download limitado e parser CSV/gzip em DEV. |
 
 Não substituir esses caminhos por V2/V2.1, `financial-v3.0` ou um endpoint sem o hífen
 em `financial-events`. A apresentação abreviada de um guia não basta para inventar
@@ -165,6 +238,12 @@ Estas são decisões locais, não garantias adicionais da API:
   retorna 409 e pede atualizar a janela original.
 - Custos manuais têm versões próprias e continuam identificados como informados
   pelo usuário; uma nova consulta externa não os converte em dados do provedor.
+- Vínculo de venda é único por empresa/loja/modo/pedido e por empresa/modo/venda,
+  com FK composta por empresa e venda. Ator, justificativa e manifesto ficam
+  preservados. A leitura histórica usa lotes de até 1000 pedidos, até 10000 por
+  relatório, evitando uma consulta ERP para cada pedido.
+- Repasses de janelas sobrepostas são evidências independentes: não há total
+  acumulado entre elas. Atualizar a mesma janela preserva suas revisões.
 
 ## Previsão por contrato
 
@@ -214,17 +293,26 @@ efetivas do Atacadão ainda exige o módulo Financial no aplicativo de produçã
 homologação própria e autorização correspondente da loja; não está liberada por esta
 entrega.
 
+Uma consulta controlada adicional ao GET do job On-demand do aplicativo **Teste (C)**
+retornou HTTP 200 com estado `error`, com loja, competência e request ID conferidos.
+Não houve download nem validação ao vivo de host de arquivo nessa tentativa. Esse
+resultado é erro terminal do job, não arquivo vazio, saldo zero ou ciclo completo
+de conciliação homologado. A evidência técnica sanitizada permanece fora do Git;
+nenhuma URL privada, resposta bruta protegida ou credencial foi copiada para este guia.
+
 Antes de apresentar Financial como integração completa:
 
 - Ampliar a validação oficial de homologação além da captura Financial Events já
   conferida, cobrindo paginação, atualizações, erros e os demais módulos financeiros.
-- Implementar e validar Sales, arquivo Reconciliation, acompanhamento On-demand,
-  Settlements e Anticipation conforme os recursos exigidos na homologação.
-- Tratar 409 de On-demand reutilizando `requestId`, além de expiração do arquivo,
-  paginação, limites e falhas transitórias. Não há isso implementado no estágio 1.
+- Concluir e validar Sales e Anticipation conforme os recursos exigidos na homologação.
+- Validar o ciclo real completo de Settlements e On-demand com o provedor, incluindo
+  erros, limites, expiração, arquivos de várias competências e diferenças reais.
+  Cliente, persistência e testes locais não substituem essa validação oficial.
 - Conciliar créditos/débitos e títulos; separar despesas sem pedido e diferenças
   ainda sem explicação. Não marcar movimentações como quitadas pela consulta.
-- Fechar o vínculo com venda/PDV e custos históricos do ERP em escopo próprio.
+- Validar a jornada assistida de vínculo explícito com a venda e CMV histórico.
+  A associação automática futura exige identificador externo canônico no fluxo
+  operacional; a primeira entrega não cria esse identificador por heurística.
 - Concluir a homologação Financial, obter a permissão correspondente e receber
   autorização específica antes de qualquer liberação em produção.
 
@@ -242,7 +330,8 @@ oficial neste documento sem link verificado no portal.
 
 ## Validação registrada em DEV
 
-- 180 testes backend e 78 testes frontend aprovados; lint, formatação e build aprovados.
+- Antes da ampliação de CMV/repasses: 180 testes backend e 78 testes frontend
+  aprovados; lint, formatação e build aprovados. Esses totais registram a etapa anterior.
 - Migrações aplicadas em PostgreSQL novo. Prova de RLS com role temporária
   `NOLOGIN NOSUPERUSER NOBYPASSRLS`: nas quatro tabelas novas, leitura isolada
   por empresa, zero linhas sem contexto e inserção cruzada recusada. A FK
@@ -257,3 +346,30 @@ oficial neste documento sem link verificado no portal.
   desconhecido; nenhuma tabela operacional foi modificada pela importação financeira.
 - O link `?aba=financeiro&inicio=2025-08-01&fim=2025-08-03` apenas abre a consulta
   local na janela oficial. A URL não concede permissão nem dispara sincronização.
+- Ampliação atual: regressões de CMV histórico/manual, manifesto, escopo e chunks
+  passaram junto às suites de Financial e custos originais. Os casos novos de
+  repasse cobrem subperíodos, consolidação indevida, apuração fora da consulta,
+  divergência de data, 429, falha de download/parser e cache do arquivo completo.
+  A prova PostgreSQL citada acima cobre as quatro tabelas da etapa anterior.
+- As três tabelas adicionais também passaram em PostgreSQL real no DEV isolado:
+  `ifood_financial_sale_links`, `ifood_payout_snapshots` e `ifood_reconciliation_jobs`.
+  Com role temporária sem superuser, login ou bypass de RLS, ENABLE/FORCE foram
+  confirmados, cada empresa viu só suas linhas, não houve leitura sem contexto e
+  a inserção cruzada foi recusada (`42501`). Unicidade (`23505`), modo somente
+  homologação (`23514`), FK tenant/venda (`23503`) e imutabilidade de UPDATE/DELETE
+  do vínculo (`P0001`) foram comprovados. Toda a prova sofreu rollback; role,
+  grants e linhas temporárias removidos, contagens e sequências preservadas.
+- A jornada atual também foi conferida na interface V2 do DEV isolado: dois títulos
+  sintéticos conciliados no provedor (repasse 91 e boleto -7,20), com banco não
+  conferido. A venda fictícia `DEV-CMV-HIST-001`, vinculada explicitamente pela tela,
+  trouxe CMV histórico 48 e contribuição 20,60 / 25,75%; o CMV manual permaneceu
+  nulo e sua versão foi preservada. Trata-se de fixture de teste, sem venda real
+  do Atacadão e sem comprovar o ciclo oficial de repasses do iFood.
+- Gate atual: 369 testes iFood aprovados; smoke raiz 203 aprovados / 2 ignorados,
+  hardening multitenant 769 aprovados / 22 ignorados. Lint, formatação, build,
+  importação do backend e auditorias de dependências backend/frontend passaram.
+  O gate completo foi interrompido na auditoria mobile por
+  `GHSA-86W9-CPQP-85RV` (node-forge/cadeia Expo). O `app-mobile/package-lock.json`
+  é idêntico ao de `origin/main` (`36949c33f6e6bc2a9e62722cf21319bf47aaacf0`);
+  nenhuma dependência mobile foi alterada nesta entrega. Portanto o gate completo
+  não deve ser apresentado como aprovado nem como autorização para produção.
