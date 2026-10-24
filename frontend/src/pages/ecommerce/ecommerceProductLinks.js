@@ -10,6 +10,26 @@ export function buildProductUrl({ origin, pathname, search = "" }, productId, te
   return url.href;
 }
 
+// O HTML deste endereço já contém a foto e o nome antes de executar JavaScript.
+// A URL normal continua sendo usada pela navegação da loja.
+export function buildProductShareUrl(productUrl) {
+  try {
+    const product = new URL(productUrl);
+    const productId = product.searchParams.get("produto");
+    const pathTenant = product.pathname.match(/^\/([^/]+)\/?$/)?.[1];
+    const tenant = product.searchParams.get("tenant") ||
+      (pathTenant !== "ecommerce" ? decodeURIComponent(pathTenant || "") : "");
+    if (!/^[1-9]\d*$/.test(productId || "") || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(tenant)) {
+      return productUrl;
+    }
+    const share = new URL(`/api/ecommerce/compartilhar/produtos/${productId}`, product.origin);
+    share.searchParams.set("tenant", tenant);
+    return share.href;
+  } catch {
+    return productUrl;
+  }
+}
+
 export function buildProductWhatsappUrl(product, url) {
   return `https://wa.me/?text=${encodeURIComponent(`${product.nome}\n${url}`)}`;
 }
