@@ -333,21 +333,38 @@ sintético não substitui essa etapa.
 1. Com a equipe de implantação, confirme a empresa, a loja de testes, o pedido
    autorizado e o único produto do piloto. Neste primeiro ensaio, o pedido deve
    ter uma unidade do SKU 018631.1, para retirada ou entrega com frete
-   explicitamente informado, igual ou maior que zero, e sem cupom, desconto ou
-   taxas adicionais. O pagamento presencial em dinheiro deve corresponder ao
-   total exato do item mais o frete: por exemplo, R$ 65,00 + R$ 8,90 = R$ 73,90.
-   A reserva e a baixa continuam sendo de uma unidade do produto.
+   explicitamente informado, igual ou maior que zero, e sem cupom ou desconto.
+   A reserva e a baixa continuam sendo de uma unidade do produto. A equipe deve
+   conferir o modo de pagamento recebido do iFood, sem trocá-lo para dinheiro.
 2. No DEV, abra **Configurações → Integrações → iFood → Pedidos para
    homologação**. Confira o pedido e os dados da sacola. Receber o pedido no
    painel ainda não reserva estoque nem cria uma venda.
 3. No bloco **Piloto do PDV em DEV**, use **Enviar ao PDV de teste**. Confira a
    indicação de estoque reservado e o vínculo **Abrir venda no PDV**. Repetir a
    ação deve manter a mesma venda e a mesma reserva.
-4. Abra a venda e confira canal iFood, produto, quantidade e valor. A finalização
-   pelo PDV registra a baixa de estoque uma única vez e encerra a reserva.
+4. Abra a venda e confira canal iFood, produto, quantidade e valor. Para dinheiro
+   presencial autorizado, registre o valor exato do item mais frete, sem outras
+   taxas. Para pagamento online, confira **Pagamento online no iFood** e use
+   **Concluir venda e baixar estoque**, na Central ou no PDV. Não registre outro
+   pagamento; esse modo não abre a cobrança do caixa. A finalização registra a
+   baixa de estoque uma única vez e encerra a reserva.
 5. Volte ao painel e use **Atualizar pedidos** para conferir a reserva e a baixa
    gravadas no CorePet. Esse botão apenas relê os dados locais; **Buscar eventos
    agora** consulta o iFood e é uma ação diferente.
+
+No modo online, o resumo separa produto, frete, valor operacional, taxa de
+serviço do iFood e total do consumidor. Por exemplo: item de R$ 65,00 + frete de
+R$ 8,90 = R$ 73,90 operacionais; com R$ 1,99 de serviço do iFood, o consumidor
+paga R$ 75,89. Esse total não é o repasse líquido da loja. O piloto aceita essa
+taxa somente quando a origem comprova que pertence ao iFood; outras condições
+ficam bloqueadas. O frete online positivo exige entrega sob responsabilidade da
+loja comprovada no pedido.
+
+**Repasse a conciliar** significa que líquido, data e margem ainda aguardam o
+Financial. Concluir a venda online registra a evidência externa e a baixa do
+produto; não registra dinheiro recebido em caixa ou banco nem dá o repasse como
+recebido. Se o modo de pagamento ou o escopo do piloto não puder ser comprovado,
+a cobrança manual continua bloqueada.
 
 Outros pedidos, itens, pagamentos ou empresas não autorizados ficam bloqueados
 no piloto. Não altere os itens da venda para contornar o bloqueio. Quando o

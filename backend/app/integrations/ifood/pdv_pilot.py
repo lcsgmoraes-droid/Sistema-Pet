@@ -92,16 +92,57 @@ def _pilot_operation(payload: dict) -> tuple[str, Decimal]:
     return "DELIVERY", shipping
 
 
-def _validate_pilot_fees_and_benefits(payload: dict, bag: dict):
-    if "fees" in payload:
+def _validate_pilot_fees_and_benefits(payload: dict, bag: dict, *, online=False):
+    service_fee = Decimal(0)
+    if payload.get("fees") is not None:
         fees = payload["fees"]
         if not isinstance(fees, list):
             _blocked("Confira as taxas do pedido; estrutura desconhecida no piloto.")
         for fee in fees:
             fee = _object(fee, "fees[]")
             prices = _object(fee.get("prices"), "fees[].prices")
-            for key in ("grossValue", "discount", "netValue"):
-                _zero_money(prices.get(key), f"fees[].prices.{key}")
+            if not online:
+                for key in ("grossValue", "discount", "netValue"):
+                    _zero_money(prices.get(key), f"fees[].prices.{key}")
+                continue
+            if str(fee.get("audience") or "").lower() != "customer":
+                _blocked(
+                    "O piloto online aceita somente taxa iFood paga pelo consumidor."
+                )
+            gross = _money(prices.get("grossValue"), "fees[].prices.grossValue")
+            _zero_money(prices.get("discount"), "fees[].prices.discount")
+            if _money(prices.get("netValue"), "fees[].prices.netValue") != gross:
+                _blocked("A taxa de servico iFood precisa estar sem desconto.")
+            values = fee.get("values")
+            if not isinstance(values, list) or not values:
+                _blocked(
+                    "A taxa iFood precisa informar seus componentes e identificadores."
+                )
+            components = Decimal(0)
+            for value in values:
+                value = _object(value, "fees[].values[]")
+                code = value.get("type")
+                if (
+                    not isinstance(code, str)
+                    or not (
+                        code.startswith("GROCERIES_")
+                        # Tipo comprovado no pedido oficial 1420 da loja de teste.
+                        or code == "MERCADO_ATACADO_25V_MIN_199_MAX_399"
+                    )
+                    or len(code) > 120
+                    or not all(
+                        char.isupper() or char.isdigit() or char == "_" for char in code
+                    )
+                ):
+                    _blocked("Tipo de taxa iFood desconhecido neste piloto.")
+                try:
+                    UUID(value.get("uniqueId"))
+                except (TypeError, ValueError, AttributeError):
+                    _blocked("Identificador da taxa iFood ausente ou invalido.")
+                components += _money(value.get("amount"), "fees[].values[].amount")
+            if components != gross:
+                _blocked("Os componentes da taxa iFood divergem de seu total.")
+            service_fee += gross
     nested = payload.get("benefit")
     if nested is not None:
         nested = _object(nested, "benefit")
@@ -109,6 +150,7 @@ def _validate_pilot_fees_and_benefits(payload: dict, bag: dict):
             _blocked("Cupons e beneficios nao fazem parte deste piloto de estoque.")
     if payload.get("benefits") or payload.get("coupons") or bag.get("benefits"):
         _blocked("Cupons e beneficios nao fazem parte deste piloto de estoque.")
+    return service_fee
 
 
 def pilot_settings_reason(
@@ -164,7 +206,7 @@ def validate_pilot_payload(order: IfoodOrder) -> dict:
 def pilot_order_display_total(order: IfoodOrder) -> Decimal:
     """Exibe valores conferidos mesmo apos encerrar, sem autorizar movimentacao."""
     _scope(order)
-    return _validated_pilot_values(order)["total"]
+    return _validated_pilot_values(order)["customer_total"]
 
 
 def _validated_pilot_values(order: IfoodOrder) -> dict:
@@ -180,7 +222,54 @@ def _validated_pilot_values(order: IfoodOrder) -> dict:
         _blocked("O identificador da sacola diverge do pedido autorizado.")
     operation_type, shipping_price = _pilot_operation(payload)
     bag = _object(payload.get("bag"), "bag")
-    _validate_pilot_fees_and_benefits(payload, bag)
+    methods = _object(payload.get("payment"), "payment").get("methods")
+    if (
+        not isinstance(methods, list)
+        or len(methods) != 1
+        or not isinstance(methods[0], dict)
+    ):
+        _blocked("Confira a unica forma de pagamento do pedido de teste.")
+    method = methods[0]
+    online = method.get("inPerson") is False
+    name = str(method.get("name") or "").strip().lower()
+    if online:
+        if str(method.get("liability") or "").upper() != "IFOOD" or name not in {
+            "credit",
+            "credito",
+            "crédito",
+            "credit_card",
+        }:
+            _blocked(
+                "O piloto online exige credito sob responsabilidade explicita do iFood."
+            )
+        try:
+            UUID(method.get("uniqueId"))
+        except (TypeError, ValueError, AttributeError):
+            _blocked("O pagamento online precisa de identificador oficial valido.")
+        try:
+            created_at = datetime.fromisoformat(
+                str(payload.get("createdAt") or "").replace("Z", "+00:00")
+            )
+            if created_at.tzinfo is None:
+                raise ValueError
+        except (ValueError, TypeError):
+            _blocked(
+                "O pedido online precisa informar sua data oficial com fuso horario."
+            )
+        if operation_type == "DELIVERY" and shipping_price > 0:
+            provider = _object(
+                _object(payload.get("operationMode"), "operationMode").get("delivery"),
+                "delivery",
+            ).get("provider")
+            if str(provider or "").upper() != "MERCHANT":
+                _blocked(
+                    "Frete online so entra no valor operacional quando a entrega e MERCHANT; confira a responsabilidade."
+                )
+    elif method.get("inPerson") is not True or name not in {"cash", "dinheiro"}:
+        _blocked(
+            "O piloto aceita dinheiro presencial ou credito online confirmado pelo iFood."
+        )
+    service_fee = _validate_pilot_fees_and_benefits(payload, bag, online=online)
     items = bag.get("items")
     if not isinstance(items, list) or len(items) != 1 or not isinstance(items[0], dict):
         _blocked("O pedido de teste deve conter somente um item do SKU 018631.1.")
@@ -214,26 +303,12 @@ def _validated_pilot_values(order: IfoodOrder) -> dict:
         _blocked(
             "Este piloto exige preco unitario positivo e subtotal igual ao unico item, sem desconto."
         )
-    methods = _object(payload.get("payment"), "payment").get("methods")
-    if not isinstance(methods, list) or len(methods) != 1:
-        _blocked("Confira a forma de pagamento presencial do pedido de teste.")
-    total_payment = Decimal(0)
-    for method in methods:
-        if (
-            not isinstance(method, dict)
-            or method.get("inPerson") is not True
-            or str(method.get("name") or "").strip().lower() not in {"cash", "dinheiro"}
-        ):
-            _blocked(
-                "Este piloto aceita somente dinheiro presencial; online, cartao, misto ou desconhecido esta bloqueado."
-            )
-        payment_amount = _object(method.get("amount"), "payment.amount")
-        amount = _money(payment_amount, "payment.amount")
-        if amount <= 0:
-            _blocked("Valor de pagamento presencial invalido.")
-        total_payment += amount
-    if total_payment != total:
-        _blocked("O pagamento precisa corresponder aos itens mais o frete do pedido.")
+    customer_total = total + service_fee
+    total_payment = _money(method.get("amount"), "payment.amount")
+    if customer_total > Decimal("99999999.99") or total_payment != customer_total:
+        _blocked(
+            "O pagamento precisa corresponder aos itens, frete e taxa exclusiva iFood."
+        )
     evidence = {
         "order_id": order.ifood_order_id,
         "merchant_id": order.merchant_id,
@@ -244,8 +319,11 @@ def _validated_pilot_values(order: IfoodOrder) -> dict:
         "price": str(price.quantize(Decimal(".01"))),
         "shipping_price": str(shipping_price.quantize(Decimal(".01"))),
         "total": str(total.quantize(Decimal(".01"))),
+        "ifood_service_fee": str(service_fee.quantize(Decimal(".01"))),
+        "fees": payload.get("fees"),
         "type": operation_type,
         "payment": methods,
+        "created_at": payload.get("createdAt") if online else None,
     }
     evidence_hash = hashlib.sha256(
         json.dumps(evidence, sort_keys=True, ensure_ascii=False).encode()
@@ -256,6 +334,12 @@ def _validated_pilot_values(order: IfoodOrder) -> dict:
         "price": price,
         "shipping_price": shipping_price,
         "total": total,
+        "customer_total": customer_total,
+        "ifood_service_fee": service_fee,
+        "payment_mode": "online" if online else "offline",
+        "payment_reference": method.get("uniqueId") if online else None,
+        "payment_method": method["name"],
+        "created_at": payload.get("createdAt") if online else None,
         "operation_type": operation_type,
         "evidence_hash": evidence_hash,
     }
@@ -379,6 +463,7 @@ def pdv_bridge_summary(db, order: IfoodOrder) -> dict:
         order_id=order.ifood_order_id,
     )
     summary = {
+        "ifood_order_id": order.ifood_order_id,
         "enabled": pilot_settings_reason(
             tenant_id=order.tenant_id, merchant_id=order.merchant_id
         )
@@ -389,21 +474,41 @@ def pdv_bridge_summary(db, order: IfoodOrder) -> dict:
         "reserved_quantity": 0,
         "stock_decreased": False,
         "reason": reason,
+        "payment_mode": None,
+        "can_finalize_online": False,
     }
     if reason:
         return summary
     bridge = _bridge(db, tenant_id=order.tenant_id, order_id=order.ifood_order_id)
     if bridge:
+        evidence = bridge.online_financial_evidence or {}
+        allowed_online, blocked_reason = False, None
+        try:
+            values = validate_pilot_payload(order)
+            blocked_reason = pilot_bag_review_reason(db, order, bridge)
+            if values["evidence_hash"] != bridge.evidence_hash:
+                blocked_reason = "A sacola mudou depois da reserva; confira o pedido."
+            if values["payment_mode"] == "online" and not _online_feed_event(db, order):
+                blocked_reason = "Aguarde o evento oficial processado de recebimento ou confirmacao do pedido de teste."
+            allowed_online = (
+                values["payment_mode"] == "online"
+                and bridge.status == "reserved"
+                and not blocked_reason
+            )
+        except HTTPException as exc:
+            blocked_reason = str(exc.detail)
         return {
             **summary,
+            **{key: evidence.get(key) for key in ("checkout", "payment", "receivable")},
+            "payment_mode": "online" if evidence else "offline",
+            "can_finalize_online": allowed_online,
             "status": bridge.status,
             "sale_id": bridge.sale_id,
             "reserved_quantity": (
                 float(bridge.quantity) if bridge.status == "reserved" else 0
             ),
             "stock_decreased": bridge.stock_decreased_at is not None,
-            "reason": pilot_bag_review_reason(db, order, bridge)
-            or "Pedido ja vinculado ao PDV de teste.",
+            "reason": blocked_reason or "Pedido ja vinculado ao PDV de teste.",
         }
     try:
         validated = validate_pilot_payload(order)
@@ -413,7 +518,98 @@ def pdv_bridge_summary(db, order: IfoodOrder) -> dict:
             _blocked(review_reason)
     except HTTPException as exc:
         return {**summary, "reason": str(exc.detail), "status": "blocked"}
-    return {**summary, "eligible": True, "reason": None}
+    return {
+        **summary,
+        "eligible": True,
+        "reason": None,
+        "payment_mode": validated["payment_mode"],
+        **(
+            _online_evidence(validated) if validated["payment_mode"] == "online" else {}
+        ),
+    }
+
+
+def _online_evidence(validated):
+    return {
+        "version": 1,
+        "checkout": {
+            "items_total": float(validated["price"]),
+            "delivery_fee": float(validated["shipping_price"]),
+            "ifood_service_fee": float(validated["ifood_service_fee"]),
+            "operational_total": float(validated["total"]),
+            "customer_total": float(validated["customer_total"]),
+        },
+        "payment": {
+            "provider": "ifood",
+            "reference": validated["payment_reference"],
+            "method": validated["payment_method"],
+            "status": "platform_responsibility",
+            "order_created_at": validated["created_at"],
+        },
+        "receivable": {
+            "status": "awaiting_financial",
+            "gross_amount": float(validated["total"]),
+            "received_amount": 0,
+            "net_amount": None,
+            "expected_date": None,
+            "margin_status": "pending",
+        },
+    }
+
+
+def _online_feed_event(db, order):
+    events = (
+        db.query(IfoodEvent)
+        .filter(
+            IfoodEvent.tenant_id == order.tenant_id,
+            IfoodEvent.merchant_id == order.merchant_id,
+            IfoodEvent.ifood_order_id == order.ifood_order_id,
+            IfoodEvent.processed_at.isnot(None),
+            or_(
+                IfoodEvent.code.in_(("PLC", "CFM")),
+                IfoodEvent.full_code.in_(
+                    ("PLACED", "CONFIRMED", "ORDER_PLACED", "ORDER_CONFIRMED")
+                ),
+            ),
+        )
+        .order_by(IfoodEvent.id)
+        .all()
+    )
+    return next(
+        (
+            event
+            for event in events
+            if isinstance(event.payload, dict)
+            and event.payload.get("merchantId") == order.merchant_id
+            and event.payload.get("orderId") == order.ifood_order_id
+        ),
+        None,
+    )
+
+
+def pdv_sale_summary(db, sale):
+    if str(getattr(sale, "canal", None) or "").lower() != "ifood":
+        return None
+    reason = pilot_settings_reason(tenant_id=sale.tenant_id)
+    if reason:
+        return {
+            "enabled": False,
+            "payment_mode": "unknown",
+            "can_finalize_online": False,
+            "reason": reason,
+        }
+    bridge = _bridge(db, tenant_id=sale.tenant_id, sale_id=sale.id)
+    if bridge is None:
+        return None
+    order = (
+        db.query(IfoodOrder)
+        .filter(
+            IfoodOrder.tenant_id == sale.tenant_id,
+            IfoodOrder.ifood_order_id == bridge.ifood_order_id,
+        )
+        .first()
+    )
+    return pdv_bridge_summary(db, order) if order is not None else None
 
 
 def import_pdv_pilot(db, *, tenant_id, order_id: str, actor_id: int) -> IfoodOrder:
@@ -548,6 +744,11 @@ def import_pdv_pilot(db, *, tenant_id, order_id: str, actor_id: int) -> IfoodOrd
         evidence_hash=validated["evidence_hash"],
         status="reserved",
         actor_id=actor_id,
+        online_financial_evidence=(
+            _online_evidence(validated)
+            if validated["payment_mode"] == "online"
+            else None
+        ),
     )
     db.add_all([sale_item, bridge])
     db.flush()
@@ -624,6 +825,13 @@ def is_pilot_external_delivery(db, sale) -> bool:
 
 
 def prepare_pilot_finalization(db, sale, pagamentos, *, cupom_code=None):
+    prepared = _prepare_pilot_finalization(db, sale, pagamentos, cupom_code=cupom_code)
+    return prepared[0] if prepared is not None else None
+
+
+def _prepare_pilot_finalization(
+    db, sale, pagamentos, *, cupom_code=None, online_mode=False
+):
     candidate = _sale_bridge(db, sale, lock=False)
     if candidate is None:
         return None
@@ -683,6 +891,10 @@ def prepare_pilot_finalization(db, sale, pagamentos, *, cupom_code=None):
             "A reserva ativa deste unico item precisa ser conferida antes da baixa."
         )
     validated = validate_pilot_payload(order)
+    if (validated["payment_mode"] == "online") != online_mode:
+        _blocked(
+            "Pagamento online iFood deve ser concluido pela acao propria, sem nova cobranca no PDV."
+        )
     review_reason = pilot_bag_review_reason(db, order, bridge)
     if review_reason:
         _blocked(review_reason)
@@ -732,7 +944,7 @@ def prepare_pilot_finalization(db, sale, pagamentos, *, cupom_code=None):
         )
     ):
         _blocked("O saldo fisico nao cobre as reservas atuais do produto.")
-    if (
+    if not online_mode and (
         len(pagamentos or []) != 1
         or sum((_decimal(p.get("valor")) for p in pagamentos), Decimal(0))
         != validated["total"]
@@ -742,7 +954,7 @@ def prepare_pilot_finalization(db, sale, pagamentos, *, cupom_code=None):
         _blocked(
             "Registre exatamente o pagamento presencial do pedido de teste, sem excedente ou credito."
         )
-    if pagamentos[0].get("forma_pagamento_id"):
+    if not online_mode and pagamentos[0].get("forma_pagamento_id"):
         from app.financeiro_models import FormaPagamento
 
         form = (
@@ -758,7 +970,163 @@ def prepare_pilot_finalization(db, sale, pagamentos, *, cupom_code=None):
             _blocked(
                 "A forma de pagamento do PDV deve ser dinheiro, como no pedido iFood de teste."
             )
-    return bridge
+    return bridge, validated, product, items
+
+
+def finalize_online_pdv_pilot(
+    db, *, tenant_id, order_id: str, actor_id: int, processar_baixa_estoque_item=None
+) -> IfoodOrder:
+    """Conclui apenas o operacional prepaid; nenhuma entrada/baixa financeira.
+
+    O endpoint e dono do commit. A ordem de locks e a mesma do finalizador
+    normal (Sale -> Order -> Bridge -> reserva/produto), incluindo o FIFO.
+    """
+    from app.models import User
+    from app.vendas_models import Venda, VendaPagamento
+    from app.vendas.custo_original import registrar_custo_original_saida
+    from app.utils.timezone import now_brasilia
+
+    reason = pilot_settings_reason(tenant_id=tenant_id, order_id=order_id)
+    if reason:
+        _blocked(reason)
+    candidate = _bridge(db, tenant_id=tenant_id, order_id=order_id)
+    if candidate is None:
+        _blocked("Importe e reserve o pedido de teste antes de concluir online.")
+    sale = (
+        db.query(Venda)
+        .filter(Venda.tenant_id == tenant_id, Venda.id == candidate.sale_id)
+        .with_for_update()
+        .populate_existing()
+        .one()
+    )
+    order = (
+        db.query(IfoodOrder)
+        .filter(
+            IfoodOrder.tenant_id == tenant_id, IfoodOrder.ifood_order_id == order_id
+        )
+        .with_for_update()
+        .populate_existing()
+        .one()
+    )
+    _scope(order)
+    bridge = _sale_bridge(db, sale)
+    actor = (
+        db.query(User).filter(User.id == actor_id, User.tenant_id == tenant_id).first()
+    )
+    if actor is None:
+        _blocked("O responsavel deve pertencer a esta empresa DEV.")
+    payments = (
+        db.query(VendaPagamento)
+        .filter(
+            VendaPagamento.tenant_id == tenant_id, VendaPagamento.venda_id == sale.id
+        )
+        .with_for_update()
+        .populate_existing()
+        .all()
+    )
+    evidence = bridge.online_financial_evidence
+    if not isinstance(evidence, dict) or evidence.get("version") != 1:
+        _blocked("A venda nao possui evidencia de pagamento online deste piloto.")
+    if bridge.status == "sold" and bridge.stock_decreased_at is not None:
+        checkout = _object(evidence.get("checkout"), "evidencia.checkout")
+        payment_evidence = _object(evidence.get("payment"), "evidencia.payment")
+        if (
+            sale.status != "finalizada"
+            or len(payments) != 1
+            or payments[0].id != payment_evidence.get("sale_payment_id")
+            or payments[0].status != "aprovado"
+            or payments[0].gateway_provider != "ifood"
+            or payments[0].caixa_id is not None
+            or _decimal(payments[0].valor)
+            != _decimal(checkout.get("operational_total"))
+            or _decimal(sale.total) != _decimal(checkout.get("operational_total"))
+            or payments[0].gateway_payment_id != payment_evidence.get("reference")
+            or payments[0].numero_transacao != payment_evidence.get("reference")
+            or payments[0].forma_pagamento != "iFood online"
+            or payment_evidence.get("status") != "approved"
+            or payment_evidence.get("quitation_basis")
+            != "ifood_liability_order_received"
+        ):
+            _blocked("Confira a evidencia da conclusao online anterior.")
+        return order
+    if sale.status != "aberta" or sale.caixa_id is not None or payments:
+        _blocked(
+            "A venda online deve estar reservada, sem caixa nem outro recebimento local."
+        )
+    bridge, validated, product, items = _prepare_pilot_finalization(
+        db, sale, [], online_mode=True
+    )
+    expected = _online_evidence(validated)
+    if evidence != expected:
+        _blocked("A evidencia financeira diverge da reserva online original.")
+    source_event = _online_feed_event(db, order)
+    if source_event is None:
+        _blocked(
+            "Aguarde o evento oficial processado de recebimento ou confirmacao do pedido de teste."
+        )
+    duplicate = (
+        db.query(VendaPagamento)
+        .filter(
+            VendaPagamento.tenant_id == tenant_id,
+            VendaPagamento.gateway_provider == "ifood",
+            VendaPagamento.gateway_payment_id == validated["payment_reference"],
+        )
+        .first()
+    )
+    if duplicate is not None:
+        _blocked("Este pagamento iFood ja esta vinculado a outra venda.")
+    if processar_baixa_estoque_item is None:
+        from app.vendas.estoque_baixa import processar_baixa_estoque_item
+    item = items[0]
+    results = processar_baixa_estoque_item(
+        produto=product,
+        quantidade_vendida=1,
+        venda_id=sale.id,
+        user_id=actor_id,
+        tenant_id=tenant_id,
+        db=db,
+        product_variation_id=None,
+        venda_codigo=sale.numero_venda,
+        venda_item=item,
+    )
+    if not registrar_custo_original_saida(item, results, tenant_id):
+        _blocked("A baixa precisa preservar um comprovante original de custo valido.")
+    payment = VendaPagamento(
+        tenant_id=tenant_id,
+        venda_id=sale.id,
+        caixa_id=None,
+        forma_pagamento="iFood online",
+        valor=validated["total"],
+        numero_parcelas=1,
+        numero_transacao=validated["payment_reference"],
+        gateway_provider="ifood",
+        gateway_payment_id=validated["payment_reference"],
+        gateway_fee_amount=None,
+        gateway_net_amount=None,
+        gateway_gross_amount=None,
+        status="aprovado",
+        data_pagamento=now_brasilia(),
+    )
+    db.add(payment)
+    db.flush()
+    expected["payment"] = {
+        **expected["payment"],
+        "status": "approved",
+        "sale_payment_id": payment.id,
+        "source_event_id": source_event.ifood_event_id,
+        "quitation_basis": "ifood_liability_order_received",
+    }
+    bridge.online_financial_evidence = expected
+    sale.status = "finalizada"
+    sale.data_finalizacao = now_brasilia()
+    sale.updated_at = now_brasilia()
+    # Nao gerar DRE, snapshot de margem, POS, caixa, conta recebida nem banco.
+    # A prova expositiva distingue cliente quitado de repasse ainda desconhecido.
+    sale.rentabilidade_snapshot = None
+    sale.rentabilidade_snapshot_em = None
+    complete_pilot_finalization(db, bridge)
+    db.flush()
+    return order
 
 
 def complete_pilot_finalization(db, bridge):
@@ -832,3 +1200,10 @@ def complete_pilot_cancellation(db, bridge):
     reservation.cancelado_em = datetime.utcnow()
     bridge.status = "cancelled"
     bridge.cancelled_at = datetime.now(timezone.utc)
+    if bridge.online_financial_evidence:
+        evidence = dict(bridge.online_financial_evidence)
+        evidence["receivable"] = {
+            **evidence["receivable"],
+            "status": "cancelled_pending_provider_review",
+        }
+        bridge.online_financial_evidence = evidence

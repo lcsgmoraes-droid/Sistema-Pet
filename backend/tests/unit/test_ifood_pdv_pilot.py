@@ -38,6 +38,8 @@ from app.integrations.ifood.pdv_pilot import (
     prepare_pilot_cancellation,
     prepare_pilot_finalization,
     validate_pilot_payload,
+    finalize_online_pdv_pilot,
+    pdv_sale_summary,
 )
 from app.estoque_reserva_service import EstoqueReservaService
 
@@ -557,6 +559,292 @@ def delivery_with_freight(payload, cents=890):
     }
     payload["payment"]["methods"][0]["amount"]["value"] = 6500 + cents
     return payload
+
+
+def online_virtual_bag(payload):
+    payload = delivery_with_freight(payload)
+    payload["createdAt"] = "2026-10-24T13:00:00Z"
+    payload["operationMode"]["delivery"]["provider"] = "MERCHANT"
+    payload["payment"]["methods"] = [
+        {
+            "name": "CREDIT",
+            "inPerson": False,
+            "liability": "IFOOD",
+            "uniqueId": str(uuid4()),
+            "amount": {"value": 7589, "currency": "BRL"},
+        }
+    ]
+    payload["fees"] = [
+        {
+            "audience": "customer",
+            "values": [
+                {
+                    "amount": {"value": 199, "currency": "BRL"},
+                    "uniqueId": str(uuid4()),
+                    "type": "MERCADO_ATACADO_25V_MIN_199_MAX_399",
+                }
+            ],
+            "prices": {
+                "grossValue": {"value": 199},
+                "discount": {"value": 0},
+                "netValue": {"value": 199},
+            },
+        }
+    ]
+    return payload
+
+
+def received_online_event(c):
+    c.db.add(
+        IfoodEvent(
+            tenant_id=c.tenant_id,
+            ifood_event_id=str(uuid4()),
+            merchant_id=c.order.merchant_id,
+            ifood_order_id=c.order.ifood_order_id,
+            code="PLC",
+            full_code="PLACED",
+            processed_at=datetime.now(timezone.utc),
+            payload={
+                "merchantId": c.order.merchant_id,
+                "orderId": c.order.ifood_order_id,
+            },
+        )
+    )
+    c.db.flush()
+
+
+def unit_fifo(**kwargs):
+    """Contrato do callback; a prova FIFO real e concorrencia estao no PG."""
+    kwargs["produto"].estoque_atual -= 1
+    return [
+        {
+            "produto_id": kwargs["produto"].id,
+            "movimentacao_id": 303,
+            "quantidade": 1,
+            "valor_total": 43,
+        }
+    ]
+
+
+def test_online_checkout_separates_customer_payment_from_operational_receivable(
+    source_order,
+):
+    source_order.payload = online_virtual_bag(source_order.payload)
+    values = validate_pilot_payload(source_order)
+    assert values["payment_mode"] == "online"
+    assert values["price"] == Decimal("65")
+    assert values["shipping_price"] == Decimal("8.90")
+    assert values["ifood_service_fee"] == Decimal("1.99")
+    assert values["total"] == Decimal("73.90")
+    assert values["customer_total"] == Decimal("75.89")
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        lambda p: p["payment"]["methods"][0].update(liability="MERCHANT"),
+        lambda p: p["payment"]["methods"][0].update(uniqueId=""),
+        lambda p: p["payment"]["methods"][0].update(name="PIX"),
+        lambda p: p["payment"]["methods"][0]["amount"].update(value=7390),
+        lambda p: p["operationMode"]["delivery"].update(provider="IFOOD"),
+        lambda p: p["operationMode"]["delivery"].pop("provider"),
+        lambda p: p["fees"][0].update(audience="merchant"),
+        lambda p: p["fees"][0]["values"][0].pop("type"),
+        lambda p: p["fees"][0]["values"][0].update(type="UNKNOWN"),
+        lambda p: p["fees"][0]["values"][0].update(uniqueId="bad"),
+        lambda p: p["fees"][0]["values"][0]["amount"].update(value=198),
+        lambda p: p["fees"][0]["prices"]["discount"].update(value=1),
+        lambda p: p["fees"][0]["prices"]["netValue"].update(value=198),
+        lambda p: p["payment"]["methods"].append(deepcopy(p["payment"]["methods"][0])),
+    ],
+)
+def test_online_unknown_liability_fee_or_payment_never_becomes_receipt(
+    source_order, change
+):
+    source_order.payload = online_virtual_bag(source_order.payload)
+    change(source_order.payload)
+    with pytest.raises(HTTPException) as exc:
+        validate_pilot_payload(source_order)
+    assert exc.value.status_code == 409
+
+
+def test_online_finalize_records_one_external_payment_and_pending_receivable_without_cash(
+    pilot_db,
+):
+    c = pilot_db
+    c.order.payload = online_virtual_bag(c.order.payload)
+    received_online_event(c)
+    import_pdv_pilot(
+        c.db, tenant_id=c.tenant_id, order_id=c.order.ifood_order_id, actor_id=c.user_id
+    )
+    sale = c.db.query(Venda).one()
+    assert pdv_sale_summary(c.db, sale)["can_finalize_online"] is True
+    assert sale.total == Decimal("73.90") and c.product.estoque_atual == 31
+    assert c.db.query(VendaPagamento).count() == 0
+    with pytest.raises(HTTPException):
+        prepare_pilot_finalization(
+            c.db, sale, [{"valor": Decimal("73.90"), "forma_pagamento": "Dinheiro"}]
+        )
+    for _ in range(2):
+        finalize_online_pdv_pilot(
+            c.db,
+            tenant_id=c.tenant_id,
+            order_id=c.order.ifood_order_id,
+            actor_id=c.user_id,
+            processar_baixa_estoque_item=unit_fifo,
+        )
+    assert c.product.estoque_atual == 30 and c.control.estoque_atual == 19
+    assert c.db.query(VendaPagamento).count() == 1
+    payment = c.db.query(VendaPagamento).one()
+    assert payment.valor == Decimal("73.90") and payment.status == "aprovado"
+    assert payment.gateway_provider == "ifood" and payment.caixa_id is None
+    assert (
+        payment.gateway_payment_id
+        == c.order.payload["payment"]["methods"][0]["uniqueId"]
+    )
+    assert payment.gateway_net_amount is payment.gateway_fee_amount is None
+    assert c.db.query(ContaReceber).count() == 0
+    assert sale.status == "finalizada" and sale.caixa_id is None
+    assert sale.rentabilidade_snapshot is None and sale.dre_gerada is False
+    assert sale.itens[0].custo_original_saida["custo_total"] == "43.00"
+    assert (
+        EstoqueReservaService.quantidade_reservada_produto(c.db, c.tenant_id, c.product)
+        == 3
+    )
+    summary = pdv_sale_summary(c.db, sale)
+    assert (
+        summary["payment"]["status"] == "approved"
+        and summary["can_finalize_online"] is False
+    )
+    assert summary["checkout"]["customer_total"] == 75.89
+    assert summary["receivable"] == {
+        "status": "awaiting_financial",
+        "gross_amount": 73.9,
+        "received_amount": 0,
+        "net_amount": None,
+        "expected_date": None,
+        "margin_status": "pending",
+    }
+
+
+@pytest.mark.parametrize("change", ["total", "item", "fee", "cancelled", "evidence"])
+def test_online_changed_local_or_provider_state_stops_before_fifo(pilot_db, change):
+    c = pilot_db
+    c.order.payload = online_virtual_bag(c.order.payload)
+    received_online_event(c)
+    import_pdv_pilot(
+        c.db, tenant_id=c.tenant_id, order_id=c.order.ifood_order_id, actor_id=c.user_id
+    )
+    sale = c.db.query(Venda).one()
+    if change == "total":
+        sale.total = 65
+    elif change == "item":
+        sale.itens[0].quantidade = 2
+    elif change == "fee":
+        payload = deepcopy(c.order.payload)
+        payload["fees"][0]["prices"]["grossValue"]["value"] = 299
+        c.order.payload = payload
+    elif change == "cancelled":
+        c.order.status = "CANCELLED"
+    else:
+        c.db.query(IfoodPdvBridge).one().online_financial_evidence = {"version": 1}
+    with pytest.raises(HTTPException):
+        finalize_online_pdv_pilot(
+            c.db,
+            tenant_id=c.tenant_id,
+            order_id=c.order.ifood_order_id,
+            actor_id=c.user_id,
+            processar_baixa_estoque_item=lambda **kw: pytest.fail(
+                "FIFO nao autorizado"
+            ),
+        )
+    assert c.product.estoque_atual == 31 and c.db.query(VendaPagamento).count() == 0
+
+
+def test_online_endpoint_never_concludes_offline_reservation(pilot_db):
+    c = pilot_db
+    import_pdv_pilot(
+        c.db, tenant_id=c.tenant_id, order_id=c.order.ifood_order_id, actor_id=c.user_id
+    )
+    with pytest.raises(HTTPException):
+        finalize_online_pdv_pilot(
+            c.db,
+            tenant_id=c.tenant_id,
+            order_id=c.order.ifood_order_id,
+            actor_id=c.user_id,
+            processar_baixa_estoque_item=unit_fifo,
+        )
+    assert c.product.estoque_atual == 31 and c.db.query(VendaPagamento).count() == 0
+
+
+def test_online_payload_alone_does_not_claim_approved_payment_without_received_feed(
+    pilot_db,
+):
+    c = pilot_db
+    c.order.payload = online_virtual_bag(c.order.payload)
+    import_pdv_pilot(
+        c.db, tenant_id=c.tenant_id, order_id=c.order.ifood_order_id, actor_id=c.user_id
+    )
+    summary = pdv_bridge_summary(c.db, c.order)
+    assert summary["can_finalize_online"] is False
+    assert summary["payment"]["status"] == "platform_responsibility"
+    with pytest.raises(HTTPException):
+        finalize_online_pdv_pilot(
+            c.db,
+            tenant_id=c.tenant_id,
+            order_id=c.order.ifood_order_id,
+            actor_id=c.user_id,
+            processar_baixa_estoque_item=lambda **kw: pytest.fail("Sem feed nao baixa"),
+        )
+    assert c.product.estoque_atual == 31 and c.db.query(VendaPagamento).count() == 0
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [("valor", 65), ("gateway_payment_id", "changed"), ("numero_transacao", "changed")],
+)
+def test_online_retry_requires_same_external_payment_evidence(pilot_db, field, value):
+    c = pilot_db
+    c.order.payload = online_virtual_bag(c.order.payload)
+    received_online_event(c)
+    import_pdv_pilot(
+        c.db, tenant_id=c.tenant_id, order_id=c.order.ifood_order_id, actor_id=c.user_id
+    )
+    finalize_online_pdv_pilot(
+        c.db,
+        tenant_id=c.tenant_id,
+        order_id=c.order.ifood_order_id,
+        actor_id=c.user_id,
+        processar_baixa_estoque_item=unit_fifo,
+    )
+    setattr(c.db.query(VendaPagamento).one(), field, value)
+    with pytest.raises(HTTPException):
+        finalize_online_pdv_pilot(
+            c.db,
+            tenant_id=c.tenant_id,
+            order_id=c.order.ifood_order_id,
+            actor_id=c.user_id,
+            processar_baixa_estoque_item=lambda **kw: pytest.fail("Retry nunca baixa"),
+        )
+    assert c.product.estoque_atual == 30 and c.db.query(VendaPagamento).count() == 1
+
+
+@pytest.mark.parametrize("created", [None, "", "broken", "2026-10-24T13:00:00"])
+def test_online_requires_timestamp_bound_to_source_contract(source_order, created):
+    source_order.payload = online_virtual_bag(source_order.payload)
+    source_order.payload["createdAt"] = created
+    with pytest.raises(HTTPException):
+        validate_pilot_payload(source_order)
+
+
+def test_disabled_ifood_sale_returns_fail_closed_marker_without_new_table_query(
+    source_order, monkeypatch
+):
+    monkeypatch.setattr(settings, "IFOOD_PDV_PILOT_ENABLED", False)
+    sale = SimpleNamespace(canal="ifood", tenant_id=source_order.tenant_id)
+    marker = pdv_sale_summary(None, sale)
+    assert marker["enabled"] is False and marker["payment_mode"] == "unknown"
+    assert marker["can_finalize_online"] is False
 
 
 def test_takeout_official_hyphen_alias_has_same_evidence(source_order):

@@ -15,6 +15,7 @@ import { montarPayloadVenda } from "../../utils/pdvVendaPayload";
 import { arredondarDinheiro } from "../../utils/pdvCarrinhoItensUtils";
 import { formatMoneyBRL } from "../../utils/formatters";
 import { CANAL_IFOOD, normalizeSalesChannel } from "../../utils/salesChannel";
+import { isIfoodManualPaymentBlocked } from "../../utils/ifoodPdvPilot";
 import {
   devePerguntarNotaFiscal,
   montarItensParaVerificarEstoqueNegativo,
@@ -94,6 +95,7 @@ export function useModalPagamentoActions({
   const finalizacaoEmAndamentoRef = useRef(false);
 
   const adicionarPagamento = () => {
+    if (isIfoodManualPaymentBlocked(venda)) return;
     if (bloqueado || finalizacaoEmAndamentoRef.current) return;
     const valor = valorRecebido || 0;
     const candidato = formaPagamentoSelecionada
@@ -172,10 +174,12 @@ export function useModalPagamentoActions({
   };
 
   const removerPagamento = (index) => {
+    if (isIfoodManualPaymentBlocked(venda)) return;
     setPagamentos(pagamentos.filter((_, i) => i !== index));
   };
 
   const excluirPagamentoExistente = async (pagamentoId) => {
+    if (isIfoodManualPaymentBlocked(venda)) return;
     if (!(await confirmarCorePet("Deseja realmente excluir este pagamento?"))) {
       return;
     }
@@ -260,6 +264,10 @@ export function useModalPagamentoActions({
   };
 
   const handleFinalizar = async () => {
+    if (isIfoodManualPaymentBlocked(venda)) {
+      setErro("Cobrança manual iFood bloqueada. Confira o resumo do piloto no pedido.");
+      return;
+    }
     if (bloqueado || finalizacaoEmAndamentoRef.current) return;
     const erroTipos = validarTiposPagamentoExcedente({
       valorTotal: venda.total,

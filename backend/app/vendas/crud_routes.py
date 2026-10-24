@@ -203,10 +203,12 @@ def buscar_venda(
     )
 
     from app.vendas.cupons_detalhes import carregar_cupons_detalhes_venda
+    from app.integrations.ifood.pdv_pilot import pdv_sale_summary
 
     return {
         **venda.to_dict(),
         "cupons_detalhes": carregar_cupons_detalhes_venda(db, venda, tenant_id),
+        "ifood_pdv_pilot": pdv_sale_summary(db, venda),
     }
 
 

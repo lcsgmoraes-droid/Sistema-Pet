@@ -21,19 +21,16 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from fastapi import HTTPException
 import pytest
-from sqlalchemy import Enum, create_engine, inspect, text
+from sqlalchemy import Enum, create_engine, func, inspect, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateIndex, CreateTable
 
 
-def _migration():
+def _migration(filename="zzzzt20261024a1_ifood_pdv_pilot.py"):
     return runpy.run_path(
-        str(
-            Path(__file__).parents[2]
-            / "alembic/versions/zzzzt20261024a1_ifood_pdv_pilot.py"
-        )
+        str(Path(__file__).parents[2] / "alembic/versions" / filename)
     )
 
 
@@ -74,6 +71,7 @@ def pg_engine():
         )
         # Registra os mesmos modelos da API; nenhum lifespan/job e iniciado.
         import app.main  # noqa: F401
+        import app.stone_models  # noqa: F401
         from app.db import Base
 
         tables = [
@@ -103,6 +101,7 @@ def pg_engine():
             )
             with Operations.context(MigrationContext.configure(conn)):
                 _migration()["upgrade"]()
+                _migration("zzzzu20261024a1_ifood_pdv_online_evidence.py")["upgrade"]()
         yield engine
     finally:
         if engine is not None:
@@ -165,6 +164,39 @@ def _virtual_bag_with_real_delivery_fee(order_id, merchant_id):
         },
     }
     payload["payment"]["methods"][0]["amount"]["value"] = 7390
+    return payload
+
+
+def _online_virtual_bag(order_id, merchant_id):
+    payload = _virtual_bag_with_real_delivery_fee(order_id, merchant_id)
+    payload["createdAt"] = datetime.now(timezone.utc).isoformat()
+    payload["operationMode"]["delivery"]["provider"] = "MERCHANT"
+    payload["payment"]["methods"] = [
+        {
+            "name": "CREDIT",
+            "inPerson": False,
+            "liability": "IFOOD",
+            "uniqueId": str(uuid4()),
+            "amount": {"value": 7589, "currency": "BRL"},
+        }
+    ]
+    payload["fees"] = [
+        {
+            "audience": "customer",
+            "values": [
+                {
+                    "amount": {"value": 199, "currency": "BRL"},
+                    "uniqueId": str(uuid4()),
+                    "type": "MERCADO_ATACADO_25V_MIN_199_MAX_399",
+                }
+            ],
+            "prices": {
+                "grossValue": {"value": 199, "currency": "BRL"},
+                "discount": {"value": 0, "currency": "BRL"},
+                "netValue": {"value": 199, "currency": "BRL"},
+            },
+        }
+    ]
     return payload
 
 
@@ -1250,6 +1282,7 @@ def _emit_bag_event(c, code, full_code):
     client = SimpleNamespace(
         poll_events=lambda merchants: [event],
         acknowledge_events=lambda ids: acknowledged.extend(ids),
+        get_order=lambda order_id: deepcopy(c.online_payload),
     )
     with tenant_context(c.tenant_id), Session(c.engine) as db:
         config = (
@@ -1412,6 +1445,411 @@ def test_changed_fresh_bag_remains_unreviewed_without_recalculating_reservation(
             == 1
         )
     assert _state(c) == reserved_state
+    assert _protected(c) == c.control_before
+
+
+def _financial_state(c):
+    """Prova entradas reais, bancos e POS; nao confunde Vpag com dinheiro recebido."""
+    from app.caixa.recebimentos import filtro_recebimentos_caixa
+    from app.caixa_models import Caixa
+    from app.db import Base
+    from app.tenancy.context import tenant_context
+    from app.vendas_models import VendaPagamento
+
+    protected_tables = (
+        "contas_bancarias",
+        "contas_receber",
+        "recebimentos",
+        "contas_pagar",
+        "pagamentos",
+        "movimentacoes_bancarias",
+        "movimentacoes_financeiras",
+        "movimentacoes_caixa",
+        "stone_transactions",
+        "provisoes_automaticas",
+        "lancamentos_manuais",
+        "lancamentos_recorrentes",
+    )
+    result = {}
+    for tenant in (c.tenant_id, c.other_tenant):
+        with tenant_context(tenant), Session(c.engine) as db:
+            result[str(tenant)] = {
+                name: [
+                    dict(row._mapping)
+                    for row in db.execute(
+                        select(Base.metadata.tables[name])
+                        .where(Base.metadata.tables[name].c.tenant_id == tenant)
+                        .order_by(Base.metadata.tables[name].c.id)
+                    )
+                ]
+                for name in protected_tables
+            }
+            if tenant == c.tenant_id:
+                caixa = db.query(Caixa).filter(Caixa.id == c.caixa_id).one()
+                result["cash_received"] = (
+                    db.query(func.coalesce(func.sum(VendaPagamento.valor), 0))
+                    .filter(
+                        VendaPagamento.tenant_id == tenant,
+                        filtro_recebimentos_caixa(caixa),
+                    )
+                    .scalar()
+                )
+    return result
+
+
+@pytest.fixture
+def online_pilot(pilot):
+    from app.caixa_models import Caixa
+    from app.financeiro_models import ContaBancaria
+    from app.ifood_order_models import IfoodOrder
+    from app.tenancy.context import tenant_context
+
+    c = pilot
+    c.online_payload = _online_virtual_bag(c.order_id, c.merchant_id)
+    with tenant_context(c.tenant_id), Session(c.engine) as db:
+        order = (
+            db.query(IfoodOrder)
+            .filter(
+                IfoodOrder.tenant_id == c.tenant_id,
+                IfoodOrder.ifood_order_id == c.order_id,
+            )
+            .one()
+        )
+        order.payload = deepcopy(c.online_payload)
+        # Pagamento online nao pode depender de caixa aberto nem usa-lo.
+        db.query(Caixa).filter(Caixa.id == c.caixa_id).one().status = "fechado"
+        db.add(
+            ContaBancaria(
+                tenant_id=c.tenant_id,
+                user_id=c.user_id,
+                nome="Banco ficticio protegido PG",
+                tipo="corrente",
+                saldo_inicial=123.45,
+                saldo_atual=123.45,
+                ativa=True,
+            )
+        )
+        db.commit()
+    # Evento persistido pelo processador normal, com provider fake em memoria.
+    _emit_bag_event(c, "PLC", "PLACED")
+    c.financial_before = _financial_state(c)
+    assert c.financial_before["cash_received"] == 0
+    return c
+
+
+def _finalize_online(c, *, barrier=None, fail_at=None, tenant_id=None):
+    from app.integrations.ifood.pdv_pilot import finalize_online_pdv_pilot
+    from app.tenancy.context import tenant_context
+    from app.vendas.estoque_baixa import processar_baixa_estoque_item
+
+    tenant_id = tenant_id or c.tenant_id
+
+    def real_fifo_with_failure(**kwargs):
+        result = processar_baixa_estoque_item(**kwargs)
+        if fail_at == "after_fifo":
+            raise RuntimeError("PG online injected after actual FIFO")
+        return result
+
+    with tenant_context(tenant_id), Session(c.engine) as db:
+        if barrier:
+            barrier.wait(timeout=15)
+        try:
+            order = finalize_online_pdv_pilot(
+                db,
+                tenant_id=tenant_id,
+                order_id=c.order_id,
+                actor_id=c.user_id,
+                processar_baixa_estoque_item=real_fifo_with_failure,
+            )
+            if fail_at == "before_commit":
+                raise RuntimeError("PG online injected after payment and marker flush")
+            db.commit()
+            return order.ifood_order_id
+        except Exception:
+            db.rollback()
+            raise
+
+
+def _assert_online_record(c, sale_id, *, finalized):
+    from app.ifood_order_models import IfoodPdvBridge
+    from app.tenancy.context import tenant_context
+    from app.vendas_models import Venda, VendaPagamento
+
+    with tenant_context(c.tenant_id), Session(c.engine) as db:
+        sale = db.query(Venda).filter(Venda.id == sale_id).one()
+        bridge = (
+            db.query(IfoodPdvBridge)
+            .filter(
+                IfoodPdvBridge.tenant_id == c.tenant_id,
+                IfoodPdvBridge.sale_id == sale_id,
+            )
+            .one()
+        )
+        evidence = bridge.online_financial_evidence
+        assert (sale.subtotal, sale.taxa_entrega, sale.total) == (
+            Decimal("65"),
+            Decimal("8.90"),
+            Decimal("73.90"),
+        )
+        assert bridge.unit_price == Decimal("65")
+        assert sale.caixa_id is None
+        assert sale.status == ("finalizada" if finalized else "aberta")
+        assert sale.rentabilidade_snapshot is None and sale.dre_gerada is False
+        assert evidence["checkout"] == {
+            "items_total": 65.0,
+            "delivery_fee": 8.9,
+            "ifood_service_fee": 1.99,
+            "operational_total": 73.9,
+            "customer_total": 75.89,
+        }
+        assert evidence["receivable"] == {
+            "status": "awaiting_financial",
+            "gross_amount": 73.9,
+            "received_amount": 0,
+            "net_amount": None,
+            "expected_date": None,
+            "margin_status": "pending",
+        }
+        official_reference = c.online_payload["payment"]["methods"][0]["uniqueId"]
+        assert evidence["payment"]["reference"] == official_reference
+        assert evidence["payment"]["provider"] == "ifood"
+        payments = (
+            db.query(VendaPagamento)
+            .filter(
+                VendaPagamento.tenant_id == c.tenant_id,
+                VendaPagamento.venda_id == sale_id,
+            )
+            .all()
+        )
+        assert len(payments) == int(finalized)
+        if finalized:
+            payment = payments[0]
+            assert payment.valor == Decimal("73.90")
+            assert payment.status == "aprovado"
+            assert payment.gateway_provider == "ifood"
+            assert payment.gateway_payment_id == official_reference
+            assert payment.numero_transacao == official_reference
+            assert payment.caixa_id is None
+            assert payment.gateway_fee_amount is None
+            assert payment.gateway_net_amount is None
+            assert payment.gateway_gross_amount is None
+            assert payment.data_recebimento_prevista is None
+            assert evidence["payment"]["sale_payment_id"] == payment.id
+            assert evidence["payment"]["status"] == "approved"
+            assert sale.itens[0].custo_original_saida["custo_total"] == "43.94"
+        else:
+            assert evidence["payment"]["status"] == "platform_responsibility"
+    assert _financial_state(c) == c.financial_before
+    assert _protected(c) == c.control_before
+
+
+def test_online_concurrent_import_finalize_and_retry_create_one_payment_and_fifo(
+    online_pilot,
+):
+    c = online_pilot
+    barrier = Barrier(2)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        sales = list(executor.map(lambda _: _import(c, barrier), range(2)))
+    assert sales[0] == sales[1]
+    sale_id = sales[0]
+    _assert_online_record(c, sale_id, finalized=False)
+    before = _state(c)
+    assert (before["physical"], before["reserved"], before["payments"]) == (31, 4, 0)
+    # O finalizador comum nao pode cobrar novamente o pagamento online.
+    with pytest.raises(HTTPException):
+        _finalize(c, sale_id, payment_amount=Decimal("73.90"))
+    assert _state(c) == before
+    barrier = Barrier(2)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(
+            executor.map(lambda _: _finalize_online(c, barrier=barrier), range(2))
+        )
+    assert results == [c.order_id, c.order_id]
+    final = _state(c)
+    assert (final["physical"], final["reserved"], final["lots"]) == (
+        30,
+        3,
+        [9, 8, 7, 6],
+    )
+    assert (
+        final["sales"],
+        final["bridges"],
+        final["movements"],
+        final["payments"],
+    ) == (1, 1, 1, 1)
+    assert final["reserve_sold"] and final["stock_decreased"]
+    assert final["bridge_status"] == "sold"
+    _assert_online_record(c, sale_id, finalized=True)
+    assert _finalize_online(c) == c.order_id
+    assert _import(c) == sale_id
+    assert _state(c) == final
+    _assert_online_record(c, sale_id, finalized=True)
+
+
+@pytest.mark.parametrize("fail_at", ["after_fifo", "before_commit"])
+def test_online_rollback_preserves_fifo_payment_evidence_and_allows_one_retry(
+    online_pilot,
+    fail_at,
+):
+    c = online_pilot
+    sale_id = _import(c)
+    reserved = _state(c)
+    with pytest.raises(RuntimeError, match="PG online injected"):
+        _finalize_online(c, fail_at=fail_at)
+    assert _state(c) == reserved
+    _assert_online_record(c, sale_id, finalized=False)
+    assert _finalize_online(c) == c.order_id
+    assert (_state(c)["physical"], _state(c)["payments"], _state(c)["movements"]) == (
+        30,
+        1,
+        1,
+    )
+    _assert_online_record(c, sale_id, finalized=True)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "item",
+        "fee",
+        "cancelled",
+        "bag_event",
+        "tenant",
+        "production",
+        "missing_feed",
+        "unprocessed_feed",
+    ],
+)
+def test_online_changed_payload_events_and_scope_block_before_any_fifo(
+    online_pilot,
+    monkeypatch,
+    change,
+):
+    from app.config import settings
+    from app.ifood_order_models import IfoodEvent, IfoodOrder
+    from app.tenancy.context import tenant_context
+
+    c = online_pilot
+    sale_id = _import(c)
+    before = _state(c)
+    if change in {"item", "fee", "cancelled"}:
+        with tenant_context(c.tenant_id), Session(c.engine) as db:
+            order = (
+                db.query(IfoodOrder)
+                .filter(
+                    IfoodOrder.tenant_id == c.tenant_id,
+                    IfoodOrder.ifood_order_id == c.order_id,
+                )
+                .one()
+            )
+            changed = deepcopy(order.payload)
+            if change == "item":
+                changed["bag"]["items"][0]["uniqueId"] = "new-item"
+            elif change == "fee":
+                changed["fees"][0]["values"][0]["amount"]["value"] = 299
+                changed["fees"][0]["prices"]["grossValue"]["value"] = 299
+                changed["fees"][0]["prices"]["netValue"]["value"] = 299
+                changed["payment"]["methods"][0]["amount"]["value"] = 7689
+            else:
+                order.status = "CANCELLED"
+            order.payload = changed
+            db.commit()
+    elif change == "bag_event":
+        _emit_bag_event(c, "OPA", "ORDER_PATCHED")
+    elif change == "production":
+        monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+    elif change in {"missing_feed", "unprocessed_feed"}:
+        with tenant_context(c.tenant_id), Session(c.engine) as db:
+            events = db.query(IfoodEvent).filter(
+                IfoodEvent.tenant_id == c.tenant_id,
+                IfoodEvent.ifood_order_id == c.order_id,
+            )
+            if change == "missing_feed":
+                events.delete()
+            else:
+                events.update({"processed_at": None})
+            db.commit()
+    with pytest.raises(HTTPException) as blocked:
+        _finalize_online(c, tenant_id=c.other_tenant if change == "tenant" else None)
+    assert blocked.value.status_code == 409
+    assert _state(c) == before
+    _assert_online_record(c, sale_id, finalized=False)
+    if change == "bag_event":
+        _, action = _refresh_bag(c, c.online_payload)
+        assert action == "pdv_bag_reviewed"
+        assert _finalize_online(c) == c.order_id
+        _assert_online_record(c, sale_id, finalized=True)
+
+
+@pytest.mark.parametrize("field", ["valor", "gateway_payment_id"])
+def test_online_retry_refuses_changed_payment_without_another_stock_decrease(
+    online_pilot,
+    field,
+):
+    from app.tenancy.context import tenant_context
+    from app.vendas_models import VendaPagamento
+
+    c = online_pilot
+    sale_id = _import(c)
+    assert _finalize_online(c) == c.order_id
+    final = _state(c)
+    with tenant_context(c.tenant_id), Session(c.engine) as db:
+        payment = (
+            db.query(VendaPagamento)
+            .filter(
+                VendaPagamento.tenant_id == c.tenant_id,
+                VendaPagamento.venda_id == sale_id,
+            )
+            .one()
+        )
+        setattr(payment, field, Decimal("74.90") if field == "valor" else str(uuid4()))
+        db.commit()
+    with pytest.raises(HTTPException) as blocked:
+        _finalize_online(c)
+    assert blocked.value.status_code == 409
+    assert _state(c) == final
+    assert _financial_state(c) == c.financial_before
+    assert _protected(c) == c.control_before
+
+
+def test_online_evidence_additive_migration_preserves_cash_and_refuses_data_loss(pilot):
+    from app.ifood_order_models import IfoodPdvBridge
+    from app.tenancy.context import tenant_context
+
+    c = pilot
+    sale_id = _import(c)
+    column = next(
+        column
+        for column in inspect(c.engine).get_columns("ifood_pdv_bridges")
+        if column["name"] == "online_financial_evidence"
+    )
+    assert column["nullable"]
+    with tenant_context(c.tenant_id), Session(c.engine) as db:
+        bridge = (
+            db.query(IfoodPdvBridge)
+            .filter(
+                IfoodPdvBridge.tenant_id == c.tenant_id,
+                IfoodPdvBridge.sale_id == sale_id,
+            )
+            .one()
+        )
+        assert bridge.online_financial_evidence is None
+        bridge.online_financial_evidence = {"version": 1, "preserve": True}
+        db.commit()
+    with c.engine.connect() as conn:
+        transaction = conn.begin()
+        try:
+            with Operations.context(MigrationContext.configure(conn)):
+                with pytest.raises(RuntimeError, match="downgrade recusado"):
+                    _migration("zzzzu20261024a1_ifood_pdv_online_evidence.py")[
+                        "downgrade"
+                    ]()
+        finally:
+            transaction.rollback()
+    assert "online_financial_evidence" in {
+        col["name"] for col in inspect(c.engine).get_columns("ifood_pdv_bridges")
+    }
+    assert _state(c)["physical"] == 31 and _state(c)["payments"] == 0
     assert _protected(c) == c.control_before
 
 

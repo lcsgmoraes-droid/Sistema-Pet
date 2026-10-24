@@ -17,7 +17,8 @@
 
 Permitir testar a entrada de um pedido iFood no PDV, sem operar a loja real ou
 outros produtos. O usuário autorizado importa explicitamente um pedido já
-armazenado, confere a reserva e finaliza a venda pelo fluxo normal do PDV.
+armazenado, confere a reserva e finaliza a venda. No pagamento online iFood,
+a conclusao tem acao propria, sem repetir a cobranca no PDV.
 
 O aceite técnico exige uma venda, uma reserva e uma baixa FIFO para uma unidade
 do SKU `018631.1`, sem duplicação por reenvio ou concorrência. Cancelar antes da
@@ -26,30 +27,36 @@ e preserva os itens, valores e a modalidade recebidos do provedor.
 
 Devem permanecer os fluxos de app, ecommerce, WhatsApp e loja física. Ficam fora
 do escopo produção, publicação de outros produtos, operação contínua, pagamentos
-online/mistos, descontos, cupons, pesagem variável e conciliação Financial. O
-ensaio sintético não substitui o aceite de um pedido oficial da loja de testes.
+mistos, outros meios não autorizados, descontos, cupons, pesagem variável e
+conciliação Financial. O ensaio sintético não substitui o aceite de um pedido
+oficial da loja de testes.
 
 ## 2. Regras de negócio e dados
 
 O piloto fica desligado por padrão e exige DEV, tenant, loja de testes, pedido
 exato e SKU autorizados. O payload precisa declarar `test=true`, um item de uma
-unidade fixa, EAN correspondente, preço positivo e dinheiro presencial no valor
-total exato. São aceitos retirada ou entrega com frete explicitamente informado
-e não negativo, sem taxas adicionais, descontos ou cupons. O total deve ser igual
-ao item mais o frete: R$ 65,00 + R$ 8,90 = R$ 73,90. Condições desconhecidas ou
-divergentes impedem a importação/finalização.
+unidade fixa, EAN correspondente e preço positivo. São aceitos retirada ou
+entrega com frete explícito não negativo, sem descontos ou cupons. O offline
+exige dinheiro presencial no total exato, sem taxas adicionais. O online exige
+um crédito sob responsabilidade do iFood, referência válida e evento oficial
+recebido; admite apenas serviço cobrado do consumidor e pertencente ao iFood.
+Frete online positivo exige responsabilidade `MERCHANT` comprovada. O resumo
+separa R$ 65,00 do item + R$ 8,90 de frete = R$ 73,90 operacionais dos R$ 1,99 de
+serviço do iFood e R$ 75,89 do consumidor. Condições desconhecidas ou divergentes
+impedem a importação/finalização.
 
 `IfoodOrder` mantém a origem; `ifood_pdv_bridges` liga pedido, produto, venda e
 reserva. A reserva usa `PedidoIntegradoItem`, sem inventar um ID Bling. A venda
 permanece aberta até a finalização explícita. Baixa FIFO e encerramento da
 reserva pertencem à mesma transação; unicidade, bloqueios e validação da sacola
 protegem contra duplicação e alteração posterior da origem. O hash da evidência
-inclui frete e total; a reserva e a baixa FIFO continuam limitadas a uma unidade
-do produto, independentemente do valor do frete.
+inclui frete, serviço, totais e pagamento; a reserva e a baixa FIFO continuam
+limitadas a uma unidade do produto, independentemente do valor do frete.
 
 A migration `zzzzt20261024a1`, filha de `zzzzs20261023a1`, cria a ponte com
 unicidade, chaves estrangeiras compostas por tenant e RLS, e permite
-`pedido_bling_id=NULL`. Preserva histórico, usuário da ação e evidência da sacola.
+`pedido_bling_id=NULL`. Preserva histórico, usuário da ação e evidência da sacola,
+incluindo a evidência financeira online em JSON na ponte.
 Não cria cadastro de cliente a partir do consumidor de teste.
 
 ## 3. Arquitetura e integrações
@@ -59,6 +66,16 @@ local. Consultas retornam `pdv_bridge` com elegibilidade, estado, venda, reserva
 baixa. A ação usa componentes V2 e abre a venda existente pelo vínculo do painel.
 Importar localmente não depende de habilitar operações externas nem faz ACK,
 Picking, entrega ou envio ao Bling.
+
+O online conclui por
+`POST /integracoes/ifood/pedidos/{order_id}/piloto-pdv/finalizar-online`, sem
+pagamentos novos enviados pela UI. A capacidade `can_finalize_online` controla
+o botão V2 na Central e no PDV. O servidor revalida a evidência e registra uma
+quitação externa `iFood online`, sem movimento de caixa ou conta global dada
+como recebida. A evidência JSON da ponte mantém o repasse aguardando Financial,
+recebido zero, líquido/data desconhecidos e margem pendente. O marcador
+`Venda.ifood_pdv_pilot` bloqueia a modal de cobrança no online ou modo
+desconhecido; somente offline habilitado conserva dinheiro presencial.
 
 Os hooks do PDV usam o vínculo validado para finalizar/cancelar. Entrega conserva
 `tem_entrega=True` e aparece como **Entrega acompanhada pelo iFood**, sem
@@ -109,10 +126,11 @@ Validações executadas nesta tarefa:
   integrada à base atual. Foram aprovados
   632 testes backend iFood, 248 frontend, 769 multiempresa e as demais suítes,
   builds e auditorias. Os 15 cenários PostgreSQL passaram juntos nessa fonte.
-  O delta de frete positivo está em validação; o gate anterior não comprova sua
-  aprovação final. Os testes focados do frontend já preservam frete, total,
-  ausência de entregador local e finalização sem PUT. O gate final e o CI remoto
-  do PR #1561 ainda precisam ser conferidos.
+  O delta de frete positivo e online está em validação; o gate anterior não
+  comprova sua aprovação final. Os testes focados do frontend já preservam frete, total,
+  ausência de entregador local e finalização sem PUT; no online, provam o botão
+  explícito idempotente, a separação dos totais e o bloqueio de cobrança manual.
+  O gate final e o CI remoto do PR #1561 ainda precisam ser conferidos.
 
 O schema descartável do ensaio PostgreSQL não comprova a execução de toda a
 cadeia histórica do Alembic. A migration nova e suas restrições foram exercidas;
@@ -141,10 +159,11 @@ reservas de 4 para 3, disponível 27, um pagamento, um movimento e lote FIFO de
 
 O pedido **oficial permanece pendente**. Após identificar a loja de testes já
 configurada pelo suporte, apenas o SKU `018631.1` foi enviado e aceito com HTTP
-202, ficando visível ao consumidor por R$ 65,00, com entrega de R$ 8,90. A
-tentativa de adicionar ao carrinho foi recusada com HTTP 431; não houve pedido
-oficial criado ou recebido. A ampliação local para esse frete está em validação
-e não resolve nem comprova a compra no provedor.
+202, ficando visível ao consumidor por R$ 65,00. O checkout oficial exibiu entrega
+de R$ 8,90, serviço iFood de R$ 1,99 e total de R$ 75,89, com pagamento online e
+sem dinheiro disponível. Ainda não houve pedido oficial criado ou recebido.
+A ampliação local para esse modo está em validação e não comprova compra no
+provedor nem conciliação do repasse.
 
 ## 7. Publicação e rollback
 
@@ -211,6 +230,6 @@ aceite de operação contínua, de pedido oficial concluído ou de produção.
 
 Pendências: Codex e Lucas devem concluir o pedido oficial assim que a compra na
 loja de testes pelo consumidor estiver disponível e registrar a evidência. O
-responsável pelo PR deve confirmar o delta de frete e o gate/CI final antes da
-conclusão da revisão.
+responsável pelo PR deve confirmar o delta de frete/online e o gate/CI final
+antes da conclusão da revisão.
 Não há prazo de liberação de produção definido nesta entrega.

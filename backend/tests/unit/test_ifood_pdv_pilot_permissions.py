@@ -135,6 +135,95 @@ def test_import_error_rolls_back_once_after_authorized_scope(local_pilot, monkey
     c.db.commit.assert_not_called()
 
 
+def test_tenant_owner_can_conclude_online_only_after_both_permissions(
+    local_pilot, monkeypatch
+):
+    c = local_pilot
+    checked = []
+    monkeypatch.setattr(
+        routes.permissions_service,
+        "check_permission",
+        lambda db, uid, permission, tenant, **kw: checked.append(permission),
+    )
+    finalize = Mock(return_value=c.imported)
+    monkeypatch.setattr(routes, "finalize_online_pdv_pilot", finalize)
+    result = routes.finalize_ifood_online_pdv_pilot(
+        c.order_id, auth=(c.user, c.tenant), db=c.db
+    )
+    assert checked == ["vendas.criar", "configuracoes.editar"] and result["id"] == 1
+    finalize.assert_called_once_with(
+        c.db, tenant_id=c.tenant, order_id=c.order_id, actor_id=c.user.id
+    )
+    c.db.commit.assert_called_once()
+
+
+@pytest.mark.parametrize("missing", ["vendas.criar", "configuracoes.editar"])
+def test_online_finalize_missing_permission_never_calls_operational_service(
+    local_pilot, monkeypatch, missing
+):
+    c = local_pilot
+
+    def check(db, uid, permission, tenant, **kw):
+        if permission == missing:
+            raise HTTPException(403, "Sem permissao")
+
+    monkeypatch.setattr(routes.permissions_service, "check_permission", check)
+    finalize = Mock()
+    monkeypatch.setattr(routes, "finalize_online_pdv_pilot", finalize)
+    with pytest.raises(HTTPException) as exc:
+        routes.finalize_ifood_online_pdv_pilot(
+            c.order_id, auth=(c.user, c.tenant), db=c.db
+        )
+    assert exc.value.status_code == 403
+    finalize.assert_not_called()
+    c.db.commit.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "scenario", ["production", "staging", "disabled", "other_tenant", "other_order"]
+)
+def test_online_finalize_scope_fails_before_database_permissions_or_payment(
+    local_pilot, monkeypatch, scenario
+):
+    c = local_pilot
+    tenant_id, order_id = c.tenant, c.order_id
+    if scenario in {"production", "staging"}:
+        monkeypatch.setenv("ENV", scenario)
+    elif scenario == "disabled":
+        monkeypatch.setattr(settings, "IFOOD_PDV_PILOT_ENABLED", False)
+    elif scenario == "other_tenant":
+        tenant_id = uuid4()
+    else:
+        order_id = str(uuid4())
+    check, finalize = Mock(), Mock()
+    monkeypatch.setattr(routes.permissions_service, "check_permission", check)
+    monkeypatch.setattr(routes, "finalize_online_pdv_pilot", finalize)
+    with pytest.raises(HTTPException) as exc:
+        routes.finalize_ifood_online_pdv_pilot(
+            order_id, auth=(c.user, tenant_id), db=c.db
+        )
+    assert exc.value.status_code == 409
+    check.assert_not_called()
+    finalize.assert_not_called()
+    c.db.commit.assert_not_called()
+
+
+def test_online_finalize_transaction_failure_rolls_back(local_pilot, monkeypatch):
+    c = local_pilot
+    monkeypatch.setattr(
+        routes.permissions_service, "check_permission", lambda *a, **kw: None
+    )
+    monkeypatch.setattr(
+        routes, "finalize_online_pdv_pilot", Mock(side_effect=RuntimeError("aposFIFO"))
+    )
+    with pytest.raises(RuntimeError):
+        routes.finalize_ifood_online_pdv_pilot(
+            c.order_id, auth=(c.user, c.tenant), db=c.db
+        )
+    c.db.rollback.assert_called_once()
+    c.db.commit.assert_not_called()
+
+
 @pytest.fixture
 def pilot_ui(local_pilot, monkeypatch):
     c = local_pilot

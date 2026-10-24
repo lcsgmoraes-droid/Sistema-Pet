@@ -18,6 +18,7 @@ from app.integrations.ifood.pdv_pilot import (
     block_pilot_picking_edit,
     pilot_settings_reason,
     confirm_pilot_bag_review,
+    finalize_online_pdv_pilot,
 )
 from app.security import permissions_service
 from app.integrations.ifood import (
@@ -271,6 +272,31 @@ def refresh_ifood_virtual_bag(
             )
     except IfoodClientError as exc:
         raise _provider_failure(db, config, exc) from exc
+
+
+@router.post("/pedidos/{order_id}/piloto-pdv/finalizar-online")
+def finalize_ifood_online_pdv_pilot(
+    order_id: str,
+    auth=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    current_user, tenant_id = auth
+    reason = pilot_settings_reason(tenant_id=tenant_id, order_id=order_id)
+    if reason:
+        raise HTTPException(409, reason)
+    for permission in ("vendas.criar", "configuracoes.editar"):
+        permissions_service.check_permission(
+            db, current_user.id, permission, tenant_id, current_user=current_user
+        )
+    try:
+        order = finalize_online_pdv_pilot(
+            db, tenant_id=tenant_id, order_id=order_id, actor_id=current_user.id
+        )
+        db.commit()
+        return order_detail(order, db=db)
+    except Exception:
+        db.rollback()
+        raise
 
 
 def _run_picking_action(

@@ -1,0 +1,50 @@
+import { formatMoneyBRL } from "../../utils/formatters";
+
+function amount(value) {
+  return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value))
+    ? formatMoneyBRL(Number(value))
+    : "Não informado";
+}
+
+export default function IfoodPdvOnlineResumo({ bridge }) {
+  if (bridge?.payment_mode !== "online") return null;
+  const checkout = bridge.checkout || {};
+  const receivable = bridge.receivable || {};
+  const approved = bridge.payment?.status === "approved";
+  const lines = [
+    ["Produto", checkout.items_total],
+    ["Frete do pedido", checkout.delivery_fee],
+    ["Valor operacional do pedido", checkout.operational_total],
+    ["Taxa de serviço do iFood", checkout.ifood_service_fee],
+    ["Total do consumidor", checkout.customer_total],
+  ];
+
+  return (
+    <div className="mt-3 rounded-lg border border-emerald-200 bg-white p-3 dark:border-emerald-900 dark:bg-slate-950">
+      <p className="font-semibold text-slate-900 dark:text-slate-100">Pagamento online no iFood</p>
+      <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+        {approved
+          ? "Pagamento externo registrado. Sem cobrança na loja."
+          : "Pagamento sob responsabilidade do iFood. Sem cobrança na loja."}
+      </p>
+      <dl className="mt-3 space-y-2 text-sm">
+        {lines.map(([label, value]) => (
+          <div key={label} className="flex justify-between gap-3">
+            <dt className="text-slate-600 dark:text-slate-300">{label}</dt>
+            <dd className="font-medium text-slate-900 dark:text-slate-100">{amount(value)}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 text-xs text-slate-600 dark:text-slate-300">
+        A taxa de serviço pertence ao iFood. O total do consumidor não representa o repasse da loja.
+      </p>
+      <p className="mt-2 font-medium text-amber-800 dark:text-amber-300">Repasse a conciliar</p>
+      <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+        {receivable.received_amount === 0
+          ? "Nenhum recebimento em caixa ou banco registrado. "
+          : "Recebimento do repasse ainda não comprovado. "}
+        Líquido, data do repasse e margem aguardam o Financial.
+      </p>
+    </div>
+  );
+}

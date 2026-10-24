@@ -89,6 +89,94 @@ function orderDetailsElement(harness) {
   return elements(harness.tree).find((item) => typeof item.type === "function");
 }
 
+test("conclusao online local nao depende de operacoes externas e trava o duplo clique", async () => {
+  const response = pending();
+  const online = {
+    ...bridge,
+    eligible: false,
+    status: "reserved",
+    sale_id: 42,
+    ifood_order_id: order.ifood_order_id,
+    payment_mode: "online",
+    can_finalize_online: true,
+  };
+  const env = prepare({
+    enabled: false,
+    detail: { ...order, pdv_bridge: online },
+    importResponse: response.promise,
+  });
+  const details = await selectOrder(env);
+  const first = details.props.onFinalizeOnlinePdv();
+  const second = details.props.onFinalizeOnlinePdv();
+  assert.deepEqual(
+    env.calls.filter(([method]) => method === "POST"),
+    [["POST", "/integracoes/ifood/pedidos/test-order-1/piloto-pdv/finalizar-online"]],
+  );
+  response.resolve({
+    data: {
+      ...order,
+      pdv_bridge: { ...online, status: "sold", can_finalize_online: false, stock_decreased: true },
+    },
+  });
+  await env.harness.act(() => Promise.all([first, second]));
+  assert.equal(orderDetailsElement(env.harness).props.order.pdv_bridge.stock_decreased, true);
+  assert.match(env.messages[0][1], /Repasse do iFood a conciliar/);
+  assert.equal(
+    env.calls.some(([, url]) => /\/vendas\/|pagamento|processar-eventos/.test(url)),
+    false,
+  );
+});
+
+test("conclusao online sem capacidade ou ja vendida nao chama endpoint", async () => {
+  for (const patch of [
+    { enabled: false },
+    { can_finalize_online: false },
+    { status: "sold" },
+    { payment_mode: "offline" },
+  ]) {
+    const env = prepare({
+      detail: {
+        ...order,
+        pdv_bridge: {
+          ...bridge,
+          ifood_order_id: order.ifood_order_id,
+          status: "reserved",
+          sale_id: 42,
+          payment_mode: "online",
+          can_finalize_online: true,
+          ...patch,
+        },
+      },
+    });
+    const details = await selectOrder(env);
+    await env.harness.act(() => details.props.onFinalizeOnlinePdv());
+    assert.equal(
+      env.calls.some(([method]) => method === "POST"),
+      false,
+    );
+  }
+});
+
+test("importar online apenas reserva e orienta a conclusao sem cobrar automaticamente", async () => {
+  const env = prepare({
+    enabled: false,
+    detail: { ...order, pdv_bridge: { ...bridge, payment_mode: "online" } },
+    importResponse: {
+      data: {
+        ...order,
+        pdv_bridge: { ...bridge, payment_mode: "online", status: "reserved", sale_id: 42 },
+      },
+    },
+  });
+  const details = await selectOrder(env);
+  await env.harness.act(() => details.props.onImportPdv());
+  assert.deepEqual(
+    env.calls.filter(([method]) => method === "POST"),
+    [["POST", "/integracoes/ifood/pedidos/test-order-1/piloto-pdv/importar"]],
+  );
+  assert.match(env.messages[0][1], /sem nova cobrança/);
+});
+
 async function selectOrder(env) {
   await env.harness.settle();
   const button = elements(env.harness.tree).find(

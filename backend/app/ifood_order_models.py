@@ -123,3 +123,4 @@ class IfoodPdvBridge(BaseTenantModel):
     actor_id = Column(Integer, nullable=False)
     stock_decreased_at = Column(DateTime(timezone=True), nullable=True)
     cancelled_at = Column(DateTime(timezone=True), nullable=True)
+    online_financial_evidence = Column(JSON, nullable=True)

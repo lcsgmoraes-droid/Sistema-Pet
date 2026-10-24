@@ -150,7 +150,11 @@ test("iFood nao inicia emissao fiscal automatica e preserva a emissao manual", a
   const pagamento = montar(dinheiro, 119.9, 119.9);
   const c = preparar({
     props: {
-      venda: { ...baseVenda, canal: "ifood" },
+      venda: {
+        ...baseVenda,
+        canal: "ifood",
+        ifood_pdv_pilot: { enabled: true, payment_mode: "offline" },
+      },
       pagamentos: [pagamento],
       moduloFiscalAtivo: true,
       emissaoAutomatica: { ativa: true, tipo: "nfce" },
@@ -188,6 +192,7 @@ test("DELIVERY iFood finaliza a venda existente sem PUT, entregador local ou dup
   const venda = {
     ...baseVenda,
     canal: "ifood",
+    ifood_pdv_pilot: { enabled: true, payment_mode: "offline" },
     tem_entrega: true,
     entregador_id: null,
     entrega: { taxa_entrega_total: 0 },
@@ -216,6 +221,7 @@ test("DELIVERY iFood com frete positivo recebe o total exato sem sobrescrever a 
   const venda = {
     ...baseVenda,
     canal: "ifood",
+    ifood_pdv_pilot: { enabled: true, payment_mode: "offline" },
     tem_entrega: true,
     entregador_id: null,
     subtotal: 65,
@@ -249,6 +255,29 @@ test("DELIVERY iFood com frete positivo recebe o total exato sem sobrescrever a 
   assert.equal(c.chamadas.finalizar[0].pagamentos[0].valor_recebido, 73.9);
   assert.deepEqual(venda, antes);
   assert.equal(c.alteracoes.Erro, "");
+});
+
+test("pagamento online ou desconhecido iFood nunca adiciona, exclui ou finaliza pela cobranca manual", async () => {
+  for (const summary of [
+    { enabled: true, payment_mode: "online" },
+    { enabled: false, payment_mode: "unknown" },
+    undefined,
+  ]) {
+    const c = preparar({
+      props: {
+        venda: { ...baseVenda, canal: "ifood", ifood_pdv_pilot: summary },
+        pagamentos: [montar(dinheiro, 119.9, 119.9)],
+        formaPagamentoSelecionada: dinheiro,
+      },
+    });
+    await c.h.act(() => c.h.tree.adicionarPagamento());
+    await c.h.act(() => c.h.tree.removerPagamento(0));
+    await c.h.act(() => c.h.tree.excluirPagamentoExistente(1));
+    await c.h.act(() => c.h.tree.handleFinalizar());
+    assert.deepEqual(c.chamadas, { persistir: [], finalizar: [], leituras: [] });
+    assert.equal(c.alteracoes.Pagamentos, undefined);
+    assert.match(c.alteracoes.Erro, /Cobrança manual iFood bloqueada/);
+  }
 });
 
 test("cartao119,90 com saldo109,90 e bloqueado sem justificativa; excecao preserva integral sem troco", async () => {

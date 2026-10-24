@@ -1,4 +1,5 @@
 import { podeRegistrarRecebimentoVenda } from "../utils/pdvReturnEligibility";
+import { isIfoodManualPaymentBlocked } from "../utils/ifoodPdvPilot";
 
 function criarEntregaVazia() {
   return {
@@ -22,6 +23,10 @@ export function usePDVVendaAcoes({
   limparComissao,
 }) {
   const abrirModalPagamento = () => {
+    if (isIfoodManualPaymentBlocked(vendaAtual)) {
+      alert("Pedido iFood sem cobrança manual autorizada. Confira o resumo do piloto no pedido.");
+      return;
+    }
     if (vendaAtual.itens.length === 0) {
       alert("Adicione pelo menos um produto ou servico");
       return;

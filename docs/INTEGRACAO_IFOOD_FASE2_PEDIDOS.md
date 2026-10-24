@@ -58,8 +58,9 @@ contornado ao identificar a loja de testes ja configurada pelo suporte. Nessa
 loja, o envio somente do SKU `018631.1` foi aceito com HTTP 202 e o produto ficou
 visivel ao consumidor por R$ 65,00. A compra e o recebimento do pedido oficial
 permanecem **pendentes**; visualizar o produto nao comprova criacao de pedido. O
-resultado sintetico nao substitui essa etapa. A ampliacao para frete positivo
-esta em validacao local e nao representa homologacao oficial concluida.
+resultado sintetico nao substitui essa etapa. A ampliacao para frete positivo e
+pagamento online esta em validacao local e nao representa homologacao oficial
+concluida.
 
 O piloto exige todas as configuracoes abaixo, inicialmente vazias/desligadas:
 
@@ -74,11 +75,14 @@ continuam recusados mesmo se a flag for ligada. O payload da Orders Virtual Bag
 precisa declarar `test=true`, a mesma loja e pedido, um unico item de uma unidade
 fixa do SKU autorizado e o mesmo EAN. Neste primeiro ensaio, sao aceitos somente
 retirada (`TAKEOUT`/`TAKE-OUT`) ou entrega (`DELIVERY`) com frete explicitamente
-informado e nao negativo, dinheiro presencial no valor total exato e preco do
-item positivo, sem cupom, desconto ou taxas adicionais. O total deve ser igual
-ao item mais o frete: R$ 65,00 + R$ 8,90 = R$ 73,90, por exemplo. Pagamento
-online, misto, cartao, pesagem variavel, itens adicionais e dados desconhecidos
-sao bloqueados antes de reservar.
+informado e nao negativo, preco do item positivo e sem cupom ou desconto. O modo
+offline aceita dinheiro presencial no total exato do item mais frete, sem taxas
+adicionais. O modo online aceita um unico credito sob responsabilidade explicita
+do iFood, identificador de pagamento valido e evidencia do evento oficial
+recebido. Nesse modo, a unica taxa adicional aceita e a de servico paga pelo
+consumidor e comprovadamente pertencente ao iFood. Frete online positivo exige
+`provider=MERCHANT`. Pagamento misto, outros meios, pesagem variavel, itens
+adicionais e dados desconhecidos ficam bloqueados.
 
 A importacao cria uma venda aberta do canal `ifood` e uma reserva pelo mesmo
 `PedidoIntegradoItem` utilizado nas demais integracoes. O pedido local tem
@@ -86,9 +90,28 @@ A importacao cria uma venda aberta do canal `ifood` e uma reserva pelo mesmo
 `ifood_pdv_bridges` une o pedido iFood, a reserva, o produto e a venda. Repetir a
 importacao retorna o vinculo existente, sem criar nova venda ou reserva.
 
-O hash da evidencia vincula tambem frete e total. Divergencia nesses valores
-impede reaproveitar a validacao anterior. O frete nao aumenta a quantidade
-reservada nem a baixa FIFO: ambas continuam restritas a uma unidade do produto.
+O hash da evidencia vincula tambem frete, taxa de servico, totais e pagamento.
+Divergencia nesses valores impede reaproveitar a validacao anterior. O frete nao
+aumenta a quantidade reservada nem a baixa FIFO: ambas continuam restritas a uma
+unidade do produto.
+
+O online usa a acao explicita
+`POST /integracoes/ifood/pedidos/{order_id}/piloto-pdv/finalizar-online`, sem
+pagamentos novos no corpo. Central e PDV mostram **Concluir venda e baixar
+estoque** somente com `can_finalize_online=true`. O endpoint revalida escopo,
+origem, evento, pagamento e sacola; registra a quitacao externa identificada
+como `iFood online` e executa a baixa uma vez, sem modal de cobranca, movimento
+de caixa ou conta global dada como recebida. O modo offline conserva o fluxo
+de pagamento presencial autorizado.
+
+`pdv_bridge` e `Venda.ifood_pdv_pilot` apresentam modo, capacidade de conclusao,
+checkout, pagamento e recebivel. O checkout diferencia R$ 65,00 do item,
+R$ 8,90 do frete e R$ 73,90 operacionais dos R$ 1,99 de servico do iFood e
+R$ 75,89 do consumidor. A evidencia JSON da ponte mantem o repasse em
+`awaiting_financial`, recebido zero, liquido/data desconhecidos e margem pendente.
+Nao se presume receita da loja ou repasse pelo total cobrado do consumidor.
+Fora do escopo ou com modo desconhecido, a UI bloqueia cobranca manual; somente
+um resumo habilitado com `payment_mode=offline` libera o dinheiro presencial.
 
 Ao finalizar a venda no PDV, o fluxo normal faz a baixa FIFO dos lotes e encerra
 a reserva na mesma transacao. Repeticoes e concorrencia nao podem executar outra
@@ -108,7 +131,8 @@ Em entrega, a venda conserva `tem_entrega=True`, sem entregador local, e a tela
 mostra **Entrega acompanhada pelo iFood**. A dispensa do entregador no finalizador
 exige o vinculo DEV valido e permissao de venda na empresa; nao se aplica aos
 outros canais. O valor de frete precisa estar explicitamente informado e ser
-nao negativo; taxas adicionais continuam proibidas. Frete desconhecido, total
+nao negativo. No online, a responsabilidade pelo frete positivo e a taxa de
+servico precisam corresponder as condicoes acima. Frete desconhecido, total
 divergente ou outras condicoes nao suportadas continuam bloqueados.
 
 ### Roteiro de validacao
@@ -125,8 +149,10 @@ divergente ou outras condicoes nao suportadas continuam bloqueados.
    para homologacao** e configure o ID exato antes de importar no PDV.
 5. Registre o saldo inicial, reservas e lotes. Use **Enviar ao PDV de teste** e
    confira uma unica reserva; repetir o envio nao pode alterar as contagens.
-6. Abra a venda pelo vinculo do painel. Confira canal iFood, item e valor; finalize
-   uma vez com o pagamento presencial correspondente ao pedido.
+6. Abra a venda pelo vinculo do painel. Confira canal iFood, item, frete, taxa e
+   totais. No offline, registre o dinheiro presencial exato. No online, use
+   **Concluir venda e baixar estoque**; nao registre outro pagamento nem abra a
+   cobranca manual. Confira a evidencia externa e o repasse ainda a conciliar.
 7. Confira uma unica baixa FIFO, reserva encerrada e a venda finalizada. Use
    **Atualizar pedidos** para reler o estado local sem consultar o provedor.
 8. Verifique produtos de controle e outra empresa, reenvios, tentativas

@@ -191,6 +191,7 @@ test("pedido iFood preserva frete positivo e total ao abrir pelo vinculo ou pela
     const resolve = env.prepararVenda(42);
     const origem = {
       canal: "ifood",
+      ifood_pdv_pilot: { enabled: true, payment_mode: "online", ifood_order_id: "test-order" },
       status: "aberta",
       cliente_id: null,
       tem_entrega: true,
@@ -210,6 +211,7 @@ test("pedido iFood preserva frete positivo e total ao abrir pelo vinculo ou pela
 
     const venda = env.publicadas[0];
     assert.equal(venda.canal, "ifood");
+    assert.deepEqual(venda.ifood_pdv_pilot, origem.ifood_pdv_pilot);
     assert.equal(venda.tem_entrega, true);
     assert.equal(venda.entregador_id, null);
     assert.equal(venda.subtotal, 65);

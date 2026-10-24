@@ -12,6 +12,7 @@ const controls = ["BotaoInteracao", "LinkPadrao"];
 const stubs = new Map([
   ...controls.map((name) => [`../v2/${name}/${name}`, { __esModule: true, default: name }]),
   ["lucide-react", {}],
+  ["./IfoodPdvOnlineResumo", { __esModule: true, default: "IfoodPdvOnlineResumo" }],
 ]);
 
 function setup(bridge, extra = {}) {
@@ -105,4 +106,28 @@ test("ausencia de prova de reserva e baixa nao vira zero ou confirmacao", () => 
   assert.match(text, /Reserva ativa deste pedido\s+Não informada/);
   assert.match(text, /Baixa de estoque\s+Não informada/);
   assert.doesNotMatch(text, /Registrada|baixa registrada/);
+});
+
+test("online reservado oferece conclusao explicita com capacidade do servidor; vendido nao repete", async () => {
+  let finalized = 0;
+  const bridge = {
+    enabled: true,
+    eligible: false,
+    status: "reserved",
+    sale_id: 42,
+    ifood_order_id: "test-order",
+    payment_mode: "online",
+    can_finalize_online: true,
+  };
+  const env = setup(bridge, { onFinalizeOnline: () => finalized++ });
+  const button = elements(env.harness.tree).find((node) => node.type === "BotaoInteracao");
+  assert.equal(elementText(button), "Concluir venda e baixar estoque");
+  assert.equal(finalized, 0);
+  await env.harness.act(() => button.props.onClick());
+  assert.equal(finalized, 1);
+  await env.harness.update({ bridge: { ...bridge, status: "sold", can_finalize_online: false } });
+  assert.equal(
+    elements(env.harness.tree).some((node) => node.type === "BotaoInteracao"),
+    false,
+  );
 });

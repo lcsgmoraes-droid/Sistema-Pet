@@ -8,6 +8,7 @@ import InputQuantidade from "../../components/v2/InputQuantidade/InputQuantidade
 import IfoodPedidoPdvPilot, {
   canImportIfoodPdvPilot,
 } from "../../components/ifood/IfoodPedidoPdvPilot";
+import { canFinalizeIfoodOnlinePdvPilot } from "../../utils/ifoodPdvPilot";
 
 function errorMessage(error, fallback) {
   const detail = error?.response?.data?.detail;
@@ -83,6 +84,7 @@ export function OrderDetails({
   onAction,
   onItemAction,
   onImportPdv,
+  onFinalizeOnlinePdv,
   action,
   actionsEnabled,
 }) {
@@ -145,6 +147,7 @@ export function OrderDetails({
         bridge={order.pdv_bridge}
         busy={Boolean(action)}
         onImport={onImportPdv}
+        onFinalizeOnline={onFinalizeOnlinePdv}
       />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -460,10 +463,38 @@ export default function IfoodPedidosPanel({ enabled: externalEnabled, onMessage 
       await loadOrders();
       onMessage(
         "success",
-        "Pedido de teste enviado ao PDV com reserva. A baixa ocorre ao finalizar a venda no PDV.",
+        response.data?.pdv_bridge?.payment_mode === "online"
+          ? "Pedido reservado. Confira o pagamento online e use Concluir venda e baixar estoque, sem nova cobrança."
+          : "Pedido de teste enviado ao PDV com reserva. A baixa ocorre ao finalizar a venda no PDV.",
       );
     } catch (error) {
       onMessage("error", errorMessage(error, "Não foi possível enviar o pedido de teste ao PDV."));
+    } finally {
+      pilotImportRef.current = false;
+      setAction(null);
+    }
+  }
+
+  async function finalizeOnlinePdvPilot() {
+    if (
+      !selectedId ||
+      pilotImportRef.current ||
+      !canFinalizeIfoodOnlinePdvPilot(selected?.pdv_bridge)
+    ) {
+      return;
+    }
+    const orderId = selectedId;
+    pilotImportRef.current = true;
+    try {
+      setAction("piloto-pdv/finalizar-online");
+      const response = await api.post(
+        `/integracoes/ifood/pedidos/${orderId}/piloto-pdv/finalizar-online`,
+      );
+      if (selectedIdRef.current === orderId) setSelected(response.data);
+      await loadOrders();
+      onMessage("success", "Venda concluída com baixa de estoque. Repasse do iFood a conciliar.");
+    } catch (error) {
+      onMessage("error", errorMessage(error, "Não foi possível concluir a venda online de teste."));
     } finally {
       pilotImportRef.current = false;
       setAction(null);
@@ -594,6 +625,7 @@ export default function IfoodPedidosPanel({ enabled: externalEnabled, onMessage 
           onAction={runOrderAction}
           onItemAction={runItemAction}
           onImportPdv={importPdvPilot}
+          onFinalizeOnlinePdv={finalizeOnlinePdvPilot}
           action={action}
           actionsEnabled={externalEnabled}
         />
