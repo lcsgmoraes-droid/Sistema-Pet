@@ -46,6 +46,29 @@ function botaoCancelar(harness) {
   );
 }
 
+test("pedido iFood mantém itens e valores em visualizacao e permite cancelamento", () => {
+  const harness = montarBanner({ id: 42, canal: "ifood", status: "aberta", tem_entrega: true });
+  assert.match(elementText(harness.tree), /Itens e valores vêm do pedido iFood/);
+  assert.ok(botaoCancelar(harness));
+  for (const label of ["Editar", "Reabrir Venda", "Devolucao"]) {
+    assert.equal(
+      elements(harness.tree).some((node) => elementText(node) === label),
+      false,
+    );
+  }
+});
+
+test("app e ecommerce preservam a acao de editar vendas abertas", () => {
+  for (const canal of ["app", "ecommerce"]) {
+    const harness = montarBanner({ id: 42, canal, status: "aberta", tem_entrega: true });
+    assert.ok(
+      elements(harness.tree).find(
+        (node) => node.type === "ActionButton" && elementText(node) === "Editar",
+      ),
+    );
+  }
+});
+
 test("nota cancelada exibe cancelamento direto, preservando o fluxo de confirmação existente", async () => {
   let cancelamentos = 0;
   const harness = montarBanner(

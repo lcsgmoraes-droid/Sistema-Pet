@@ -1192,6 +1192,51 @@ test("persistencia entrega total do servidor para revisar pagamentos antes da fi
   assert.deepEqual(retornos, [criada, atualizada]);
 });
 
+test("pagamento da venda iFood existente preserva DELIVERY sem PUT previo ou entregador inventado", async () => {
+  const venda = { id: 42, canal: "ifood", tem_entrega: true, entregador_id: null, total: 65 };
+  const chamadas = [];
+  const id = await persistirVendaAbertaParaPagamento({
+    vendaParaPersistir: venda,
+    payloadVenda: { tem_entrega: true, entregador_id: null },
+    criarVenda: async () => chamadas.push("criar"),
+    atualizarVenda: async () => chamadas.push("atualizar"),
+    onVendaPersistida: () => chamadas.push("snapshot"),
+  });
+  assert.equal(id, 42);
+  assert.deepEqual(chamadas, []);
+  assert.equal(venda.tem_entrega, true);
+  assert.equal(venda.entregador_id, null);
+});
+
+test("pagamento iFood sem venda vinculada nao cria venda generica nem reutiliza outro id", async () => {
+  let chamadas = 0;
+  await assert.rejects(
+    persistirVendaAbertaParaPagamento({
+      vendaParaPersistir: { canal: "ifood", tem_entrega: true },
+      vendaIdPersistida: 999,
+      criarVenda: async () => chamadas++,
+      atualizarVenda: async () => chamadas++,
+    }),
+    /Abra a venda existente do pedido iFood/,
+  );
+  assert.equal(chamadas, 0);
+});
+
+test("pagamentos app e ecommerce continuam persistindo a venda antes de finalizar", async () => {
+  const chamadas = [];
+  for (const canal of ["app", "ecommerce"]) {
+    await persistirVendaAbertaParaPagamento({
+      vendaParaPersistir: { id: 42, canal, tem_entrega: true, entregador_id: 77 },
+      payloadVenda: { tem_entrega: true, entregador_id: 77 },
+      atualizarVenda: async (id, payload) => chamadas.push({ id, payload }),
+    });
+  }
+  assert.deepEqual(chamadas, [
+    { id: 42, payload: { tem_entrega: true, entregador_id: 77 } },
+    { id: 42, payload: { tem_entrega: true, entregador_id: 77 } },
+  ]);
+});
+
 test("monta pagamento a vista com a forma cadastrada no tenant", () => {
   assert.deepEqual(montarPagamentoAVista(99.9, 42), [
     { forma_pagamento_id: 42, valor: 99.9, parcelas: 1 },

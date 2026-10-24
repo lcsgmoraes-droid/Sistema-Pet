@@ -2,6 +2,7 @@ import { Plus } from "lucide-react";
 import CurrencyInput from "../CurrencyInput";
 import { formatMoneyBRL } from "../../utils/formatters";
 import Panel from "../ui/Panel";
+import { CANAL_IFOOD, normalizeSalesChannel } from "../../utils/salesChannel";
 
 export default function PDVEntregaCard({
   cliente,
@@ -20,6 +21,22 @@ export default function PDVEntregaCard({
   onToggleTemEntrega,
   vendaAtual,
 }) {
+  if (normalizeSalesChannel(vendaAtual.canal) === CANAL_IFOOD) {
+    return (
+      <Panel padding="lg">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          {vendaAtual.tem_entrega
+            ? "Entrega acompanhada pelo iFood"
+            : "Retirada informada no iFood"}
+        </h2>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          A modalidade e os dados de atendimento vêm do pedido iFood. Confira o endereço e o
+          andamento no pedido do canal; esta venda não usa um entregador cadastrado no CorePet.
+        </p>
+      </Panel>
+    );
+  }
+
   return (
     <Panel padding="lg">
       <div className="flex items-center justify-between mb-4">

@@ -68,7 +68,7 @@ function preparar() {
   const prepararVenda = (id) => {
     const resposta = pendente();
     respostas.set(id, resposta);
-    return () =>
+    return (extra = {}) =>
       resposta.resolver({
         id,
         cliente_id: id + 100,
@@ -77,6 +77,7 @@ function preparar() {
         status: "pago_nf",
         nfe_status: "cancelada",
         total: 10,
+        ...extra,
       });
   };
   return {
@@ -162,4 +163,21 @@ test("pedidos simultâneos da mesma venda compartilham consulta e publicação",
   await atual;
   env.timers.forEach((callback) => callback());
   assert.deepEqual(env.modais, []);
+});
+
+test("abrir pedido DELIVERY iFood conserva modalidade, canal e ausencia de entregador local", async () => {
+  const env = preparar();
+  const resolve = env.prepararVenda(42);
+  const loading = env.harness.tree.carregarVendaEspecifica(42);
+  resolve({
+    canal: "ifood",
+    tem_entrega: true,
+    entregador_id: null,
+    entrega: { taxa_entrega_total: 0 },
+  });
+  await loading;
+  assert.equal(env.publicadas[0].canal, "ifood");
+  assert.equal(env.publicadas[0].tem_entrega, true);
+  assert.equal(env.publicadas[0].entregador_id, null);
+  assert.deepEqual(env.entregadores, [null]);
 });

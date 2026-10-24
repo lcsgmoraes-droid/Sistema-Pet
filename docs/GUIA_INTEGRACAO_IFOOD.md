@@ -315,6 +315,51 @@ vincular um existente para atualizar somente estoque. Pausa, reativação,
 alteração de promoções, entrada de pedidos e baixa de estoque por venda
 exigem validação própria antes de serem consideradas disponíveis ou automáticas.
 
+## Pedido de teste no PDV — somente DEV
+
+O piloto de pedidos é separado do envio de catálogo. Ele usa uma empresa
+fictícia no DEV e um único pedido da loja de testes do iFood; não habilita o
+recebimento de vendas no PDV de produção.
+
+**Validação desta etapa em 24/10/2026:** o ensaio local **sintético**, feito pela
+interface com dados fictícios, passou: uma reserva, uma venda, uma baixa FIFO e
+um pagamento, sem duplicação ao repetir a importação. O teste pela loja de testes
+do iFood continua **pendente**: o provedor retornou HTTP 400, **Merchant without
+setup configured**. Esse resultado local não comprova recebimento de um pedido
+oficial do iFood.
+
+1. Com a equipe de implantação, confirme a empresa, a loja de testes, o pedido
+   autorizado e o único produto do piloto. Neste primeiro ensaio, o pedido deve
+   ter uma unidade do SKU 018631.1, para retirada ou entrega com frete
+   comprovadamente zero, pagamento presencial em dinheiro e sem cupom, desconto
+   ou taxas adicionais.
+2. No DEV, abra **Configurações → Integrações → iFood → Pedidos para
+   homologação**. Confira o pedido e os dados da sacola. Receber o pedido no
+   painel ainda não reserva estoque nem cria uma venda.
+3. No bloco **Piloto do PDV em DEV**, use **Enviar ao PDV de teste**. Confira a
+   indicação de estoque reservado e o vínculo **Abrir venda no PDV**. Repetir a
+   ação deve manter a mesma venda e a mesma reserva.
+4. Abra a venda e confira canal iFood, produto, quantidade e valor. A finalização
+   pelo PDV registra a baixa de estoque uma única vez e encerra a reserva.
+5. Volte ao painel e use **Atualizar pedidos** para conferir a reserva e a baixa
+   gravadas no CorePet. Esse botão apenas relê os dados locais; **Buscar eventos
+   agora** consulta o iFood e é uma ação diferente.
+
+Outros pedidos, itens, pagamentos ou empresas não autorizados ficam bloqueados
+no piloto. Não altere os itens da venda para contornar o bloqueio. Quando o
+cancelamento remoto já tiver sido recebido e registrado no CorePet, a finalização
+local fica bloqueada. Confira e use **Cancelar** no PDV para liberar a reserva.
+Cancelar uma reserva que ainda não teve baixa não deve criar uma entrada de
+estoque.
+
+Os botões de entrega e retirada usados pelo app/ecommerce não operam o pedido
+iFood. A situação no provedor, a disponibilidade ao consumidor e os custos
+financeiros precisam de conferências próprias. O roteiro técnico e as condições
+do ensaio estão em [Pedidos e homologação](INTEGRACAO_IFOOD_FASE2_PEDIDOS.md).
+
+A finalização da venda iFood não dispara emissão fiscal automática. A emissão
+manual continua disponível conforme as permissões e regras fiscais da empresa.
+
 ## Financeiro em DEV: custo histórico e repasses
 
 A calculadora continua sendo uma previsão com as premissas da loja. A aba

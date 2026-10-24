@@ -408,6 +408,9 @@ def prever_devolucao(
     venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
+    from app.integrations.ifood.pdv_pilot import block_pilot_sale_edit
+
+    block_pilot_sale_edit(db, venda)
     _validar_pagamentos_beneficio(
         venda, tenant_id, dados.get("devolver_na_origem", False)
     )
@@ -509,6 +512,9 @@ def registrar_devolucao(
             logger.info(f"❌ Venda #{venda_id} não encontrada")
             raise HTTPException(status_code=404, detail="Venda não encontrada")
 
+        from app.integrations.ifood.pdv_pilot import block_pilot_sale_edit
+
+        block_pilot_sale_edit(db, venda)
         status_venda = str(venda.status or "").lower()
         if status_venda not in {
             "finalizada",

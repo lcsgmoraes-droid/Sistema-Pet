@@ -82,10 +82,24 @@ async def finalizar_venda(
     # ========================================
     venda_temp = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
     if venda_temp and venda_temp.tem_entrega and not venda_temp.entregador_id:
-        raise HTTPException(
-            status_code=400,
-            detail="❌ Não é possível finalizar. Entregador é obrigatório quando a venda tem entrega. Atribua um entregador antes de finalizar.",
-        )
+        from app.integrations.ifood.pdv_pilot import is_pilot_external_delivery
+
+        if str(getattr(venda_temp, "canal", None) or "").lower() == "ifood":
+            from app.security import permissions_service
+
+            permissions_service.check_permission(
+                db,
+                current_user.id,
+                "vendas.criar",
+                tenant_id,
+                current_user=current_user,
+            )
+
+        if not is_pilot_external_delivery(db, venda_temp):
+            raise HTTPException(
+                status_code=400,
+                detail="❌ Não é possível finalizar. Entregador é obrigatório quando a venda tem entrega. Atribua um entregador antes de finalizar.",
+            )
 
     # ============================================================
     # 🔥 ORQUESTRAÇÃO ATÔMICA VIA VendaService
@@ -216,9 +230,9 @@ async def finalizar_venda(
         status_final=venda.status,
         total_venda=float(venda.total),
         total_pagamentos=total_pago,
-        forma_pagamento=dados.pagamentos[0].forma_pagamento
-        if dados.pagamentos
-        else None,
+        forma_pagamento=(
+            dados.pagamentos[0].forma_pagamento if dados.pagamentos else None
+        ),
         lembretes_criados=len(lembretes_criados),
         lembretes_atualizados=len(lembretes_atualizados),
     )

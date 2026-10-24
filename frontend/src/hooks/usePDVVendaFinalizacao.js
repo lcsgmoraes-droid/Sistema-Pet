@@ -15,6 +15,7 @@ import { confirmarCorePet, perguntarCorePet } from "../services/corepetDialog";
 import { obterTotalRecebidoExistente } from "../components/modalPagamentoUtils";
 import { normalizarDescontosVenda } from "../utils/pdvDescontosUtils";
 import { cancelarEdicaoVenda } from "../utils/pdvCancelarEdicaoVenda";
+import { CANAL_IFOOD, normalizeSalesChannel } from "../utils/salesChannel";
 import {
   extrairCamposFiscaisVenda,
   temNotaFiscalAtiva,
@@ -157,6 +158,10 @@ export function usePDVVendaFinalizacao({
   }, [vendaAtual.id, vendaAtual.status]);
 
   const habilitarEdicao = () => {
+    if (vendaAtual.id && normalizeSalesChannel(vendaAtual.canal) === CANAL_IFOOD) {
+      alert("Itens e valores vêm do pedido iFood. Use as ações de finalizar ou cancelar a venda.");
+      return;
+    }
     setModoVisualizacao(false);
   };
 

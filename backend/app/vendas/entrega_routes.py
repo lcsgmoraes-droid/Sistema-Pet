@@ -38,6 +38,9 @@ async def marcar_venda_entregue(
     )
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
+    from app.integrations.ifood.pdv_pilot import block_pilot_sale_edit
+
+    block_pilot_sale_edit(db, venda)
     retirado_por = _resolver_retirado_por_conclusao(venda, dados.retirado_por)
     venda.status_entrega = "entregue"
     venda.data_entrega = datetime.now()
@@ -68,6 +71,9 @@ async def marcar_venda_pronta_retirada(
     )
     if not venda:
         raise HTTPException(status_code=404, detail="Venda nao encontrada")
+    from app.integrations.ifood.pdv_pilot import block_pilot_sale_edit
+
+    block_pilot_sale_edit(db, venda)
     if venda.status_entrega == "entregue":
         raise HTTPException(status_code=400, detail="Venda ja foi entregue/retirada")
     venda.status_entrega = "pronto"

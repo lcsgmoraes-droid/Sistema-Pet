@@ -12,6 +12,14 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.config import settings
 from app.db import get_session
 from app.ifood_order_models import IfoodOrder
+from app.integrations.ifood.pdv_pilot import (
+    import_pdv_pilot,
+    pdv_bridge_summary,
+    block_pilot_picking_edit,
+    pilot_settings_reason,
+    confirm_pilot_bag_review,
+)
+from app.security import permissions_service
 from app.integrations.ifood import (
     IfoodClientError,
     mark_order_action,
@@ -64,6 +72,33 @@ def _require_order_operations() -> None:
         )
 
 
+def _require_pilot_or_legacy_order_permission(db, user, tenant_id, *, order_id=None):
+    if not settings.IFOOD_PDV_PILOT_ENABLED:
+        _require_admin(user)
+        return
+    reason = pilot_settings_reason(
+        tenant_id=tenant_id, order_id=order_id, require_order=order_id is not None
+    )
+    if reason:
+        raise HTTPException(409, reason)
+    for permission in ("vendas.criar", "configuracoes.editar"):
+        permissions_service.check_permission(
+            db, user.id, permission, tenant_id, current_user=user
+        )
+
+
+def _require_pilot_merchant_scope(tenant_id, merchant_id, *, order_id=None):
+    if settings.IFOOD_PDV_PILOT_ENABLED:
+        reason = pilot_settings_reason(
+            tenant_id=tenant_id,
+            merchant_id=merchant_id,
+            order_id=order_id,
+            require_order=order_id is not None,
+        )
+        if reason:
+            raise HTTPException(409, reason)
+
+
 def _order(db: Session, tenant_id, order_id: str) -> IfoodOrder:
     value = (
         db.query(IfoodOrder)
@@ -103,7 +138,37 @@ def _ensure_ready(db: Session, tenant_id):
 def _refresh_virtual_bag(
     *, db: Session, tenant_id, order: IfoodOrder, client
 ) -> dict[str, Any]:
+    pilot_refresh = (
+        pilot_settings_reason(
+            tenant_id=tenant_id,
+            merchant_id=order.merchant_id,
+            order_id=order.ifood_order_id,
+        )
+        is None
+    )
+    if pilot_refresh:
+        # A consulta externa e o reconhecimento pertencem ao mesmo limite do
+        # pedido: evento concorrente nao pode ser aprovado com resposta antiga.
+        order = (
+            db.query(IfoodOrder)
+            .filter(
+                IfoodOrder.tenant_id == tenant_id,
+                IfoodOrder.ifood_order_id == order.ifood_order_id,
+            )
+            .with_for_update()
+            .populate_existing()
+            .one()
+        )
     payload = client.get_virtual_bag(order.ifood_order_id)
+    if pilot_refresh and (
+        not isinstance(payload, dict)
+        or payload.get("test") is not True
+        or not isinstance(payload.get("merchant"), dict)
+        or payload["merchant"].get("id") != order.merchant_id
+    ):
+        raise HTTPException(
+            409, "A sacola retornada nao pertence a loja de teste autorizada."
+        )
     upsert_ifood_order(
         db,
         tenant_id=tenant_id,
@@ -111,9 +176,11 @@ def _refresh_virtual_bag(
         order_id=order.ifood_order_id,
         payload=payload,
     )
+    if pilot_refresh:
+        confirm_pilot_bag_review(db, order)
     db.commit()
     db.refresh(order)
-    return order_detail(order)
+    return order_detail(order, db=db)
 
 
 @router.get("/pedidos")
@@ -132,7 +199,7 @@ def list_ifood_orders(
         .limit(limit)
         .all()
     )
-    return {"orders": [order_summary(order) for order in orders]}
+    return {"orders": [order_summary(order, db=db) for order in orders]}
 
 
 @router.get("/pedidos/{order_id}")
@@ -142,7 +209,44 @@ def get_ifood_order(
     db: Session = Depends(get_session),
 ):
     _user, tenant_id = auth
-    return order_detail(_order(db, tenant_id, order_id))
+    return order_detail(_order(db, tenant_id, order_id), db=db)
+
+
+@router.get("/pedidos/{order_id}/piloto-pdv")
+def get_ifood_pdv_pilot(
+    order_id: str,
+    auth=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    _user, tenant_id = auth
+    return pdv_bridge_summary(db, _order(db, tenant_id, order_id))
+
+
+@router.post("/pedidos/{order_id}/piloto-pdv/importar")
+def import_ifood_pdv_pilot(
+    order_id: str,
+    auth=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    current_user, tenant_id = auth
+    # Este endpoint local usa as permissoes da empresa selecionada; ser admin
+    # global nao concede acesso operacional a outra empresa.
+    reason = pilot_settings_reason(tenant_id=tenant_id, order_id=order_id)
+    if reason:
+        raise HTTPException(409, reason)
+    for permission in ("vendas.criar", "configuracoes.editar"):
+        permissions_service.check_permission(
+            db, current_user.id, permission, tenant_id, current_user=current_user
+        )
+    try:
+        order = import_pdv_pilot(
+            db, tenant_id=tenant_id, order_id=order_id, actor_id=current_user.id
+        )
+        db.commit()
+        return order_detail(order, db=db)
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.post("/pedidos/{order_id}/atualizar-sacola")
@@ -152,10 +256,14 @@ def refresh_ifood_virtual_bag(
     db: Session = Depends(get_session),
 ):
     current_user, tenant_id = auth
-    _require_admin(current_user)
+    _require_pilot_or_legacy_order_permission(
+        db, current_user, tenant_id, order_id=order_id
+    )
     _require_order_operations()
     config = _ensure_ready(db, tenant_id)
+    _require_pilot_merchant_scope(tenant_id, config.merchant_id, order_id=order_id)
     order = _order(db, tenant_id, order_id)
+    _require_pilot_merchant_scope(tenant_id, order.merchant_id, order_id=order_id)
     try:
         with _client() as client:
             return _refresh_virtual_bag(
@@ -228,6 +336,7 @@ def update_ifood_picking_item(
     _require_order_operations()
     config = _ensure_ready(db, tenant_id)
     order = _order(db, tenant_id, order_id)
+    block_pilot_picking_edit(db, order)
     try:
         with _client() as client:
             provider = client.update_picking_item(
@@ -257,6 +366,7 @@ def remove_ifood_picking_item(
     _require_order_operations()
     config = _ensure_ready(db, tenant_id)
     order = _order(db, tenant_id, order_id)
+    block_pilot_picking_edit(db, order)
     try:
         with _client() as client:
             provider = client.remove_picking_item(order.ifood_order_id, unique_id)
@@ -296,9 +406,10 @@ def poll_ifood_order_events(
     db: Session = Depends(get_session),
 ):
     current_user, tenant_id = auth
-    _require_admin(current_user)
+    _require_pilot_or_legacy_order_permission(db, current_user, tenant_id)
     _require_order_operations()
     config = _ensure_ready(db, tenant_id)
+    _require_pilot_merchant_scope(tenant_id, config.merchant_id)
     try:
         with _client() as client:
             return process_order_events(

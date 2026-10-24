@@ -629,6 +629,9 @@ jobs:
           tests/unit/test_ifood_catalog_contract.py
           tests/unit/test_ifood_routes_contract.py
           tests/unit/test_ifood_orders_contract.py
+          tests/unit/test_ifood_pdv_pilot.py
+          tests/unit/test_ifood_pdv_pilot_bypasses.py
+          tests/unit/test_ifood_pdv_pilot_permissions.py
           tests/unit/test_ifood_client_contract.py
           tests/unit/test_ifood_financial.py
           tests/unit/test_ifood_financial_client.py
@@ -722,9 +725,58 @@ jobs:
       - name: Run Alembic migration smoke
         run: python scripts/ci_migration_smoke.py
 
+  ifood-pdv-postgres:
+    name: iFood PDV PostgreSQL
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ifood_pdv_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ifood_pdv_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: sqlite://
+      IFOOD_PDV_TEST_POSTGRES_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/ifood_pdv_test
+      ENVIRONMENT: test
+      JWT_SECRET_KEY: ifood-pdv-test-only-not-a-production-secret
+      IFOOD_CLIENT_ID: ""
+      IFOOD_CLIENT_SECRET: ""
+      IFOOD_CATALOG_WRITE_ENABLED: "false"
+      IFOOD_ORDER_POLLING_ENABLED: "false"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install backend test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt -c backend/requirements.lock
+          pip install pytest pytest-cov pytest-asyncio
+
+      - name: Verify isolated iFood reservation and stock transactions
+        working-directory: ./backend
+        run: python -m pytest tests/integration/test_ifood_pdv_pilot_postgres.py -q
+
   quality-gate:
     name: Quality Gate
-    needs: [tests, migration-smoke]
+    needs: [tests, migration-smoke, ifood-pdv-postgres]
     runs-on: ubuntu-latest
 
     steps:
@@ -734,4 +786,5 @@ jobs:
           echo "Tests & Quality passed"
           echo "Startup import passed"
           echo "Migration smoke passed"
+          echo "iFood PDV PostgreSQL passed"
           echo "SonarCloud runs as an independent PR check and is not waited on here"

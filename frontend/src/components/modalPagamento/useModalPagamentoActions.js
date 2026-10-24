@@ -14,6 +14,7 @@ import { ehVendaCrediario } from "../../utils/pdvReceipt";
 import { montarPayloadVenda } from "../../utils/pdvVendaPayload";
 import { arredondarDinheiro } from "../../utils/pdvCarrinhoItensUtils";
 import { formatMoneyBRL } from "../../utils/formatters";
+import { CANAL_IFOOD, normalizeSalesChannel } from "../../utils/salesChannel";
 import {
   devePerguntarNotaFiscal,
   montarItensParaVerificarEstoqueNegativo,
@@ -389,7 +390,10 @@ export function useModalPagamentoActions({
 
       if (!moduloFiscalAtivo || devePerguntarNotaFiscal(resultado)) {
         setAutoEmitirTipo(
-          moduloFiscalAtivo && emissaoAutomatica?.ativa && devePerguntarNotaFiscal(resultado)
+          normalizeSalesChannel(venda.canal) !== CANAL_IFOOD &&
+            moduloFiscalAtivo &&
+            emissaoAutomatica?.ativa &&
+            devePerguntarNotaFiscal(resultado)
             ? emissaoAutomatica.tipo
             : null,
         );

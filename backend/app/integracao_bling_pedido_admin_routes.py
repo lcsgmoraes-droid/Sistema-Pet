@@ -48,6 +48,7 @@ def listar_pedidos_bling(
     tenant_id = user_tenant[1]
 
     q = db.query(PedidoIntegrado).filter(
+        PedidoIntegrado.pedido_bling_id.isnot(None),
         PedidoIntegrado.tenant_id == tenant_id,
         PedidoIntegrado.status != "mesclado",
     )
@@ -298,6 +299,7 @@ def confirmar_pedido_manual(
         .filter(
             PedidoIntegrado.id == pedido_id,
             PedidoIntegrado.tenant_id == tenant_id,
+            PedidoIntegrado.pedido_bling_id.isnot(None),
         )
         .first()
     )
@@ -350,6 +352,7 @@ def cancelar_pedido_manual(
         .filter(
             PedidoIntegrado.id == pedido_id,
             PedidoIntegrado.tenant_id == tenant_id,
+            PedidoIntegrado.pedido_bling_id.isnot(None),
         )
         .first()
     )
@@ -390,6 +393,7 @@ def reprocessar_pedidos_sem_itens(
         .filter(
             PedidoIntegrado.tenant_id == tenant_id,
             PedidoIntegrado.status.in_(["aberto", "expirado"]),
+            PedidoIntegrado.pedido_bling_id.isnot(None),
             PedidoIntegrado.id.notin_(subq_com_itens),
         )
         .limit(limite)

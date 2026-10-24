@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     IFOOD_ORDER_OPERATIONS_ENABLED: bool = False
     IFOOD_ORDER_POLLING_ENABLED: bool = False
     IFOOD_ORDER_POLLING_INTERVAL_SECONDS: int = 30
+    # Piloto assistido de pedidos: nunca habilitado em producao/staging.
+    IFOOD_PDV_PILOT_ENABLED: bool = False
+    IFOOD_PDV_PILOT_TENANT_ID: str = ""
+    IFOOD_PDV_PILOT_MERCHANT_ID: str = ""
+    IFOOD_PDV_PILOT_ORDER_ID: str = ""
+    IFOOD_PDV_PILOT_SKU: str = ""
     # Leitura Financial em DEV, independente de catalogo/pedidos; sempre envia
     # x-request-homologation:true. Nao habilita consultas financeiras em producao.
     IFOOD_FINANCIAL_READ_ENABLED: bool = False

@@ -9,6 +9,10 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    Integer,
+    Numeric,
+    ForeignKeyConstraint,
+    CheckConstraint,
 )
 
 from app.base_models import BaseTenantModel
@@ -68,3 +72,54 @@ class IfoodEvent(BaseTenantModel):
     acknowledged_at = Column(DateTime(timezone=True), nullable=True)
     processing_error = Column(Text, nullable=True)
     payload = Column(JSON, nullable=False, default=dict)
+
+
+class IfoodPdvBridge(BaseTenantModel):
+    """Vinculo auditavel entre um pedido de teste e a reserva/venda normais."""
+
+    __tablename__ = "ifood_pdv_bridges"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "ifood_order_id", name="uq_ifood_pdv_order"),
+        UniqueConstraint("tenant_id", "sale_id", name="uq_ifood_pdv_sale"),
+        UniqueConstraint(
+            "tenant_id", "reservation_id", name="uq_ifood_pdv_reservation"
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "ifood_order_id"],
+            ["ifood_orders.tenant_id", "ifood_orders.ifood_order_id"],
+            name="fk_ifood_pdv_order",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "sale_id"],
+            ["vendas.tenant_id", "vendas.id"],
+            name="fk_ifood_pdv_sale",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "reservation_id"],
+            ["pedidos_integrados.tenant_id", "pedidos_integrados.id"],
+            name="fk_ifood_pdv_reservation",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "product_id"],
+            ["produtos.tenant_id", "produtos.id"],
+            name="fk_ifood_pdv_product",
+        ),
+        CheckConstraint(
+            "status IN ('reserved','sold','cancelled')", name="ck_ifood_pdv_status"
+        ),
+        CheckConstraint("quantity = 1", name="ck_ifood_pdv_one_unit"),
+        CheckConstraint("unit_price > 0", name="ck_ifood_pdv_positive_price"),
+    )
+
+    merchant_id = Column(String(36), nullable=False)
+    ifood_order_id = Column(String(64), nullable=False)
+    sale_id = Column(Integer, nullable=False)
+    reservation_id = Column(Integer, nullable=False)
+    product_id = Column(Integer, nullable=False)
+    quantity = Column(Numeric(14, 3), nullable=False)
+    unit_price = Column(Numeric(14, 2), nullable=False)
+    evidence_hash = Column(String(64), nullable=False)
+    status = Column(String(16), nullable=False, default="reserved")
+    actor_id = Column(Integer, nullable=False)
+    stock_decreased_at = Column(DateTime(timezone=True), nullable=True)
+    cancelled_at = Column(DateTime(timezone=True), nullable=True)

@@ -147,6 +147,10 @@ def cancelar_venda(
             f"📋 Cancelando venda #{venda.numero_venda} (Status: {venda.status})"
         )
 
+        from app.integrations.ifood.pdv_pilot import prepare_pilot_cancellation
+
+        pilot_bridge = prepare_pilot_cancellation(db, venda)
+
         # ============================================================
         # ETAPA 2: ESTORNAR ESTOQUE DE TODOS OS ITENS
         # ============================================================
@@ -156,6 +160,9 @@ def cancelar_venda(
         estornos_fiscais_legados = {}
 
         for item in itens:
+            if pilot_bridge is not None and pilot_bridge.stock_decreased_at is None:
+                # O rascunho reservou, mas nunca teve saida fisica.
+                continue
             if item.produto_id and tipo_controla_estoque(item.tipo):
                 try:
                     tenant_estoque, compartilhado = resolver_tenant_estoque_item(
@@ -480,6 +487,9 @@ def cancelar_venda(
         # pode continuar disponível para um recálculo ou leitura posterior.
         invalidate_venda_rentabilidade_snapshot(venda)
 
+        from app.integrations.ifood.pdv_pilot import complete_pilot_cancellation
+
+        complete_pilot_cancellation(db, pilot_bridge)
         db.flush()
 
         logger.info(

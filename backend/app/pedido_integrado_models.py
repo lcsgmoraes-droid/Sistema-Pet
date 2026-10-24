@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, JSON
+from sqlalchemy import Column, String, DateTime, JSON, UniqueConstraint
 from app.base_models import BaseTenantModel
 from datetime import datetime, timedelta
 
@@ -10,9 +10,13 @@ class PedidoIntegrado(BaseTenantModel):
     """
 
     __tablename__ = "pedidos_integrados"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_pedidos_integrados_tenant_id"),
+    )
 
     # Identificação Bling
-    pedido_bling_id = Column(String(50), nullable=False, index=True)
+    # Outras origens (por exemplo iFood) nao inventam identificadores Bling.
+    pedido_bling_id = Column(String(50), nullable=True, index=True)
     pedido_bling_numero = Column(String(50), nullable=True)
 
     canal = Column(String(50), nullable=False)
