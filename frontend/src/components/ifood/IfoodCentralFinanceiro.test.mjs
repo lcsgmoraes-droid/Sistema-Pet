@@ -64,6 +64,7 @@ async function setup(user, search = "") {
     "IfoodProdutoDetalhes",
     "IfoodStatus",
     "IfoodFinanceiro",
+    "IfoodPublicacaoProduto",
   ])
     mocks.set(`../components/ifood/${name}`, stub(name));
   const harness = createControllerHarness(

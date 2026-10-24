@@ -45,6 +45,7 @@ import app.produtos_models
 import app.vendas_models
 import app.vendas_devolucoes_models
 import app.ifood_integration_models
+import app.ifood_catalog_models
 import app.ifood_order_models
 import app.ifood_financial_models
 import app.ifood_financial_cost_models

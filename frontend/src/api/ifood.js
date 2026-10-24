@@ -15,6 +15,20 @@ export const getIfoodConfiguracao = (config = {}) => api.get("/integracoes/ifood
 export const salvarIfoodConfiguracao = (payload) =>
   api.put("/integracoes/ifood/catalogo/configuracao", payload);
 
+// Piloto assistido: um produto salvo por ação; sem scheduler ou envio por seleção.
+const produtoPublicacao = (id) => `/integracoes/ifood/catalogo/produtos/${encodeURIComponent(id)}`;
+
+export const getIfoodPublicacaoProduto = (id, config = {}) =>
+  api.get(`${produtoPublicacao(id)}/publicacao`, config);
+export const vincularIfoodProduto = (id, payload) =>
+  api.put(`${produtoPublicacao(id)}/vinculo`, payload);
+export const prepararIfoodPublicacaoProduto = (id, payload) =>
+  api.post(`${produtoPublicacao(id)}/preparar`, payload);
+export const enviarIfoodPublicacaoProduto = (id, payload) =>
+  api.post(`${produtoPublicacao(id)}/enviar`, payload);
+export const confirmarIfoodProdutoPortal = (id, payload) =>
+  api.post(`${produtoPublicacao(id)}/confirmar-portal`, payload);
+
 // Consulta financeira independente do catalogo. Nao publica nem opera pedidos.
 export const getIfoodFinanceiroStatus = (config = {}) =>
   api.get("/integracoes/ifood/financeiro/status", config);

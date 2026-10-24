@@ -110,22 +110,73 @@ os valores calculados e não acione **Aplicar preço ao produto** durante uma
 consulta. Aplicar preço altera o preço específico salvo no CorePet; não é uma
 confirmação de publicação no iFood.
 
-## 5. Se o produto já estiver publicado
+## 5. Confira o vínculo e escolha o caminho de um produto
 
-**Etapa pendente de validação do fluxo de vínculo.**
+**Fluxo assistido implementado; rótulos revisados no código, ainda pendentes de
+conferência visual em DEV e de validação real em produção.** Os passos abaixo
+continuam em rascunho: não registram uma publicação ou um vínculo já concluídos.
 
-Antes de criar outro anúncio, compare o item existente com o produto do CorePet:
+Na Central do iFood, abra as ações do produto e escolha **Conferir vínculo e
+publicação**. No cadastro único do produto, o mesmo fluxo fica no bloco
+**Vínculo e publicação assistida**, pelo botão **Conferir vínculo e envio**.
+Se houver alterações em edição, salve o cadastro antes das ações. O fluxo usa
+a versão salva; não salva nem publica os campos em edição por conta própria.
 
-- nome e apresentação, incluindo peso, volume ou quantidade por embalagem;
-- código de barras, quando houver;
-- código interno da loja e identidade do item publicado;
-- situação atual, preço e disponibilidade.
+O piloto trabalha com **um produto por vez**, sem operação em lote e sem
+iniciar uma sincronização automática contínua. Confira a empresa, a loja, o
+EAN e a apresentação, incluindo peso ou quantidade por embalagem. Nome
+semelhante ou preço igual não bastam para estabelecer a correspondência.
 
-O vínculo precisa apontar para o mesmo produto e para a mesma apresentação.
-Encontrar um nome semelhante não basta para confirmar essa correspondência.
-Somente após essa conferência será definido o vínculo e o envio de preço ou
-estoque. O procedimento completo ainda não foi validado; este guia não presume
-que já exista um botão ou uma rotina automática para executá-lo.
+### Produto já existente: vincular e atualizar somente estoque
+
+1. Em **1. Confira o mesmo EAN no Portal**, use **Abrir Portal do Parceiro** e
+   localize o mesmo EAN na loja correta. Confira também a apresentação e a
+   situação do item.
+2. Escolha **Já existe no iFood**, marque a confirmação da conferência e use
+   **Registrar conferência do EAN**. Isso grava o vínculo e a declaração humana
+   no CorePet; **não envia alteração ao iFood** e não copia automaticamente
+   preços ou saldos do Portal para o cadastro.
+3. Confira que o produto está selecionado para vender no iFood e que o saldo
+   disponível no CorePet corresponde ao teste combinado. Corrija e salve pelo
+   cadastro e pelos procedimentos normais de estoque, se necessário. O saldo
+   enviado considera as reservas e a segurança; não é um saldo livre digitado
+   na tela de envio.
+4. Em **2. Prepare e revise antes de enviar**, desmarque **Preço regular** e
+   deixe marcada somente **Estoque disponível**. Use **Preparar prévia de um
+   produto**. **Preparar não envia nada ao iFood.**
+5. Revise o EAN, o estoque e as pendências. Para este teste, a prévia deve
+   mostrar apenas a atualização de estoque, sem preço regular enviado.
+   Atualizar somente estoque preserva preço, promoção, nome, descrição, foto
+   e canais existentes no iFood.
+6. Somente com o teste autorizado, as pendências resolvidas e o envio
+   habilitado, marque a confirmação da revisão e use **Enviar atualização de
+   preço e/ou estoque**. O alcance é o campo escolhido, de um único produto.
+   Confira o resultado conforme a seção 8.
+
+### Produto novo: conferir ausência e preparar a criação
+
+1. Consulte o EAN nas listas disponíveis do Portal da mesma loja, incluindo
+   ativos, inativos, em análise e para cadastrar. Um item inativo ou em análise
+   não deve ser tratado como ausente. Se a pesquisa não for conclusiva,
+   esclareça a correspondência antes de tentar criar.
+2. Em **1. Confira o mesmo EAN no Portal**, escolha **Não encontrei este EAN no
+   Portal**, marque a confirmação da pesquisa e use **Registrar conferência do
+   EAN**. Essa ação registra a ausência declarada; **não cria um anúncio** nem
+   representa uma busca automática de todo o catálogo remoto.
+3. Em **2. Prepare e revise antes de enviar**, use **Preparar prévia de um
+   produto**. Revise o EAN, nome, apresentação, foto, descrição, preço, estoque
+   e eventual promoção incluída na criação. Resolva as pendências no cadastro
+   existente e salve antes de preparar novamente.
+4. Somente com o teste autorizado e o envio habilitado, marque a confirmação
+   da revisão e use **Publicar este produto**. A criação envolve somente esse
+   produto, sem substituir ou reiniciar o catálogo da loja.
+5. Mesmo depois de o envio ser aceito, confira o Portal conforme a seção 8.
+   O aceite ainda não comprova publicação ou visibilidade no aplicativo.
+
+Se mudar o EAN, a loja, o preço, o estoque ou o vínculo depois da preparação,
+atualize o acompanhamento e prepare uma nova prévia antes de enviar. Quando o
+envio estiver desabilitado, a prévia continua sendo somente uma conferência;
+ela não libera uma publicação.
 
 ## 6. Autorize o aplicativo CorePet no iFood
 
@@ -206,11 +257,11 @@ Antes do primeiro envio, a prévia deverá identificar um único produto, a loja
 a situação de vínculo, os campos que serão enviados e os valores antes e depois.
 As informações que não fazem parte do teste devem ser preservadas.
 
-**Prévia corrigida e conferida somente em DEV.** A conexão bem-sucedida já foi
-observada em produção. A correção da listagem passou nos testes, na revisão e
-na conferência visual com dados fictícios, mas ainda não foi aplicada em
-produção. Este rascunho não apresenta a prévia de produção nem o envio como
-etapas finalizadas e não fornece passos de publicação ainda não validados.
+**A prévia local de preparação já foi conferida em produção**, assim como a
+conexão do ERP. O novo fluxo assistido das seções 5 e 8 é uma etapa separada:
+seus rótulos foram revisados no código e ainda precisam de conferência visual
+em DEV e de validação real em produção. Não considere vínculo ou envio
+concluídos com base somente na prévia local.
 
 Para um item novo, confirme antes que ele realmente não existe no catálogo.
 Para um item publicado, conclua a correspondência antes de atualizar. O piloto
@@ -218,7 +269,28 @@ não deve substituir nem reiniciar o catálogo inteiro.
 
 ## 8. Confirme o resultado da publicação
 
-**Etapa pendente de execução e validação.**
+**Roteiro em rascunho, pendente de conferência visual e execução real.**
+
+Depois do envio assistido da seção 5, acompanhe **3. Acompanhe e registre a
+conferência no Portal**:
+
+1. Se aparecer **Aceito pela API — confira no Portal**, o iFood retornou o
+   aceite de processamento (HTTP 202). Isso **não confirma a publicação** nem
+   que o preço ou estoque já mudou no Portal ou no aplicativo.
+2. Abra o Portal da mesma loja e pesquise o mesmo EAN. Para criação, confira
+   o produto e a apresentação. Para atualização somente de estoque, confira
+   o novo saldo e que preço e promoção foram preservados.
+3. Informe **Produto localizado** ou **Produto não localizado**, conforme a
+   conferência. Preço e estoque conferidos são opcionais: deixe vazio o que
+   não verificou. Zero significa um valor explicitamente conferido, não
+   ausência de informação.
+4. Marque a confirmação da conferência e use **Registrar conferência manual**.
+   O CorePet guarda a declaração humana com responsável e data. Ela não é
+   uma confirmação automática do iFood e não confirma envios posteriores.
+5. Se aparecer falha, envio em andamento ou resultado desconhecido, preserve
+   o histórico e confira o Portal antes de tentar novamente. Não repita um
+   envio apenas porque a resposta demorou; respeite as pendências e o
+   intervalo apresentados pelo acompanhamento.
 
 Os marcos precisam ser conferidos separadamente:
 
@@ -227,20 +299,21 @@ Os marcos precisam ser conferidos separadamente:
 | Aplicativo autorizado pela loja | A loja concedeu os acessos apresentados ao aplicativo CorePet |
 | Conexão do ERP conferida | O CorePet foi validado com a mesma loja autorizada |
 | Pronto para envio | O cadastro passou nas validações locais |
-| Vínculo confirmado | O produto local corresponde ao item remoto conferido |
+| Conferência do EAN registrada | O responsável declarou a presença ou ausência do mesmo EAN no Portal; nenhum envio foi feito por essa ação |
+| Prévia preparada | Os dados salvos de um produto foram preparados para revisão; nada foi enviado |
 | Envio solicitado | Uma solicitação foi encaminhada |
-| Solicitação aceita | O iFood aceitou o processamento da solicitação |
-| Publicação conferida | O resultado foi verificado no catálogo e no canal |
-| Estoque integrado | A atualização de estoque foi testada e conferida |
+| Aceito pela API | O iFood aceitou o processamento; o resultado ainda precisa de conferência |
+| Conferência manual registrada | Um responsável registrou o que encontrou no Portal, com data; não é confirmação automática |
+| Atualização de estoque conferida | O saldo do teste foi verificado no Portal, sem comprovar uma rotina contínua de sincronização |
 
 **Pronto para envio não significa publicado.** O sucesso de uma requisição
-também não substitui a conferência do resultado visível. Os nomes da tabela
-explicam os marcos de validação; não são uma promessa de que todos já apareçam
-como status na interface atual.
+também não substitui a conferência do resultado visível. A tabela explica os
+marcos de validação; o roteiro e os rótulos ainda serão conferidos nas telas.
 
-Depois da primeira publicação validada, poderão ser testados estoque, pausa,
-reativação e promoções. A entrada de pedidos e a baixa de estoque por venda
-também exigem validação própria antes de serem consideradas automáticas.
+Este piloto cobre os dois caminhos assistidos: criar um produto novo e
+vincular um existente para atualizar somente estoque. Pausa, reativação,
+alteração de promoções, entrada de pedidos e baixa de estoque por venda
+exigem validação própria antes de serem consideradas disponíveis ou automáticas.
 
 ## Financeiro em DEV: custo histórico e repasses
 
@@ -338,8 +411,8 @@ premissas de taxas. Um valor desconhecido não deve ser substituído por zero
 apenas para fazer aparecer um resultado.
 
 **O estoque já sincroniza só porque o produto está pronto?** Não. Confirme o
-vínculo, a ativação da rotina e um teste real de atualização antes de depender
-dessa sincronização na operação diária.
+vínculo e um teste real de atualização. Este piloto envia um produto por ação
+assistida; não inicia uma rotina contínua de sincronização na operação diária.
 
 **Pausar ou programar uma promoção no CorePet garante a mudança no iFood?**
 Não presuma esse resultado sem a validação do envio e da confirmação externa.

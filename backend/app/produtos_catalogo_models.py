@@ -497,6 +497,7 @@ class Produto(BaseTenantModel):
 
     # Índices adicionais
     __table_args__ = (
+        Index("uq_produtos_tenant_id", "tenant_id", "id", unique=True),
         Index(
             "ux_produtos_tenant_codigo_lower",
             "tenant_id",

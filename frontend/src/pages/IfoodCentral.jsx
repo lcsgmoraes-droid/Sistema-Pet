@@ -7,6 +7,7 @@ import {
   ChevronRight,
   DollarSign,
   ListFilter,
+  Link2,
   Package,
   Pencil,
   RefreshCw,
@@ -34,6 +35,7 @@ import IfoodConfiguracao from "../components/ifood/IfoodConfiguracao";
 import IfoodProdutoDetalhes from "../components/ifood/IfoodProdutoDetalhes";
 import IfoodStatus from "../components/ifood/IfoodStatus";
 import IfoodFinanceiro from "../components/ifood/IfoodFinanceiro";
+import IfoodPublicacaoProduto from "../components/ifood/IfoodPublicacaoProduto";
 import { lerLinkFinanceiro } from "../components/ifood/ifoodFinanceiroNavigation";
 import {
   IFOOD_FILTROS,
@@ -41,6 +43,7 @@ import {
   mensagemErroIfood,
   moedaIfood,
   percentualIfood,
+  statusEnvioIfood,
   valorConhecido,
 } from "../components/ifood/ifoodPresentation";
 
@@ -87,6 +90,7 @@ export default function IfoodCentral() {
   const [revisao, setRevisao] = useState(0);
   const [ocupado, setOcupado] = useState(null);
   const [detalhe, setDetalhe] = useState(null);
+  const [publicacao, setPublicacao] = useState(null);
   const [salvandoPreco, setSalvandoPreco] = useState(false);
   const [tempoCatalogo, setTempoCatalogo] = useState(null);
   const inicializadoRef = useRef(false);
@@ -206,6 +210,11 @@ export default function IfoodCentral() {
           acoes={[
             // Calculator segue o icone das calculadoras existentes do sistema.
             { icon: Calculator, label: "Simular preço e margem", onClick: () => setDetalhe(item) },
+            {
+              icon: Link2,
+              label: "Conferir vínculo e publicação",
+              onClick: () => setPublicacao(item),
+            },
             podeEditar && {
               icon: Pencil,
               label: "Editar no cadastro",
@@ -310,6 +319,17 @@ export default function IfoodCentral() {
           {item.pending?.length ? (
             <p className="v2-texto-ajuda mt-1">{item.pending.length} orientação(ões)</p>
           ) : null}
+          {item.selected || item.publication?.link ? (
+            <p className="v2-texto-ajuda mt-1 max-w-64">
+              {item.publication?.link?.stale
+                ? "EAN alterado: confira o vínculo"
+                : item.publication?.link
+                  ? "EAN conferido manualmente"
+                  : "EAN ainda não conferido"}
+              {" · "}
+              {statusEnvioIfood(item.sync_status)}
+            </p>
+          ) : null}
         </div>
       ),
     },
@@ -348,7 +368,7 @@ export default function IfoodCentral() {
         className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200"
       >
         Esta central prepara o catálogo no CorePet. Selecionar produtos ou aplicar preços não
-        publica alterações no iFood.
+        publica alterações no iFood. O envio assistido é uma ação separada, para um produto por vez.
       </div>
       {erro && aba !== "financeiro" ? (
         <p
@@ -545,6 +565,16 @@ export default function IfoodCentral() {
           onConfigurar={() => {
             setDetalhe(null);
             setAba("configuracao");
+          }}
+        />
+      ) : null}
+      {publicacao ? (
+        <IfoodPublicacaoProduto
+          key={publicacao.product_id}
+          productId={publicacao.product_id}
+          onFechar={() => {
+            setPublicacao(null);
+            setRevisao((atual) => atual + 1);
           }}
         />
       ) : null}

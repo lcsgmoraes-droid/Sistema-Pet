@@ -44,6 +44,18 @@ export const IFOOD_PENDING_LABELS = {
   recomendacao: "Recomendação",
 };
 
+export function statusEnvioIfood(status) {
+  return (
+    {
+      sending: "Envio em andamento — resultado ainda não confirmado",
+      accepted: "Aceito pela API — confira no Portal",
+      error: "Falha no envio",
+      uncertain: "Resultado do envio desconhecido — confira no Portal",
+      nao_enviado: "Nenhum envio registrado neste acompanhamento",
+    }[status || "nao_enviado"] || "Situação do envio a conferir"
+  );
+}
+
 export function valorConhecido(value) {
   return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
 }

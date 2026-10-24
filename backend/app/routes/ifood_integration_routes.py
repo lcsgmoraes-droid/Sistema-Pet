@@ -264,6 +264,9 @@ def _catalog(
 ):
     products = _products(db, tenant_id, product_ids)
     stocks = _available_stocks(db, tenant_id, products)
+    identifiers = Counter(
+        product_identifier(p).casefold() for p in _products(db, tenant_id)
+    )
     for product in products:
         product.ifood_available_stock = stocks.get(product.id)
     return build_catalog_preview(
@@ -272,6 +275,7 @@ def _catalog(
         markup_percent=float(config.default_markup_percent or 0) if config else 0,
         stock_safety=float(config.stock_safety or 0) if config else 0,
         public_base_url=settings.COREPET_FRONTEND_URL,
+        duplicate_identifiers={key for key, count in identifiers.items() if count > 1},
     )
 
 
@@ -317,7 +321,6 @@ def _management_items(
     identifiers = Counter(
         product_identifier(product).casefold()
         for product in (products if product_ids is None else _products(db, tenant_id))
-        if product.anunciar_ifood
     )
     safety = float(config.stock_safety or 0) if config else 0
     evaluated_at = now or datetime.now(timezone.utc)
@@ -344,6 +347,29 @@ def _management_items(
                 > 1,
                 now=evaluated_at,
             )
+        )
+    from app.integrations.ifood.catalog_pilot import summaries
+
+    publication = summaries(
+        db, tenant_id, config.merchant_id if config else None, [p.id for p in products]
+    )
+    for item in items:
+        evidence = publication.get(
+            item["product_id"],
+            {"link": None, "last_submission": None, "last_confirmation": None},
+        )
+        if evidence["link"]:
+            evidence["link"]["stale"] = (
+                evidence["link"]["barcode"] != item["identifier"]
+            )
+        item["publication"] = evidence
+        last = evidence["last_submission"]
+        item["sync_status"] = last["status"] if last else "nao_enviado"
+        confirmed = evidence["last_confirmation"]
+        item["last_confirmed_price"] = (
+            confirmed["price"]
+            if confirmed and confirmed["barcode"] == item["identifier"]
+            else None
         )
     return items
 
@@ -685,7 +711,6 @@ def preview_ifood_product(
     identifier = product_identifier(snapshot)
     duplicate = any(
         p.id != getattr(snapshot, "id", None)
-        and p.anunciar_ifood
         and product_identifier(p).casefold() == identifier.casefold()
         for p in _products(db, tenant_id)
     )
@@ -741,7 +766,14 @@ def test_ifood_connection(
         ) from exc
 
 
-@router.post("/catalogo/sincronizar")
+@router.post(
+    "/catalogo/sincronizar",
+    responses={
+        409: {
+            "description": "Envio legado/reset bloqueado; use o piloto individual na Central"
+        }
+    },
+)
 def sync_ifood_catalog(
     body: IfoodSyncPayload,
     auth=Depends(get_current_user_and_tenant),
@@ -749,9 +781,17 @@ def sync_ifood_catalog(
 ):
     current_user, tenant_id = auth
     _require_admin(current_user)
+    if body.reset_catalog and str(settings.ENVIRONMENT).lower() in {
+        "production",
+        "prod",
+        "staging",
+    }:
+        raise HTTPException(
+            409,
+            "Reset de catalogo esta bloqueado em producao. Use a Central iFood para o piloto de um produto.",
+        )
     config = _get_config(db, tenant_id)
     items = _catalog(db, tenant_id, config, body.product_ids)
-    eligible = [item for item in items if item.eligible and item.payload]
     preview = _catalog_response(items, limit=200)
     if body.dry_run:
         return {
@@ -761,88 +801,7 @@ def sync_ifood_catalog(
             **preview,
         }
 
-    if body.reset_catalog and body.operation != "create":
-        raise HTTPException(
-            status_code=422,
-            detail="Reset de catalogo so pode ser usado na criacao via POST.",
-        )
-    if body.reset_catalog and not body.confirm_reset:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "Confirme o reset do catalogo de teste. Produtos omitidos serao "
-                "desativados no iFood."
-            ),
-        )
-
-    if not settings.IFOOD_CATALOG_WRITE_ENABLED:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Envios reais estao bloqueados ate concluir a homologacao do iFood.",
-        )
-    if not body.confirm_send:
-        raise HTTPException(
-            status_code=422,
-            detail="Confirme explicitamente o envio real do catalogo.",
-        )
-    if not config or not config.active or not config.merchant_id:
-        raise HTTPException(
-            status_code=409,
-            detail="Ative a integracao e informe o Merchant ID antes de enviar.",
-        )
-    if not _credentials_configured():
-        raise HTTPException(
-            status_code=503,
-            detail="Credenciais do aplicativo iFood nao configuradas no servidor.",
-        )
-    if len(eligible) > 200:
-        raise HTTPException(
-            status_code=422,
-            detail="Selecione no maximo 200 produtos por envio para respeitar a volumetria do iFood.",
-        )
-    payloads = [item.payload for item in eligible if item.payload]
-    if not payloads:
-        raise HTTPException(
-            status_code=422,
-            detail="Nenhum produto elegivel foi selecionado para o envio.",
-        )
-    if body.operation == "update":
-        payloads = [
-            {
-                "barcode": payload["barcode"],
-                "name": payload["name"],
-                "inventory": payload["inventory"],
-                "details": payload["details"],
-                "prices": payload["prices"],
-                "channels": payload["channels"],
-            }
-            for payload in payloads
-        ]
-    try:
-        with _client() as client:
-            result = client.ingest_items(
-                config.merchant_id,
-                payloads,
-                method="POST" if body.operation == "create" else "PATCH",
-                reset_catalog=body.reset_catalog,
-            )
-        config.status = "connected"
-        config.last_catalog_sync_at = _utcnow()
-        config.last_error = None
-        db.commit()
-        return {
-            "dry_run": False,
-            "operation": body.operation,
-            "reset_catalog": body.reset_catalog,
-            "sent": len(payloads),
-            "rejected": len(items) - len(eligible),
-            **result,
-        }
-    except IfoodClientError as exc:
-        config.status = "error"
-        config.last_error = str(exc)
-        db.commit()
-        raise HTTPException(
-            status_code=_provider_http_status(exc),
-            detail=str(exc),
-        ) from exc
+    raise HTTPException(
+        status_code=409,
+        detail="Envios reais pelo fluxo legado estao bloqueados. Use a Central iFood e a conferencia individual do produto; reset de catalogo nao e permitido.",
+    )
