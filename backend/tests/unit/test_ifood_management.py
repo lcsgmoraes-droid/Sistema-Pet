@@ -11,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
-from app.ifood_integration_models import IfoodMerchantConfig
+from app.ifood_integration_models import IfoodMarginRulesRevision, IfoodMerchantConfig
 from app.integrations.ifood.catalog import build_catalog_item
 from app.integrations.ifood.management import build_management_item, calculate_margin
 from app.produtos.schemas import ProdutoCreate, ProdutoUpdate
@@ -320,6 +320,7 @@ def api(monkeypatch):
                 Marca,
                 Departamento,
                 IfoodMerchantConfig,
+                IfoodMarginRulesRevision,
                 PedidoIntegradoItem,
                 ProdutoKitComponente,
             )

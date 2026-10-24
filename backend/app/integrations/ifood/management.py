@@ -79,6 +79,11 @@ def calculate_margin(
         "below_target": False,
         "missing": missing,
         "assumption": "Percentuais sobre o preço vigente do item; entrega, embalagem por pedido e custos fixos não incluídos.",
+        "rates_reference": getattr(config, "rates_reference", None),
+        "rates_valid_from": getattr(config, "rates_valid_from", None),
+        "rates_source": "store_declared_contract"
+        if getattr(config, "rates_reference", None)
+        else "unverified_store_assumptions",
     }
     if missing:
         return result
