@@ -6,7 +6,13 @@ import { createControllerHarness } from "../../scripts/helpers/reactControllerHa
 const noOp = () => {};
 const source = (name) => fileURLToPath(new URL(`./${name}.js`, import.meta.url));
 
-async function setup({ product = {}, fiscal = {}, failFiscal = false } = {}) {
+async function setup({
+  product = {},
+  fiscal = {},
+  failFiscal = false,
+  isEdicao = true,
+  isClone = false,
+} = {}) {
   const env = {
     product: {
       id: 7,
@@ -32,7 +38,7 @@ async function setup({ product = {}, fiscal = {}, failFiscal = false } = {}) {
     failFiscal,
     failSaveFiscal: false,
   };
-  const calls = { fiscal: [], products: [], alerts: [], navigation: [] };
+  const calls = { fiscal: [], products: [], creates: [], alerts: [], navigation: [] };
   let formData = {};
   const setFormData = (update) => {
     formData = typeof update === "function" ? update(formData) : update;
@@ -59,6 +65,10 @@ async function setup({ product = {}, fiscal = {}, failFiscal = false } = {}) {
     getLotes: async () => ({ data: [] }),
     getFornecedoresProduto: async () => ({ data: [] }),
     previewPrecosVendaProdutosCompostos: async () => ({ data: { sugestoes: [] } }),
+    createProduto: async (body) => {
+      calls.creates.push(body);
+      return { data: { id: 99 } };
+    },
     updateProduto: async (id, body) => {
       calls.products.push({ id, body });
       return { data: { id } };
@@ -73,8 +83,9 @@ async function setup({ product = {}, fiscal = {}, failFiscal = false } = {}) {
     mocks,
     globals: { console: { error: noOp } },
     props: {
-      id: env.product.id,
-      isEdicao: true,
+      id: isEdicao ? env.product.id : undefined,
+      cloneId: isClone ? env.product.id : undefined,
+      isEdicao,
       formData,
       setFormData,
       ...Object.fromEntries(
@@ -137,7 +148,8 @@ async function setup({ product = {}, fiscal = {}, failFiscal = false } = {}) {
         },
         props: {
           id: env.product.id,
-          isEdicao: true,
+          isEdicao,
+          isClone,
           formData,
           salvarFiscal: loader.tree.salvarFiscal,
           setSalvando: noOp,
@@ -321,4 +333,95 @@ test("trocar produto descarta edição fiscal anterior e usa o snapshot do novo 
   assert.deepEqual(h.calls.fiscal, []);
   assert.equal(h.calls.products[0].id, 8);
   assert.equal(h.calls.products[0].body.estoque_maximo, 0);
+});
+
+const originalHtml =
+  '<h2 style="color: red">Produto fictício</h2><p>Texto &amp; cuidados.<br>Uso diário.</p>';
+const displayedDescription = "Produto fictício\nTexto & cuidados.\nUso diário.";
+
+test("pausar e retomar pelo cadastro completo conserva HTML original e EANs não editados", async () => {
+  const h = await setup({
+    product: {
+      descricao_curta: originalHtml,
+      codigo_barras: "7890000000011",
+      gtin_ean: "7890000000011",
+      produto_identidade_id: null,
+    },
+  });
+  assert.equal(h.form.descricao, displayedDescription);
+  for (const paused of [true, false]) {
+    await h.edit({ ifood_pausado: paused });
+    await h.submit();
+    const { body } = h.calls.products.at(-1);
+    assert.equal(body.ifood_pausado, paused);
+    assert.equal(body.descricao_curta, originalHtml);
+    assert.equal(body.codigo_barras, "7890000000011");
+    assert.equal(body.gtin_ean, "7890000000011");
+    assert.equal(body.estoque_maximo, 0);
+    assert.equal(Object.hasOwn(body, "produto_identidade_id"), false);
+  }
+  assert.equal(h.calls.products.length, 2);
+  assert.equal(Object.keys(h.calls.products[0].body).length > 50, true);
+  assert.deepEqual(h.calls.fiscal, []);
+});
+
+test("descrição realmente editada continua sendo normalizada e salva", async () => {
+  const h = await setup({ product: { descricao_curta: originalHtml } });
+  await h.edit({ descricao: "<p>Nova descrição &amp; instruções.</p>" });
+  await h.submit();
+  assert.equal(h.calls.products[0].body.descricao_curta, "Nova descrição & instruções.");
+});
+
+test("limpar uma descrição existente continua enviando null", async () => {
+  const h = await setup({ product: { descricao_curta: originalHtml } });
+  await h.edit({ descricao: "" });
+  await h.submit();
+  assert.equal(h.calls.products[0].body.descricao_curta, null);
+});
+
+test("editar e desfazer a descrição preserva exatamente o HTML salvo", async () => {
+  const h = await setup({ product: { descricao_curta: originalHtml } });
+  await h.edit({ descricao: "Mudança temporária" });
+  await h.edit({ descricao: `  ${displayedDescription}\n` });
+  await h.submit();
+  assert.equal(h.calls.products[0].body.descricao_curta, originalHtml);
+});
+
+test("descrição original null ou string vazia conserva a distinção quando não editada", async () => {
+  for (const original of [null, ""]) {
+    const h = await setup({ product: { descricao_curta: original } });
+    await h.edit({ ifood_pausado: true });
+    await h.submit();
+    assert.equal(h.calls.products[0].body.descricao_curta, original);
+  }
+});
+
+test("sem descrição original definida a edição usa o conteúdo atual normalizado", async () => {
+  const h = await setup();
+  await h.edit({ descricao: "<p>Descrição preenchida agora.</p>" });
+  await h.submit();
+  assert.equal(h.calls.products[0].body.descricao_curta, "Descrição preenchida agora.");
+});
+
+test("criação continua normalizando a descrição, mesmo se o estado contém HTML original", async () => {
+  const h = await setup({ isEdicao: false });
+  await h.edit({ ...h.env.product, descricao_curta: originalHtml, descricao: originalHtml });
+  await h.submit();
+  assert.equal(h.calls.creates.length, 1);
+  assert.equal(h.calls.creates[0].descricao_curta, displayedDescription);
+  assert.deepEqual(h.calls.products, []);
+});
+
+test("clone carrega a descrição do produto de origem e mantém normalização no novo cadastro", async () => {
+  const h = await setup({
+    isEdicao: false,
+    isClone: true,
+    product: { descricao_curta: originalHtml },
+  });
+  assert.equal(h.form.descricao, originalHtml);
+  await h.edit({ codigo: "DEV-CLONE", sku: "DEV-CLONE" });
+  await h.submit();
+  assert.equal(h.calls.creates.length, 1);
+  assert.equal(h.calls.creates[0].descricao_curta, displayedDescription);
+  assert.deepEqual(h.calls.products, []);
 });

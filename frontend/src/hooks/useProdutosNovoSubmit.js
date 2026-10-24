@@ -155,6 +155,11 @@ export default function useProdutosNovoSubmit({
       setSalvando(true);
       const skuNormalizado = (formData.sku || formData.codigo || "").trim().toUpperCase();
       const descricaoNormalizada = normalizeMarkdownContent(formData.descricao);
+      // O editor exibe texto normalizado, mas abrir/salvar outra aba não deve reescrever o original.
+      const preservarDescricaoOriginal =
+        isEdicao &&
+        formData.descricao_curta !== undefined &&
+        normalizeMarkdownContent(formData.descricao_curta) === descricaoNormalizada;
       const produtoEhServico = formData.tipo === "servico";
 
       const composicaoKitNormalizada = (formData.composicao_kit || []).map((item) => ({
@@ -194,7 +199,9 @@ export default function useProdutosNovoSubmit({
         codigo: skuNormalizado,
         nome: formData.nome,
         tipo: formData.tipo || "produto",
-        descricao_curta: descricaoNormalizada || null,
+        descricao_curta: preservarDescricaoOriginal
+          ? formData.descricao_curta
+          : descricaoNormalizada || null,
         codigo_barras: formData.codigo_barras || null,
         gtin_ean: formData.gtin_ean || null,
         gtin_ean_tributario: formData.gtin_ean_tributario || null,
