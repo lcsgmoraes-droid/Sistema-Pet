@@ -269,7 +269,9 @@ não deve substituir nem reiniciar o catálogo inteiro.
 
 ## 8. Confirme o resultado da publicação
 
-**Roteiro em rascunho, pendente de conferência visual e execução real.**
+**A ampliação da conferência descrita abaixo está em validação em DEV em
+25/10/2026.** Não considerar esses novos controles publicados em produção
+antes da liberação e da validação correspondentes.
 
 Depois do envio assistido da seção 5, acompanhe **3. Acompanhe e registre a
 conferência no Portal**:
@@ -281,16 +283,44 @@ conferência no Portal**:
    o produto e a apresentação. Para atualização somente de estoque, confira
    o novo saldo e que preço e promoção foram preservados.
 3. Informe **Produto localizado** ou **Produto não localizado**, conforme a
-   conferência. Preço e estoque conferidos são opcionais: deixe vazio o que
-   não verificou. Zero significa um valor explicitamente conferido, não
-   ausência de informação.
-4. Marque a confirmação da conferência e use **Registrar conferência manual**.
+   conferência. Se não localizou o produto, disponibilidade, preço e estoque
+   observados ficam vazios; isso não exclui nem muda o vínculo existente de
+   uma rotina automática.
+4. Em **Disponibilidade no Portal**, marque **Ativo**, **Inativo** ou
+   **Não conferi**. A tela não escolhe a resposta a partir do estoque, do
+   preço ou de uma conferência antiga. **Não conferi** mantém a informação
+   desconhecida; estoque zero também não significa automaticamente inativo.
+5. Preço e estoque conferidos são opcionais: deixe vazio o que não verificou.
+   Zero significa um valor explicitamente conferido, não ausência de
+   informação. Os campos registram o que foi visto no Portal; não alteram os
+   valores do produto no CorePet.
+6. Marque a confirmação da conferência e use **Registrar conferência manual**.
    O CorePet guarda a declaração humana com responsável e data. Ela não é
    uma confirmação automática do iFood e não confirma envios posteriores.
-5. Se aparecer falha, envio em andamento ou resultado desconhecido, preserve
-   o histórico e confira o Portal antes de tentar novamente. Não repita um
-   envio apenas porque a resposta demorou; respeite as pendências e o
-   intervalo apresentados pelo acompanhamento.
+7. Se o acompanhamento mudar enquanto a tela está aberta, o aceite é
+   desmarcado, mas os valores em edição permanecem. Confira novamente o
+   Portal e marque um novo aceite. Se o registro for recusado porque o
+   contexto mudou, use **Atualizar acompanhamento**, reconfira o resultado
+   e então confirme de novo. O CorePet não troca a referência nem repete o
+   registro automaticamente usando o aceite anterior.
+8. Durante envio em andamento, resultado desconhecido ou espera por limite
+   de tentativas, respeite o bloqueio e acompanhe a pendência. O registro
+   comum de uma observação não recupera uma tentativa incerta nem libera
+   reenvio. Não repita um envio apenas porque a resposta demorou.
+
+Com a automação de estoque estável, a conferência factual pode ser registrada
+sem desligar a rotina. Ela não altera o último saldo aceito, a fila, os
+intervalos nem o histórico de tentativas, e não envia preço ou estoque ao
+iFood. Alterar o vínculo e enviar manualmente continuam bloqueados durante
+a automação.
+
+Uma observação de produto **Inativo**, **não localizado** ou com disponibilidade
+**Não conferi** mantém novos despachos automáticos em espera até uma nova
+conferência de produto localizado e ativo. O acompanhamento explica o motivo;
+o saldo que a automação leu antes dessa espera pode estar antigo. Confira o
+saldo atual no cadastro ou na lista. Se o saldo visto no Portal divergir do
+último saldo aceito, a observação registra a diferença para conferência; não
+redefine a referência nem dispara um acerto remoto por conta própria.
 
 Os marcos precisam ser conferidos separadamente:
 
@@ -341,10 +371,13 @@ ativa sincronização contínua na loja real nem libera os demais produtos.
 **Recebido não significa aplicado.** O HTTP 202 indica recebimento na fila.
 A conferência manual do Portal continua sendo evidência separada. Em DEV, o
 simulador comprova a solicitação e seu conteúdo; não comprova aplicação no
-iFood real. Para uma falha sem resultado conhecido, desative o piloto e
-confira o resultado antes de registrar uma nova conferência e retomar.
-Enquanto a automação estiver ativa, envio manual e alteração da conferência
-desse vínculo ficam bloqueados para evitar duas operações concorrentes.
+iFood real. Para uma falha sem resultado conhecido, desative o piloto,
+confira o resultado e siga a conciliação específica da tentativa antes de
+retomar. Uma observação comum não recupera esse resultado desconhecido.
+Enquanto a automação estiver ativa, envio manual e alteração do vínculo
+continuam bloqueados para evitar duas operações concorrentes. A ampliação
+em DEV de 25/10 permite registrar a observação factual pela mesma tela quando
+o acompanhamento estiver estável, preservando a fila e os intervalos.
 
 O primeiro ensaio do SKU 227 usou produto sem lotes. A correção seguinte em DEV
 também cobre produtos com lotes: o cancelamento recompõe os mesmos lotes da
@@ -467,10 +500,15 @@ validação desses eventos em produção quando forem observados separadamente.
 Se `S` não permitir o teste de uma unidade, não force ajuste físico nem use
 outro produto: mantenha a rotina desligada até definir o cenário apropriado.
 
-Enquanto a automação estiver habilitada, envios manuais e alterações da
-conferência desse vínculo ficam bloqueados. Para registrar uma conferência
-posterior, desligue a rotina primeiro. Uma tentativa sem resultado conhecido
-exige conferir o Portal antes de retomar; o sistema não faz repetição cega.
+Envios manuais e alterações do vínculo continuam bloqueados enquanto a
+automação estiver habilitada. A ampliação da tela em validação em DEV permite
+registrar uma observação factual posterior, com o acompanhamento estável,
+sem desligar a rotina. O registro preserva o estado, a fila, a referência e
+a janela de 35 minutos; não equivale a reativar ou reenviar uma tentativa.
+Uma tentativa sem resultado conhecido exige conferência do Portal e
+conciliação separada antes de retomar; o sistema não faz repetição cega.
+Produto observado como ausente, inativo ou sem disponibilidade conferida
+mantém futuros despachos em espera até nova conferência de produto ativo.
 
 ### Interromper ou reverter o piloto
 

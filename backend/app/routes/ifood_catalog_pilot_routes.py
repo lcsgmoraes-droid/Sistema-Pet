@@ -53,6 +53,9 @@ class LinkBody(PortalEvidence):
 
 class ConfirmationBody(PortalEvidence):
     present: bool
+    confirmation_context_token: str | None = Field(
+        default=None, min_length=64, max_length=64, pattern=r"^[0-9a-f]+$"
+    )
 
 
 class PrepareBody(BaseModel):

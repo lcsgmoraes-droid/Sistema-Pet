@@ -11,6 +11,7 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from hashlib import sha256
+from hmac import compare_digest
 import json
 from uuid import UUID
 
@@ -21,6 +22,7 @@ from app.ifood_catalog_models import (
     IfoodCatalogConfirmation as Confirmation,
     IfoodCatalogLink as Link,
     IfoodCatalogSubmission as Submission,
+    IfoodStockSyncState as StockState,
 )
 from app.produtos_catalogo_models import Produto
 from app.integrations.ifood.catalog import build_catalog_item
@@ -184,6 +186,8 @@ def confirmation_view(row):
     if not row:
         return None
     return {
+        "id": row.id,
+        "kind": row.kind,
         "present": row.present,
         "portal_active": row.portal_active,
         "barcode": row.barcode,
@@ -192,6 +196,93 @@ def confirmation_view(row):
         "confirmed_at": _iso(row.confirmed_at),
         "actor_id": row.actor_id,
     }
+
+
+def _stock_state(db, tenant_id, link):
+    if not link:
+        return None
+    return (
+        db.query(StockState)
+        .filter(
+            StockState.tenant_id == tenant_id,
+            StockState.merchant_id == link.merchant_id,
+            StockState.link_id == link.id,
+        )
+        .populate_existing()
+        .first()
+    )
+
+
+def _confirmation_context(
+    tenant_id, product, link, submission, confirmation, state, automatic
+):
+    if not link:
+        return None
+    frame = {
+        "tenant": str(tenant_id),
+        "product": product.id,
+        "barcode": product_identifier(product),
+        "link": [link.id, link.merchant_id, link.barcode, link.mode, link.revision],
+        "submission": None
+        if submission is None
+        else [
+            submission.id,
+            submission.request_key,
+            submission.status,
+            _iso(submission.created_at),
+            _iso(submission.finished_at),
+            submission.source,
+            submission.provider_mode,
+        ],
+        "confirmation_id": confirmation.id if confirmation else None,
+        "state": None
+        if state is None
+        else [
+            state.id,
+            state.provider_mode,
+            state.link_revision,
+            state.status,
+            state.desired_stock,
+            state.last_accepted_stock,
+            state.last_request_key,
+            state.last_confirmation_id,
+            state.failure_count,
+            state.error_code,
+            _iso(state.next_attempt_at),
+        ],
+        "automatic": automatic,
+    }
+    return sha256(
+        json.dumps(frame, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+
+
+def _observation_inflight(submission, state):
+    return bool(
+        (submission and submission.status in {"sending", "uncertain"})
+        or (submission and submission.http_status == 429)
+        or (state and state.status in {"sending", "uncertain", "backoff"})
+    )
+
+
+def portal_observation_reason(confirmation):
+    """Gate factual separado da referencia do estoque e do aceite da API."""
+    if not confirmation or confirmation.kind != "observation":
+        return None
+    if not confirmation.present:
+        return "portal_item_not_found"
+    if confirmation.portal_active is False:
+        return "portal_item_inactive"
+    if confirmation.portal_active is None:
+        return "portal_activity_unknown"
+    return None
+
+
+OBSERVATION_MESSAGES = {
+    "portal_item_not_found": "Produto nao localizado na ultima conferencia do Portal. Novos envios automaticos aguardam uma conferencia de produto localizado e ativo.",
+    "portal_item_inactive": "Item inativo na ultima conferencia do Portal. A conferencia nao reativa o item; novos envios automaticos aguardam uma conferencia ativa.",
+    "portal_activity_unknown": "Disponibilidade no Portal nao conferida. Novos envios automaticos aguardam uma conferencia explicita de item ativo.",
+}
 
 
 def summaries(db, tenant_id, merchant_id, product_ids):
@@ -220,6 +311,9 @@ def summaries(db, tenant_id, merchant_id, product_ids):
             "stock_sync": {
                 **state_view(stock_states[link.id]),
                 "enabled": enabled_for(tenant_id, merchant_id, link.product_id),
+                "observation_block_reason": portal_observation_reason(
+                    confirmations.get(link.id)
+                ),
             }
             if link.id in stock_states
             else None,
@@ -273,11 +367,45 @@ def publication_view(
 
     automatic_stock = enabled_for(tenant_id, merchant, product.id)
     stock_sync = stock_sync_view(db, tenant_id, merchant, product.id)
+    state = _stock_state(db, tenant_id, link)
+    receipt_only = automatic_stock or state is not None
+    observation_busy = receipt_only and _observation_inflight(submission, state)
+    observation_reason = portal_observation_reason(confirmation)
+    if receipt_only and observation_reason:
+        pending.append(
+            _issue(observation_reason, OBSERVATION_MESSAGES[observation_reason])
+        )
+    if (
+        receipt_only
+        and confirmation
+        and confirmation.kind == "observation"
+        and confirmation.present
+        and confirmation.portal_active is True
+        and confirmation.stock is not None
+        and state
+        and state.last_accepted_stock is not None
+        and confirmation.stock != state.last_accepted_stock
+    ):
+        pending.append(
+            _issue(
+                "portal_stock_divergent",
+                "O estoque observado no Portal difere do ultimo saldo aceito. Registrar a conferencia nao reenviou estoque nem alterou a referencia da fila.",
+                "warning",
+            )
+        )
+    if observation_busy:
+        pending.append(
+            _issue(
+                "portal_observation_wait",
+                "Ha um envio em andamento, incerto ou limitado. Aguarde ou resolva a conciliacao operacional antes de registrar esta conferencia.",
+                "warning",
+            )
+        )
     if automatic_stock:
         pending.append(
             _issue(
                 "automatic_stock_active",
-                "O piloto automatico de estoque esta ativo para este produto. Desative-o antes de um envio manual ou de alterar a conferencia do vinculo.",
+                "O piloto automatico de estoque esta ativo. Envios manuais e alteracoes do vinculo estao bloqueados; a conferencia do resultado continua disponivel quando nao houver envio pendente.",
             )
         )
     if not merchant:
@@ -359,6 +487,9 @@ def publication_view(
         "barcode": barcode,
         "snapshot_saved": saved_snapshot(product),
         "link": link_view(link, barcode),
+        "confirmation_context_token": _confirmation_context(
+            tenant_id, product, link, submission, confirmation, state, automatic_stock
+        ),
         "capabilities": {
             "can_link": bool(can_edit and merchant and not automatic_stock),
             "can_prepare": bool(can_edit),
@@ -371,7 +502,7 @@ def publication_view(
                 and not any(p["kind"] == "blocking" for p in pending)
             ),
             "can_confirm": bool(
-                can_edit and link and link.barcode == barcode and not automatic_stock
+                can_edit and link and link.barcode == barcode and not observation_busy
             ),
             "write_enabled": bool(write_enabled),
             "credentials_configured": bool(credentials),
@@ -467,7 +598,8 @@ def _add_confirmation(db, tenant_id, link, data, actor_id, *, kind, present):
 
 
 def confirm_portal(db, tenant_id, config, product, data, actor_id):
-    _guard_manual_stock_sync(tenant_id, config, product)
+    from .stock_sync import enabled_for
+
     _check_declared_identity(
         db, tenant_id, config, product, data["merchant_id"], data["barcode"]
     )
@@ -476,13 +608,41 @@ def confirm_portal(db, tenant_id, config, product, data, actor_id):
         raise HTTPException(
             409, "Confira o vinculo atual antes de registrar o resultado do Portal."
         )
-    _add_confirmation(
-        db, tenant_id, link, data, actor_id, kind="portal", present=data["present"]
+    automatic = enabled_for(tenant_id, config.merchant_id, product.id)
+    state = _stock_state(db, tenant_id, link)
+    submission = _last_rows(db, tenant_id, [link.id], Submission).get(link.id)
+    confirmation = _last_rows(db, tenant_id, [link.id], Confirmation).get(link.id)
+    expected = _confirmation_context(
+        tenant_id, product, link, submission, confirmation, state, automatic
     )
-    link.mode = "existing" if data["present"] else "new"
-    link.revision += 1
-    link.portal_checked_at = now()
-    link.portal_checked_by = actor_id
+    supplied = data.get("confirmation_context_token")
+    if not supplied or not compare_digest(supplied, expected):
+        raise HTTPException(
+            409,
+            "O acompanhamento mudou. Atualize, confira o Portal e marque novamente a confirmacao.",
+        )
+    receipt_only = automatic or state is not None
+    if receipt_only and _observation_inflight(submission, state):
+        raise HTTPException(
+            409,
+            "Ha um envio em andamento, incerto ou limitado. A conferencia comum nao pode liberar sua repeticao.",
+        )
+    _add_confirmation(
+        db,
+        tenant_id,
+        link,
+        data,
+        actor_id,
+        kind="observation" if receipt_only else "portal",
+        present=data["present"],
+    )
+    if not receipt_only:
+        # A primeira referencia continua pelo fluxo manual legado, antes da
+        # ativacao. Depois que existe fila, recibos nao sao revisao/rebaseline.
+        link.mode = "existing" if data["present"] else "new"
+        link.revision += 1
+        link.portal_checked_at = now()
+        link.portal_checked_by = actor_id
 
 
 def _guard_manual_stock_sync(tenant_id, config, product):

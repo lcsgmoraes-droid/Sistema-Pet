@@ -218,6 +218,9 @@ def test_create_single_item_requires_absence_review_and_always_reset_false(
             "price": "100",
             "stock": "10",
             "portal_active": True,
+            "confirmation_context_token": response.json()["publication"][
+                "confirmation_context_token"
+            ],
         },
     )
     assert confirmation.status_code == 200
@@ -490,7 +493,14 @@ def test_orphan_sending_stays_blocked_until_manual_confirmation_and_window(
     assert not prepare(s)["eligible"]
     result = s.client.post(
         s.path + "/confirmar-portal",
-        json={"merchant_id": s.merchant, "barcode": EAN, "present": True},
+        json={
+            "merchant_id": s.merchant,
+            "barcode": EAN,
+            "present": True,
+            "confirmation_context_token": s.client.get(s.path + "/publicacao").json()[
+                "confirmation_context_token"
+            ],
+        },
     )
     assert result.status_code == 200
     assert prepare(s)["eligible"]
@@ -809,7 +819,7 @@ def test_automatic_stock_blocks_manual_mutations_but_preserves_read_only_evidenc
     assert view["stock_sync"]["enabled"] is True
     assert view["stock_sync"]["external_confirmed"] is False
     assert not view["capabilities"]["can_link"]
-    assert not view["capabilities"]["can_confirm"]
+    assert view["capabilities"]["can_confirm"]
     assert not view["capabilities"]["can_send"]
     assert "automatic_stock_active" in {p["code"] for p in view["pending"]}
     assert not prepare(s, fields=["stock"])["eligible"]
@@ -828,6 +838,18 @@ def test_automatic_stock_blocks_manual_mutations_but_preserves_read_only_evidenc
         ).status_code
         == 409
     )
+    observed = s.client.post(
+        s.path + "/confirmar-portal",
+        json={
+            **evidence,
+            "present": True,
+            "portal_active": True,
+            "confirmation_context_token": view["confirmation_context_token"],
+        },
+    )
+    assert observed.status_code == 200, observed.text
+    assert observed.json()["last_confirmation"]["kind"] == "observation"
+    assert observed.json()["link"] == view["link"]
     item = s.client.get("/integracoes/ifood/catalogo/gestao").json()["items"][0]
     assert item["publication"]["stock_sync"] == view["stock_sync"]
     assert not s.calls and s.db.query(IfoodCatalogSubmission).count() == 0

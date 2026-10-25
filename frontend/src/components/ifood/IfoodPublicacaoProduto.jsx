@@ -19,6 +19,16 @@ const dataHora = (value) => {
 };
 const quantidade = (value) =>
   value == null ? "Não conferido" : Number(value).toLocaleString("pt-BR");
+const disponibilidadePortal = (value) => {
+  if (value === true) return "Ativo";
+  if (value === false) return "Inativo";
+  return "Não conferida";
+};
+const opcaoDisponibilidade = (value) => {
+  if (value === true) return "active";
+  if (value === false) return "inactive";
+  return "unknown";
+};
 
 function Pendencias({ items = [] }) {
   if (!items.length) return null;
@@ -34,7 +44,13 @@ function Pendencias({ items = [] }) {
 export function ResumoEstoqueAutomatico({ sync, compacto = false }) {
   if (!sync) return null;
   const real = sync.provider_mode === "ifood_api" && sync.environment === "production";
+  const bloqueioObservacao = {
+    portal_item_not_found: "Novos envios em espera: produto não localizado no Portal",
+    portal_item_inactive: "Novos envios em espera: produto conferido como inativo no Portal",
+    portal_activity_unknown: "Novos envios em espera: disponibilidade no Portal não conferida",
+  }[sync.observation_block_reason];
   const status =
+    bloqueioObservacao ||
     {
       queued: "Saldo aguardando envio",
       sending: "Envio de estoque em andamento",
@@ -45,7 +61,8 @@ export function ResumoEstoqueAutomatico({ sync, compacto = false }) {
       backoff: "Aguardando nova tentativa por limite de envios",
       blocked: "Envio bloqueado; confira o vínculo e as pendências",
       uncertain: "Resultado desconhecido; confira antes de reenviar",
-    }[sync.status] || "Situação a conferir";
+    }[sync.status] ||
+    "Situação a conferir";
   if (compacto)
     return (
       <p className="v2-texto-ajuda mt-1 max-w-64">
@@ -59,9 +76,16 @@ export function ResumoEstoqueAutomatico({ sync, compacto = false }) {
       </h4>
       <p className="v2-texto">{status}.</p>
       <p className="v2-texto-ajuda">
-        Saldo disponível atual: {quantidade(sync.desired_stock)} · Último saldo enviado ou
-        conferido: {quantidade(sync.last_accepted_stock)}.
+        {bloqueioObservacao ? "Último saldo calculado pela automação" : "Saldo disponível atual"}:{" "}
+        {quantidade(sync.desired_stock)} · Último saldo enviado ou conferido:{" "}
+        {quantidade(sync.last_accepted_stock)}.
       </p>
+      {bloqueioObservacao ? (
+        <p className="v2-texto-ajuda">
+          O saldo atual do cadastro pode ter mudado enquanto os envios estão em espera. Confira a
+          disponibilidade no cadastro ou na lista de produtos.
+        </p>
+      ) : null}
       {sync.next_attempt_at ? (
         <p className="v2-texto-ajuda">
           Próximo envio permitido a partir de {dataHora(sync.next_attempt_at)}.
@@ -173,6 +197,9 @@ export default function IfoodPublicacaoProduto({ productId, draft = null, imagen
   const last = p?.last_submission;
   const confirmacao = p?.last_confirmation;
   const prefix = `ifood-publicacao-${productId || "novo"}`;
+  const podeConferirPortal = Boolean(
+    c.ready && p?.capabilities?.can_confirm && p?.confirmation_context_token,
+  );
 
   if (!productId)
     return (
@@ -246,6 +273,12 @@ export default function IfoodPublicacaoProduto({ productId, draft = null, imagen
             {c.success ? (
               <p role="status" className="text-sm text-emerald-800 dark:text-emerald-200">
                 {c.success}
+              </p>
+            ) : null}
+            {c.confirmationContextChanged ? (
+              <p role="status" className="v2-texto-ajuda">
+                O acompanhamento mudou. Confira novamente o produto no Portal e marque a confirmação
+                antes de registrar. Seus valores em edição foram mantidos.
               </p>
             ) : null}
             {p && c.dirty ? (
@@ -410,12 +443,22 @@ export default function IfoodPublicacaoProduto({ productId, draft = null, imagen
                 Aceite da API não confirma a publicação nem a visibilidade no aplicativo. Confira o
                 resultado no Portal.
               </p>
+              <p className="v2-texto-ajuda">
+                Registrar a conferência salva sua observação. Não envia alterações ao iFood nem muda
+                o estoque do cadastro.
+              </p>
               {confirmacao ? (
                 <div className="space-y-1 text-sm">
                   <p>
                     Última conferência manual:{" "}
                     {confirmacao.present ? "produto localizado" : "produto não localizado"}, em{" "}
                     {dataHora(confirmacao.confirmed_at)}.
+                  </p>
+                  <p>
+                    Disponibilidade conferida:{" "}
+                    {confirmacao.present
+                      ? disponibilidadePortal(confirmacao.portal_active)
+                      : "Não se aplica — produto não localizado"}
                   </p>
                   <p>
                     Preço conferido:{" "}
@@ -432,12 +475,27 @@ export default function IfoodPublicacaoProduto({ productId, draft = null, imagen
                 label="O que encontrou no Portal?"
                 name={`${prefix}-present`}
                 value={c.present ? "yes" : "no"}
-                disabled={!c.ready || !p?.capabilities?.can_confirm}
+                disabled={!podeConferirPortal}
                 opcoes={[
                   { value: "yes", label: "Produto localizado" },
                   { value: "no", label: "Produto não localizado" },
                 ]}
                 onChange={(value) => c.alterar("present", value === "yes")}
+              />
+              <InputRadio
+                label="Disponibilidade no Portal"
+                name={`${prefix}-portal-active`}
+                value={opcaoDisponibilidade(c.observedActive)}
+                disabled={!podeConferirPortal || !c.present}
+                opcoes={[
+                  { value: "active", label: "Ativo" },
+                  { value: "inactive", label: "Inativo" },
+                  { value: "unknown", label: "Não conferi" },
+                ]}
+                onChange={(value) =>
+                  c.alterar("observedActive", { active: true, inactive: false }[value] ?? null)
+                }
+                help="Informe o status que viu no Portal; o estoque não define esta resposta. Na sincronização automática, novos envios aguardam a conferência de produto Ativo."
               />
               <div className="grid gap-3 sm:grid-cols-2">
                 <InputTexto
@@ -445,7 +503,7 @@ export default function IfoodPublicacaoProduto({ productId, draft = null, imagen
                   label="Preço conferido no Portal (opcional)"
                   inputMode="decimal"
                   value={c.observedPrice ?? ""}
-                  disabled={!c.ready || !p?.capabilities?.can_confirm || !c.present}
+                  disabled={!podeConferirPortal || !c.present}
                   onChange={(value) => c.alterar("observedPrice", value)}
                   help="Deixe vazio se não conferiu; não copie a estimativa."
                 />
@@ -454,7 +512,7 @@ export default function IfoodPublicacaoProduto({ productId, draft = null, imagen
                   label="Estoque conferido no Portal (opcional)"
                   inputMode="decimal"
                   value={c.observedStock ?? ""}
-                  disabled={!c.ready || !p?.capabilities?.can_confirm || !c.present}
+                  disabled={!podeConferirPortal || !c.present}
                   onChange={(value) => c.alterar("observedStock", value)}
                   help="Vazio significa não conferido; zero é uma declaração explícita."
                 />
@@ -462,7 +520,7 @@ export default function IfoodPublicacaoProduto({ productId, draft = null, imagen
               <InputCheckTexto
                 id={`${prefix}-confirm-portal`}
                 checked={c.confirmPortal}
-                disabled={!c.ready || !p?.capabilities?.can_confirm}
+                disabled={!podeConferirPortal}
                 onChange={(value) => c.alterar("confirmPortal", value)}
               >
                 Conferi agora a loja, o EAN e o resultado acima no Portal do Parceiro.
