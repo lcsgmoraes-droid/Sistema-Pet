@@ -160,6 +160,10 @@ def _entries(c):
 
 def _snapshot(c):
     c.db.flush()
+    # Compare os valores persistidos, inclusive defaults e timestamps do banco.
+    # Um rollback recarrega as linhas; o baseline nao pode usar valores ainda
+    # retidos no identity map com precisao diferente da armazenada pelo SQLite.
+    c.db.expire_all()
     result = {}
     for model in (
         Produto,
