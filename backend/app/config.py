@@ -48,6 +48,16 @@ class Settings(BaseSettings):
     IFOOD_REQUEST_TIMEOUT_SECONDS: int = 15
     # Trava operacional: a primeira fase funciona em simulacao ate a homologacao.
     IFOOD_CATALOG_WRITE_ENABLED: bool = False
+    # Sincronizacao exclusiva de estoque do SKU 227 no DEV. Escopo independente
+    # do piloto de pedidos; vazio/desligado nunca libera outros produtos.
+    IFOOD_STOCK_SYNC_DEV_ENABLED: bool = False
+    IFOOD_STOCK_SYNC_POLLING_ENABLED: bool = False
+    IFOOD_STOCK_SYNC_INTERVAL_SECONDS: int = 30
+    IFOOD_STOCK_SYNC_TENANT_ID: str = ""
+    IFOOD_STOCK_SYNC_MERCHANT_ID: str = ""
+    IFOOD_STOCK_SYNC_PRODUCT_ID: int = 0
+    IFOOD_STOCK_SYNC_SKU: str = ""
+    IFOOD_STOCK_SYNC_BARCODE: str = ""
     # Travas independentes: pedidos de teste so operam durante homologacao assistida.
     IFOOD_ORDER_OPERATIONS_ENABLED: bool = False
     IFOOD_ORDER_POLLING_ENABLED: bool = False

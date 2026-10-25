@@ -772,3 +772,62 @@ def test_stock_only_patch_omits_even_rich_description(setup):
     }
     assert "details" not in result["payload"]
     assert s.first.descricao_completa == source and not s.calls
+
+
+def test_automatic_stock_blocks_manual_mutations_but_preserves_read_only_evidence(
+    setup, monkeypatch
+):
+    from app.ifood_catalog_models import IfoodStockSyncState
+    from app.integrations.ifood import stock_sync
+
+    s = setup
+    initial = link(s, price="100", stock="21", portal_active=True)
+    prepared = prepare(s, fields=["stock"])
+    row = IfoodStockSyncState(
+        tenant_id=s.tenant,
+        merchant_id=s.merchant,
+        link_id=initial["link"]["id"],
+        link_revision=initial["link"]["revision"],
+        desired_stock=20,
+        last_accepted_stock=21,
+        status="queued",
+        failure_count=0,
+    )
+    s.db.add(row)
+    s.db.commit()
+    monkeypatch.setattr(
+        stock_sync,
+        "enabled_for",
+        lambda tenant, merchant, product: (
+            tenant == s.tenant and merchant == s.merchant and product == s.first.id
+        ),
+    )
+    monkeypatch.setattr(settings, "IFOOD_CATALOG_WRITE_ENABLED", True)
+    view = s.client.get(s.path + "/publicacao").json()
+    assert view["stock_sync"]["desired_stock"] == 20
+    assert view["stock_sync"]["last_accepted_stock"] == 21
+    assert view["stock_sync"]["enabled"] is True
+    assert view["stock_sync"]["external_confirmed"] is False
+    assert not view["capabilities"]["can_link"]
+    assert not view["capabilities"]["can_confirm"]
+    assert not view["capabilities"]["can_send"]
+    assert "automatic_stock_active" in {p["code"] for p in view["pending"]}
+    assert not prepare(s, fields=["stock"])["eligible"]
+    assert send(s, prepared).status_code == 409
+    evidence = {"merchant_id": s.merchant, "barcode": EAN, "stock": "21"}
+    assert (
+        s.client.post(
+            s.path + "/confirmar-portal", json={**evidence, "present": True}
+        ).status_code
+        == 409
+    )
+    assert (
+        s.client.put(
+            s.path + "/vinculo",
+            json={**evidence, "mode": "existing", "portal_checked": True},
+        ).status_code
+        == 409
+    )
+    item = s.client.get("/integracoes/ifood/catalogo/gestao").json()["items"][0]
+    assert item["publication"]["stock_sync"] == view["stock_sync"]
+    assert not s.calls and s.db.query(IfoodCatalogSubmission).count() == 0

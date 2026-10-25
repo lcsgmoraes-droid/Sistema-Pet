@@ -44,7 +44,16 @@ export const IFOOD_PENDING_LABELS = {
   recomendacao: "Recomendação",
 };
 
-export function statusEnvioIfood(status) {
+export function statusEnvioIfood(status, submission) {
+  if (submission?.provider_mode === "local_simulator")
+    return (
+      {
+        sending: "Envio ao simulador DEV em andamento",
+        accepted: "Aceito pelo simulador DEV — iFood real não conferido",
+        error: "Falha no simulador DEV",
+        uncertain: "Resultado do simulador DEV desconhecido",
+      }[status] || "Situação do simulador DEV a conferir"
+    );
   return (
     {
       sending: "Envio em andamento — resultado ainda não confirmado",

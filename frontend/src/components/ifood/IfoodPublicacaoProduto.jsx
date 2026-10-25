@@ -31,6 +31,46 @@ function Pendencias({ items = [] }) {
   );
 }
 
+export function ResumoEstoqueAutomatico({ sync, compacto = false }) {
+  if (!sync) return null;
+  const status =
+    {
+      queued: "Saldo aguardando envio",
+      sending: "Envio de estoque em andamento",
+      accepted:
+        sync.reference_source === "portal"
+          ? "Saldo igual à conferência registrada"
+          : "Saldo recebido; resultado externo a conferir",
+      backoff: "Aguardando nova tentativa por limite de envios",
+      blocked: "Envio bloqueado; confira o vínculo e as pendências",
+      uncertain: "Resultado desconhecido; confira antes de reenviar",
+    }[sync.status] || "Situação a conferir";
+  if (compacto)
+    return <p className="v2-texto-ajuda mt-1 max-w-64">Estoque automático DEV: {status}.</p>;
+  return (
+    <section className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+      <h4 className="v2-titulo-secao">Estoque automático — piloto DEV</h4>
+      <p className="v2-texto">{status}.</p>
+      <p className="v2-texto-ajuda">
+        Saldo disponível atual: {quantidade(sync.desired_stock)} · Último saldo enviado ou
+        conferido: {quantidade(sync.last_accepted_stock)}.
+      </p>
+      {sync.next_attempt_at ? (
+        <p className="v2-texto-ajuda">
+          Próximo envio permitido a partir de {dataHora(sync.next_attempt_at)}.
+        </p>
+      ) : null}
+      <p className="v2-texto-ajuda">
+        {sync.enabled
+          ? "Piloto ativo somente para este produto em DEV."
+          : "Piloto desativado; histórico preservado."}{" "}
+        Este ensaio usa um simulador local. O acompanhamento não comprova aplicação no iFood. Preços
+        não fazem parte desta rotina.
+      </p>
+    </section>
+  );
+}
+
 export function MemoriaEnvio({ review }) {
   const item = review.payload;
   if (!item) return null;
@@ -106,7 +146,7 @@ export function MemoriaEnvio({ review }) {
 }
 
 // Bloco do mesmo cadastro, compartilhado com a central. Não cria outro produto,
-// não salva o rascunho e não inicia sincronização automática contínua.
+// não salva o rascunho nem ativa a automação, configurada separadamente em DEV.
 export default function IfoodPublicacaoProduto({ productId, draft = null, imagens, onFechar }) {
   const [localAberto, setLocalAberto] = useState(false);
   const c = useIfoodPublicacaoProduto({ productId, draft, imagens });
@@ -135,7 +175,8 @@ export default function IfoodPublicacaoProduto({ productId, draft = null, imagen
       {!onFechar ? (
         <div className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
           <h4 className="v2-titulo-secao">Vínculo e publicação assistida</h4>
-          <p className="v2-texto-ajuda">{statusEnvioIfood(last?.status)}</p>
+          <p className="v2-texto-ajuda">{statusEnvioIfood(last?.status, last)}</p>
+          <ResumoEstoqueAutomatico sync={p?.stock_sync} compacto />
           <BotaoInteracao icon={Link2} tamanho="pequeno" onClick={() => setLocalAberto(true)}>
             Conferir vínculo e envio
           </BotaoInteracao>
@@ -154,8 +195,9 @@ export default function IfoodPublicacaoProduto({ productId, draft = null, imagen
         >
           <div className="space-y-5">
             <p className="v2-texto-ajuda">
-              Piloto assistido. Preparar ou salvar o cadastro não envia alterações ao iFood. Os
-              dados usados são os da versão salva.
+              {p?.stock_sync?.enabled
+                ? "O piloto automático acompanha o estoque salvo deste produto em DEV. Envios manuais estão bloqueados enquanto ele estiver ativo."
+                : "Piloto assistido. Preparar ou salvar o cadastro não envia alterações ao iFood. Os dados usados são os da versão salva."}
             </p>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -209,6 +251,7 @@ export default function IfoodPublicacaoProduto({ productId, draft = null, imagen
               </p>
             ) : null}
             <Pendencias items={p?.pending} />
+            <ResumoEstoqueAutomatico sync={p?.stock_sync} />
 
             <section className="space-y-3 rounded-lg border border-slate-200 p-4 dark:border-slate-700">
               <h3 className="v2-titulo-secao">1. Confira o mesmo EAN no Portal</h3>
@@ -343,7 +386,7 @@ export default function IfoodPublicacaoProduto({ productId, draft = null, imagen
 
             <section className="space-y-3 rounded-lg border border-slate-200 p-4 dark:border-slate-700">
               <h3 className="v2-titulo-secao">3. Acompanhe e registre a conferência no Portal</h3>
-              <p className="font-medium">{statusEnvioIfood(last?.status)}</p>
+              <p className="font-medium">{statusEnvioIfood(last?.status, last)}</p>
               {last ? (
                 <p className="v2-texto-ajuda">
                   {dataHora(last.finished_at || last.created_at)}

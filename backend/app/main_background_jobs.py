@@ -762,6 +762,13 @@ def start_background_jobs() -> None:
             except Exception:
                 logger.exception("[IFOOD] Falha ao registrar consulta Financial DEV")
 
+            try:
+                from app.integrations.ifood.stock_sync import register_stock_sync_job
+
+                register_stock_sync_job(_campaign_scheduler.scheduler)
+            except Exception:
+                logger.exception("[IFOOD] Falha ao registrar estoque automatico DEV")
+
         if _env_bool("BLING_SYNC_SCHEDULER_ENABLED", True):
             try:
                 from app.schedulers.bling_sync_scheduler import BlingSyncScheduler

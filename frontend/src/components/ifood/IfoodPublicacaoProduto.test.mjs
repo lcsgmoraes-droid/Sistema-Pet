@@ -181,3 +181,72 @@ test("memória de atualização mostra somente valores enviados e preserva promo
   assert.doesNotMatch(elementText(harness.tree), /Preço regular enviado/);
   assert.match(elementText(harness.tree), /promoção do iFood serão preservados/);
 });
+
+function stockSummary(sync) {
+  return createControllerHarness(
+    fileURLToPath(new URL("./IfoodPublicacaoProduto.jsx", import.meta.url)),
+    {
+      exportName: "ResumoEstoqueAutomatico",
+      props: { sync },
+      mocks: new Map([
+        ...[
+          "BotaoCancelar",
+          "BotaoInteracao",
+          "InputCheckTexto",
+          "InputTexto",
+          "InputRadio",
+          "LinkPadrao",
+          "ModalPadrao",
+        ].map((name) => [`../v2/${name}/${name}`, stub(name)]),
+        ["lucide-react", {}],
+        ["../../utils/modalEscape", { useEscapeToClose() {} }],
+        ["./useIfoodPublicacaoProduto", stub(() => ({}))],
+      ]),
+    },
+  );
+}
+
+test("estoque automático preserva zero, distingue referência de confirmação e não oferece envio", () => {
+  const env = stockSummary({
+    status: "accepted",
+    desired_stock: 0,
+    last_accepted_stock: 0,
+    enabled: true,
+  });
+  assert.match(elementText(env.tree), /Saldo disponível atual:\s+0/);
+  assert.match(elementText(env.tree), /resultado externo a conferir/);
+  assert.match(elementText(env.tree), /não comprova aplicação no iFood/);
+  assert.match(elementText(env.tree), /Preços não fazem parte/);
+  assert.equal(
+    elements(env.tree).some((el) => /^(input|button|select|textarea|Botao)/.test(el.type)),
+    false,
+  );
+});
+
+test("histórico da automação desligada mantém saldo desconhecido e resultado incerto", () => {
+  const env = stockSummary({
+    status: "uncertain",
+    desired_stock: null,
+    last_accepted_stock: 21,
+    enabled: false,
+  });
+  assert.match(elementText(env.tree), /Saldo disponível atual:\s+Não conferido/);
+  assert.match(elementText(env.tree), /Resultado desconhecido; confira antes de reenviar/);
+  assert.match(elementText(env.tree), /Piloto desativado; histórico preservado/);
+});
+
+test("aceite do simulador DEV não aparece como aceite do iFood real", () => {
+  const env = setup({
+    publication: {
+      ...publication,
+      last_submission: {
+        status: "accepted",
+        source: "auto_stock",
+        provider_mode: "local_simulator",
+        message: "Ensaio com simulador local em DEV",
+      },
+    },
+  });
+  assert.match(text(env), /Aceito pelo simulador DEV — iFood real não conferido/);
+  assert.doesNotMatch(text(env), /Aceito pela API — confira no Portal/);
+});

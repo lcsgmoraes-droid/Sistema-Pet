@@ -154,10 +154,13 @@ def _last_rows(db, tenant_id, link_ids, model):
 def submission_view(row):
     if not row:
         return None
+    source = getattr(row, "source", None) or "manual"
     return {
         "id": row.id,
         "request_key": row.request_key,
         "operation": row.operation,
+        "source": source,
+        "provider_mode": "local_simulator" if source == "auto_stock" else "ifood_api",
         "fields": row.fields,
         "status": row.status,
         "created_at": _iso(row.created_at),
@@ -165,7 +168,11 @@ def submission_view(row):
         "http_status": row.http_status,
         "provider_request_id": row.provider_request_id,
         "error_code": row.error_code,
-        "message": MESSAGES[row.status],
+        "message": (
+            "Ensaio com simulador local em DEV; este registro nao comprova recebimento ou aplicacao no iFood real."
+            if source == "auto_stock"
+            else MESSAGES[row.status]
+        ),
         "payload_hash": row.payload_hash,
     }
 
@@ -198,11 +205,21 @@ def summaries(db, tenant_id, merchant_id, product_ids):
     keys = [link.id for link in links]
     submissions = _last_rows(db, tenant_id, keys, Submission)
     confirmations = _last_rows(db, tenant_id, keys, Confirmation)
+    from app.ifood_catalog_models import IfoodStockSyncState
+    from .stock_sync import enabled_for, state_view
+
+    stock_states = _last_rows(db, tenant_id, keys, IfoodStockSyncState)
     return {
         link.product_id: {
             "link": link_view(link, link.barcode),
             "last_submission": submission_view(submissions.get(link.id)),
             "last_confirmation": confirmation_view(confirmations.get(link.id)),
+            "stock_sync": {
+                **state_view(stock_states[link.id]),
+                "enabled": enabled_for(tenant_id, merchant_id, link.product_id),
+            }
+            if link.id in stock_states
+            else None,
         }
         for link in links
     }
@@ -249,6 +266,17 @@ def publication_view(
         else None
     )
     pending = _identity_issues(db, tenant_id, product)
+    from .stock_sync import enabled_for, stock_sync_view
+
+    automatic_stock = enabled_for(tenant_id, merchant, product.id)
+    stock_sync = stock_sync_view(db, tenant_id, merchant, product.id)
+    if automatic_stock:
+        pending.append(
+            _issue(
+                "automatic_stock_active",
+                "O piloto automatico de estoque esta ativo em DEV para este produto. Desative-o antes de um envio manual ou de alterar a conferencia do vinculo.",
+            )
+        )
     if not merchant:
         pending.append(
             _issue(
@@ -329,7 +357,7 @@ def publication_view(
         "snapshot_saved": saved_snapshot(product),
         "link": link_view(link, barcode),
         "capabilities": {
-            "can_link": bool(can_edit and merchant),
+            "can_link": bool(can_edit and merchant and not automatic_stock),
             "can_prepare": bool(can_edit),
             "can_send": bool(
                 can_edit
@@ -339,13 +367,16 @@ def publication_view(
                 and config.active
                 and not any(p["kind"] == "blocking" for p in pending)
             ),
-            "can_confirm": bool(can_edit and link and link.barcode == barcode),
+            "can_confirm": bool(
+                can_edit and link and link.barcode == barcode and not automatic_stock
+            ),
             "write_enabled": bool(write_enabled),
             "credentials_configured": bool(credentials),
         },
         "pending": pending,
         "last_submission": submission_view(submission),
         "last_confirmation": confirmation_view(confirmation),
+        "stock_sync": stock_sync,
     }
 
 
@@ -364,6 +395,7 @@ def _check_declared_identity(db, tenant_id, config, product, merchant_id, barcod
 
 
 def record_link(db, tenant_id, config, product, data, actor_id):
+    _guard_manual_stock_sync(tenant_id, config, product)
     _check_declared_identity(
         db, tenant_id, config, product, data["merchant_id"], data["barcode"]
     )
@@ -432,6 +464,7 @@ def _add_confirmation(db, tenant_id, link, data, actor_id, *, kind, present):
 
 
 def confirm_portal(db, tenant_id, config, product, data, actor_id):
+    _guard_manual_stock_sync(tenant_id, config, product)
     _check_declared_identity(
         db, tenant_id, config, product, data["merchant_id"], data["barcode"]
     )
@@ -447,6 +480,16 @@ def confirm_portal(db, tenant_id, config, product, data, actor_id):
     link.revision += 1
     link.portal_checked_at = now()
     link.portal_checked_by = actor_id
+
+
+def _guard_manual_stock_sync(tenant_id, config, product):
+    from .stock_sync import enabled_for
+
+    if enabled_for(tenant_id, config.merchant_id if config else None, product.id):
+        raise HTTPException(
+            409,
+            "Desative o piloto automatico de estoque em DEV antes de enviar manualmente ou alterar a conferencia deste vinculo.",
+        )
 
 
 def prepare(
@@ -661,6 +704,7 @@ def send_prepared(
             409,
             "Preco, estoque ou vinculo mudou. Prepare e confira uma nova revisao antes de enviar.",
         )
+    _guard_manual_stock_sync(tenant_id, config, product)
     if not prepared["eligible"]:
         raise HTTPException(
             409, "Resolva as pendencias e prepare novamente antes do envio."

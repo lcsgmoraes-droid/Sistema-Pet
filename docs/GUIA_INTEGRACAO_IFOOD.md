@@ -315,6 +315,58 @@ vincular um existente para atualizar somente estoque. Pausa, reativação,
 alteração de promoções, entrada de pedidos e baixa de estoque por venda
 exigem validação própria antes de serem consideradas disponíveis ou automáticas.
 
+## Estoque automático do SKU 227 — ensaio em DEV
+
+Este ensaio é separado da publicação do SKU `018631.1`. Usa uma cópia de teste
+do SKU `227`, já vinculado pelo mesmo EAN, e um simulador local do iFood. Não
+ativa sincronização contínua na loja real nem libera os demais produtos.
+
+1. Abra a empresa de testes, confira o SKU `227`, o EAN e o vínculo existente.
+   Registre o saldo inicial conhecido e guarde os preços dos quatro canais.
+2. Na Central iFood ou no mesmo componente do cadastro, abra **Conferir vínculo
+   e envio**. O bloco **Estoque automático — piloto DEV** apresenta o saldo
+   disponível, o último saldo enviado ou conferido e eventuais pendências.
+3. Faça uma venda de uma unidade em DEV. Partindo de 21 disponíveis, o saldo
+   deve chegar a 20. Se houver reserva anterior, concluir a baixa não pode
+   descontar essa unidade novamente.
+4. Cancele a venda de teste. O saldo disponível deve voltar a 21. Liberar uma
+   reserva sem baixa também deve recompor apenas a disponibilidade.
+5. Registre uma entrada de duas unidades. O saldo deve chegar a 23. Confira
+   que o preço do ERP, app, ecommerce e iFood permaneceu igual ao início.
+6. Mudanças próximas são agrupadas: quando chegar a próxima oportunidade de
+   envio, o sistema usa o saldo mais recente, sem reproduzir saldos antigos.
+   Reiniciar o worker não apaga o histórico nem permite repetir uma tentativa
+   cujo resultado ficou desconhecido.
+
+**Recebido não significa aplicado.** O HTTP 202 indica recebimento na fila.
+A conferência manual do Portal continua sendo evidência separada. Em DEV, o
+simulador comprova a solicitação e seu conteúdo; não comprova aplicação no
+iFood real. Para uma falha sem resultado conhecido, desative o piloto e
+confira o resultado antes de registrar uma nova conferência e retomar.
+Enquanto a automação estiver ativa, envio manual e alteração da conferência
+desse vínculo ficam bloqueados para evitar duas operações concorrentes.
+
+O ensaio de venda/cancelamento do SKU 227 usa produto sem lotes. Ele valida
+a sincronização do saldo disponível. A recomposição FIFO do cancelamento
+genérico de produtos com lotes ainda exige uma correção e validação próprias;
+não usar este ensaio como liberação desse fluxo na loja real.
+
+Detalhes operacionais para implantação: as flags `IFOOD_STOCK_SYNC_DEV_ENABLED`
+e `IFOOD_STOCK_SYNC_POLLING_ENABLED` começam desligadas. A allowlist exige
+empresa, loja, ID do produto, SKU 227 e EAN `7898242031448` exatos; exige também
+vínculo existente e conferência do saldo. Produção/staging e URL externa são
+bloqueados nesta etapa, mesmo com credenciais herdadas. O PATCH contém apenas
+`barcode` e `inventory.stock`, sem preço, promoção ou ativação do item.
+
+A rotina consulta o banco a cada 30 segundos, respeita reservas, segurança e
+pausa local, e mantém o intervalo conservador de 35 minutos entre tentativas.
+Esse intervalo é uma proteção do CorePet; a regra publicada pelo iFood é de
+volumetria por catálogo na janela, não um prazo individual comprovado por SKU.
+Nos testes automatizados, o relógio é avançado para validar a janela sem
+esperar 35 minutos reais. Referências: [atualização parcial](https://developer.ifood.com.br/en-US/docs/groceries/guides/modules/item/endpoints),
+[volumetria](https://developer.ifood.com.br/en-US/docs/groceries/guides/modules/item/introduction)
+e [processamento assíncrono](https://developer.ifood.com.br/en-US/docs/groceries/guides/modules/item/how-it-works).
+
 ## Pedido de teste no PDV — somente DEV
 
 O piloto de pedidos é separado do envio de catálogo. Ele usa uma empresa
