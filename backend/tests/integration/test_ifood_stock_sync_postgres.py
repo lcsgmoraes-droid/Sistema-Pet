@@ -17,6 +17,8 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+import sqlalchemy as sa
+from alembic import op
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import create_engine, inspect, text
@@ -39,6 +41,15 @@ def _migration():
     )
 
 
+def _live_migration():
+    return runpy.run_path(
+        str(
+            Path(__file__).parents[2]
+            / "alembic/versions/zzzzw20261025a1_ifood_stock_sync_live_mode.py"
+        )
+    )
+
+
 @pytest.fixture(scope="module")
 def stock_pg_engine(request):
     """Aplica a migration real sobre a versao anterior, preservando uma tentativa."""
@@ -46,6 +57,7 @@ def stock_pg_engine(request):
     from app.ifood_catalog_models import IfoodCatalogLink
     from app.models import Tenant, User
     from app.produtos_models import Produto
+    from app.tenant_rls_migration import apply_tenant_rls
     from app.tenancy.context import tenant_context
 
     # O metadata atual inclui a nova tabela/coluna. Reconstituir somente as duas
@@ -60,6 +72,12 @@ def stock_pg_engine(request):
             conn.exec_driver_sql("SELECT current_schema()").scalar_one(),
         )
         conn.exec_driver_sql("DROP TABLE ifood_stock_sync_states")
+        conn.exec_driver_sql(
+            "ALTER TABLE ifood_catalog_submissions DROP CONSTRAINT ck_ifood_catalog_submission_provider_mode"
+        )
+        conn.exec_driver_sql(
+            "ALTER TABLE ifood_catalog_submissions DROP COLUMN provider_mode"
+        )
         conn.exec_driver_sql(
             "ALTER TABLE ifood_catalog_submissions DROP CONSTRAINT ck_ifood_catalog_submission_source"
         )
@@ -137,7 +155,20 @@ def stock_pg_engine(request):
             .one()
         )
         with Operations.context(MigrationContext.configure(conn)):
+            # O metadata nao executa o RLS da migration s do catalogo. Reproduz
+            # suas politicas para o worker usar o mesmo isolamento de producao.
+            apply_tenant_rls(
+                op_module=op,
+                sa_module=sa,
+                table_names=(
+                    "ifood_catalog_links",
+                    "ifood_catalog_confirmations",
+                    "ifood_catalog_submissions",
+                ),
+                enable=True,
+            )
             _migration()["upgrade"]()
+            _live_migration()["upgrade"]()
         after = dict(
             conn.execute(
                 text("SELECT * FROM ifood_catalog_submissions WHERE id=:id"),
@@ -146,7 +177,8 @@ def stock_pg_engine(request):
             .mappings()
             .one()
         )
-        assert after.pop("source") == "manual" and after == before
+        assert after.pop("source") == "manual"
+        assert after.pop("provider_mode") == "ifood_api" and after == before
         assert (
             conn.exec_driver_sql(
                 "SELECT count(*) FROM ifood_stock_sync_states"

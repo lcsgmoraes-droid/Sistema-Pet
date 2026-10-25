@@ -67,6 +67,7 @@ def pilot(api, monkeypatch):  # noqa: F811
         "ENVIRONMENT": "development",
         "IFOOD_CATALOG_WRITE_ENABLED": True,
         "IFOOD_STOCK_SYNC_DEV_ENABLED": True,
+        "IFOOD_STOCK_SYNC_LIVE_ENABLED": False,
         "IFOOD_STOCK_SYNC_POLLING_ENABLED": True,
         "IFOOD_STOCK_SYNC_TENANT_ID": str(api.tenant),
         "IFOOD_STOCK_SYNC_MERCHANT_ID": merchant,

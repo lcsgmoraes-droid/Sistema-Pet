@@ -155,12 +155,15 @@ def submission_view(row):
     if not row:
         return None
     source = getattr(row, "source", None) or "manual"
+    mode = getattr(row, "provider_mode", None) or (
+        "local_simulator" if source == "auto_stock" else "ifood_api"
+    )
     return {
         "id": row.id,
         "request_key": row.request_key,
         "operation": row.operation,
         "source": source,
-        "provider_mode": "local_simulator" if source == "auto_stock" else "ifood_api",
+        "provider_mode": mode,
         "fields": row.fields,
         "status": row.status,
         "created_at": _iso(row.created_at),
@@ -170,7 +173,7 @@ def submission_view(row):
         "error_code": row.error_code,
         "message": (
             "Ensaio com simulador local em DEV; este registro nao comprova recebimento ou aplicacao no iFood real."
-            if source == "auto_stock"
+            if mode == "local_simulator"
             else MESSAGES[row.status]
         ),
         "payload_hash": row.payload_hash,
@@ -274,7 +277,7 @@ def publication_view(
         pending.append(
             _issue(
                 "automatic_stock_active",
-                "O piloto automatico de estoque esta ativo em DEV para este produto. Desative-o antes de um envio manual ou de alterar a conferencia do vinculo.",
+                "O piloto automatico de estoque esta ativo para este produto. Desative-o antes de um envio manual ou de alterar a conferencia do vinculo.",
             )
         )
     if not merchant:
@@ -488,7 +491,7 @@ def _guard_manual_stock_sync(tenant_id, config, product):
     if enabled_for(tenant_id, config.merchant_id if config else None, product.id):
         raise HTTPException(
             409,
-            "Desative o piloto automatico de estoque em DEV antes de enviar manualmente ou alterar a conferencia deste vinculo.",
+            "Desative o piloto automatico de estoque antes de enviar manualmente ou alterar a conferencia deste vinculo.",
         )
 
 

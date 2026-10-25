@@ -250,3 +250,19 @@ test("aceite do simulador DEV não aparece como aceite do iFood real", () => {
   assert.match(text(env), /Aceito pelo simulador DEV — iFood real não conferido/);
   assert.doesNotMatch(text(env), /Aceito pela API — confira no Portal/);
 });
+
+test("histórico real usa o modo persistido e continua separando aceite de aplicação", () => {
+  const env = stockSummary({
+    status: "accepted",
+    desired_stock: 21,
+    last_accepted_stock: 21,
+    enabled: true,
+    provider_mode: "ifood_api",
+    environment: "production",
+    reference_source: "api_acceptance",
+  });
+  assert.match(elementText(env.tree), /Sincronização ativa somente para este produto/);
+  assert.match(elementText(env.tree), /aceite não confirma a aplicação/);
+  assert.match(elementText(env.tree), /Preços não fazem parte/);
+  assert.doesNotMatch(elementText(env.tree), /simulador|piloto DEV/);
+});

@@ -105,6 +105,10 @@ class IfoodCatalogSubmission(BaseTenantModel):
             "source IN ('manual','auto_stock')",
             name="ck_ifood_catalog_submission_source",
         ),
+        CheckConstraint(
+            "provider_mode IN ('local_simulator','ifood_api')",
+            name="ck_ifood_catalog_submission_provider_mode",
+        ),
     )
     link_id = Column(Integer, nullable=False)
     merchant_id = Column(String(36), nullable=False)
@@ -113,6 +117,9 @@ class IfoodCatalogSubmission(BaseTenantModel):
     operation = Column(String(12), nullable=False)
     source = Column(
         String(16), nullable=False, default="manual", server_default="manual"
+    )
+    provider_mode = Column(
+        String(16), nullable=False, default="ifood_api", server_default="ifood_api"
     )
     fields = Column(JSON, nullable=False)
     payload_hash = Column(String(64), nullable=False)
@@ -127,7 +134,7 @@ class IfoodCatalogSubmission(BaseTenantModel):
 
 
 class IfoodStockSyncState(BaseTenantModel):
-    """Ultimo saldo desejado do piloto DEV, nunca uma confirmacao remota.
+    """Ultimo saldo desejado do piloto, nunca uma confirmacao remota.
 
     Cada tentativa continua append-only em IfoodCatalogSubmission. O marcador
     sending e gravado antes da rede: um crash exige conferencia, nao reenvio.
@@ -161,9 +168,19 @@ class IfoodStockSyncState(BaseTenantModel):
             "status IN ('queued','sending','accepted','backoff','blocked','uncertain')",
             name="ck_ifood_stock_sync_status",
         ),
+        CheckConstraint(
+            "provider_mode IN ('local_simulator','ifood_api')",
+            name="ck_ifood_stock_sync_provider_mode",
+        ),
     )
     merchant_id = Column(String(36), nullable=False)
     link_id = Column(Integer, nullable=False)
+    provider_mode = Column(
+        String(16),
+        nullable=False,
+        default="local_simulator",
+        server_default="local_simulator",
+    )
     link_revision = Column(Integer, nullable=False)
     desired_stock = Column(Integer, nullable=True)
     # Ultimo saldo recebido em 202 ou observado no Portal pelo responsavel.

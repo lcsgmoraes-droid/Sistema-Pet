@@ -1,10 +1,11 @@
-"""Estoque absoluto, duravel e exclusivo do SKU 227 no DEV.
+"""Estoque absoluto, duravel e exclusivo do SKU 227.
 
 O scheduler le o saldo confirmado no banco, incluindo reservas, sem depender de
 eventos em memoria. Cada PATCH omite todos os campos fora barcode/inventory.stock.
-Nesta etapa o cliente so pode apontar para um servidor falso em loopback; a API
-real e bloqueada mesmo com flags/credenciais herdadas. HTTP 202 significa aceite
-assincrono, nunca confirmacao de aplicacao. Timeout/5xx/crash exigem conferencia.
+DEV so aceita um servidor falso em loopback. O piloto real exige opt-in separado,
+ambiente de producao e a identidade exata da loja/produto autorizado. HTTP 202
+significa aceite assincrono, nunca confirmacao de aplicacao. Falhas incertas
+exigem conferencia; evidencias locais nunca viram comprovantes da API real.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import text
 
-from app.config import _is_strict_runtime_environment, settings
+from app.config import _is_strict_runtime_environment, _runtime_environments, settings
 from app.db import SessionLocal
 from app.ifood_catalog_models import (
     IfoodCatalogConfirmation as Confirmation,
@@ -39,6 +40,13 @@ from .management import product_identifier
 logger = logging.getLogger(__name__)
 PILOT_SKU = "227"
 PILOT_BARCODE = "7898242031448"
+LOCAL_MODE = "local_simulator"
+LIVE_MODE = "ifood_api"
+LIVE_MERCHANT_ID = "adf87cbc-3858-413b-ae1e-3be36b1533e2"
+LIVE_PRODUCT_ID = 5867
+# Identidade autorizada conferida operacionalmente; o UUID permanece na
+# configuracao protegida. O fonte publica apenas sua impressao de validacao.
+LIVE_TENANT_SHA256 = "137b121246f899a855dedfb6e4a5c6c92ef4df25ea6a1fd70ddb22a0bc9dc8bf"
 COOLDOWN_SECONDS = 35 * 60
 MAX_RATE_LIMIT_RETRIES = 5
 MAX_STOCK = 1_000_000
@@ -69,24 +77,64 @@ def _local_provider(base_url=None):
         return False
 
 
+def _live_provider(base_url=None):
+    """A API real deste piloto nao aceita hosts alternativos nem redirecionamento."""
+    try:
+        raw = str(settings.IFOOD_API_BASE_URL if base_url is None else base_url)
+        parsed = urlsplit(raw)
+        return (
+            raw
+            in {
+                "https://merchant-api.ifood.com.br",
+                "https://merchant-api.ifood.com.br/",
+            }
+            and parsed.scheme == "https"
+            and parsed.hostname == "merchant-api.ifood.com.br"
+            and parsed.username is None
+            and parsed.password is None
+            and parsed.port is None
+            and parsed.path in {"", "/"}
+            and not parsed.query
+            and not parsed.fragment
+        )
+    except (ValueError, TypeError):
+        return False
+
+
+def _provider_mode():
+    return LIVE_MODE if settings.IFOOD_STOCK_SYNC_LIVE_ENABLED else LOCAL_MODE
+
+
 def settings_reason():
     """Fail closed inclusive para os aliases APP_ENV/ENV/ENVIRONMENT."""
-    if _is_strict_runtime_environment() or str(
+    live = bool(settings.IFOOD_STOCK_SYNC_LIVE_ENABLED)
+    if live:
+        if settings.IFOOD_STOCK_SYNC_DEV_ENABLED:
+            return "mode_conflict"
+        production = {"production", "prod"}
+        if (
+            str(settings.ENVIRONMENT).strip().lower() not in production
+            or not _runtime_environments()
+            or not _runtime_environments().issubset(production)
+        ):
+            return "production_only"
+    elif _is_strict_runtime_environment() or str(
         settings.ENVIRONMENT
     ).strip().lower() not in {"development", "dev", "test", "local"}:
         return "dev_only"
-    if (
-        not settings.IFOOD_STOCK_SYNC_DEV_ENABLED
-        or not settings.IFOOD_STOCK_SYNC_POLLING_ENABLED
+    if not settings.IFOOD_STOCK_SYNC_POLLING_ENABLED or (
+        not live and not settings.IFOOD_STOCK_SYNC_DEV_ENABLED
     ):
         return "disabled"
     if not settings.IFOOD_CATALOG_WRITE_ENABLED:
         return "catalog_write_disabled"
-    if not _local_provider():
+    if live and not _live_provider():
+        return "provider_not_official"
+    if not live and not _local_provider():
         return "provider_not_local"
     try:
-        UUID(settings.IFOOD_STOCK_SYNC_TENANT_ID)
-        UUID(settings.IFOOD_STOCK_SYNC_MERCHANT_ID)
+        tenant = str(UUID(settings.IFOOD_STOCK_SYNC_TENANT_ID))
+        merchant = str(UUID(settings.IFOOD_STOCK_SYNC_MERCHANT_ID))
         if (
             isinstance(settings.IFOOD_STOCK_SYNC_PRODUCT_ID, bool)
             or int(settings.IFOOD_STOCK_SYNC_PRODUCT_ID) <= 0
@@ -94,6 +142,12 @@ def settings_reason():
             or settings.IFOOD_STOCK_SYNC_BARCODE != PILOT_BARCODE
         ):
             return "scope_invalid"
+        if live and (
+            sha256(tenant.encode()).hexdigest() != LIVE_TENANT_SHA256
+            or merchant != LIVE_MERCHANT_ID
+            or settings.IFOOD_STOCK_SYNC_PRODUCT_ID != LIVE_PRODUCT_ID
+        ):
+            return "live_scope_invalid"
     except (ValueError, TypeError, AttributeError):
         return "scope_invalid"
     if (
@@ -117,6 +171,7 @@ def enabled_for(tenant_id, merchant_id, product_id):
 def state_view(row):
     if row is None:
         return None
+    mode = getattr(row, "provider_mode", None) or LOCAL_MODE
     return {
         "status": row.status,
         "desired_stock": row.desired_stock,
@@ -128,7 +183,8 @@ def state_view(row):
         "failure_count": row.failure_count,
         "error_code": row.error_code,
         "external_confirmed": False,
-        "environment": "dev",
+        "provider_mode": mode,
+        "environment": "production" if mode == LIVE_MODE else "dev",
     }
 
 
@@ -159,7 +215,9 @@ def register_stock_sync_job(scheduler):
         "interval",
         seconds=max(30, int(settings.IFOOD_STOCK_SYNC_INTERVAL_SECONDS)),
         id=JOB_ID,
-        name="iFood estoque: piloto DEV SKU 227",
+        name="iFood estoque: piloto real SKU 227"
+        if _provider_mode() == LIVE_MODE
+        else "iFood estoque: piloto DEV SKU 227",
         max_instances=1,
         coalesce=True,
         replace_existing=True,
@@ -301,6 +359,7 @@ def _save_status(db, state, status, code=None, *, next_attempt_at=None):
 
 def _observe(db, scope, now):
     tenant, merchant, product_id = scope
+    mode = _provider_mode()
     if not _advisory_lock(db, *scope):
         return None, {"status": "busy"}
     target, reason = _target(db, *scope)
@@ -339,13 +398,22 @@ def _observe(db, scope, now):
             tenant_id=tenant,
             merchant_id=merchant,
             link_id=link.id,
+            provider_mode=mode,
             link_revision=link.revision,
             status="queued",
             failure_count=0,
         )
         db.add(state)
         db.flush()
+    elif state.provider_mode != mode:
+        return None, _save_status(db, state, "blocked", "provider_mode_changed")
     last = _last_rows(db, tenant, [link.id], Submission).get(link.id)
+    if (
+        last
+        and (last.source or "manual") == "auto_stock"
+        and last.provider_mode != mode
+    ):
+        return None, _save_status(db, state, "blocked", "provider_mode_changed")
     confirmation = _last_rows(db, tenant, [link.id], Confirmation).get(link.id)
     reviewed = _confirmed(last, confirmation, known_stock=True)
     if (
@@ -432,11 +500,18 @@ def _observe(db, scope, now):
     return (config, product, link, state), None
 
 
-def _client():
+def _client(*, expected_mode=None):
     base_url = str(settings.IFOOD_API_BASE_URL or "")
-    if not _local_provider(base_url):
+    mode = _provider_mode()
+    if (
+        (expected_mode is not None and mode != expected_mode)
+        or settings_reason() is not None
+        or not (
+            _live_provider(base_url) if mode == LIVE_MODE else _local_provider(base_url)
+        )
+    ):
         raise IfoodClientError(
-            "O piloto DEV exige provedor local falso.", status_code=400
+            "O provedor diverge do piloto de estoque autorizado.", status_code=400
         )
     return IfoodClient(
         client_id=settings.IFOOD_CLIENT_ID,
@@ -463,6 +538,7 @@ def _preflight(db, scope, link_revision, sent_stock):
 
 def _dispatch(db, target, scope, now, client_factory):
     config, product, link, state = target
+    mode = state.provider_mode
     payload = {"barcode": PILOT_BARCODE, "inventory": {"stock": state.desired_stock}}
     request_key = str(uuid4())
     row = Submission(
@@ -473,6 +549,7 @@ def _dispatch(db, target, scope, now, client_factory):
         request_key=request_key,
         operation="update",
         source="auto_stock",
+        provider_mode=mode,
         fields=["stock"],
         payload_hash=sha256(
             json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
@@ -495,7 +572,11 @@ def _dispatch(db, target, scope, now, client_factory):
     sent_stock = payload["inventory"]["stock"]
     db.expire_all()
     sync_rls_tenant(db, scope[0])
-    preflight_reason = _preflight(db, scope, link_revision, sent_stock)
+    preflight_reason = (
+        "provider_mode_changed"
+        if _provider_mode() != mode
+        else _preflight(db, scope, link_revision, sent_stock)
+    )
     if preflight_reason:
         row = (
             db.query(Submission)
@@ -587,7 +668,12 @@ def _dispatch(db, target, scope, now, client_factory):
         .with_for_update()
         .one()
     )
-    if state.last_request_key != request_key or row.status != "sending":
+    if (
+        state.last_request_key != request_key
+        or row.status != "sending"
+        or state.provider_mode != mode
+        or row.provider_mode != mode
+    ):
         db.rollback()
         return {"status": "uncertain", "reason": "attempt_identity_changed"}
     row.status, row.http_status, row.error_code = status, http_status, error
@@ -643,11 +729,18 @@ def poll_ifood_stock_once(*, client_factory=None, session_factory=None, now=None
             target, result = _observe(db, scope, now)
             if result is not None:
                 return result
-            return _dispatch(db, target, scope, now, client_factory or _client)
+            mode = _provider_mode()
+            return _dispatch(
+                db,
+                target,
+                scope,
+                now,
+                client_factory or (lambda: _client(expected_mode=mode)),
+            )
         except Exception:
             db.rollback()
             logger.error(
-                "[IFOOD] Ciclo de estoque DEV interrompido; nenhuma repeticao cega."
+                "[IFOOD] Ciclo de estoque interrompido; nenhuma repeticao cega."
             )
             return {"status": "blocked", "reason": "cycle_failed"}
         finally:

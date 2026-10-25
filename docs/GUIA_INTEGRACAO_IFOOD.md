@@ -2,7 +2,7 @@
 
 **Situação: rascunho, pendente de validação do vínculo e da publicação.**
 
-Última atualização: 24/10/2026. Público: responsáveis pelo catálogo de lojas
+Última atualização: 25/10/2026. Público: responsáveis pelo catálogo de lojas
 pet shop que usam ou desejam usar o iFood. Plataforma: ERP web CorePet.
 
 Este guia acompanha a implantação da integração. A consulta do catálogo e a
@@ -357,14 +357,14 @@ antigos nem de composições antigas de kits virtuais.
 Para conferir esse cenário, registre os saldos dos lotes antes da venda e
 compare cada um após cancelar. Uma reposição posterior deve criar ou aumentar
 o lote da entrada, preservando os anteriores. Repetir o cancelamento não pode
-gerar nova entrada. O ensaio e a automação continuam restritos ao DEV com
-simulador; a aplicação no iFood real exige homologação separada.
+gerar nova entrada. Esse ensaio usa DEV com simulador; a aplicação no iFood
+real segue o piloto separado descrito abaixo.
 
 Detalhes operacionais para implantação: as flags `IFOOD_STOCK_SYNC_DEV_ENABLED`
 e `IFOOD_STOCK_SYNC_POLLING_ENABLED` começam desligadas. A allowlist exige
 empresa, loja, ID do produto, SKU 227 e EAN `7898242031448` exatos; exige também
-vínculo existente e conferência do saldo. Produção/staging e URL externa são
-bloqueados nesta etapa, mesmo com credenciais herdadas. O PATCH contém apenas
+vínculo existente e conferência do saldo. No modo DEV, produção/staging e URL
+externa são bloqueados, mesmo com credenciais herdadas. O PATCH contém apenas
 `barcode` e `inventory.stock`, sem preço, promoção ou ativação do item.
 
 A rotina consulta o banco a cada 30 segundos, respeita reservas, segurança e
@@ -375,6 +375,121 @@ Nos testes automatizados, o relógio é avançado para validar a janela sem
 esperar 35 minutos reais. Referências: [atualização parcial](https://developer.ifood.com.br/en-US/docs/groceries/guides/modules/item/endpoints),
 [volumetria](https://developer.ifood.com.br/en-US/docs/groceries/guides/modules/item/introduction)
 e [processamento assíncrono](https://developer.ifood.com.br/en-US/docs/groceries/guides/modules/item/how-it-works).
+
+## Estoque automático real — piloto restrito ao SKU 227
+
+Este procedimento prepara o teste real autorizado pelo Lucas. Não registra que
+o deploy ou o teste já ocorreu. A homologação e suas evidências devem registrar
+separadamente cada resultado observado. A publicação de anúncios, a ponte de
+pedidos em DEV e a integração financeira não são ativadas por este procedimento.
+
+O único produto permitido é o SKU `227`, **Special Dog Carne Adultos 20 kg**,
+produto CorePet `5867`, EAN `7898242031448`, na loja Atacadão das Rações Avenida
+Brasil, merchant `adf87cbc-3858-413b-ae1e-3be36b1533e2`. O UUID da empresa fica
+na configuração protegida e é conferido pelo código. Informar outro tenant,
+merchant, produto, SKU ou EAN bloqueia o envio. Nenhum outro produto é liberado.
+
+O modo real exige `IFOOD_STOCK_SYNC_LIVE_ENABLED=true`,
+`IFOOD_STOCK_SYNC_POLLING_ENABLED=true`, escrita de catálogo habilitada e
+`IFOOD_STOCK_SYNC_DEV_ENABLED=false`. O ambiente e seus aliases presentes devem
+ser `production` ou `prod`, sem mistura com DEV ou staging. O endereço aceito é
+somente `https://merchant-api.ifood.com.br`, com barra final opcional. Não são
+aceitos proxies de ambiente, redirecionamento ou outro servidor neste piloto.
+
+### Publicar o código com a rotina desligada
+
+1. Conclua o gate de DEV e o CI do commit final. Compare o commit atualmente
+   servido em produção com a `main` e registre tudo que entrará no deploy.
+   Siga o [fluxo único](FLUXO_UNICO_DEV_PROD.md) e o
+   [deploy oficial](PRODUCAO_DEPLOY_SSH.md), com a autorização de produção já
+   registrada para o escopo correspondente.
+2. Antes do deploy, mantenha `IFOOD_STOCK_SYNC_LIVE_ENABLED=false` e
+   `IFOOD_STOCK_SYNC_POLLING_ENABLED=false` na configuração protegida de
+   produção. A flag DEV permanece `false`. Não copie dados, configurações de
+   simulador nem evidências do banco DEV para produção.
+3. Execute o deploy oficial, com reconstrução do backend e aplicação da
+   migração `zzzzw20261025a1`. Confira saúde dos serviços e commit servido.
+   Preserve as referências do backup e do deploy. Publicar o código com essas
+   flags desligadas não inicia a sincronização.
+4. Confira a configuração efetiva dentro do backend sem exibir credenciais.
+   O Compose de produção declara cada variável de estoque explicitamente;
+   alterar apenas o arquivo `.env` não modifica um container que já está
+   rodando. Não habilite a rotina no `worker-bling`.
+
+### Conferir a referência e testar a atualização automática
+
+1. Com a automação ainda desligada, confirme a empresa, o vínculo existente,
+   o EAN e a apresentação no CorePet e no Portal da mesma loja. O anúncio
+   precisa estar presente e ativo. Registre o estoque físico, reservas, saldo
+   disponível para o canal e preços de ERP, app, ecommerce e iFood. Preserve
+   lotes, custo, promoções e os outros produtos.
+2. Consulte o produto por uma **nova busca do EAN no catálogo do Portal**.
+   Não use apenas o recarregamento de uma página de detalhes já aberta: a URL
+   dessa tela pode carregar uma cópia antiga dos dados. Registre o saldo
+   anunciado atual e o horário da conferência.
+3. Se o Portal e o CorePet já mostrarem o mesmo saldo inteiro `S`, com `S > 1`,
+   altere temporariamente **somente o estoque desse item no Portal** para
+   `S − 1`. Não faça venda, retirada, entrada ou ajuste no estoque físico do
+   CorePet para provocar o teste. Confirme por nova busca que o Portal mostra
+   `S − 1`; a diferença deve ser de uma unidade, sem alterar preço.
+4. No mesmo componente de **Conferir vínculo e envio**, registre uma
+   conferência humana verdadeira: produto presente, ativo e saldo `S − 1`
+   efetivamente visto no Portal. Não registre `S − 1` se a alteração não
+   apareceu. Se já existir uma diferença natural entre os dois sistemas, use
+   o saldo real observado como referência, sem criar outra diferença.
+5. Preencha a configuração protegida de escopo: `IFOOD_STOCK_SYNC_TENANT_ID`
+   da empresa autorizada, `IFOOD_STOCK_SYNC_MERCHANT_ID` da loja acima,
+   `IFOOD_STOCK_SYNC_PRODUCT_ID=5867`, `IFOOD_STOCK_SYNC_SKU=227` e
+   `IFOOD_STOCK_SYNC_BARCODE=7898242031448`. Confira os identificadores antes
+   de habilitar as flags LIVE e POLLING; DEV continua desligada.
+6. Recrie somente o backend, usando a mesma imagem aprovada, para carregar a
+   configuração. Não substitua esse passo por `docker restart`. Confira que
+   o scheduler líder registrou o job do piloto real. O intervalo mínimo é de
+   30 segundos; a janela conservadora de 35 minutos continua valendo para
+   tentativas anteriores. Não avance relógio nem reduza a janela em produção.
+7. Aguarde a rotina automática ler o saldo atual do banco. No cenário sem
+   outras movimentações, ela deve enviar um PATCH com apenas o EAN e
+   `inventory.stock=S`, devolvendo o anúncio ao saldo original. Não use o
+   botão de envio manual para substituir esse teste. Acompanhe a tentativa
+   marcada como API real no cadastro e na Central do iFood.
+8. **HTTP 202 significa aceito para processamento, não aplicado.** Consulte
+   novamente o Portal até verificar o saldo `S`. Não repita PATCHes para
+   tentar acelerar o processamento. Confirme que um ciclo seguinte, sem
+   mudança de saldo, não cria outro envio.
+9. Compare todos os preços e os dados de estoque preservados com o início.
+   Registre o conteúdo do PATCH, o aceite e a conferência externa como provas
+   separadas. Se uma venda real ocorrer durante o teste, o saldo esperado
+   passa a ser o disponível atual correto; não restaure um saldo antigo.
+
+Esse teste comprova uma atualização automática real do produto autorizado.
+Venda, cancelamento e reposição já possuem ensaios próprios em DEV; só afirmar
+validação desses eventos em produção quando forem observados separadamente.
+Se `S` não permitir o teste de uma unidade, não force ajuste físico nem use
+outro produto: mantenha a rotina desligada até definir o cenário apropriado.
+
+Enquanto a automação estiver habilitada, envios manuais e alterações da
+conferência desse vínculo ficam bloqueados. Para registrar uma conferência
+posterior, desligue a rotina primeiro. Uma tentativa sem resultado conhecido
+exige conferir o Portal antes de retomar; o sistema não faz repetição cega.
+
+### Interromper ou reverter o piloto
+
+1. Defina LIVE e POLLING como `false`, mantenha DEV `false` e recrie somente
+   o backend para carregar a configuração. Confira a interrupção do job.
+   Desligar flags impede novas tentativas; não desfaz uma requisição já aceita
+   pelo iFood e não restaura estoque remotamente por conta própria.
+2. Faça nova busca no Portal e confira o saldo efetivo. Se a redução
+   temporária de uma unidade ainda estiver aplicada, restaure somente esse
+   saldo no Portal após conferir o disponível atual correto no CorePet.
+   Preserve preços, lotes, reservas e os outros produtos.
+3. Preserve `IfoodStockSyncState`, tentativas e conferências. Não apague
+   registros nem troque sua origem para desbloquear um envio. O histórico
+   distingue `local_simulator` de `ifood_api`, e mudar o modo de um estado
+   existente bloqueia o piloto.
+4. Não execute downgrade destrutivo depois de histórico real. A migração
+   recusa remover a origem quando existe estado ou tentativa automática da
+   API real. Se for necessário voltar código, revise a compatibilidade com
+   o banco e siga o [checklist de rollback](PRODUCAO_ROLLBACK_CHECKLIST.md).
 
 ## Pedido de teste no PDV — somente DEV
 
@@ -640,8 +755,9 @@ premissas de taxas. Um valor desconhecido não deve ser substituído por zero
 apenas para fazer aparecer um resultado.
 
 **O estoque já sincroniza só porque o produto está pronto?** Não. Confirme o
-vínculo e um teste real de atualização. Este piloto envia um produto por ação
-assistida; não inicia uma rotina contínua de sincronização na operação diária.
+vínculo e um teste real de atualização. Os envios assistidos continuam separados
+da rotina automática. O piloto automático real exige ativação operacional
+explícita e fica restrito ao SKU `227`; não libera a sincronização dos demais.
 
 **Pausar ou programar uma promoção no CorePet garante a mudança no iFood?**
 Não presuma esse resultado sem a validação do envio e da confirmação externa.

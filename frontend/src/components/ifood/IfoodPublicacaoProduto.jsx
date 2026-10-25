@@ -33,6 +33,7 @@ function Pendencias({ items = [] }) {
 
 export function ResumoEstoqueAutomatico({ sync, compacto = false }) {
   if (!sync) return null;
+  const real = sync.provider_mode === "ifood_api" && sync.environment === "production";
   const status =
     {
       queued: "Saldo aguardando envio",
@@ -46,10 +47,16 @@ export function ResumoEstoqueAutomatico({ sync, compacto = false }) {
       uncertain: "Resultado desconhecido; confira antes de reenviar",
     }[sync.status] || "Situação a conferir";
   if (compacto)
-    return <p className="v2-texto-ajuda mt-1 max-w-64">Estoque automático DEV: {status}.</p>;
+    return (
+      <p className="v2-texto-ajuda mt-1 max-w-64">
+        Estoque automático{real ? "" : " DEV"}: {status}.
+      </p>
+    );
   return (
     <section className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-      <h4 className="v2-titulo-secao">Estoque automático — piloto DEV</h4>
+      <h4 className="v2-titulo-secao">
+        Estoque automático — {real ? "piloto deste produto" : "piloto DEV"}
+      </h4>
       <p className="v2-texto">{status}.</p>
       <p className="v2-texto-ajuda">
         Saldo disponível atual: {quantidade(sync.desired_stock)} · Último saldo enviado ou
@@ -62,10 +69,14 @@ export function ResumoEstoqueAutomatico({ sync, compacto = false }) {
       ) : null}
       <p className="v2-texto-ajuda">
         {sync.enabled
-          ? "Piloto ativo somente para este produto em DEV."
+          ? real
+            ? "Sincronização ativa somente para este produto."
+            : "Piloto ativo somente para este produto em DEV."
           : "Piloto desativado; histórico preservado."}{" "}
-        Este ensaio usa um simulador local. O acompanhamento não comprova aplicação no iFood. Preços
-        não fazem parte desta rotina.
+        {real
+          ? "Os envios são processados pelo iFood. Confira o resultado no Portal; o aceite não confirma a aplicação."
+          : "Este ensaio usa um simulador local. O acompanhamento não comprova aplicação no iFood."}{" "}
+        Preços não fazem parte desta rotina.
       </p>
     </section>
   );
@@ -196,7 +207,9 @@ export default function IfoodPublicacaoProduto({ productId, draft = null, imagen
           <div className="space-y-5">
             <p className="v2-texto-ajuda">
               {p?.stock_sync?.enabled
-                ? "O piloto automático acompanha o estoque salvo deste produto em DEV. Envios manuais estão bloqueados enquanto ele estiver ativo."
+                ? p.stock_sync.provider_mode === "ifood_api"
+                  ? "A sincronização automática acompanha o estoque salvo deste produto. Envios manuais estão bloqueados enquanto ela estiver ativa."
+                  : "O piloto automático acompanha o estoque salvo deste produto em DEV. Envios manuais estão bloqueados enquanto ele estiver ativo."
                 : "Piloto assistido. Preparar ou salvar o cadastro não envia alterações ao iFood. Os dados usados são os da versão salva."}
             </p>
             <div className="flex flex-wrap items-start justify-between gap-3">

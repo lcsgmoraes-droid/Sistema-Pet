@@ -767,7 +767,7 @@ def start_background_jobs() -> None:
 
                 register_stock_sync_job(_campaign_scheduler.scheduler)
             except Exception:
-                logger.exception("[IFOOD] Falha ao registrar estoque automatico DEV")
+                logger.exception("[IFOOD] Falha ao registrar estoque automatico")
 
         if _env_bool("BLING_SYNC_SCHEDULER_ENABLED", True):
             try:

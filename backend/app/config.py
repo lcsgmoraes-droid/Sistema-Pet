@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     # Sincronizacao exclusiva de estoque do SKU 227 no DEV. Escopo independente
     # do piloto de pedidos; vazio/desligado nunca libera outros produtos.
     IFOOD_STOCK_SYNC_DEV_ENABLED: bool = False
+    # Piloto real opt-in, restrito ao vinculo exato do SKU 227. Nao libera DEV.
+    IFOOD_STOCK_SYNC_LIVE_ENABLED: bool = False
     IFOOD_STOCK_SYNC_POLLING_ENABLED: bool = False
     IFOOD_STOCK_SYNC_INTERVAL_SECONDS: int = 30
     IFOOD_STOCK_SYNC_TENANT_ID: str = ""
