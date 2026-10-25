@@ -205,7 +205,8 @@ def test_mode_downgrade_refuses_to_erase_real_attempt_or_state(stock_pilot, live
 
 
 def test_live_stock_sale_cancel_replenishment_concurrency_and_rls(
-    stock_pilot, monkeypatch  # noqa: F811
+    stock_pilot,
+    monkeypatch,  # noqa: F811
 ):
     from app.config import settings
     from app.estoque_entrada_manual_routes import EntradaEstoqueRequest, entrada_estoque
