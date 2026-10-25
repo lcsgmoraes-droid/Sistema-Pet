@@ -10,6 +10,7 @@ import {
 } from "../vendasFinanceiroUtils";
 import { confirmarCorePet } from "../../../services/corepetDialog";
 import useShiftRangeSelection from "../../../hooks/useShiftRangeSelection";
+import { PENDENCIA_IFOOD_LABEL, temRentabilidadePendente } from "./rentabilidadePendente.js";
 
 export function useVendasFinanceiroActions({
   carregarDados,
@@ -138,7 +139,18 @@ export function useVendasFinanceiroActions({
       ["Venda Bruta", resumo.venda_bruta],
       ["Taxa de Entrega", resumo.taxa_entrega],
       ["Desconto", resumo.desconto],
-      ["Venda Liquida", resumo.venda_liquida],
+      [
+        "Venda Liquida",
+        temRentabilidadePendente(resumo) ? PENDENCIA_IFOOD_LABEL : resumo.venda_liquida,
+      ],
+      ...(temRentabilidadePendente(resumo)
+        ? [
+            [
+              "Rentabilidade",
+              "Aguardando cobranças do iFood; taxas pendentes não representam custo zero.",
+            ],
+          ]
+        : []),
       ["Em Aberto", resumo.em_aberto],
       ["Quantidade de Vendas", resumo.quantidade_vendas],
     ];

@@ -325,6 +325,24 @@ def gerar_dre_por_canais(
 
     linhas, totais = montar_linhas_dre_competencia(dados_canais_resultado)
 
+    alertas_financial = [
+        {
+            "codigo": "ifood_financial_pendente",
+            "nivel": "atencao",
+            "canal": canal,
+            "titulo": "Taxas e margem do iFood pendentes",
+            "mensagem": (
+                "As cobrancas do iFood ainda aguardam conciliacao financeira. "
+                "A ausencia de lancamento nao confirma taxa zero. Receitas e "
+                "custos conhecidos foram preservados; lucro e margem finais "
+                "permanecem pendentes."
+            ),
+            "quantidade_vendas": int(dados.get("vendas_rentabilidade_pendente") or 0),
+        }
+        for canal, dados in dados_canais_resultado.items()
+        if dados.get("vendas_rentabilidade_pendente")
+    ]
+
     return DREPorCanalResponse(
         periodo=periodo,
         mes_inicial=mes_inicial,
@@ -334,8 +352,13 @@ def gerar_dre_por_canais(
         linhas=linhas,
         totais=totais,
         canais_encontrados=list(dados_canais_resultado.keys()),
+        rentabilidade_status=totais["rentabilidade_status"],
+        taxas_ifood_pendentes=totais["taxas_ifood_pendentes"],
+        vendas_rentabilidade_pendente=totais["vendas_rentabilidade_pendente"],
+        pendencias_rentabilidade=totais["pendencias_rentabilidade"],
         alertas=(
             _montar_alertas_cmv_estimado(dados_canais_resultado)
             + _montar_alertas_devolucoes(dados_canais_resultado)
+            + alertas_financial
         ),
     )

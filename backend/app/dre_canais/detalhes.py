@@ -272,8 +272,12 @@ def _detalhes_vendas_campo(
     detalhes: List[DREDetalheItem] = []
     for venda in vendas:
         snapshot = snapshots.get(int(venda.id), {})
-        valor = _valor_snapshot_campo(campo, venda, snapshot)
-        if abs(valor) <= Decimal("0.004"):
+        pendente = bool(snapshot.get("taxas_ifood_pendentes")) and campo in {
+            "taxas_cartao",
+            "taxas_marketplace",
+        }
+        valor = None if pendente else _valor_snapshot_campo(campo, venda, snapshot)
+        if valor is not None and abs(valor) <= Decimal("0.004"):
             continue
 
         pagamentos = []
@@ -298,13 +302,20 @@ def _detalhes_vendas_campo(
                 contraparte=cliente_nome,
                 documento=str(numero),
                 status=getattr(venda, "status", None),
-                valor=float(valor),
+                valor=float(valor) if valor is not None else None,
                 valor_auxiliar=float(_decimal(getattr(venda, "total", 0))),
                 link="/financeiro/vendas",
                 meta={
                     "canal": canal,
                     "cupom": getattr(venda, "cupom_code", None),
                     "pagamentos": ", ".join(pagamentos),
+                    "taxas_ifood_pendentes": pendente,
+                    "rentabilidade_status": snapshot.get(
+                        "rentabilidade_status", "complete"
+                    ),
+                    "pendencias_rentabilidade": snapshot.get(
+                        "pendencias_rentabilidade", []
+                    ),
                 },
             )
         )
@@ -621,8 +632,31 @@ def detalhar_linha_dre_por_canal(
             mes_inicial=mes_inicial,
             data_final=data_final,
         )
+        if campo == "taxas_marketplace":
+            detalhes.extend(
+                item
+                for item in _detalhes_vendas_campo(
+                    db,
+                    mes,
+                    ano,
+                    tenant_id,
+                    canal,
+                    campo,
+                    mes_inicial=mes_inicial,
+                    data_final=data_final,
+                )
+                if item.meta.get("taxas_ifood_pendentes")
+            )
 
     total = sum((_decimal(item.valor) for item in detalhes), Decimal("0"))
+    pendentes = [item for item in detalhes if item.meta.get("taxas_ifood_pendentes")]
+    pendencias = list(
+        dict.fromkeys(
+            mensagem
+            for item in pendentes
+            for mensagem in item.meta.get("pendencias_rentabilidade", []) or []
+        )
+    )
     pagina_items, page_size_final, pages = _paginar_detalhes(detalhes, page, page_size)
     config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG["loja_fisica"])
 
@@ -632,10 +666,14 @@ def detalhar_linha_dre_por_canal(
         canal_nome=config["nome"],
         periodo=_periodo_label_intervalo(mes_inicial, mes, ano, data_final),
         origem=ORIGENS_DRE.get(campo),
-        total=float(total),
+        total=None if pendentes else float(total),
         total_itens=len(detalhes),
         page=max(int(page or 1), 1),
         page_size=page_size_final,
         pages=pages,
         items=pagina_items,
+        rentabilidade_status="pending_ifood_financial" if pendentes else "complete",
+        taxas_ifood_pendentes=bool(pendentes),
+        vendas_rentabilidade_pendente=len(pendentes),
+        pendencias_rentabilidade=pendencias,
     )

@@ -1,6 +1,5 @@
 import { RefreshCcw, X } from "lucide-react";
-import { formatMoneyBRL } from "../../utils/formatters";
-import { formatarDataBR } from "./pontoEquilibrioUtils";
+import { formatarDataBR, valorPontoEquilibrio } from "./pontoEquilibrioUtils";
 
 export default function DetalhesPontoEquilibrioDrawer({
   linha,
@@ -45,7 +44,7 @@ export default function DetalhesPontoEquilibrioDrawer({
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <p className="text-xs font-semibold uppercase text-slate-500">Total da linha</p>
                 <p className="mt-1 text-lg font-bold text-slate-900">
-                  {formatMoneyBRL(detalhes?.total ?? linha.valor ?? 0)}
+                  {valorPontoEquilibrio(detalhes ? detalhes.total : linha.valor, detalhes || linha)}
                 </p>
               </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -106,7 +105,7 @@ export default function DetalhesPontoEquilibrioDrawer({
                         )}
                       </span>
                       <span className="text-right font-bold text-slate-900">
-                        {formatMoneyBRL(item.valor || 0)}
+                        {valorPontoEquilibrio(item.valor, item)}
                       </span>
                     </div>
                   ))}

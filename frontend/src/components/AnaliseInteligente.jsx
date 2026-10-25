@@ -5,6 +5,7 @@ import {
   compararPeriodosDRE,
   dadosCorrespondemParametrosDRE,
   extrairIndicadoresDRE,
+  formatarComparativoDRE,
   obterParametrosMesAnterior,
 } from "./dre/analiseInteligenteUtils";
 import {
@@ -490,13 +491,10 @@ const AnaliseInteligente = ({ dados, parametrosDRE }) => {
               <div key={chave} className="bg-gray-50 rounded-lg p-4">
                 <p className="text-sm text-gray-600 mb-1 capitalize">{chave}</p>
                 <p className="text-xl font-bold text-gray-800 mb-2">
-                  {chave === "margem" ? `${formatBRL(valor.atual)}%` : formatMoneyBRL(valor.atual)}
+                  {formatarComparativoDRE(valor.atual, chave)}
                 </p>
                 <p className="text-xs text-gray-500 mb-2">
-                  Anterior:{" "}
-                  {chave === "margem"
-                    ? `${formatBRL(valor.anterior)}%`
-                    : formatMoneyBRL(valor.anterior)}
+                  Anterior: {formatarComparativoDRE(valor.anterior, chave)}
                 </p>
                 {valor.variacao !== null && (
                   <div

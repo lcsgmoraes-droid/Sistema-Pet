@@ -11,6 +11,7 @@ from app.financeiro_models import FormaPagamento
 from app.models import Cliente
 from app.produtos_models import EstoqueMovimentacao
 from app.utils.timezone import now_brasilia
+from app.services.rentabilidade_pendencias import aplicar_pendencia_ifood
 from app.services.venda_descontos import (
     bruto_item,
     ratear_descontos_venda,
@@ -280,12 +281,12 @@ def _resolve_gateway_financials(venda: Any) -> Dict[str, Any]:
         "gateway_provider": provider,
         "gateway_payment_ids": payment_ids,
         "taxa_gateway": _round_money(taxa_gateway) if has_fee else None,
-        "valor_liquido_gateway": _round_money(valor_liquido_gateway)
-        if has_net
-        else None,
-        "valor_bruto_gateway": _round_money(valor_bruto_gateway)
-        if has_gateway
-        else None,
+        "valor_liquido_gateway": (
+            _round_money(valor_liquido_gateway) if has_net else None
+        ),
+        "valor_bruto_gateway": (
+            _round_money(valor_bruto_gateway) if has_gateway else None
+        ),
     }
 
 
@@ -628,9 +629,11 @@ def build_venda_rentabilidade_snapshot(
                 "taxa_loja": _round_money(taxa_loja_rateada),
                 "desconto": _round_money(desconto_rateado),
                 "desconto_item": float(descontos_item["desconto_item"]),
-                "desconto_venda": float(descontos_item["desconto_venda"])
-                if descontos_item["desconto_venda"] is not None
-                else None,
+                "desconto_venda": (
+                    float(descontos_item["desconto_venda"])
+                    if descontos_item["desconto_venda"] is not None
+                    else None
+                ),
                 "cupom_desconto": float(descontos_item["cupom"]),
                 "desconto_origem_legado": descontos_item["legado"],
                 "taxa_entrega": _round_money(taxa_entrega_rateada),
@@ -668,16 +671,21 @@ def build_venda_rentabilidade_snapshot(
     congelado = getattr(venda, "status", None) in FROZEN_STATUSES
     snapshot_em = now_brasilia().isoformat()
 
-    return {
+    snapshot = {
+        "rentabilidade_status": "complete",
+        "taxas_ifood_pendentes": False,
+        "pendencias_rentabilidade": [],
         "snapshot_version": SNAPSHOT_VERSION,
         "snapshot_em": snapshot_em,
         "snapshot_congelado": congelado,
         "venda_id": getattr(venda, "id", None),
         "numero_venda": getattr(venda, "numero_venda", None),
         "status": getattr(venda, "status", None),
-        "data_venda": getattr(venda, "data_venda", None).isoformat()
-        if getattr(venda, "data_venda", None)
-        else None,
+        "data_venda": (
+            getattr(venda, "data_venda", None).isoformat()
+            if getattr(venda, "data_venda", None)
+            else None
+        ),
         "cliente_nome": getattr(getattr(venda, "cliente", None), "nome", None)
         or "Sem cliente",
         "venda_bruta": _round_money(venda_bruta),
@@ -705,6 +713,7 @@ def build_venda_rentabilidade_snapshot(
         "margem_sobre_custo": round(margem_sobre_custo, 1),
         "itens": itens_snapshot,
     }
+    return aplicar_pendencia_ifood(venda, snapshot)
 
 
 def get_or_build_venda_rentabilidade_snapshot(
@@ -734,6 +743,9 @@ def get_or_build_venda_rentabilidade_snapshot(
         if getattr(venda, "desconto_venda_valor", None) is None:
             versoes_aceitas.add(5)
         if existing and int(existing.get("snapshot_version") or 0) in versoes_aceitas:
+            protegido = aplicar_pendencia_ifood(venda, existing)
+            if protegido.get("taxas_ifood_pendentes"):
+                return protegido
             return ajustar_snapshot_taxa_mista(venda, existing)
 
     snapshot = build_venda_rentabilidade_snapshot(

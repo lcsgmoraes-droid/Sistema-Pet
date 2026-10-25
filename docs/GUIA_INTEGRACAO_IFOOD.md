@@ -469,6 +469,20 @@ separadas, descritas nas etapas anteriores.
 
 ## Dúvidas comuns
 
+**O que significa “Pendente iFood” nos relatórios?** A venda foi registrada, mas
+as cobranças da plataforma ainda precisam ser conciliadas. O sistema mantém
+faturamento e custos conhecidos visíveis, sem apresentar taxa ausente como zero
+nem inventar lucro ou margem final. Se o período contiver uma venda pendente,
+os totais de rentabilidade desse conjunto também ficam pendentes. Filtrar outros
+canais continua mostrando os resultados conhecidos dessas vendas.
+
+Na lista de vendas, alternar impostos não elimina essa pendência. DRE, ponto de
+equilíbrio, rankings por margem e exportações preservam a mesma indicação. A
+previsão baseada no contrato continua sendo uma simulação separada. Uma taxa de
+pagamento isolada, mesmo zero, não comprova a comissão e os demais custos do
+iFood. A conclusão da conciliação e sua aplicação à margem geral ainda dependem
+da etapa Financial; o aviso não confirma recebimento do repasse no banco.
+
 **Preciso cadastrar tudo novamente?** Primeiro analise os itens já publicados.
 O objetivo é aproveitar o catálogo existente e evitar duplicidade; o vínculo
 operacional ainda precisa passar pela validação descrita neste guia.

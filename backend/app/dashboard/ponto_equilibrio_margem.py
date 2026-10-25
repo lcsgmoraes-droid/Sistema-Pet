@@ -133,12 +133,13 @@ def _ajustar_snapshot_custo_fiscal_pe(
     ):
         ajustado["imposto"] = 0.0
         ajustado["custo_fiscal_desconsiderado"] = imposto_original
-        ajustado["venda_liquida"] = _round_money(
-            _snapshot_float(ajustado, "venda_liquida") + imposto_original
-        )
-        ajustado["lucro"] = _round_money(
-            _snapshot_float(ajustado, "lucro") + imposto_original
-        )
+        if not ajustado.get("taxas_ifood_pendentes"):
+            ajustado["venda_liquida"] = _round_money(
+                _snapshot_float(ajustado, "venda_liquida") + imposto_original
+            )
+            ajustado["lucro"] = _round_money(
+                _snapshot_float(ajustado, "lucro") + imposto_original
+            )
 
     return ajustado
 
@@ -212,10 +213,16 @@ def _somar_componentes_margem_vendas_pe(
     componentes["outros_variaveis"] = (
         list(detalhes_outros_variaveis or []) if incluir_detalhes else []
     )
+    quantidade_pendente = 0
+    pendencias = []
 
     for venda_info in vendas_snapshot or []:
         snapshot = dict(venda_info.get("snapshot") or venda_info)
         nf_emitida = bool(venda_info.get("nf_emitida", False))
+        pendente = bool(snapshot.get("taxas_ifood_pendentes"))
+        if pendente:
+            quantidade_pendente += 1
+            pendencias.extend(snapshot.get("pendencias_rentabilidade") or [])
         mapa = {
             "receita_produtos_servicos": ("venda_bruta", ""),
             "receita_entrega": ("taxa_loja", ""),
@@ -227,13 +234,32 @@ def _somar_componentes_margem_vendas_pe(
             "comissoes": ("comissao", ""),
             "custo_fiscal": (
                 "imposto",
-                "Custo fiscal estimado desconsiderado nesta visao"
-                if _snapshot_float(snapshot, "custo_fiscal_desconsiderado") > 0
-                else "",
+                (
+                    "Custo fiscal estimado desconsiderado nesta visao"
+                    if _snapshot_float(snapshot, "custo_fiscal_desconsiderado") > 0
+                    else ""
+                ),
             ),
             "cmv_estimado": ("custo_produtos", ""),
         }
         for campo_total, (campo_snapshot, observacao) in mapa.items():
+            if pendente and campo_total == "taxas_cartao":
+                if incluir_detalhes:
+                    componentes[campo_total].append(
+                        {
+                            **_detalhe_venda_margem_pe(
+                                snapshot,
+                                campo=campo_total,
+                                valor=0,
+                                nf_emitida=nf_emitida,
+                                observacao="Cobrancas do iFood aguardam conciliacao financeira.",
+                            ),
+                            "valor": None,
+                            "rentabilidade_status": "pending_ifood_financial",
+                            "taxas_ifood_pendentes": True,
+                        }
+                    )
+                continue
             valor = _snapshot_float(snapshot, campo_snapshot)
             campos[campo_total] = _round_money(campos[campo_total] + valor)
             custo_fiscal_omitido = (
@@ -336,7 +362,7 @@ def _somar_componentes_margem_vendas_pe(
         },
     ]
 
-    return {
+    resultado = {
         "faturamento": faturamento,
         "faturamento_bruto": faturamento_bruto,
         "deducoes_receita": deducoes_receita,
@@ -361,6 +387,31 @@ def _somar_componentes_margem_vendas_pe(
             "componentes": componentes,
         },
     }
+    resultado.update(
+        rentabilidade_status=(
+            "pending_ifood_financial" if quantidade_pendente else "complete"
+        ),
+        taxas_ifood_pendentes=bool(quantidade_pendente),
+        vendas_rentabilidade_pendente=quantidade_pendente,
+        pendencias_rentabilidade=list(dict.fromkeys(pendencias)),
+    )
+    if quantidade_pendente:
+        for campo in ("taxas_cartao", "despesas_variaveis", "custos_variaveis"):
+            resultado[f"{campo}_conhecidos"] = resultado[campo]
+            resultado[campo] = None
+        for campo in (
+            "margem_contribuicao",
+            "margem_contribuicao_percentual",
+            "margem_decimal",
+        ):
+            resultado[campo] = None
+        for subtotal in subtotais:
+            if subtotal["id"] == "taxas_cartao":
+                subtotal["valor_conhecido"] = subtotal["valor"]
+                subtotal["valor"] = None
+                subtotal["taxas_ifood_pendentes"] = True
+                subtotal["rentabilidade_status"] = "pending_ifood_financial"
+    return resultado
 
 
 def _adicionar_meses(data_base: date, meses: int) -> date:

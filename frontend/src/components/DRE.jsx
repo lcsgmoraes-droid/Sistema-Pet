@@ -6,6 +6,10 @@ import { formatarMesLocal, obterPeriodoPresetDRE } from "../utils/drePeriodos";
 import MoneyCell from "./ui/MoneyCell";
 import NumberCell from "./ui/NumberCell";
 import DREView from "./dre/DREView";
+import {
+  PENDENCIA_IFOOD_LABEL,
+  temRentabilidadePendente,
+} from "./financeiro/vendasFinanceiro/rentabilidadePendente";
 
 const DRE_REQUEST_TIMEOUT_MS = 120000;
 
@@ -16,6 +20,7 @@ const CANAIS_DRE_PADRAO = [
   { id: "amazon", nome: "Amazon", cor: "green" },
   { id: "ecommerce", nome: "E-commerce", cor: "purple" },
   { id: "app", nome: "App", cor: "indigo" },
+  { id: "ifood", nome: "iFood", cor: "red" },
 ];
 
 const DRE_TABLE_COLUMNS = [
@@ -38,13 +43,23 @@ const DRE_TABLE_COLUMNS = [
     key: "valor",
     header: "Valor",
     align: "right",
-    render: (linha) => <MoneyCell value={linha.valor} zeroAsDash />,
+    render: (linha) =>
+      linha.valor == null && temRentabilidadePendente(linha) ? (
+        PENDENCIA_IFOOD_LABEL
+      ) : (
+        <MoneyCell value={linha.valor} zeroAsDash />
+      ),
   },
   {
     key: "percentual",
     header: "% Receita",
     align: "right",
-    render: (linha) => <NumberCell value={linha.percentual} decimals={2} suffix="%" zeroAsDash />,
+    render: (linha) =>
+      linha.percentual == null && temRentabilidadePendente(linha) ? (
+        PENDENCIA_IFOOD_LABEL
+      ) : (
+        <NumberCell value={linha.percentual} decimals={2} suffix="%" zeroAsDash />
+      ),
   },
 ];
 
@@ -74,7 +89,13 @@ const DRE_DETAIL_COLUMNS = [
     header: "Valor",
     align: "right",
     className: "font-semibold",
-    render: (item) => <MoneyCell value={item.valor} zeroAsDash />,
+    render: (item) =>
+      item.valor == null &&
+      (temRentabilidadePendente(item) || temRentabilidadePendente(item.meta)) ? (
+        PENDENCIA_IFOOD_LABEL
+      ) : (
+        <MoneyCell value={item.valor} zeroAsDash />
+      ),
   },
 ];
 
@@ -192,6 +213,7 @@ const DRE = () => {
   };
 
   const formatarPercentual = (valor) => {
+    if (valor == null) return "—";
     return `${(valor || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
   };
 
@@ -203,6 +225,7 @@ const DRE = () => {
   };
 
   const calcularPercentual = (valor, total) => {
+    if (valor == null || total == null) return null;
     if (!total || total === 0) return 0;
     return (valor / total) * 100;
   };

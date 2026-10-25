@@ -41,6 +41,11 @@ import { useTour } from "../../hooks/useTour";
 import { useTheme } from "../../theme/ThemeContext";
 import { tourDashboard } from "../../tours/tourDefinitions";
 import { formatMoneyBRL } from "../../utils/formatters";
+import {
+  descreverRentabilidadePendente,
+  PENDENCIA_IFOOD_LABEL,
+  temRentabilidadePendente,
+} from "../../components/financeiro/vendasFinanceiro/rentabilidadePendente.js";
 import { formatarDataLocal } from "../../components/financeiro/vendasFinanceiro/vendasFinanceiroDatas";
 import {
   calculateDashboardIndicators,
@@ -245,7 +250,8 @@ export default function DashboardFinanceiro() {
   const cashResult = Number(summary?.fluxo_periodo?.lucro || 0);
   const salesCount = Number(summary?.vendas_periodo?.quantidade || 0);
   const unitsSold = Number(summary?.vendas_periodo?.unidades || 0);
-  const salesProfit = Number(summary?.vendas_periodo?.lucro || 0);
+  const salesProfitPending = temRentabilidadePendente(summary?.vendas_periodo);
+  const salesProfit = salesProfitPending ? null : Number(summary?.vendas_periodo?.lucro || 0);
   const displayedBalance = bankBalance ?? Number(summary?.saldo_atual || 0);
   const hasChartMovement = cashFlow.some(
     (item) => Number(item?.entradas || 0) !== 0 || Number(item?.saidas || 0) !== 0,
@@ -427,13 +433,17 @@ export default function DashboardFinanceiro() {
           </CartaoIndicador>
           <CartaoIndicador
             icone={BarChart3}
-            tom={salesProfit >= 0 ? "sucesso" : "perigo"}
+            tom={salesProfitPending ? "atencao" : salesProfit >= 0 ? "sucesso" : "perigo"}
             titulo="Lucro das vendas"
-            detalhe="Após custos e deduções de cada venda"
+            detalhe={
+              salesProfitPending
+                ? descreverRentabilidadePendente(summary?.vendas_periodo)
+                : "Após custos e deduções de cada venda"
+            }
             aoClicar={() => navigate("/financeiro/dre")}
           >
             <p className="text-2xl font-bold leading-tight text-slate-950 dark:text-white">
-              {formatMoneyBRL(salesProfit)}
+              {salesProfitPending ? PENDENCIA_IFOOD_LABEL : formatMoneyBRL(salesProfit)}
             </p>
           </CartaoIndicador>
         </div>

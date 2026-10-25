@@ -1,5 +1,6 @@
 import { parseDataHoraLocal } from "./vendasFinanceiroDatas.js";
 import { sanitizarNumero } from "./vendasFinanceiroRelatorio.js";
+import { temRentabilidadePendente } from "./rentabilidadePendente.js";
 function arredondarMoeda(valor) {
   return Math.round((Number(valor) || 0) * 100) / 100;
 }
@@ -22,6 +23,7 @@ export function calcularAnaliseInteligenteVendas({
   }
 
   const produtosComMargem = produtosAnalise.map((produto) => {
+    const pendente = temRentabilidadePendente(produto);
     const custo = sanitizarNumero(produto.custo_total);
     const preco = sanitizarNumero(produto.valor_total);
     const quantidade = sanitizarNumero(produto.quantidade) || 1;
@@ -34,13 +36,15 @@ export function calcularAnaliseInteligenteVendas({
       quantidade,
       custo: sanitizarNumero(custo / quantidade),
       preco: sanitizarNumero(preco / quantidade),
-      lucro_total: sanitizarNumero(lucro),
-      margem: sanitizarNumero(margem),
+      lucro_total: pendente ? null : sanitizarNumero(lucro),
+      margem: pendente ? null : sanitizarNumero(margem),
+      ...(pendente && { taxas_ifood_pendentes: true }),
       categoria: produto.categoria || "Sem Categoria",
     };
   });
 
   const produtosMaisLucrativos = [...produtosComMargem]
+    .filter((produto) => !temRentabilidadePendente(produto))
     .sort((a, b) => b.lucro_total - a.lucro_total)
     .slice(0, 20);
   const produtosPorCategoria = {};
@@ -55,7 +59,11 @@ export function calcularAnaliseInteligenteVendas({
     }
     produtosPorCategoria[categoria].quantidade += produto.quantidade;
     produtosPorCategoria[categoria].total += produto.preco * produto.quantidade;
-    produtosPorCategoria[categoria].margens.push(produto.margem);
+    if (temRentabilidadePendente(produto)) {
+      produtosPorCategoria[categoria].taxas_ifood_pendentes = true;
+    } else {
+      produtosPorCategoria[categoria].margens.push(produto.margem);
+    }
   });
 
   Object.keys(produtosPorCategoria).forEach((categoria) => {
@@ -64,9 +72,11 @@ export function calcularAnaliseInteligenteVendas({
       (total, margem) => sanitizarNumero(total) + sanitizarNumero(margem),
       0,
     );
-    produtosPorCategoria[categoria].margem_media = sanitizarNumero(
-      margens.length > 0 ? somaMargens / margens.length : 0,
-    );
+    produtosPorCategoria[categoria].margem_media = temRentabilidadePendente(
+      produtosPorCategoria[categoria],
+    )
+      ? null
+      : sanitizarNumero(margens.length > 0 ? somaMargens / margens.length : 0);
     delete produtosPorCategoria[categoria].margens;
   });
   const alertasInteligentesVendas = [];
@@ -100,7 +110,9 @@ export function calcularAnaliseInteligenteVendas({
     }
   }
 
-  const baixaMargem = produtosComMargem.filter((produto) => produto.margem < 20).length;
+  const baixaMargem = produtosComMargem.filter(
+    (produto) => !temRentabilidadePendente(produto) && produto.margem < 20,
+  ).length;
   if (baixaMargem >= 5) {
     alertasInteligentesVendas.push({
       id: "mix-baixa-margem",
@@ -186,6 +198,7 @@ export function calcularDistribuicaoTemporalVendasFinanceiro(vendas = []) {
       dia.quantidade += 1;
       dia.valor_bruto += Number(venda.venda_bruta || 0);
       dia.valor_liquido += Number(venda.venda_liquida || 0);
+      if (temRentabilidadePendente(venda)) dia.taxas_ifood_pendentes = true;
     }
 
     const hora = horas[data.getHours()];
@@ -193,16 +206,27 @@ export function calcularDistribuicaoTemporalVendasFinanceiro(vendas = []) {
       hora.quantidade += 1;
       hora.valor_bruto += Number(venda.venda_bruta || 0);
       hora.valor_liquido += Number(venda.venda_liquida || 0);
+      if (temRentabilidadePendente(venda)) hora.taxas_ifood_pendentes = true;
     }
   });
 
   const vendasPorDiaSemanaResumo = Array.from(mapaDias.values()).map((item) => ({
     ...item,
-    ticket_medio: item.quantidade > 0 ? item.valor_liquido / item.quantidade : 0,
+    valor_liquido: temRentabilidadePendente(item) ? null : item.valor_liquido,
+    ticket_medio: temRentabilidadePendente(item)
+      ? null
+      : item.quantidade > 0
+        ? item.valor_liquido / item.quantidade
+        : 0,
   }));
   const vendasPorHorarioResumo = horas.map((item) => ({
     ...item,
-    ticket_medio: item.quantidade > 0 ? item.valor_liquido / item.quantidade : 0,
+    valor_liquido: temRentabilidadePendente(item) ? null : item.valor_liquido,
+    ticket_medio: temRentabilidadePendente(item)
+      ? null
+      : item.quantidade > 0
+        ? item.valor_liquido / item.quantidade
+        : 0,
   }));
   const vendasPorHorarioComMovimento = vendasPorHorarioResumo.filter((item) => item.quantidade > 0);
 
@@ -210,16 +234,21 @@ export function calcularDistribuicaoTemporalVendasFinanceiro(vendas = []) {
     vendasPorDiaSemanaResumo,
     vendasPorHorarioResumo,
     vendasPorHorarioComMovimento,
-    melhorDiaSemana: [...vendasPorDiaSemanaResumo].sort(
-      (a, b) => Number(b.valor_liquido || 0) - Number(a.valor_liquido || 0),
-    )[0],
-    melhorHorario: [...vendasPorHorarioComMovimento].sort(
-      (a, b) => Number(b.valor_liquido || 0) - Number(a.valor_liquido || 0),
-    )[0],
+    melhorDiaSemana: (vendas || []).some(temRentabilidadePendente)
+      ? { taxas_ifood_pendentes: true }
+      : [...vendasPorDiaSemanaResumo].sort(
+          (a, b) => Number(b.valor_liquido || 0) - Number(a.valor_liquido || 0),
+        )[0],
+    melhorHorario: (vendas || []).some(temRentabilidadePendente)
+      ? { taxas_ifood_pendentes: true }
+      : [...vendasPorHorarioComMovimento].sort(
+          (a, b) => Number(b.valor_liquido || 0) - Number(a.valor_liquido || 0),
+        )[0],
   };
 }
 
 export function montarFluxoResultadoCardsFinanceiro(resumo = {}) {
+  const pendente = temRentabilidadePendente(resumo);
   const taxaLoja = Number(resumo.taxa_loja_total || 0);
   const repasseEntrega = Number(resumo.taxa_entrega_repasse_total ?? resumo.taxa_entrega ?? 0);
   const taxaOperacional = Number(resumo.taxa_operacional_total || 0);
@@ -263,8 +292,11 @@ export function montarFluxoResultadoCardsFinanceiro(resumo = {}) {
     {
       sinal: "-",
       titulo: "Cartao",
-      valor: taxasCartao,
-      detalhe: "Taxas das operadoras de cartao.",
+      valor: pendente ? null : taxasCartao,
+      ...(pendente && { pendente: true }),
+      detalhe: pendente
+        ? "Cobranças do iFood ainda não conhecidas."
+        : "Taxas das operadoras de cartao.",
       cor: "border-purple-200 bg-purple-50 text-purple-800",
     },
     {
@@ -291,7 +323,8 @@ export function montarFluxoResultadoCardsFinanceiro(resumo = {}) {
     {
       sinal: "=",
       titulo: "Venda Liquida",
-      valor: Number(resumo.venda_liquida || 0),
+      valor: pendente ? null : Number(resumo.venda_liquida || 0),
+      ...(pendente && { pendente: true }),
       detalhe: "Resultado antes do custo dos produtos.",
       cor: "border-sky-200 bg-sky-50 text-sky-800",
     },
@@ -320,17 +353,20 @@ export function montarFluxoResultadoCardsFinanceiro(resumo = {}) {
     {
       sinal: "=",
       titulo: "Lucro",
-      valor: lucro,
+      valor: pendente ? null : lucro,
+      ...(pendente && { pendente: true }),
       detalhe: "Venda liquida menos custo dos produtos.",
-      cor:
-        lucro >= 0
+      cor: pendente
+        ? "border-amber-200 bg-amber-50 text-amber-800"
+        : lucro >= 0
           ? "border-green-200 bg-green-50 text-green-800"
           : "border-red-200 bg-red-50 text-red-800",
     },
     {
       sinal: "%",
       titulo: "Margem",
-      valor: Number(resumo.margem_media || 0),
+      valor: pendente ? null : Number(resumo.margem_media || 0),
+      ...(pendente && { pendente: true }),
       detalhe: "Lucro sobre a venda liquida.",
       percentual: true,
       cor: "border-teal-200 bg-teal-50 text-teal-800",

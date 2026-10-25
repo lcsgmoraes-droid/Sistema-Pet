@@ -3,6 +3,22 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from app.services.rentabilidade_pendencias import (
+    PENDING_IFOOD_FINANCIAL,
+    PENDENCIA_IFOOD,
+    venda_aguarda_financial_ifood,
+)
+
+
+def _pendencia_periodo(vendas):
+    quantidade = sum(venda_aguarda_financial_ifood(venda) for venda in vendas)
+    return {
+        "rentabilidade_status": PENDING_IFOOD_FINANCIAL if quantidade else "complete",
+        "taxas_ifood_pendentes": bool(quantidade),
+        "vendas_rentabilidade_pendente": quantidade,
+        "pendencias_rentabilidade": [PENDENCIA_IFOOD] if quantidade else [],
+    }
+
 
 class ChatIAMetricasMixin:
     def _obter_resumo_vendas_periodo(
@@ -89,7 +105,12 @@ class ChatIAMetricasMixin:
                         "quantidade": 0.0,
                         "receita": 0.0,
                         "custo": 0.0,
+                        "taxas_ifood_pendentes": False,
                     }
+
+                acumulado[nome]["taxas_ifood_pendentes"] |= (
+                    venda_aguarda_financial_ifood(venda)
+                )
 
                 acumulado[nome]["quantidade"] += qtd
                 acumulado[nome]["receita"] += receita
@@ -107,15 +128,25 @@ class ChatIAMetricasMixin:
                     "produto": dados["produto"],
                     "quantidade": round(dados["quantidade"], 2),
                     "receita": round(receita, 2),
-                    "lucro": round(lucro, 2),
-                    "margem_percentual": round(margem, 2),
+                    "lucro": (
+                        None if dados["taxas_ifood_pendentes"] else round(lucro, 2)
+                    ),
+                    "margem_percentual": (
+                        None if dados["taxas_ifood_pendentes"] else round(margem, 2)
+                    ),
+                    "taxas_ifood_pendentes": dados["taxas_ifood_pendentes"],
                 }
             )
 
         top_vendidos = sorted(lista, key=lambda x: x["quantidade"], reverse=True)[
             :limite
         ]
-        top_margem = [p for p in lista if p["receita"] > 0]
+        pendencia = _pendencia_periodo(vendas)
+        top_margem = (
+            []
+            if pendencia["taxas_ifood_pendentes"]
+            else [p for p in lista if p["receita"] > 0]
+        )
         top_margem = sorted(
             top_margem, key=lambda x: x["margem_percentual"], reverse=True
         )[:limite]
@@ -123,6 +154,7 @@ class ChatIAMetricasMixin:
         return {
             "top_vendidos": top_vendidos,
             "top_margem": top_margem,
+            **pendencia,
         }
 
     def _obter_dre_simplificada_mes(
@@ -199,6 +231,7 @@ class ChatIAMetricasMixin:
             (lucro_liquido / receita_bruta * 100) if receita_bruta > 0 else 0.0
         )
 
+        pendencia = _pendencia_periodo(vendas)
         return {
             "receita_bruta": round(receita_bruta, 2),
             "descontos": round(descontos, 2),
@@ -206,8 +239,13 @@ class ChatIAMetricasMixin:
             "cmv_estimado": round(cmv_estimado, 2),
             "lucro_bruto": round(lucro_bruto, 2),
             "despesas_operacionais": round(despesas_operacionais, 2),
-            "lucro_liquido_estimado": round(lucro_liquido, 2),
-            "margem_liquida_estimada": round(margem_liquida, 2),
+            "lucro_liquido_estimado": (
+                None if pendencia["taxas_ifood_pendentes"] else round(lucro_liquido, 2)
+            ),
+            "margem_liquida_estimada": (
+                None if pendencia["taxas_ifood_pendentes"] else round(margem_liquida, 2)
+            ),
+            **pendencia,
         }
 
     def _obter_rankings_periodo(
@@ -329,10 +367,16 @@ class ChatIAMetricasMixin:
         top_canais.sort(key=lambda item: item["receita"], reverse=True)
         top_clientes.sort(key=lambda item: item["valor_total"], reverse=True)
 
+        pendencia = _pendencia_periodo(vendas)
         return {
-            "top_categorias_margem": top_categorias_margem[:limite],
+            "top_categorias_margem": (
+                []
+                if pendencia["taxas_ifood_pendentes"]
+                else top_categorias_margem[:limite]
+            ),
             "top_canais": top_canais[:limite],
             "top_clientes": top_clientes[:limite],
+            **pendencia,
         }
 
     def _montar_resumo_executivo_periodo(

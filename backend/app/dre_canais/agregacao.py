@@ -916,6 +916,14 @@ def obter_vendas_por_canal(
             estoque_custos_por_venda.get(venda.id, {}),
             tenant_id,
         )
+        if snapshot.get("taxas_ifood_pendentes"):
+            dados["vendas_rentabilidade_pendente"] += 1
+            dados["pendencias_rentabilidade"] = list(
+                dict.fromkeys(
+                    dados["pendencias_rentabilidade"]
+                    + list(snapshot.get("pendencias_rentabilidade") or [])
+                )
+            )
         _registrar_base_estimativa_cmv(
             venda,
             canal,

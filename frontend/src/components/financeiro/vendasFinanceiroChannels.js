@@ -1,6 +1,7 @@
 import {
   CANAL_APP,
   CANAL_ECOMMERCE,
+  CANAL_IFOOD,
   CANAL_LOJA_FISICA,
   CANAL_WHATSAPP,
   normalizeSalesChannel,
@@ -49,6 +50,14 @@ export const VENDAS_FINANCEIRO_CHANNEL_FILTERS = [
     description: "Site da loja",
     activeClass: "bg-purple-600 text-white border-purple-600",
     idleClass: "bg-purple-50 text-purple-700 border-purple-200 hover:border-purple-300",
+  },
+  {
+    value: CANAL_IFOOD,
+    label: "iFood",
+    filterLabel: "iFood",
+    description: "Marketplace iFood",
+    activeClass: "bg-red-600 text-white border-red-600",
+    idleClass: "bg-red-50 text-red-700 border-red-200 hover:border-red-300",
   },
   {
     value: CANAL_WHATSAPP,

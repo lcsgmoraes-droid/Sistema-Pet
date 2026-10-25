@@ -1,4 +1,5 @@
 import { calcularValorRecebidoVenda } from "./vendasFinanceiroRelatorio.js";
+import { PENDENCIA_IFOOD_LABEL, temRentabilidadePendente } from "./rentabilidadePendente.js";
 
 export const RESUMO_VENDAS_VAZIO = {
   venda_bruta: 0,
@@ -50,6 +51,7 @@ export function calcularTotalizadoresListaVendasFinanceiro(vendas = []) {
       acc.valor_recebido += calcularValorRecebidoVenda(venda);
       acc.custo_produtos += Number(venda.custo_produtos || 0);
       acc.lucro += Number(venda.lucro || 0);
+      if (temRentabilidadePendente(venda)) acc.vendas_rentabilidade_pendente += 1;
       if (vendaTemNotaFiscal(venda)) acc.com_nf += 1;
       return acc;
     },
@@ -69,15 +71,28 @@ export function calcularTotalizadoresListaVendasFinanceiro(vendas = []) {
       custo_produtos: 0,
       lucro: 0,
       com_nf: 0,
+      vendas_rentabilidade_pendente: 0,
     },
   );
 
+  const pendente = totais.vendas_rentabilidade_pendente > 0;
   return {
     ...totais,
-    margem_sobre_venda:
-      totais.venda_bruta > 0 ? arredondarPercentual((totais.lucro / totais.venda_bruta) * 100) : 0,
-    margem_sobre_custo:
-      totais.custo_produtos > 0
+    ...(pendente && {
+      rentabilidade_status: "pending_ifood_financial",
+      taxas_ifood_pendentes: true,
+      taxa_cartao: null,
+      venda_liquida: null,
+      lucro: null,
+    }),
+    margem_sobre_venda: pendente
+      ? null
+      : totais.venda_bruta > 0
+        ? arredondarPercentual((totais.lucro / totais.venda_bruta) * 100)
+        : 0,
+    margem_sobre_custo: pendente
+      ? null
+      : totais.custo_produtos > 0
         ? arredondarPercentual((totais.lucro / totais.custo_produtos) * 100)
         : 0,
   };
@@ -91,7 +106,11 @@ export function montarCardsTotalizadoresListaVendasFinanceiro(
     formatarPercentualOuTraco = (valor) => String(Number(valor || 0)),
   } = {},
 ) {
-  const formatarDeducao = (valor) => formatarMoedaComSinalOuTraco(valor, "-");
+  const pendente = temRentabilidadePendente(totalizadores);
+  const formatarDeducao = (valor) =>
+    valor === null && pendente ? PENDENCIA_IFOOD_LABEL : formatarMoedaComSinalOuTraco(valor, "-");
+  const formatarResultado = (valor, formatar) =>
+    valor === null && pendente ? PENDENCIA_IFOOD_LABEL : formatar(valor);
 
   return [
     {
@@ -139,7 +158,7 @@ export function montarCardsTotalizadoresListaVendasFinanceiro(
     },
     {
       label: "Liquida",
-      value: formatarMoedaOuTraco(totalizadores.venda_liquida),
+      value: formatarResultado(totalizadores.venda_liquida, formatarMoedaOuTraco),
       intent: "blue",
     },
     {
@@ -150,17 +169,17 @@ export function montarCardsTotalizadoresListaVendasFinanceiro(
     { label: "Custo", value: formatarDeducao(totalizadores.custo_produtos), intent: "amber" },
     {
       label: "Lucro",
-      value: formatarMoedaOuTraco(totalizadores.lucro),
-      intent: Number(totalizadores.lucro || 0) >= 0 ? "emerald" : "red",
+      value: formatarResultado(totalizadores.lucro, formatarMoedaOuTraco),
+      intent: pendente ? "amber" : Number(totalizadores.lucro || 0) >= 0 ? "emerald" : "red",
     },
     {
       label: "MG Venda",
-      value: formatarPercentualOuTraco(totalizadores.margem_sobre_venda),
+      value: formatarResultado(totalizadores.margem_sobre_venda, formatarPercentualOuTraco),
       intent: "slate",
     },
     {
       label: "MG Custo",
-      value: formatarPercentualOuTraco(totalizadores.margem_sobre_custo),
+      value: formatarResultado(totalizadores.margem_sobre_custo, formatarPercentualOuTraco),
       intent: "slate",
     },
   ];
@@ -170,6 +189,9 @@ function ajustarItemImposto(item, aplicarImposto) {
   if (aplicarImposto) return item;
 
   const impostoOriginal = Number(item?.imposto || 0);
+  if (temRentabilidadePendente(item)) {
+    return { ...item, imposto_original: impostoOriginal, imposto: 0 };
+  }
   const vendaBruta = Number(item?.venda_bruta || 0);
   const custoTotal = Number(item?.custo_total || 0);
   const valorLiquido = arredondarMoeda(Number(item?.valor_liquido || 0) + impostoOriginal);
@@ -197,6 +219,17 @@ export function ajustarVendaImposto(venda, mostrarImpostoTodasVendas) {
   }
 
   const impostoOriginal = Number(venda?.imposto || 0);
+  if (temRentabilidadePendente(venda)) {
+    return {
+      ...venda,
+      imposto_aplicado: false,
+      imposto_original: impostoOriginal,
+      imposto: 0,
+      itens: Array.isArray(venda?.itens)
+        ? venda.itens.map((item) => ajustarItemImposto(item, false))
+        : [],
+    };
+  }
   const vendaBruta = Number(venda?.venda_bruta || 0);
   const custoProdutos = Number(venda?.custo_produtos || 0);
   const vendaLiquida = arredondarMoeda(Number(venda?.venda_liquida || 0) + impostoOriginal);

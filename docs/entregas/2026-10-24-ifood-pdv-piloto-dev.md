@@ -204,10 +204,35 @@ bloqueio. Sucesso exige contagens e saldo coerentes no banco, não apenas um sel
 visual ou HTTP 202. Reenvio, evento remoto e sacola alterada precisam preservar a
 evidência e explicar a impossibilidade de continuar.
 
-Os relatórios gerais ainda não tratam o estado `awaiting_financial` como margem
-pendente e não foram homologados para avaliar este piloto online. A pendência
-P2 permanece: não usar margem ou totais gerais para autorizar expansão de
-produtos/lojas ou produção. O financeiro geral não foi alterado nesta tarefa.
+Após o pedido oficial, a proteção dos relatórios foi adicionada em DEV: vendas
+iFood permanecem `pending_ifood_financial`, com taxas desconhecidas, líquido após
+despesas, lucro e margens nulos. Isso também protege snapshots antigos e o
+reprocessamento, sem recalcular os custos congelados durante uma leitura.
+Relatório de vendas, dashboard, DRE, ponto de equilíbrio, rankings/IA e suas
+exportações não transformam a pendência em zero. Totais mistos também ficam
+pendentes, preservando faturamento, quantidades e custos conhecidos. O canal
+iFood possui identificação própria na lista e na DRE.
+
+Na API do perfil Gestor, resultados desconhecidos ficam nulos e a DRE fica
+indisponível com aviso específico, pois clientes mobile instalados ainda não
+possuem apresentação de pendências. Nenhum código/binário mobile foi publicado.
+
+A validação real local consultou os dois pedidos já existentes, incluindo o
+oficial #1420, sem criar vendas, pagamentos ou movimentos. Resultado: receita
+operacional R$ 138,90, produtos R$ 130,00, CMV conhecido R$ 87,88 e duas vendas
+com margem pendente. PDF e Excel gerados pela API continham “Pendente iFood”.
+O segundo tenant permaneceu sem vendas e sem pendências. A conferência visual
+incluiu lista, alternância de impostos, DRE e simulador do ponto de equilíbrio.
+Os testes novos integram os gates de CI e release; resultados finais devem ser
+conferidos na revisão do PR. Evidência local: `pending-reports-api-proof.json`.
+
+Essa proteção resolve a apresentação de lucro indevido por taxas ausentes;
+não conclui a conciliação Financial. Taxa de pagamento preenchida, inclusive
+zero, pagamento online e previsão contratual não comprovam todas as cobranças.
+O extrato de homologação ainda não publica um fechamento canônico na
+rentabilidade geral da Venda; até esse vínculo ser implementado e validado,
+nenhum valor isolado libera a margem final iFood. Não usar esse aceite para
+ampliar automaticamente o piloto ou habilitar produção.
 
 Falhas previstas: loja de testes não configurada, acesso do consumidor
 indisponível, pedido fora da allowlist, condição comercial não suportada e falha

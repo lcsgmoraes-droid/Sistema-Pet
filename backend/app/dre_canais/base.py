@@ -14,9 +14,14 @@ from app.services.venda_rentabilidade_snapshot_service import (
     SNAPSHOT_VERSION,
     ajustar_snapshot_taxa_mista,
 )
-
+from app.services.rentabilidade_pendencias import aplicar_pendencia_ifood
 
 CANAIS_CONFIG = {
+    "ifood": {
+        "nome": "iFood",
+        "cor": "#ea1d2c",
+        "cor_bg": "#fff1f2",
+    },
     "loja_fisica": {
         "nome": "Loja Física",
         "cor": "#3b82f6",  # Azul
@@ -133,7 +138,7 @@ def _snapshot_pronto(venda: Venda) -> Optional[Dict[str, Any]]:
     except (TypeError, ValueError):
         version = 0
     return (
-        ajustar_snapshot_taxa_mista(venda, snapshot)
+        aplicar_pendencia_ifood(venda, ajustar_snapshot_taxa_mista(venda, snapshot))
         if version >= SNAPSHOT_VERSION
         or (version == 5 and getattr(venda, "desconto_venda_valor", None) is None)
         else None
@@ -146,6 +151,8 @@ def _campo_zero() -> Decimal:
 
 def _novo_canal() -> Dict:
     return {
+        "vendas_rentabilidade_pendente": 0,
+        "pendencias_rentabilidade": [],
         "receita_produtos": _campo_zero(),
         "receita_servicos": _campo_zero(),
         "receita_frete": _campo_zero(),

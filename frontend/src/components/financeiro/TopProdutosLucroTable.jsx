@@ -1,6 +1,11 @@
 import DataTable from "../ui/DataTable";
 import MoneyCell from "../ui/MoneyCell";
 import NumberCell from "../ui/NumberCell";
+import RentabilidadeCell from "./RentabilidadeCell.jsx";
+import {
+  PENDENCIA_IFOOD_LABEL,
+  temRentabilidadePendente,
+} from "./vendasFinanceiro/rentabilidadePendente.js";
 
 function toNumber(value) {
   const numericValue = Number(value);
@@ -29,7 +34,11 @@ function RankBadge({ index }) {
   );
 }
 
-function MargemBadge({ value }) {
+function MargemBadge({ value, dados }) {
+  if (temRentabilidadePendente(dados))
+    return (
+      <span className="text-xs text-amber-800 dark:text-amber-300">{PENDENCIA_IFOOD_LABEL}</span>
+    );
   const margem = toNumber(value);
   const tone =
     margem >= 50
@@ -92,16 +101,17 @@ export default function TopProdutosLucroTable({ produtos = [] }) {
           key: "margem",
           header: "Margem %",
           align: "right",
-          render: (produto) => <MargemBadge value={produto.margem} />,
+          render: (produto) => <MargemBadge dados={produto} value={produto.margem} />,
         },
         {
           key: "lucro",
           header: "Lucro total",
           align: "right",
           render: (produto) => (
-            <MoneyCell
+            <RentabilidadeCell
+              dados={produto}
               className="font-bold text-emerald-700"
-              value={toNumber(produto.lucro_total)}
+              value={produto.lucro_total}
               zeroAsDash
             />
           ),

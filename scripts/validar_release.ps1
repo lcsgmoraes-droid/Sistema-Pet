@@ -225,6 +225,18 @@ Invoke-GateStep 'Backend iFood safety contracts' $python @(
     'tests/unit/test_produto_origem_historico.py', '-q'
 ) $backend
 
+Invoke-GateStep 'iFood pending fees reporting regression' $python @(
+    '-m', 'pytest', 'tests/unit/test_ifood_rentabilidade_pendente.py',
+    'tests/unit/test_ifood_rentabilidade_dre_pe_pendente.py',
+    'tests/unit/test_venda_rentabilidade_snapshot.py',
+    'tests/unit/test_venda_rentabilidade_reprocessamento_service.py',
+    'tests/unit/test_dashboard_resumo_numeric_types.py',
+    'tests/unit/test_aba6_chat_ia_metricas.py',
+    'tests/unit/test_aba6_chat_ia_periodos.py',
+    'tests/unit/test_aba6_chat_ia_respostas.py',
+    'tests/unit/test_app_mobile_gestor_contract.py', '-q'
+) $backend
+
 if ($Nivel -eq 'rapido') {
     Write-Host "`nOK: gate rapido passou." -ForegroundColor Green
     exit 0

@@ -2,6 +2,7 @@ import { formatMoneyBRL } from "../../utils/formatters";
 import {
   linhaValorClassName,
   montarLinhasDetalhamentoPontoEquilibrio,
+  valorPontoEquilibrio,
 } from "./pontoEquilibrioUtils";
 
 export default function DetalhamentoMargemPanel({ dados, onAbrirDetalhes }) {
@@ -36,8 +37,9 @@ export default function DetalhamentoMargemPanel({ dados, onAbrirDetalhes }) {
                 <span className="block truncate text-xs text-slate-500">{linha.origem}</span>
               </span>
               <span className={`font-bold sm:text-right ${linhaValorClassName(linha.tipo)}`}>
-                {linha.tipo === "receita" ? "+" : linha.tipo === "informativo" ? "" : "-"}{" "}
-                {formatMoneyBRL(Math.abs(linha.valor || 0))}
+                {linha.valor == null
+                  ? valorPontoEquilibrio(null, dados)
+                  : `${linha.tipo === "receita" ? "+ " : linha.tipo === "informativo" ? "" : "- "}${formatMoneyBRL(Math.abs(linha.valor))}`}
               </span>
               <span className="sm:text-right">
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
