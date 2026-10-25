@@ -50,3 +50,34 @@ test("dados monetarios desconhecidos nao viram zero e offline nao exibe comprova
   assert.equal((text.match(/Não informado/g) || []).length, 5);
   assert.doesNotMatch(text, /R\$\s*0,00/);
 });
+
+test("margem com cobranças completas não depende de recebimento bancário e simulação não libera lucro real", () => {
+  const bridge = {
+    payment_mode: "online",
+    payment: { status: "approved" },
+    receivable: { received_amount: 0 },
+    ifood_financial: { complete: true, charges: [], pending_components: [] },
+    ifood_rentabilidade: {
+      lucro: 17.46,
+      margem_sobre_venda: 26.9,
+      rentabilidade_status: "complete",
+    },
+  };
+  const text = elementText(render(bridge));
+  assert.match(text, /Contribuição da venda:.*17,46.*26,9%/s);
+  assert.match(text, /Repasse a conciliar/);
+  assert.match(text, /não confirma recebimento no banco/);
+  assert.doesNotMatch(text, /margem aguardam o Financial/);
+  const simulada = elementText(
+    render({
+      ...bridge,
+      ifood_financial: { complete: false, simulated: true, simulation_complete: true },
+      ifood_rentabilidade: {
+        lucro: null,
+        margem_sobre_venda: null,
+        rentabilidade_status: "pending_ifood_financial",
+      },
+    }),
+  );
+  assert.doesNotMatch(simulada, /Contribuição da venda:/);
+});

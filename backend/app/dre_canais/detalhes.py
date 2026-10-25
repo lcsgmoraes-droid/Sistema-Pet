@@ -272,12 +272,26 @@ def _detalhes_vendas_campo(
     detalhes: List[DREDetalheItem] = []
     for venda in vendas:
         snapshot = snapshots.get(int(venda.id), {})
-        pendente = bool(snapshot.get("taxas_ifood_pendentes")) and campo in {
-            "taxas_cartao",
-            "taxas_marketplace",
-        }
+        origem_taxa = {
+            "taxas_cartao": "taxa_cartao",
+            "taxas_marketplace": "taxa_ifood",
+        }.get(campo)
+        pendente = (
+            bool(snapshot.get("taxas_ifood_pendentes"))
+            and bool(origem_taxa)
+            and snapshot.get(origem_taxa) is None
+        )
         valor = None if pendente else _valor_snapshot_campo(campo, venda, snapshot)
-        if valor is not None and abs(valor) <= Decimal("0.004"):
+        taxa_ifood_conhecida = (
+            bool(origem_taxa)
+            and bool(snapshot.get("ifood_financial"))
+            and snapshot.get(origem_taxa) is not None
+        )
+        if (
+            valor is not None
+            and abs(valor) <= Decimal("0.004")
+            and not taxa_ifood_conhecida
+        ):
             continue
 
         pagamentos = []
@@ -310,9 +324,13 @@ def _detalhes_vendas_campo(
                     "cupom": getattr(venda, "cupom_code", None),
                     "pagamentos": ", ".join(pagamentos),
                     "taxas_ifood_pendentes": pendente,
-                    "rentabilidade_status": snapshot.get(
+                    "rentabilidade_status": "pending_ifood_financial"
+                    if pendente
+                    else "complete",
+                    "venda_rentabilidade_status": snapshot.get(
                         "rentabilidade_status", "complete"
                     ),
+                    "ifood_financial": snapshot.get("ifood_financial"),
                     "pendencias_rentabilidade": snapshot.get(
                         "pendencias_rentabilidade", []
                     ),

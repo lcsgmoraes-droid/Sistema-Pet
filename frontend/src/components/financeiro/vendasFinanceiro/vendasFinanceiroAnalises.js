@@ -23,11 +23,14 @@ export function calcularAnaliseInteligenteVendas({
   }
 
   const produtosComMargem = produtosAnalise.map((produto) => {
-    const pendente = temRentabilidadePendente(produto);
+    const apurada = produto.rentabilidade_calculada === true;
+    const pendente =
+      temRentabilidadePendente(produto) ||
+      (apurada && (produto.lucro_total == null || produto.valor_liquido_total == null));
     const custo = sanitizarNumero(produto.custo_total);
     const preco = sanitizarNumero(produto.valor_total);
     const quantidade = sanitizarNumero(produto.quantidade) || 1;
-    const lucro = preco - custo;
+    const lucro = apurada ? sanitizarNumero(produto.lucro_total) : preco - custo;
     const margem = custo > 0 ? (lucro / custo) * 100 : 0;
 
     return {
@@ -254,6 +257,7 @@ export function montarFluxoResultadoCardsFinanceiro(resumo = {}) {
   const taxaOperacional = Number(resumo.taxa_operacional_total || 0);
   const custoOperacional = repasseEntrega + taxaOperacional;
   const taxasCartao = Number(resumo.taxa_cartao_total || 0);
+  const pagamentoPendente = pendente && resumo.taxa_cartao_total == null;
   const comissao = Number(resumo.comissao_total || 0);
   const imposto = Number(resumo.imposto_total || 0);
   const campanhas = Number(resumo.custo_campanha_total || 0);
@@ -292,13 +296,26 @@ export function montarFluxoResultadoCardsFinanceiro(resumo = {}) {
     {
       sinal: "-",
       titulo: "Cartao",
-      valor: pendente ? null : taxasCartao,
-      ...(pendente && { pendente: true }),
-      detalhe: pendente
-        ? "Cobranças do iFood ainda não conhecidas."
+      valor: pagamentoPendente ? null : taxasCartao,
+      ...(pagamentoPendente && { pendente: true }),
+      detalhe: pagamentoPendente
+        ? "Taxa de pagamento do iFood ainda não recebida."
         : "Taxas das operadoras de cartao.",
       cor: "border-purple-200 bg-purple-50 text-purple-800",
     },
+    ...(resumo.ifood_financial_resumo
+      ? [
+          {
+            sinal: "-",
+            titulo: "Taxas iFood",
+            valor: resumo.taxa_ifood_total ?? null,
+            ...(resumo.taxa_ifood_total == null && { pendente: true }),
+            detalhe:
+              "Comissão e outras cobranças classificadas. A taxa de pagamento fica separada.",
+            cor: "border-purple-200 bg-purple-50 text-purple-800",
+          },
+        ]
+      : []),
     {
       sinal: "-",
       titulo: "Comissao",

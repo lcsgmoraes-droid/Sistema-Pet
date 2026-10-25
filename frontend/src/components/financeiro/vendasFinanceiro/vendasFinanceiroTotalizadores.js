@@ -1,5 +1,10 @@
 import { calcularValorRecebidoVenda } from "./vendasFinanceiroRelatorio.js";
-import { PENDENCIA_IFOOD_LABEL, temRentabilidadePendente } from "./rentabilidadePendente.js";
+import {
+  campoRentabilidadePendente,
+  PENDENCIA_IFOOD_LABEL,
+  temRentabilidadePendente,
+} from "./rentabilidadePendente.js";
+import { formatMoneyBRL } from "../../../utils/formatters.js";
 
 export const RESUMO_VENDAS_VAZIO = {
   venda_bruta: 0,
@@ -34,6 +39,19 @@ function vendaTemNotaFiscal(venda) {
   );
 }
 
+function subtotalCobrancasConhecidas(financeiro, pagamento) {
+  const cobrancas = (financeiro?.charges || []).filter(
+    (cobranca) =>
+      cobranca.status !== "unclassified" &&
+      cobranca.amount != null &&
+      Number.isFinite(Number(cobranca.amount)) &&
+      (cobranca.code === "PAYMENT_TRANSACTION_FEE") === pagamento,
+  );
+  return cobrancas.length
+    ? cobrancas.reduce((total, cobranca) => total + Number(cobranca.amount), 0)
+    : null;
+}
+
 export function calcularTotalizadoresListaVendasFinanceiro(vendas = []) {
   const totais = (vendas || []).reduce(
     (acc, venda) => {
@@ -43,7 +61,18 @@ export function calcularTotalizadoresListaVendasFinanceiro(vendas = []) {
       acc.desconto += Number(venda.desconto || 0);
       acc.taxa_entrega += Number(venda.taxa_entrega || 0);
       acc.taxa_operacional += Number(venda.taxa_operacional || 0);
-      acc.taxa_cartao += Number(venda.taxa_cartao || 0);
+      const pagamentoConhecido =
+        venda.taxa_cartao ?? subtotalCobrancasConhecidas(venda.ifood_financial, true);
+      const ifoodConhecido =
+        venda.taxa_ifood ?? subtotalCobrancasConhecidas(venda.ifood_financial, false);
+      acc.taxa_cartao += Number(pagamentoConhecido || 0);
+      acc.taxa_ifood += Number(ifoodConhecido || 0);
+      if (pagamentoConhecido != null) acc.taxas_pagamento_conhecidas += 1;
+      if (venda.ifood_financial && ifoodConhecido != null) acc.taxas_ifood_conhecidas += 1;
+      if (campoRentabilidadePendente(venda, "taxa_cartao")) acc.taxas_pagamento_pendentes += 1;
+      if (venda.ifood_financial && campoRentabilidadePendente(venda, "taxa_ifood"))
+        acc.taxas_ifood_incompletas += 1;
+      if (venda.ifood_financial) acc.quantidade_ifood += 1;
       acc.comissao += Number(venda.comissao || 0);
       acc.imposto += Number(venda.imposto || 0);
       acc.custo_campanha += Number(venda.custo_campanha || 0);
@@ -63,6 +92,12 @@ export function calcularTotalizadoresListaVendasFinanceiro(vendas = []) {
       taxa_entrega: 0,
       taxa_operacional: 0,
       taxa_cartao: 0,
+      taxa_ifood: 0,
+      taxas_pagamento_pendentes: 0,
+      taxas_ifood_incompletas: 0,
+      taxas_pagamento_conhecidas: 0,
+      taxas_ifood_conhecidas: 0,
+      quantidade_ifood: 0,
       comissao: 0,
       imposto: 0,
       custo_campanha: 0,
@@ -76,12 +111,33 @@ export function calcularTotalizadoresListaVendasFinanceiro(vendas = []) {
   );
 
   const pendente = totais.vendas_rentabilidade_pendente > 0;
+  const {
+    taxa_ifood,
+    quantidade_ifood,
+    taxas_ifood_incompletas,
+    taxas_pagamento_pendentes,
+    taxas_pagamento_conhecidas,
+    taxas_ifood_conhecidas,
+    ...base
+  } = totais;
   return {
-    ...totais,
+    ...base,
+    taxa_cartao: taxas_pagamento_pendentes > 0 ? null : totais.taxa_cartao,
+    ...(quantidade_ifood > 0 && {
+      quantidade_ifood,
+      taxa_ifood: taxas_ifood_incompletas > 0 ? null : taxa_ifood,
+      ...(taxas_ifood_incompletas > 0 &&
+        taxas_ifood_conhecidas > 0 && {
+          taxa_ifood_conhecida: arredondarMoeda(taxa_ifood),
+        }),
+      ...(taxas_pagamento_pendentes > 0 &&
+        taxas_pagamento_conhecidas > 0 && {
+          taxa_cartao_conhecida: arredondarMoeda(totais.taxa_cartao),
+        }),
+    }),
     ...(pendente && {
       rentabilidade_status: "pending_ifood_financial",
       taxas_ifood_pendentes: true,
-      taxa_cartao: null,
       venda_liquida: null,
       lucro: null,
     }),
@@ -111,6 +167,14 @@ export function montarCardsTotalizadoresListaVendasFinanceiro(
     valor === null && pendente ? PENDENCIA_IFOOD_LABEL : formatarMoedaComSinalOuTraco(valor, "-");
   const formatarResultado = (valor, formatar) =>
     valor === null && pendente ? PENDENCIA_IFOOD_LABEL : formatar(valor);
+  const formatarTaxa = (valor, conhecido) =>
+    totalizadores.quantidade_ifood > 0
+      ? valor == null
+        ? conhecido != null
+          ? `${formatMoneyBRL(conhecido)} (subtotal conhecido; pendente)`
+          : PENDENCIA_IFOOD_LABEL
+        : formatMoneyBRL(Number(valor))
+      : formatarDeducao(valor);
 
   return [
     {
@@ -146,9 +210,18 @@ export function montarCardsTotalizadoresListaVendasFinanceiro(
     },
     {
       label: "Tx. Pagto",
-      value: formatarDeducao(totalizadores.taxa_cartao),
+      value: formatarTaxa(totalizadores.taxa_cartao, totalizadores.taxa_cartao_conhecida),
       intent: "violet",
     },
+    ...(totalizadores.quantidade_ifood > 0
+      ? [
+          {
+            label: "Taxas iFood",
+            value: formatarTaxa(totalizadores.taxa_ifood, totalizadores.taxa_ifood_conhecida),
+            intent: "violet",
+          },
+        ]
+      : []),
     { label: "Comissao", value: formatarDeducao(totalizadores.comissao), intent: "blue" },
     { label: "Imposto", value: formatarDeducao(totalizadores.imposto), intent: "red" },
     {

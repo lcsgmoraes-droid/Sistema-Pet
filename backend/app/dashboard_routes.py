@@ -37,6 +37,7 @@ from .services.rentabilidade_pendencias import (
     PENDENCIA_IFOOD,
     aplicar_pendencia_ifood,
 )
+from .services.ifood_rentabilidade_contexto import carregar_snapshots_ifood_vendas
 from .caixa.conferencia import moeda
 from .utils.tenant_safe_sql import execute_tenant_safe
 from .dashboard.ponto_equilibrio_routes import (
@@ -316,8 +317,10 @@ async def obter_resumo_dashboard(
             for venda in vendas_periodo
             for item in list(getattr(venda, "itens", []) or [])
         )
+        snapshots_ifood = carregar_snapshots_ifood_vendas(db, tenant_id, vendas_periodo)
         snapshots_periodo = [
-            aplicar_pendencia_ifood(venda, _snapshot_dict(venda))
+            snapshots_ifood.get(getattr(venda, "id", None))
+            or aplicar_pendencia_ifood(venda, _snapshot_dict(venda))
             for venda in vendas_periodo
         ]
         vendas_rentabilidade_pendente = sum(

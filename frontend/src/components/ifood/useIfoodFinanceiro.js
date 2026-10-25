@@ -7,6 +7,7 @@ import {
 } from "../../api/ifood";
 import { mensagemErroIfood } from "./ifoodPresentation";
 import { periodoFinanceiroValido } from "./ifoodFinanceiroNavigation";
+import { notifyIfoodFinancialUpdated } from "../../utils/ifoodFinancialRefresh.js";
 
 const CAMPOS_CUSTOS = ["revenue", "cmv", "tax", "other_costs"];
 const VAZIO = { revenue: null, cmv: null, tax: null, other_costs: null, source_note: "" };
@@ -100,6 +101,7 @@ export default function useIfoodFinanceiro({ enabled = false, periodoSugerido = 
     setSucesso("");
     try {
       const response = await sincronizarIfoodFinanceiro(params);
+      notifyIfoodFinancialUpdated();
       if (montado.current) {
         setRelatorio(response.data);
         setSucesso("Consulta de eventos concluída. Conferindo os dados locais…");
@@ -173,6 +175,7 @@ export default function useIfoodFinanceiro({ enabled = false, periodoSugerido = 
         ),
         source_note: rascunho.source_note.trim(),
       });
+      notifyIfoodFinancialUpdated();
       if (montado.current) {
         atualizarPedido(response.data);
         setPedido(null);

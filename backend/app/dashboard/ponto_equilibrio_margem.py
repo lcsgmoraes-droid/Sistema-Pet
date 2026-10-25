@@ -16,6 +16,7 @@ from ..ia.aba7_dre_detalhada_models import DREDetalheCanal
 from ..services.venda_rentabilidade_snapshot_service import (
     build_venda_rentabilidade_snapshot,
 )
+from ..services.ifood_rentabilidade_contexto import carregar_financial_das_vendas
 from ..dre_canais_routes import (
     _bulk_cashback_por_venda,
     _bulk_comissoes_por_venda,
@@ -112,6 +113,11 @@ def _detalhe_venda_margem_pe(
         "campo": campo,
         "nf_emitida": bool(nf_emitida),
         "observacao": observacao,
+        **(
+            {"ifood_financial": snapshot["ifood_financial"]}
+            if snapshot.get("ifood_financial")
+            else {}
+        ),
     }
 
 
@@ -203,6 +209,7 @@ def _somar_componentes_margem_vendas_pe(
         "descontos": 0.0,
         "beneficios_campanhas": 0.0,
         "taxas_cartao": 0.0,
+        "taxas_ifood": 0.0,
         "repasse_entrega": 0.0,
         "custo_operacional_entrega": 0.0,
         "comissoes": 0.0,
@@ -215,6 +222,7 @@ def _somar_componentes_margem_vendas_pe(
     )
     quantidade_pendente = 0
     pendencias = []
+    taxas_pendentes = set()
 
     for venda_info in vendas_snapshot or []:
         snapshot = dict(venda_info.get("snapshot") or venda_info)
@@ -229,6 +237,7 @@ def _somar_componentes_margem_vendas_pe(
             "descontos": ("desconto", ""),
             "beneficios_campanhas": ("custo_campanha", ""),
             "taxas_cartao": ("taxa_cartao", ""),
+            "taxas_ifood": ("taxa_ifood", ""),
             "repasse_entrega": ("taxa_entrega", ""),
             "custo_operacional_entrega": ("taxa_operacional", ""),
             "comissoes": ("comissao", ""),
@@ -243,7 +252,12 @@ def _somar_componentes_margem_vendas_pe(
             "cmv_estimado": ("custo_produtos", ""),
         }
         for campo_total, (campo_snapshot, observacao) in mapa.items():
-            if pendente and campo_total == "taxas_cartao":
+            if (
+                pendente
+                and campo_total in {"taxas_cartao", "taxas_ifood"}
+                and snapshot.get(campo_snapshot) is None
+            ):
+                taxas_pendentes.add(campo_total)
                 if incluir_detalhes:
                     componentes[campo_total].append(
                         {
@@ -266,7 +280,14 @@ def _somar_componentes_margem_vendas_pe(
                 campo_total == "custo_fiscal"
                 and _snapshot_float(snapshot, "custo_fiscal_desconsiderado") > 0
             )
-            if incluir_detalhes and (valor > 0 or custo_fiscal_omitido):
+            taxa_ifood_conhecida = (
+                campo_total in {"taxas_cartao", "taxas_ifood"}
+                and bool(snapshot.get("ifood_financial"))
+                and snapshot.get(campo_snapshot) is not None
+            )
+            if incluir_detalhes and (
+                valor != 0 or custo_fiscal_omitido or taxa_ifood_conhecida
+            ):
                 componentes[campo_total].append(
                     _detalhe_venda_margem_pe(
                         snapshot,
@@ -287,6 +308,7 @@ def _somar_componentes_margem_vendas_pe(
     outros_variaveis = _round_money(outros_variaveis)
     despesas_variaveis = _round_money(
         campos["taxas_cartao"]
+        + campos["taxas_ifood"]
         + campos["repasse_entrega"]
         + campos["custo_operacional_entrega"]
         + campos["comissoes"]
@@ -330,6 +352,12 @@ def _somar_componentes_margem_vendas_pe(
             "valor": _round_money(campos["taxas_cartao"]),
         },
         {
+            "id": "taxas_ifood",
+            "label": "Comissao e demais cobrancas iFood",
+            "tipo": "deducao",
+            "valor": _round_money(campos["taxas_ifood"]),
+        },
+        {
             "id": "repasse_entrega",
             "label": "Repasse/custo de entrega",
             "tipo": "deducao",
@@ -371,6 +399,7 @@ def _somar_componentes_margem_vendas_pe(
         "descontos": descontos,
         "beneficios_campanhas": beneficios_campanhas,
         "taxas_cartao": _round_money(campos["taxas_cartao"]),
+        "taxas_ifood": _round_money(campos["taxas_ifood"]),
         "repasse_entrega": _round_money(campos["repasse_entrega"]),
         "custo_operacional_entrega": _round_money(campos["custo_operacional_entrega"]),
         "comissoes": _round_money(campos["comissoes"]),
@@ -396,7 +425,7 @@ def _somar_componentes_margem_vendas_pe(
         pendencias_rentabilidade=list(dict.fromkeys(pendencias)),
     )
     if quantidade_pendente:
-        for campo in ("taxas_cartao", "despesas_variaveis", "custos_variaveis"):
+        for campo in (*taxas_pendentes, "despesas_variaveis", "custos_variaveis"):
             resultado[f"{campo}_conhecidos"] = resultado[campo]
             resultado[campo] = None
         for campo in (
@@ -406,7 +435,7 @@ def _somar_componentes_margem_vendas_pe(
         ):
             resultado[campo] = None
         for subtotal in subtotais:
-            if subtotal["id"] == "taxas_cartao":
+            if subtotal["id"] in taxas_pendentes:
                 subtotal["valor_conhecido"] = subtotal["valor"]
                 subtotal["valor"] = None
                 subtotal["taxas_ifood_pendentes"] = True
@@ -546,13 +575,16 @@ def _preparar_snapshots_margem_vendas_pe(
     estoque_custos_por_venda = _bulk_estoque_custos_por_venda(db, tenant_id, venda_ids)
 
     vendas_snapshot = []
+    financeiros_ifood = carregar_financial_das_vendas(db, tenant_id, vendas)
     for venda in vendas:
         venda_id = getattr(venda, "id", None)
         nf_emitida = _venda_tem_documento_fiscal_pe(venda)
         cupom_desconto = cupons_por_venda.get(venda_id, 0.0)
         custo_campanha = cupom_desconto + cashback_por_venda.get(venda_id, 0.0)
 
-        snapshot = _snapshot_pronto(venda)
+        snapshot = _snapshot_pronto(
+            venda, financial=financeiros_ifood.get(venda.id, {})
+        )
         if (
             snapshot
             and custo_campanha > 0
@@ -572,6 +604,7 @@ def _preparar_snapshots_margem_vendas_pe(
                 comissao_total=comissoes_por_venda.get(venda_id, 0.0),
                 taxa_operacional_entrega=taxa_operacional_por_venda.get(venda_id, 0.0),
                 estoque_custos_por_produto=estoque_custos_por_venda.get(venda_id, {}),
+                ifood_financial=financeiros_ifood.get(venda.id, {}),
             )
 
         snapshot = _ajustar_snapshot_custo_fiscal_pe(

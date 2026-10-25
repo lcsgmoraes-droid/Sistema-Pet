@@ -11,6 +11,15 @@ export function valorPontoEquilibrio(valor, dados, percentual = false) {
   return percentual ? formatPercent(valor) : formatMoneyBRL(valor);
 }
 
+export function valorCobrancaPontoEquilibrio(dados, campo) {
+  const valor = dados?.[campo];
+  const conhecido = dados?.[`${campo}_conhecidos`];
+  if (valor == null && conhecido != null && temRentabilidadePendente(dados)) {
+    return `${formatMoneyBRL(conhecido)} (subtotal conhecido; apuração pendente)`;
+  }
+  return valorPontoEquilibrio(valor, dados);
+}
+
 export function indicadoresPontoEquilibrio(dados) {
   if (temRentabilidadePendente(dados)) {
     return { percentualAtingido: null, margemUsadaPercentual: null, margemPeriodoPercentual: null };
@@ -72,6 +81,7 @@ export function montarLinhasDetalhamentoPontoEquilibrio(dados) {
       (subtotal) =>
         (subtotal.valor == null && temRentabilidadePendente(dados)) ||
         Math.abs(Number(subtotal.valor || 0)) > 0 ||
+        ["taxas_ifood", "taxas_cartao"].includes(subtotal.id) ||
         subtotal.id === "custo_fiscal",
     )
     .map((subtotal) => ({

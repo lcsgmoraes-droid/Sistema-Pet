@@ -58,6 +58,7 @@ def _venda(venda_id=1, canal="ifood"):
 
 
 def _preloads(monkeypatch, module):
+    monkeypatch.setattr(module, "carregar_financial_das_vendas", lambda *args: {})
     monkeypatch.setattr(module, "_formas_pagamento_map", lambda *args: {})
     monkeypatch.setattr(module, "_impostos_percentual", lambda *args: 0)
     for name in (

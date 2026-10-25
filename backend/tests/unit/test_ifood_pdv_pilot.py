@@ -27,6 +27,8 @@ from app.vendas_models import Venda, VendaItem, VendaPagamento
 from app.financeiro_models import ContaReceber
 from app.ifood_integration_models import IfoodMerchantConfig
 from app.ifood_order_models import IfoodEvent, IfoodOrder, IfoodPdvBridge
+from app.ifood_financial_cost_models import IfoodFinancialSaleLink
+from app.ifood_financial_models import IfoodFinancialEvent, IfoodFinancialSnapshot
 from app.integrations.ifood.pdv_pilot import (
     block_pilot_sale_edit,
     complete_pilot_cancellation,
@@ -186,6 +188,9 @@ def pilot_db(monkeypatch, tenant_context):
         IfoodOrder,
         IfoodEvent,
         IfoodPdvBridge,
+        IfoodFinancialSaleLink,
+        IfoodFinancialSnapshot,
+        IfoodFinancialEvent,
     ):
         with engine.begin() as conn:
             conn.execute(

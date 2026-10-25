@@ -11,7 +11,7 @@
 | Issue/PR | PR #1561, branch `codex/ifood-preservar-cadastro-na-pausa` |
 | Prioridade | P2 |
 | Risco | Alto: reserva, baixa FIFO, pagamentos e isolamento entre empresas |
-| Domínios afetados | Integração iFood, PDV, vendas, estoque e caixa |
+| Domínios afetados | Integração iFood, PDV, vendas, estoque, caixa e relatórios |
 
 ## 1. Necessidade e requisitos
 
@@ -27,9 +27,11 @@ e preserva os itens, valores e a modalidade recebidos do provedor.
 
 Devem permanecer os fluxos de app, ecommerce, WhatsApp e loja física. Ficam fora
 do escopo produção, publicação de outros produtos, operação contínua, pagamentos
-mistos, outros meios não autorizados, descontos, cupons, pesagem variável e
-conciliação Financial. O ensaio sintético não substitui o aceite de um pedido
-oficial da loja de testes.
+mistos, outros meios não autorizados, descontos, cupons e pesagem variável. O
+escopo inicial não incluía a ligação Financial, acrescentada nesta mesma tarefa
+em DEV para apresentar taxas por componente e atualizar os relatórios. O ciclo
+oficial completo de conciliação e o recebimento bancário continuam sem aceite.
+O ensaio sintético não substitui o aceite de um pedido oficial da loja de testes.
 
 ## 2. Regras de negócio e dados
 
@@ -89,6 +91,20 @@ piloto não inventa estado externo quando o iFood está indisponível: a importa
 do espelho local e as operações externas permanecem separadas. Não há novo retry
 automático de venda nem estorno retroativo automático por evento remoto.
 
+A leitura Financial usa a ponte exata `IfoodPdvBridge` ou uma confirmação manual
+explícita em `IfoodFinancialSaleLink`, respeitando tenant, loja e homologação.
+Não relaciona pedidos por data, valor ou cliente e não fabrica confirmação humana
+para uma ponte canônica. O CMV é obtido dos comprovantes originais, com conferência
+de IDs, quantidade, produto, preço, finalização e baixa; o custo atual do cadastro
+não completa prova ausente. Horários históricos sem offset emitidos pelo ERP são
+interpretados como Brasília, preservando o JSON original.
+
+Cada GET aplicável resolve a revisão Financial ativa sobre a base histórica de
+rentabilidade, inclusive quando esta já está em cache. A sobreposição é de leitura:
+não regrava a base para guardar taxas, não refaz CMV nem movimenta venda, reserva,
+baixa, pagamento, recebível ou caixa. Uma revisão substitui a anterior sem acumular;
+evidência removida ou inválida restaura a pendência do componente correspondente.
+
 ## 4. Segurança e privacidade
 
 As rotas exigem autenticação e permissões de integração/venda na empresa. As
@@ -128,6 +144,11 @@ Validações executadas nesta tarefa:
   e build. Inclui totais do consumidor separados, cabeçalho sem cobrança manual
   e recarga da venda pelo ID após concluir, testada com o carregador real do PDV.
   O CI remoto do commit final do PR #1561 continua uma conferência separada.
+
+Esses resultados pertencem às etapas anteriores indicadas. A ampliação atual de
+taxas por componente, revisão, atualização das telas e worker DEV possui testes
+específicos, mas seu ensaio final, CI final e gate completo ainda serão registrados.
+Não reutilizar o aceite anterior como aprovação automática desta ampliação.
 
 O schema descartável do ensaio PostgreSQL não comprova a execução de toda a
 cadeia histórica do Alembic. A migration nova e suas restrições foram exercidas;
@@ -174,6 +195,19 @@ PASS. Outras empresas, produtos e preços do ERP/app/ecommerce foram preservados
 produção permaneceu intacta. Esse aceite não comprova recebimento do repasse,
 margem final ou validade dos relatórios gerais para ampliar o piloto.
 
+Na ligação Financial acrescentada em DEV, o pedido oficial #1420 continua sem
+eventos Financial próprios fornecidos pelo iFood. A ponte reconhece seu CMV
+original de **R$ 43,94**. A posição de referência é físico **29**, reservado **3**,
+disponível **26**; a leitura financeira deve preservá-la e não criar pagamento
+ou caixa adicional.
+
+O ensaio de atualização usa temporariamente fonte **`synthetic`**, com rótulo de
+simulação DEV: comissão de **R$ 6,50**, taxa de pagamento explícita de **R$ 0,00**
+e revisão de comissão para **R$ 7,50**, substituindo a anterior. Esses valores não
+são taxas reais do pedido oficial. A massa não libera lucro/margem real e será
+restaurada ao final, retornando à ausência de Financial oficial. O fechamento
+do ensaio ainda deve ser registrado; não há alteração de produção.
+
 ## 7. Publicação e rollback
 
 Entrega backend/frontend, migration e documentação; não há alteração mobile.
@@ -205,9 +239,10 @@ visual ou HTTP 202. Reenvio, evento remoto e sacola alterada precisam preservar 
 evidência e explicar a impossibilidade de continuar.
 
 Após o pedido oficial, a proteção dos relatórios foi adicionada em DEV: vendas
-iFood permanecem `pending_ifood_financial`, com taxas desconhecidas, líquido após
-despesas, lucro e margens nulos. Isso também protege snapshots antigos e o
-reprocessamento, sem recalcular os custos congelados durante uma leitura.
+iFood com componentes faltantes permanecem `pending_ifood_financial`, com líquido
+após despesas, lucro e margens nulos. Taxas conhecidas são exibidas com nome e valor;
+somente as parcelas ou conferências que faltam permanecem pendentes. Isso protege
+snapshots antigos e o reprocessamento, sem recalcular os custos congelados durante uma leitura.
 Relatório de vendas, dashboard, DRE, ponto de equilíbrio, rankings/IA e suas
 exportações não transformam a pendência em zero. Totais mistos também ficam
 pendentes, preservando faturamento, quantidades e custos conhecidos. O canal
@@ -227,12 +262,29 @@ Os testes novos integram os gates de CI e release; resultados finais devem ser
 conferidos na revisão do PR. Evidência local: `pending-reports-api-proof.json`.
 
 Essa proteção resolve a apresentação de lucro indevido por taxas ausentes;
-não conclui a conciliação Financial. Taxa de pagamento preenchida, inclusive
-zero, pagamento online e previsão contratual não comprovam todas as cobranças.
-O extrato de homologação ainda não publica um fechamento canônico na
-rentabilidade geral da Venda; até esse vínculo ser implementado e validado,
-nenhum valor isolado libera a margem final iFood. Não usar esse aceite para
-ampliar automaticamente o piloto ou habilitar produção.
+não conclui o ciclo oficial de conciliação Financial. A ligação canônica está
+implementada em DEV: comissão e pagamento são componentes independentes; o zero
+exige evento explícito. Frete do consumidor e serviço exclusivo do iFood ficam
+separados de despesas da loja. Logística iFood sem cobrança classificada, tipos
+desconhecidos, ajustes, lançamentos sem pedido e conflitos de vínculo/janela
+preservam valores conhecidos e impedem concluir a margem sem conferência.
+
+Chegada tardia e revisão podem completar a leitura dos relatórios sem alterar
+caixa ou custos originais. As telas conectadas releem o ERP a cada 30 segundos
+enquanto visíveis, ao retomar a aba e após importação; abrir relatório não chama
+o provedor. Confirmação bancária do repasse continua separada da apuração de taxas.
+Pagamento online, previsão contratual e massa sintética não comprovam custos reais.
+
+O worker Financial é opt-in, com `IFOOD_FINANCIAL_POLLING_ENABLED=false` e leitura
+externa também desligada por padrão. Exige DEV, credenciais de teste e a allowlist
+exata de empresa, loja, pedido e SKU do piloto. Reutiliza janela exata compatível
+ou a competência mensal completa, com limite de 33 dias inclusivos e pedido de
+até 32 dias atrás. Não amplia automaticamente para outras competências: ajustes
+fora dessa cobertura continuam pendentes. Usa o scheduler líder existente,
+intervalo mínimo de 15 minutos, exclusão de execuções e backoff; falhas preservam
+a evidência anterior. Não executa anúncio, ACK, estoque, pagamento ou caixa.
+O aceite dessa ligação e seu CI/gate final ainda precisam ser concluídos antes
+de ampliar o piloto ou avaliar qualquer habilitação em produção.
 
 Falhas previstas: loja de testes não configurada, acesso do consumidor
 indisponível, pedido fora da allowlist, condição comercial não suportada e falha
@@ -265,13 +317,18 @@ operação de produção pronta.
 - [x] Comunicação e treinamento avaliados.
 - [x] Gate do online e validação do delta visual registrados.
 - [ ] CI remoto do commit final do PR confirmado.
-- [ ] Financial e relatórios gerais com margem pendente homologados para expansão.
+- [ ] Ensaio final da ligação Financial por componente e restauração da massa DEV registrados.
+- [ ] Gate completo da ampliação atual confirmado.
+- [ ] Financial oficial e relatórios gerais homologados para expansão.
 
 Decisão técnica: **aprovado para o fluxo oficial específico de pedido, PDV,
-reserva e baixa em DEV, com pendências de Financial e relatórios gerais**.
+reserva e baixa em DEV**. A ligação de Financial aos relatórios está implementada
+em DEV, com ensaio final e evidência oficial do pedido ainda pendentes.
 Não é aceite de operação contínua ou de produção.
 
-Pendências: Codex e Lucas devem validar a conciliação Financial e o tratamento de
-margem pendente nos relatórios gerais antes de ampliar o piloto. O responsável
-pelo PR deve confirmar o CI do commit final antes da conclusão da revisão.
+Pendências: Codex e Lucas devem concluir o ensaio da ligação, restaurar os dados
+temporários, obter Financial oficial do pedido e validar as conferências de
+conciliação e margem antes de ampliar o piloto. O responsável pelo PR deve
+confirmar o CI do commit final e o gate completo desta ampliação antes da
+conclusão da revisão.
 Não há prazo de liberação de produção definido nesta entrega.

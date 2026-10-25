@@ -1,7 +1,8 @@
 # iFood Financial — validação em DEV
 
-Data: 2026-10-23. DEV: **Financial Events V3 em homologação**, CMV histórico ERP
-por vínculo confirmado, títulos de repasse e arquivo de conciliação On-demand.
+Atualização: 2026-10-24. DEV: **Financial Events V3 em homologação**, taxas por
+venda, CMV histórico ERP por ponte canônica ou vínculo confirmado, títulos de
+repasse e arquivo de conciliação On-demand.
 Esta documentação registra a implementação em DEV; não declara homologação
 Financial concluída nem disponibilidade financeira em produção.
 
@@ -13,17 +14,23 @@ Financial concluída nem disponibilidade financeira em produção.
 - Exibir taxas observadas e valores ainda não classificados, mantendo pendências visíveis.
 - Informar receita, CMV, tributos e outros custos **do pedido inteiro**, com fonte e histórico.
 - Manter a previsão por contrato separada das cobranças observadas por pedido.
-- Confirmar uma vez o vínculo exato com uma venda ERP e buscar seu CMV original
-  automaticamente nas leituras seguintes, sem copiar custos no formulário manual.
+- Usar a ponte exata entre pedido e venda criada pelo piloto do PDV ou um vínculo
+  manual explicitamente confirmado, sem associar por valor, data ou cliente.
+- Mostrar cada cobrança conhecida com nome, sinal, valor e origem, mantendo
+  pendente somente o componente ou a conferência que ainda faltar.
+- Reaplicar a revisão Financial ativa nas leituras da venda e dos relatórios,
+  preservando o CMV original e sem repetir a operação da venda.
 - Guardar versões dos títulos de Settlements e do arquivo mensal Reconciliation.
 - Conferir os valores do provedor por identificação documentada, mantendo as
   diferenças e as relações ainda não comprovadas como pendências.
 
 Não há publicação de anúncios nesta jornada. Ela também não cria venda no PDV,
 recebível, recebimento, movimento de caixa, baixa de estoque ou conciliação bancária.
-O vínculo inicial com a venda exige confirmação explícita: a Venda ainda não tem
-um identificador externo iFood canônico. Depois dessa confirmação, o CMV comprovado
-é lido automaticamente; não há busca por coincidência de valor, data ou cliente.
+Pedidos importados pelo piloto possuem associação canônica em `IfoodPdvBridge`.
+Essa ponte exata já pode fornecer o vínculo para taxas e CMV; não exige criar uma
+confirmação humana fictícia. Para vendas sem ponte, continua disponível o vínculo
+manual explícito em `IfoodFinancialSaleLink`. Ambas as leituras respeitam empresa,
+loja e modo de homologação; conflito entre associações gera pendência.
 
 ## Como conferir pela interface
 
@@ -57,30 +64,77 @@ Não converter este documento em uma promessa de acesso em produção antes do a
 
 ### Vincular a venda ERP e usar o CMV histórico
 
-1. Abra **Conferir venda** no pedido correto. No bloco de custos históricos, procure
-   pelo **Número ou ID da venda ERP**. A busca lista candidatos e não escolhe uma venda.
-2. Confira o número no ERP. A venda precisa pertencer à mesma empresa e ao canal
+1. Abra **Conferir venda** no pedido correto. Se ele veio do piloto do PDV, confira
+   o vínculo identificado como ponte do PDV e o CMV original disponível. A leitura
+   valida o estado finalizado, a baixa e o produto, quantidade e preço exatos da ponte.
+   Nesse caso, não é necessário confirmar outro vínculo manual.
+2. Para um pedido sem ponte, no bloco de custos históricos procure pelo **Número
+   ou ID da venda ERP**. A busca lista candidatos e não escolhe uma venda.
+3. Confira o número no ERP. A venda precisa pertencer à mesma empresa e ao canal
    `ifood`, estar finalizada e não ter cancelamento ou devolução. Todos os itens
    precisam ter comprovante original de baixa compatível com seus IDs e quantidades.
-3. Selecione a venda encontrada, informe **Fonte e justificativa do vínculo** e marque
+4. Selecione a venda encontrada, informe **Fonte e justificativa do vínculo** e marque
    **Conferi que o pedido e a venda ERP correspondem à mesma venda**. Só então use
    **Confirmar vínculo com venda ERP**. Essa ação grava uma associação local auditada;
    não cria nem finaliza venda, não baixa estoque e não envia anúncio.
-4. Confira o CMV total e os comprovantes de cada linha. O custo exibido por item é o
+5. Confira o CMV total e os comprovantes de cada linha. O custo exibido por item é o
    **total daquela linha**, com a quantidade já considerada. O custo atual do produto
    e o snapshot reprocessável de rentabilidade não são usados como substitutos.
-5. Se o CMV manual estiver **Não informado**, a contribuição usa o CMV histórico
+6. Se o CMV manual estiver **Não informado**, a contribuição usa o CMV histórico
    comprovado. Um CMV manual explicitamente informado, inclusive zero, tem prioridade
    e permanece identificado como manual. Alterar essa escolha cria uma nova versão
    dos custos informados; o histórico e os comprovantes originais são preservados.
 
 O vínculo não é reatribuído silenciosamente e uma mesma venda não prova dois pedidos.
-O manifesto da confirmação permite detectar inclusão, remoção ou alteração de itens
-e de suas provas depois do vínculo. Inconsistência, cancelamento ou devolução deixa
+O manifesto do vínculo manual permite detectar inclusão, remoção ou alteração de
+itens e de suas provas depois da confirmação. A ponte usa sua própria evidência e
+o conjunto exato de itens, sem fabricar um manifesto de confirmação humana.
+Inconsistência, cancelamento ou devolução deixa
 o custo automático e a contribuição pendentes de conferência, mesmo havendo um CMV
 manual. Vendas antigas sem comprovante original permanecem pendentes; não completar
 essas provas com o custo atual. A confirmação inicial não recupera itens que já
 tenham sido removidos antes dela: o operador precisa conferir a venda correspondente.
+
+As provas originais exigem versão, origem de baixa, IDs da empresa/venda/item/produto,
+quantidade e valor compatíveis. O horário histórico sem offset emitido pelo writer
+do ERP é interpretado como Brasília; o JSON original não é reescrito. Datas inválidas
+ou provas adulteradas continuam recusadas. O custo atual do cadastro não substitui
+o custo original da saída.
+
+### Taxas por venda e atualização dos relatórios
+
+A leitura local apresenta **Comissão iFood** (`ORDER_COMMISSION`) e **Taxa de
+pagamento iFood** (`PAYMENT_TRANSACTION_FEE`) separadamente. Cada linha conserva
+valor com sinal, fonte, revisão e, quando recebidos, base e percentual. Comissão
+conhecida permanece visível enquanto a taxa de pagamento está pendente, e vice-versa.
+Zero só é conhecido quando há lançamento explícito de zero; ausência não vira zero.
+
+Frete cobrado do consumidor e serviço exclusivo do iFood no checkout são mostrados
+separados das despesas da loja. Uma entrega operada pelo iFood exige identificar
+sua cobrança de logística no extrato: não usar o frete do cliente como esse custo.
+Tipos sem classificação confirmada preservam descrição e valor e continuam
+pendentes, assim como ajustes, lançamentos sem pedido, cancelamentos, conflitos de
+vínculo ou lançamentos em mais de uma janela ativa. Uma previsão contratual ou uma
+taxa avulsa não elimina essas pendências.
+
+As consultas GET do ERP resolvem a revisão ativa dos eventos locais, inclusive
+quando a rentabilidade-base da venda já está em cache. A chegada tardia completa
+os componentes que puderem ser comprovados; revisão substitui o valor anterior,
+sem somá-lo novamente. A sobreposição Financial é aplicada apenas à apresentação:
+não regrava o snapshot-base, não refaz CMV, reserva, baixa, pagamento, recebível ou
+caixa. Remover a evidência válida devolve o componente à pendência.
+
+As telas conectadas releem o ERP a cada 30 segundos enquanto visíveis, ao voltar à
+aba e após uma importação local concluída. Isso não consulta o iFood por GET nem
+repete a importação do pedido. Valores conhecidos aparecem mesmo com outras
+parcelas pendentes; lucro e margem continuam desconhecidos até haver evidência
+suportada e custos necessários completos. A confirmação bancária do repasse é
+outra conferência e não é exigida para mostrar uma despesa já comprovada.
+
+Massa de fonte `synthetic` só pode ser exibida com
+`IFOOD_FINANCIAL_SHOW_SYNTHETIC=true`, desabilitado por padrão e restrito a DEV/teste.
+Ela aparece como **Simulação Financial em DEV**. Mesmo com comissão e pagamento
+simulados completos, não libera lucro ou margem real nem comprova cobrança oficial.
 
 ### Repasses e arquivo de conciliação
 
@@ -245,6 +299,28 @@ Estas são decisões locais, não garantias adicionais da API:
 - Repasses de janelas sobrepostas são evidências independentes: não há total
   acumulado entre elas. Atualizar a mesma janela preserva suas revisões.
 
+### Consulta automática limitada ao piloto DEV
+
+O worker usa o scheduler e o processo líder existentes. É opt-in:
+`IFOOD_FINANCIAL_POLLING_ENABLED=false` e
+`IFOOD_FINANCIAL_READ_ENABLED=false` são os padrões. Para operar, exige também
+credenciais de teste, guardas DEV do piloto e allowlist exata de empresa, loja,
+pedido técnico e SKU `018631.1`, com ponte finalizada e baixa comprovada. Não é
+um sincronizador geral da loja e não habilita catálogo ou operações de pedidos.
+
+A consulta reutiliza uma janela exata já existente e compatível; na ausência
+dela, usa a competência mensal completa do pedido. Mantém a mesma janela nas
+revisões para evitar sobreposição crescente. O limite é 33 dias inclusivos;
+o pedido precisa estar entre hoje e os 32 dias anteriores. Outras competências,
+ajustes tardios fora desse alcance ou janelas conflitantes ficam pendentes de
+consulta e conferência próprias, sem serem declarados conciliados pelo worker.
+
+O intervalo mínimo é 15 minutos. Há exclusão entre execuções, backoff de falhas
+de até seis horas e preservação da evidência anterior em erro. Resposta idêntica
+não cria nova revisão; uma carga completa diferente pode criar a revisão ativa.
+O worker não faz ACK, Picking, publicação, recebimento, pagamento, caixa ou estoque.
+Uma leitura GET de relatório continua sem acesso ao provedor.
+
 ## Previsão por contrato
 
 Nas regras da loja, registrar a referência e a vigência das taxas informadas.
@@ -262,10 +338,11 @@ depende de `IFOOD_FINANCIAL_READ_ENABLED`, desabilitado por padrão (`false`), e
 não habilitá-las para executar este roteiro. Não inserir tokens ou segredos em
 capturas, documentos, exemplos ou commits.
 
-As credenciais do aplicativo **Teste (C)** foram usadas em uma consulta controlada ao
-Financial oficial com o cabeçalho de homologação. Nenhuma credencial de produção foi
-copiada para DEV. O backend do ambiente isolado continua sem credenciais e com a
-leitura externa desabilitada; o botão da interface não executa uma consulta externa.
+Na etapa de 2026-10-23, as credenciais do aplicativo **Teste (C)** foram usadas em
+uma consulta controlada ao Financial oficial com o cabeçalho de homologação. Nenhuma credencial de produção foi
+copiada para DEV. Naquela etapa, o backend isolado estava sem credenciais e com
+a leitura externa desabilitada. A ligação de 2026-10-24 mantém as flags desligadas
+por padrão; uma janela assistida precisa configurar explicitamente o escopo de testes.
 
 ### Resposta oficial de homologação observada
 
@@ -395,9 +472,10 @@ Antes de apresentar Financial como integração completa:
   Cliente, persistência e testes locais não substituem essa validação oficial.
 - Conciliar créditos/débitos e títulos; separar despesas sem pedido e diferenças
   ainda sem explicação. Não marcar movimentações como quitadas pela consulta.
-- Validar a jornada assistida de vínculo explícito com a venda e CMV histórico.
-  A associação automática futura exige identificador externo canônico no fluxo
-  operacional; a primeira entrega não cria esse identificador por heurística.
+- Concluir a validação da ponte canônica do PDV e do vínculo manual explícito,
+  incluindo CMV original, chegada tardia, revisão e pendências por componente.
+  A ligação local está implementada em DEV e não usa heurística; isso não
+  substitui a evidência Financial oficial do pedido nem o aceite de produção.
 - Concluir a homologação Financial, obter a permissão correspondente e receber
   autorização específica antes de qualquer liberação em produção.
 
@@ -464,6 +542,30 @@ oficial neste documento sem link verificado no portal.
   sete verificações negativas em memória passaram, preservando o hash original.
   Os novos testes do Portal integram os gates de CI e release. Não houve nova
   migração, importação do arquivo real no ERP ou alteração de produção.
+
+### Ligação de taxas e CMV por venda (2026-10-24)
+
+A implementação em DEV passou a cruzar Financial com a venda pela ponte exata do
+PDV ou pelo vínculo manual explícito. Relatório de vendas, composição de resultado,
+PDV/Central, dashboard, DRE, ponto de equilíbrio, rankings/IA e exportações recebem
+os componentes conhecidos e suas pendências, preservando a base histórica de custos.
+
+O pedido **oficial de testes #1420** continua sem eventos Financial próprios
+recebidos do iFood. Sua venda `202610240002` (ID 2) possui CMV original de
+**R$ 43,94**, reconhecido pela ponte. A posição de referência após a baixa oficial
+é físico **29**, reservado **3**, disponível **26**. Ler e atualizar as taxas não
+deve modificar esses valores, o pagamento externo ou o caixa.
+
+O ensaio local dessa ligação usa temporariamente fonte **`synthetic`**, rotulada
+como simulação DEV: comissão de **R$ 6,50**, taxa de pagamento explícita de
+**R$ 0,00** e uma revisão de comissão para **R$ 7,50**, que substitui a anterior.
+Serve para conferir chegada, revisão e atualização das telas; não são cobranças
+reais do pedido #1420. Os dados temporários serão restaurados ao final, mantendo
+visível a ausência de Financial oficial. Nenhum dado será levado a produção.
+
+A validação final desse ensaio, o CI do commit final e o gate completo desta
+ampliação ainda devem ser registrados. Os resultados abaixo e os totais anteriores
+pertencem às etapas indicadas; não comprovam por si só o aceite desta ligação.
 
 ### Preparação para publicação do código (2026-10-23)
 

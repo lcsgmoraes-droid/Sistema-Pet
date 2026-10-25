@@ -2,7 +2,7 @@ import { DollarSign, ShoppingCart, Target, TrendingUp } from "lucide-react";
 import { formatMoneyBRL } from "../../utils/formatters";
 import DetalhamentoMargemPanel from "./DetalhamentoMargemPanel";
 import PontoEquilibrioMetricCard from "./PontoEquilibrioMetricCard";
-import { valorPontoEquilibrio } from "./pontoEquilibrioUtils";
+import { valorCobrancaPontoEquilibrio, valorPontoEquilibrio } from "./pontoEquilibrioUtils";
 
 export default function PontoEquilibrioResumoTab({
   dados,
@@ -87,7 +87,8 @@ export default function PontoEquilibrioResumoTab({
             <div className="grid grid-cols-2 gap-2 rounded-md bg-slate-50 p-3 text-xs text-slate-600">
               <span>Descontos: {formatMoneyBRL(dados.descontos || 0)}</span>
               <span>Campanhas: {formatMoneyBRL(dados.beneficios_campanhas || 0)}</span>
-              <span>Cartao: {valorPontoEquilibrio(dados.taxas_cartao, dados)}</span>
+              <span>Cartao: {valorCobrancaPontoEquilibrio(dados, "taxas_cartao")}</span>
+              <span>Taxas iFood: {valorCobrancaPontoEquilibrio(dados, "taxas_ifood")}</span>
               <span>
                 Entrega:{" "}
                 {formatMoneyBRL(

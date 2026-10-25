@@ -25,6 +25,8 @@ import MetricGrid from "../ui/MetricGrid";
 import MoneyCell from "../ui/MoneyCell";
 import ModuleTabs from "../ui/ModuleTabs";
 import NumberCell from "../ui/NumberCell";
+import IfoodVendaTaxasResumo from "../ifood/IfoodVendaTaxasResumo.jsx";
+import { formatMoneyBRL } from "../../utils/formatters";
 import { getDreAlertDetail, getDreAlertMetrics } from "./dreAlertMetrics";
 import {
   PENDENCIA_IFOOD_LABEL,
@@ -551,6 +553,12 @@ export default function DREView({
                         />
                       )}
                     </p>
+                    {detalhesLinha?.total == null && linhaDetalhe.valor_conhecido != null && (
+                      <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">
+                        Subtotal conhecido: {formatMoneyBRL(linhaDetalhe.valor_conhecido)}. Apuração
+                        pendente.
+                      </p>
+                    )}
                   </div>
                   <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                     <p className="text-xs font-medium uppercase text-gray-500">Lancamentos</p>
@@ -621,12 +629,27 @@ export default function DREView({
                                 temRentabilidadePendente(item.meta)) ? (
                                 PENDENCIA_IFOOD_LABEL
                               ) : (
-                                <MoneyCell value={item.valor} zeroAsDash />
+                                <MoneyCell
+                                  value={item.valor}
+                                  zeroAsDash={!item.meta?.ifood_financial}
+                                />
                               )}
                             </p>
                           </div>
                         </div>
                       ))}
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      {detalhesLinha.items
+                        .filter((item) => item.meta?.ifood_financial)
+                        .map((item) => (
+                          <div key={`ifood-${item.id}`}>
+                            <p className="mb-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                              {item.descricao}
+                            </p>
+                            <IfoodVendaTaxasResumo financeiro={item.meta.ifood_financial} />
+                          </div>
+                        ))}
                     </div>
                   </>
                 )}

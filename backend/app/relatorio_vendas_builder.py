@@ -24,7 +24,12 @@ from .relatorio_vendas_preloads import (
 from .services.venda_rentabilidade_snapshot_service import (
     get_or_build_venda_rentabilidade_snapshot,
 )
-from .services.rentabilidade_pendencias import PENDING_IFOOD_FINANCIAL, PENDENCIA_IFOOD
+from .services.rentabilidade_pendencias import (
+    PENDING_IFOOD_FINANCIAL,
+    PENDENCIA_IFOOD,
+    resumir_financial_ifood,
+)
+from .services.ifood_rentabilidade_contexto import carregar_financial_das_vendas
 
 
 def _valor_rentabilidade(snapshot: dict, campo: str, casas: int = 2):
@@ -393,6 +398,11 @@ def montar_relatorio_vendas(
     desconto_snapshot_geral = 0
     valor_recebido_geral = 0
     vendas_rentabilidade_pendente = 0
+    financial_das_vendas = carregar_financial_das_vendas(db, tenant_id, vendas)
+    financeiros_periodo, pendencias_periodo = [], []
+    taxa_cartao_pendente = False
+    taxa_ifood_total = 0
+    taxa_ifood_pendente = False
 
     for venda in vendas:
         valor_recebido_venda = _total_recebido_venda(venda)
@@ -426,9 +436,16 @@ def montar_relatorio_vendas(
                 else None
             ),
             estoque_custos_por_produto=estoque_custos_por_venda.get(venda.id, {}),
+            ifood_financial=financial_das_vendas.get(venda.id, {}),
         )
         pendente_ifood = bool(snapshot.get("taxas_ifood_pendentes"))
         vendas_rentabilidade_pendente += int(pendente_ifood)
+        if snapshot.get("ifood_financial"):
+            financeiros_periodo.append(snapshot["ifood_financial"])
+            taxa_ifood_pendente |= snapshot.get("taxa_ifood") is None
+            taxa_ifood_total += float(snapshot.get("taxa_ifood") or 0)
+        taxa_cartao_pendente |= snapshot.get("taxa_cartao") is None
+        pendencias_periodo.extend(snapshot.get("pendencias_rentabilidade") or [])
 
         venda_bruta_snapshot_geral += float(snapshot.get("venda_bruta", 0) or 0)
         desconto_snapshot_geral += float(snapshot.get("desconto", 0) or 0)
@@ -485,6 +502,7 @@ def montar_relatorio_vendas(
                 ),
                 "taxas_ifood_pendentes": pendente_ifood,
                 "taxa_ifood": snapshot.get("taxa_ifood"),
+                "ifood_financial": snapshot.get("ifood_financial"),
                 "pendencias_rentabilidade": snapshot.get(
                     "pendencias_rentabilidade", []
                 ),
@@ -564,6 +582,10 @@ def montar_relatorio_vendas(
     resumo["taxa_entrega_repasse_total"] = round(taxa_entrega_repasse_total_geral, 2)
     resumo["taxa_operacional_total"] = round(taxa_operacional_total_geral, 2)
     resumo["taxa_cartao_total"] = round(taxa_total_geral, 2)
+    resumo["taxa_ifood_total"] = (
+        round(taxa_ifood_total, 2) if not taxa_ifood_pendente else None
+    )
+    resumo["ifood_financial_resumo"] = resumir_financial_ifood(financeiros_periodo)
     resumo["comissao_total"] = round(comissao_total_geral, 2)
     resumo["imposto_total"] = round(imposto_total_geral, 2)
     resumo["custo_campanha_total"] = round(custo_campanha_total_geral, 2)
@@ -585,7 +607,8 @@ def montar_relatorio_vendas(
         taxas_ifood_pendentes=bool(vendas_rentabilidade_pendente),
         vendas_rentabilidade_pendente=vendas_rentabilidade_pendente,
         pendencias_rentabilidade=(
-            [PENDENCIA_IFOOD] if vendas_rentabilidade_pendente else []
+            list(dict.fromkeys(pendencias_periodo))
+            or ([PENDENCIA_IFOOD] if vendas_rentabilidade_pendente else [])
         ),
     )
     if vendas_rentabilidade_pendente:
@@ -595,9 +618,10 @@ def montar_relatorio_vendas(
             "lucro_total",
             "margem_media",
             "venda_liquida",
-            "taxa_cartao_total",
         ):
             resumo[campo] = None
+    if taxa_cartao_pendente:
+        resumo["taxa_cartao_total"] = None
 
     # ==============================================
     # PRODUTOS PARA ANÁLISE INTELIGENTE (flat list)
@@ -634,6 +658,9 @@ def montar_relatorio_vendas(
                     "custo_total": 0,
                     "rentabilidade_status": "complete",
                     "taxas_ifood_pendentes": False,
+                    "rentabilidade_calculada": True,
+                    "lucro_total": 0,
+                    "valor_liquido_total": 0,
                 }
 
             if item_snapshot.get("taxas_ifood_pendentes"):
@@ -642,6 +669,21 @@ def montar_relatorio_vendas(
                     taxas_ifood_pendentes=True,
                     pendencias_rentabilidade=[PENDENCIA_IFOOD],
                 )
+            for origem, campo in (
+                ("lucro", "lucro_total"),
+                ("valor_liquido", "valor_liquido_total"),
+            ):
+                if (
+                    item_snapshot.get(origem) is None
+                    or produtos_analise[prod_nome][campo] is None
+                ):
+                    produtos_analise[prod_nome][campo] = None
+                else:
+                    produtos_analise[prod_nome][campo] = round(
+                        produtos_analise[prod_nome][campo]
+                        + float(item_snapshot[origem]),
+                        2,
+                    )
 
             produtos_analise[prod_nome]["quantidade"] += float(
                 item_snapshot.get("quantidade", 0) or 0

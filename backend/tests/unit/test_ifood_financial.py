@@ -19,6 +19,7 @@ from app.ifood_financial_models import (
     IfoodFinancialSnapshot,
 )
 from app.ifood_integration_models import IfoodMerchantConfig
+from app.ifood_order_models import IfoodPdvBridge
 from app.integrations.ifood.financial import (
     IfoodFinancialError,
     get_financial_report,
@@ -168,6 +169,9 @@ def db():
             CreateTable(
                 IfoodFinancialSaleLink.__table__, include_foreign_key_constraints=[]
             )
+        )
+        connection.execute(
+            CreateTable(IfoodPdvBridge.__table__, include_foreign_key_constraints=[])
         )
     yield session
     session.close()

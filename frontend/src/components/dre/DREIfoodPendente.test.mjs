@@ -33,6 +33,11 @@ test("colunas DRE distinguem taxa pendente de zero conhecido e identificam canal
   assert.equal(amount.render({ ...pendencia, valor: null }), "Pendente iFood");
   assert.equal(percent.render({ ...pendencia, percentual: null }), "Pendente iFood");
   assert.equal(amount.render({ valor: 0 }).props.value, 0);
+  assert.equal(amount.render({ campo: "taxas_cartao", valor: 0 }).props.zeroAsDash, false);
+  assert.match(
+    elementText(amount.render({ ...pendencia, valor: null, valor_conhecido: 6.5 })),
+    /Pendente iFood.*Subtotal conhecido:\s*R\$\s*6,50/,
+  );
   assert.equal(
     DRE_DETAIL_COLUMNS.find((column) => column.key === "valor").render({
       meta: pendencia,
@@ -41,6 +46,50 @@ test("colunas DRE distinguem taxa pendente de zero conhecido e identificam canal
     "Pendente iFood",
   );
   assert.ok(canaisDisponiveis.some((canal) => canal.id === "ifood"));
+});
+
+test("DRE mantém pagamento conhecido e detalha taxas por nome mesmo com comissão pendente", () => {
+  const financeiro = {
+    charges: [
+      {
+        code: "PAYMENT_TRANSACTION_FEE",
+        label: "Taxa de pagamento iFood",
+        amount: 0,
+        status: "known",
+      },
+    ],
+    pending_components: [{ code: "ORDER_COMMISSION", label: "Comissão iFood" }],
+    complete: false,
+  };
+  const tree = view("demonstrativo", {
+    linhaDetalhe: {
+      ...pendencia,
+      valor: null,
+      valor_conhecido: 6.5,
+      campo: "taxas_marketplace",
+      canal: "ifood",
+    },
+    detalhesLinha: {
+      ...pendencia,
+      total: null,
+      items: [
+        {
+          id: "ifood-1420",
+          descricao: "Pedido 1420",
+          valor: 0,
+          meta: { ...pendencia, ifood_financial: financeiro },
+        },
+      ],
+    },
+    formatarData: () => "24/10/2026",
+  });
+  assert.match(elementText(tree), /Subtotal conhecido:\s*R\$\s*6,50.*Apuração pendente/);
+  const panel = elements(tree).find((node) => node.props?.financeiro === financeiro);
+  assert.ok(panel, "o extrato da DRE reutiliza as cobranças individuais da venda");
+  const payment = elements(tree).find(
+    (node) => node.type === "ui/MoneyCell" && node.props.value === 0,
+  );
+  assert.equal(payment.props.zeroAsDash, false);
 });
 
 function view(tabAtiva, extraProps = {}) {

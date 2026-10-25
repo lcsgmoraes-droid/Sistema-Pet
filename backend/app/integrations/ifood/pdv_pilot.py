@@ -17,6 +17,7 @@ from sqlalchemy import or_, text
 
 from app.config import _is_strict_runtime_environment, settings
 from app.ifood_order_models import IfoodEvent, IfoodOrder, IfoodPdvBridge
+from app.services.ifood_rentabilidade_contexto import carregar_snapshots_ifood_vendas
 
 PILOT_SKU = "018631.1"
 _ACTIVE_STATUSES = {
@@ -609,7 +610,25 @@ def pdv_sale_summary(db, sale):
         )
         .first()
     )
-    return pdv_bridge_summary(db, order) if order is not None else None
+    if order is None:
+        return None
+    summary = pdv_bridge_summary(db, order)
+    snapshot = carregar_snapshots_ifood_vendas(db, sale.tenant_id, [sale]).get(
+        sale.id, {}
+    )
+    return {
+        **summary,
+        "ifood_financial": snapshot.get("ifood_financial", {}),
+        "ifood_rentabilidade": {
+            campo: snapshot.get(campo)
+            for campo in (
+                "lucro",
+                "margem_sobre_venda",
+                "venda_liquida",
+                "rentabilidade_status",
+            )
+        },
+    }
 
 
 def import_pdv_pilot(db, *, tenant_id, order_id: str, actor_id: int) -> IfoodOrder:

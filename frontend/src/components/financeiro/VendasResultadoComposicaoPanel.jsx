@@ -2,6 +2,7 @@ import {
   PENDENCIA_IFOOD_LABEL,
   temRentabilidadePendente,
 } from "./vendasFinanceiro/rentabilidadePendente.js";
+import IfoodVendaTaxasResumo from "../ifood/IfoodVendaTaxasResumo.jsx";
 
 export default function VendasResultadoComposicaoPanel({
   abaAtiva,
@@ -26,6 +27,7 @@ export default function VendasResultadoComposicaoPanel({
             : `${formatarMoeda(resumo.venda_liquida || 0)} liquido antes do CMV`}
         </div>
       </div>
+      <IfoodVendaTaxasResumo financeiro={resumo.ifood_financial_resumo} resumo />
       <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
         {fluxoResultadoCards.map((card) => {
           const clicavel = card.acao === "vendas_em_aberto";

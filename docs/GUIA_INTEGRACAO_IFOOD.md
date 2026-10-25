@@ -331,8 +331,10 @@ separada.
 
 O pedido online registrou R$ 73,90 como pagamento externo iFood, sem nova entrada
 em caixa. O repasse líquido, sua data e a margem continuam pendentes do
-Financial. Esse aceite vale para o pedido e o fluxo de estoque deste piloto em
-DEV; não libera produção, operação contínua nem valida os relatórios gerais.
+Financial oficial desse pedido. A ligação das taxas por venda já está
+implementada em DEV, mas não cria cobranças que o iFood ainda não forneceu.
+Esse aceite vale para o pedido e o fluxo de estoque deste piloto em DEV;
+não libera produção, operação contínua nem valida os relatórios gerais.
 
 1. Com a equipe de implantação, confirme a empresa, a loja de testes, o pedido
    autorizado e o único produto do piloto. Neste primeiro ensaio, o pedido deve
@@ -364,9 +366,11 @@ taxa somente quando a origem comprova que pertence ao iFood; outras condições
 ficam bloqueadas. O frete online positivo exige entrega sob responsabilidade da
 loja comprovada no pedido.
 
-**Repasse a conciliar** significa que líquido, data e margem ainda aguardam o
-Financial. Concluir a venda online registra a evidência externa e a baixa do
-produto; não registra dinheiro recebido em caixa ou banco nem dá o repasse como
+**Repasse a conciliar** significa que o recebimento líquido e sua data ainda
+precisam ser conferidos. As taxas e a margem têm pendências próprias: uma cobrança
+conhecida pode aparecer antes da confirmação bancária. Concluir a venda online
+registra a evidência externa e a baixa do produto; não registra dinheiro recebido
+em caixa ou banco nem dá o repasse como
 recebido. Se o modo de pagamento ou o escopo do piloto não puder ser comprovado,
 a cobrança manual continua bloqueada.
 
@@ -385,7 +389,7 @@ do ensaio estão em [Pedidos e homologação](INTEGRACAO_IFOOD_FASE2_PEDIDOS.md)
 A finalização da venda iFood não dispara emissão fiscal automática. A emissão
 manual continua disponível conforme as permissões e regras fiscais da empresa.
 
-## Financeiro em DEV: custo histórico e repasses
+## Financeiro em DEV: taxas por venda, custo histórico e repasses
 
 A calculadora continua sendo uma previsão com as premissas da loja. A aba
 **Financeiro**, disponível nesta entrega somente em DEV/homologação, separa essa
@@ -398,16 +402,19 @@ Financial de produção. A aprovação dos módulos operacionais não substitui 
 
 1. Em DEV, abra **Central do iFood → Financeiro**, escolha o período dos eventos
    importados e use **Conferir venda** no pedido escolhido.
-2. No bloco de custos históricos, pesquise o **Número ou ID da venda ERP** e
-   confira a mesma venda no ERP. A busca não seleciona automaticamente por
-   valor, data, cliente ou produto.
-3. Selecione a venda, registre a justificativa, marque a confirmação de que ela
+2. Se o pedido já foi importado pelo piloto do PDV, confira o vínculo da ponte
+   e o CMV original. Essa associação exata é aproveitada automaticamente;
+   não precisa criar outro vínculo nem preencher uma confirmação manual.
+3. Para pedidos sem essa ponte, no bloco de custos históricos pesquise o
+   **Número ou ID da venda ERP** e confira a mesma venda no ERP. A busca não
+   escolhe por coincidência de valor, data, cliente ou produto.
+4. Selecione a venda, registre a justificativa, marque a confirmação de que ela
    corresponde ao pedido e use **Confirmar vínculo com venda ERP**. A associação
    é local e auditada; ela não cria venda, caixa, recebível ou baixa de estoque.
-4. Confira o CMV histórico total e os comprovantes das linhas. Só são aceitas
+5. Confira o CMV histórico total e os comprovantes das linhas. Só são aceitas
    vendas da mesma empresa, do canal iFood, finalizadas e sem cancelamento ou
    devolução, com custo original comprovado em todos os itens.
-5. Se o CMV manual ficar **Não informado**, a contribuição usa automaticamente
+6. Se o CMV manual ficar **Não informado**, a contribuição usa automaticamente
    esse custo histórico. Um CMV manual informado, inclusive zero, tem prioridade
    explícita. Receita, tributos e outros custos ainda precisam ser conhecidos
    e justificados; o CMV histórico sozinho não completa a contribuição.
@@ -417,6 +424,41 @@ itens ou em seus comprovantes após a confirmação, devolução e cancelamento
 geram pendência. A confirmação precisa ser feita com cuidado: o sistema não
 reatribui o vínculo nem reutiliza a mesma venda para outro pedido silenciosamente.
 Os custos manuais continuam separados e versionados; não são sobrescritos pela leitura.
+
+### Conferir as taxas e o que ainda falta
+
+No resumo da venda, confira cada linha de **Comissão iFood** e **Taxa de pagamento
+iFood**, com nome, valor e origem. Uma parcela recebida permanece visível mesmo
+que outra ainda falte. Uma taxa de R$ 0,00 só deixa de estar pendente quando o
+Financial trouxer explicitamente esse zero. A previsão pelas taxas do contrato
+continua na calculadora e não substitui a cobrança da venda.
+
+Frete pago pelo cliente e serviço cobrado pelo iFood do consumidor são dados do
+checkout, separados dos custos da loja. Se o iFood fizer a entrega, sua despesa
+de logística também precisa ser identificada no extrato. Lançamentos desconhecidos,
+ajustes, valores sem pedido ou conflitos de vínculo/período continuam com aviso;
+o sistema não atribui esses custos por suposição.
+
+Quando uma cobrança atrasada for importada, o sistema cruza o ID exato do pedido
+com a venda e completa somente o que puder comprovar. Uma revisão substitui a
+cobrança anterior, sem somá-la duas vezes. As telas conectadas consultam novamente
+o ERP a cada 30 segundos enquanto visíveis, ao voltar à aba e após a importação.
+Essas leituras usam os eventos locais: não refazem a venda, CMV, reserva, baixa,
+pagamento ou caixa e não consultam o iFood por conta de abrir um relatório.
+
+A busca automática no provedor é uma configuração separada, desligada por padrão
+e limitada ao pedido/SKU autorizado no piloto DEV. Usa a competência mensal ou a
+janela exata já importada, respeitando o limite de 33 dias. Outras competências e
+ajustes fora dessa janela exigem conferência própria; não ficam conciliados
+automaticamente. A equipe deve manter o escopo de testes e as permissões restritos.
+
+**Referência do pedido #1420:** o CMV original é R$ 43,94; após a baixa oficial,
+o estoque físico é 29, reservado 3 e disponível 26. Ainda não há Financial oficial
+desse pedido. Para validar a atualização das telas em DEV, o ensaio temporário
+usa fonte sintética rotulada, com comissão R$ 6,50, pagamento R$ 0,00 e revisão da
+comissão para R$ 7,50. Isso não comprova cobrança real nem libera margem real.
+Os dados temporários serão restaurados ao final; produção não faz parte do ensaio.
+O fechamento da validação, CI e gate desta ampliação ainda serão registrados.
 
 ### Conferir repasses do provedor
 
@@ -480,8 +522,10 @@ Na lista de vendas, alternar impostos não elimina essa pendência. DRE, ponto d
 equilíbrio, rankings por margem e exportações preservam a mesma indicação. A
 previsão baseada no contrato continua sendo uma simulação separada. Uma taxa de
 pagamento isolada, mesmo zero, não comprova a comissão e os demais custos do
-iFood. A conclusão da conciliação e sua aplicação à margem geral ainda dependem
-da etapa Financial; o aviso não confirma recebimento do repasse no banco.
+iFood. Em DEV, a ligação por pedido já aplica os componentes recebidos e atualiza
+o que faltar quando houver nova evidência válida. Até lá, a pendência permanece;
+uma simulação nunca libera margem real. O aviso de taxas e margem é separado
+da confirmação de recebimento do repasse no banco.
 
 **Preciso cadastrar tudo novamente?** Primeiro analise os itens já publicados.
 O objetivo é aproveitar o catálogo existente e evitar duplicidade; o vínculo

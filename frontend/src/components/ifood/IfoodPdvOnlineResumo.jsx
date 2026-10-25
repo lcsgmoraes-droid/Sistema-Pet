@@ -1,4 +1,5 @@
 import { formatMoneyBRL } from "../../utils/formatters";
+import IfoodVendaTaxasResumo from "./IfoodVendaTaxasResumo.jsx";
 
 function amount(value) {
   return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value))
@@ -11,6 +12,11 @@ export default function IfoodPdvOnlineResumo({ bridge }) {
   const checkout = bridge.checkout || {};
   const receivable = bridge.receivable || {};
   const approved = bridge.payment?.status === "approved";
+  const rentabilidade = bridge.ifood_rentabilidade || {};
+  const margemConhecida =
+    rentabilidade.lucro !== null &&
+    rentabilidade.lucro !== undefined &&
+    rentabilidade.rentabilidade_status === "complete";
   const lines = [
     ["Produto", checkout.items_total],
     ["Frete do pedido", checkout.delivery_fee],
@@ -38,12 +44,24 @@ export default function IfoodPdvOnlineResumo({ bridge }) {
       <p className="mt-3 text-xs text-slate-600 dark:text-slate-300">
         A taxa de serviço pertence ao iFood. O total do consumidor não representa o repasse da loja.
       </p>
+      <div className="mt-3">
+        <IfoodVendaTaxasResumo financeiro={bridge.ifood_financial} />
+      </div>
+      {margemConhecida && (
+        <p className="mt-2 font-semibold text-slate-900 dark:text-slate-100">
+          Contribuição da venda: {amount(rentabilidade.lucro)}
+          {rentabilidade.margem_sobre_venda != null &&
+            ` (${Number(rentabilidade.margem_sobre_venda).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%)`}
+        </p>
+      )}
       <p className="mt-2 font-medium text-amber-800 dark:text-amber-300">Repasse a conciliar</p>
       <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
         {receivable.received_amount === 0
           ? "Nenhum recebimento em caixa ou banco registrado. "
           : "Recebimento do repasse ainda não comprovado. "}
-        Líquido, data do repasse e margem aguardam o Financial.
+        {margemConhecida
+          ? "A contribuição conhecida não confirma recebimento no banco."
+          : "Líquido, data do repasse e margem aguardam o Financial."}
       </p>
     </div>
   );

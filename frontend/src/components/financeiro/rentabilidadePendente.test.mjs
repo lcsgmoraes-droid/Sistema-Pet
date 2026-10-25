@@ -339,6 +339,58 @@ test("lista e detalhes mostram iFood e pendência sem formatar nulos como dinhei
   assert.doesNotMatch(elementText(detalhes), /money:null|null%/);
 });
 
+test("taxas iFood exibem débito, zero e crédito com sinal correto sem transformar pendência em zero", () => {
+  const formatar = createControllerHarness(
+    fileURLToPath(new URL("../ui/MoneyCell.jsx", import.meta.url)),
+    { mocks: new Map(), exportName: "formatMoneyCellValue", invoke: (formatter) => formatter },
+  ).tree;
+  const mocks = new Map([
+    ["../../utils/pdvFiscalStatus", { obterPendenciaCancelamentoFiscal: () => null }],
+    ["lucide-react", {}],
+    ["../ui/MoneyCell", { __esModule: true, default: (props) => formatar(props.value, props) }],
+    ...[
+      "DataTable",
+      "CustomerIdentity",
+      "NumberCell",
+      "SaleReference",
+      "StatusBadge",
+      "ProductIdentity",
+    ].map((name) => [`../ui/${name}`, { __esModule: true, default: name }]),
+  ]);
+  for (const [valor, esperado] of [
+    [3, "-R$ 3,00"],
+    [0, "R$ 0,00"],
+    [-3, "+R$ 3,00"],
+    [null, PENDENCIA_IFOOD_LABEL],
+  ]) {
+    const venda = {
+      ...pendente,
+      canal_venda: "ifood",
+      taxa_cartao: valor,
+      taxa_ifood: valor,
+      ifood_financial: { charges: [], pending_components: [] },
+      itens: [{ taxa_cartao: valor, taxas_ifood_pendentes: true }],
+    };
+    const tree = createControllerHarness(
+      fileURLToPath(new URL("./VendasFinanceiroListaTable.jsx", import.meta.url)),
+      {
+        mocks,
+        props: { vendas: [venda], vendasExpandidas: new Set([venda.id]), formatarMoeda: String },
+      },
+    ).tree;
+    for (const key of ["taxa_cartao", "taxa_ifood"]) {
+      const cell = tree.props.columns.find((column) => column.key === key).render(venda);
+      assert.equal(elementText(resolverComponentes(cell)), esperado, `${key}: ${valor}`);
+    }
+    const detalhes = resolverComponentes(tree.props.renderExpandedRow(venda, 0, 20));
+    const row = elements(detalhes).find(
+      (node) => node.type === "tr" && node.props.className?.includes("border-b"),
+    );
+    const cells = elements(row).filter((node) => node.type === "td");
+    assert.equal(elementText(cells[8]), esperado, `taxa de pagamento do item: ${valor}`);
+  }
+});
+
 test("comparação financeira preserva nulos no gráfico e não calcula variação do líquido pendente", () => {
   const resumo = { ...pendente, quantidade_vendas: 1, valor_recebido: 65, em_aberto: 0 };
   const mocks = new Map([

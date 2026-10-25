@@ -14,3 +14,11 @@ export function descreverRentabilidadePendente(dados = {}) {
     ? `${quantidade} venda(s) aguardam as cobranças do iFood. Líquido, lucro e margem permanecem pendentes.`
     : "Aguardando as cobranças do iFood para conhecer o líquido, o lucro e a margem.";
 }
+
+export function campoRentabilidadePendente(dados, campo) {
+  if (!temRentabilidadePendente(dados)) return false;
+  if (["taxa_cartao", "taxa_ifood"].includes(campo)) {
+    return dados?.[campo] === null || dados?.[campo] === undefined;
+  }
+  return true;
+}

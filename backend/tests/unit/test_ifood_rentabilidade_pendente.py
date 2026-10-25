@@ -15,6 +15,17 @@ from app.services.venda_rentabilidade_snapshot_service import (
 )
 
 
+@pytest.fixture(autouse=True)
+def financial_sem_evidencia(monkeypatch):
+    # Estes testes isolam as regras de calculo; os vinculos SQL sao exercidos
+    # pela suite propria do resolver, com tenants UUID e tabelas reais.
+    monkeypatch.setattr(
+        "app.services.ifood_rentabilidade_contexto.carregar_financial_das_vendas",
+        lambda *_args: {},
+    )
+    monkeypatch.setattr(report, "carregar_financial_das_vendas", lambda *_args: {})
+
+
 class NoQueries:
     def __init__(self):
         self.flushes = 0
@@ -307,3 +318,250 @@ def test_resumo_gestor_nao_reconstitui_margem_nos_clientes_antigos(monkeypatch):
     assert resultado.receita_liquida == 73.9
     assert resultado.cmv == 40
     assert resultado.vendas_rentabilidade_pendente == 1
+
+
+def financial(
+    *, commission=None, payment=None, complete=False, revision=1, simulated=False
+):
+    charges = [
+        {
+            "code": code,
+            "label": label,
+            "amount": amount,
+            "signed_amount": -amount,
+            "classification": classification,
+            "status": "simulated" if simulated else "known",
+            "source": "synthetic" if simulated else "ifood_financial_events",
+            "revision": revision,
+        }
+        for code, label, classification, amount in (
+            ("ORDER_COMMISSION", "Comissão iFood", "commission", commission),
+            (
+                "PAYMENT_TRANSACTION_FEE",
+                "Taxa de pagamento iFood",
+                "payment_fee",
+                payment,
+            ),
+        )
+        if amount is not None
+    ]
+    pending = [
+        {"code": code, "label": label, "reason": "Ainda não recebida."}
+        for code, label, amount in (
+            ("ORDER_COMMISSION", "Comissão iFood", commission),
+            ("PAYMENT_TRANSACTION_FEE", "Taxa de pagamento iFood", payment),
+        )
+        if amount is None
+    ]
+    total = sum(charge["amount"] for charge in charges)
+    return {
+        "charges": charges,
+        "pending_components": pending,
+        "fee_known_total": total,
+        "fee_total": total if complete else None,
+        "complete": complete,
+        "simulated": simulated,
+        "fingerprint": f"revision-{revision}",
+    }
+
+
+@pytest.mark.parametrize("commission,payment", [(6.5, None), (None, 0), (0, None)])
+def test_taxa_recebida_aparece_mesmo_faltando_outro_componente(commission, payment):
+    venda = sale()
+    base = build(venda)
+    resultado = aplicar_pendencia_ifood(
+        venda, base, financial=financial(commission=commission, payment=payment)
+    )
+    assert resultado["taxa_ifood"] == commission
+    assert resultado["taxa_cartao"] == payment
+    assert resultado["lucro"] is None
+    assert resultado["taxas_ifood_pendentes"] is True
+    assert len(resultado["ifood_financial"]["pending_components"]) == 1
+
+
+def test_financial_tardio_e_revisao_atualizam_cache_sem_reprocessar_cmv(monkeypatch):
+    venda = sale()
+    venda.rentabilidade_snapshot = build(venda)
+    original = deepcopy(venda.rentabilidade_snapshot)
+    recebido = {}
+    monkeypatch.setattr(
+        "app.services.ifood_rentabilidade_contexto.carregar_financial_das_vendas",
+        lambda *_: {1: recebido},
+    )
+    db = NoQueries()
+    assert (
+        get_or_build_venda_rentabilidade_snapshot(venda, db, venda.tenant_id)["lucro"]
+        is None
+    )
+    recebido.update(financial(commission=6.5))
+    parcial = get_or_build_venda_rentabilidade_snapshot(venda, db, venda.tenant_id)
+    assert parcial["taxa_ifood"] == 6.5 and parcial["lucro"] is None
+    recebido.clear()
+    recebido.update(financial(commission=6.5, payment=0, complete=True, revision=2))
+    venda.itens[0].produto.preco_custo = 9999  # Custo atual nao substitui o congelado.
+    completo = get_or_build_venda_rentabilidade_snapshot(venda, db, venda.tenant_id)
+    assert completo["taxas_ifood_pendentes"] is False
+    assert completo["lucro"] == 27.4
+    assert completo["itens"][0]["lucro"] == 27.4
+    assert completo["taxa_cartao"] == 0
+    recebido.clear()
+    recebido.update(financial(commission=7.5, payment=0, complete=True, revision=3))
+    revisado = get_or_build_venda_rentabilidade_snapshot(venda, db, venda.tenant_id)
+    assert revisado["lucro"] == 26.4  # Substitui 6.50; nao acumula 6.50 + 7.50.
+    recebido.clear()  # Uma revisao sem prova nao reutiliza o lucro anterior.
+    assert (
+        get_or_build_venda_rentabilidade_snapshot(venda, db, venda.tenant_id)["lucro"]
+        is None
+    )
+    assert venda.rentabilidade_snapshot == original
+    assert db.flushes == 0
+
+
+def test_taxa_local_e_comissao_interna_nao_se_confundem_com_ifood():
+    venda = sale()
+    base = build(venda)
+    base.update(taxa_cartao_local=1, comissao=2)
+    base["itens"][0]["comissao"] = 2
+    resultado = aplicar_pendencia_ifood(
+        venda, base, financial=financial(commission=6.5, payment=0, complete=True)
+    )
+    assert resultado["taxa_cartao"] == 1
+    assert resultado["taxa_ifood"] == 6.5
+    assert resultado["comissao"] == 2
+    assert resultado["lucro"] == 24.4
+    assert resultado["itens"][0]["lucro"] == 24.4
+
+
+def test_overlay_completo_nunca_e_persistido_como_base(monkeypatch):
+    venda = sale()
+    db = NoQueries()
+    monkeypatch.setattr(
+        "app.services.ifood_rentabilidade_contexto.carregar_financial_das_vendas",
+        lambda *_: {1: financial(commission=6.5, payment=0, complete=True)},
+    )
+    resultado = get_or_build_venda_rentabilidade_snapshot(
+        venda,
+        db,
+        venda.tenant_id,
+        impostos_percentual=0,
+        formas_pagamento_map={},
+        custo_campanha=0,
+        cupom_desconto=0,
+        comissao_total=0,
+        taxa_operacional_entrega=0,
+        estoque_custos_por_produto={},
+    )
+    assert resultado["lucro"] == 27.4
+    assert venda.rentabilidade_snapshot["lucro"] is None
+    assert venda.rentabilidade_snapshot["taxa_cartao_local"] == 0
+    assert db.flushes == 1
+
+
+def test_simulacao_explicitamente_marcada_nao_libera_lucro_real():
+    venda = sale()
+    resultado = aplicar_pendencia_ifood(
+        venda,
+        build(venda),
+        financial=financial(commission=6.5, payment=0, complete=True, simulated=True),
+    )
+    assert resultado["ifood_financial"]["simulated"] is True
+    assert resultado["lucro"] is None
+    assert resultado["taxa_ifood"] == 6.5
+
+
+def test_rateio_das_taxas_fecha_centavos_sem_duplicar_valor():
+    venda = sale()
+    base = build(venda)
+    base.update(venda_bruta=3, taxa_loja=0, custo_produtos=0)
+    item = base["itens"][0]
+    base["itens"] = [
+        {**item, "venda_bruta": 1, "taxa_loja": 0, "custo_total": 0} for _ in range(3)
+    ]
+    resultado = aplicar_pendencia_ifood(
+        venda, base, financial=financial(commission=1, payment=0, complete=True)
+    )
+    assert resultado["lucro"] == 2
+    assert [item["taxa_ifood"] for item in resultado["itens"]] == [0.33, 0.33, 0.34]
+    assert sum(item["lucro"] for item in resultado["itens"]) == 2
+
+
+def test_relatorio_misto_preserva_taxa_pagamento_conhecida_e_outra_pendente(
+    monkeypatch,
+):
+    vendas = [sale(), sale(sale_id=2, canal="loja_fisica", gateway_fee=0)]
+    monkeypatch.setattr(report, "carregar_vendas_relatorio", lambda **_: vendas)
+    monkeypatch.setattr(
+        report, "carregar_financial_das_vendas", lambda *_: {1: financial(payment=0)}
+    )
+    contexto = {
+        "impostos_percentual_global": 0,
+        **{
+            key: {}
+            for key in (
+                "comissao_total_por_venda",
+                "formas_pagamento_map",
+                "cashback_por_venda",
+                "cupons_por_venda",
+                "entregadores_map",
+                "estoque_custos_por_venda",
+            )
+        },
+    }
+    monkeypatch.setattr(
+        report, "carregar_contexto_relatorio_vendas", lambda **_: contexto
+    )
+    monkeypatch.setattr(
+        report, "_enriquecer_itens_promocionais", lambda _, itens: itens
+    )
+    resultado = report.montar_relatorio_vendas(
+        data_inicio="2026-10-24",
+        data_fim="2026-10-24",
+        canal_venda=None,
+        db=NoQueries(),
+        tenant_id="tenant-dev",
+    )
+    assert resultado["resumo"]["taxa_cartao_total"] == 0
+    assert resultado["resumo"]["taxa_ifood_total"] is None
+    assert resultado["resumo"]["lucro_total"] is None
+    assert resultado["resumo"]["ifood_financial_resumo"]["charges"][0]["amount"] == 0
+
+
+def test_taxa_ifood_chegada_depois_nao_vira_credito_local_no_cache_legado():
+    venda = sale()
+    base = build(venda)
+    base.pop("taxa_cartao_local")
+    base.pop("ifood_financial")
+    base["taxa_cartao"] = 0
+    venda.pagamentos[0].gateway_fee_amount = 3
+    resultado = aplicar_pendencia_ifood(
+        venda, base, financial=financial(commission=6.5, payment=3, complete=True)
+    )
+    assert resultado["taxa_cartao_local"] == 0
+    assert resultado["lucro"] == 24.4
+
+
+def test_subtotal_conta_pedidos_sem_perder_linhas_legitimas_repetidas():
+    from app.services.rentabilidade_pendencias import resumir_financial_ifood
+
+    dados = financial(commission=2, payment=0, complete=True)
+    dados["charges"].append(deepcopy(dados["charges"][0]))
+    dados.update(fee_known_total=4, fee_total=4)
+    resumo = resumir_financial_ifood([dados])
+    comissao = next(c for c in resumo["charges"] if c["code"] == "ORDER_COMMISSION")
+    assert comissao["amount"] == 4
+    assert comissao["orders"] == 1
+
+
+def test_taxa_local_desconhecida_nao_vira_zero_no_segundo_overlay():
+    venda = sale()
+    base = build(venda)
+    base.pop("taxa_cartao_local")
+    base.pop("ifood_financial")
+    venda.pagamentos = []
+    base["taxa_cartao"] = 5
+    recebido = financial(commission=6.5, payment=0, complete=True)
+    primeiro = aplicar_pendencia_ifood(venda, base, financial=recebido)
+    segundo = aplicar_pendencia_ifood(venda, primeiro, financial=recebido)
+    assert primeiro["taxa_cartao_local"] is None
+    assert segundo["taxa_cartao_local"] is None
+    assert segundo["lucro"] is None

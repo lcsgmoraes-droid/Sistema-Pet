@@ -8,16 +8,48 @@ from app.services.rentabilidade_pendencias import (
     PENDENCIA_IFOOD,
     venda_aguarda_financial_ifood,
 )
+from app.services.ifood_rentabilidade_contexto import carregar_snapshots_ifood_vendas
 
 
-def _pendencia_periodo(vendas):
-    quantidade = sum(venda_aguarda_financial_ifood(venda) for venda in vendas)
+def _pendencia_periodo(vendas, snapshots=None):
+    snapshots = snapshots or {}
+    pendentes = [
+        snapshots.get(getattr(venda, "id", None), {})
+        for venda in vendas
+        if venda_aguarda_financial_ifood(venda)
+        and snapshots.get(getattr(venda, "id", None), {}).get(
+            "taxas_ifood_pendentes", True
+        )
+    ]
+    quantidade = len(pendentes)
+    mensagens = list(
+        dict.fromkeys(
+            texto
+            for snapshot in pendentes
+            for texto in snapshot.get("pendencias_rentabilidade", [])
+        )
+    )
     return {
         "rentabilidade_status": PENDING_IFOOD_FINANCIAL if quantidade else "complete",
         "taxas_ifood_pendentes": bool(quantidade),
         "vendas_rentabilidade_pendente": quantidade,
-        "pendencias_rentabilidade": [PENDENCIA_IFOOD] if quantidade else [],
+        "pendencias_rentabilidade": mensagens
+        or ([PENDENCIA_IFOOD] if quantidade else []),
     }
+
+
+def _item_snapshot(snapshot, item, indice):
+    fotografias = list(snapshot.get("itens") or [])
+    item_id = getattr(item, "id", None)
+    if item_id is not None:
+        return next(
+            (foto for foto in fotografias if foto.get("venda_item_id") == item_id), {}
+        )
+    if indice < len(fotografias) and fotografias[indice].get("produto_id") == getattr(
+        item, "produto_id", None
+    ):
+        return fotografias[indice]
+    return {}
 
 
 class ChatIAMetricasMixin:
@@ -86,10 +118,12 @@ class ChatIAMetricasMixin:
             .all()
         )
 
+        snapshots_ifood = carregar_snapshots_ifood_vendas(self.db, tenant_id, vendas)
         acumulado: Dict[str, Dict[str, Any]] = {}
 
         for venda in vendas:
-            for item in venda.itens:
+            snapshot = snapshots_ifood.get(getattr(venda, "id", None), {})
+            for indice, item in enumerate(venda.itens):
                 if not item.produto:
                     continue
 
@@ -98,6 +132,15 @@ class ChatIAMetricasMixin:
                 receita = float(item.subtotal or 0)
                 custo_unit = float(item.produto.preco_custo or 0)
                 custo = custo_unit * qtd
+                foto = _item_snapshot(snapshot, item, indice)
+                pendente = venda_aguarda_financial_ifood(venda) and snapshot.get(
+                    "taxas_ifood_pendentes", True
+                )
+                lucro_item = receita - custo
+                if snapshot:
+                    custo = float(foto.get("custo_total", 0) or 0)
+                    lucro_item = foto.get("lucro")
+                    pendente = pendente or lucro_item is None
 
                 if nome not in acumulado:
                     acumulado[nome] = {
@@ -106,21 +149,20 @@ class ChatIAMetricasMixin:
                         "receita": 0.0,
                         "custo": 0.0,
                         "taxas_ifood_pendentes": False,
+                        "lucro": 0.0,
                     }
 
-                acumulado[nome]["taxas_ifood_pendentes"] |= (
-                    venda_aguarda_financial_ifood(venda)
-                )
+                acumulado[nome]["taxas_ifood_pendentes"] |= pendente
 
                 acumulado[nome]["quantidade"] += qtd
                 acumulado[nome]["receita"] += receita
                 acumulado[nome]["custo"] += custo
+                acumulado[nome]["lucro"] += float(lucro_item or 0)
 
         lista = []
         for dados in acumulado.values():
             receita = dados["receita"]
-            custo = dados["custo"]
-            lucro = receita - custo
+            lucro = dados["lucro"]
             margem = (lucro / receita * 100) if receita > 0 else 0.0
 
             lista.append(
@@ -141,10 +183,11 @@ class ChatIAMetricasMixin:
         top_vendidos = sorted(lista, key=lambda x: x["quantidade"], reverse=True)[
             :limite
         ]
-        pendencia = _pendencia_periodo(vendas)
+        pendencia = _pendencia_periodo(vendas, snapshots_ifood)
         top_margem = (
             []
             if pendencia["taxas_ifood_pendentes"]
+            or any(p["taxas_ifood_pendentes"] for p in lista)
             else [p for p in lista if p["receita"] > 0]
         )
         top_margem = sorted(
@@ -197,8 +240,24 @@ class ChatIAMetricasMixin:
         descontos = sum(float(v.desconto_valor or 0) for v in vendas)
         receita_liquida = receita_bruta - descontos
 
+        snapshots_ifood = carregar_snapshots_ifood_vendas(self.db, tenant_id, vendas)
         cmv_estimado = 0.0
+        ajuste_ifood = 0.0
         for venda in vendas:
+            snapshot = snapshots_ifood.get(getattr(venda, "id", None), {})
+            if snapshot:
+                custo_ifood = float(snapshot.get("custo_produtos", 0) or 0)
+                cmv_estimado += custo_ifood
+                if snapshot.get("lucro") is not None:
+                    receita_ifood = (
+                        float(venda.subtotal or 0)
+                        + float(venda.taxa_entrega or 0)
+                        - float(venda.desconto_valor or 0)
+                    )
+                    ajuste_ifood += float(snapshot["lucro"]) - (
+                        receita_ifood - custo_ifood
+                    )
+                continue
             for item in venda.itens:
                 if item.produto and item.produto.preco_custo:
                     cmv_estimado += float(item.produto.preco_custo) * float(
@@ -226,12 +285,12 @@ class ChatIAMetricasMixin:
             and getattr(c, "nota_entrada_id", None) is None
         )
 
-        lucro_liquido = lucro_bruto - despesas_operacionais
+        lucro_liquido = lucro_bruto - despesas_operacionais + ajuste_ifood
         margem_liquida = (
             (lucro_liquido / receita_bruta * 100) if receita_bruta > 0 else 0.0
         )
 
-        pendencia = _pendencia_periodo(vendas)
+        pendencia = _pendencia_periodo(vendas, snapshots_ifood)
         return {
             "receita_bruta": round(receita_bruta, 2),
             "descontos": round(descontos, 2),
@@ -280,6 +339,7 @@ class ChatIAMetricasMixin:
             .all()
         )
 
+        snapshots_ifood = carregar_snapshots_ifood_vendas(self.db, tenant_id, vendas)
         categorias: Dict[str, Dict[str, float]] = {}
         canais: Dict[str, Dict[str, float]] = {}
         clientes: Dict[int, Dict[str, Any]] = {}
@@ -311,7 +371,8 @@ class ChatIAMetricasMixin:
                 clientes[cliente_id]["valor_total"] += float(venda.total or 0)
                 clientes[cliente_id]["quantidade_compras"] += 1
 
-            for item in venda.itens:
+            snapshot = snapshots_ifood.get(getattr(venda, "id", None), {})
+            for indice, item in enumerate(venda.itens):
                 if not item.produto:
                     continue
 
@@ -326,6 +387,9 @@ class ChatIAMetricasMixin:
                 quantidade = float(item.quantidade or 0)
                 custo = float(getattr(item.produto, "preco_custo", 0) or 0) * quantidade
                 lucro = receita - custo
+                if snapshot:
+                    fotografia = _item_snapshot(snapshot, item, indice)
+                    lucro = float(fotografia.get("lucro") or 0)
 
                 categorias.setdefault(categoria_nome, {"receita": 0.0, "lucro": 0.0})
                 categorias[categoria_nome]["receita"] += receita
@@ -367,7 +431,7 @@ class ChatIAMetricasMixin:
         top_canais.sort(key=lambda item: item["receita"], reverse=True)
         top_clientes.sort(key=lambda item: item["valor_total"], reverse=True)
 
-        pendencia = _pendencia_periodo(vendas)
+        pendencia = _pendencia_periodo(vendas, snapshots_ifood)
         return {
             "top_categorias_margem": (
                 []

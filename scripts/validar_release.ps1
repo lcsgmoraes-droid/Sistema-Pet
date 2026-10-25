@@ -227,6 +227,9 @@ Invoke-GateStep 'Backend iFood safety contracts' $python @(
 
 Invoke-GateStep 'iFood pending fees reporting regression' $python @(
     '-m', 'pytest', 'tests/unit/test_ifood_rentabilidade_pendente.py',
+    'tests/unit/test_ifood_sale_financials.py',
+    'tests/unit/test_ifood_financial_report_consumers.py',
+    'tests/unit/test_ifood_financial_poller.py',
     'tests/unit/test_ifood_rentabilidade_dre_pe_pendente.py',
     'tests/unit/test_venda_rentabilidade_snapshot.py',
     'tests/unit/test_venda_rentabilidade_reprocessamento_service.py',

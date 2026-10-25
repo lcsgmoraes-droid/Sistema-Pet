@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     # Leitura Financial em DEV, independente de catalogo/pedidos; sempre envia
     # x-request-homologation:true. Nao habilita consultas financeiras em producao.
     IFOOD_FINANCIAL_READ_ENABLED: bool = False
+    # Consulta automatica limitada ao pedido/SKU allowlisted do piloto DEV.
+    IFOOD_FINANCIAL_POLLING_ENABLED: bool = False
+    IFOOD_FINANCIAL_POLLING_INTERVAL_SECONDS: int = 900
+    # Somente exibicao de ensaios em DEV; nunca libera lucro real ou producao.
+    IFOOD_FINANCIAL_SHOW_SYNTHETIC: bool = False
 
     # Imagens de produtos
     PRODUCT_IMAGE_STORAGE_BACKEND: str = "local"  # local | s3

@@ -127,7 +127,7 @@ def _load_rentabilidade_snapshot(snapshot_raw: Any) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _snapshot_pronto(venda: Venda) -> Optional[Dict[str, Any]]:
+def _snapshot_pronto(venda: Venda, *, financial=None) -> Optional[Dict[str, Any]]:
     snapshot = _load_rentabilidade_snapshot(
         getattr(venda, "rentabilidade_snapshot", None)
     )
@@ -138,7 +138,9 @@ def _snapshot_pronto(venda: Venda) -> Optional[Dict[str, Any]]:
     except (TypeError, ValueError):
         version = 0
     return (
-        aplicar_pendencia_ifood(venda, ajustar_snapshot_taxa_mista(venda, snapshot))
+        aplicar_pendencia_ifood(
+            venda, ajustar_snapshot_taxa_mista(venda, snapshot), financial=financial
+        )
         if version >= SNAPSHOT_VERSION
         or (version == 5 and getattr(venda, "desconto_venda_valor", None) is None)
         else None

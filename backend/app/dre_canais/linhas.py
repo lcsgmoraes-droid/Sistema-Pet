@@ -502,9 +502,25 @@ def montar_linhas_dre_competencia(
             canal_pendente = linha.canal == "total" or bool(
                 dados_canais.get(linha.canal, {}).get("vendas_rentabilidade_pendente")
             )
+            canais_linha = (
+                dados_canais.values()
+                if linha.canal == "total"
+                else [dados_canais.get(linha.canal, {})]
+            )
+            taxa_pendente = linha.campo in {
+                "taxas_cartao",
+                "taxas_marketplace",
+            } and any(
+                dados.get("vendas_rentabilidade_pendente")
+                and linha.campo
+                in dados.get(
+                    "campos_taxas_pendentes", {"taxas_cartao", "taxas_marketplace"}
+                )
+                for dados in canais_linha
+            )
             if canal_pendente and (
                 linha.tipo == "lucro"
-                or linha.campo in {"taxas_cartao", "taxas_marketplace"}
+                or taxa_pendente
                 or linha.descricao == "(-) CUSTOS E DESPESAS VARIAVEIS DE VENDA"
             ):
                 if linha.tipo != "lucro":

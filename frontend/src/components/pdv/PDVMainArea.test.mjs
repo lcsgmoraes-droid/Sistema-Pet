@@ -18,7 +18,7 @@ const children = [
   "PDVProdutosCard",
   "PDVResumoFinanceiroCard",
 ];
-function render(vendaAtual) {
+function renderTree(vendaAtual) {
   const h = createControllerHarness(fileURLToPath(new URL("./PDVMainArea.jsx", import.meta.url)), {
     props: { vendaAtual: { itens: [], ...vendaAtual }, modoVisualizacao: true },
     mocks: new Map([
@@ -30,8 +30,18 @@ function render(vendaAtual) {
       ["../../api", { __esModule: true, default: { get: async () => ({ data: [] }) } }],
     ]),
   });
-  return elements(h.tree).map((node) => node.type);
+  return h.tree;
 }
+function render(vendaAtual) {
+  return elements(renderTree(vendaAtual)).map((node) => node.type);
+}
+
+test("cartão iFood do PDV ativa atualização exclusiva de apresentação", () => {
+  const card = elements(
+    renderTree({ canal: "ifood", ifood_pdv_pilot: { enabled: true, payment_mode: "online" } }),
+  ).find((node) => node.type === "IfoodPdvOnlineVendaCard");
+  assert.equal(card.props.autoRefresh, true);
+});
 
 test("PDV online e modo desconhecido exibem resumo externo sem rodape de cobranca", () => {
   for (const summary of [

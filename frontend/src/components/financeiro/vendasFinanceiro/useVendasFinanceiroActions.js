@@ -7,6 +7,7 @@ import {
   exportarPlanilhasExcel,
   filtrarVendasRelatorio,
   ordenarVendasRelatorio,
+  montarLinhasCobrancasIfoodExcel,
 } from "../vendasFinanceiroUtils";
 import { confirmarCorePet } from "../../../services/corepetDialog";
 import useShiftRangeSelection from "../../../hooks/useShiftRangeSelection";
@@ -75,6 +76,7 @@ export function useVendasFinanceiroActions({
 
     const dataArquivo = new Date().toISOString().slice(0, 10);
     const sufixo = escopo === "geral" ? "geral" : "filtrado";
+    const cobrancas = montarLinhasCobrancasIfoodExcel(dadosOrdenados);
     try {
       await exportarPlanilhasExcel(
         [
@@ -82,6 +84,7 @@ export function useVendasFinanceiroActions({
             sheet: "Lista de Vendas",
             linhas: [colunas.map((coluna) => coluna.label), ...linhas],
           },
+          ...(cobrancas.length ? [{ sheet: "Cobranças iFood", linhas: cobrancas }] : []),
         ],
         `vendas_${sufixo}_${dataArquivo}.xlsx`,
       );
@@ -160,6 +163,8 @@ export function useVendasFinanceiroActions({
         linhas: resumoData,
       },
     ];
+    const cobrancas = montarLinhasCobrancasIfoodExcel(listaVendasFiltrada);
+    if (cobrancas.length) planilhas.push({ sheet: "Cobranças iFood", linhas: cobrancas });
 
     if (vendasPorDataCalendario.length > 0) {
       const vendasData = [

@@ -482,6 +482,7 @@ async def obter_ponto_equilibrio(
         "descontos": margem_periodo.get("descontos", 0),
         "beneficios_campanhas": margem_periodo.get("beneficios_campanhas", 0),
         "taxas_cartao": margem_periodo.get("taxas_cartao", 0),
+        "taxas_ifood": margem_periodo.get("taxas_ifood", 0),
         "repasse_entrega": margem_periodo.get("repasse_entrega", 0),
         "custo_operacional_entrega": margem_periodo.get("custo_operacional_entrega", 0),
         "comissoes": margem_periodo.get("comissoes", 0),
@@ -571,7 +572,12 @@ async def obter_ponto_equilibrio(
             )
         ),
     )
-    for campo in ("taxas_cartao", "despesas_variaveis", "custos_variaveis"):
+    for campo in (
+        "taxas_cartao",
+        "taxas_ifood",
+        "despesas_variaveis",
+        "custos_variaveis",
+    ):
         conhecido = f"{campo}_conhecidos"
         if conhecido in margem_periodo:
             resultado[conhecido] = margem_periodo[conhecido]
@@ -662,8 +668,14 @@ async def obter_ponto_equilibrio_detalhes(
         "origem": origem,
         "periodo": f"{_formatar_data_br_ponto_equilibrio(inicio)} - {_formatar_data_br_ponto_equilibrio(fim)}",
         **paginacao,
-        "rentabilidade_status": dados.get("rentabilidade_status", "complete"),
-        "taxas_ifood_pendentes": dados.get("taxas_ifood_pendentes", False),
-        "vendas_rentabilidade_pendente": dados.get("vendas_rentabilidade_pendente", 0),
-        "pendencias_rentabilidade": dados.get("pendencias_rentabilidade", []),
+        "rentabilidade_status": (
+            "pending_ifood_financial" if total is None else "complete"
+        ),
+        "taxas_ifood_pendentes": total is None,
+        "vendas_rentabilidade_pendente": (
+            dados.get("vendas_rentabilidade_pendente", 0) if total is None else 0
+        ),
+        "pendencias_rentabilidade": (
+            dados.get("pendencias_rentabilidade", []) if total is None else []
+        ),
     }

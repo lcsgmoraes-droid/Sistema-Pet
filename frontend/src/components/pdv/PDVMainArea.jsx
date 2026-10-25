@@ -316,7 +316,7 @@ export default function PDVMainArea(props) {
           />
 
           {isIfoodManualPaymentBlocked(vendaAtual) ? (
-            <IfoodPdvOnlineVendaCard venda={vendaAtual} onUpdated={onRecarregarVenda} />
+            <IfoodPdvOnlineVendaCard venda={vendaAtual} onUpdated={onRecarregarVenda} autoRefresh />
           ) : (
             <PDVResumoFinanceiroCard
               alertasCarrinho={alertasCarrinho}

@@ -6,6 +6,7 @@ import { formatarMesLocal, obterPeriodoPresetDRE } from "../utils/drePeriodos";
 import MoneyCell from "./ui/MoneyCell";
 import NumberCell from "./ui/NumberCell";
 import DREView from "./dre/DREView";
+import { formatMoneyBRL } from "../utils/formatters";
 import {
   PENDENCIA_IFOOD_LABEL,
   temRentabilidadePendente,
@@ -43,12 +44,26 @@ const DRE_TABLE_COLUMNS = [
     key: "valor",
     header: "Valor",
     align: "right",
-    render: (linha) =>
-      linha.valor == null && temRentabilidadePendente(linha) ? (
-        PENDENCIA_IFOOD_LABEL
-      ) : (
-        <MoneyCell value={linha.valor} zeroAsDash />
-      ),
+    render: (linha) => {
+      if (linha.valor == null && temRentabilidadePendente(linha)) {
+        return linha.valor_conhecido != null ? (
+          <span>
+            <span className="block">{PENDENCIA_IFOOD_LABEL}</span>
+            <span className="block text-xs text-amber-800 dark:text-amber-300">
+              Subtotal conhecido: {formatMoneyBRL(linha.valor_conhecido)}
+            </span>
+          </span>
+        ) : (
+          PENDENCIA_IFOOD_LABEL
+        );
+      }
+      return (
+        <MoneyCell
+          value={linha.valor}
+          zeroAsDash={!["taxas_cartao", "taxas_marketplace"].includes(linha.campo)}
+        />
+      );
+    },
   },
   {
     key: "percentual",
@@ -94,7 +109,7 @@ const DRE_DETAIL_COLUMNS = [
       (temRentabilidadePendente(item) || temRentabilidadePendente(item.meta)) ? (
         PENDENCIA_IFOOD_LABEL
       ) : (
-        <MoneyCell value={item.valor} zeroAsDash />
+        <MoneyCell value={item.valor} zeroAsDash={!item.meta?.ifood_financial} />
       ),
   },
 ];

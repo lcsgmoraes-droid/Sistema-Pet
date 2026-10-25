@@ -19,6 +19,7 @@ import SaleReference from "../ui/SaleReference";
 import StatusBadge from "../ui/StatusBadge";
 import ProductIdentity from "../ui/ProductIdentity";
 import RentabilidadeCell from "./RentabilidadeCell.jsx";
+import IfoodVendaTaxasResumo from "../ifood/IfoodVendaTaxasResumo.jsx";
 import { temRentabilidadePendente } from "./vendasFinanceiro/rentabilidadePendente.js";
 import { obterPendenciaCancelamentoFiscal } from "../../utils/pdvFiscalStatus";
 import {
@@ -198,6 +199,9 @@ function StatusVendaCell({ getStatusVendaMeta, venda }) {
 }
 
 function TaxaPagamentoCell({ venda }) {
+  if (hasValorInformado(venda.taxa_cartao) && venda.ifood_financial) {
+    return <MoneyCell value={venda.taxa_cartao} sign={Number(venda.taxa_cartao) < 0 ? "+" : "-"} />;
+  }
   if (temRentabilidadePendente(venda)) {
     return <RentabilidadeCell dados={venda} value={venda.taxa_cartao} />;
   }
@@ -245,6 +249,7 @@ function ItensVendaDetalhes({ colSpan, formatarMoeda, venda }) {
     <tr className="bg-blue-50">
       <td colSpan={colSpan} className="px-2 py-3 sm:px-4">
         <div className="pl-0 sm:pl-8">
+          <IfoodVendaTaxasResumo financeiro={venda.ifood_financial} />
           <div className="mb-2 font-semibold text-slate-700">Produtos desta venda:</div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1280px] text-xs">
@@ -315,10 +320,10 @@ function ItensVendaDetalhes({ colSpan, formatarMoeda, venda }) {
                     </td>
                     <td className="px-1 py-1 text-right text-purple-600 whitespace-nowrap">
                       <RentabilidadeCell
-                        dados={item}
+                        dados={hasValorInformado(item.taxa_cartao) ? null : item}
                         value={item.taxa_cartao}
-                        sign="-"
-                        zeroAsDash
+                        sign={venda.ifood_financial && Number(item.taxa_cartao) < 0 ? "+" : "-"}
+                        zeroAsDash={!venda.ifood_financial}
                       />
                     </td>
                     <td className="px-1 py-1 text-right text-blue-600 whitespace-nowrap">
@@ -553,6 +558,24 @@ export default function VendasFinanceiroListaTable({
       align: "right",
       className: "text-blue-600 whitespace-nowrap",
       render: (venda) => <MoneyCell value={venda.comissao} sign="-" zeroAsDash />,
+    },
+    {
+      key: "taxa_ifood",
+      header: "Taxas iFood",
+      align: "right",
+      className: "text-purple-600 whitespace-nowrap",
+      cellTitle:
+        "Comissão e outras cobranças classificadas do iFood, sem repetir a taxa de pagamento",
+      render: (venda) =>
+        venda.ifood_financial ? (
+          <RentabilidadeCell
+            dados={hasValorInformado(venda.taxa_ifood) ? null : venda}
+            value={venda.taxa_ifood}
+            sign={Number(venda.taxa_ifood) < 0 ? "+" : "-"}
+          />
+        ) : (
+          <span className="text-slate-400">—</span>
+        ),
     },
     {
       key: "imposto",

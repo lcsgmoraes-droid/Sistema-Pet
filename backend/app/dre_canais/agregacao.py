@@ -18,6 +18,8 @@ from app.services.venda_rentabilidade_snapshot_service import (
     _round_money,
     build_venda_rentabilidade_snapshot,
 )
+from app.services.ifood_rentabilidade_contexto import carregar_financial_das_vendas
+from app.services.rentabilidade_pendencias import aplicar_pendencia_ifood
 from app.dre_canais.base import (
     _classificar_conta_dre,
     _conta_valor,
@@ -885,6 +887,7 @@ def obter_vendas_por_canal(
 
     bases_estimativa: Dict[str, Dict[str, Decimal]] = {}
     pendencias_estimativa: Dict[str, List[Dict[str, Any]]] = {}
+    financeiros_ifood = carregar_financial_das_vendas(db, tenant_id, vendas)
 
     for venda in vendas:
         canal = _normalizar_canal(getattr(venda, "canal", None))
@@ -892,7 +895,7 @@ def obter_vendas_por_canal(
         cupom_desconto = cupons_por_venda.get(venda.id, 0.0)
         custo_campanha = cupom_desconto + cashback_por_venda.get(venda.id, 0.0)
         snapshot = _conciliar_custo_campanha_snapshot(
-            _snapshot_pronto(venda),
+            _snapshot_pronto(venda, financial=financeiros_ifood.get(venda.id, {})),
             custo_campanha,
             cupom_desconto,
             getattr(venda, "desconto_valor", 0),
@@ -909,6 +912,7 @@ def obter_vendas_por_canal(
                 comissao_total=comissoes_por_venda.get(venda.id, 0.0),
                 taxa_operacional_entrega=taxa_operacional_por_venda.get(venda.id, 0.0),
                 estoque_custos_por_produto=estoque_custos_por_venda.get(venda.id, {}),
+                ifood_financial=financeiros_ifood.get(venda.id, {}),
             )
         snapshot = _complementar_snapshot_com_custos_reais(
             venda,
@@ -916,6 +920,17 @@ def obter_vendas_por_canal(
             estoque_custos_por_venda.get(venda.id, {}),
             tenant_id,
         )
+        snapshot = aplicar_pendencia_ifood(
+            venda, snapshot, financial=financeiros_ifood.get(venda.id, {})
+        )
+        if snapshot.get("taxas_ifood_pendentes"):
+            campos_pendentes = dados.setdefault("campos_taxas_pendentes", set())
+            for campo, origem in (
+                ("taxas_cartao", "taxa_cartao"),
+                ("taxas_marketplace", "taxa_ifood"),
+            ):
+                if snapshot.get(origem) is None:
+                    campos_pendentes.add(campo)
         if snapshot.get("taxas_ifood_pendentes"):
             dados["vendas_rentabilidade_pendente"] += 1
             dados["pendencias_rentabilidade"] = list(
@@ -947,6 +962,7 @@ def obter_vendas_por_canal(
         dados["cmv"] += cmv_produtos
         dados["custo_servicos"] += custo_servicos
         dados["taxas_cartao"] += _decimal(snapshot.get("taxa_cartao", 0))
+        dados["taxas_marketplace"] += _decimal(snapshot.get("taxa_ifood", 0))
         dados["repasse_entrega"] += _decimal(snapshot.get("taxa_entrega", 0))
         dados["taxa_operacional_entrega"] += _decimal(
             snapshot.get("taxa_operacional", 0)
@@ -1329,11 +1345,12 @@ def _preparar_snapshots_vendas(
     estoque_custos_por_venda = _bulk_estoque_custos_por_venda(db, tenant_id, venda_ids)
 
     snapshots: Dict[int, Dict[str, Any]] = {}
+    financeiros_ifood = carregar_financial_das_vendas(db, tenant_id, vendas)
     for venda in vendas:
         cupom_desconto = cupons_por_venda.get(venda.id, 0.0)
         custo_campanha = cupom_desconto + cashback_por_venda.get(venda.id, 0.0)
         snapshot = _conciliar_custo_campanha_snapshot(
-            _snapshot_pronto(venda),
+            _snapshot_pronto(venda, financial=financeiros_ifood.get(venda.id, {})),
             custo_campanha,
             cupom_desconto,
             getattr(venda, "desconto_valor", 0),
@@ -1350,6 +1367,7 @@ def _preparar_snapshots_vendas(
                 comissao_total=comissoes_por_venda.get(venda.id, 0.0),
                 taxa_operacional_entrega=taxa_operacional_por_venda.get(venda.id, 0.0),
                 estoque_custos_por_produto=estoque_custos_por_venda.get(venda.id, {}),
+                ifood_financial=financeiros_ifood.get(venda.id, {}),
             )
         snapshot = _complementar_snapshot_com_custos_reais(
             venda,
@@ -1357,7 +1375,9 @@ def _preparar_snapshots_vendas(
             estoque_custos_por_venda.get(venda.id, {}),
             tenant_id,
         )
-        snapshots[int(venda.id)] = snapshot
+        snapshots[int(venda.id)] = aplicar_pendencia_ifood(
+            venda, snapshot, financial=financeiros_ifood.get(venda.id, {})
+        )
     return snapshots
 
 
@@ -1380,6 +1400,7 @@ def _valor_snapshot_campo(
         "descontos": "desconto",
         "impostos": "imposto",
         "taxas_cartao": "taxa_cartao",
+        "taxas_marketplace": "taxa_ifood",
         "repasse_entrega": "taxa_entrega",
         "taxa_operacional_entrega": "taxa_operacional",
         "comissoes": "comissao",

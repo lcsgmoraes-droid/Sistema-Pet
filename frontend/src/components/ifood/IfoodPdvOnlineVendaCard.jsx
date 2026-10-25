@@ -1,16 +1,17 @@
 import { useRef, useState } from "react";
 import api from "../../api";
+import useIfoodPdvFinancialPresentation from "../../hooks/useIfoodPdvFinancialPresentation.js";
 import { canFinalizeIfoodOnlinePdvPilot } from "../../utils/ifoodPdvPilot";
 import IfoodPedidoPdvPilot from "./IfoodPedidoPdvPilot";
 import IfoodPdvOnlineResumo from "./IfoodPdvOnlineResumo";
 
-export default function IfoodPdvOnlineVendaCard({ venda, onUpdated }) {
+export default function IfoodPdvOnlineVendaCard({ venda, onUpdated, autoRefresh = false }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const inFlight = useRef(false);
   const currentSale = useRef(venda.id);
   currentSale.current = venda.id;
-  const bridge = venda.ifood_pdv_pilot;
+  const bridge = useIfoodPdvFinancialPresentation({ venda, autoRefresh });
 
   async function finalizeOnline() {
     if (inFlight.current || !canFinalizeIfoodOnlinePdvPilot(bridge)) return;

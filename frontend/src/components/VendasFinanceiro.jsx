@@ -42,12 +42,13 @@ import { useVendasFinanceiroActions } from "./financeiro/vendasFinanceiro/useVen
 import { formatMoneyCellValue, isZeroMoneyValue } from "./ui/MoneyCell";
 import { getDashboardPeriodFromSearch } from "../pages/dashboard/dashboardOverview";
 import VisaoVendasFinanceiro from "./financeiro/VisaoVendasFinanceiro";
+import useIfoodFinancialReportRefresh from "../hooks/useIfoodFinancialReportRefresh.js";
 
 export default function VendasFinanceiro() {
   return <VisaoVendasFinanceiro PorVenda={VendasFinanceiroPorVenda} />;
 }
 
-function VendasFinanceiroPorVenda() {
+export function VendasFinanceiroPorVenda() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -84,6 +85,7 @@ function VendasFinanceiroPorVenda() {
   const [vendasPorGrupo, setVendasPorGrupo] = useState([]);
   const [produtosDetalhados, setProdutosDetalhados] = useState([]);
   const [listaVendas, setListaVendas] = useState([]);
+  const leituraRelatorio = useRef(0);
   const [vendasExpandidas, setVendasExpandidas] = useState(new Set());
 
   // Dados de comparação estendidos
@@ -381,11 +383,12 @@ function VendasFinanceiroPorVenda() {
     ...(filtroCanalVenda && abaAtiva !== "vendedores" ? { canal_venda: filtroCanalVenda } : {}),
   });
 
-  const carregarDados = async () => {
+  const carregarDados = async ({ silencioso = false } = {}) => {
     if (!podeVerFinanceiroCompleto) return;
     if (!dataInicio || !dataFim) return;
 
-    setLoading(true);
+    const leitura = ++leituraRelatorio.current;
+    if (!silencioso) setLoading(true);
 
     try {
       const response = await api.get("/relatorios/vendas/relatorio", {
@@ -395,6 +398,7 @@ function VendasFinanceiroPorVenda() {
         }),
       });
       const data = response.data;
+      if (leitura !== leituraRelatorio.current) return;
 
       setResumo(data.resumo || {});
       setVendasPorData(data.vendas_por_data || []);
@@ -411,6 +415,7 @@ function VendasFinanceiroPorVenda() {
         const responseComp = await api.get("/relatorios/vendas/relatorio", {
           params: montarParametrosRelatorio(periodoComp),
         });
+        if (leitura !== leituraRelatorio.current) return;
         setResumoComparacao(responseComp.data.resumo || {});
         setFormasRecebimentoComparacao(responseComp.data.formas_recebimento || []);
         setVendasPorGrupoComparacao(responseComp.data.vendas_por_grupo || []);
@@ -422,9 +427,15 @@ function VendasFinanceiroPorVenda() {
     } catch (error) {
       console.error("Erro ao carregar relatório:", error);
     } finally {
-      setLoading(false);
+      if (leitura === leituraRelatorio.current) setLoading(false);
     }
   };
+
+  useIfoodFinancialReportRefresh({
+    enabled:
+      podeVerFinanceiroCompleto && listaVendas.some((venda) => Boolean(venda.ifood_financial)),
+    refresh: () => carregarDados({ silencioso: true }),
+  });
 
   const {
     exportarParaExcel,
@@ -483,6 +494,9 @@ function VendasFinanceiroPorVenda() {
     if (podeVerFinanceiroCompleto) {
       carregarDados();
     }
+    return () => {
+      leituraRelatorio.current += 1;
+    };
   }, [
     dataInicio,
     dataFim,
