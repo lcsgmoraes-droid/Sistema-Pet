@@ -237,12 +237,12 @@ export function calcularDistribuicaoTemporalVendasFinanceiro(vendas = []) {
     vendasPorDiaSemanaResumo,
     vendasPorHorarioResumo,
     vendasPorHorarioComMovimento,
-    melhorDiaSemana: (vendas || []).some(temRentabilidadePendente)
+    melhorDiaSemana: (vendas || []).some((venda) => temRentabilidadePendente(venda))
       ? { taxas_ifood_pendentes: true }
       : [...vendasPorDiaSemanaResumo].sort(
           (a, b) => Number(b.valor_liquido || 0) - Number(a.valor_liquido || 0),
         )[0],
-    melhorHorario: (vendas || []).some(temRentabilidadePendente)
+    melhorHorario: (vendas || []).some((venda) => temRentabilidadePendente(venda))
       ? { taxas_ifood_pendentes: true }
       : [...vendasPorHorarioComMovimento].sort(
           (a, b) => Number(b.valor_liquido || 0) - Number(a.valor_liquido || 0),
