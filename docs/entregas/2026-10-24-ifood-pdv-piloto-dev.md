@@ -122,15 +122,12 @@ Validações executadas nesta tarefa:
   aprovado em PostgreSQL local dedicado, incluindo concorrência entre conexões,
   RLS, chaves compostas, sacola alterada e baixa FIFO única.
 - `FLUXO_UNICO.bat release-check`: entrada oficial com Git limpo e gate completo
-  aprovados na fonte `ae3356755`, anterior à ampliação para frete positivo e já
-  integrada à base atual. Foram aprovados
-  632 testes backend iFood, 248 frontend, 769 multiempresa e as demais suítes,
-  builds e auditorias. Os 15 cenários PostgreSQL passaram juntos nessa fonte.
-  O delta de frete positivo e online está em validação; o gate anterior não
-  comprova sua aprovação final. Os testes focados do frontend já preservam frete, total,
-  ausência de entregador local e finalização sem PUT; no online, provam o botão
-  explícito idempotente, a separação dos totais e o bloqueio de cobrança manual.
-  O gate final e o CI remoto do PR #1561 ainda precisam ser conferidos.
+  aprovados na fonte `cc4a9ae13`, incluindo o online: 693 testes backend iFood,
+  267 frontend e 32 cenários PostgreSQL aprovados, além das demais validações do
+  gate. O delta visual `797d4a4ba` passou com 272 testes frontend, lint, formatação
+  e build. Inclui totais do consumidor separados, cabeçalho sem cobrança manual
+  e recarga da venda pelo ID após concluir, testada com o carregador real do PDV.
+  O CI remoto do commit final do PR #1561 continua uma conferência separada.
 
 O schema descartável do ensaio PostgreSQL não comprova a execução de toda a
 cadeia histórica do Alembic. A migration nova e suas restrições foram exercidas;
@@ -157,19 +154,31 @@ O ensaio **sintético pela interface passou**: estoque físico de 31 para 30,
 reservas de 4 para 3, disponível 27, um pagamento, um movimento e lote FIFO de
 10 para 9. Reimportação não duplicou a venda/reserva/baixa.
 
-O pedido **oficial permanece pendente**. Após identificar a loja de testes já
-configurada pelo suporte, apenas o SKU `018631.1` foi enviado e aceito com HTTP
-202, ficando visível ao consumidor por R$ 65,00. O checkout oficial exibiu entrega
-de R$ 8,90, serviço iFood de R$ 1,99 e total de R$ 75,89, com pagamento online e
-sem dinheiro disponível. Ainda não houve pedido oficial criado ou recebido.
-A ampliação local para esse modo está em validação e não comprova compra no
-provedor nem conciliação do repasse.
+O pedido **oficial de testes #1420 passou no fluxo assistido em DEV**. Confirmado
+pela interface do iFood às 20h43, gerou três eventos recebidos, três ACKs e zero
+falhas no CorePet. A importação pela UI criou somente a venda `202610240002`
+(ID 2) e uma reserva de uma unidade. A conclusão no PDV fez uma baixa FIFO:
+físico 30 para 29, reservas 4 para 3, disponível 26 e primeiro lote 9 para 8.
+
+O checkout do consumidor foi R$ 75,89, composto por produto de R$ 65,00, frete de
+R$ 8,90 e serviço exclusivo do iFood de R$ 1,99. A venda e seu único pagamento
+externo `iFood online` ficaram em R$ 73,90, sem caixa associado. A evidência JSON
+do recebível ficou `awaiting_financial`, bruto R$ 73,90, recebido zero,
+líquido/vencimento nulos e margem pendente. Os hashes das 12 tabelas financeiras
+de controle permaneceram iguais; o caixa preservou somente os R$ 65,00 da venda
+sintética anterior. O pedido oficial não criou entrada nova de caixa.
+
+Reimportar e repetir a conclusão pela API não alterou venda, reserva, pagamento
+ou estoque. A evidência local `official1420-finalization-proof.json` registrou
+PASS. Outras empresas, produtos e preços do ERP/app/ecommerce foram preservados;
+produção permaneceu intacta. Esse aceite não comprova recebimento do repasse,
+margem final ou validade dos relatórios gerais para ampliar o piloto.
 
 ## 7. Publicação e rollback
 
 Entrega backend/frontend, migration e documentação; não há alteração mobile.
-Fonte identificável pela branch indicada; referência do ensaio PostgreSQL:
-`ae3356755`. O PR deve registrar o commit final e seu CI.
+Fonte identificável pela branch indicada: gate do online em `cc4a9ae13` e delta
+visual em `797d4a4ba`. O PR deve registrar o commit final e seu CI.
 
 Somente após autorização específica para o ambiente: aplicar a migration antes
 de iniciar o backend novo, manter flags desligadas, conferir saúde e consultar
@@ -195,6 +204,11 @@ bloqueio. Sucesso exige contagens e saldo coerentes no banco, não apenas um sel
 visual ou HTTP 202. Reenvio, evento remoto e sacola alterada precisam preservar a
 evidência e explicar a impossibilidade de continuar.
 
+Os relatórios gerais ainda não tratam o estado `awaiting_financial` como margem
+pendente e não foram homologados para avaliar este piloto online. A pendência
+P2 permanece: não usar margem ou totais gerais para autorizar expansão de
+produtos/lojas ou produção. O financeiro geral não foi alterado nesta tarefa.
+
 Falhas previstas: loja de testes não configurada, acesso do consumidor
 indisponível, pedido fora da allowlist, condição comercial não suportada e falha
 de concorrência/rede. Manter o piloto desligado e usar consulta somente leitura
@@ -208,28 +222,31 @@ O usuário passa a enviar explicitamente um pedido de teste ao PDV, conferir seu
 vínculo e finalizar/cancelar com os limites descritos. O canal iFood não permite
 recompor itens/valores nem operar entrega local no lugar do provedor.
 
-Guia e fase 2 foram atualizados com o roteiro. A equipe de implantação e Lucas
-devem conferir estoque/reservas/lotes antes e depois do ensaio oficial. A
-comunicação aos usuários finais depende da homologação oficial e de aprovação
-posterior de publicação; não anunciar a ponte como operação de produção pronta.
+Guia e fase 2 foram atualizados com o roteiro e o resultado oficial de DEV. A
+equipe de implantação e Lucas devem preservar essa conferência de saldo/reserva
+e lotes nos próximos ensaios. A comunicação de uso amplo depende de avaliação
+das pendências e aprovação posterior de publicação; não anunciar a ponte como
+operação de produção pronta.
 
 ## 10. Fechamento
 
 - [x] Critérios técnicos do ensaio sintético atendidos e limitações registradas.
+- [x] Pedido oficial recebido e fluxo específico de PDV/reserva/baixa homologado em DEV.
 - [x] Testes e evidências técnicas registrados.
 - [x] Tenant, permissões, integridade e auditoria avaliados.
 - [x] Documentação de uso e contrato atualizados.
-- [x] Homologação local registrada; homologação oficial pendente explicitada.
+- [x] Homologações sintética e oficial de DEV registradas separadamente.
 - [x] Publicação, observabilidade e rollback definidos para o piloto.
 - [x] Comunicação e treinamento avaliados.
-- [ ] Revalidação final/CI do commit do PR confirmados.
-- [ ] Pedido oficial recebido e jornada completa homologada no DEV.
+- [x] Gate do online e validação do delta visual registrados.
+- [ ] CI remoto do commit final do PR confirmado.
+- [ ] Financial e relatórios gerais com margem pendente homologados para expansão.
 
-Decisão técnica: **aprovado com pendências para revisão do piloto DEV**. Não é
-aceite de operação contínua, de pedido oficial concluído ou de produção.
+Decisão técnica: **aprovado para o fluxo oficial específico de pedido, PDV,
+reserva e baixa em DEV, com pendências de Financial e relatórios gerais**.
+Não é aceite de operação contínua ou de produção.
 
-Pendências: Codex e Lucas devem concluir o pedido oficial assim que a compra na
-loja de testes pelo consumidor estiver disponível e registrar a evidência. O
-responsável pelo PR deve confirmar o delta de frete/online e o gate/CI final
-antes da conclusão da revisão.
+Pendências: Codex e Lucas devem validar a conciliação Financial e o tratamento de
+margem pendente nos relatórios gerais antes de ampliar o piloto. O responsável
+pelo PR deve confirmar o CI do commit final antes da conclusão da revisão.
 Não há prazo de liberação de produção definido nesta entrega.

@@ -2,7 +2,7 @@
 
 **Situação: rascunho, pendente de validação do vínculo e da publicação.**
 
-Última atualização: 23/10/2026. Público: responsáveis pelo catálogo de lojas
+Última atualização: 24/10/2026. Público: responsáveis pelo catálogo de lojas
 pet shop que usam ou desejam usar o iFood. Plataforma: ERP web CorePet.
 
 Este guia acompanha a implantação da integração. A consulta do catálogo e a
@@ -321,14 +321,18 @@ O piloto de pedidos é separado do envio de catálogo. Ele usa uma empresa
 fictícia no DEV e um único pedido da loja de testes do iFood; não habilita o
 recebimento de vendas no PDV de produção.
 
-**Validação desta etapa em 24/10/2026:** o ensaio local **sintético**, feito pela
-interface com dados fictícios, passou: uma reserva, uma venda, uma baixa FIFO e
-um pagamento, sem duplicação ao repetir a importação. A dificuldade inicial de
-configuração foi contornada ao identificar a loja de testes já configurada pelo
-suporte. Somente o SKU `018631.1` foi preparado nessa loja e ficou visível ao
-consumidor por R$ 65,00. A compra oficial continua **pendente**: visualizar o
-produto ainda não comprova a criação nem o recebimento de um pedido. O resultado
-sintético não substitui essa etapa.
+**Validação desta etapa em 24/10/2026:** o pedido oficial de testes **#1420** foi
+confirmado no iFood às 20h43, recebido no CorePet e concluído pela interface em
+DEV. Somente uma unidade do SKU `018631.1` foi importada: uma venda, uma reserva
+e uma baixa FIFO. Reimportar e repetir a conclusão não duplicou esses registros.
+Os demais produtos, empresas e preços do ERP, app e ecommerce foram preservados;
+produção não foi alterada. O ensaio sintético anterior permanece uma evidência
+separada.
+
+O pedido online registrou R$ 73,90 como pagamento externo iFood, sem nova entrada
+em caixa. O repasse líquido, sua data e a margem continuam pendentes do
+Financial. Esse aceite vale para o pedido e o fluxo de estoque deste piloto em
+DEV; não libera produção, operação contínua nem valida os relatórios gerais.
 
 1. Com a equipe de implantação, confirme a empresa, a loja de testes, o pedido
    autorizado e o único produto do piloto. Neste primeiro ensaio, o pedido deve

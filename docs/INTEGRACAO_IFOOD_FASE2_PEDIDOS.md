@@ -51,16 +51,28 @@ A recepcao e o espelho do pedido sao separados da importacao no PDV. O piloto
 adiciona uma acao explicita no painel de pedidos da integracao: **Enviar ao PDV
 de teste**. Essa acao nao confirma, separa ou entrega o pedido no iFood.
 
-**Estado da validacao em 24/10/2026:** ensaio local **sintetico** pela interface
-aprovado, com uma reserva, uma baixa FIFO, um pagamento e reimportacao sem
-duplicacao. O bloqueio inicial **Merchant without setup configured** foi
-contornado ao identificar a loja de testes ja configurada pelo suporte. Nessa
-loja, o envio somente do SKU `018631.1` foi aceito com HTTP 202 e o produto ficou
-visivel ao consumidor por R$ 65,00. A compra e o recebimento do pedido oficial
-permanecem **pendentes**; visualizar o produto nao comprova criacao de pedido. O
-resultado sintetico nao substitui essa etapa. A ampliacao para frete positivo e
-pagamento online esta em validacao local e nao representa homologacao oficial
-concluida.
+**Estado da validacao em 24/10/2026:** o ensaio sintetico local e o fluxo do
+pedido **oficial de testes #1420** foram aprovados, como evidencias separadas.
+O pedido foi confirmado pela UI do iFood as 20h43; o CorePet recebeu tres eventos,
+confirmou os tres (ACK) e registrou zero falhas. A importacao pela interface criou
+somente a venda de teste `202610240002` (ID 2) e uma reserva de uma unidade do SKU
+`018631.1`. A conclusao pela acao propria no PDV fez uma unica baixa FIFO: fisico
+30 para 29, reservas 4 para 3, disponivel 26 e primeiro lote 9 para 8.
+
+O checkout oficial foi R$ 75,89: produto R$ 65,00, frete R$ 8,90 e servico
+exclusivo do iFood R$ 1,99. A venda operacional e o pagamento externo iFood
+ficaram em R$ 73,90, com caixa nulo. A evidencia JSON do recebivel permaneceu
+`awaiting_financial`, bruto R$ 73,90, recebido zero, liquido/data nulos e margem
+pendente. Os hashes das 12 tabelas financeiras de controle nao mudaram; os
+R$ 65,00 que ja constavam no caixa pertencem a venda sintetica anterior, sem nova
+entrada de caixa pelo pedido oficial.
+
+Reimportacao e repeticao da conclusao pela API nao produziram delta de venda,
+reserva, pagamento ou estoque. A evidencia local
+`official1420-finalization-proof.json` registrou PASS. Outras empresas, produtos
+e precos de ERP/app/ecommerce foram preservados, sem alteracao em producao.
+O aceite tecnico oficial e especifico deste pedido/PDV/reserva/baixa em DEV;
+Financial e relatorios gerais continuam com os limites descritos abaixo.
 
 O piloto exige todas as configuracoes abaixo, inicialmente vazias/desligadas:
 
@@ -113,7 +125,7 @@ Nao se presume receita da loja ou repasse pelo total cobrado do consumidor.
 Fora do escopo ou com modo desconhecido, a UI bloqueia cobranca manual; somente
 um resumo habilitado com `payment_mode=offline` libera o dinheiro presencial.
 
-**Limite dos relatorios gerais:** essas telas ainda nao consideram o repasse
+**Pendencia P2 — relatorios gerais:** essas telas ainda nao consideram o repasse
 `awaiting_financial` como uma condicao propria de margem pendente. Seus totais e
 margens nao foram homologados para este piloto online e nao podem justificar
 ampliacao para outros produtos/lojas ou producao. A referencia desta etapa e o
