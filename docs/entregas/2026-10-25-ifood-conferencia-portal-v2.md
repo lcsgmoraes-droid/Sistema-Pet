@@ -121,5 +121,11 @@ mantendo disponibilidade, preço e quantidade digitados. Atualizar preservou
 esses campos e exigiu novo aceite; o registro seguinte foi gravado como
 observação, sem publicação.
 
+O cadastro foi aberto separadamente, sem salvar o produto: apresentou o mesmo
+componente com a disponibilidade em **Não conferi** e campos observados vazios,
+embora o histórico anterior mostrasse item ativo. Os testes antigos de pausa,
+saldo zero e reposição também passaram usando o contexto atual exigido pelo
+novo contrato; mantiveram as verificações de preço, conteúdo e janela.
+
 Evidências de runtime e credenciais permanecem fora do Git. Nenhum resultado
 deste documento autoriza deploy ou alteração do ambiente de produção.
