@@ -346,10 +346,19 @@ confira o resultado antes de registrar uma nova conferência e retomar.
 Enquanto a automação estiver ativa, envio manual e alteração da conferência
 desse vínculo ficam bloqueados para evitar duas operações concorrentes.
 
-O ensaio de venda/cancelamento do SKU 227 usa produto sem lotes. Ele valida
-a sincronização do saldo disponível. A recomposição FIFO do cancelamento
-genérico de produtos com lotes ainda exige uma correção e validação próprias;
-não usar este ensaio como liberação desse fluxo na loja real.
+O primeiro ensaio do SKU 227 usou produto sem lotes. A correção seguinte em DEV
+também cobre produtos com lotes: o cancelamento recompõe os mesmos lotes da
+baixa e preserva o custo registrado na saída. Não escolhe lotes novos nem usa
+o custo atual do cadastro. Isso vale também para linhas repetidas do mesmo SKU
+quando a origem é rastreável. Históricos contraditórios ou sem origem suficiente
+exigem conciliação antes do cancelamento; não há reparo automático de saldos
+antigos nem de composições antigas de kits virtuais.
+
+Para conferir esse cenário, registre os saldos dos lotes antes da venda e
+compare cada um após cancelar. Uma reposição posterior deve criar ou aumentar
+o lote da entrada, preservando os anteriores. Repetir o cancelamento não pode
+gerar nova entrada. O ensaio e a automação continuam restritos ao DEV com
+simulador; a aplicação no iFood real exige homologação separada.
 
 Detalhes operacionais para implantação: as flags `IFOOD_STOCK_SYNC_DEV_ENABLED`
 e `IFOOD_STOCK_SYNC_POLLING_ENABLED` começam desligadas. A allowlist exige

@@ -183,6 +183,24 @@ Invoke-GateStep 'Faturamento and cash audit reconciliation regression' $python @
     'tests/unit/test_vendas_comissao_reprocessamento_contract.py', '-q'
 ) $backend
 
+Invoke-GateStep 'Sale cancellation original stock regression' $python @(
+    '-m', 'pytest',
+    'tests/unit/test_venda_cancelamento_lotes.py',
+    'tests/unit/test_cancelamento_pagamentos_caixa.py',
+    'tests/unit/test_venda_cancelamento_fiscal.py',
+    'tests/unit/test_venda_cancelamento_comercial_fiscal.py',
+    'tests/unit/test_vendas_cancelamento_com_devolucao.py',
+    'tests/unit/test_vendas_devolucao_lotes.py',
+    'tests/unit/test_vendas_devolucao_atomicidade.py',
+    'tests/unit/test_finalizacao_pagamento_estoque.py',
+    'tests/unit/test_estoque_service_quantidade_decimal.py',
+    'tests/unit/test_grupo_comercial_estoque_compartilhado_service.py',
+    'tests/unit/test_venda_custo_original_proveniencia.py',
+    'tests/unit/test_venda_edicao_preserva_custo_original.py',
+    'tests/unit/test_pedido_cancelamento_fiscal_estoque_service.py',
+    'tests/unit/test_bling_estoque_sync_transaction.py', '-q'
+) $backend
+
 Invoke-GateStep 'Billing operational continuity regression' $python @(
     '-m', 'pytest',
     'tests/unit/test_plan_catalog_and_limits.py',

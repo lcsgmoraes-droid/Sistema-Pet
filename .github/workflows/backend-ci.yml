@@ -682,6 +682,24 @@ jobs:
           tests/unit/test_vendas_fechamento_edicao.py
           tests/unit/test_vendas_comissao_reprocessamento_contract.py -q
 
+      - name: Sale cancellation original stock regression
+        run: >-
+          python -m pytest
+          tests/unit/test_venda_cancelamento_lotes.py
+          tests/unit/test_cancelamento_pagamentos_caixa.py
+          tests/unit/test_venda_cancelamento_fiscal.py
+          tests/unit/test_venda_cancelamento_comercial_fiscal.py
+          tests/unit/test_vendas_cancelamento_com_devolucao.py
+          tests/unit/test_vendas_devolucao_lotes.py
+          tests/unit/test_vendas_devolucao_atomicidade.py
+          tests/unit/test_finalizacao_pagamento_estoque.py
+          tests/unit/test_estoque_service_quantidade_decimal.py
+          tests/unit/test_grupo_comercial_estoque_compartilhado_service.py
+          tests/unit/test_venda_custo_original_proveniencia.py
+          tests/unit/test_venda_edicao_preserva_custo_original.py
+          tests/unit/test_pedido_cancelamento_fiscal_estoque_service.py
+          tests/unit/test_bling_estoque_sync_transaction.py -q
+
       - name: Billing operational continuity regression
         run: |
           pytest tests/unit/test_plan_catalog_and_limits.py tests/unit/test_modulos_liberacao_temporaria_contract.py tests/unit/test_module_access_dependency.py tests/unit/test_custom_billing_offers.py tests/unit/test_asaas_billing.py tests/unit/test_ops_tenants_routes_contract.py tests/unit/test_manual_full_access.py -q
@@ -793,7 +811,8 @@ jobs:
         working-directory: ./backend
         run: >-
           python -m pytest tests/integration/test_ifood_pdv_pilot_postgres.py
-          tests/integration/test_ifood_stock_sync_postgres.py -q
+          tests/integration/test_ifood_stock_sync_postgres.py
+          tests/integration/test_venda_cancelamento_lotes_postgres.py -q
 
   quality-gate:
     name: Quality Gate

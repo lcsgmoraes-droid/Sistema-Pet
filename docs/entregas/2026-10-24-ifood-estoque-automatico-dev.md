@@ -55,14 +55,14 @@ O gate completo e o CI do head final devem ser conferidos no PR 1561.
 
 ## Limite e próximo passo
 
-O produto sintético deste ensaio não possui lotes. O cancelamento genérico
-existente devolve o saldo agregado, mas não recompõe os lotes consumidos.
-Este trabalho não altera esse serviço para os demais produtos e não valida
-FIFO genérico; a correção anterior de FIFO continua restrita ao piloto de
-pedidos 018631.1 em DEV.
+O produto sintético deste primeiro ensaio não possuía lotes. A limitação do
+cancelamento genérico identificada aqui recebeu uma correção posterior em DEV:
+ver `2026-10-25-cancelamento-lotes-dev.md`. Esse registro original não comprova
+a recomposição; os testes da correção posterior exercitam lotes reais de DEV,
+histórico de custo, SKU repetido, concorrência e rollback.
 
-Antes de uma liberação real para o SKU 227, resolver e validar o cenário com
-lotes, definir a política de volumetria da loja e autorizar separadamente
+Antes de uma liberação real para o SKU 227, concluir a homologação do cenário
+com lotes, definir a política de volumetria da loja e autorizar separadamente
 o provedor real. Depois executar o piloto assistido e conferir o Portal.
 O sucesso deste ensaio não equivale a sincronização contínua homologada em
 produção. O guia de implantação contém o roteiro para treinamento.
