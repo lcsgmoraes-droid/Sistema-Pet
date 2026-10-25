@@ -125,12 +125,20 @@ Nao se presume receita da loja ou repasse pelo total cobrado do consumidor.
 Fora do escopo ou com modo desconhecido, a UI bloqueia cobranca manual; somente
 um resumo habilitado com `payment_mode=offline` libera o dinheiro presencial.
 
-**Pendencia P2 — relatorios gerais:** essas telas ainda nao consideram o repasse
-`awaiting_financial` como uma condicao propria de margem pendente. Seus totais e
-margens nao foram homologados para este piloto online e nao podem justificar
-ampliacao para outros produtos/lojas ou producao. A referencia desta etapa e o
-resumo do pedido com margem/repasse pendentes do Financial; o financeiro geral
-nao e alterado por esta entrega.
+**Financial e relatorios gerais em DEV:** a ligacao por pedido ja aplica a revisao
+Financial ativa sobre a base historica, pela ponte exata do PDV ou por vinculo
+manual explicitamente confirmado. Comissao e taxa de pagamento sao componentes
+separados, com nome e valor; somente o que faltar continua pendente. Zero exige
+evento explicito. Chegada tardia e revisao atualizam a leitura sem acumular taxas,
+refazer CMV ou movimentar caixa, reserva e estoque. Relatorio, DRE, ponto de
+equilibrio, dashboard, rankings/IA e exportacoes preservam valores desconhecidos
+como pendentes. A confirmacao bancaria do repasse continua separada.
+
+O pedido oficial #1420 ainda nao tem Financial proprio fornecido pelo iFood. A
+ligacao foi ensaiada com massa `synthetic`, identificada como simulacao DEV e
+restaurada ao final; ela nunca liberou lucro real. O aceite local nao conclui a
+homologacao Financial oficial, nao habilita leitura externa em producao e nao
+amplia automaticamente o piloto. Detalhes e limites: [Financial em DEV](IFOOD_FINANCIAL_DEV.md).
 
 Ao finalizar a venda no PDV, o fluxo normal faz a baixa FIFO dos lotes e encerra
 a reserva na mesma transacao. Repeticoes e concorrencia nao podem executar outra
@@ -139,6 +147,29 @@ inventar uma entrada de estoque. O cancelamento remoto impede a finalizacao
 depois de seu evento ser recebido e registrado no CorePet. Neste piloto, a
 liberacao local exige a acao explicita **Cancelar** no PDV. Nao ha estorno
 retroativo automatico por eventos do provedor.
+
+O cancelamento local depois da baixa exige venda finalizada, ponte `sold`,
+reserva original, unico item e comprovante da saida compativeis. A transacao
+recompoe a unidade nos lotes originais e usa o CMV da prova, preservando o JSON
+original; nao executa outro FIFO nem usa o custo atual do produto. Lote bloqueado
+ou vencido conserva sua restricao. Prova adulterada, saida inconsistente, retorno
+anterior ou efeito financeiro local inesperado bloqueiam a operacao, sem retorno
+parcial de estoque. Concorrencia e repeticao nao podem criar segunda entrada.
+
+`pdv_bridge` apresenta `stock_restored` e `cancellation`. Antes da baixa,
+`stock_restored=false` significa reserva liberada sem entrada; depois da baixa,
+`stock_restored=true` comprova a recomposicao validada. A evidencia acrescenta
+`scope=local_dev`, `provider_cancellation_confirmed=false` e, no online,
+`refund_status=pending_provider_review`, com `refunded_amount=null`. A ponte fica
+`cancelled`; o recebivel de evidencia passa a `cancelled_pending_provider_review`.
+O registro local do pagamento e preservado com status `cancelado` para exclusao
+dos saldos ativos. A prova original da aprovacao externa permanece auditavel.
+
+Nenhuma dessas acoes envia `CAN` ao iFood ou devolve dinheiro ao consumidor.
+A interface informa **Cancelado no CorePet**, **Lotes originais recompostos** ou
+**Reserva liberada, sem entrada fisica**, e **Estorno iFood a conferir** no online.
+Cancelamento remoto, reembolso e cobrancas Financial exigem comprovacao propria;
+`null` nao significa reembolso zero ou concluido.
 
 Itens e precos da venda ficam preservados. Edicao, reabertura, devolucao e acoes
 locais de entrega/retirada nao substituem as acoes do provedor. O piloto nao
@@ -177,6 +208,38 @@ divergente ou outras condicoes nao suportadas continuam bloqueados.
 8. Verifique produtos de controle e outra empresa, reenvios, tentativas
    simultaneas, cancelamento e rollback. Nao chame o ensaio local simulado de
    pedido oficial recebido do iFood.
+9. Preserve o pedido oficial #1420. Para cancelamento, use pedidos ficticios
+   separados do mesmo SKU: um ainda reservado e outro ja finalizado. Confira
+   liberacao sem entrada no primeiro e recomposicao dos lotes/CMV originais no
+   segundo. Repita a chave idempotente e os eventos recebidos, confirmando que
+   nao houve outra baixa, reserva ou entrada. Confira o pagamento auditado e a
+   ausencia de reembolso ficticio em caixa ou banco.
+
+### Situacao dos testes de cancelamento
+
+A ampliacao possui **303 testes unitarios backend**, **37 cenarios PostgreSQL**
+e **320 testes frontend iFood/produto** aprovados em validacoes focadas. Os testes
+de banco cobrem cancelamento depois da baixa, lotes/CMV originais, repeticao,
+concorrencia e rollback. Esses totais nao substituem o gate completo do commit final.
+
+No runtime DEV, o cancelamento antes da baixa passou com outro pedido sintetico:
+o SKU `018631.1` voltou a fisico **29**, reservado **3**, disponivel **26**, sem
+entrada fisica. Evento `CAN` repetido e a mesma chave de solicitacao retornaram
+o resultado ja registrado (HTTP 200); uma nova solicitacao apos o cancelamento
+foi recusada (HTTP 400), sem duplicar movimentos. O pedido #1420 foi preservado.
+O cancelamento depois da baixa tambem passou: fisico 29 para 28 na saida e de
+volta a 29 na entrada, lotes originais recompostos e CMV **R$ 43,94** nas duas
+movimentacoes. Repeticoes nao geraram outra entrada. A interface mostrou
+**Cancelado no CorePet**, **Lotes originais recompostos** e **Estorno iFood a conferir**.
+As linhas anteriores, incluindo o pedido #1420, e os hashes das 12 tabelas
+financeiras de controle permaneceram iguais. A configuracao privada foi restaurada;
+os dois pedidos sinteticos cancelados ficaram no historico. Prova local fora do
+Git: `cancel-pilot-final-proof.json`. Gate completo e CI do head final devem ser
+conferidos no PR #1561 antes de qualquer merge ou publicacao autorizados.
+
+O vinculo de um produto ja publicado continua sendo outra etapa: escolher outro
+EAN conferido no catalogo da mesma loja, sem reutilizar o SKU criado no primeiro
+teste nem criar um anuncio duplicado. Essa ampliacao de cancelamento nao o executa.
 
 Para uma unidade, o saldo disponivel diminui na reserva; na finalizacao, a
 quantidade fisica diminui e a reserva e encerrada, mantendo o mesmo disponivel.

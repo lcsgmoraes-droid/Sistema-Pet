@@ -81,3 +81,23 @@ test("margem com cobranças completas não depende de recebimento bancário e si
   );
   assert.doesNotMatch(simulada, /Contribuição da venda:/);
 });
+
+test("cancelamento local preserva pagamento original sem afirmar reembolso ou margem", () => {
+  for (const paymentStatus of ["approved", "platform_responsibility"]) {
+    const text = elementText(
+      render({
+        status: "cancelled",
+        payment_mode: "online",
+        payment: { status: paymentStatus },
+        receivable: { status: "cancelled_pending_provider_review", received_amount: 0 },
+        ifood_rentabilidade: { lucro: 17.46, rentabilidade_status: "complete" },
+      }),
+    );
+    assert.match(text, /Cancelamento registrado no CorePet/);
+    assert.match(text, /pagamento original do pedido permanece no histórico/);
+    assert.match(text, /Estorno iFood a conferir/);
+    assert.match(text, /não cancela o pedido no iFood nem comprova devolução ao consumidor/);
+    assert.match(text, /nenhum reembolso foi lançado em caixa ou banco/);
+    assert.doesNotMatch(text, /Contribuição da venda|Repasse a conciliar|margem aguardam/);
+  }
+});

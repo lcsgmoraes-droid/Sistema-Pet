@@ -377,9 +377,44 @@ a cobrança manual continua bloqueada.
 Outros pedidos, itens, pagamentos ou empresas não autorizados ficam bloqueados
 no piloto. Não altere os itens da venda para contornar o bloqueio. Quando o
 cancelamento remoto já tiver sido recebido e registrado no CorePet, a finalização
-local fica bloqueada. Confira e use **Cancelar** no PDV para liberar a reserva.
-Cancelar uma reserva que ainda não teve baixa não deve criar uma entrada de
-estoque.
+local fica bloqueada. A conferência e o cancelamento local continuam sendo ações
+explícitas; receber novamente o mesmo evento não deve duplicar movimentos.
+
+### Cancelar o pedido de teste no CorePet
+
+Este ensaio usa outro pedido fictício, com uma unidade do mesmo SKU `018631.1`.
+O pedido oficial **1420** fica preservado como evidência da reserva e da baixa.
+Antes de agir, confira que está no DEV, na empresa e na venda de teste corretas.
+
+1. Anote o saldo físico, as reservas, o disponível e os lotes antes do pedido.
+2. Para testar **antes da baixa**, abra a venda ainda aberta e use **Cancelar**
+   no PDV. A reserva deve ser liberada, sem entrada física nem mudança nos lotes.
+   A Central mostra **Cancelado no CorePet** e **Reserva liberada, sem entrada física**.
+3. Para testar **depois da baixa**, use outro pedido de teste, conclua sua venda
+   uma vez e confira a saída. Depois use **Cancelar**. O sistema exige a prova
+   original da saída e recompõe uma unidade nos mesmos lotes, com o mesmo CMV;
+   não escolhe novos lotes pelo FIFO nem usa o custo atual do cadastro. A Central
+   mostra **Lotes originais recompostos**. Uma prova ausente ou divergente exige
+   conferência antes do retorno; um lote bloqueado ou vencido não é liberado por
+   causa do cancelamento.
+4. Confira novamente saldos, lotes e histórico. Repetir a solicitação ou receber
+   o evento de cancelamento novamente não pode criar outra entrada ou reserva.
+   Um novo pedido não pode ser importado retroativamente a partir de um pedido
+   já encerrado.
+
+**Cancelar no CorePet não cancela o pedido no iFood nem reembolsa o consumidor.**
+Esta ação local não solicita o cancelamento no iFood e não cria reembolso em caixa ou banco.
+No online, a linha de pagamento continua no histórico, com status local cancelado
+para deixar de compor saldos ativos; a evidência original da aprovação externa é
+preservada. O resumo passa a mostrar **Estorno iFood a conferir**, sem inventar
+valor devolvido. O cancelamento e eventual reembolso no iFood e no Financial
+continuam sendo conferências separadas.
+
+**Situação do ensaio:** o cancelamento antes da baixa foi conferido no DEV,
+incluindo repetição da mesma solicitação e evento duplicado, mantendo o saldo de
+referência em físico **29**, reservado **3**, disponível **26**. O ensaio pela tela
+após a baixa ainda está em curso. Os testes automatizados locais passaram, mas
+o gate completo e o CI do commit final desta ampliação ainda precisam ser registrados.
 
 Os botões de entrega e retirada usados pelo app/ecommerce não operam o pedido
 iFood. A situação no provedor, a disponibilidade ao consumidor e os custos
@@ -455,10 +490,11 @@ automaticamente. A equipe deve manter o escopo de testes e as permissões restri
 **Referência do pedido #1420:** o CMV original é R$ 43,94; após a baixa oficial,
 o estoque físico é 29, reservado 3 e disponível 26. Ainda não há Financial oficial
 desse pedido. Para validar a atualização das telas em DEV, o ensaio temporário
-usa fonte sintética rotulada, com comissão R$ 6,50, pagamento R$ 0,00 e revisão da
+usou fonte sintética rotulada, com comissão R$ 6,50, pagamento R$ 0,00 e revisão da
 comissão para R$ 7,50. Isso não comprova cobrança real nem libera margem real.
-Os dados temporários serão restaurados ao final; produção não faz parte do ensaio.
-O fechamento da validação, CI e gate desta ampliação ainda serão registrados.
+Os dados temporários foram removidos e a configuração foi restaurada, preservando
+CMV, estoque, reservas, lotes e caixa. Esse ensaio e sua validação técnica passaram
+em DEV, sem envolver produção ou comprovar cobranças oficiais do pedido.
 
 ### Conferir repasses do provedor
 
@@ -530,6 +566,10 @@ da confirmação de recebimento do repasse no banco.
 **Preciso cadastrar tudo novamente?** Primeiro analise os itens já publicados.
 O objetivo é aproveitar o catálogo existente e evitar duplicidade; o vínculo
 operacional ainda precisa passar pela validação descrita neste guia.
+Esse é um teste separado da criação do SKU `018631.1`: falta escolher outro
+produto já publicado, conferir seu EAN e sua apresentação na mesma loja e só
+então registrar o vínculo. Reutilizar o item criado no primeiro teste não comprova
+o aproveitamento de um anúncio preexistente.
 
 **Marcar “Vender no iFood” já publica?** A seleção registra a intenção no
 CorePet. Não comprova que um envio ou uma publicação aconteceu.

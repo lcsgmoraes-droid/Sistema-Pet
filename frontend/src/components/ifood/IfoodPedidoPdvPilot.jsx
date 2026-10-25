@@ -8,7 +8,7 @@ const STATUS_LABELS = {
   not_imported: "Ainda não enviado ao PDV",
   reserved: "Estoque reservado no CorePet",
   sold: "Venda finalizada no CorePet",
-  cancelled: "Pedido cancelado",
+  cancelled: "Cancelado no CorePet",
   blocked: "Pedido fora do piloto",
 };
 
@@ -49,7 +49,11 @@ export default function IfoodPedidoPdvPilot({
       <p role="status" className="mt-3 font-medium text-slate-900 dark:text-slate-100">
         {STATUS_LABELS[bridge.status] || "Conferência pendente"}
       </p>
-      {bridge.reason ? (
+      {bridge.status === "cancelled" ? (
+        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+          Cancelamento registrado somente no CorePet. Confira a situação do pedido no iFood.
+        </p>
+      ) : bridge.reason ? (
         <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{bridge.reason}</p>
       ) : null}
       <IfoodPdvOnlineResumo bridge={bridge} />
@@ -72,6 +76,18 @@ export default function IfoodPedidoPdvPilot({
                 : "Não informada"}
           </dd>
         </div>
+        {bridge.status === "cancelled" && (
+          <div>
+            <dt className="text-xs text-slate-500 dark:text-slate-400">Recomposição do estoque</dt>
+            <dd className="font-medium text-slate-900 dark:text-slate-100">
+              {bridge.stock_restored === true
+                ? "Lotes originais recompostos"
+                : bridge.stock_decreased === false
+                  ? "Reserva liberada, sem entrada física"
+                  : "Conferência pendente"}
+            </dd>
+          </div>
+        )}
       </dl>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         {canImportIfoodPdvPilot(bridge) ? (

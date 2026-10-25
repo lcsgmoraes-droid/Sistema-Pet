@@ -215,6 +215,7 @@ Invoke-GateStep 'Backend iFood safety contracts' $python @(
     'tests/unit/test_ifood_catalog_contract.py', 'tests/unit/test_ifood_routes_contract.py',
     'tests/unit/test_ifood_orders_contract.py', 'tests/unit/test_ifood_client_contract.py',
     'tests/unit/test_ifood_pdv_pilot.py',
+    'tests/unit/test_ifood_pdv_cancellation.py',
     'tests/unit/test_ifood_pdv_pilot_bypasses.py',
     'tests/unit/test_ifood_pdv_pilot_permissions.py',
     'tests/unit/test_ifood_financial.py', 'tests/unit/test_ifood_financial_client.py',

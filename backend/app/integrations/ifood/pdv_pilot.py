@@ -482,6 +482,8 @@ def pdv_bridge_summary(db, order: IfoodOrder) -> dict:
         return summary
     bridge = _bridge(db, tenant_id=order.tenant_id, order_id=order.ifood_order_id)
     if bridge:
+        from .pdv_pilot_cancellation import cancellation_summary
+
         evidence = bridge.online_financial_evidence or {}
         allowed_online, blocked_reason = False, None
         try:
@@ -509,6 +511,7 @@ def pdv_bridge_summary(db, order: IfoodOrder) -> dict:
                 float(bridge.quantity) if bridge.status == "reserved" else 0
             ),
             "stock_decreased": bridge.stock_decreased_at is not None,
+            **cancellation_summary(db, bridge),
             "reason": blocked_reason or "Pedido ja vinculado ao PDV de teste.",
         }
     try:
@@ -1182,47 +1185,12 @@ def complete_pilot_finalization(db, bridge):
 
 
 def prepare_pilot_cancellation(db, sale):
-    bridge = _sale_bridge(db, sale)
-    if bridge is None:
-        return None
-    if bridge.status not in {"reserved", "sold"}:
-        _blocked("O vinculo deste pedido ja esta cancelado.")
-    return bridge
+    from .pdv_pilot_cancellation import prepare_cancellation
+
+    return prepare_cancellation(db, sale)
 
 
 def complete_pilot_cancellation(db, bridge):
-    if bridge is None:
-        return
-    from app.pedido_integrado_item_models import PedidoIntegradoItem
-    from app.pedido_integrado_models import PedidoIntegrado
+    from .pdv_pilot_cancellation import complete_cancellation
 
-    item = (
-        db.query(PedidoIntegradoItem)
-        .filter(
-            PedidoIntegradoItem.tenant_id == bridge.tenant_id,
-            PedidoIntegradoItem.pedido_integrado_id == bridge.reservation_id,
-        )
-        .with_for_update()
-        .one()
-    )
-    if not item.liberado_em:
-        item.liberado_em = datetime.utcnow()
-    reservation = (
-        db.query(PedidoIntegrado)
-        .filter(
-            PedidoIntegrado.tenant_id == bridge.tenant_id,
-            PedidoIntegrado.id == bridge.reservation_id,
-        )
-        .one()
-    )
-    reservation.status = "cancelado"
-    reservation.cancelado_em = datetime.utcnow()
-    bridge.status = "cancelled"
-    bridge.cancelled_at = datetime.now(timezone.utc)
-    if bridge.online_financial_evidence:
-        evidence = dict(bridge.online_financial_evidence)
-        evidence["receivable"] = {
-            **evidence["receivable"],
-            "status": "cancelled_pending_provider_review",
-        }
-        bridge.online_financial_evidence = evidence
+    complete_cancellation(db, bridge)

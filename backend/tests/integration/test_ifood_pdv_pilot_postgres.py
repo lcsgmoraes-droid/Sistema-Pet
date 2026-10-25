@@ -418,6 +418,11 @@ def pilot(pg_engine, monkeypatch):
     monkeypatch.setattr(
         finalization, "processar_pos_commit_finalizacao", lambda **kwargs: []
     )
+    import app.domain.events as domain_events
+
+    # A transacao e a auditoria local sao reais; handlers pos-commit usam uma
+    # SessionLocal global, fora deste schema dedicado, e nao pertencem ao ensaio.
+    monkeypatch.setattr(domain_events, "publish_event", lambda event: None)
     c.control_before = _protected(c)
     return c
 
@@ -1850,6 +1855,316 @@ def test_online_evidence_additive_migration_preserves_cash_and_refuses_data_loss
         col["name"] for col in inspect(c.engine).get_columns("ifood_pdv_bridges")
     }
     assert _state(c)["physical"] == 31 and _state(c)["payments"] == 0
+    assert _protected(c) == c.control_before
+
+
+def _cancel_pilot_sale(c, sale_id, *, barrier=None):
+    from app.tenancy.context import tenant_context
+    from app.vendas.cancelamento_service import cancelar_venda
+
+    with tenant_context(c.tenant_id), Session(c.engine) as db:
+        if barrier:
+            barrier.wait(timeout=15)
+        return cancelar_venda(
+            venda_id=sale_id,
+            motivo="Ensaio PG: cancelamento do piloto iFood",
+            user_id=c.user_id,
+            tenant_id=c.tenant_id,
+            db=db,
+        )
+
+
+def _repeat_cancel_event(c, event):
+    """Processador real com transporte fake; nenhum cancelamento externo."""
+    from app.ifood_integration_models import IfoodMerchantConfig
+    from app.integrations.ifood.orders import process_order_events
+    from app.tenancy.context import tenant_context
+
+    acknowledgements = []
+    fetched = []
+
+    def unexpected_get(order_id):
+        fetched.append(order_id)
+        raise AssertionError("Evento CAN de pedido existente nao deve refazer a sacola")
+
+    with tenant_context(c.tenant_id), Session(c.engine) as db:
+        config = (
+            db.query(IfoodMerchantConfig)
+            .filter(
+                IfoodMerchantConfig.tenant_id == c.tenant_id,
+                IfoodMerchantConfig.merchant_id == c.merchant_id,
+            )
+            .one()
+        )
+        summary = process_order_events(
+            db,
+            tenant_id=c.tenant_id,
+            config=config,
+            client=SimpleNamespace(
+                poll_events=lambda merchants: [deepcopy(event)],
+                acknowledge_events=lambda ids: acknowledgements.extend(ids),
+                get_order=unexpected_get,
+            ),
+        )
+    assert summary["acknowledged"] == 1 and summary["failed"] == 0
+    assert acknowledgements == [event["id"]] and fetched == []
+    return summary
+
+
+def _cancellation_audit(c, sale_id):
+    from app.ifood_order_models import IfoodEvent, IfoodPdvBridge
+    from app.pedido_integrado_models import PedidoIntegrado
+    from app.produtos_models import EstoqueMovimentacao
+    from app.tenancy.context import tenant_context
+    from app.vendas_models import Venda, VendaPagamento
+
+    def cols(row):
+        return {
+            column.key: getattr(row, column.key) for column in row.__mapper__.columns
+        }
+
+    with tenant_context(c.tenant_id), Session(c.engine) as db:
+        sale = (
+            db.query(Venda)
+            .filter(Venda.tenant_id == c.tenant_id, Venda.id == sale_id)
+            .one()
+        )
+        bridge = (
+            db.query(IfoodPdvBridge)
+            .filter(
+                IfoodPdvBridge.tenant_id == c.tenant_id,
+                IfoodPdvBridge.sale_id == sale_id,
+            )
+            .one()
+        )
+        return {
+            "sale_status": sale.status,
+            "sale_cancelled_at": sale.data_cancelamento,
+            "original_cost": deepcopy(sale.itens[0].custo_original_saida),
+            "bridge": cols(bridge),
+            "reservation_payload": deepcopy(
+                db.query(PedidoIntegrado)
+                .filter(
+                    PedidoIntegrado.tenant_id == c.tenant_id,
+                    PedidoIntegrado.id == bridge.reservation_id,
+                )
+                .one()
+                .payload
+            ),
+            "payments": [
+                cols(payment)
+                for payment in db.query(VendaPagamento)
+                .filter(
+                    VendaPagamento.tenant_id == c.tenant_id,
+                    VendaPagamento.venda_id == sale_id,
+                )
+                .order_by(VendaPagamento.id)
+            ],
+            "movements": [
+                cols(movement)
+                for movement in db.query(EstoqueMovimentacao)
+                .filter(
+                    EstoqueMovimentacao.tenant_id == c.tenant_id,
+                    EstoqueMovimentacao.produto_id == c.product_id,
+                    EstoqueMovimentacao.referencia_id == sale_id,
+                )
+                .order_by(EstoqueMovimentacao.id)
+            ],
+            "events": db.query(IfoodEvent)
+            .filter(
+                IfoodEvent.tenant_id == c.tenant_id,
+                IfoodEvent.ifood_order_id == c.order_id,
+            )
+            .count(),
+        }
+
+
+@pytest.mark.parametrize("after_stock_decrease", [False, True])
+def test_online_cancel_and_event_replays_restore_only_the_original_unit_and_lot(
+    online_pilot, after_stock_decrease
+):
+    from app.produtos_models import Produto
+    from app.tenancy.context import tenant_context
+
+    c = online_pilot
+    sale_id = _import(c)
+    if after_stock_decrease:
+        _finalize_online(c)
+    before = _cancellation_audit(c, sale_id)
+    # A entrada de cancelamento deve usar a prova da saida, nao o custo atual.
+    with tenant_context(c.tenant_id), Session(c.engine) as db:
+        db.query(Produto).filter(
+            Produto.tenant_id == c.tenant_id, Produto.id == c.product_id
+        ).one().preco_custo = Decimal("9999")
+        db.commit()
+    event = {
+        "id": str(uuid4()),
+        "orderId": c.order_id,
+        "merchantId": c.merchant_id,
+        "code": "CAN",
+        "fullCode": "CANCELLED",
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+    }
+    first = _repeat_cancel_event(c, event)
+    assert first["updated_orders"] == 1
+    assert _repeat_cancel_event(c, event)["updated_orders"] == 0
+    # Receber um status remoto nao autoriza uma nova baixa ou estorno repetido.
+    assert _state(c)["physical"] == (30 if after_stock_decrease else 31)
+    result = _cancel_pilot_sale(c, sale_id)
+    assert result["venda"]["status"] == "cancelada"
+    assert result["estornos"]["itens_estornados"] == int(after_stock_decrease)
+    final = _state(c)
+    assert (final["physical"], final["reserved"], final["lots"]) == (
+        31,
+        3,
+        [10, 8, 7, 6],
+    )
+    assert final["bridge_status"] == "cancelled" and final["reserve_released"]
+    assert final["stock_decreased"] is after_stock_decrease
+    assert final["reserve_sold"] is after_stock_decrease
+    assert final["payments"] == int(after_stock_decrease)
+    assert final["movements"] == 2 * int(after_stock_decrease)
+    audit = _cancellation_audit(c, sale_id)
+    assert audit["original_cost"] == before["original_cost"]
+    assert audit["sale_cancelled_at"] is not None
+    assert audit["bridge"]["online_financial_evidence"]["receivable"] == {
+        **before["bridge"]["online_financial_evidence"]["receivable"],
+        "status": "cancelled_pending_provider_review",
+    }
+    cancellation = audit["bridge"]["online_financial_evidence"]["cancellation"]
+    assert audit["reservation_payload"]["pilot_cancellation"] == cancellation
+    assert cancellation["scope"] == "local_dev"
+    assert cancellation["stock_restored"] is after_stock_decrease
+    assert cancellation["provider_cancellation_confirmed"] is False
+    assert cancellation["refund_status"] == "pending_provider_review"
+    assert cancellation["refunded_amount"] is None
+    if after_stock_decrease:
+        payment = audit["payments"][0]
+        original_payment = before["payments"][0]
+        assert {
+            key: value for key, value in payment.items() if key != "updated_at"
+        } == {
+            **{
+                key: value
+                for key, value in original_payment.items()
+                if key != "updated_at"
+            },
+            "status": "cancelado",
+        }
+        assert audit["movements"][0] == before["movements"][0]
+        restored = audit["movements"][1]
+        assert restored["tipo"] == "entrada"
+        assert Decimal(str(restored["quantidade"])) == Decimal("1")
+        assert Decimal(str(restored["custo_unitario"])) == Decimal("43.94")
+        assert Decimal(str(restored["valor_total"])) == Decimal("43.94")
+        assert cancellation["stock_reversal"] == {
+            "movement_id": restored["id"],
+            "original_movement_id": before["movements"][0]["id"],
+            "quantity": 1,
+            "original_cost": "43.94",
+        }
+    else:
+        assert cancellation["stock_reversal"] is None
+    assert _repeat_cancel_event(c, event)["updated_orders"] == 0
+    with pytest.raises(HTTPException) as repeated:
+        _cancel_pilot_sale(c, sale_id)
+    assert repeated.value.status_code == 400
+    assert _import(c) == sale_id
+    assert _state(c) == final and _cancellation_audit(c, sale_id) == audit
+    assert _financial_state(c) == c.financial_before
+    assert _protected(c) == c.control_before
+
+
+def test_online_two_simultaneous_cancellations_restore_one_unit_and_one_fifo_lot(
+    online_pilot,
+):
+    c = online_pilot
+    sale_id = _import(c)
+    _finalize_online(c)
+    barrier = Barrier(2)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(_cancel_pilot_sale, c, sale_id, barrier=barrier)
+            for _ in range(2)
+        ]
+        outcomes = []
+        for future in futures:
+            try:
+                outcomes.append(future.result(timeout=30)["venda"]["status"])
+            except HTTPException as exc:
+                outcomes.append(exc.status_code)
+    assert sorted(str(value) for value in outcomes) == ["400", "cancelada"]
+    final = _state(c)
+    assert (final["physical"], final["reserved"], final["lots"]) == (
+        31,
+        3,
+        [10, 8, 7, 6],
+    )
+    assert (final["movements"], final["payments"]) == (2, 1)
+    assert _financial_state(c) == c.financial_before
+    assert _protected(c) == c.control_before
+
+
+def test_online_cancellation_failure_rolls_back_stock_lots_payment_and_markers(
+    online_pilot, monkeypatch
+):
+    import app.integrations.ifood.pdv_pilot as pilot_module
+
+    c = online_pilot
+    sale_id = _import(c)
+    _finalize_online(c)
+    before, audit_before = _state(c), _cancellation_audit(c, sale_id)
+    complete = pilot_module.complete_pilot_cancellation
+
+    def fail_after_complete(db, bridge):
+        complete(db, bridge)
+        db.flush()
+        raise RuntimeError("PG injected after cancellation stock and payment")
+
+    with monkeypatch.context() as inject:
+        inject.setattr(pilot_module, "complete_pilot_cancellation", fail_after_complete)
+        with pytest.raises(RuntimeError, match="PG injected after cancellation"):
+            _cancel_pilot_sale(c, sale_id)
+    assert _state(c) == before and _cancellation_audit(c, sale_id) == audit_before
+    assert _financial_state(c) == c.financial_before
+    _cancel_pilot_sale(c, sale_id)
+    assert (_state(c)["physical"], _state(c)["lots"], _state(c)["movements"]) == (
+        31,
+        [10, 8, 7, 6],
+        2,
+    )
+    assert _financial_state(c) == c.financial_before
+    assert _protected(c) == c.control_before
+
+
+def test_online_finalization_racing_cancellation_finishes_cancelled_without_double_stock(
+    online_pilot,
+):
+    c = online_pilot
+    sale_id = _import(c)
+    barrier = Barrier(2)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        finalizer = executor.submit(_finalize_online, c, barrier=barrier)
+        cancellation = executor.submit(_cancel_pilot_sale, c, sale_id, barrier=barrier)
+        cancelled = cancellation.result(timeout=30)
+        assert cancelled["venda"]["status"] == "cancelada"
+        try:
+            assert finalizer.result(timeout=30) == c.order_id
+        except HTTPException as exc:
+            assert exc.status_code == 409
+    final = _state(c)
+    assert (final["physical"], final["reserved"], final["lots"]) == (
+        31,
+        3,
+        [10, 8, 7, 6],
+    )
+    assert final["bridge_status"] == "cancelled" and final["reserve_released"]
+    assert final["movements"] in (0, 2)
+    assert final["payments"] == final["movements"] // 2
+    audit = _cancellation_audit(c, sale_id)
+    assert audit["sale_status"] == "cancelada"
+    assert all(payment["status"] == "cancelado" for payment in audit["payments"])
+    assert _financial_state(c) == c.financial_before
     assert _protected(c) == c.control_before
 
 

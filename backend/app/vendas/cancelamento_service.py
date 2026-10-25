@@ -163,6 +163,14 @@ def cancelar_venda(
             if pilot_bridge is not None and pilot_bridge.stock_decreased_at is None:
                 # O rascunho reservou, mas nunca teve saida fisica.
                 continue
+            if pilot_bridge is not None:
+                from app.integrations.ifood.pdv_pilot_cancellation import (
+                    estornar_item_piloto,
+                )
+
+                estornar_item_piloto(db, pilot_bridge, venda, item, user_id, motivo)
+                itens_estornados += 1
+                continue
             if item.produto_id and tipo_controla_estoque(item.tipo):
                 try:
                     tenant_estoque, compartilhado = resolver_tenant_estoque_item(

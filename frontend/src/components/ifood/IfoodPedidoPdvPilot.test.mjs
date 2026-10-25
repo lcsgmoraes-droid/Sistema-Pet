@@ -131,3 +131,28 @@ test("online reservado oferece conclusao explicita com capacidade do servidor; v
     false,
   );
 });
+
+test("cancelamento distingue liberação da reserva e recomposição comprovada dos lotes", () => {
+  const base = {
+    enabled: true,
+    status: "cancelled",
+    sale_id: 42,
+    reserved_quantity: 0,
+    reason: "Pedido encerrado nao pode criar reserva retroativa.",
+  };
+  const before = setup({ ...base, stock_decreased: false, stock_restored: false });
+  assert.match(elementText(before.harness.tree), /Cancelado no CorePet/);
+  assert.match(elementText(before.harness.tree), /Reserva liberada, sem entrada física/);
+  const after = setup({ ...base, stock_decreased: true, stock_restored: true });
+  assert.match(elementText(after.harness.tree), /Lotes originais recompostos/);
+  const unknown = setup({ ...base, stock_decreased: true });
+  assert.match(elementText(unknown.harness.tree), /Recomposição do estoque\s+Conferência pendente/);
+  for (const env of [before, after, unknown]) {
+    assert.match(elementText(env.harness.tree), /Cancelamento registrado somente no CorePet/);
+    assert.doesNotMatch(elementText(env.harness.tree), /nao pode criar reserva retroativa/);
+    assert.equal(
+      elements(env.harness.tree).some((node) => node.type === "BotaoInteracao"),
+      false,
+    );
+  }
+});

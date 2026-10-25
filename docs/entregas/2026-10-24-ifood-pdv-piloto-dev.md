@@ -22,8 +22,11 @@ a conclusao tem acao propria, sem repetir a cobranca no PDV.
 
 O aceite técnico exige uma venda, uma reserva e uma baixa FIFO para uma unidade
 do SKU `018631.1`, sem duplicação por reenvio ou concorrência. Cancelar antes da
-finalização deve liberar apenas a reserva. A interface identifica o canal iFood
-e preserva os itens, valores e a modalidade recebidos do provedor.
+finalização deve liberar apenas a reserva. Cancelar depois da baixa deve recompor
+a unidade nos lotes originais, usando o CMV comprovado e sem duplicar a entrada.
+A interface identifica o canal iFood e preserva os itens, valores e a modalidade
+recebidos do provedor. O cancelamento local não comprova cancelamento ou reembolso
+na plataforma.
 
 Devem permanecer os fluxos de app, ecommerce, WhatsApp e loja física. Ficam fora
 do escopo produção, publicação de outros produtos, operação contínua, pagamentos
@@ -91,6 +94,22 @@ piloto não inventa estado externo quando o iFood está indisponível: a importa
 do espelho local e as operações externas permanecem separadas. Não há novo retry
 automático de venda nem estorno retroativo automático por evento remoto.
 
+O cancelamento explícito usa a ponte e a reserva originais. Antes da baixa,
+somente libera a reserva. Depois da baixa, exige o comprovante original, saída
+única e ausência de retorno anterior; recompõe os mesmos lotes e CMV na mesma
+transação. Não executa novo FIFO, não libera lote bloqueado/vencido e não substitui
+o custo histórico pelo cadastro atual. Provas inconsistentes e efeitos financeiros
+locais inesperados bloqueiam o piloto online, preservando o estado anterior.
+
+O resumo expõe `stock_restored` e `cancellation`, com escopo `local_dev` e sem
+confirmação de cancelamento externo. No online, mantém `refund_status` como
+`pending_provider_review` e `refunded_amount=null`; o recebível de evidência fica
+`cancelled_pending_provider_review`. O pagamento local permanece auditável com
+status `cancelado`, excluído de saldos ativos, preservando a prova original da
+aprovação externa. Não há envio `CAN`, reembolso ou lançamento novo em caixa/banco.
+A Central/PDV distinguem **Reserva liberada, sem entrada física** de **Lotes
+originais recompostos**, e informam **Estorno iFood a conferir**.
+
 A leitura Financial usa a ponte exata `IfoodPdvBridge` ou uma confirmação manual
 explícita em `IfoodFinancialSaleLink`, respeitando tenant, loja e homologação.
 Não relaciona pedidos por data, valor ou cliente e não fabrica confirmação humana
@@ -151,6 +170,14 @@ passou no gate completo em `cbd97462f`, com Git limpo: 718 testes backend iFood,
 ignorados, hardening multitenant 769/22 ignorados e 104 mobile. Lint, formatação,
 build e auditorias passaram. Os 32 cenários PostgreSQL foram revalidados em banco
 dedicado. O CI do commit final deve ser conferido separadamente no PR #1561.
+
+Na ampliação de cancelamento, a validação focada registrou **303 testes unitários
+backend**, **37 cenários PostgreSQL** e **320 testes frontend iFood/produto**
+aprovados. A cobertura inclui retorno após a baixa com lotes/CMV originais,
+concorrência, repetição e rollback. Os dois ensaios runtime passaram e seu estado
+final está registrado abaixo. Gate completo e CI do head final são registrados
+no PR #1561; os resultados anteriores
+não devem ser reutilizados como aprovação automática desse delta.
 
 O schema descartável do ensaio PostgreSQL não comprova a execução de toda a
 cadeia histórica do Alembic. A migration nova e suas restrições foram exercidas;
@@ -216,6 +243,40 @@ de controle permaneceram iguais. CMV R$ 43,94, estoque 29/3/26, reservas, lotes,
 pagamento e caixa foram preservados. Não houve consulta ao provedor ou produção.
 Provas locais: `fees-link-restoration-proof.json`, `fees-link-revision-api-proof.json`
 e capturas de tela, fora do Git.
+
+### Cancelamento antes e depois da baixa
+
+O pedido oficial **1420** permanece como evidência da venda concluída; ele não é
+cancelado para executar estes testes. Os cenários usam outros pedidos sintéticos
+de uma unidade do mesmo SKU `018631.1`, no DEV isolado.
+
+O cenário **antes da baixa passou no runtime**: depois de liberar a reserva, o
+produto voltou à referência físico **29**, reservado **3**, disponível **26**, sem
+entrada física nem alteração dos lotes. Evento `CAN` duplicado e repetição da
+mesma chave de solicitação retornaram o resultado registrado (HTTP 200). Nova
+solicitação após cancelamento recebeu HTTP 400, sem duplicar movimentos.
+
+O cenário **depois da baixa passou no runtime**: a saída levou o físico de 29 a
+28 e o cancelamento retornou a 29, com reservado 3 e disponível 26. Os lotes
+originais foram recompostos, com CMV R$ 43,94 na saída e na única entrada de
+retorno. Repetições do evento e do cancelamento não duplicaram a movimentação.
+A interface confirmou **Cancelado no CorePet**, **Lotes originais recompostos**
+e **Estorno iFood a conferir**. Dados anteriores do pedido 1420, outros produtos,
+outra empresa e os hashes das 12 tabelas financeiras foram preservados. A
+configuração privada voltou exatamente aos bytes anteriores. As vendas 3 e 4
+permaneceram canceladas no histórico de DEV. Prova sanitizada local fora do Git:
+`cancel-pilot-final-proof.json`, snapshots e capturas do ensaio.
+
+Cancelar localmente não envia uma ação de cancelamento ao iFood, não comprova
+estorno ao consumidor e não cria caixa ou banco. A linha local de pagamento
+cancelada é mantida para auditoria; a aprovação externa original também. O valor
+reembolsado fica desconhecido (`null`), aguardando conferência no provedor/Financial.
+Nenhum teste desta ampliação autoriza produção ou outros produtos.
+
+O vínculo de produto preexistente continua separado: falta escolher outro EAN
+da mesma loja, conferir apresentação e cadastro e então executar o roteiro de
+vínculo/atualização parcial. Não reutilizar o SKU criado no primeiro teste como
+prova desse segundo caminho e não criar anúncio duplicado.
 
 ## 7. Publicação e rollback
 
@@ -325,19 +386,25 @@ operação de produção pronta.
 - [x] Publicação, observabilidade e rollback definidos para o piloto.
 - [x] Comunicação e treinamento avaliados.
 - [x] Gate do online e validação do delta visual registrados.
-- [ ] CI remoto do commit final do PR confirmado.
+- CI remoto do head final: consultar os checks do PR #1561.
 - [x] Ensaio final da ligação Financial por componente e restauração da massa DEV registrados.
-- [x] Gate completo da ampliação atual confirmado em `cbd97462f`.
+- [x] Gate completo da ligação Financial confirmado em `cbd97462f`.
+- [x] Testes focados de cancelamento pré/pós-baixa e repetição aprovados.
+- [x] Cancelamento pré-baixa conferido no runtime DEV, preservando o pedido 1420.
+- [x] Cancelamento pós-baixa conferido no runtime DEV e evidência final registrada.
+- Gate completo desta ampliação: resultado e fonte registrados no PR #1561.
 - [ ] Financial oficial e relatórios gerais homologados para expansão.
 
 Decisão técnica: **aprovado para o fluxo oficial específico de pedido, PDV,
 reserva e baixa em DEV**. A ligação de Financial aos relatórios está implementada
-e seu ensaio por componente estão aprovados em DEV. A evidência oficial Financial
+e seu ensaio por componente está aprovado em DEV. A evidência oficial Financial
 do pedido ainda está pendente.
+Cancelamentos pré e pós-baixa passaram no runtime com dados sintéticos, prova de
+preservação e recomposição FIFO. Gate e CI do head final devem passar antes de
+qualquer merge/publicação autorizados.
 Não é aceite de operação contínua ou de produção.
 
-Pendências: Codex e Lucas devem obter Financial oficial do pedido e validar as conferências de
-conciliação e margem antes de ampliar o piloto. O responsável pelo PR deve
-confirmar o CI do commit final antes da
-conclusão da revisão.
+Codex e Lucas devem obter Financial oficial do pedido
+e validar as conferências de conciliação e margem antes de ampliar o piloto. O
+vínculo de produto preexistente exige outro EAN conferido e segue em etapa separada.
 Não há prazo de liberação de produção definido nesta entrega.
