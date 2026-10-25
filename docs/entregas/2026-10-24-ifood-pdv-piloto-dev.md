@@ -145,10 +145,12 @@ Validações executadas nesta tarefa:
   e recarga da venda pelo ID após concluir, testada com o carregador real do PDV.
   O CI remoto do commit final do PR #1561 continua uma conferência separada.
 
-Esses resultados pertencem às etapas anteriores indicadas. A ampliação atual de
-taxas por componente, revisão, atualização das telas e worker DEV possui testes
-específicos, mas seu ensaio final, CI final e gate completo ainda serão registrados.
-Não reutilizar o aceite anterior como aprovação automática desta ampliação.
+Esses resultados pertencem às etapas anteriores indicadas. A ampliação de taxas
+passou no gate completo em `cbd97462f`, com Git limpo: 718 testes backend iFood,
+135 de relatórios/consumidores, 318 frontend iFood/produto, smoke raiz 203/2
+ignorados, hardening multitenant 769/22 ignorados e 104 mobile. Lint, formatação,
+build e auditorias passaram. Os 32 cenários PostgreSQL foram revalidados em banco
+dedicado. O CI do commit final deve ser conferido separadamente no PR #1561.
 
 O schema descartável do ensaio PostgreSQL não comprova a execução de toda a
 cadeia histórica do Alembic. A migration nova e suas restrições foram exercidas;
@@ -201,12 +203,19 @@ original de **R$ 43,94**. A posição de referência é físico **29**, reservad
 disponível **26**; a leitura financeira deve preservá-la e não criar pagamento
 ou caixa adicional.
 
-O ensaio de atualização usa temporariamente fonte **`synthetic`**, com rótulo de
+O ensaio de atualização usou temporariamente fonte **`synthetic`**, com rótulo de
 simulação DEV: comissão de **R$ 6,50**, taxa de pagamento explícita de **R$ 0,00**
 e revisão de comissão para **R$ 7,50**, substituindo a anterior. Esses valores não
-são taxas reais do pedido oficial. A massa não libera lucro/margem real e será
-restaurada ao final, retornando à ausência de Financial oficial. O fechamento
-do ensaio ainda deve ser registrado; não há alteração de produção.
+são taxas reais do pedido oficial. A massa não liberou lucro/margem real. A lista
+atualizou sem recarga, preservando seleção e expansão; o PDV atualizou somente
+sua apresentação financeira. A revisão substituiu R$ 6,50 por R$ 7,50, sem somar.
+As três revisões e cinco eventos temporários foram removidos, a configuração
+privada foi restaurada e as telas voltaram automaticamente à pendência real.
+As linhas operacionais dos dois tenants e os hashes das 12 tabelas financeiras
+de controle permaneceram iguais. CMV R$ 43,94, estoque 29/3/26, reservas, lotes,
+pagamento e caixa foram preservados. Não houve consulta ao provedor ou produção.
+Provas locais: `fees-link-restoration-proof.json`, `fees-link-revision-api-proof.json`
+e capturas de tela, fora do Git.
 
 ## 7. Publicação e rollback
 
@@ -283,8 +292,8 @@ até 32 dias atrás. Não amplia automaticamente para outras competências: ajus
 fora dessa cobertura continuam pendentes. Usa o scheduler líder existente,
 intervalo mínimo de 15 minutos, exclusão de execuções e backoff; falhas preservam
 a evidência anterior. Não executa anúncio, ACK, estoque, pagamento ou caixa.
-O aceite dessa ligação e seu CI/gate final ainda precisam ser concluídos antes
-de ampliar o piloto ou avaliar qualquer habilitação em produção.
+O ensaio local e o gate dessa ligação passaram; CI final e evidência oficial
+Financial continuam sendo conferências separadas antes de ampliar o piloto.
 
 Falhas previstas: loja de testes não configurada, acesso do consumidor
 indisponível, pedido fora da allowlist, condição comercial não suportada e falha
@@ -317,18 +326,18 @@ operação de produção pronta.
 - [x] Comunicação e treinamento avaliados.
 - [x] Gate do online e validação do delta visual registrados.
 - [ ] CI remoto do commit final do PR confirmado.
-- [ ] Ensaio final da ligação Financial por componente e restauração da massa DEV registrados.
-- [ ] Gate completo da ampliação atual confirmado.
+- [x] Ensaio final da ligação Financial por componente e restauração da massa DEV registrados.
+- [x] Gate completo da ampliação atual confirmado em `cbd97462f`.
 - [ ] Financial oficial e relatórios gerais homologados para expansão.
 
 Decisão técnica: **aprovado para o fluxo oficial específico de pedido, PDV,
 reserva e baixa em DEV**. A ligação de Financial aos relatórios está implementada
-em DEV, com ensaio final e evidência oficial do pedido ainda pendentes.
+e seu ensaio por componente estão aprovados em DEV. A evidência oficial Financial
+do pedido ainda está pendente.
 Não é aceite de operação contínua ou de produção.
 
-Pendências: Codex e Lucas devem concluir o ensaio da ligação, restaurar os dados
-temporários, obter Financial oficial do pedido e validar as conferências de
+Pendências: Codex e Lucas devem obter Financial oficial do pedido e validar as conferências de
 conciliação e margem antes de ampliar o piloto. O responsável pelo PR deve
-confirmar o CI do commit final e o gate completo desta ampliação antes da
+confirmar o CI do commit final antes da
 conclusão da revisão.
 Não há prazo de liberação de produção definido nesta entrega.

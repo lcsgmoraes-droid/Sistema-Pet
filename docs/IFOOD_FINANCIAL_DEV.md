@@ -556,16 +556,26 @@ recebidos do iFood. Sua venda `202610240002` (ID 2) possui CMV original de
 é físico **29**, reservado **3**, disponível **26**. Ler e atualizar as taxas não
 deve modificar esses valores, o pagamento externo ou o caixa.
 
-O ensaio local dessa ligação usa temporariamente fonte **`synthetic`**, rotulada
+O ensaio local dessa ligação usou temporariamente fonte **`synthetic`**, rotulada
 como simulação DEV: comissão de **R$ 6,50**, taxa de pagamento explícita de
 **R$ 0,00** e uma revisão de comissão para **R$ 7,50**, que substitui a anterior.
 Serve para conferir chegada, revisão e atualização das telas; não são cobranças
-reais do pedido #1420. Os dados temporários serão restaurados ao final, mantendo
-visível a ausência de Financial oficial. Nenhum dado será levado a produção.
+reais do pedido #1420. As telas atualizaram sem recarga, preservando seleção e
+expansão da venda; o PDV também releu somente a apresentação financeira. As três
+revisões e seus cinco eventos sintéticos foram removidos e a configuração privada
+foi restaurada. Comissão e pagamento voltaram automaticamente à pendência real.
+Os dados operacionais dos dois tenants e os hashes das 12 tabelas financeiras de
+controle ficaram idênticos ao início. CMV, posição 29/3/26, lotes e caixa foram
+preservados. Leitura externa, polling e exibição sintética terminaram desligados.
+Nenhuma consulta ao provedor, anúncio ou alteração de produção ocorreu no ensaio.
 
-A validação final desse ensaio, o CI do commit final e o gate completo desta
-ampliação ainda devem ser registrados. Os resultados abaixo e os totais anteriores
-pertencem às etapas indicadas; não comprovam por si só o aceite desta ligação.
+Na fonte `cbd97462f`, o `FLUXO_UNICO.bat release-check` completo passou com Git
+limpo: 718 testes backend iFood, 135 de relatórios/consumidores, 318 frontend
+iFood/produto, smoke raiz 203 aprovados/2 ignorados e hardening multitenant 769
+aprovados/22 ignorados. Lint, formatação, build, auditorias de dependências e 104
+testes mobile passaram. Os 32 cenários PostgreSQL dedicados também passaram em
+execução separada. O CI remoto do commit final permanece registrado no PR #1561;
+esse aceite local não conclui a homologação oficial Financial nem autoriza produção.
 
 ### Preparação para publicação do código (2026-10-23)
 
