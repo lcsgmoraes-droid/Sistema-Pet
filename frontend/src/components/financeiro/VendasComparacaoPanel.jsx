@@ -13,6 +13,10 @@ import {
   YAxis,
 } from "recharts";
 import VendasComparativoPeriodoTable from "./VendasComparativoPeriodoTable";
+import {
+  PENDENCIA_IFOOD_LABEL,
+  temRentabilidadePendente,
+} from "./vendasFinanceiro/rentabilidadePendente.js";
 
 const TIPOS_COMPARACAO = [
   { value: "financeiro", label: "Comparacao Financeira" },
@@ -26,6 +30,7 @@ function numero(valor) {
 }
 
 function valorRecebido(resumo) {
+  if (temRentabilidadePendente(resumo)) return numero(resumo.valor_recebido);
   return numero(resumo.venda_liquida) - numero(resumo.em_aberto);
 }
 
@@ -48,7 +53,9 @@ function ResumoPeriodoCard({ borderClass, headerClass, periodo, resumo, titulo, 
         <div className="border-b pb-2">
           <div className="text-xs text-gray-600">Valor Liquido</div>
           <div className="text-xl font-bold text-blue-600">
-            {formatarMoeda(resumo.venda_liquida)}
+            {temRentabilidadePendente(resumo)
+              ? PENDENCIA_IFOOD_LABEL
+              : formatarMoeda(resumo.venda_liquida)}
           </div>
         </div>
         <div>
@@ -63,6 +70,16 @@ function ResumoPeriodoCard({ borderClass, headerClass, periodo, resumo, titulo, 
 }
 
 function VariacaoLinha({ formatarValor, label, variacao }) {
+  if (variacao.pendente) {
+    return (
+      <div className="border-b pb-2">
+        <div className="text-xs text-gray-600">{label}</div>
+        <div className="text-xl font-bold text-amber-800 dark:text-amber-300">
+          {PENDENCIA_IFOOD_LABEL}
+        </div>
+      </div>
+    );
+  }
   const positiva = variacao.percentual >= 0;
   const Icon = positiva ? ArrowUp : ArrowDown;
 
@@ -97,7 +114,10 @@ function VariacaoCard({ calcularVariacao, formatarMoeda, resumo, resumoComparaca
     {
       label: "Valor Liquido",
       formatarValor: formatarMoeda,
-      value: calcularVariacao(resumo.venda_liquida, resumoComparacao.venda_liquida),
+      value:
+        temRentabilidadePendente(resumo) || temRentabilidadePendente(resumoComparacao)
+          ? { pendente: true }
+          : calcularVariacao(resumo.venda_liquida, resumoComparacao.venda_liquida),
     },
     {
       label: "Valor Recebido",
@@ -149,8 +169,10 @@ function ComparacaoFinanceira({
     },
     {
       nome: "Vl. Liquido (mil)",
-      Anterior: numero(resumoComparacao.venda_liquida) / 1000,
-      Atual: numero(resumo.venda_liquida) / 1000,
+      Anterior: temRentabilidadePendente(resumoComparacao)
+        ? null
+        : numero(resumoComparacao.venda_liquida) / 1000,
+      Atual: temRentabilidadePendente(resumo) ? null : numero(resumo.venda_liquida) / 1000,
     },
     {
       nome: "Vl. Recebido (mil)",

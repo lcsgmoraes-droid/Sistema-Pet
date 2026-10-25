@@ -7,9 +7,11 @@ import {
   exportarPlanilhasExcel,
   filtrarVendasRelatorio,
   ordenarVendasRelatorio,
+  montarLinhasCobrancasIfoodExcel,
 } from "../vendasFinanceiroUtils";
 import { confirmarCorePet } from "../../../services/corepetDialog";
 import useShiftRangeSelection from "../../../hooks/useShiftRangeSelection";
+import { PENDENCIA_IFOOD_LABEL, temRentabilidadePendente } from "./rentabilidadePendente.js";
 
 export function useVendasFinanceiroActions({
   carregarDados,
@@ -74,6 +76,7 @@ export function useVendasFinanceiroActions({
 
     const dataArquivo = new Date().toISOString().slice(0, 10);
     const sufixo = escopo === "geral" ? "geral" : "filtrado";
+    const cobrancas = montarLinhasCobrancasIfoodExcel(dadosOrdenados);
     try {
       await exportarPlanilhasExcel(
         [
@@ -81,6 +84,7 @@ export function useVendasFinanceiroActions({
             sheet: "Lista de Vendas",
             linhas: [colunas.map((coluna) => coluna.label), ...linhas],
           },
+          ...(cobrancas.length ? [{ sheet: "Cobranças iFood", linhas: cobrancas }] : []),
         ],
         `vendas_${sufixo}_${dataArquivo}.xlsx`,
       );
@@ -138,7 +142,18 @@ export function useVendasFinanceiroActions({
       ["Venda Bruta", resumo.venda_bruta],
       ["Taxa de Entrega", resumo.taxa_entrega],
       ["Desconto", resumo.desconto],
-      ["Venda Liquida", resumo.venda_liquida],
+      [
+        "Venda Liquida",
+        temRentabilidadePendente(resumo) ? PENDENCIA_IFOOD_LABEL : resumo.venda_liquida,
+      ],
+      ...(temRentabilidadePendente(resumo)
+        ? [
+            [
+              "Rentabilidade",
+              "Aguardando cobranças do iFood; taxas pendentes não representam custo zero.",
+            ],
+          ]
+        : []),
       ["Em Aberto", resumo.em_aberto],
       ["Quantidade de Vendas", resumo.quantidade_vendas],
     ];
@@ -148,6 +163,8 @@ export function useVendasFinanceiroActions({
         linhas: resumoData,
       },
     ];
+    const cobrancas = montarLinhasCobrancasIfoodExcel(listaVendasFiltrada);
+    if (cobrancas.length) planilhas.push({ sheet: "Cobranças iFood", linhas: cobrancas });
 
     if (vendasPorDataCalendario.length > 0) {
       const vendasData = [

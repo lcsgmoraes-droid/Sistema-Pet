@@ -472,6 +472,7 @@ class EstoqueService:
         observacao: Optional[str] = None,
         custo_unitario_override: Optional[float] = None,
         valor_total_override: Optional[float] = None,
+        preservar_custo_desconhecido: bool = False,
     ) -> Dict:
         """
         Devolve estoque ao produto (usado em devolução/cancelamento)
@@ -550,12 +551,16 @@ class EstoqueService:
             quantidade_anterior=estoque_anterior,
             quantidade_nova=estoque_novo,
             custo_unitario=(
-                float(custo_unitario_override)
+                None
+                if preservar_custo_desconhecido
+                else float(custo_unitario_override)
                 if custo_unitario_override is not None
                 else float(produto.preco_custo or 0)
             ),
             valor_total=(
-                float(valor_total_override)
+                None
+                if preservar_custo_desconhecido
+                else float(valor_total_override)
                 if valor_total_override is not None
                 else quantidade_estoque
                 * (
@@ -564,7 +569,9 @@ class EstoqueService:
                     else float(produto.preco_custo or 0)
                 )
             ),
-            lotes_consumidos=None,  # Estorno não usa lotes
+            # O chamador vincula a composicao dos lotes originais quando existe
+            # prova da saida; este metodo nao escolhe um novo FIFO no retorno.
+            lotes_consumidos=None,
             documento=documento,
             referencia_id=referencia_id,
             referencia_tipo=referencia_tipo,

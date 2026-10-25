@@ -32,6 +32,12 @@ from .services.faturamento_service import (
     montar_composicao_vendas,
     opcoes_composicao_vendas,
 )
+from .services.rentabilidade_pendencias import (
+    PENDING_IFOOD_FINANCIAL,
+    PENDENCIA_IFOOD,
+    aplicar_pendencia_ifood,
+)
+from .services.ifood_rentabilidade_contexto import carregar_snapshots_ifood_vendas
 from .caixa.conferencia import moeda
 from .utils.tenant_safe_sql import execute_tenant_safe
 from .dashboard.ponto_equilibrio_routes import (
@@ -311,9 +317,26 @@ async def obter_resumo_dashboard(
             for venda in vendas_periodo
             for item in list(getattr(venda, "itens", []) or [])
         )
-        lucro_vendas_periodo = sum(
-            safe_decimal_to_float_zero(_snapshot_dict(venda).get("lucro", 0))
+        snapshots_ifood = carregar_snapshots_ifood_vendas(db, tenant_id, vendas_periodo)
+        snapshots_periodo = [
+            snapshots_ifood.get(getattr(venda, "id", None))
+            or aplicar_pendencia_ifood(venda, _snapshot_dict(venda))
             for venda in vendas_periodo
+        ]
+        vendas_rentabilidade_pendente = sum(
+            bool(snapshot.get("taxas_ifood_pendentes"))
+            for snapshot in snapshots_periodo
+        )
+        lucro_vendas_periodo = (
+            None
+            if vendas_rentabilidade_pendente
+            else round(
+                sum(
+                    safe_decimal_to_float_zero(snapshot.get("lucro", 0))
+                    for snapshot in snapshots_periodo
+                ),
+                2,
+            )
         )
 
         # Vendas finalizadas
@@ -391,7 +414,17 @@ async def obter_resumo_dashboard(
                 "faturamento_bruto": round(float(faturamento_bruto_periodo), 2),
                 "faturamento_liquido": composicao_vendas["faturamento_liquido"],
                 "valor_recebido": round(valor_recebido_periodo, 2),
-                "lucro": round(lucro_vendas_periodo, 2),
+                "lucro": lucro_vendas_periodo,
+                "rentabilidade_status": (
+                    PENDING_IFOOD_FINANCIAL
+                    if vendas_rentabilidade_pendente
+                    else "complete"
+                ),
+                "taxas_ifood_pendentes": bool(vendas_rentabilidade_pendente),
+                "vendas_rentabilidade_pendente": vendas_rentabilidade_pendente,
+                "pendencias_rentabilidade": (
+                    [PENDENCIA_IFOOD] if vendas_rentabilidade_pendente else []
+                ),
                 "finalizadas": int(vendas_finalizadas),
                 "ticket_medio": round(ticket_medio, 2),
             },
@@ -664,12 +697,12 @@ async def obter_contas_vencidas(
                         "valor_total": valor_final,
                         "valor_pago": valor_recebido,
                         "saldo": valor_final - valor_recebido,
-                        "data_vencimento": c.data_vencimento.isoformat()
-                        if c.data_vencimento
-                        else None,
-                        "dias_vencido": (hoje - c.data_vencimento).days
-                        if c.data_vencimento
-                        else 0,
+                        "data_vencimento": (
+                            c.data_vencimento.isoformat() if c.data_vencimento else None
+                        ),
+                        "dias_vencido": (
+                            (hoje - c.data_vencimento).days if c.data_vencimento else 0
+                        ),
                         "status": c.status,
                     }
                 )
@@ -702,12 +735,12 @@ async def obter_contas_vencidas(
                         "valor_total": valor_final,
                         "valor_pago": valor_pago,
                         "saldo": valor_final - valor_pago,
-                        "data_vencimento": c.data_vencimento.isoformat()
-                        if c.data_vencimento
-                        else None,
-                        "dias_vencido": (hoje - c.data_vencimento).days
-                        if c.data_vencimento
-                        else 0,
+                        "data_vencimento": (
+                            c.data_vencimento.isoformat() if c.data_vencimento else None
+                        ),
+                        "dias_vencido": (
+                            (hoje - c.data_vencimento).days if c.data_vencimento else 0
+                        ),
                         "status": c.status,
                     }
                 )

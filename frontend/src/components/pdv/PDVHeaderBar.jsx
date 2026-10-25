@@ -17,8 +17,10 @@ import MenuCaixa from "../MenuCaixa";
 import ActionButton from "../ui/ActionButton";
 import IconActionButton from "../ui/IconActionButton";
 import PageHeader from "../ui/PageHeader";
+import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
 import { podeRegistrarRecebimentoVenda } from "../../utils/pdvReturnEligibility";
 import { mensagemCaixaIndisponivel } from "../../utils/caixaAbertoMonitor";
+import { isIfoodManualPaymentBlocked } from "../../utils/ifoodPdvPilot";
 
 export default function PDVHeaderBar({
   destaqueAbrirCaixa,
@@ -61,6 +63,7 @@ export default function PDVHeaderBar({
     month: "long",
     day: "numeric",
   });
+  const cobrancaManualBloqueada = isIfoodManualPaymentBlocked(vendaAtual);
 
   return (
     <div className="border-b bg-white px-4 py-3 md:px-5">
@@ -233,22 +236,35 @@ export default function PDVHeaderBar({
             {!temCaixaAberto && <Lock className="h-4 w-4 opacity-80" />}
           </ActionButton>
 
-          <ActionButton
-            onClick={onAbrirModalPagamento}
-            disabled={loading || !podeRegistrarRecebimentoVenda(vendaAtual) || !temCaixaAberto}
-            icon={CreditCard}
-            intent="create"
-            size="lg"
-            className="w-full sm:w-auto sm:min-w-[190px]"
-            title={
-              !temCaixaAberto
-                ? mensagemCaixaIndisponivel(statusConsultaCaixa)
-                : "Registrar pagamento da venda"
-            }
-          >
-            <span>Registrar Recebimento</span>
-            {!temCaixaAberto && <Lock className="h-4 w-4 opacity-80" />}
-          </ActionButton>
+          {cobrancaManualBloqueada ? (
+            <BotaoInteracao
+              disabled
+              icon={CreditCard}
+              tamanho="grande"
+              title="Cobrança manual bloqueada. Confira o resumo do piloto iFood no pedido."
+            >
+              {vendaAtual.ifood_pdv_pilot?.payment_mode === "online"
+                ? "Pagamento online no iFood"
+                : "Pagamento iFood a conferir"}
+            </BotaoInteracao>
+          ) : (
+            <ActionButton
+              onClick={onAbrirModalPagamento}
+              disabled={loading || !podeRegistrarRecebimentoVenda(vendaAtual) || !temCaixaAberto}
+              icon={CreditCard}
+              intent="create"
+              size="lg"
+              className="w-full sm:w-auto sm:min-w-[190px]"
+              title={
+                !temCaixaAberto
+                  ? mensagemCaixaIndisponivel(statusConsultaCaixa)
+                  : "Registrar pagamento da venda"
+              }
+            >
+              <span>Registrar Recebimento</span>
+              {!temCaixaAberto && <Lock className="h-4 w-4 opacity-80" />}
+            </ActionButton>
+          )}
         </div>
       </div>
     </div>

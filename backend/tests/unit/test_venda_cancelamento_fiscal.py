@@ -208,6 +208,7 @@ def test_cancelamento_venda_com_nota_cancelada_preserva_fiscal_e_estorna_uma_vez
     monkeypatch, quantidade_legado, quantidade_itens
 ):
     from app.produtos_estoque_models import EstoqueMovimentacao
+    from app.produtos_models import Produto
     from app.vendas_models import VendaItem
 
     venda = _venda(nfe_status="cancelada")
@@ -222,7 +223,30 @@ def test_cancelamento_venda_com_nota_cancelada_preserva_fiscal_e_estorna_uma_vez
         "nfe_status": venda.nfe_status,
     }
     item = SimpleNamespace(
-        tipo="produto", produto_id=20, quantidade=1, estoque_origem_tenant_id=None
+        id=1,
+        tenant_id=venda.tenant_id,
+        venda_id=venda.id,
+        tipo="produto",
+        produto_id=20,
+        quantidade=1,
+        estoque_origem_tenant_id=None,
+        product_variation_id=None,
+        custo_original_saida=None,
+        lote_id=None,
+    )
+    itens = [
+        SimpleNamespace(**{**vars(item), "id": indice + 1})
+        for indice in range(quantidade_itens)
+    ]
+    produto = SimpleNamespace(
+        id=20,
+        tenant_id=venda.tenant_id,
+        controlar_estoque=True,
+        tipo_produto="SIMPLES",
+        tipo_kit=None,
+        estoque_atual=Decimal("10")
+        - quantidade_itens
+        + Decimal(str(quantidade_legado)),
     )
     db = MagicMock()
     consulta_legado = None
@@ -233,13 +257,23 @@ def test_cancelamento_venda_com_nota_cancelada_preserva_fiscal_e_estorna_uma_vez
         consulta.filter_by.return_value = consulta
         consulta.filter.return_value = consulta
         consulta.with_for_update.return_value = consulta
+        consulta.populate_existing.return_value = consulta
+        consulta.order_by.return_value = consulta
         consulta.first.return_value = venda if model is Venda else None
-        consulta.all.return_value = (
-            [item] * quantidade_itens if model is VendaItem else []
-        )
+        consulta.one_or_none.return_value = produto if model is Produto else None
+        consulta.all.return_value = itens if model is VendaItem else []
         if model is EstoqueMovimentacao:
             consulta_legado = consulta
-            consulta.all.return_value = [SimpleNamespace(quantidade=quantidade_legado)]
+            consulta.all.return_value = [
+                SimpleNamespace(
+                    quantidade=quantidade_legado,
+                    tipo="saida",
+                    status="cancelado",
+                    referencia_tipo="venda_bling",
+                    lote_id=None,
+                    lotes_consumidos=None,
+                )
+            ]
         return consulta
 
     db.query.side_effect = query

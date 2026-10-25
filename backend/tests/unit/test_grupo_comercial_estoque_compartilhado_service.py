@@ -28,6 +28,7 @@ from app.produtos_models import (
 )
 from app.tenancy.context import clear_current_tenant, tenant_context
 from app.vendas.estoque_baixa import processar_baixa_estoque_item
+from app.vendas_models import Venda
 
 
 ORIGEM = "71111111-1111-1111-1111-111111111111"
@@ -56,6 +57,7 @@ def db(monkeypatch):
         tables=[
             Tenant.__table__,
             User.__table__,
+            Venda.__table__,
             Produto.__table__,
             ProdutoLote.__table__,
             ProdutoFornecedor.__table__,

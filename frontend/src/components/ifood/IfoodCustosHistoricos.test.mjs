@@ -119,3 +119,16 @@ test("venda candidata com pendências bloqueia confirmação e mantém justifica
     "Justificativa em edição",
   );
 });
+
+test("origem do vínculo distingue entrada automática no PDV de conferência manual", () => {
+  for (const [source, esperado] of [
+    ["pdv_bridge", "Vínculo automático pela entrada do pedido no PDV"],
+    ["explicit_confirmation", "Vínculo conferido manualmente"],
+  ]) {
+    const env = setup({
+      effective_cmv: 40,
+      historical_cost: { link: { source, linked_at: "2026-10-24" } },
+    });
+    assert.ok(elementText(env.harness.tree).includes(esperado));
+  }
+});

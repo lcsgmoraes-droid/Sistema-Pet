@@ -11,6 +11,10 @@ import VendasPorVendedorPanel from "./VendasPorVendedorPanel";
 import VendasRelatorioPersonalizadoModal from "./VendasRelatorioPersonalizadoModal";
 import VendasResultadoComposicaoPanel from "./VendasResultadoComposicaoPanel";
 import VendasResumoTabelasPanel from "./VendasResumoTabelasPanel";
+import {
+  descreverRentabilidadePendente,
+  temRentabilidadePendente,
+} from "./vendasFinanceiro/rentabilidadePendente.js";
 
 export default function VendasFinanceiroView({
   abaAtiva,
@@ -162,6 +166,16 @@ export default function VendasFinanceiroView({
         setPeriodoComparacao={setPeriodoComparacao}
         vendasPorFuncionario={vendasPorFuncionario}
       />
+
+      {temRentabilidadePendente(resumo) && (
+        <p
+          role="status"
+          className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
+        >
+          {descreverRentabilidadePendente(resumo)} O faturamento e os custos conhecidos continuam
+          visíveis.
+        </p>
+      )}
 
       {/* Conteúdo das Abas */}
       {abaAtiva === "resumo" && (

@@ -395,9 +395,9 @@ async def obter_ponto_equilibrio(
         canais_lista,
         modo_custo_fiscal=modo_custo_fiscal,
         outros_variaveis=outros_variaveis_contas,
-        detalhes_outros_variaveis=detalhes_classificacao["variaveis"]
-        if incluir_detalhes
-        else None,
+        detalhes_outros_variaveis=(
+            detalhes_classificacao["variaveis"] if incluir_detalhes else None
+        ),
         incluir_detalhes=incluir_detalhes,
     )
     faturamento = margem_periodo["faturamento"]
@@ -419,8 +419,19 @@ async def obter_ponto_equilibrio(
         margem_periodo,
         modo_custo_fiscal=modo_custo_fiscal,
     )
-    margem_usada_decimal = float(margem_referencia.get("margem_decimal") or 0)
-    margem_usada_percentual = round(margem_usada_decimal * 100, 2)
+    periodo_pendente = bool(margem_periodo.get("taxas_ifood_pendentes"))
+    referencia_pendente = bool(margem_referencia.get("taxas_ifood_pendentes"))
+    rentabilidade_pendente = periodo_pendente or referencia_pendente
+    margem_usada_decimal = (
+        None
+        if referencia_pendente
+        else float(margem_referencia.get("margem_decimal") or 0)
+    )
+    margem_usada_percentual = (
+        round(margem_usada_decimal * 100, 2)
+        if margem_usada_decimal is not None
+        else None
+    )
     ticket_medio_usado = (
         ticket_medio
         if ticket_medio > 0
@@ -433,7 +444,10 @@ async def obter_ponto_equilibrio(
     vendas_necessarias = None
     status_pe = "sem_faturamento"
 
-    if margem_usada_decimal > 0:
+    if rentabilidade_pendente:
+        status_pe = "pending_ifood_financial"
+        percentual_atingido = None
+    elif margem_usada_decimal > 0:
         ponto_equilibrio = despesas_fixas / margem_usada_decimal
         falta_faturar = max(0, ponto_equilibrio - faturamento)
         percentual_atingido = (
@@ -448,7 +462,7 @@ async def obter_ponto_equilibrio(
     elif faturamento > 0:
         status_pe = "margem_insuficiente"
 
-    return {
+    resultado = {
         "periodo": {
             "inicio": inicio,
             "fim": fim,
@@ -468,6 +482,7 @@ async def obter_ponto_equilibrio(
         "descontos": margem_periodo.get("descontos", 0),
         "beneficios_campanhas": margem_periodo.get("beneficios_campanhas", 0),
         "taxas_cartao": margem_periodo.get("taxas_cartao", 0),
+        "taxas_ifood": margem_periodo.get("taxas_ifood", 0),
         "repasse_entrega": margem_periodo.get("repasse_entrega", 0),
         "custo_operacional_entrega": margem_periodo.get("custo_operacional_entrega", 0),
         "comissoes": margem_periodo.get("comissoes", 0),
@@ -481,7 +496,9 @@ async def obter_ponto_equilibrio(
         "despesas_variaveis": despesas_variaveis,
         "despesas_variaveis_contas": outros_variaveis_contas,
         "despesas_variaveis_ja_cobertas": despesas_variaveis_ja_cobertas,
-        "custos_variaveis": _round_money(custos_variaveis),
+        "custos_variaveis": (
+            _round_money(custos_variaveis) if custos_variaveis is not None else None
+        ),
         "despesas_fixas": despesas_fixas,
         "despesas_sem_classificacao": despesas_sem_classificacao,
         "despesas_estoque_excluidas": despesas_estoque_excluidas,
@@ -492,31 +509,79 @@ async def obter_ponto_equilibrio(
         "folha_provisoes_dre": folha_provisoes_dre,
         "folha_complemento_gerencial": folha_complemento_gerencial,
         "folha_funcionarios_ativos": folha_gerencial["quantidade_funcionarios"],
-        "margem_contribuicao": _round_money(margem_contribuicao),
-        "margem_contribuicao_percentual": round(
-            margem_contribuicao_percentual * 100, 2
+        "margem_contribuicao": (
+            _round_money(margem_contribuicao)
+            if margem_contribuicao is not None
+            else None
         ),
-        "margem_periodo_percentual": round(margem_contribuicao_percentual * 100, 2),
-        "margem_periodo_valor": _round_money(margem_contribuicao),
+        "margem_contribuicao_percentual": (
+            round(margem_contribuicao_percentual * 100, 2)
+            if margem_contribuicao_percentual is not None
+            else None
+        ),
+        "margem_periodo_percentual": (
+            round(margem_contribuicao_percentual * 100, 2)
+            if margem_contribuicao_percentual is not None
+            else None
+        ),
+        "margem_periodo_valor": (
+            _round_money(margem_contribuicao)
+            if margem_contribuicao is not None
+            else None
+        ),
         "margem_usada_percentual": margem_usada_percentual,
-        "margem_usada_valor": _round_money(
-            margem_referencia.get("margem_contribuicao")
+        "margem_usada_valor": (
+            _round_money(margem_referencia.get("margem_contribuicao"))
+            if not referencia_pendente
+            else None
         ),
         "margem_usada_label": margem_referencia.get("label"),
         "margem_referencia": margem_referencia,
         "detalhes_margem": margem_periodo.get("detalhes_margem", {}),
-        "ponto_equilibrio": _round_money(ponto_equilibrio)
-        if ponto_equilibrio is not None
-        else None,
-        "falta_faturar": _round_money(falta_faturar)
-        if falta_faturar is not None
-        else None,
-        "percentual_atingido": round(percentual_atingido, 2),
+        "ponto_equilibrio": (
+            _round_money(ponto_equilibrio) if ponto_equilibrio is not None else None
+        ),
+        "falta_faturar": (
+            _round_money(falta_faturar) if falta_faturar is not None else None
+        ),
+        "percentual_atingido": (
+            round(percentual_atingido, 2) if percentual_atingido is not None else None
+        ),
         "vendas_necessarias": vendas_necessarias,
         "produtos_sem_custo": produtos_sem_custo,
         "detalhes_classificacao": detalhes_classificacao,
         "status": status_pe,
     }
+    resultado.update(
+        rentabilidade_status=(
+            "pending_ifood_financial" if rentabilidade_pendente else "complete"
+        ),
+        taxas_ifood_pendentes=rentabilidade_pendente,
+        vendas_rentabilidade_pendente=(
+            int(margem_periodo.get("vendas_rentabilidade_pendente") or 0)
+            + (
+                int(margem_referencia.get("vendas_rentabilidade_pendente") or 0)
+                if fonte_margem != "periodo_atual"
+                else 0
+            )
+        ),
+        pendencias_rentabilidade=list(
+            dict.fromkeys(
+                list(margem_periodo.get("pendencias_rentabilidade") or [])
+                + list(margem_referencia.get("pendencias_rentabilidade") or [])
+            )
+        ),
+    )
+    for campo in (
+        "taxas_cartao",
+        "taxas_ifood",
+        "despesas_variaveis",
+        "custos_variaveis",
+    ):
+        conhecido = f"{campo}_conhecidos"
+        if conhecido in margem_periodo:
+            resultado[conhecido] = margem_periodo[conhecido]
+    return resultado
 
 
 @router.get("/financeiro/ponto-equilibrio/detalhes")
@@ -559,7 +624,11 @@ async def obter_ponto_equilibrio_detalhes(
     if subtotal is not None:
         label = subtotal.get("label") or label
         origem = "Snapshot financeiro das vendas no periodo filtrado."
-        total = _round_money(subtotal.get("valor") or 0)
+        total = (
+            _round_money(subtotal["valor"])
+            if subtotal.get("valor") is not None
+            else None
+        )
         items = [
             _normalizar_item_detalhe_ponto_equilibrio(item, "Venda")
             for item in componentes.get(grupo, [])
@@ -599,4 +668,14 @@ async def obter_ponto_equilibrio_detalhes(
         "origem": origem,
         "periodo": f"{_formatar_data_br_ponto_equilibrio(inicio)} - {_formatar_data_br_ponto_equilibrio(fim)}",
         **paginacao,
+        "rentabilidade_status": (
+            "pending_ifood_financial" if total is None else "complete"
+        ),
+        "taxas_ifood_pendentes": total is None,
+        "vendas_rentabilidade_pendente": (
+            dados.get("vendas_rentabilidade_pendente", 0) if total is None else 0
+        ),
+        "pendencias_rentabilidade": (
+            dados.get("pendencias_rentabilidade", []) if total is None else []
+        ),
     }

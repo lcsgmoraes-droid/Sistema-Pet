@@ -1,5 +1,7 @@
 from datetime import date, datetime, timedelta
 
+import pytest
+
 from app.ia.aba6_chat_ia_parts.base import ChatIABase
 from app.ia.aba6_chat_ia_parts.periodos import ChatIAPeriodosMixin
 from app.ia.aba6_chat_ia_parts.service import ChatIAService
@@ -77,3 +79,35 @@ def test_responde_ranking_de_clientes_no_intervalo_solicitado():
     assert "1. Maria Silva" in resposta
     assert "R$ 1.234,56" in resposta
     assert "3 compra(s)" in resposta
+
+
+class _RespostaPendente(ChatIAPeriodosMixin, ChatIABase):
+    def _montar_resumo_executivo_periodo(self, _tenant_id, periodo, limite_rankings=5):
+        return {
+            "resumo_vendas": {"faturamento_liquido": 73.9},
+            "produtos": {"top_margem": []},
+            "dre": {
+                "lucro_liquido_estimado": None,
+                "margem_liquida_estimada": None,
+                "taxas_ifood_pendentes": True,
+            },
+            "rankings": {},
+        }
+
+
+@pytest.mark.parametrize(
+    "mensagem",
+    [
+        "Mostre a DRE de outubro",
+        "Raio x de outubro",
+        "Qual a melhor margem de outubro?",
+        "Compare outubro com setembro",
+    ],
+)
+def test_resposta_ia_explicita_margem_ifood_pendente_sem_inventar_zero(mensagem):
+    resposta = gerar_resposta_simples(
+        _RespostaPendente(None), mensagem, {}, tenant_id="tenant-dev"
+    )
+    assert "pendente" in resposta.lower()
+    assert "ifood" in resposta.lower()
+    assert "0.00%" not in resposta

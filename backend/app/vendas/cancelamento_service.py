@@ -147,15 +147,54 @@ def cancelar_venda(
             f"📋 Cancelando venda #{venda.numero_venda} (Status: {venda.status})"
         )
 
+        from app.integrations.ifood.pdv_pilot import prepare_pilot_cancellation
+
+        pilot_bridge = prepare_pilot_cancellation(db, venda)
+
         # ============================================================
         # ETAPA 2: ESTORNAR ESTOQUE DE TODOS OS ITENS
         # ============================================================
 
-        itens = db.query(VendaItem).filter_by(venda_id=venda_id).all()
+        itens = (
+            db.query(VendaItem)
+            .filter_by(venda_id=venda_id, tenant_id=tenant_id)
+            .with_for_update()
+            .populate_existing()
+            .order_by(VendaItem.id)
+            .all()
+        )
+        from app.vendas.cancelamento_estoque import (
+            preparar_cancelamento_estoque,
+            estornar_item_cancelamento,
+        )
+
+        planos_estoque = (
+            preparar_cancelamento_estoque(db, venda, itens, tenant_id)
+            if pilot_bridge is None
+            else {}
+        )
         itens_estornados = 0
         estornos_fiscais_legados = {}
 
         for item in itens:
+            if pilot_bridge is not None and pilot_bridge.stock_decreased_at is None:
+                # O rascunho reservou, mas nunca teve saida fisica.
+                continue
+            if pilot_bridge is not None:
+                from app.integrations.ifood.pdv_pilot_cancellation import (
+                    estornar_item_piloto,
+                )
+
+                estornar_item_piloto(db, pilot_bridge, venda, item, user_id, motivo)
+                itens_estornados += 1
+                continue
+            if item.id in planos_estoque:
+                resultado = estornar_item_cancelamento(
+                    db, venda, item, planos_estoque[item.id], user_id, motivo
+                )
+                if resultado is not None:
+                    itens_estornados += 1
+                continue
             if item.produto_id and tipo_controla_estoque(item.tipo):
                 try:
                     tenant_estoque, compartilhado = resolver_tenant_estoque_item(
@@ -221,12 +260,15 @@ def cancelar_venda(
                                 if compartilhado
                                 else f"Cancelamento: {motivo}"
                             ),
+                            preservar_custo_desconhecido=True,
                         )
                     itens_estornados += 1
                     logger.info(
                         f"  ✅ Estoque estornado: {resultado['produto_nome']} "
                         f"+{quantidade_estorno} ({resultado['estoque_anterior']} → {resultado['estoque_novo']})"
                     )
+                except HTTPException:
+                    raise
                 except Exception as e:
                     logger.error(f"  ❌ Erro ao estornar estoque: {e}")
                     raise HTTPException(
@@ -480,6 +522,9 @@ def cancelar_venda(
         # pode continuar disponível para um recálculo ou leitura posterior.
         invalidate_venda_rentabilidade_snapshot(venda)
 
+        from app.integrations.ifood.pdv_pilot import complete_pilot_cancellation
+
+        complete_pilot_cancellation(db, pilot_bridge)
         db.flush()
 
         logger.info(

@@ -11,6 +11,8 @@ function preparar(vendaAtualizada, resumoPagamentos = {}) {
   const chamadas = [];
   const restauracoes = [];
   const erros = [];
+  const visualizacoes = [];
+  const alertas = [];
   const harness = createControllerHarness(
     fileURLToPath(new URL("./usePDVVendaFinalizacao.js", import.meta.url)),
     {
@@ -46,18 +48,18 @@ function preparar(vendaAtualizada, resumoPagamentos = {}) {
         vendaAtual: { ...vendaAtualizada, status: "finalizada" },
         setVendaAtual: (venda) => publicadas.push(venda),
         setLoading() {},
-        setModoVisualizacao() {},
+        setModoVisualizacao: (value) => visualizacoes.push(value),
         limparVenda() {},
         carregarVendasRecentes() {},
         recarregarContextoClienteAtual: async () => {},
       },
       globals: {
-        alert() {},
+        alert: (message) => alertas.push(message),
         console: { error: (...args) => erros.push(args) },
       },
     },
   );
-  return { harness, publicadas, chamadas, restauracoes, erros };
+  return { harness, publicadas, chamadas, restauracoes, erros, visualizacoes, alertas };
 }
 
 const vendaEntrega = {
@@ -90,6 +92,23 @@ const vendaEntrega = {
     { produto_id: 1, tipo: "produto", quantidade: 1, preco_unitario: 244.9, subtotal: 244.9 },
   ],
 };
+
+test("iFood nao abre modo de edicao de itens e valores recebidos", async () => {
+  const env = preparar({ ...vendaEntrega, canal: "ifood", entregador_id: null });
+  await env.harness.act(() => env.harness.tree.habilitarEdicao());
+  assert.deepEqual(env.visualizacoes, []);
+  assert.match(env.alertas[0], /Itens e valores vêm do pedido iFood/);
+  assert.deepEqual(env.chamadas, []);
+});
+
+test("app e ecommerce continuam permitindo entrar no modo de edicao", async () => {
+  for (const canal of ["app", "ecommerce"]) {
+    const env = preparar({ ...vendaEntrega, canal });
+    await env.harness.act(() => env.harness.tree.habilitarEdicao());
+    assert.deepEqual(env.visualizacoes, [false]);
+    assert.deepEqual(env.alertas, []);
+  }
+});
 
 test("reabrir entrega concluída mantém vendedor e rateio no próximo recebimento", async () => {
   const pagamento = { id: 45, forma_pagamento: "dinheiro", valor: 259.9 };

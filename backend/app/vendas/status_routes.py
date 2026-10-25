@@ -50,6 +50,10 @@ def reabrir_venda(
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
 
+    from app.integrations.ifood.pdv_pilot import block_pilot_sale_edit
+
+    block_pilot_sale_edit(db, venda)
+
     # Impedir reabertura de vendas com NF emitida
     cancelamento_fiscal_confirmado = nota_fiscal_cancelada(venda)
     if venda.status == "pago_nf" and not cancelamento_fiscal_confirmado:
@@ -253,6 +257,10 @@ def atualizar_status_venda(
 
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
+
+    from app.integrations.ifood.pdv_pilot import block_pilot_sale_edit
+
+    block_pilot_sale_edit(db, venda)
 
     # Extrair status do body
     novo_status = status_data.get("status")

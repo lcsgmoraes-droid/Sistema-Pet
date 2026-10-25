@@ -409,6 +409,9 @@ def excluir_pagamento_atomico(*, db, pagamento_id, tenant_id, current_user):
     )
     if not venda:
         raise HTTPException(404, "Venda nao encontrada")
+    from app.integrations.ifood.pdv_pilot import block_pilot_sale_edit
+
+    block_pilot_sale_edit(db, venda)
     pagamentos = (
         db.query(VendaPagamento)
         .filter_by(venda_id=venda.id, tenant_id=tenant_id)

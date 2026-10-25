@@ -14,7 +14,12 @@ from app.intnfe.models import IntNFeEmissionSequence
 from app.models import Tenant
 from app.produto_identidade_models import ProdutoIdentidade  # noqa: F401 - FK de Produto
 from app.produtos_lembretes_variacoes_models import ProdutoProtocoloRecorrencia
-from app.produtos_models import EstoqueMovimentacao, Produto, ProdutoBlingSync
+from app.produtos_models import (
+    EstoqueMovimentacao,
+    Produto,
+    ProdutoBlingSync,
+    ProdutoLote,
+)
 from app.tenancy.context import set_current_tenant
 from app.vendas.cancelamento_service import cancelar_venda
 from app.vendas.fiscal_status import pendencia_fiscal_cancelamento
@@ -33,6 +38,7 @@ def venda_com_nota(cancelamento):
         Tenant,
         ProdutoIdentidade,
         Produto,
+        ProdutoLote,
         ProdutoProtocoloRecorrencia,
         EstoqueMovimentacao,
         ProdutoBlingSync,

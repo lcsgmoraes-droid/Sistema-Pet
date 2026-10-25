@@ -42,6 +42,7 @@ const fotografia = {
 function preparar({ props = {}, persistir, finalizar, recebido = 0 } = {}) {
   const alteracoes = {},
     chamadas = { persistir: [], finalizar: [], leituras: [] };
+  const emissoes = [];
   const setters = Object.fromEntries(
     [
       "Bandeira",
@@ -125,7 +126,15 @@ function preparar({ props = {}, persistir, finalizar, recebido = 0 } = {}) {
             },
           },
         ],
-        ["../../utils/nfeFiscalAssistida", {}],
+        [
+          "../../utils/nfeFiscalAssistida",
+          {
+            emitirNotaFiscalAssistida: async (payload) => {
+              emissoes.push(payload);
+              return { data: {} };
+            },
+          },
+        ],
         ["../../utils/fiscalRejectionGuidance.mjs", {}],
         [
           "../../services/corepetDialog",
@@ -134,8 +143,142 @@ function preparar({ props = {}, persistir, finalizar, recebido = 0 } = {}) {
       ]),
     },
   );
-  return { h, alteracoes, chamadas };
+  return { h, alteracoes, chamadas, emissoes };
 }
+
+test("iFood nao inicia emissao fiscal automatica e preserva a emissao manual", async () => {
+  const pagamento = montar(dinheiro, 119.9, 119.9);
+  const c = preparar({
+    props: {
+      venda: {
+        ...baseVenda,
+        canal: "ifood",
+        ifood_pdv_pilot: { enabled: true, payment_mode: "offline" },
+      },
+      pagamentos: [pagamento],
+      moduloFiscalAtivo: true,
+      emissaoAutomatica: { ativa: true, tipo: "nfce" },
+    },
+    finalizar: async (id, pagamentos) => ({ id, status: "finalizada", pagamentos }),
+  });
+  await c.h.act(() => c.h.tree.handleFinalizar());
+  assert.equal(c.alteracoes.AutoEmitirTipo, null);
+  assert.equal(c.alteracoes.MostrarPerguntaNFe, true);
+  assert.deepEqual(c.emissoes, []);
+  await c.h.update({ vendaFinalizadaId: 12 });
+  await c.h.act(() => c.h.tree.emitirNFe("nfce"));
+  assert.deepEqual(c.emissoes, [{ vendaId: 12, tipoNota: "nfce", semInteracao: false }]);
+});
+
+test("emissao automatica configurada continua disponivel para app e ecommerce", async () => {
+  for (const canal of ["app", "ecommerce"]) {
+    const c = preparar({
+      props: {
+        venda: { ...baseVenda, canal },
+        pagamentos: [montar(dinheiro, 119.9, 119.9)],
+        moduloFiscalAtivo: true,
+        emissaoAutomatica: { ativa: true, tipo: "nfce" },
+      },
+      finalizar: async (id, pagamentos) => ({ id, status: "finalizada", pagamentos }),
+    });
+    await c.h.act(() => c.h.tree.handleFinalizar());
+    assert.equal(c.alteracoes.AutoEmitirTipo, "nfce");
+    assert.equal(c.alteracoes.MostrarPerguntaNFe, true);
+  }
+});
+
+test("DELIVERY iFood finaliza a venda existente sem PUT, entregador local ou duplicacao", async () => {
+  const pagamento = montar(dinheiro, 119.9, 119.9);
+  const venda = {
+    ...baseVenda,
+    canal: "ifood",
+    ifood_pdv_pilot: { enabled: true, payment_mode: "offline" },
+    tem_entrega: true,
+    entregador_id: null,
+    entrega: { taxa_entrega_total: 0 },
+  };
+  const c = preparar({
+    props: { venda, pagamentos: [pagamento], formaPagamentoSelecionada: dinheiro },
+    finalizar: async (id, pagamentos) => ({
+      id,
+      status: "finalizada",
+      tem_entrega: true,
+      pagamentos,
+    }),
+  });
+  const first = c.h.tree.handleFinalizar();
+  const second = c.h.tree.handleFinalizar();
+  await c.h.act(() => Promise.all([first, second]));
+  assert.deepEqual(c.chamadas.persistir, []);
+  assert.equal(c.chamadas.finalizar.length, 1);
+  assert.equal(c.chamadas.finalizar[0].id, 12);
+  assert.equal(venda.tem_entrega, true);
+  assert.equal(venda.entregador_id, null);
+  assert.equal(c.alteracoes.Erro, "");
+});
+
+test("DELIVERY iFood com frete positivo recebe o total exato sem sobrescrever a venda", async () => {
+  const venda = {
+    ...baseVenda,
+    canal: "ifood",
+    ifood_pdv_pilot: { enabled: true, payment_mode: "offline" },
+    tem_entrega: true,
+    entregador_id: null,
+    subtotal: 65,
+    total: 73.9,
+    entrega: { taxa_entrega_total: 8.9, taxa_loja: 0, taxa_entregador: 0 },
+    itens: [{ produto_id: 1, quantidade: 1, preco_unitario: 65, subtotal: 65 }],
+  };
+  const antes = structuredClone(venda);
+  const c = preparar({
+    props: {
+      venda,
+      pagamentos: [montar(dinheiro, 73.9, 73.9)],
+      formaPagamentoSelecionada: dinheiro,
+      valorRecebido: 73.9,
+      valorRestante: 73.9,
+    },
+    finalizar: async (id, pagamentos) => ({
+      id,
+      status: "finalizada",
+      total: 73.9,
+      tem_entrega: true,
+      pagamentos,
+    }),
+  });
+  await c.h.act(() => Promise.all([c.h.tree.handleFinalizar(), c.h.tree.handleFinalizar()]));
+  assert.deepEqual(c.chamadas.persistir, []);
+  assert.equal(c.chamadas.finalizar.length, 1);
+  assert.equal(c.chamadas.finalizar[0].id, 12);
+  assert.equal(c.chamadas.finalizar[0].pagamentos.length, 1);
+  assert.equal(c.chamadas.finalizar[0].pagamentos[0].valor, 73.9);
+  assert.equal(c.chamadas.finalizar[0].pagamentos[0].valor_recebido, 73.9);
+  assert.deepEqual(venda, antes);
+  assert.equal(c.alteracoes.Erro, "");
+});
+
+test("pagamento online ou desconhecido iFood nunca adiciona, exclui ou finaliza pela cobranca manual", async () => {
+  for (const summary of [
+    { enabled: true, payment_mode: "online" },
+    { enabled: false, payment_mode: "unknown" },
+    undefined,
+  ]) {
+    const c = preparar({
+      props: {
+        venda: { ...baseVenda, canal: "ifood", ifood_pdv_pilot: summary },
+        pagamentos: [montar(dinheiro, 119.9, 119.9)],
+        formaPagamentoSelecionada: dinheiro,
+      },
+    });
+    await c.h.act(() => c.h.tree.adicionarPagamento());
+    await c.h.act(() => c.h.tree.removerPagamento(0));
+    await c.h.act(() => c.h.tree.excluirPagamentoExistente(1));
+    await c.h.act(() => c.h.tree.handleFinalizar());
+    assert.deepEqual(c.chamadas, { persistir: [], finalizar: [], leituras: [] });
+    assert.equal(c.alteracoes.Pagamentos, undefined);
+    assert.match(c.alteracoes.Erro, /Cobrança manual iFood bloqueada/);
+  }
+});
 
 test("cartao119,90 com saldo109,90 e bloqueado sem justificativa; excecao preserva integral sem troco", async () => {
   const venda = { ...baseVenda, total: 109.9, desconto_valor: 10, desconto_venda_valor: 10 };

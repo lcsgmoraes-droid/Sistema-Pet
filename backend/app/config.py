@@ -48,13 +48,36 @@ class Settings(BaseSettings):
     IFOOD_REQUEST_TIMEOUT_SECONDS: int = 15
     # Trava operacional: a primeira fase funciona em simulacao ate a homologacao.
     IFOOD_CATALOG_WRITE_ENABLED: bool = False
+    # Sincronizacao exclusiva de estoque do SKU 227 no DEV. Escopo independente
+    # do piloto de pedidos; vazio/desligado nunca libera outros produtos.
+    IFOOD_STOCK_SYNC_DEV_ENABLED: bool = False
+    # Piloto real opt-in, restrito ao vinculo exato do SKU 227. Nao libera DEV.
+    IFOOD_STOCK_SYNC_LIVE_ENABLED: bool = False
+    IFOOD_STOCK_SYNC_POLLING_ENABLED: bool = False
+    IFOOD_STOCK_SYNC_INTERVAL_SECONDS: int = 30
+    IFOOD_STOCK_SYNC_TENANT_ID: str = ""
+    IFOOD_STOCK_SYNC_MERCHANT_ID: str = ""
+    IFOOD_STOCK_SYNC_PRODUCT_ID: int = 0
+    IFOOD_STOCK_SYNC_SKU: str = ""
+    IFOOD_STOCK_SYNC_BARCODE: str = ""
     # Travas independentes: pedidos de teste so operam durante homologacao assistida.
     IFOOD_ORDER_OPERATIONS_ENABLED: bool = False
     IFOOD_ORDER_POLLING_ENABLED: bool = False
     IFOOD_ORDER_POLLING_INTERVAL_SECONDS: int = 30
+    # Piloto assistido de pedidos: nunca habilitado em producao/staging.
+    IFOOD_PDV_PILOT_ENABLED: bool = False
+    IFOOD_PDV_PILOT_TENANT_ID: str = ""
+    IFOOD_PDV_PILOT_MERCHANT_ID: str = ""
+    IFOOD_PDV_PILOT_ORDER_ID: str = ""
+    IFOOD_PDV_PILOT_SKU: str = ""
     # Leitura Financial em DEV, independente de catalogo/pedidos; sempre envia
     # x-request-homologation:true. Nao habilita consultas financeiras em producao.
     IFOOD_FINANCIAL_READ_ENABLED: bool = False
+    # Consulta automatica limitada ao pedido/SKU allowlisted do piloto DEV.
+    IFOOD_FINANCIAL_POLLING_ENABLED: bool = False
+    IFOOD_FINANCIAL_POLLING_INTERVAL_SECONDS: int = 900
+    # Somente exibicao de ensaios em DEV; nunca libera lucro real ou producao.
+    IFOOD_FINANCIAL_SHOW_SYNTHETIC: bool = False
 
     # Imagens de produtos
     PRODUCT_IMAGE_STORAGE_BACKEND: str = "local"  # local | s3

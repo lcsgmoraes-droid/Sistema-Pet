@@ -211,6 +211,12 @@ def finalizar_venda(
                 detail=f"Apenas vendas abertas ou com baixa parcial podem receber pagamentos (status atual: {venda.status})",
             )
 
+        from app.integrations.ifood.pdv_pilot import prepare_pilot_finalization
+
+        pilot_bridge = prepare_pilot_finalization(
+            db, venda, pagamentos, cupom_code=cupom_code
+        )
+
         exigir_vendedor_pdv(
             db,
             tenant_id,
@@ -448,7 +454,10 @@ def finalizar_venda(
         # Receber outra parcela ou concluir o pagamento não gera nova saída.
 
         estoque_baixado = []
-        deve_baixar_estoque = status_anterior not in {"aberta", "baixa_parcial"}
+        deve_baixar_estoque = pilot_bridge is not None or status_anterior not in {
+            "aberta",
+            "baixa_parcial",
+        }
 
         if deve_baixar_estoque:
             logger.info("📦 Baixando estoque de venda sem saída anterior")
@@ -548,9 +557,9 @@ def finalizar_venda(
                     user_id=user_id,
                     tenant_id=tenant_id,
                     pagamentos_anteriores=pagamentos_existentes,
-                    data_recebimento=data_ocorrencia.date()
-                    if data_ocorrencia
-                    else None,
+                    data_recebimento=(
+                        data_ocorrencia.date() if data_ocorrencia else None
+                    ),
                 )
             )
             valor_ja_baixado = sum(
@@ -655,6 +664,9 @@ def finalizar_venda(
                 commit=False,
             )
 
+        from app.integrations.ifood.pdv_pilot import complete_pilot_finalization
+
+        complete_pilot_finalization(db, pilot_bridge)
         db.commit()
         logger.info(
             f"✅ ✅ ✅ COMMIT REALIZADO - Venda #{venda.numero_venda} finalizada com sucesso! ✅ ✅ ✅"
@@ -763,9 +775,11 @@ def finalizar_venda(
                         Decimal("0"),
                     )
                 ),
-                "data_finalizacao": venda.data_finalizacao.isoformat()
-                if venda.data_finalizacao
-                else None,
+                "data_finalizacao": (
+                    venda.data_finalizacao.isoformat()
+                    if venda.data_finalizacao
+                    else None
+                ),
             },
             "operacoes": {
                 "estoque_baixado": estoque_baixado,

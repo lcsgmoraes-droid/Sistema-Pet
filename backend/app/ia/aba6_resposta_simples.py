@@ -49,6 +49,11 @@ def gerar_resposta_simples(
     def moeda(valor: float) -> str:
         return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
+    def resultado(valor, *, percentual=False):
+        if valor is None:
+            return "Pendente iFood (aguardando conciliacao das cobrancas)"
+        return f"{float(valor):.2f}%" if percentual else moeda(float(valor))
+
     if comparacao_periodos:
         resumo_a = service._montar_resumo_executivo_periodo(
             tenant_id, comparacao_periodos["periodo_a"]
@@ -59,8 +64,13 @@ def gerar_resposta_simples(
 
         faturamento_a = float(resumo_a["resumo_vendas"].get("faturamento_liquido", 0))
         faturamento_b = float(resumo_b["resumo_vendas"].get("faturamento_liquido", 0))
-        lucro_a = float(resumo_a["dre"].get("lucro_liquido_estimado", 0))
-        lucro_b = float(resumo_b["dre"].get("lucro_liquido_estimado", 0))
+        lucro_a = resumo_a["dre"].get("lucro_liquido_estimado", 0)
+        lucro_b = resumo_b["dre"].get("lucro_liquido_estimado", 0)
+        diferenca_lucro = (
+            float(lucro_a) - float(lucro_b)
+            if lucro_a is not None and lucro_b is not None
+            else None
+        )
 
         if any(palavra in msg_normalizada for palavra in ["canal", "canais"]):
             canais_a = {
@@ -99,11 +109,11 @@ def gerar_resposta_simples(
             f"- Faturamento {comparacao_periodos['periodo_a']['label']}: **{moeda(faturamento_a)}**\n"
             f"- Faturamento {comparacao_periodos['periodo_b']['label']}: **{moeda(faturamento_b)}**\n"
             f"- Diferença de faturamento: **{moeda(faturamento_a - faturamento_b)}**\n"
-            f"- Lucro líquido {comparacao_periodos['periodo_a']['label']}: **{moeda(lucro_a)}**\n"
-            f"- Lucro líquido {comparacao_periodos['periodo_b']['label']}: **{moeda(lucro_b)}**\n"
-            f"- Diferença de lucro: **{moeda(lucro_a - lucro_b)}**\n"
-            f"- Margem {comparacao_periodos['periodo_a']['label']}: **{float(resumo_a['dre'].get('margem_liquida_estimada', 0)):.2f}%**\n"
-            f"- Margem {comparacao_periodos['periodo_b']['label']}: **{float(resumo_b['dre'].get('margem_liquida_estimada', 0)):.2f}%**"
+            f"- Lucro líquido {comparacao_periodos['periodo_a']['label']}: **{resultado(lucro_a)}**\n"
+            f"- Lucro líquido {comparacao_periodos['periodo_b']['label']}: **{resultado(lucro_b)}**\n"
+            f"- Diferença de lucro: **{resultado(diferenca_lucro)}**\n"
+            f"- Margem {comparacao_periodos['periodo_a']['label']}: **{resultado(resumo_a['dre'].get('margem_liquida_estimada', 0), percentual=True)}**\n"
+            f"- Margem {comparacao_periodos['periodo_b']['label']}: **{resultado(resumo_b['dre'].get('margem_liquida_estimada', 0), percentual=True)}**"
         )
 
     if any(
@@ -136,8 +146,8 @@ def gerar_resposta_simples(
             f"📌 **Raio-x do periodo: {label_periodo}**\n",
             f"- Vendas: **{int(resumo_vendas_periodo.get('quantidade', 0))}**",
             f"- Faturamento liquido: **{moeda(float(resumo_vendas_periodo.get('faturamento_liquido', 0)))}**",
-            f"- Lucro liquido estimado: **{moeda(float(dre_periodo.get('lucro_liquido_estimado', 0)))}**",
-            f"- Margem liquida estimada: **{float(dre_periodo.get('margem_liquida_estimada', 0)):.2f}%**",
+            f"- Lucro liquido estimado: **{resultado(dre_periodo.get('lucro_liquido_estimado', 0))}**",
+            f"- Margem liquida estimada: **{resultado(dre_periodo.get('margem_liquida_estimada', 0), percentual=True)}**",
         ]
         if top_produto:
             linhas.append(
@@ -218,6 +228,8 @@ def gerar_resposta_simples(
     if any(
         palavra in msg_lower for palavra in ["margem", "melhor margem", "maior margem"]
     ):
+        if dre_periodo.get("taxas_ifood_pendentes"):
+            return f"A margem de {label_periodo} esta pendente: aguardando a conciliacao das cobrancas do iFood. O ranking por margem ainda nao pode ser concluido."
         if "categoria" in msg_normalizada:
             top_categorias = rankings_periodo.get("top_categorias_margem", [])
             if not top_categorias:
@@ -265,8 +277,8 @@ def gerar_resposta_simples(
             f"- CMV estimado: **{moeda(float(dre_periodo.get('cmv_estimado', 0)))}**\n"
             f"- Lucro bruto: **{moeda(float(dre_periodo.get('lucro_bruto', 0)))}**\n"
             f"- Despesas operacionais: **{moeda(float(dre_periodo.get('despesas_operacionais', 0)))}**\n"
-            f"- Lucro líquido estimado: **{moeda(float(dre_periodo.get('lucro_liquido_estimado', 0)))}**\n"
-            f"- Margem líquida estimada: **{float(dre_periodo.get('margem_liquida_estimada', 0)):.2f}%**"
+            f"- Lucro líquido estimado: **{resultado(dre_periodo.get('lucro_liquido_estimado', 0))}**\n"
+            f"- Margem líquida estimada: **{resultado(dre_periodo.get('margem_liquida_estimada', 0), percentual=True)}**"
         )
 
     if any(palavra in msg_lower for palavra in ["saldo", "quanto tenho", "dinheiro"]):

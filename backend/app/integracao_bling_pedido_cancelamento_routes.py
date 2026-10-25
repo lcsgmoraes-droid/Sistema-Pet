@@ -16,7 +16,6 @@ from app.services.pedido_cancelamento_fiscal_estoque_service import (
 )
 from app.utils.logger import logger
 
-
 router = APIRouter()
 
 
@@ -40,6 +39,7 @@ def _buscar_pedido_com_itens(
         .filter(
             PedidoIntegrado.id == pedido_id,
             PedidoIntegrado.tenant_id == tenant_id,
+            PedidoIntegrado.pedido_bling_id.isnot(None),
         )
         .first()
     )

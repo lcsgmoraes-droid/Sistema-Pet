@@ -1,4 +1,5 @@
 import { parametrosPeriodoDashboard, validarPeriodoDashboard } from "./dashboardPeriod.js";
+import { temRentabilidadePendente } from "../../components/financeiro/vendasFinanceiro/rentabilidadePendente.js";
 
 export function createEmptyDashboardSummary() {
   return {
@@ -116,7 +117,8 @@ export function calculateDashboardIndicators(summary = createEmptyDashboardSumma
   const dueTodayPayable = numberValue(summary?.contas_pagar?.vence_hoje);
   const salesCount = numberValue(summary?.vendas_periodo?.quantidade);
   const unitsSold = numberValue(summary?.vendas_periodo?.unidades);
-  const salesProfit = numberValue(summary?.vendas_periodo?.lucro);
+  const salesProfitPending = temRentabilidadePendente(summary?.vendas_periodo);
+  const salesProfit = salesProfitPending ? null : numberValue(summary?.vendas_periodo?.lucro);
 
   return {
     inflows,
@@ -128,6 +130,7 @@ export function calculateDashboardIndicators(summary = createEmptyDashboardSumma
     dueTodayPayable,
     unitsSold,
     salesProfit,
+    salesProfitPending,
     cashMargin: inflows > 0 ? (cashResult / inflows) * 100 : null,
     expenseCoverage: outflows > 0 ? (inflows / outflows) * 100 : null,
     hasMovement: salesCount > 0 || inflows !== 0 || outflows !== 0,

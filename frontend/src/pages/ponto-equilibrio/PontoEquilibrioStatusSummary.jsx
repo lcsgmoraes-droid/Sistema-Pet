@@ -18,18 +18,20 @@ export default function PontoEquilibrioStatusSummary({ dados, percentualAtingido
           <p className="text-lg font-bold text-slate-900">{statusResumo.title}</p>
           <p className="text-sm text-slate-700">{statusResumo.text}</p>
         </div>
-        <div className="min-w-[220px]">
-          <div className="flex justify-between text-xs font-semibold text-slate-600">
-            <span>0%</span>
-            <span>{formatPercent(dados.percentual_atingido || 0)}</span>
+        {percentualAtingido != null && (
+          <div className="min-w-[220px]">
+            <div className="flex justify-between text-xs font-semibold text-slate-600">
+              <span>0%</span>
+              <span>{formatPercent(dados.percentual_atingido || 0)}</span>
+            </div>
+            <div className="mt-1 h-3 overflow-hidden rounded-full bg-white/80">
+              <div
+                className="h-full rounded-full bg-emerald-500 transition-all"
+                style={{ width: `${percentualAtingido}%` }}
+              />
+            </div>
           </div>
-          <div className="mt-1 h-3 overflow-hidden rounded-full bg-white/80">
-            <div
-              className="h-full rounded-full bg-emerald-500 transition-all"
-              style={{ width: `${percentualAtingido}%` }}
-            />
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

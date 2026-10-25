@@ -56,9 +56,11 @@ def _item_key(item: PedidoIntegradoItem | dict | None) -> tuple[str | None, int]
         getattr(item, "sku", None) if item is not None else item_dict.get("sku")
     )
     quantidade = _coerce_int(
-        getattr(item, "quantidade", None)
-        if item is not None
-        else item_dict.get("quantidade"),
+        (
+            getattr(item, "quantidade", None)
+            if item is not None
+            else item_dict.get("quantidade")
+        ),
         0,
     )
     return sku, quantidade
@@ -281,6 +283,7 @@ def listar_grupos_duplicados_pedido_loja(
 ) -> list[dict]:
     query = db.query(PedidoIntegrado).filter(
         PedidoIntegrado.tenant_id == tenant_id,
+        PedidoIntegrado.pedido_bling_id.isnot(None),
         PedidoIntegrado.status != "mesclado",
     )
     if dias:

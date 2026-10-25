@@ -2,6 +2,7 @@ export const CANAL_APP = "app";
 export const CANAL_ECOMMERCE = "ecommerce";
 export const CANAL_LOJA_FISICA = "loja_fisica";
 export const CANAL_WHATSAPP = "whatsapp";
+export const CANAL_IFOOD = "ifood";
 
 const CHANNEL_ALIASES = {
   pdv: CANAL_LOJA_FISICA,
@@ -23,6 +24,9 @@ const CHANNEL_ALIASES = {
   whatsapp: CANAL_WHATSAPP,
   whats_app: CANAL_WHATSAPP,
   zap: CANAL_WHATSAPP,
+  ifood: CANAL_IFOOD,
+  i_food: CANAL_IFOOD,
+  "i-food": CANAL_IFOOD,
   app_funcionario: "app_funcionario",
   banho_tosa: "banho_tosa",
   "banho-e-tosa": "banho_tosa",
@@ -48,12 +52,21 @@ export function normalizeSalesChannel(value, defaultChannel = CANAL_ECOMMERCE) {
 }
 
 export function isOnlineSalesChannel(value) {
+  return [CANAL_APP, CANAL_ECOMMERCE, CANAL_WHATSAPP, CANAL_IFOOD].includes(
+    normalizeSalesChannel(value),
+  );
+}
+
+// O ciclo de entrega do iFood e comandado pelo provedor. Os controles locais de
+// entrega/retirada do app, ecommerce e WhatsApp nao confirmam uma entrega iFood.
+export function isCorepetOnlineSalesChannel(value) {
   return [CANAL_APP, CANAL_ECOMMERCE, CANAL_WHATSAPP].includes(normalizeSalesChannel(value));
 }
 
 export function benefitChannelFromSalesChannel(value) {
   const channel = normalizeSalesChannel(value, CANAL_LOJA_FISICA);
   if (channel === CANAL_WHATSAPP) return CANAL_ECOMMERCE;
+  if (channel === CANAL_IFOOD) return CANAL_IFOOD;
   if (
     [CANAL_APP, CANAL_ECOMMERCE, CANAL_LOJA_FISICA, "banho_tosa", "veterinario"].includes(channel)
   ) {
@@ -90,6 +103,15 @@ export function getSalesChannelInfo(value) {
         icon: "💬",
         label: "WhatsApp",
         title: "Pedido recebido pelo WhatsApp",
+      },
+      [CANAL_IFOOD]: {
+        value: CANAL_IFOOD,
+        cor: "border-l-red-500",
+        bg: "bg-red-50",
+        border: "border-red-200 hover:border-red-300",
+        icon: "🛍️",
+        label: "iFood",
+        title: "Pedido recebido pelo iFood",
       },
       app_funcionario: {
         value: "app_funcionario",

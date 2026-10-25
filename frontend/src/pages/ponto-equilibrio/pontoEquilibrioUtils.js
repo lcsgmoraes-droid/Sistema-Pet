@@ -1,5 +1,39 @@
 import { formatMoneyBRL, formatPercent } from "../../utils/formatters";
 import { LINHAS_CLASSIFICACAO_PE } from "./pontoEquilibrioConstants";
+import {
+  PENDENCIA_IFOOD_LABEL,
+  descreverRentabilidadePendente,
+  temRentabilidadePendente,
+} from "../../components/financeiro/vendasFinanceiro/rentabilidadePendente";
+
+export function valorPontoEquilibrio(valor, dados, percentual = false) {
+  if (valor == null) return temRentabilidadePendente(dados) ? PENDENCIA_IFOOD_LABEL : "—";
+  return percentual ? formatPercent(valor) : formatMoneyBRL(valor);
+}
+
+export function valorCobrancaPontoEquilibrio(dados, campo) {
+  const valor = dados?.[campo];
+  const conhecido = dados?.[`${campo}_conhecidos`];
+  if (valor == null && conhecido != null && temRentabilidadePendente(dados)) {
+    return `${formatMoneyBRL(conhecido)} (subtotal conhecido; apuração pendente)`;
+  }
+  return valorPontoEquilibrio(valor, dados);
+}
+
+export function indicadoresPontoEquilibrio(dados) {
+  if (temRentabilidadePendente(dados)) {
+    return { percentualAtingido: null, margemUsadaPercentual: null, margemPeriodoPercentual: null };
+  }
+  return {
+    percentualAtingido: Math.min(Number(dados?.percentual_atingido || 0), 100),
+    margemUsadaPercentual: Number(
+      dados?.margem_usada_percentual ?? dados?.margem_contribuicao_percentual ?? 0,
+    ),
+    margemPeriodoPercentual: Number(
+      dados?.margem_periodo_percentual ?? dados?.margem_contribuicao_percentual ?? 0,
+    ),
+  };
+}
 
 export function formatarDataInput(data) {
   const local = new Date(data.getTime() - data.getTimezoneOffset() * 60000);
@@ -44,10 +78,17 @@ export function montarLinhasDetalhamentoPontoEquilibrio(dados) {
   const subtotais = dados?.detalhes_margem?.subtotais || [];
   const linhasMargem = subtotais
     .filter(
-      (subtotal) => Math.abs(Number(subtotal.valor || 0)) > 0 || subtotal.id === "custo_fiscal",
+      (subtotal) =>
+        (subtotal.valor == null && temRentabilidadePendente(dados)) ||
+        Math.abs(Number(subtotal.valor || 0)) > 0 ||
+        ["taxas_ifood", "taxas_cartao"].includes(subtotal.id) ||
+        subtotal.id === "custo_fiscal",
     )
     .map((subtotal) => ({
       ...subtotal,
+      ...(subtotal.valor == null && temRentabilidadePendente(dados)
+        ? { rentabilidade_status: "pending_ifood_financial", taxas_ifood_pendentes: true }
+        : {}),
       grupo: subtotal.id,
       origem: "Snapshot financeiro das vendas",
     }));
@@ -101,6 +142,13 @@ export function statusParecerLabelGerencial(parecer) {
 
 export function getStatusResumo(dados) {
   if (!dados) return null;
+  if (temRentabilidadePendente(dados)) {
+    return {
+      tone: "amber",
+      title: PENDENCIA_IFOOD_LABEL,
+      text: descreverRentabilidadePendente(dados),
+    };
+  }
   if (dados.status === "atingido") {
     return {
       tone: "green",

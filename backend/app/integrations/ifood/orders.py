@@ -6,10 +6,12 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.ifood_integration_models import IfoodMerchantConfig
 from app.ifood_order_models import IfoodEvent, IfoodOrder
+from app.config import settings
 
 from .client import IfoodClient, IfoodClientError
 
@@ -24,6 +26,23 @@ _STATUS_BY_CODE = {
     "CAN": "CANCELLED",
     "CAR": "CANCELLATION_REQUESTED",
     "CARF": "CANCELLATION_REQUEST_FAILED",
+    "OPA": "ORDER_PATCHED",
+}
+_PROGRESS = {
+    value: index
+    for index, value in enumerate(
+        (
+            "PLACED",
+            "CONFIRMED",
+            "PREPARATION_STARTED",
+            "SEPARATION_STARTED",
+            "SEPARATION_ENDED",
+            "READY_TO_PICKUP",
+            "DISPATCHED",
+            "CONCLUDED",
+            "CANCELLED",
+        )
+    )
 }
 
 
@@ -112,6 +131,8 @@ def upsert_ifood_order(
             IfoodOrder.tenant_id == tenant_id,
             IfoodOrder.ifood_order_id == order_id,
         )
+        .with_for_update()
+        .populate_existing()
         .first()
     )
     if order is None:
@@ -123,6 +144,16 @@ def upsert_ifood_order(
         )
         db.add(order)
 
+    old_time = _date(str(order.last_event_at)) if order.last_event_at else None
+    new_time = _date(str(event_at)) if event_at else None
+    if old_time and old_time.tzinfo is None:
+        old_time = old_time.replace(tzinfo=timezone.utc)
+    if new_time and new_time.tzinfo is None:
+        new_time = new_time.replace(tzinfo=timezone.utc)
+    stale = bool(old_time and new_time and new_time < old_time)
+    if stale:
+        return order
+
     delivery = _mapping(payload.get("delivery"))
     operation_mode = _mapping(payload.get("operationMode"))
     operation_delivery = _mapping(operation_mode.get("delivery"))
@@ -133,9 +164,24 @@ def upsert_ifood_order(
         or _text(payload.get("shortCode"))
         or order.display_id
     )
-    order.status = (
-        _text(payload.get("status")) or event_status or order.status or "PLACED"
+    incoming_status = (
+        event_status or _text(payload.get("status")) or order.status or "PLACED"
     )
+    incoming_status = incoming_status.removeprefix("ORDER_")
+    terminal = order.status in {"CONCLUDED", "CANCELLED"}
+    regresses = _PROGRESS.get(incoming_status, -1) < _PROGRESS.get(
+        order.status or "", -1
+    )
+    if (
+        not stale
+        and (
+            not regresses
+            or incoming_status
+            in {"CANCELLATION_REQUESTED", "CANCELLATION_REQUEST_FAILED"}
+        )
+        and not (terminal and incoming_status != "CANCELLED")
+    ):
+        order.status = incoming_status
     order.order_type = (
         _text(payload.get("orderType"))
         or _text(operation_mode.get("type"))
@@ -163,9 +209,22 @@ def upsert_ifood_order(
         or _date(payload.get("preparationStartDateTime"))
         or order.preparation_start_at
     )
-    order.last_event_at = event_at or order.last_event_at
-    if payload:
+    if event_at and not stale:
+        order.last_event_at = event_at
+    if payload and not stale:
         order.payload = payload
+        if settings.IFOOD_PDV_PILOT_ENABLED:
+            from .pdv_pilot import pilot_order_display_total
+
+            try:
+                pilot_total = pilot_order_display_total(order)
+            except HTTPException:
+                # Fora do contrato estrito do piloto, mantem a leitura legada.
+                pass
+            else:
+                # Virtual Bag separa itens e frete. A validacao tambem exige
+                # pagamento exato e taxas zeradas antes de exibir a soma.
+                order.total = float(pilot_total)
     return order
 
 
@@ -192,6 +251,14 @@ def process_order_events(
     merchant_id = _text(config.merchant_id)
     if not merchant_id:
         raise IfoodClientError("Informe o Merchant ID antes de consultar pedidos.")
+    if settings.IFOOD_PDV_PILOT_ENABLED:
+        from .pdv_pilot import pilot_settings_reason
+
+        reason = pilot_settings_reason(
+            tenant_id=tenant_id, merchant_id=merchant_id, require_order=False
+        )
+        if reason:
+            raise IfoodClientError(reason)
 
     events = sorted(
         client.poll_events([merchant_id]),
@@ -203,6 +270,9 @@ def process_order_events(
     updated_orders = 0
 
     for event_payload in events:
+        if _text(event_payload.get("merchantId")) != merchant_id:
+            failed += 1
+            continue
         event_id = _text(event_payload.get("id"))
         if not event_id:
             failed += 1
@@ -241,6 +311,20 @@ def process_order_events(
                 details: dict[str, Any] = {}
                 if existing is None or _event_status(event_payload) == "PLACED":
                     details = client.get_order(order_id)
+                    details_merchant = _text(
+                        _mapping(details.get("merchant")).get("id")
+                    )
+                    if details_merchant and details_merchant != merchant_id:
+                        raise IfoodClientError(
+                            "A loja do pedido recebido diverge da loja consultada."
+                        )
+                    if settings.IFOOD_PDV_PILOT_ENABLED and (
+                        details.get("test") is not True
+                        or details_merchant != merchant_id
+                    ):
+                        raise IfoodClientError(
+                            "Este piloto DEV recebe somente pedidos oficiais da loja de teste autorizada."
+                        )
                 order = upsert_ifood_order(
                     db,
                     tenant_id=tenant_id,
@@ -296,15 +380,22 @@ def process_order_events(
 
 
 def mark_order_action(order: IfoodOrder, action: str) -> None:
+    if (
+        settings.IFOOD_PDV_PILOT_ENABLED
+        and order.last_action == "pdv_bag_review_required"
+    ):
+        # Confirmar/despachar nao e uma nova leitura da sacola nem pode apagar
+        # a pendencia de conferencia do piloto.
+        return
     order.last_action = action
     order.last_action_at = _utcnow()
 
 
-def order_summary(order: IfoodOrder) -> dict[str, Any]:
+def order_summary(order: IfoodOrder, db: Session | None = None) -> dict[str, Any]:
     payload = _mapping(order.payload)
     customer = _mapping(payload.get("customer"))
     address = _delivery_details(payload)
-    return {
+    summary = {
         "id": order.id,
         "ifood_order_id": order.ifood_order_id,
         "display_id": order.display_id,
@@ -322,7 +413,12 @@ def order_summary(order: IfoodOrder) -> dict[str, Any]:
         "customer_name": _text(customer.get("name")),
         "delivery_address": address,
     }
+    if db is not None:
+        from .pdv_pilot import pdv_bridge_summary
+
+        summary["pdv_bridge"] = pdv_bridge_summary(db, order)
+    return summary
 
 
-def order_detail(order: IfoodOrder) -> dict[str, Any]:
-    return {**order_summary(order), "payload": _mapping(order.payload)}
+def order_detail(order: IfoodOrder, db: Session | None = None) -> dict[str, Any]:
+    return {**order_summary(order, db=db), "payload": _mapping(order.payload)}

@@ -35,7 +35,9 @@ import IfoodConfiguracao from "../components/ifood/IfoodConfiguracao";
 import IfoodProdutoDetalhes from "../components/ifood/IfoodProdutoDetalhes";
 import IfoodStatus from "../components/ifood/IfoodStatus";
 import IfoodFinanceiro from "../components/ifood/IfoodFinanceiro";
-import IfoodPublicacaoProduto from "../components/ifood/IfoodPublicacaoProduto";
+import IfoodPublicacaoProduto, {
+  ResumoEstoqueAutomatico,
+} from "../components/ifood/IfoodPublicacaoProduto";
 import { lerLinkFinanceiro } from "../components/ifood/ifoodFinanceiroNavigation";
 import {
   IFOOD_FILTROS,
@@ -327,9 +329,10 @@ export default function IfoodCentral() {
                   ? "EAN conferido manualmente"
                   : "EAN ainda não conferido"}
               {" · "}
-              {statusEnvioIfood(item.sync_status)}
+              {statusEnvioIfood(item.sync_status, item.publication?.last_submission)}
             </p>
           ) : null}
+          <ResumoEstoqueAutomatico sync={item.publication?.stock_sync} compacto />
         </div>
       ),
     },

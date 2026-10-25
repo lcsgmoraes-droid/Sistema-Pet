@@ -8,8 +8,8 @@ class LinhaCanal(BaseModel):
     """Uma linha da DRE de um canal específico"""
 
     descricao: str  # Ex: "Faturamento Mercado Livre"
-    valor: float
-    percentual: float
+    valor: Optional[float]
+    percentual: Optional[float]
     cor: str  # Cor do canal
     cor_bg: str  # Cor de fundo
     canal: str  # ID do canal
@@ -19,6 +19,9 @@ class LinhaCanal(BaseModel):
     origem: Optional[str] = None
     campo: Optional[str] = None
     detalhavel: bool = False
+    rentabilidade_status: str = "complete"
+    taxas_ifood_pendentes: bool = False
+    valor_conhecido: Optional[float] = None
 
 
 class DREAlerta(BaseModel):
@@ -49,6 +52,10 @@ class DREPorCanalResponse(BaseModel):
     totais: Dict
     canais_encontrados: List[str]
     alertas: List[DREAlerta] = Field(default_factory=list)
+    rentabilidade_status: str = "complete"
+    taxas_ifood_pendentes: bool = False
+    vendas_rentabilidade_pendente: int = 0
+    pendencias_rentabilidade: List[str] = Field(default_factory=list)
 
 
 class DREDetalheItem(BaseModel):
@@ -60,7 +67,7 @@ class DREDetalheItem(BaseModel):
     contraparte: Optional[str] = None
     documento: Optional[str] = None
     status: Optional[str] = None
-    valor: float
+    valor: Optional[float]
     valor_auxiliar: Optional[float] = None
     link: Optional[str] = None
     meta: Dict[str, Any] = Field(default_factory=dict)
@@ -72,9 +79,13 @@ class DREDetalheResponse(BaseModel):
     canal_nome: str
     periodo: str
     origem: Optional[str] = None
-    total: float
+    total: Optional[float]
     total_itens: int
     page: int
     page_size: int
     pages: int
     items: List[DREDetalheItem]
+    rentabilidade_status: str = "complete"
+    taxas_ifood_pendentes: bool = False
+    vendas_rentabilidade_pendente: int = 0
+    pendencias_rentabilidade: List[str] = Field(default_factory=list)

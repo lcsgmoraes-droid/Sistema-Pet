@@ -101,12 +101,26 @@ class IfoodCatalogSubmission(BaseTenantModel):
             "status IN ('sending','accepted','error','uncertain')",
             name="ck_ifood_catalog_submission_status",
         ),
+        CheckConstraint(
+            "source IN ('manual','auto_stock')",
+            name="ck_ifood_catalog_submission_source",
+        ),
+        CheckConstraint(
+            "provider_mode IN ('local_simulator','ifood_api')",
+            name="ck_ifood_catalog_submission_provider_mode",
+        ),
     )
     link_id = Column(Integer, nullable=False)
     merchant_id = Column(String(36), nullable=False)
     barcode = Column(String(13), nullable=False)
     request_key = Column(String(36), nullable=False)
     operation = Column(String(12), nullable=False)
+    source = Column(
+        String(16), nullable=False, default="manual", server_default="manual"
+    )
+    provider_mode = Column(
+        String(16), nullable=False, default="ifood_api", server_default="ifood_api"
+    )
     fields = Column(JSON, nullable=False)
     payload_hash = Column(String(64), nullable=False)
     # Somente barcode e numeros escolhidos; nunca resposta livre do provedor.
@@ -116,4 +130,66 @@ class IfoodCatalogSubmission(BaseTenantModel):
     finished_at = Column(DateTime(timezone=True), nullable=True)
     http_status = Column(Integer, nullable=True)
     provider_request_id = Column(String(36), nullable=True)
+    error_code = Column(String(40), nullable=True)
+
+
+class IfoodStockSyncState(BaseTenantModel):
+    """Ultimo saldo desejado do piloto, nunca uma confirmacao remota.
+
+    Cada tentativa continua append-only em IfoodCatalogSubmission. O marcador
+    sending e gravado antes da rede: um crash exige conferencia, nao reenvio.
+    """
+
+    __tablename__ = "ifood_stock_sync_states"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "merchant_id", "link_id", name="uq_ifood_stock_sync_link"
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "link_id"],
+            ["ifood_catalog_links.tenant_id", "ifood_catalog_links.id"],
+            name="fk_ifood_stock_sync_link",
+        ),
+        CheckConstraint("link_revision > 0", name="ck_ifood_stock_sync_revision"),
+        CheckConstraint(
+            "desired_stock IS NULL OR desired_stock >= 0",
+            name="ck_ifood_stock_sync_desired",
+        ),
+        CheckConstraint(
+            "last_accepted_stock IS NULL OR last_accepted_stock >= 0",
+            name="ck_ifood_stock_sync_accepted",
+        ),
+        CheckConstraint("failure_count >= 0", name="ck_ifood_stock_sync_failures"),
+        CheckConstraint(
+            "reference_source IS NULL OR reference_source IN ('portal','api_acceptance')",
+            name="ck_ifood_stock_sync_reference",
+        ),
+        CheckConstraint(
+            "status IN ('queued','sending','accepted','backoff','blocked','uncertain')",
+            name="ck_ifood_stock_sync_status",
+        ),
+        CheckConstraint(
+            "provider_mode IN ('local_simulator','ifood_api')",
+            name="ck_ifood_stock_sync_provider_mode",
+        ),
+    )
+    merchant_id = Column(String(36), nullable=False)
+    link_id = Column(Integer, nullable=False)
+    provider_mode = Column(
+        String(16),
+        nullable=False,
+        default="local_simulator",
+        server_default="local_simulator",
+    )
+    link_revision = Column(Integer, nullable=False)
+    desired_stock = Column(Integer, nullable=True)
+    # Ultimo saldo recebido em 202 ou observado no Portal pelo responsavel.
+    # Nenhum desses valores comprova que um envio posterior foi aplicado.
+    last_accepted_stock = Column(Integer, nullable=True)
+    status = Column(String(16), nullable=False, default="queued")
+    next_attempt_at = Column(DateTime(timezone=True), nullable=True)
+    failure_count = Column(Integer, nullable=False, default=0)
+    last_request_key = Column(String(36), nullable=True)
+    last_confirmation_id = Column(Integer, nullable=True)
+    reference_source = Column(String(16), nullable=True)
     error_code = Column(String(40), nullable=True)
