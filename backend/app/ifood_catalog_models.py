@@ -59,7 +59,8 @@ class IfoodCatalogConfirmation(BaseTenantModel):
             name="fk_ifood_catalog_confirmation_link",
         ),
         CheckConstraint(
-            "kind IN ('link','portal')", name="ck_ifood_catalog_confirmation_kind"
+            "kind IN ('link','portal','observation')",
+            name="ck_ifood_catalog_confirmation_kind",
         ),
         CheckConstraint(
             "price IS NULL OR price >= 0", name="ck_ifood_catalog_confirmation_price"

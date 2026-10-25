@@ -165,6 +165,8 @@ def _send_phase(c, expected_stock):
 def _confirm(c):
     c.clock.advance(1)
     before = len(c.requests)
+    publication = c.s.client.get(c.s.path + "/publicacao")
+    assert publication.status_code == 200, publication.text
     response = c.s.client.post(
         c.s.path + "/confirmar-portal",
         json={
@@ -172,6 +174,9 @@ def _confirm(c):
             "barcode": EAN,
             "present": True,
             "portal_active": c.remote[EAN]["active"],
+            "confirmation_context_token": publication.json()[
+                "confirmation_context_token"
+            ],
             "price": str(c.remote[EAN]["prices"]["price"]),
             "stock": str(c.remote[EAN]["inventory"]["stock"]),
         },

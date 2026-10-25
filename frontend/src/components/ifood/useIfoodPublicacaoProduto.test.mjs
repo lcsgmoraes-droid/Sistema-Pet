@@ -17,6 +17,7 @@ const publication = (extra = {}) => ({
   product_id: 7,
   merchant_id: "merchant-fixture",
   barcode: "0789000000011",
+  confirmation_context_token: "c".repeat(64),
   snapshot_saved: saved,
   link: { mode: "existing", barcode: "0789000000011", stale: false },
   capabilities: {
@@ -42,7 +43,15 @@ const deferred = () => {
 
 async function setup({ draft = null, data = publication(), productId = 7 } = {}) {
   const calls = { reads: [], links: [], prepares: [], sends: [], confirmations: [] };
-  const env = { data, failRead: false, failSend: null, pendingPrepare: null, pendingSend: null };
+  const env = {
+    data,
+    failRead: false,
+    failSend: null,
+    failConfirm: null,
+    pendingPrepare: null,
+    pendingSend: null,
+    pendingConfirm: null,
+  };
   const mocks = new Map([
     [
       "../../api/ifood",
@@ -91,6 +100,8 @@ async function setup({ draft = null, data = publication(), productId = 7 } = {})
         },
         confirmarIfoodProdutoPortal: async (id, body) => {
           calls.confirmations.push({ id, body });
+          if (env.failConfirm) throw env.failConfirm;
+          if (env.pendingConfirm) return env.pendingConfirm.promise;
           env.data = {
             ...env.data,
             last_confirmation: { ...body, actor_id: 1, confirmed_at: "2026-10-23T12:00:00Z" },
@@ -263,11 +274,201 @@ test("conferência manual mantém desconhecido diferente de zero e não envia ao
     merchant_id: "merchant-fixture",
     barcode: "0789000000011",
     present: true,
+    portal_active: null,
+    confirmation_context_token: "c".repeat(64),
     price: null,
     stock: 0,
   });
   assert.equal(calls.sends.length, 0);
   assert.equal(harness.tree.publication.last_confirmation.actor_id, 1);
+});
+
+test("disponibilidade só usa declaração explícita, inclusive inativo com estoque zero", async () => {
+  for (const active of [true, false, null]) {
+    const { harness, calls } = await setup({
+      data: publication({ last_confirmation: { present: true, portal_active: true, stock: 21 } }),
+    });
+    assert.equal(harness.tree.observedActive, null);
+    await harness.act(() => harness.tree.alterar("observedActive", active));
+    await harness.act(() => harness.tree.alterar("observedStock", 0));
+    await harness.act(() => harness.tree.alterar("confirmPortal", true));
+    await harness.act(() => harness.tree.confirmar());
+    assert.equal(calls.confirmations[0].body.portal_active, active);
+    assert.equal(calls.confirmations[0].body.stock, 0);
+    assert.equal(calls.sends.length, 0);
+  }
+});
+
+test("alterar qualquer observação exige novo aceite e não apaga os valores em edição", async () => {
+  const { harness, calls } = await setup();
+  for (const [field, value] of [
+    ["observedPrice", "154,90"],
+    ["observedStock", "20"],
+    ["observedActive", true],
+    ["present", true],
+  ]) {
+    await harness.act(() => harness.tree.alterar("confirmPortal", true));
+    await harness.act(() => harness.tree.alterar(field, value));
+    assert.equal(harness.tree.confirmPortal, false);
+    await harness.act(() => harness.tree.confirmar());
+  }
+  assert.equal(harness.tree.observedPrice, "154,90");
+  assert.equal(harness.tree.observedStock, "20");
+  assert.equal(harness.tree.observedActive, true);
+  assert.equal(calls.confirmations.length, 0);
+});
+
+test("produto não localizado limpa disponibilidade, preço e estoque observados", async () => {
+  const { harness, calls } = await setup();
+  await harness.act(() => harness.tree.alterar("observedActive", false));
+  await harness.act(() => harness.tree.alterar("observedPrice", "154,90"));
+  await harness.act(() => harness.tree.alterar("observedStock", "20"));
+  await harness.act(() => harness.tree.alterar("present", false));
+  assert.equal(harness.tree.observedActive, null);
+  assert.equal(harness.tree.observedPrice, null);
+  assert.equal(harness.tree.observedStock, null);
+  await harness.act(() => harness.tree.alterar("confirmPortal", true));
+  await harness.act(() => harness.tree.confirmar());
+  assert.equal(calls.confirmations[0].body.present, false);
+  assert.equal(calls.confirmations[0].body.portal_active, null);
+  assert.equal(calls.confirmations[0].body.price, null);
+  assert.equal(calls.confirmations[0].body.stock, null);
+});
+
+test("troca de produto descarta a observação anterior sem predefinir disponibilidade", async () => {
+  const { harness, env } = await setup();
+  await harness.act(() => harness.tree.alterar("present", false));
+  await harness.act(() => harness.tree.alterar("observedActive", true));
+  await harness.act(() => harness.tree.alterar("observedStock", "20"));
+  env.data = publication({ product_id: 8, barcode: "outro-ean" });
+  await harness.update({ productId: 8 });
+  await harness.settle();
+  assert.equal(harness.tree.present, true);
+  assert.equal(harness.tree.observedActive, null);
+  assert.equal(harness.tree.observedStock, null);
+  assert.equal(harness.tree.confirmPortal, false);
+});
+
+test("automação ativa aceita observação com contexto sem liberar envio ou vínculo manual", async () => {
+  const sync = { enabled: true, status: "accepted", desired_stock: 21, last_accepted_stock: 21 };
+  const last = { id: 8, status: "accepted", source: "auto_stock" };
+  const { harness, calls } = await setup({
+    data: publication({
+      stock_sync: sync,
+      last_submission: last,
+      capabilities: { can_link: false, can_send: false, can_prepare: false, can_confirm: true },
+    }),
+  });
+  await harness.act(() => harness.tree.alterar("observedActive", true));
+  await harness.act(() => harness.tree.alterar("observedStock", 21));
+  await harness.act(() => harness.tree.alterar("confirmPortal", true));
+  assert.equal(harness.tree.canConfirm, true);
+  assert.equal(harness.tree.canLink, false);
+  assert.equal(harness.tree.canSend, false);
+  await harness.act(() => harness.tree.confirmar());
+  assert.equal(calls.confirmations[0].body.confirmation_context_token, "c".repeat(64));
+  assert.deepEqual(harness.tree.publication.stock_sync, sync);
+  assert.deepEqual(harness.tree.publication.last_submission, last);
+  assert.equal(calls.links.length + calls.prepares.length + calls.sends.length, 0);
+});
+
+test("contexto novo descarta só o aceite e mantém a observação durante envio e retorno", async () => {
+  const { harness, env, calls } = await setup();
+  await harness.act(() => harness.tree.alterar("observedPrice", "154,90"));
+  await harness.act(() => harness.tree.alterar("observedStock", "20"));
+  await harness.act(() => harness.tree.alterar("observedActive", true));
+  await harness.act(() => harness.tree.alterar("confirmPortal", true));
+  env.data = publication({
+    confirmation_context_token: "d".repeat(64),
+    last_submission: { status: "sending" },
+    capabilities: { can_confirm: false },
+  });
+  await harness.act(() => harness.tree.atualizar());
+  assert.equal(harness.tree.confirmPortal, false);
+  assert.equal(harness.tree.confirmationContextChanged, true);
+  assert.equal(harness.tree.canConfirm, false);
+  assert.equal(harness.tree.observedPrice, "154,90");
+  assert.equal(harness.tree.observedStock, "20");
+  assert.equal(harness.tree.observedActive, true);
+  await harness.act(() => harness.tree.confirmar());
+  assert.equal(calls.confirmations.length, 0);
+  env.data = publication({ confirmation_context_token: "e".repeat(64) });
+  await harness.act(() => harness.tree.atualizar());
+  assert.equal(harness.tree.canConfirm, false);
+  await harness.act(() => harness.tree.alterar("confirmPortal", true));
+  await harness.act(() => harness.tree.confirmar());
+  assert.equal(calls.confirmations[0].body.confirmation_context_token, "e".repeat(64));
+});
+
+test("atualizar o mesmo contexto preserva observação e aceite sem registrar automaticamente", async () => {
+  const { harness, calls } = await setup();
+  await harness.act(() => harness.tree.alterar("observedActive", false));
+  await harness.act(() => harness.tree.alterar("observedStock", "0"));
+  await harness.act(() => harness.tree.alterar("confirmPortal", true));
+  await harness.act(() => harness.tree.atualizar());
+  assert.equal(harness.tree.observedActive, false);
+  assert.equal(harness.tree.observedStock, "0");
+  assert.equal(harness.tree.confirmPortal, true);
+  assert.equal(harness.tree.canConfirm, true);
+  assert.equal(calls.confirmations.length, 0);
+});
+
+test("409 preserva rascunhos e exige atualização e novo aceite, sem GET ou POST automático", async () => {
+  const { harness, env, calls } = await setup();
+  await harness.act(() => harness.tree.alterar("observedActive", true));
+  await harness.act(() => harness.tree.alterar("observedStock", "21"));
+  await harness.act(() => harness.tree.alterar("confirmPortal", true));
+  env.failConfirm = { response: { status: 409, data: { detail: "O acompanhamento mudou." } } };
+  const readCount = calls.reads.length;
+  await harness.act(() => harness.tree.confirmar());
+  assert.equal(calls.reads.length, readCount);
+  assert.equal(calls.confirmations.length, 1);
+  assert.equal(harness.tree.observedStock, "21");
+  assert.equal(harness.tree.observedActive, true);
+  assert.equal(harness.tree.confirmPortal, false);
+  assert.equal(harness.tree.stale, true);
+  assert.equal(harness.tree.confirmationContextChanged, true);
+  await harness.act(() => harness.tree.alterar("confirmPortal", true));
+  await harness.act(() => harness.tree.confirmar());
+  assert.equal(calls.confirmations.length, 1);
+  env.failConfirm = null;
+  env.data = publication({ confirmation_context_token: "d".repeat(64) });
+  await harness.act(() => harness.tree.atualizar());
+  assert.equal(harness.tree.confirmPortal, false);
+  assert.equal(harness.tree.canConfirm, false);
+  await harness.act(() => harness.tree.alterar("confirmPortal", true));
+  await harness.act(() => harness.tree.confirmar());
+  assert.equal(calls.confirmations.length, 2);
+  assert.equal(calls.confirmations[1].body.confirmation_context_token, "d".repeat(64));
+});
+
+test("contexto ausente bloqueia confirmação mesmo quando uma capacidade antiga permite", async () => {
+  const { harness, calls } = await setup({
+    data: publication({ confirmation_context_token: null }),
+  });
+  await harness.act(() => harness.tree.alterar("confirmPortal", true));
+  assert.equal(harness.tree.canConfirm, false);
+  await harness.act(() => harness.tree.confirmar());
+  assert.equal(calls.confirmations.length, 0);
+});
+
+test("resposta de confirmação do produto anterior não preenche o produto recém-aberto", async () => {
+  const { harness, calls, env } = await setup();
+  await harness.act(() => harness.tree.alterar("observedActive", true));
+  await harness.act(() => harness.tree.alterar("confirmPortal", true));
+  env.pendingConfirm = deferred();
+  const pending = harness.tree.confirmar();
+  await harness.settle();
+  env.data = publication({ product_id: 8, confirmation_context_token: "d".repeat(64) });
+  await harness.update({ productId: 8 });
+  env.pendingConfirm.resolve({ data: publication() });
+  await pending;
+  await harness.settle();
+  assert.equal(calls.confirmations.length, 1);
+  assert.equal(calls.confirmations[0].id, 7);
+  assert.equal(harness.tree.publication.product_id, 8);
+  assert.equal(harness.tree.observedActive, null);
+  assert.equal(harness.tree.confirmPortal, false);
 });
 
 test("cliques duplos geram somente uma tentativa com a chave preparada", async () => {

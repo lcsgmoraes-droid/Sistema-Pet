@@ -28,7 +28,10 @@ export default function useIfoodPublicacaoProduto({ productId, draft = null, ima
   const [fields, setFields] = useState(["price", "stock"]);
   const [confirmSend, setConfirmSend] = useState(false);
   const [confirmPortal, setConfirmPortal] = useState(false);
+  const [confirmedContextToken, setConfirmedContextToken] = useState(null);
+  const [confirmationContextChanged, setConfirmationContextChanged] = useState(false);
   const [present, setPresent] = useState(true);
+  const [observedActive, setObservedActive] = useState(null);
   const [observedPrice, setObservedPrice] = useState(null);
   const [observedStock, setObservedStock] = useState(null);
   const [uncertain, setUncertain] = useState(false);
@@ -37,6 +40,7 @@ export default function useIfoodPublicacaoProduto({ productId, draft = null, ima
   const generation = useRef(0);
   const identity = useRef(productId);
   const loaded = useRef(false);
+  const previousConfirmationContext = useRef(null);
   const draftKey = assinaturaCadastroIfood(draft, { formulario: true, imagens });
   const latestDraft = useRef(draftKey);
   latestDraft.current = draftKey;
@@ -53,6 +57,7 @@ export default function useIfoodPublicacaoProduto({ productId, draft = null, ima
     !busy,
   );
   const caps = publication?.capabilities || {};
+  const confirmationContextToken = publication?.confirmation_context_token || null;
   const operation = publication?.link?.mode === "new" ? "create" : "update";
 
   useEffect(() => {
@@ -67,6 +72,10 @@ export default function useIfoodPublicacaoProduto({ productId, draft = null, ima
       setPortalChecked(false);
       setConfirmSend(false);
       setConfirmPortal(false);
+      setConfirmedContextToken(null);
+      setConfirmationContextChanged(false);
+      setPresent(true);
+      setObservedActive(null);
       setObservedPrice(null);
       setObservedStock(null);
       setUncertain(false);
@@ -115,6 +124,15 @@ export default function useIfoodPublicacaoProduto({ productId, draft = null, ima
   }, [productId, revision]);
 
   useEffect(() => {
+    if (previousConfirmationContext.current !== confirmationContextToken) {
+      if (previousConfirmationContext.current && confirmPortal) setConfirmationContextChanged(true);
+      setConfirmPortal(false);
+      setConfirmedContextToken(null);
+      previousConfirmationContext.current = confirmationContextToken;
+    }
+  }, [confirmationContextToken, confirmPortal]);
+
+  useEffect(() => {
     setReview(null);
     setConfirmSend(false);
   }, [draftKey]);
@@ -131,6 +149,12 @@ export default function useIfoodPublicacaoProduto({ productId, draft = null, ima
     } catch (err) {
       if (version === generation.current) {
         if (err.response?.status === 403) setStale(true);
+        if (name === "confirm" && err.response?.status === 409) {
+          setStale(true);
+          setConfirmPortal(false);
+          setConfirmedContextToken(null);
+          setConfirmationContextChanged(true);
+        }
         if (name === "send") {
           setReview(null);
           setConfirmSend(false);
@@ -236,7 +260,12 @@ export default function useIfoodPublicacaoProduto({ productId, draft = null, ima
   };
 
   const confirmar = () => {
-    if (!confirmPortal) return;
+    if (
+      !confirmPortal ||
+      !confirmationContextToken ||
+      confirmedContextToken !== confirmationContextToken
+    )
+      return;
     const price = valorConferidoPortal(observedPrice, 2);
     const stock = valorConferidoPortal(observedStock, 3);
     if (!price.valid || !stock.valid) {
@@ -250,11 +279,15 @@ export default function useIfoodPublicacaoProduto({ productId, draft = null, ima
         merchant_id: publication.merchant_id,
         barcode: publication.barcode,
         present,
+        portal_active: present ? observedActive : null,
+        confirmation_context_token: confirmedContextToken,
         price: present ? price.value : null,
         stock: present ? stock.value : null,
       });
       if (!isCurrent()) return;
       setConfirmPortal(false);
+      setConfirmedContextToken(null);
+      setConfirmationContextChanged(false);
       setReview(null);
       setConfirmSend(false);
       await reload(isCurrent);
@@ -282,7 +315,9 @@ export default function useIfoodPublicacaoProduto({ productId, draft = null, ima
     fields,
     confirmSend,
     confirmPortal,
+    confirmationContextChanged,
     present,
+    observedActive,
     observedPrice,
     observedStock,
     uncertain,
@@ -295,7 +330,12 @@ export default function useIfoodPublicacaoProduto({ productId, draft = null, ima
       (operation === "create" || fields.length > 0),
     canSend:
       ready && Boolean(caps.can_send) && Boolean(review?.eligible && confirmSend) && !uncertain,
-    canConfirm: ready && Boolean(caps.can_confirm) && confirmPortal,
+    canConfirm:
+      ready &&
+      Boolean(caps.can_confirm) &&
+      confirmPortal &&
+      Boolean(confirmationContextToken) &&
+      confirmedContextToken === confirmationContextToken,
     alterar(campo, value) {
       if (lock.current) return;
       if (campo === "mode") {
@@ -310,17 +350,37 @@ export default function useIfoodPublicacaoProduto({ productId, draft = null, ima
         setConfirmSend(false);
       }
       if (campo === "confirmSend") setConfirmSend(value);
-      if (campo === "confirmPortal") setConfirmPortal(value);
+      if (campo === "confirmPortal") {
+        const accepted = Boolean(value && ready && caps.can_confirm && confirmationContextToken);
+        setConfirmPortal(accepted);
+        setConfirmedContextToken(accepted ? confirmationContextToken : null);
+        if (accepted) setConfirmationContextChanged(false);
+      }
       if (campo === "present") {
         setPresent(value);
         setConfirmPortal(false);
+        setConfirmedContextToken(null);
         if (!value) {
+          setObservedActive(null);
           setObservedPrice(null);
           setObservedStock(null);
         }
       }
-      if (campo === "observedPrice") setObservedPrice(value);
-      if (campo === "observedStock") setObservedStock(value);
+      if (campo === "observedActive") {
+        setObservedActive(value === true || value === false ? value : null);
+        setConfirmPortal(false);
+        setConfirmedContextToken(null);
+      }
+      if (campo === "observedPrice") {
+        setObservedPrice(value);
+        setConfirmPortal(false);
+        setConfirmedContextToken(null);
+      }
+      if (campo === "observedStock") {
+        setObservedStock(value);
+        setConfirmPortal(false);
+        setConfirmedContextToken(null);
+      }
     },
     atualizar() {
       if (!lock.current) {

@@ -33,7 +33,7 @@ from app.produtos_catalogo_models import Produto
 from app.tenancy.context import get_current_tenant, tenant_context
 from app.tenancy.rls import sync_rls_tenant
 
-from .catalog_pilot import _identity_issues, _last_rows
+from .catalog_pilot import _identity_issues, _last_rows, portal_observation_reason
 from .client import IfoodClient, IfoodClientError
 from .management import product_identifier
 
@@ -204,6 +204,11 @@ def stock_sync_view(db, tenant_id, merchant_id, product_id):
     result = state_view(row)
     if result:
         result["enabled"] = enabled_for(tenant_id, merchant_id, product_id)
+        confirmation = _last_rows(db, tenant_id, [row.link_id], Confirmation).get(
+            row.link_id
+        )
+        # Gate derivado: a observacao nunca reescreve aceite, tentativa ou fila.
+        result["observation_block_reason"] = portal_observation_reason(confirmation)
     return result
 
 
@@ -382,6 +387,12 @@ def _observe(db, scope, now):
             return None, _save_status(db, existing, "blocked", reason)
         return None, {"status": "blocked", "reason": reason}
     config, product, link = target
+    latest_confirmation = _last_rows(db, tenant, [link.id], Confirmation).get(link.id)
+    observation_reason = portal_observation_reason(latest_confirmation)
+    if observation_reason:
+        # O registro factual pode impedir o proximo despacho, sem apagar uma
+        # tentativa pendente/incerta nem modificar sua janela e ultimo aceite.
+        return None, {"status": "blocked", "reason": observation_reason}
     state = (
         db.query(State)
         .filter(
@@ -414,7 +425,16 @@ def _observe(db, scope, now):
         and last.provider_mode != mode
     ):
         return None, _save_status(db, state, "blocked", "provider_mode_changed")
-    confirmation = _last_rows(db, tenant, [link.id], Confirmation).get(link.id)
+    confirmation = (
+        db.query(Confirmation)
+        .filter(
+            Confirmation.tenant_id == tenant,
+            Confirmation.link_id == link.id,
+            Confirmation.kind != "observation",
+        )
+        .order_by(Confirmation.id.desc())
+        .first()
+    )
     reviewed = _confirmed(last, confirmation, known_stock=True)
     if (
         last
