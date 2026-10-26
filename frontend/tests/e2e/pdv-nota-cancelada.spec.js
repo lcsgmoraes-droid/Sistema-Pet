@@ -18,7 +18,7 @@ test.skip(
 
 async function prepararApi(
   page,
-  { statusFiscal = "cancelada", statusVenda = "pago_nf", resultadoFiscal } = {},
+  { statusFiscal = "cancelada", statusVenda = "pago_nf", resultadoFiscal, estornoTeste } = {},
 ) {
   const tenant = { id: "tenant-sintetico-qa", name: "Loja Sintética QA", login_name: "qa" };
   const user = { id: 42002, name: "Usuário QA", is_admin: true, role: { name: "admin" }, tenant };
@@ -28,6 +28,8 @@ async function prepararApi(
     consultasFiscais: 0,
     envios: [],
     avisos: [],
+    enviosEstorno: [],
+    estorno: null,
     venda: {
       id: vendaId,
       numero_venda: "QA-NOTA-CANCELADA",
@@ -61,6 +63,20 @@ async function prepararApi(
       nfe_chave: "0".repeat(44),
     },
   };
+  if (estornoTeste?.rejeitado) {
+    estado.estorno = {
+      id: 7,
+      status: "rejeitado",
+      numero: 1,
+      serie: 3,
+      codigo: "974",
+      motivo: "CNPJ do responsavel tecnico diverge do cadastrado",
+      correlation_id: "estorno-sintetico-rejeitado-qa",
+      pode_consultar: true,
+      xml_validado: false,
+    };
+    estado.venda.nfe_estorno_status = "rejeitado";
+  }
   await page.addInitScript(
     ({ user, tenant }) => {
       globalThis.localStorage.setItem("access_token", "token-sintetico-sem-validade");
@@ -76,6 +92,94 @@ async function prepararApi(
     async (route) => {
       const request = route.request();
       const path = new URL(request.url()).pathname;
+      const apiEstorno = `/api/nfe/vendas/${vendaId}/estorno`;
+      if (path.startsWith(apiEstorno) && estornoTeste) {
+        const destinatarioProprio =
+          new URL(request.url()).searchParams.get("destinatario_proprio_emitente") === "true";
+        const bloqueado = estornoTeste.anonimo && !destinatarioProprio && !estado.estorno;
+        const previa = {
+          modelo: 55,
+          tipo_operacao: "entrada",
+          finalidade: "ajuste",
+          ambiente_codigo: 2,
+          ambiente_label: "Homologação",
+          emitente: { nome: "Emitente Sintético QA", cnpj: "00000000000000" },
+          destinatario: { razaoSocial: "Emitente Sintético QA", cnpj: "00000000000000" },
+          original: { numero: 18574, serie: 1, chave: "0".repeat(44), status: "autorizada" },
+          itens: [
+            {
+              descricao: "Produto Sintético QA",
+              quantidade: 1,
+              valor_unitario: 39.9,
+              desconto: 0,
+              total: 39.9,
+              cfop: "1102",
+            },
+          ],
+          totais: { produtos: 39.9, desconto: 0, total: 39.9 },
+          declaracao:
+            "Declaro que a operação não foi realizada e a mercadoria não saiu do estabelecimento.",
+        };
+        const resposta = () => ({
+          success: estado.estorno?.status === "autorizado",
+          elegivel: !bloqueado && !estado.estorno,
+          bloqueios: bloqueado
+            ? ["Identifique o destinatário da NF-e de estorno antes de emitir."]
+            : [],
+          previa: bloqueado ? null : previa,
+          estorno: estado.estorno,
+          destinatario_anonimo: Boolean(estornoTeste.anonimo),
+          requer_destinatario: Boolean(bloqueado),
+        });
+        if (path === apiEstorno && request.method() === "POST") {
+          estado.enviosEstorno.push({ path, payload: request.postDataJSON() });
+          estado.estorno = {
+            id: 7,
+            status: estornoTeste.incerto ? "incerto" : "processando",
+            numero: null,
+            pode_consultar: !estornoTeste.incerto,
+            xml_validado: false,
+            motivo: estornoTeste.incerto
+              ? "Resultado incerto sem identificador; solicite conferência ao suporte e não reenvie."
+              : null,
+          };
+          estado.venda.nfe_estorno_status = estado.estorno.status;
+          if (estornoTeste.incerto)
+            return route.fulfill({ status: 503, json: { detail: estado.estorno.motivo } });
+        } else if (path === `${apiEstorno}/consultar`) {
+          estado.enviosEstorno.push({ path, payload: request.postDataJSON() });
+          estado.estorno = {
+            ...estado.estorno,
+            status: "autorizado",
+            numero: 90001,
+            serie: 9,
+            chave: "1".repeat(44),
+            protocolo: "1".repeat(15),
+            xml_validado: true,
+            pode_consultar: true,
+            xml_url: `/nfe/vendas/${vendaId}/estorno/xml`,
+            danfe_url: `/nfe/vendas/${vendaId}/estorno/danfe`,
+          };
+          Object.assign(estado.venda, {
+            nfe_estorno_status: "autorizado",
+            nfe_estorno_numero: 90001,
+            nfe_estorno_serie: 9,
+            nfe_estorno_protocolo: "1".repeat(15),
+            pendencia_fiscal_cancelamento: false,
+          });
+        } else if (path.endsWith("/xml")) {
+          return route.fulfill({
+            contentType: "application/xml",
+            body: "<nfeProc>XML sintético QA</nfeProc>",
+          });
+        } else if (path.endsWith("/danfe")) {
+          return route.fulfill({
+            contentType: "application/pdf",
+            body: "%PDF-1.4\nDANFE sintético QA",
+          });
+        }
+        return route.fulfill({ json: resposta() });
+      }
       if (path === apiStatus) {
         estado.consultasFiscais += 1;
         if (estado.falharConsulta) {
@@ -171,6 +275,11 @@ async function prepararApi(
     dialog.accept();
   });
   return estado;
+}
+
+async function acaoNota(page, label) {
+  await page.getByRole("button", { name: "Ações da nota 18574", exact: true }).click();
+  await page.getByRole("menuitem", { name: label, exact: true }).click();
 }
 
 test.describe("PDV — cancelamento após nota fiscal cancelada", () => {
@@ -285,7 +394,7 @@ test.describe("PDV — cancelamento após nota fiscal cancelada", () => {
       },
     });
     await page.goto("/notas-fiscais/saida");
-    await page.getByTitle("Cancelar NF-e", { exact: true }).click();
+    await acaoNota(page, "Cancelar NF-e");
     const modal = page.getByRole("dialog", { name: "Cancelar Nota Fiscal" });
     await modal.getByLabel(/Justificativa/).fill("Nota a cancelar após desfazer venda.");
     await modal.getByRole("button", { name: "Confirmar Cancelamento" }).click();
@@ -313,7 +422,7 @@ test.describe("PDV — cancelamento após nota fiscal cancelada", () => {
       statusVenda: "cancelada",
     });
     await page.goto("/notas-fiscais/saida");
-    await page.getByTitle("Cancelar NF-e", { exact: true }).click();
+    await acaoNota(page, "Cancelar NF-e");
     const modal = page.getByRole("dialog", { name: "Cancelar Nota Fiscal" });
     await modal.getByLabel(/Justificativa/).fill("Nota a cancelar após desfazer venda.");
     await modal.getByRole("button", { name: "Confirmar Cancelamento" }).click();
@@ -326,11 +435,150 @@ test.describe("PDV — cancelamento após nota fiscal cancelada", () => {
     ).toBeVisible();
     expect(estado.venda.nfe_status).toBe("autorizada");
     estado.statusFiscal = "cancelada";
-    await page.getByTitle("Forçar reconciliação desta NF", { exact: true }).click();
+    await acaoNota(page, "Forçar reconciliação desta NF");
     await expect(page.getByText("Cancelamento da nota em andamento", { exact: true })).toHaveCount(
       0,
     );
     expect(estado.venda.nfe_status).toBe("cancelada");
     expect(estado.venda.status).toBe("cancelada");
+  });
+});
+
+test.describe("NF-e de estorno vinculada à NFC-e", () => {
+  test("rejeição 974 exibe código e motivo sem regularizar, reenviar ou liberar documentos", async ({
+    page,
+  }) => {
+    const estado = await prepararApi(page, {
+      statusFiscal: "autorizada",
+      statusVenda: "cancelada",
+      estornoTeste: { rejeitado: true },
+    });
+    estado.venda.pendencia_fiscal_cancelamento = true;
+    await page.goto("/notas-fiscais/saida");
+    await expect(page.getByText("Regularizada por estorno", { exact: true })).toHaveCount(0);
+    await acaoNota(page, "Ver NF-e de estorno");
+    const modal = page.getByRole("dialog", { name: "NF-e de estorno da NFC-e 18574", exact: true });
+    await expect(modal.getByText("NF-e de estorno rejeitada", { exact: true })).toBeVisible();
+    await expect(
+      modal.getByText("974 — CNPJ do responsavel tecnico diverge do cadastrado", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      modal.getByRole("button", { name: "Emitir NF-e de estorno", exact: true }),
+    ).toHaveCount(0);
+    await expect(modal.getByRole("button", { name: "XML do estorno", exact: true })).toHaveCount(0);
+    await expect(modal.getByRole("button", { name: "DANFE do estorno", exact: true })).toHaveCount(
+      0,
+    );
+    expect(estado.enviosEstorno).toHaveLength(0);
+    expect(estado.venda.pendencia_fiscal_cancelamento).toBe(true);
+    expect(estado.venda.nfe_status).toBe("autorizada");
+  });
+
+  test("destinatário próprio exige escolha, transmite uma vez e regulariza sem cancelar original", async ({
+    page,
+  }) => {
+    const estado = await prepararApi(page, {
+      statusFiscal: "autorizada",
+      statusVenda: "cancelada",
+      estornoTeste: { anonimo: true },
+    });
+    estado.venda.pendencia_fiscal_cancelamento = true;
+    await page.goto("/notas-fiscais/saida");
+    await acaoNota(page, "Emitir NF-e de estorno");
+    const modal = page.getByRole("dialog", { name: "NF-e de estorno da NFC-e 18574", exact: true });
+    await expect(modal.getByRole("alert")).toContainText("Identifique o destinatário");
+    await expect(
+      modal.getByRole("button", { name: "Emitir NF-e de estorno", exact: true }),
+    ).toBeDisabled();
+    await modal
+      .getByLabel("Usar próprio CNPJ como destinatário, conforme orientação contábil", {
+        exact: true,
+      })
+      .check();
+    await expect(modal.getByText("1102", { exact: true })).toBeVisible();
+    await modal
+      .getByLabel(/Motivo do estorno/)
+      .fill("Operação não realizada e mercadoria não saiu.");
+    await modal
+      .getByLabel(
+        "Declaro que a operação não foi realizada e a mercadoria não saiu do estabelecimento.",
+        { exact: true },
+      )
+      .check();
+    await modal.getByRole("button", { name: "Emitir NF-e de estorno", exact: true }).click();
+    await page
+      .getByRole("dialog", { name: "Emitir NF-e de estorno?" })
+      .getByRole("button", { name: "Confirmar emissão do estorno", exact: true })
+      .click();
+    await expect(
+      modal.getByText("Emissão do estorno em processamento", { exact: true }),
+    ).toBeVisible();
+    expect(estado.enviosEstorno).toHaveLength(1);
+    expect(estado.enviosEstorno[0].payload.destinatario_proprio_emitente).toBe(true);
+    expect(estado.enviosEstorno[0].payload.declaracao_operacao_nao_realizada).toBe(true);
+    await expect(
+      modal.getByRole("button", { name: "Emitir NF-e de estorno", exact: true }),
+    ).toHaveCount(0);
+    await modal.getByRole("button", { name: "Consultar estorno", exact: true }).click();
+    await expect(modal.getByText("NF-e de estorno autorizada", { exact: true })).toBeVisible();
+    expect(estado.enviosEstorno).toHaveLength(2);
+    expect(estado.enviosEstorno[1].path).toMatch(/\/consultar$/);
+    const download = page.waitForEvent("download");
+    await modal.getByRole("button", { name: "XML do estorno", exact: true }).click();
+    expect((await download).suggestedFilename()).toBe("nfe_estorno_90001.xml");
+    await modal.getByRole("button", { name: "Fechar", exact: true }).last().click();
+    await expect(page.getByText("Regularizada por estorno", { exact: true })).toBeVisible();
+    expect(estado.venda.nfe_status).toBe("autorizada");
+    expect(estado.venda.status).toBe("cancelada");
+    await page.goto(`/pdv?venda_id=${vendaId}`);
+    await expect(page.getByText("NFC-e nº 18574 — Autorizada", { exact: true })).toBeVisible();
+    await expect(page.getByText("Regularizada por estorno", { exact: true })).toBeVisible();
+    await expect(page.getByRole("alert").filter({ hasText: "Nota a cancelar" })).toHaveCount(0);
+  });
+
+  test("resultado incerto persiste após atualizar e não oferece reemissão", async ({ page }) => {
+    const estado = await prepararApi(page, {
+      statusFiscal: "autorizada",
+      statusVenda: "cancelada",
+      estornoTeste: { incerto: true },
+    });
+    estado.venda.pendencia_fiscal_cancelamento = true;
+    await page.goto("/notas-fiscais/saida");
+    await acaoNota(page, "Emitir NF-e de estorno");
+    const modal = page.getByRole("dialog", { name: "NF-e de estorno da NFC-e 18574", exact: true });
+    await modal
+      .getByLabel(/Motivo do estorno/)
+      .fill("Operação não realizada e mercadoria não saiu.");
+    await modal
+      .getByLabel(
+        "Declaro que a operação não foi realizada e a mercadoria não saiu do estabelecimento.",
+        { exact: true },
+      )
+      .check();
+    await modal.getByRole("button", { name: "Emitir NF-e de estorno", exact: true }).click();
+    await page
+      .getByRole("dialog", { name: "Emitir NF-e de estorno?" })
+      .getByRole("button", { name: "Confirmar emissão do estorno", exact: true })
+      .click();
+    await expect(
+      modal.getByText("Resultado do estorno não confirmado", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      modal.getByRole("button", { name: "Emitir NF-e de estorno", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      modal.getByRole("button", { name: "Consultar estorno", exact: true }),
+    ).toBeDisabled();
+    await page.reload();
+    await acaoNota(page, "Ver NF-e de estorno");
+    await expect(
+      modal.getByText("Resultado do estorno não confirmado", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      modal.getByRole("button", { name: "Emitir NF-e de estorno", exact: true }),
+    ).toHaveCount(0);
+    expect(estado.enviosEstorno).toHaveLength(1);
+    expect(estado.venda.pendencia_fiscal_cancelamento).toBe(true);
+    expect(estado.venda.nfe_status).toBe("autorizada");
   });
 });

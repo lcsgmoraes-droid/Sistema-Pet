@@ -58,16 +58,32 @@ def _referencias(db, tenant_id):
         .limit(MAX_MONITOR_DOCUMENTOS + 1)
         .all()
     )
-    if len(vendas) > MAX_MONITOR_DOCUMENTOS:
+    from app.intnfe.estorno_models import IntNFeEstorno
+
+    estornos = (
+        documentos._estornos_elegiveis(db, tenant_id)
+        .with_entities(IntNFeEstorno.id)
+        .order_by(IntNFeEstorno.id)
+        .limit(MAX_MONITOR_DOCUMENTOS + 1)
+        .all()
+    )
+    if len(vendas) + len(estornos) > MAX_MONITOR_DOCUMENTOS:
         raise XmlContabilidadeError(
             "O histórico excede o limite de consulta de eventos fiscais. Contate o suporte; nenhum lote parcial foi preparado.",
             409,
         )
-    return [("intnfe", str(row[0])) for row in vendas]
+    return [("intnfe", str(row[0])) for row in vendas] + [
+        ("intnfe", f"estorno:{row[0]}") for row in estornos
+    ]
 
 
 def priorizar_documento(db, tenant_id, provider, documento_id, agora):
-    if provider != "intnfe" or not str(documento_id).isdigit():
+    if provider != "intnfe":
+        return None
+    if (
+        not str(documento_id).isdigit()
+        and documentos._documento(db, tenant_id, provider, documento_id) is None
+    ):
         return None
     monitor = (
         db.query(XmlContabilidadeMonitor)
@@ -153,7 +169,9 @@ def enfileirar_nota(db, tenant_id, provider, documento_id, agora):
     if doc.venda is None or not doc.venda.nfe_xml:
         return None
     xml = documentos._xml_bytes(doc.venda.nfe_xml)
-    validacao = documentos.validar_xml_saida(xml, doc.chave, doc.modelo)
+    validacao = documentos.validar_xml_documento(
+        xml, doc, tenant_id, documentos._cnpj_empresa(db, tenant_id)
+    )
     if validacao is None or validacao[0].findtext(
         ".//n:infNFe/n:emit/n:CNPJ", namespaces=NS
     ) != documentos._cnpj_empresa(db, tenant_id):
@@ -210,8 +228,11 @@ def consultar_documento(
     desde = _utc(config.envio_automatico_desde) if ativo else None
     if ativo:
         # A coluna legada pode guardar UTC sem fuso; o XML decide o instante.
-        validacao = documentos.validar_xml_saida(
-            por_nome[f"{doc.chave}-nfe.xml"], doc.chave, doc.modelo
+        validacao = documentos.validar_xml_documento(
+            por_nome[f"{doc.chave}-nfe.xml"],
+            doc,
+            tenant_id,
+            documentos._cnpj_empresa(db, tenant_id),
         )
         emissao = _emissao_oficial(validacao[0])
         if emissao >= desde:
@@ -474,12 +495,15 @@ def preparar_anexos_individual(db, tenant_id, envio):
         raise XmlContabilidadeError(
             "A nota fiscal não corresponde à identidade deste envio.", 409
         )
-    validacao = documentos.validar_xml_saida(xml, doc.chave, doc.modelo)
+    validacao = documentos.validar_xml_documento(
+        xml, doc, tenant_id, documentos._cnpj_empresa(db, tenant_id)
+    )
     if validacao is None or validacao[0].findtext(
         ".//n:infNFe/n:emit/n:CNPJ", namespaces=NS
     ) != documentos._cnpj_empresa(db, tenant_id):
         raise XmlContabilidadeError(
-            "O documento não é uma nota de saída em produção desta empresa.", 409
+            "O documento não é uma saída ou estorno próprio validado em produção desta empresa.",
+            409,
         )
     nome = f"{doc.chave}-nfe.xml"
     from app.services.xml_contabilidade_relatorios import atual

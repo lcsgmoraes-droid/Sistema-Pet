@@ -25,6 +25,7 @@ import {
 } from "../utils/fiscalRejectionGuidance.mjs";
 import NFSaidaCompartilharModal from "./centralNFSaida/NFSaidaCompartilharModal";
 import { resumirCancelamentoNota } from "../utils/nfeCancelamentoFeedback";
+import NFSaidaEstornoModal from "./centralNFSaida/NFSaidaEstornoModal";
 import {
   atalhoDiretoCorePet,
   carregarNotaDiretaCorePet,
@@ -84,6 +85,7 @@ export default function CentralNFSaida() {
   const [carregandoDetalhe, setCarregandoDetalhe] = useState(false);
   const [erroDetalhe, setErroDetalhe] = useState("");
   const [modalCancelar, setModalCancelar] = useState(null);
+  const [notaEstorno, setNotaEstorno] = useState(null);
   const [justificativa, setJustificativa] = useState("");
   const [cancelando, setCancelando] = useState(false);
   const [reconciliandoNotaId, setReconciliandoNotaId] = useState("");
@@ -260,6 +262,32 @@ export default function CentralNFSaida() {
       salvarArquivo(blob, `nfe_${nota.numero}.xml`);
     } catch (error) {
       alert(await mensagemDocumento(error, "Erro ao baixar XML"));
+    } finally {
+      setDocumentoEmCurso("");
+    }
+  }
+
+  async function baixarDocumentoEstorno(nota, tipo, estorno) {
+    const documentoId = `estorno-${nota.venda_id}`;
+    setDocumentoEmCurso(documentoId);
+    try {
+      const endpoint = estorno?.[`${tipo}_url`] || `/nfe/vendas/${nota.venda_id}/estorno/${tipo}`;
+      const response = await api.get(endpoint, { responseType: "blob" });
+      const nome = estorno?.numero || nota.venda_id;
+      if (tipo === "danfe") {
+        const download = metadadosDownloadDanfe(response, nome);
+        salvarArquivo(
+          new Blob([response.data], { type: download.tipo }),
+          `estorno_${download.nome}`,
+        );
+      } else {
+        salvarArquivo(
+          new Blob([response.data], { type: "application/xml" }),
+          `nfe_estorno_${nome}.xml`,
+        );
+      }
+    } catch (error) {
+      alert(await mensagemDocumento(error, "Não foi possível baixar o documento do estorno."));
     } finally {
       setDocumentoEmCurso("");
     }
@@ -690,6 +718,7 @@ export default function CentralNFSaida() {
         baixarDanfe={baixarDanfe}
         baixarXml={baixarXml}
         abrirDetalhes={abrirDetalhes}
+        abrirEstorno={setNotaEstorno}
         notaSelecionada={notaSelecionada}
         detalheNota={detalheNota}
         carregandoDetalhe={carregandoDetalhe}
@@ -707,6 +736,15 @@ export default function CentralNFSaida() {
           fechar={() => setCompartilharNota(null)}
           baixarDanfe={baixarDanfe}
           documentoEmCurso={documentoEmCurso}
+        />
+      )}
+      {notaEstorno && (
+        <NFSaidaEstornoModal
+          key={notaEstorno.venda_id}
+          nota={notaEstorno}
+          onFechar={() => setNotaEstorno(null)}
+          onAtualizado={() => carregarNotas(false)}
+          onBaixarDocumento={baixarDocumentoEstorno}
         />
       )}
     </>

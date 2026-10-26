@@ -8,6 +8,7 @@ import {
 import { buildValidadePdvMessage } from "./pdvValidadeAlertUtils";
 import { mensagemCaixaIndisponivel } from "../../utils/caixaAbertoMonitor";
 import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
+import { obterSituacaoEstorno } from "../../utils/nfeEstorno";
 
 const ESTILOS_FISCAIS = {
   success: "border-emerald-200 bg-emerald-50 text-emerald-800",
@@ -46,6 +47,7 @@ export default function PDVInfoBanners({
   const situacaoFiscal = modoVisualizacao ? obterSituacaoFiscalVenda(vendaAtual) : null;
   const rotaNotaFiscal = situacaoFiscal ? rotaNotaFiscalVenda(vendaAtual) : null;
   const pendenciaFiscal = obterPendenciaCancelamentoFiscal(vendaAtual);
+  const situacaoEstorno = obterSituacaoEstorno(vendaAtual);
 
   return (
     <>
@@ -145,6 +147,23 @@ export default function PDVInfoBanners({
                     {pendenciaFiscal.detalhe && (
                       <div className="mt-1 text-xs">{pendenciaFiscal.detalhe}</div>
                     )}
+                  </div>
+                )}
+                {situacaoEstorno && (
+                  <div className="mt-2 rounded border border-slate-300 bg-white/70 p-2 text-sm text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100">
+                    <div className="font-semibold">
+                      {situacaoEstorno.status === "autorizado" &&
+                      vendaAtual.pendencia_fiscal_cancelamento === false
+                        ? "Regularizada por estorno"
+                        : situacaoEstorno.label}
+                    </div>
+                    {situacaoEstorno.estorno.numero && (
+                      <div className="text-xs">
+                        NF-e {situacaoEstorno.estorno.numero} · Série{" "}
+                        {situacaoEstorno.estorno.serie}
+                      </div>
+                    )}
+                    <div className="text-xs">A nota original mantém a situação fiscal acima.</div>
                   </div>
                 )}
                 {vendaAtual.nfe_atualizacao_falhou && (

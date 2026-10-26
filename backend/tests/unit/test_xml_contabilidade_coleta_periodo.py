@@ -10,6 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.db import base as _registry  # noqa: F401
+from app.intnfe.estorno_models import IntNFeEstorno
 from app.models import Tenant
 from app.nfe_cache_models import BlingNotaFiscalCache
 from app.services import xml_contabilidade_documentos as documentos
@@ -37,6 +38,7 @@ def banco(monkeypatch):
     for model in (
         Tenant,
         Venda,
+        IntNFeEstorno,
         BlingNotaFiscalCache,
         XmlContabilidadeConfig,
         XmlContabilidadeEnvio,
