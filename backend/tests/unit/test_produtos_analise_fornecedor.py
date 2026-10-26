@@ -31,16 +31,27 @@ from app.vendas_models import Venda, VendaItem
 def relatorio():
     engine = create_engine("sqlite://", poolclass=StaticPool)
     for model in (
-        Departamento, Categoria, Marca, Cliente, Produto, ProdutoFornecedor,
-        Venda, VendaItem,
+        Departamento,
+        Categoria,
+        Marca,
+        Cliente,
+        Produto,
+        ProdutoFornecedor,
+        Venda,
+        VendaItem,
     ):
         model.__table__.create(engine)
     db = Session(engine)
     tenant, outro_tenant = uuid4(), uuid4()
     for fornecedor_id, nome in ((1, "Principal"), (2, "QUIMIAGRI")):
-        db.execute(Cliente.__table__.insert().values(
-            id=fornecedor_id, tenant_id=tenant, user_id=1, nome=nome,
-        ))
+        db.execute(
+            Cliente.__table__.insert().values(
+                id=fornecedor_id,
+                tenant_id=tenant,
+                user_id=1,
+                nome=nome,
+            )
+        )
     db.commit()
     sequencias = {"produto": 0, "venda": 0, "vinculo": 0}
 
@@ -48,8 +59,13 @@ def relatorio():
         sequencias["produto"] += 1
         produto_id = sequencias["produto"]
         dados = dict(
-            id=produto_id, tenant_id=tenant, user_id=1, nome=nome,
-            codigo=f"SKU-{produto_id}", preco_custo=10, preco_venda=25,
+            id=produto_id,
+            tenant_id=tenant,
+            user_id=1,
+            nome=nome,
+            codigo=f"SKU-{produto_id}",
+            preco_custo=10,
+            preco_venda=25,
         )
         dados.update(extra)
         db.execute(Produto.__table__.insert().values(**dados))
@@ -59,8 +75,11 @@ def relatorio():
     def vinculo(produto_id, fornecedor_id=2, **extra):
         sequencias["vinculo"] += 1
         dados = dict(
-            id=sequencias["vinculo"], tenant_id=tenant, produto_id=produto_id,
-            fornecedor_id=fornecedor_id, ativo=True,
+            id=sequencias["vinculo"],
+            tenant_id=tenant,
+            produto_id=produto_id,
+            fornecedor_id=fornecedor_id,
+            ativo=True,
         )
         dados.update(extra)
         db.execute(ProdutoFornecedor.__table__.insert().values(**dados))
@@ -70,32 +89,57 @@ def relatorio():
         sequencias["venda"] += 1
         venda_id = sequencias["venda"]
         dados = dict(
-            id=venda_id, tenant_id=tenant, numero_venda=f"VEN-{venda_id}",
-            vendedor_id=1, user_id=1, status="finalizada", canal="loja_fisica",
-            data_venda=datetime(2026, 10, 20, 12), subtotal=quantidade * 25,
+            id=venda_id,
+            tenant_id=tenant,
+            numero_venda=f"VEN-{venda_id}",
+            vendedor_id=1,
+            user_id=1,
+            status="finalizada",
+            canal="loja_fisica",
+            data_venda=datetime(2026, 10, 20, 12),
+            subtotal=quantidade * 25,
             total=quantidade * 25,
         )
         dados.update(extra)
         db.execute(Venda.__table__.insert().values(**dados))
-        db.execute(VendaItem.__table__.insert().values(
-            id=venda_id, tenant_id=dados["tenant_id"], venda_id=venda_id,
-            produto_id=produto_id, tipo="produto", quantidade=quantidade,
-            preco_unitario=25, subtotal=quantidade * 25,
-        ))
+        db.execute(
+            VendaItem.__table__.insert().values(
+                id=venda_id,
+                tenant_id=dados["tenant_id"],
+                venda_id=venda_id,
+                produto_id=produto_id,
+                tipo="produto",
+                quantidade=quantidade,
+                preco_unitario=25,
+                subtotal=quantidade * 25,
+            )
+        )
         db.commit()
 
     filtros = dict(
-        categoria_id=None, marca_id=None, departamento_id=None,
-        fornecedor_id=2, canal=None, busca=None,
+        categoria_id=None,
+        marca_id=None,
+        departamento_id=None,
+        fornecedor_id=2,
+        canal=None,
+        busca=None,
     )
     parametros = dict(
-        tenant_id=tenant, access_ids=[tenant], inicio=datetime(2026, 1, 1),
-        fim=datetime(2026, 10, 26, 23, 59, 59), filtros=filtros,
+        tenant_id=tenant,
+        access_ids=[tenant],
+        inicio=datetime(2026, 1, 1),
+        fim=datetime(2026, 10, 26, 23, 59, 59),
+        filtros=filtros,
     )
     set_current_tenant(tenant)
     yield SimpleNamespace(
-        db=db, tenant=tenant, outro_tenant=outro_tenant, produto=produto,
-        vinculo=vinculo, venda=venda, parametros=parametros,
+        db=db,
+        tenant=tenant,
+        outro_tenant=outro_tenant,
+        produto=produto,
+        vinculo=vinculo,
+        venda=venda,
+        parametros=parametros,
     )
     db.close()
     engine.dispose()
@@ -110,7 +154,9 @@ def consultar(relatorio, fornecedor_id=2):
 
 
 @pytest.mark.parametrize("fornecedor_principal", [None, 1])
-def test_inclui_fornecedor_principal_e_alternativo_ativo(relatorio, fornecedor_principal):
+def test_inclui_fornecedor_principal_e_alternativo_ativo(
+    relatorio, fornecedor_principal
+):
     principal = relatorio.produto("Principal", fornecedor_id=2)
     alternativo = relatorio.produto("Alternativo", fornecedor_id=fornecedor_principal)
     relatorio.vinculo(alternativo)
@@ -174,7 +220,9 @@ def test_todas_consultas_respeitam_fornecedor_periodo_status_e_empresa(relatorio
     relatorio.venda(produto_id, data_venda=datetime(2025, 12, 31))
     relatorio.venda(produto_id, tenant_id=relatorio.outro_tenant)
     externo = relatorio.produto(
-        "Produto inacessível", fornecedor_id=2, tenant_id=relatorio.outro_tenant,
+        "Produto inacessível",
+        fornecedor_id=2,
+        tenant_id=relatorio.outro_tenant,
     )
     relatorio.venda(externo)
     sem_fornecedor = relatorio.produto("Não corresponde")
@@ -183,7 +231,9 @@ def test_todas_consultas_respeitam_fornecedor_periodo_status_e_empresa(relatorio
     [item] = consultar(relatorio)
 
     assert (item["produto_id"], item["quantidade"], item["faturamento"]) == (
-        produto_id, 2, 50,
+        produto_id,
+        2,
+        50,
     )
     assert analise._contar_vendas(relatorio.db, **relatorio.parametros) == 1
     diaria = (
@@ -193,5 +243,7 @@ def test_todas_consultas_respeitam_fornecedor_periodo_status_e_empresa(relatorio
         .join(Produto, Produto.id == VendaItem.produto_id)
     )
     filtros = relatorio.parametros["filtros"]
-    parametros = {key: value for key, value in relatorio.parametros.items() if key != "filtros"}
+    parametros = {
+        key: value for key, value in relatorio.parametros.items() if key != "filtros"
+    }
     assert analise._filtros_base(diaria, **parametros, **filtros).scalar() == 2

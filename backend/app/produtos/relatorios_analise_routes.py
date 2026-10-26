@@ -15,7 +15,13 @@ from app.models import Cliente
 from app.partner_utils import get_all_accessible_tenant_ids
 from app.produtos.relatorios import _parse_relatorio_datetime
 from app.produtos.validators import _validar_tenant_e_obter_usuario
-from app.produtos_models import Categoria, Departamento, Marca, Produto, ProdutoFornecedor
+from app.produtos_models import (
+    Categoria,
+    Departamento,
+    Marca,
+    Produto,
+    ProdutoFornecedor,
+)
 from app.security.permissions_decorator import require_permission
 from app.vendas_models import Venda, VendaItem
 
