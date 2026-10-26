@@ -19,6 +19,14 @@ from app.bling_integration_fiscal import (
 )
 from app.financeiro.crediario_parcelamento import montar_plano_crediario
 from app.intnfe.client import IntNFeError
+from app.intnfe.additional_information import sale_context_lines
+from app.intnfe.commercial_context import (
+    CommercialContextError,
+    context_data,
+    context_lines,
+    has_context,
+    payload_context,
+)
 from app.intnfe.cancellation import (
     aplicar_resultado_cancelamento,
     campos_cancelamento,
@@ -387,8 +395,16 @@ def _format_brl(value):
     return formatted.replace(",", "_").replace(".", ",").replace("_", ".")
 
 
-def _additional_information(venda, installments):
+def _additional_information(venda, installments, *, commercial_data=None):
     parts = [f"Venda {venda.numero_venda}"]
+    explicit_context = commercial_data is not None or has_context(venda)
+    if explicit_context:
+        try:
+            data = context_data(venda, override=commercial_data)
+        except CommercialContextError as exc:
+            raise DirectEmissionError(str(exc), status=exc.status) from None
+        parts.extend(context_lines(data))
+    parts.extend(sale_context_lines(venda, include_channel=not explicit_context))
     observation = _text(getattr(venda, "observacoes", None))
     if observation:
         parts.append(f"Observacoes da venda: {' '.join(observation.split())}")
@@ -402,7 +418,12 @@ def _additional_information(venda, installments):
             for item in installments
         )
         parts.append(f"Crediario: {schedule}")
-    return " | ".join(parts)[:5000]
+    result = " | ".join(parts)
+    if explicit_context and len(result) > 5000:
+        raise DirectEmissionError(
+            "As informações adicionais completas ultrapassam 5000 caracteres. Reduza o texto para preservar o pedido, o rastreamento e todas as observações na nota."
+        )
+    return result[:5000]
 
 
 def _recipient(
@@ -628,6 +649,10 @@ def _lot_from_recorded_fifo(db, venda, item):
 
 
 def build_payload(db, tenant, connection, venda, document_type):
+    try:
+        commercial = payload_context(venda, document_type)
+    except CommercialContextError as exc:
+        raise DirectEmissionError(str(exc), status=exc.status) from None
     emitter, emitter_pending = local_profile(db, tenant.id)
     emitter_cnpj = _digits(getattr(tenant, "cnpj", None))
     if len(emitter_cnpj) == 14:
@@ -960,13 +985,18 @@ def build_payload(db, tenant, connection, venda, document_type):
     credit_installments = _crediario_installments(venda)
 
     channel = re.sub(r"[^a-z0-9]+", "_", _ascii(venda.canal)).strip("_")
-    if channel in MARKETPLACE_CHANNELS:
+    amazon_context = bool(commercial and commercial["canal"] == "amazon")
+    if channel in MARKETPLACE_CHANNELS and not (channel == "amazon" and amazon_context):
         raise DirectEmissionError(
             "A emissão direta está disponível apenas para vendas do PDV do ERP. "
             "Pedidos de marketplace não podem ser emitidos por este fluxo."
         )
 
     presence = "1" if channel == "loja_fisica" else "9"
+    if commercial:
+        presence = (
+            "2" if commercial["canal"] in {"amazon", "venda_direta_online"} else "1"
+        )
     if nfce_delivery:
         presence = "4"
     payload = {
@@ -989,6 +1019,11 @@ def build_payload(db, tenant, connection, venda, document_type):
     if recipient:
         key = "destinatario" if document_type == "nfe" else "consumidor"
         payload[key] = recipient
+    if amazon_context:
+        payload["intermediador"] = {
+            "cnpj": commercial["intermediador_cnpj"],
+            "identificadorCadastro": commercial["intermediador_identificacao"],
+        }
     return payload
 
 
@@ -1029,6 +1064,7 @@ def preview(db, tenant, venda, document_type):
             for item in _crediario_installments(venda)
         ],
         "informacoes_adicionais": payload["informacoesAdicionais"],
+        "contexto_comercial": context_data(venda),
         "frete": payload.get("frete", {}).get("valor", 0),
         "indicador_presenca": payload["indicadorPresenca"],
         "modalidade_frete": payload.get("frete", {}).get("modalidade"),
@@ -1220,6 +1256,17 @@ def local_document_details(db, tenant, venda):
     presence_label = (
         "1 - Operação presencial" if channel == "loja_fisica" else "9 - Outros"
     )
+    commercial = None
+    if has_context(venda):
+        try:
+            commercial = context_data(venda)
+        except CommercialContextError as exc:
+            raise DirectEmissionError(str(exc), status=exc.status) from None
+        presence_label = (
+            "2 - Operação pela internet"
+            if commercial["canal"] in {"amazon", "venda_direta_online"}
+            else "1 - Operação presencial"
+        )
     transport_type = "Entrega local" if venda.tem_entrega else "Sem transporte"
     freight_account = "9 - Sem ocorrência de transporte"
     if nfce_delivery:
@@ -1323,6 +1370,17 @@ def local_document_details(db, tenant, venda):
         },
         "pessoas_autorizadas_xml": [],
     }
+    if commercial:
+        details["contexto_comercial"] = commercial
+        details["informacoes_adicionais"]["numero_pedido_loja"] = (
+            commercial["numero_pedido"] or venda.numero_venda
+        )
+        details["informacoes_adicionais"]["origem_canal_venda"] = commercial["canal"]
+        if commercial["canal"] == "amazon":
+            details["intermediador"] = {
+                "cnpj": commercial["intermediador_cnpj"],
+                "identificacao": commercial["intermediador_identificacao"],
+            }
     if delivery_address:
         selected_fields = {
             "endereco": delivery_address["logradouro"],

@@ -18,7 +18,7 @@ test.skip(
 
 async function prepararApi(
   page,
-  { statusFiscal = "cancelada", statusVenda = "pago_nf", resultadoFiscal } = {},
+  { statusFiscal = "cancelada", statusVenda = "pago_nf", resultadoFiscal, semNota = false } = {},
 ) {
   const tenant = { id: "tenant-sintetico-qa", name: "Loja Sintética QA", login_name: "qa" };
   const user = { id: 42002, name: "Usuário QA", is_admin: true, role: { name: "admin" }, tenant };
@@ -30,6 +30,15 @@ async function prepararApi(
     avisos: [],
     clones: [],
     operacoesClone: [],
+    operacoesFiscais: [],
+    dadosAdicionais: {
+      canal: "loja_fisica",
+      numero_pedido: "",
+      codigo_rastreamento: "",
+      informacoes_complementares: "",
+      intermediador_cnpj: "",
+      intermediador_identificacao: "",
+    },
     venda: {
       id: vendaId,
       numero_venda: "QA-NOTA-CANCELADA",
@@ -63,6 +72,13 @@ async function prepararApi(
       nfe_chave: "0".repeat(44),
     },
   };
+  if (semNota) {
+    for (const campo of Object.keys(estado.venda).filter((nome) => nome.startsWith("nfe_"))) {
+      delete estado.venda[campo];
+    }
+    estado.venda.status = "finalizada";
+    estado.venda.cliente_id = 42006;
+  }
   await page.addInitScript(
     ({ user, tenant }) => {
       globalThis.localStorage.setItem("access_token", "token-sintetico-sem-validade");
@@ -78,6 +94,74 @@ async function prepararApi(
     async (route) => {
       const request = route.request();
       const path = new URL(request.url()).pathname;
+      if (path === "/api/clientes/42006") {
+        return route.fulfill({
+          json: { id: 42006, nome: "Cliente Sintético", cpf: "52998224725" },
+        });
+      }
+      if (path === `/api/nfe/vendas/${vendaId}/dados-adicionais`) {
+        if (request.method() === "PUT") {
+          const payload = request.postDataJSON();
+          estado.operacoesFiscais.push({ path, payload });
+          estado.dadosAdicionais = payload.dados;
+        }
+        return route.fulfill({ json: { dados: estado.dadosAdicionais, pode_editar: true } });
+      }
+      if (path === "/api/nfe/prevalidar") {
+        const { tipo_nota: tipo } = request.postDataJSON();
+        const dados = estado.dadosAdicionais;
+        const complemento = [
+          "Venda QA-NOTA-CANCELADA",
+          dados.canal === "amazon" ? "Canal de venda: Amazon" : "",
+          dados.numero_pedido ? `Nº Pedido Loja: ${dados.numero_pedido}` : "",
+          dados.codigo_rastreamento ? `Código de rastreamento: ${dados.codigo_rastreamento}` : "",
+          dados.informacoes_complementares,
+        ]
+          .filter(Boolean)
+          .join(" | ");
+        return route.fulfill({
+          json: {
+            success: true,
+            pode_emitir: true,
+            bloqueios: [],
+            correcoes: [],
+            provedor: "intnfe",
+            resumo_emissao: {
+              modelo: tipo === "nfe" ? 55 : 65,
+              ambiente_codigo: 2,
+              ambiente: "homologação",
+              serie: 1,
+              total: 39.9,
+              itens: [{}],
+              destinatario: { nome: "Cliente Sintético" },
+              contexto_comercial: dados,
+              informacoes_adicionais: complemento,
+            },
+          },
+        });
+      }
+      if (path === "/api/nfe/emitir") {
+        const payload = request.postDataJSON();
+        estado.operacoesFiscais.push({ path, payload });
+        Object.assign(estado.venda, {
+          nfe_provider: "intnfe",
+          nfe_tipo: "nfe",
+          nfe_modelo: "55",
+          nfe_numero: 18590,
+          nfe_status: "autorizada",
+          nfe_correlation_id: "sintetica-qa",
+        });
+        estado.statusFiscal = "autorizada";
+        return route.fulfill({
+          json: {
+            success: true,
+            processando: false,
+            provedor: "intnfe",
+            situacao: "autorizada",
+            numero: 18590,
+          },
+        });
+      }
       if (path === "/api/nfe/clones/preparar") {
         estado.operacoesClone.push({ path, payload: request.postDataJSON() });
         return route.fulfill({
@@ -461,5 +545,68 @@ test.describe("PDV — cancelamento após nota fiscal cancelada", () => {
     expect(estado.operacoesClone.filter((item) => item.path.endsWith("/emitir"))).toHaveLength(1);
     expect(estado.venda).toEqual(vendaOriginal);
     expect(estado.envios).toHaveLength(0);
+  });
+
+  test("NF-e manual revisa pedido Amazon e mostra o complemento antes da transmissão", async ({
+    page,
+  }) => {
+    const estado = await prepararApi(page, { semNota: true });
+    await page.goto(`/pdv?venda_id=${vendaId}`);
+    await page.getByRole("button", { name: "Emitir NF", exact: true }).click();
+    const escolha = page.getByRole("dialog", { name: "Escolha o documento fiscal" });
+    await escolha.getByRole("button", { name: /NF-e Modelo 55/ }).click();
+    await escolha.getByRole("button", { name: "Emitir NF-e (55)", exact: true }).click();
+    const revisao = page.getByRole("dialog", { name: "Dados adicionais da NF-e" });
+    await revisao.getByRole("combobox", { name: "Canal desta operação" }).fill("Amazon");
+    await revisao.getByRole("option", { name: "Amazon", exact: true }).click();
+    await revisao.getByLabel("Número do pedido da Amazon").fill("QA-AMAZON-0001");
+    await revisao.getByLabel("Código de rastreamento (opcional)").fill("QA-RASTREIO");
+    await revisao.getByLabel("CNPJ do intermediador").fill("11222333000181");
+    await revisao
+      .getByLabel("Identificação da sua loja ou vendedor na Amazon")
+      .fill("QA-AMAZON-0001");
+    await revisao.getByRole("button", { name: "Salvar e revisar nota", exact: true }).click();
+    await expect(revisao.getByRole("alert")).toContainText("não pode ser o número do pedido");
+    expect(estado.operacoesFiscais).toHaveLength(0);
+    await revisao.getByLabel("Identificação da sua loja ou vendedor na Amazon").fill("LOJA-QA");
+    await revisao
+      .getByLabel("Informações complementares")
+      .fill("Envio referente ao pedido da Amazon.");
+    expect(estado.operacoesFiscais).toHaveLength(0);
+    await revisao.getByRole("button", { name: "Salvar e revisar nota", exact: true }).click();
+    const confirmacao = page
+      .getByRole("dialog")
+      .filter({ hasText: "Confirmar a transmissão destes dados?" });
+    await expect(confirmacao).toContainText("Canal da operação: Amazon");
+    await expect(confirmacao).toContainText("Informações adicionais no DANFE:");
+    await expect(confirmacao).toContainText("Nº Pedido Loja: QA-AMAZON-0001");
+    await expect(confirmacao).toContainText("Código de rastreamento: QA-RASTREIO");
+    await expect(confirmacao).toContainText("Envio referente ao pedido da Amazon.");
+    expect(estado.operacoesFiscais.map((item) => item.path)).toEqual([
+      `/api/nfe/vendas/${vendaId}/dados-adicionais`,
+    ]);
+    await confirmacao.getByRole("button", { name: "Confirmar", exact: true }).click();
+    await expect
+      .poll(() => estado.operacoesFiscais.filter((item) => item.path === "/api/nfe/emitir").length)
+      .toBe(1);
+    expect(estado.dadosAdicionais.intermediador_identificacao).toBe("LOJA-QA");
+    expect(estado.dadosAdicionais.numero_pedido).toBe("QA-AMAZON-0001");
+  });
+
+  test("voltar da revisão de dados adicionais não transmite nem salva a nota", async ({ page }) => {
+    const estado = await prepararApi(page, { semNota: true });
+    await page.goto(`/pdv?venda_id=${vendaId}`);
+    await page.getByRole("button", { name: "Emitir NF", exact: true }).click();
+    const escolha = page.getByRole("dialog", { name: "Escolha o documento fiscal" });
+    await escolha.getByRole("button", { name: /NF-e Modelo 55/ }).click();
+    await escolha.getByRole("button", { name: "Emitir NF-e (55)", exact: true }).click();
+    const revisao = page.getByRole("dialog", { name: "Dados adicionais da NF-e" });
+    await revisao.getByLabel("Informações complementares").fill("Texto que não deve ser enviado.");
+    await revisao.getByRole("button", { name: "Voltar", exact: true }).click();
+    await expect(revisao).toHaveCount(0);
+    await expect(
+      escolha.getByRole("button", { name: "Emitir NF-e (55)", exact: true }),
+    ).toBeVisible();
+    expect(estado.operacoesFiscais).toHaveLength(0);
   });
 });

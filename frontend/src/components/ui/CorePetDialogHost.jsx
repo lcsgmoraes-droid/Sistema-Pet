@@ -122,7 +122,7 @@ export default function CorePetDialogHost() {
             </h2>
             <p
               id="corepet-dialog-message"
-              className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600 dark:text-slate-300"
+              className="mt-2 max-h-[55dvh] overflow-y-auto whitespace-pre-line break-words text-sm leading-6 text-slate-600 dark:text-slate-300"
             >
               {dialogo.mensagem}
             </p>

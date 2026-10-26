@@ -2,6 +2,7 @@ import api from "../api";
 import { formatMoneyBRL } from "./formatters";
 import { confirmarCorePet } from "../services/corepetDialog";
 import { solicitarCorrecaoFiscal } from "../services/fiscalCorrectionDialog";
+import { solicitarDadosAdicionaisNota } from "../services/nfeAdditionalDataDialog";
 import {
   MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO,
   rejeicaoResponsavelTecnico,
@@ -115,6 +116,20 @@ function resumoIntNFe(resumo) {
   ];
   const destinatario = resumo.destinatario?.razaoSocial || resumo.destinatario?.nome;
   if (destinatario) linhas.push(`Destinatário: ${destinatario}`);
+  const contexto = resumo.contexto_comercial;
+  const informacoesAdicionais =
+    typeof resumo.informacoes_adicionais === "string" ? resumo.informacoes_adicionais.trim() : "";
+  if (contexto) {
+    const canais = {
+      loja_fisica: "PDV / loja física",
+      venda_direta_online: "Venda direta pela internet",
+      amazon: "Amazon",
+    };
+    if (contexto.canal)
+      linhas.push(`Canal da operação: ${canais[contexto.canal] || contexto.canal}`);
+    if (contexto.numero_pedido) linhas.push(`Número do pedido: ${contexto.numero_pedido}`);
+    if (contexto.codigo_rastreamento) linhas.push(`Rastreamento: ${contexto.codigo_rastreamento}`);
+  }
   if (resumo.indicador_presenca === "4") {
     const endereco = resumo.destinatario?.endereco || {};
     const enderecoEntrega = [
@@ -136,6 +151,8 @@ function resumoIntNFe(resumo) {
   if (resumo.ambiente_codigo === 1) {
     linhas.unshift("ATENÇÃO: esta confirmação transmitirá uma nota fiscal real.", "");
   }
+  if (informacoesAdicionais)
+    linhas.push("", "Informações adicionais no DANFE:", informacoesAdicionais);
   linhas.push("", "Confirmar a transmissão destes dados?");
   return linhas.join("\n");
 }
@@ -206,8 +223,13 @@ export async function emitirNotaFiscalAssistida({
   vendaId,
   tipoNota = "nfce",
   confirmar = confirmarCorePet,
+  revisarDadosAdicionais = solicitarDadosAdicionaisNota,
   semInteracao = false,
 } = {}) {
+  if (tipoNota === "nfe" && !semInteracao) {
+    const revisado = await revisarDadosAdicionais({ vendaId });
+    if (!revisado) return { cancelado: true };
+  }
   let validacao;
   for (let tentativa = 0; tentativa < 5; tentativa += 1) {
     validacao = await prevalidarNotaFiscal({ vendaId, tipoNota });
