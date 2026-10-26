@@ -15,6 +15,7 @@ test.skip(
 const racao = (quantidade, vendaBruta) => ({
   produto_id: 101,
   produto_nome: "Ração QA",
+  produto_codigo: "RACAO-QA",
   quantidade,
   preco_unitario: vendaBruta / quantidade,
   venda_bruta: vendaBruta,
@@ -22,6 +23,7 @@ const racao = (quantidade, vendaBruta) => ({
 const areia = (valor) => ({
   produto_id: 102,
   produto_nome: "Areia QA",
+  produto_codigo: "AREIA-QA",
   quantidade: 1,
   preco_unitario: valor,
   venda_bruta: valor,
@@ -90,12 +92,12 @@ async function abrirRelatorio(page) {
   await expect(
     page.getByRole("heading", { name: "Vendas por vendedor", exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "Produto", exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: /^Produtos/ })).toBeVisible();
 }
 
 async function selecionarProduto(page) {
-  await page.getByRole("combobox", { name: "Produto", exact: true }).fill("Ração QA");
-  await page.getByRole("option", { name: "Ração QA (#101)", exact: true }).click();
+  await page.getByRole("combobox", { name: /^Produtos/ }).fill("Ração QA");
+  await page.getByRole("option").filter({ hasText: "Ração QA" }).click();
 }
 
 test("produto por vendedor conta só seus itens e mantém os filtros independentes", async ({
@@ -105,7 +107,7 @@ test("produto por vendedor conta só seus itens e mantém os filtros independent
   await expect(page.getByText(/4 venda\(s\) · Total vendido: R\$\s*460,00/)).toBeVisible();
   await selecionarProduto(page);
 
-  const resumo = page.getByRole("table", { name: "Resumo por vendedor · Ração QA (#101)" });
+  const resumo = page.getByRole("table", { name: "Resumo por vendedor · Ração QA (RACAO-QA)" });
   await expect(resumo).toBeVisible();
   await expect(resumo.getByRole("row")).toHaveCount(4);
   await expect(resumo.getByRole("row").filter({ hasText: "Ana QA" }).getByRole("cell")).toHaveText([
@@ -132,8 +134,7 @@ test("produto por vendedor conta só seus itens e mantém os filtros independent
     page.getByText(/Quantidade do produto: 2.*Valor bruto do produto: R\$\s*60,00/),
   ).toBeVisible();
 
-  const campoProduto = page.locator("#relatorio-produto-vendedor").locator("..");
-  await campoProduto.getByRole("button", { name: "Limpar seleção", exact: true }).click();
+  await page.getByRole("button", { name: "Remover Ração QA (RACAO-QA)", exact: true }).click();
   await expect(resumo).toHaveCount(0);
   await expect(page.getByText(/2 venda\(s\) · Total vendido: R\$\s*290,00/)).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Vendedor", exact: true })).toHaveValue("Ana QA");
@@ -149,7 +150,7 @@ test("exporta o recorte de produto para um arquivo Excel", async ({ page }) => {
   const baixar = page.waitForEvent("download");
   await page.getByRole("button", { name: "Exportar Excel", exact: true }).click();
   const arquivo = await baixar;
-  expect(arquivo.suggestedFilename()).toMatch(/^vendas_por_vendedor_produto_101_.*\.xlsx$/);
+  expect(arquivo.suggestedFilename()).toMatch(/^vendas_por_vendedor_produtos_.*\.xlsx$/);
   expect(await arquivo.failure()).toBeNull();
   const dados = await stat(await arquivo.path());
   expect(dados.size).toBeGreaterThan(100);
@@ -178,7 +179,7 @@ test("exporta PDF somente do produto e vendedor selecionados", async ({ page }) 
 
   const { arquivo, texto } = await baixarPdf(page);
   expect(arquivo.suggestedFilename()).toMatch(
-    /^vendas_por_vendedor_produto_101_\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}\.pdf$/,
+    /^vendas_por_vendedor_produtos_\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}\.pdf$/,
   );
   expect(texto).toContain("Ana QA");
   expect(texto).toContain("60,00");

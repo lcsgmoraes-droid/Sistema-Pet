@@ -4,12 +4,31 @@ Chamado ao finalizar vendas para calcular e registrar comissões
 """
 
 import logging
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional, Dict
 from app.tenancy.context import get_current_tenant_id
 from app.utils.tenant_safe_sql import TenantSafeSQLError, execute_tenant_safe
 
 logger = logging.getLogger(__name__)
+
+
+def calcular_comissao_fixa_parcela(
+    valor_comissao_total, valor_pago, total_venda, valor_pago_anterior=0
+):
+    """Distribui centavos pelo recebimento acumulado, sem pagar centavos extras."""
+    total = Decimal(str(total_venda))
+    comissao = Decimal(str(valor_comissao_total))
+    if total <= 0:
+        return max(Decimal("0"), comissao)
+    anterior = min(total, max(Decimal("0"), Decimal(str(valor_pago_anterior or 0))))
+    atual = min(total, anterior + max(Decimal("0"), Decimal(str(valor_pago or 0))))
+    antes = (comissao * anterior / total).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    depois = (comissao * atual / total).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    return max(Decimal("0"), depois - antes)
 
 
 CONFIGURACAO_COMISSAO_COLUMNS = """
@@ -26,7 +45,8 @@ CONFIGURACAO_COMISSAO_COLUMNS = """
             comissao_venda_parcial,
             permite_edicao_venda,
             observacoes,
-            ativo
+            ativo,
+            valor_fixo
 """
 
 
@@ -46,6 +66,7 @@ def _configuracao_row_to_dict(config) -> Dict:
         "permite_edicao_venda": config[11] if config[11] is not None else True,
         "observacoes": config[12] or "",
         "ativo": config[13],
+        "valor_fixo": config[14] if len(config) > 14 else 0,
     }
 
 
@@ -274,8 +295,15 @@ def calcular_comissao_item(
         base -= taxa_entregador_item
         base -= custo_operacional_item
 
-    # ETAPA 5: APLICAR PERCENTUAL
-    comissao_bruta = base * (percentual / 100)
+    # Valor fixo é por unidade; não sofre deduções de taxas nem muda regras antigas.
+    if tipo_calculo == "fixo":
+        base = quantidade
+        percentual = Decimal("0")
+        comissao_bruta = (
+            Decimal(str(config.get("valor_fixo") or 0)) * quantidade
+        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    else:
+        comissao_bruta = base * (percentual / 100)
     comissao_final = max(Decimal("0"), comissao_bruta)
 
     return {
@@ -283,6 +311,7 @@ def calcular_comissao_item(
         "base_calculo": float(base),
         "tipo_calculo": tipo_calculo,
         "percentual": float(percentual),
+        "valor_fixo": float(config.get("valor_fixo") or 0),
         "valor_bruto": float(valor_bruto_item),
         "valor_liquido": float(valor_liquido_item),
         "custo_item": float(custo_total),

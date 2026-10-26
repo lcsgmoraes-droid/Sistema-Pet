@@ -21,12 +21,19 @@ from .financeiro.contas_pagar_common import (
     _normalizar_texto_busca,
 )
 from .financeiro_models import ContaReceber
+from .financeiro.status_contas_receber import status_conta_receber
 from .models import Cliente
 from .utils.timezone import now_brasilia
 
 router = APIRouter()
 
-STATUS_CONTAS_RECEBER_EM_ABERTO = ("pendente", "parcial", "vencido", "vencida")
+STATUS_CONTAS_RECEBER_EM_ABERTO = (
+    "pendente",
+    "parcial",
+    "baixa_parcial",
+    "vencido",
+    "vencida",
+)
 
 
 def _montar_condicao_busca_contas_receber(tenant_id, busca: str):
@@ -110,6 +117,10 @@ def listar_contas_receber(
             query = query.filter(
                 ContaReceber.status.in_(STATUS_CONTAS_RECEBER_EM_ABERTO)
             )
+        elif status_normalizado in {"recebido", "pago"}:
+            query = query.filter(ContaReceber.status.in_(("recebido", "pago")))
+        elif status_normalizado == "parcial":
+            query = query.filter(ContaReceber.status.in_(("parcial", "baixa_parcial")))
         else:
             query = query.filter(ContaReceber.status == status_normalizado)
     if cliente_id:
@@ -213,7 +224,7 @@ def listar_contas_receber(
                 "data_emissao": conta.data_emissao,
                 "data_vencimento": conta.data_vencimento,
                 "data_recebimento": conta.data_recebimento,
-                "status": conta.status,
+                "status": status_conta_receber(conta),
                 "dias_vencimento": dias_venc,
                 "eh_parcelado": conta.eh_parcelado,
                 "numero_parcela": conta.numero_parcela,
@@ -379,7 +390,7 @@ def buscar_conta_receber(
             "vencimento": conta.data_vencimento,
             "recebimento": conta.data_recebimento,
         },
-        "status": conta.status,
+        "status": status_conta_receber(conta),
         "encargos": calculo_encargos,
         "parcelamento": (
             {

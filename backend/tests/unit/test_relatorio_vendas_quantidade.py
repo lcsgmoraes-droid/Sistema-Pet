@@ -99,3 +99,22 @@ def test_quantidade_original_zero_tambem_e_preservada():
     resultado = _enriquecer([_item(10, 20, "0.000")], snapshots)
 
     assert resultado[0]["quantidade"] == 0
+
+
+def test_snapshot_legado_recebe_codigo_publico_sem_depender_de_grupo_salvo():
+    item = _item(10, 20, "2.000")
+    item.produto = SimpleNamespace(codigo="  RACAO-0007  ")
+    snapshot = {"venda_item_id": 10, "produto_id": 20, "quantidade": 2}
+
+    resultado = _enriquecer([item], [snapshot])
+
+    assert resultado[0]["produto_codigo"] == "RACAO-0007"
+    assert "produto_codigo" not in snapshot
+
+
+def test_produto_sem_codigo_publico_nunca_exibe_id_interno_como_codigo():
+    item = _item(10, 20, "2.000")
+    item.produto = SimpleNamespace(id=20, codigo="")
+    snapshot = {"venda_item_id": 10, "produto_id": 20, "quantidade": 2}
+
+    assert "produto_codigo" not in _enriquecer([item], [snapshot])[0]

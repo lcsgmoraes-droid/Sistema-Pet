@@ -26,7 +26,7 @@ export function useVacinasDeepLinks({
     if (pessoaId) {
       const tutorSelecionado = {
         id: pessoaId,
-        nome: petEncontrado.cliente_nome ?? `Pessoa #${pessoaId}`,
+        nome: petEncontrado.cliente_nome ?? "Pessoa não informada",
       };
 
       setPessoaFiltro(pessoaId);
@@ -59,7 +59,7 @@ export function useVacinasDeepLinks({
 
     setTutorFormSelecionado({
       id: String(tutorIdQuery),
-      nome: tutorNomeQuery || `Pessoa #${tutorIdQuery}`,
+      nome: tutorNomeQuery || "Pessoa não informada",
     });
     setForm((prev) => ({ ...prev, pessoa_id: String(tutorIdQuery) }));
   }, [setForm, setTutorFormSelecionado, tutorFormSelecionado, tutorIdQuery, tutorNomeQuery]);

@@ -89,3 +89,18 @@ def test_fusao_recarrega_credito_de_pessoas_ja_carregadas_antes_do_lock():
     assert carregado_principal is principal
     assert carregado_duplicado is duplicado
     assert carregado_principal.credito + carregado_duplicado.credito == Decimal("40.00")
+
+
+def test_preview_obtem_pessoas_sem_bloquear_linhas():
+    principal = SimpleNamespace(id=1, ativo=True, merged_into_id=None)
+    duplicado = SimpleNamespace(id=2, ativo=True, merged_into_id=None)
+    consulta = MagicMock()
+    consulta.filter.return_value = consulta
+    consulta.populate_existing.return_value = consulta
+    consulta.all.return_value = [principal, duplicado]
+    db = MagicMock()
+    db.query.return_value = consulta
+
+    assert _obter_pessoas(db, uuid4(), 1, 2, bloquear=False) == (principal, duplicado)
+    consulta.populate_existing.assert_called_once()
+    consulta.with_for_update.assert_not_called()

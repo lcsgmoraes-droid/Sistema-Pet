@@ -20,6 +20,15 @@ def _phone_digits(value: str | None) -> str:
     return digits[2:] if len(digits) == 13 and digits.startswith("55") else digits
 
 
+def _user_phone(user: User) -> str | None:
+    """Contas por SMS podem ter apenas login_phone, sem telefone no perfil."""
+    for field in ("telefone", "login_phone"):
+        value = str(getattr(user, field, None) or "").strip()
+        if value:
+            return value
+    return None
+
+
 def _is_operational_cliente(cliente: Cliente | None) -> bool:
     if not cliente or getattr(cliente, "ativo", True) is False:
         return False
@@ -195,7 +204,7 @@ def _find_operational_cliente_match(
 ) -> Cliente | None:
     email = (getattr(user, "email", None) or "").strip().lower()
     cpf_digits = _digits_only(getattr(user, "cpf_cnpj", None))
-    telefone_digits = _digits_only(getattr(user, "telefone", None))
+    telefone_digits = _phone_digits(_user_phone(user))
     if not email and not cpf_digits and not telefone_digits:
         return None
 
@@ -384,7 +393,7 @@ def _get_or_create_cliente_for_user(
     cliente: Cliente | None = None
     cpf_usuario = getattr(user, "cpf_cnpj", None)
     email_usuario = (getattr(user, "email", None) or "").strip().lower()
-    telefone_usuario = getattr(user, "telefone", None)
+    telefone_usuario = _user_phone(user)
     if clientes_vinculados:
         cliente = _select_preferred_cliente(
             clientes_vinculados,
@@ -406,7 +415,7 @@ def _get_or_create_cliente_for_user(
             user_id=user.id,
             email=user.email,
             cpf=user.cpf_cnpj,
-            telefone=user.telefone,
+            telefone=telefone_usuario,
         )
 
     if not cliente:
@@ -418,7 +427,7 @@ def _get_or_create_cliente_for_user(
             codigo=gerar_codigo_cliente(db, "PF", tenant_id),
             nome=user.nome or getattr(user, "username", None) or user.email,
             email=user.email,
-            telefone=user.telefone,
+            telefone=telefone_usuario,
             cpf=user.cpf_cnpj,
             is_cliente=True,
             tipo_pessoa="PF",
@@ -440,8 +449,8 @@ def _get_or_create_cliente_for_user(
             cliente.nome = user.nome or getattr(user, "username", None) or user.email
         if not cliente.email:
             cliente.email = user.email
-        if not cliente.telefone and user.telefone:
-            cliente.telefone = user.telefone
+        if not cliente.telefone and telefone_usuario:
+            cliente.telefone = telefone_usuario
         if not cliente.cpf and user.cpf_cnpj:
             cliente.cpf = user.cpf_cnpj
 

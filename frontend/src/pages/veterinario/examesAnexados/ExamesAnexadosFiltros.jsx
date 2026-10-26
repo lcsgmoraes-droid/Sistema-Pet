@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import BuscaPessoa from "../../../components/v2/BuscaPessoa/BuscaPessoa";
 
 const PERIODOS = [
   { id: "hoje", label: "Hoje" },
@@ -42,13 +42,11 @@ export default function ExamesAnexadosFiltros({
         <div className="md:col-span-2">
           <label className="block text-xs font-medium text-gray-600 mb-1">Tutor (nome)</label>
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
+            <BuscaPessoa
               value={tutorBusca}
-              onChange={(event) => onChangeTutorBusca(event.target.value)}
+              onChange={(valor) => onChangeTutorBusca(valor)}
               placeholder="Digite o nome do tutor..."
-              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300"
+              showSuggestions={false}
             />
           </div>
         </div>

@@ -169,21 +169,27 @@ def _pessoa_resumo(pessoa: Cliente) -> dict[str, Any]:
 
 
 def _obter_pessoas(
-    db: Session, tenant_id: Any, principal_id: int, duplicado_id: int
+    db: Session,
+    tenant_id: Any,
+    principal_id: int,
+    duplicado_id: int,
+    *,
+    bloquear: bool = True,
 ) -> tuple[Cliente, Cliente]:
     if principal_id == duplicado_id:
         raise ValueError("Selecione duas pessoas diferentes para fundir.")
 
-    pessoas = (
+    consulta = (
         db.query(Cliente)
         .filter(
             Cliente.tenant_id == tenant_id,
             Cliente.id.in_([principal_id, duplicado_id]),
         )
         .populate_existing()
-        .with_for_update()
-        .all()
     )
+    if bloquear:
+        consulta = consulta.with_for_update()
+    pessoas = consulta.all()
     por_id = {int(pessoa.id): pessoa for pessoa in pessoas}
     principal = por_id.get(int(principal_id))
     duplicado = por_id.get(int(duplicado_id))
@@ -291,7 +297,9 @@ def montar_preview_fusao_pessoas(
     principal_id: int,
     duplicado_id: int,
 ) -> dict[str, Any]:
-    principal, duplicado = _obter_pessoas(db, tenant_id, principal_id, duplicado_id)
+    principal, duplicado = _obter_pessoas(
+        db, tenant_id, principal_id, duplicado_id, bloquear=False
+    )
     campos = []
 
     for campo, label in CAMPOS_CADASTRAIS_PESSOA:

@@ -123,7 +123,7 @@ async def finalizar_venda(
         cupom_code=dados.cupom_code,
         cupom_discount_applied=dados.cupom_discount_applied,
         db=db,
-        caixa_id=caixa_revisao.id if caixa_revisao else None,
+        caixa_id=caixa_revisao.id if caixa_revisao else dados.caixa_id,
         data_ocorrencia=dados.data_ocorrencia if caixa_revisao else None,
         motivo_revisao=dados.motivo_revisao.strip() if caixa_revisao else None,
         motivo_liberacao_crediario=dados.motivo_liberacao_crediario,

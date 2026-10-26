@@ -1,3 +1,4 @@
+import { obterCodigoPessoaPublico } from "../utils/codigosPublicos";
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -116,8 +117,8 @@ export default function ClientePessoaEditar() {
         title={cliente.nome}
         subtitle={
           <>
-            Código {cliente.codigo || cliente.id} · Editando cadastro · Criado em{" "}
-            {formatarDataHoraCadastro(cliente.created_at)} · Criado por{" "}
+            Código {obterCodigoPessoaPublico(cliente) || "Não informado"} · Editando cadastro ·
+            Criado em {formatarDataHoraCadastro(cliente.created_at)} · Criado por{" "}
             {cliente.criado_por_nome || cliente.criado_por_email || "Usuário não registrado"}
           </>
         }

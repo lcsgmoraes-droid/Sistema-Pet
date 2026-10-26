@@ -26,7 +26,7 @@ export default function BanhoTosaCreditosList({ creditos = [] }) {
               <p className="flex flex-wrap items-center gap-1.5 text-sm text-slate-500">
                 <CustomerIdentity
                   codeLabel="Cod. tutor"
-                  fallback={`Tutor #${credito.cliente_id || "-"}`}
+                  fallback={"Tutor não informado"}
                   layout="inline"
                   nameClassName="font-medium text-slate-600"
                   record={credito}

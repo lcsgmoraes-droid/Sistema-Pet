@@ -189,7 +189,8 @@ async def buscar_configuracoes_funcionario(
                         WHEN cc.tipo = 'subcategoria' THEN sc.nome
                         WHEN cc.tipo = 'produto' THEN p.nome
                         WHEN cc.tipo = 'geral' THEN 'Regra geral'
-                    END as nome_item
+                    END as nome_item,
+                    cc.valor_fixo
                 FROM comissoes_configuracao cc
                 LEFT JOIN categorias c ON cc.tipo = 'categoria' AND cc.referencia_id = c.id AND c.tenant_id = cc.tenant_id
                 LEFT JOIN categorias sc ON cc.tipo = 'subcategoria' AND cc.referencia_id = sc.id AND sc.tenant_id = cc.tenant_id
@@ -226,6 +227,7 @@ async def buscar_configuracoes_funcionario(
                         else False,
                         "observacoes": row[13] or "",
                         "nome_item": row[14] if row[14] else None,
+                        "valor_fixo": float(row[15] or 0),
                     }
                 )
 

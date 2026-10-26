@@ -1,3 +1,4 @@
+import BuscaPessoa from "../../components/v2/BuscaPessoa/BuscaPessoa";
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import {
@@ -162,10 +163,10 @@ export default function LembretesClientesInativos() {
               className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
             />
             <span className="sr-only">Buscar cliente inativo</span>
-            <input
+            <BuscaPessoa
               type="search"
               value={busca}
-              onChange={(event) => setBusca(event.target.value)}
+              onChange={setBusca}
               placeholder="Buscar por nome, código, telefone ou e-mail"
               className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
             />
@@ -253,7 +254,7 @@ export default function LembretesClientesInativos() {
                           {cliente.nome}
                         </p>
                         <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                          {cliente.codigo ? `Código ${cliente.codigo}` : `ID ${cliente.cliente_id}`}
+                          {cliente.codigo ? `Código ${cliente.codigo}` : "Código não informado"}
                           {cliente.telefone ? ` · ${cliente.telefone}` : " · Sem telefone"}
                         </p>
                       </td>

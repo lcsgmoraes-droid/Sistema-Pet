@@ -29,11 +29,13 @@ from .comissoes_parceiros_routes import (
     router as parceiros_router,
 )
 from .comissoes_schema_guard import ensure_comissoes_config_schema
+from .comissoes_grupos_routes import router as grupos_router
 
 router = APIRouter(prefix="/comissoes", tags=["comissoes"])
 router.include_router(parceiros_router)
 router.include_router(configuracoes_router)
 router.include_router(operacional_router)
+router.include_router(grupos_router)
 
 __all__ = [
     "TIPOS_CONFIGURACAO_COMISSAO",

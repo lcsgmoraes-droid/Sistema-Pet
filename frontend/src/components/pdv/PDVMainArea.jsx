@@ -69,6 +69,7 @@ export default function PDVMainArea(props) {
     onCopiarCampoCliente,
     onRemoverCliente,
     onSelecionarCliente,
+    onAtualizarCliente,
     onSelecionarPet,
     saldoCampanhas,
     vendasEmAbertoInfo,
@@ -255,6 +256,7 @@ export default function PDVMainArea(props) {
             onCopiarCampoCliente={onCopiarCampoCliente}
             onRemoverCliente={onRemoverCliente}
             onSelecionarCliente={selecionarClienteEFocarProduto}
+            onAtualizarCliente={onAtualizarCliente}
             onSelecionarPet={onSelecionarPet}
             onTrocarCliente={onRemoverCliente}
             saldoCampanhas={saldoCampanhas}

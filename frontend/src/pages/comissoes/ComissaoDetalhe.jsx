@@ -116,6 +116,10 @@ const ComissaoDetalhe = ({ comissaoId, onClose }) => {
   };
 
   const formatarValorLinhaDemonstrativo = (linha) => {
+    if (linha.tipo === "quantidade")
+      return (
+        Number(linha.valor || 0).toLocaleString("pt-BR", { maximumFractionDigits: 3 }) + " un."
+      );
     if (linha.tipo === "percentual") {
       return formatarPercentual(Number(linha.valor || 0));
     }
@@ -247,7 +251,7 @@ const ComissaoDetalhe = ({ comissaoId, onClose }) => {
                   />
                   <Campo
                     label="ID do Produto"
-                    valor={<CopyableCode label="Produto" value={comissao.produto_id} />}
+                    valor={<CopyableCode label="Produto" value={comissao.produto_codigo || "—"} />}
                   />
                   <Campo label="ID do Funcionário" valor={`#${comissao.funcionario_id}`} />
                   <Campo label="Data da Venda" valor={formatarData(comissao.data_venda)} />
@@ -379,16 +383,32 @@ const ComissaoDetalhe = ({ comissaoId, onClose }) => {
                     }
                   />
                   <Campo
-                    label="Percentual da Comissão"
-                    valor={formatarPercentual(comissao.calculo.percentual_comissao)}
+                    label={
+                      comissao.calculo.tipo_calculo === "fixo"
+                        ? "Valor fixo por unidade"
+                        : "Percentual da Comissão"
+                    }
+                    valor={
+                      comissao.calculo.tipo_calculo === "fixo"
+                        ? formatarMoeda(comissao.calculo.valor_fixo)
+                        : formatarPercentual(comissao.calculo.percentual_comissao)
+                    }
                   />
                   <Campo
                     label="Percentual Aplicado (Pago)"
                     valor={formatarPercentual(comissao.calculo.percentual_aplicado)}
                   />
                   <Campo
-                    label="Valor Base de Cálculo"
-                    valor={formatarMoeda(comissao.calculo.valor_base_calculo)}
+                    label={
+                      comissao.calculo.tipo_calculo === "fixo"
+                        ? "Quantidade comissionada"
+                        : "Valor Base de Cálculo"
+                    }
+                    valor={
+                      comissao.calculo.tipo_calculo === "fixo"
+                        ? `${Number(comissao.calculo.valor_base_calculo || 0).toLocaleString("pt-BR", { maximumFractionDigits: 3 })} un.`
+                        : formatarMoeda(comissao.calculo.valor_base_calculo)
+                    }
                     destaque
                   />
                   <Campo
@@ -625,16 +645,28 @@ const ComissaoDetalhe = ({ comissaoId, onClose }) => {
                   )}
 
                   <div className="flex justify-between items-center border-t-2 border-white/40 pt-2">
-                    <span className="text-blue-100 font-semibold">(=) Base de Cálculo:</span>
+                    <span className="text-blue-100 font-semibold">
+                      {comissao.calculo.tipo_calculo === "fixo"
+                        ? "(=) Quantidade comissionada:"
+                        : "(=) Base de Cálculo:"}
+                    </span>
                     <span className="font-bold text-lg">
-                      {formatarMoeda(comissao.calculo.valor_base_calculo)}
+                      {comissao.calculo.tipo_calculo === "fixo"
+                        ? `${Number(comissao.calculo.valor_base_calculo || 0).toLocaleString("pt-BR", { maximumFractionDigits: 3 })} un.`
+                        : formatarMoeda(comissao.calculo.valor_base_calculo)}
                     </span>
                   </div>
 
                   <div className="flex justify-between items-center border-b border-white/20 pb-2">
-                    <span className="text-blue-100">(×) Percentual:</span>
+                    <span className="text-blue-100">
+                      {comissao.calculo.tipo_calculo === "fixo"
+                        ? "(×) Valor por unidade:"
+                        : "(×) Percentual:"}
+                    </span>
                     <span className="font-bold text-lg">
-                      {formatarPercentual(comissao.calculo.percentual_comissao)}
+                      {comissao.calculo.tipo_calculo === "fixo"
+                        ? formatarMoeda(comissao.calculo.valor_fixo)
+                        : formatarPercentual(comissao.calculo.percentual_comissao)}
                     </span>
                   </div>
 

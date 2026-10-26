@@ -1,3 +1,4 @@
+import BuscaProduto from "../v2/BuscaProduto/BuscaProduto";
 import { useEffect, useRef } from "react";
 import { Check } from "lucide-react";
 import CardFiscal from "../CardFiscal";
@@ -18,7 +19,7 @@ function EntradaXmlDetalhesItemCard({
   desvincularProduto,
   detectarDivergencias,
   filtroProduto,
-  formatarOpcaoProduto,
+  formatarOpcaoProduto: _formatarOpcaoProduto,
   formatarValorFiscal,
   getConfiancaBadge,
   item,
@@ -366,37 +367,29 @@ function EntradaXmlDetalhesItemCard({
                     Para alterar o vinculo, selecione outro produto ou clique no V para desvincular
                   </div>
 
-                  <div className="grid gap-2 xl:grid-cols-[minmax(180px,0.8fr)_minmax(260px,1.2fr)]">
-                    <input
-                      type="text"
-                      placeholder="Pesquisar outro produto..."
-                      value={filtroProduto[item.id] || ""}
-                      onChange={(e) => atualizarFiltroProduto(item.id, e.target.value)}
-                      className="w-full rounded border border-slate-300 px-3 py-1.5 text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500"
-                    />
-
-                    {/* Select para trocar produto */}
-                    <select
-                      value={item.produto_id}
-                      onChange={(e) => {
-                        if (e.target.value && e.target.value != item.produto_id) {
-                          vincularProduto(notaSelecionada.id, item.id, e.target.value);
-                        }
-                      }}
-                      className="w-full rounded border border-slate-300 px-3 py-1.5 text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500"
-                    >
-                      <option value={item.produto_id}>
-                        {`${item.produto_codigo || "Sem SKU"} | EAN: ${item.produto_ean || "Sem EAN"} | ${item.produto_nome}`}
-                      </option>
-                      {(resultadosBuscaProduto[item.id] || [])
-                        .filter((p) => p.id !== item.produto_id)
-                        .map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {formatarOpcaoProduto(p)}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
+                  <BuscaProduto
+                    value={filtroProduto[item.id] || ""}
+                    onChange={(valor) => atualizarFiltroProduto(item.id, valor)}
+                    suggestions={(resultadosBuscaProduto[item.id] || []).filter(
+                      (produto) => produto.id !== item.produto_id,
+                    )}
+                    showSuggestions
+                    loading={buscandoProduto[item.id]}
+                    onSelect={(produto) => vincularProduto(notaSelecionada.id, item.id, produto.id)}
+                    renderSuggestionContent={(produto) => (
+                      <>
+                        <span className="block font-medium">
+                          {produto.ativo === false ? "[INATIVO] " : ""}
+                          {produto.codigo || "Sem código"} - {produto.nome}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          EAN: {produto.codigo_barras || produto.gtin_ean || "Sem EAN"} | Estoque:{" "}
+                          {produto.estoque_atual || 0}
+                        </span>
+                      </>
+                    )}
+                    placeholder="Pesquisar outro produto por código, nome ou EAN"
+                  />
                 </>
               ) : (
                 <>
@@ -407,67 +400,32 @@ function EntradaXmlDetalhesItemCard({
                   </div>
 
                   <div className="space-y-3">
-                    {/* Campo de pesquisa */}
-                    <div>
-                      <div className="block text-xs font-semibold text-gray-700 mb-1">
-                        Pesquisar produto existente:
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Digite nome ou SKU..."
-                        value={filtroProduto[item.id] || ""}
-                        onChange={(e) => atualizarFiltroProduto(item.id, e.target.value)}
-                        className="w-full px-3 py-2 border-2 border-gray-400 rounded focus:ring-2 focus:ring-blue-500 text-sm"
-                      />
-                    </div>
-
-                    {/* Lista de produtos filtrados */}
-                    {filtroProduto[item.id] && filtroProduto[item.id].length >= 2 && (
-                      <div className="border-2 border-gray-300 rounded max-h-48 overflow-y-auto bg-white">
-                        {(() => {
-                          const filtrados = resultadosBuscaProduto[item.id] || [];
-                          if (buscandoProduto[item.id]) {
-                            return (
-                              <div className="px-3 py-4 text-center text-gray-500 text-xs">
-                                Buscando produtos...
-                              </div>
-                            );
-                          }
-                          if (filtrados.length === 0) {
-                            return (
-                              <div className="px-3 py-4 text-center text-gray-500 text-xs">
-                                ❌ Nenhum produto encontrado
-                              </div>
-                            );
-                          }
-                          return filtrados.map((p) => (
-                            <button
-                              key={`produto-${item.id}-${p.id}`}
-                              type="button"
-                              onClick={() => {
-                                vincularProduto(notaSelecionada.id, item.id, p.id);
-                                setFiltroProduto((prev) => ({ ...prev, [item.id]: "" }));
-                                setResultadosBuscaProduto((prev) => ({ ...prev, [item.id]: [] }));
-                              }}
-                              className={`w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-200 last:border-b-0 text-xs ${!p.ativo ? "text-red-600 font-bold" : ""}`}
-                            >
-                              {!p.ativo && "[INATIVO] "}
-                              {p.codigo || "Sem SKU"} - {p.nome}
-                              <span className="text-gray-500 ml-1">
-                                | EAN:{" "}
-                                {p.codigo_barras ||
-                                  p.gtin_ean ||
-                                  p.gtin_ean_tributario ||
-                                  "Sem EAN"}
-                              </span>
-                              <span className="text-gray-500 ml-1">
-                                (Est: {p.estoque_atual || 0})
-                              </span>
-                            </button>
-                          ));
-                        })()}
-                      </div>
-                    )}
+                    <BuscaProduto
+                      label="Pesquisar produto existente"
+                      value={filtroProduto[item.id] || ""}
+                      onChange={(valor) => atualizarFiltroProduto(item.id, valor)}
+                      suggestions={resultadosBuscaProduto[item.id] || []}
+                      showSuggestions
+                      loading={buscandoProduto[item.id]}
+                      onSelect={(produto) => {
+                        vincularProduto(notaSelecionada.id, item.id, produto.id);
+                        setFiltroProduto((prev) => ({ ...prev, [item.id]: "" }));
+                        setResultadosBuscaProduto((prev) => ({ ...prev, [item.id]: [] }));
+                      }}
+                      renderSuggestionContent={(produto) => (
+                        <>
+                          <span className="block font-medium">
+                            {produto.ativo === false ? "[INATIVO] " : ""}
+                            {produto.codigo || "Sem código"} - {produto.nome}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            EAN: {produto.codigo_barras || produto.gtin_ean || "Sem EAN"} | Estoque:{" "}
+                            {produto.estoque_atual || 0}
+                          </span>
+                        </>
+                      )}
+                      placeholder="Código, nome, SKU ou EAN do produto"
+                    />
 
                     <div className="flex items-center gap-2">
                       <div className="flex-1 border-t border-gray-300"></div>

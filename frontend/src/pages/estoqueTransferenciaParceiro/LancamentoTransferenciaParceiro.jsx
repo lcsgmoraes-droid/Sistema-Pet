@@ -1,3 +1,5 @@
+import BuscaPessoa from "../../components/v2/BuscaPessoa/BuscaPessoa";
+import BuscaProduto from "../../components/v2/BuscaProduto/BuscaProduto";
 import { formatarMoeda } from "../../api/produtos";
 import { ResumoTransferenciaCard } from "./transferenciaParceiroComponents";
 import { formatarQuantidade } from "./transferenciaParceiroUtils";
@@ -196,47 +198,16 @@ export default function LancamentoTransferenciaParceiro({
                 </div>
               ) : (
                 <>
-                  <input
-                    type="text"
+                  <BuscaPessoa
                     value={buscaParceiro}
-                    onChange={(event) => setBuscaParceiro(event.target.value)}
+                    onChange={setBuscaParceiro}
                     onFocus={() => setDropdownParceiroAberto(true)}
-                    placeholder="Buscar pessoa por nome, codigo, telefone ou email"
-                    className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                    suggestions={sugestoesParceiros}
+                    showSuggestions={dropdownParceiroAberto}
+                    loading={loadingParceiros}
+                    onSelect={selecionarParceiro}
+                    placeholder="Código, nome, documento ou telefone do parceiro"
                   />
-
-                  {dropdownParceiroAberto && (
-                    <div className="absolute z-20 mt-2 w-full rounded-2xl border border-gray-200 bg-white p-2 shadow-xl">
-                      {loadingParceiros ? (
-                        <p className="px-3 py-3 text-sm text-gray-500">Buscando pessoas...</p>
-                      ) : sugestoesParceiros.length > 0 ? (
-                        sugestoesParceiros.map((parceiro) => (
-                          <button
-                            key={parceiro.id}
-                            type="button"
-                            onClick={() => selecionarParceiro(parceiro)}
-                            className="flex w-full flex-col rounded-xl px-3 py-3 text-left transition-colors hover:bg-slate-50"
-                          >
-                            <span className="text-sm font-semibold text-gray-900">
-                              {parceiro.nome}
-                            </span>
-                            <span className="mt-1 text-xs text-gray-500">
-                              Codigo: {parceiro.codigo || "-"}
-                              {parceiro.celular ? ` | ${parceiro.celular}` : ""}
-                            </span>
-                            <span className="mt-1 text-xs text-gray-500">
-                              {tiposCadastroLabel(parceiro)}
-                              {parceiro.parceiro_ativo ? " | Parceiro ativo" : ""}
-                            </span>
-                          </button>
-                        ))
-                      ) : (
-                        <p className="px-3 py-3 text-sm text-gray-500">
-                          Nenhuma pessoa ativa encontrada para esta busca.
-                        </p>
-                      )}
-                    </div>
-                  )}
                 </>
               )}
             </div>
@@ -315,55 +286,26 @@ export default function LancamentoTransferenciaParceiro({
           </p>
         </div>
 
-        <div ref={produtoRef} className="relative mt-5">
-          <label className="mb-2 block text-sm font-medium text-gray-700">Buscar produto</label>
-          <input
-            ref={produtoInputRef}
-            type="text"
-            value={buscaProduto}
-            onChange={(event) => setBuscaProduto(event.target.value)}
-            onFocus={() => setDropdownProdutoAberto(true)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                void adicionarProdutoPorBuscaAtual();
-              }
-            }}
-            placeholder="Digite nome, SKU ou codigo de barras"
-            className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-          />
-
-          {dropdownProdutoAberto && (
-            <div className="absolute z-20 mt-2 w-full rounded-2xl border border-gray-200 bg-white p-2 shadow-xl">
-              {loadingProdutos ? (
-                <p className="px-3 py-3 text-sm text-gray-500">Buscando produtos...</p>
-              ) : sugestoesProdutos.length > 0 ? (
-                sugestoesProdutos.map((produto) => (
-                  <button
-                    key={produto.id}
-                    type="button"
-                    onClick={() => adicionarProduto(produto)}
-                    className="flex w-full flex-col rounded-xl px-3 py-3 text-left transition-colors hover:bg-slate-50"
-                  >
-                    <span className="text-sm font-semibold text-gray-900">{produto.nome}</span>
-                    <span className="mt-1 text-xs text-gray-500">
-                      Codigo: {produto.codigo || "-"}
-                      {produto.codigo_barras ? ` | CB: ${produto.codigo_barras}` : ""}
-                    </span>
-                    <span className="mt-1 text-xs text-gray-500">
-                      Estoque: {formatarQuantidade(produto.estoque_atual)} | Custo:{" "}
-                      {formatarMoeda(produto.preco_custo || 0)}
-                    </span>
-                  </button>
-                ))
-              ) : (
-                <p className="px-3 py-3 text-sm text-gray-500">
-                  Nenhum produto encontrado para esta busca.
-                </p>
-              )}
-            </div>
-          )}
-        </div>
+        <BuscaProduto
+          containerRef={produtoRef}
+          inputRef={produtoInputRef}
+          className="mt-5"
+          label="Buscar produto"
+          value={buscaProduto}
+          onChange={setBuscaProduto}
+          onFocus={() => setDropdownProdutoAberto(true)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              void adicionarProdutoPorBuscaAtual();
+            }
+          }}
+          suggestions={sugestoesProdutos}
+          showSuggestions={dropdownProdutoAberto}
+          loading={loadingProdutos}
+          onSelect={adicionarProduto}
+          placeholder="Digite nome, SKU, código ou código de barras"
+        />
 
         <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
           {entradaParceiro

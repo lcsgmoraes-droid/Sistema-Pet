@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { PackageSearch, X } from "lucide-react";
+import BuscaProduto from "../v2/BuscaProduto/BuscaProduto";
+import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
 import { vetApi } from "../../pages/veterinario/vetApi";
 
 export default function ProdutoEstoqueAutocomplete({
@@ -16,13 +17,14 @@ export default function ProdutoEstoqueAutocomplete({
   const [sugestoes, setSugestoes] = useState([]);
 
   useEffect(() => {
+    let ativo = true;
     if (disabled) {
       setSugestoes([]);
       return;
     }
     if (selectedProduct?.id) return;
     const termo = busca.trim();
-    if (termo.length < 2) {
+    if (termo.length < 1) {
       setSugestoes([]);
       return;
     }
@@ -34,15 +36,18 @@ export default function ProdutoEstoqueAutocomplete({
           ? await searchProducts(termo)
           : await vetApi.listarProdutosEstoque(termo);
         const lista = Array.isArray(res.data) ? res.data : (res.data?.items ?? []);
-        setSugestoes(lista.slice(0, 8));
+        if (ativo) setSugestoes(lista.slice(0, 20));
       } catch {
-        setSugestoes([]);
+        if (ativo) setSugestoes([]);
       } finally {
-        setCarregando(false);
+        if (ativo) setCarregando(false);
       }
     }, 250);
 
-    return () => clearTimeout(timer);
+    return () => {
+      ativo = false;
+      clearTimeout(timer);
+    };
   }, [busca, disabled, selectedProduct, searchProducts]);
 
   const estoqueLabel = useMemo(() => {
@@ -71,7 +76,8 @@ export default function ProdutoEstoqueAutocomplete({
                 })}
               </p>
             </div>
-            <button
+            <BotaoInteracao
+              tamanho="pequeno"
               type="button"
               onClick={() => {
                 onSelect?.(null);
@@ -81,56 +87,30 @@ export default function ProdutoEstoqueAutocomplete({
               disabled={disabled}
               className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
             >
-              <X size={12} />
               Trocar
-            </button>
+            </BotaoInteracao>
           </div>
         </div>
       ) : (
         <>
-          <div className="relative">
-            <PackageSearch
-              size={15}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <input
-              type="text"
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              disabled={disabled}
-              placeholder={placeholder}
-              className="w-full rounded-lg border border-gray-200 px-10 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
-            />
-          </div>
+          <BuscaProduto
+            value={busca}
+            onChange={setBusca}
+            disabled={disabled}
+            placeholder={placeholder}
+            suggestions={sugestoes}
+            showSuggestions
+            loading={carregando}
+            onSelect={(produto) => {
+              onSelect?.(produto);
+              setBusca(produto.nome || "");
+              setSugestoes([]);
+            }}
+          />
 
           {helperText ? <p className="text-xs text-gray-500">{helperText}</p> : null}
 
-          {carregando ? (
-            <p className="text-xs text-gray-400">Buscando insumos...</p>
-          ) : sugestoes.length > 0 ? (
-            <div className="max-h-52 space-y-2 overflow-auto rounded-xl border border-gray-200 bg-white p-2">
-              {sugestoes.map((produto) => (
-                <button
-                  key={produto.id}
-                  type="button"
-                  onClick={() => {
-                    onSelect?.(produto);
-                    setBusca(produto.nome || "");
-                    setSugestoes([]);
-                  }}
-                  disabled={disabled}
-                  className="w-full rounded-lg border border-gray-100 px-3 py-2 text-left hover:bg-emerald-50 disabled:opacity-50"
-                >
-                  <p className="text-sm font-medium text-gray-800">{produto.nome}</p>
-                  <p className="text-xs text-gray-500">
-                    Código: {produto.codigo || "—"} • Estoque:{" "}
-                    {Number(produto.estoque_atual || 0).toLocaleString("pt-BR")}{" "}
-                    {produto.unidade || "un"}
-                  </p>
-                </button>
-              ))}
-            </div>
-          ) : busca.trim().length >= 2 ? (
+          {!carregando && sugestoes.length === 0 && busca.trim().length >= 1 ? (
             <p className="text-xs text-amber-600">Nenhum insumo encontrado para essa busca.</p>
           ) : null}
         </>

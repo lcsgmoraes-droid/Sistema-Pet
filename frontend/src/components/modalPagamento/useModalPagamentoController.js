@@ -78,6 +78,7 @@ export default function useModalPagamentoController({
   const moduloCampanhasAtivo = moduloAtivo("campanhas");
   const moduloFiscalAtivo = moduloAtivo("fiscal");
   const [pagamentos, setPagamentos] = useState([]);
+  const [caixaRecebimentoId, setCaixaRecebimentoId] = useState(null);
   const [pagamentosExistentes, setPagamentosExistentes] = useState([]);
   const [naoGerarBeneficios, setNaoGerarBeneficios] = useState(Boolean(venda.nao_gerar_beneficios));
   const [justificativaBeneficios, setJustificativaBeneficios] = useState(
@@ -775,6 +776,7 @@ export default function useModalPagamentoController({
     setContextoExcedenteServidor,
     setErroPagamentosExistentes,
     bandeira,
+    caixaRecebimentoId,
     corParcelamentoAtual,
     cupomParaFinalizar,
     descricaoCupomMargem,
@@ -839,6 +841,8 @@ export default function useModalPagamentoController({
       vendaId: vendaFinalizadaId,
     },
     viewProps: {
+      caixaRecebimentoId,
+      setCaixaRecebimentoId,
       venda,
       onClose,
       modalPagamentoContentRef,

@@ -1,8 +1,9 @@
+import BuscaProduto from "../../components/v2/BuscaProduto/BuscaProduto";
+import FornecedorSelector from "../../components/fornecedores/FornecedorSelector";
 import { Filter, RotateCcw, Search } from "lucide-react";
 import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
 import InputCombobox from "../../components/v2/InputCombobox/InputCombobox";
 import InputData from "../../components/v2/InputData/InputData";
-import InputTexto from "../../components/v2/InputTexto/InputTexto";
 import SeletorOpcoes from "../../components/v2/SeletorOpcoes/SeletorOpcoes";
 import { CANAIS_VENDA, PERIODOS_ANALISE } from "./analiseProdutosUtils";
 
@@ -86,13 +87,14 @@ export default function AnaliseProdutosFiltros({
           placeholder="Todos os departamentos"
           onChange={(valor) => onChange("departamento_id", valor)}
         />
-        <InputCombobox
-          id="analise-produtos-fornecedor"
+        <FornecedorSelector
           label="Fornecedor"
-          value={filtros.fornecedor_id}
-          opcoes={opcoesCatalogo(catalogos.fornecedores, "Todos os fornecedores")}
-          placeholder="Todos os fornecedores"
-          onChange={(valor) => onChange("fornecedor_id", valor)}
+          fornecedorId={filtros.fornecedor_id}
+          fornecedores={catalogos.fornecedores}
+          allowCreate={false}
+          onSelect={(fornecedor) => onChange("fornecedor_id", String(fornecedor.id))}
+          onClear={() => onChange("fornecedor_id", "")}
+          placeholder="Código ou nome do fornecedor"
         />
         <InputCombobox
           id="analise-produtos-canal"
@@ -102,7 +104,7 @@ export default function AnaliseProdutosFiltros({
           placeholder="Todos os canais"
           onChange={(valor) => onChange("canal", valor)}
         />
-        <InputTexto
+        <BuscaProduto
           id="analise-produtos-busca"
           type="search"
           label="Produto"

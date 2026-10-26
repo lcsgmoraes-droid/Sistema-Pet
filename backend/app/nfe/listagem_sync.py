@@ -3,9 +3,10 @@ import sys
 from time import monotonic, sleep
 
 from sqlalchemy import or_
-from sqlalchemy.orm import Session, load_only, noload
+from sqlalchemy.orm import Session, joinedload, load_only, noload
 
 from app.bling_integration import BlingAPI
+from app.models import Cliente
 from app.nfe.listagem_base import (
     _canal_label,
     _canal_slug,
@@ -148,6 +149,7 @@ def _enriquecer_notas_com_vendas(db: Session, tenant_id, notas: list[dict]) -> N
             .options(
                 load_only(
                     Venda.id,
+                    Venda.cliente_id,
                     Venda.status,
                     Venda.nfe_status,
                     Venda.nfe_correlation_id,
@@ -160,6 +162,9 @@ def _enriquecer_notas_com_vendas(db: Session, tenant_id, notas: list[dict]) -> N
                     Venda.nfe_cancelamento_solicitado_em,
                 ),
                 noload("*"),
+                joinedload(Venda.cliente).load_only(
+                    Cliente.id, Cliente.codigo, Cliente.nome, Cliente.cpf, Cliente.cnpj
+                ),
             )
             .filter(
                 Venda.tenant_id == tenant_id,
@@ -188,6 +193,7 @@ def _enriquecer_notas_com_vendas(db: Session, tenant_id, notas: list[dict]) -> N
             ) != str(nota.get("id") or ""):
                 continue
             nota["venda_id"] = venda.id
+            _aplicar_cliente_venda_em_nota(nota, venda)
             nota["venda_status"] = venda.status
             nota.update(campos_cancelamento_com_aliases(venda))
             if venda.nfe_status:
@@ -216,6 +222,7 @@ def _vendas_por_bling_id(
 ) -> dict[str, Venda]:
     vendas = (
         db.query(Venda)
+        .options(joinedload(Venda.cliente))
         .filter(
             Venda.tenant_id == tenant_id,
             Venda.nfe_bling_id.in_(ids_bling),
@@ -250,6 +257,7 @@ def _aplicar_cliente_venda_em_nota(nota: dict, venda: Venda) -> None:
     cliente = nota.get("cliente") or {}
     if venda.cliente:
         cliente["id"] = cliente.get("id") or venda.cliente.id
+        cliente["codigo"] = getattr(venda.cliente, "codigo", None)
         cliente["nome"] = cliente.get("nome") or venda.cliente.nome
         cliente["cpf_cnpj"] = (
             cliente.get("cpf_cnpj") or venda.cliente.cpf or venda.cliente.cnpj

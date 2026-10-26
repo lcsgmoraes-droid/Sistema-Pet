@@ -36,6 +36,7 @@ export default function useEntradaXmlProdutos({
   const [resultadosBuscaProduto, setResultadosBuscaProduto] = useState({});
   const [buscandoProduto, setBuscandoProduto] = useState({});
   const buscaProdutoTimersRef = useRef({});
+  const buscaProdutoControllersRef = useRef({});
 
   useEffect(() => {
     return () => {
@@ -43,74 +44,55 @@ export default function useEntradaXmlProdutos({
         if (timerId) clearTimeout(timerId);
       });
       buscaProdutoTimersRef.current = {};
+      Object.values(buscaProdutoControllersRef.current).forEach((controller) => controller.abort());
+      buscaProdutoControllersRef.current = {};
     };
   }, []);
 
   const buscarProdutosParaVinculo = async (itemId, termo) => {
     const textoBusca = (termo || "").trim();
-
-    if (textoBusca.length < 2) {
-      setResultadosBuscaProduto((prev) => ({ ...prev, [itemId]: [] }));
-      setBuscandoProduto((prev) => ({ ...prev, [itemId]: false }));
-      return;
-    }
-
+    if (!textoBusca) return;
+    buscaProdutoControllersRef.current[itemId]?.abort();
+    const controller = new AbortController();
+    buscaProdutoControllersRef.current[itemId] = controller;
     setBuscandoProduto((prev) => ({ ...prev, [itemId]: true }));
-
     try {
-      const palavras = textoBusca.toLowerCase().split(/\s+/).filter(Boolean);
-      const palavrasServidor = [...palavras].sort((a, b) => b.length - a.length).slice(0, 4);
-
-      const promises = [];
-      palavrasServidor.forEach((palavra) => {
-        const params = { busca: palavra, ativo: null, page: 1, page_size: 300 };
-        promises.push(api.get("/produtos/", { params }));
-        promises.push(api.get("/produtos/", { params: { ...params, tipo_produto: "VARIACAO" } }));
+      const { data } = await api.get("/produtos/", {
+        params: {
+          busca: textoBusca,
+          ativo: null,
+          include_variations: true,
+          page: 1,
+          page_size: 60,
+          busca_completa: false,
+          incluir_imagens: false,
+          incluir_lotes: false,
+          incluir_detalhes_composto: false,
+        },
+        signal: controller.signal,
       });
-
-      const respostas = await Promise.all(promises);
-      const mapaPorId = new Map();
-      respostas.forEach((res) => {
-        (res.data?.items || []).forEach((p) => mapaPorId.set(p.id, p));
-      });
-
-      const encontrados = Array.from(mapaPorId.values()).filter((p) => {
-        const campos = [
-          p.nome?.toLowerCase() || "",
-          p.codigo?.toLowerCase() || "",
-          p.codigo_barras?.toLowerCase() || "",
-          p.descricao?.toLowerCase() || "",
-        ].join(" ");
-        return palavras.every((palavra) => campos.includes(palavra));
-      });
-
-      encontrados.sort((a, b) => {
-        if (a.ativo !== b.ativo) return a.ativo ? -1 : 1;
-        const na = (a.nome || "").toLowerCase();
-        const nb = (b.nome || "").toLowerCase();
-        const scoreA = palavras.filter((w) => na.includes(w)).length;
-        const scoreB = palavras.filter((w) => nb.includes(w)).length;
-        if (scoreA !== scoreB) return scoreB - scoreA;
-        return na.localeCompare(nb);
-      });
-
-      setResultadosBuscaProduto((prev) => ({ ...prev, [itemId]: encontrados.slice(0, 60) }));
+      if (!controller.signal.aborted) {
+        setResultadosBuscaProduto((prev) => ({ ...prev, [itemId]: data?.items || [] }));
+      }
     } catch (error) {
-      console.error("Erro ao buscar produtos para vinculo:", error);
-      setResultadosBuscaProduto((prev) => ({ ...prev, [itemId]: [] }));
+      if (!controller.signal.aborted) {
+        console.error("Erro ao buscar produtos para vinculo:", error);
+        setResultadosBuscaProduto((prev) => ({ ...prev, [itemId]: [] }));
+      }
     } finally {
-      setBuscandoProduto((prev) => ({ ...prev, [itemId]: false }));
+      if (!controller.signal.aborted) setBuscandoProduto((prev) => ({ ...prev, [itemId]: false }));
     }
   };
 
   const atualizarFiltroProduto = (itemId, valor) => {
+    buscaProdutoControllersRef.current[itemId]?.abort();
     setFiltroProduto((prev) => ({ ...prev, [itemId]: valor }));
 
     if (buscaProdutoTimersRef.current[itemId]) {
       clearTimeout(buscaProdutoTimersRef.current[itemId]);
     }
 
-    if ((valor || "").trim().length < 2) {
+    if ((valor || "").trim().length < 1) {
       setResultadosBuscaProduto((prev) => ({ ...prev, [itemId]: [] }));
       setBuscandoProduto((prev) => ({ ...prev, [itemId]: false }));
       return;

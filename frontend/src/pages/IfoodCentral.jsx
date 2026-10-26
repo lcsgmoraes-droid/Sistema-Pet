@@ -1,3 +1,4 @@
+import BuscaProduto from "../components/v2/BuscaProduto/BuscaProduto";
 import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -29,7 +30,6 @@ import BotaoMenuAcoes from "../components/v2/BotaoMenuAcoes/BotaoMenuAcoes";
 import CartaoIndicador from "../components/v2/CartaoIndicador/CartaoIndicador";
 import InputCheckbox from "../components/v2/InputCheckbox/InputCheckbox";
 import InputCombobox from "../components/v2/InputCombobox/InputCombobox";
-import InputTexto from "../components/v2/InputTexto/InputTexto";
 import SeletorOpcoes from "../components/v2/SeletorOpcoes/SeletorOpcoes";
 import IfoodConfiguracao from "../components/ifood/IfoodConfiguracao";
 import IfoodProdutoDetalhes from "../components/ifood/IfoodProdutoDetalhes";
@@ -465,13 +465,13 @@ export default function IfoodCentral() {
       <div hidden={aba !== "catalogo"}>
         <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <div className="grid items-start gap-3 md:grid-cols-[minmax(220px,1fr)_minmax(220px,0.65fr)]">
-            <InputTexto
+            <BuscaProduto
               id="ifood-busca"
               label="Buscar produto existente"
               placeholder="Nome, SKU ou EAN"
               value={busca}
               onChange={setBusca}
-              left={<Search className="h-4 w-4 text-slate-400" aria-hidden="true" />}
+              left={<Search aria-hidden="true" showSuggestions={false} />}
             />
             <InputCombobox
               id="ifood-filtro"

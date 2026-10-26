@@ -9,6 +9,8 @@ from sqlalchemy.exc import IntegrityError
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.clientes.common import _validar_tenant_e_obter_usuario
+from app.clientes.baixa_lote_pagamento import registrar_pagamento_lote
+from app.clientes.baixa_lote_comissoes import completar_comissoes_lote
 from app.db import get_session
 from app.financeiro_models import ContaReceber
 from app.utils.timezone import now_brasilia
@@ -130,9 +132,9 @@ async def baixar_vendas_lote(
         logger.info(f"Cliente ID: {cliente_id}")
         logger.info(f"Dados recebidos: {dados}")
 
-        from app.vendas_models import Venda, VendaPagamento
+        from app.vendas_models import Venda
         from app.caixa_models import MovimentacaoCaixa
-        from app.caixa.escopo import buscar_caixa_aberto
+        from app.caixa.escopo import buscar_caixa_para_recebimento
         from app.financeiro_models import Recebimento
         from app.ia.aba5_models import FluxoCaixa
 
@@ -150,7 +152,7 @@ async def baixar_vendas_lote(
             requisicao=requisicao,
         )
         if repeticao:
-            return repeticao.resultado
+            return completar_comissoes_lote(db, repeticao)
         instante_recebimento = now_brasilia()
 
         logger.info(f"Vendas IDs: {vendas_ids}")
@@ -158,8 +160,12 @@ async def baixar_vendas_lote(
         logger.info(f"Forma pagamento: {forma_pagamento}")
 
         # Validar se há caixa aberto
-        caixa_aberto, _ = buscar_caixa_aberto(
-            db, tenant_id=tenant_id, usuario_id=current_user.id, bloquear_caixa=True
+        caixa_aberto, _ = buscar_caixa_para_recebimento(
+            db,
+            tenant_id=tenant_id,
+            usuario_id=current_user.id,
+            caixa_id=requisicao.get("caixa_id"),
+            bloquear_caixa=True,
         )
 
         logger.info(f"Caixa aberto: {caixa_aberto}")
@@ -169,6 +175,24 @@ async def baixar_vendas_lote(
                 status_code=400,
                 detail="Não há caixa aberto. Abra o caixa antes de dar baixa nas vendas.",
             )
+
+        banco = None
+        if requisicao.get("conta_bancaria_id"):
+            from app.financeiro_models import ContaBancaria
+
+            banco = (
+                db.query(ContaBancaria)
+                .filter(
+                    ContaBancaria.id == requisicao["conta_bancaria_id"],
+                    ContaBancaria.tenant_id == tenant_id,
+                    ContaBancaria.ativa.is_(True),
+                )
+                .populate_existing()
+                .with_for_update()
+                .first()
+            )
+            if not banco:
+                raise HTTPException(400, "Conta bancária inexistente ou inativa.")
 
         lote, repetido = preparar_lote(
             db,
@@ -180,7 +204,7 @@ async def baixar_vendas_lote(
             requisicao=requisicao,
         )
         if repetido:
-            return lote.resultado
+            return completar_comissoes_lote(db, lote)
         instante_recebimento = lote.data
 
         # Buscar vendas ordenadas da mais antiga para a mais nova
@@ -248,6 +272,8 @@ async def baixar_vendas_lote(
         vendas_quitadas = []
         vendas_parciais = []
         eventos_campanha_enfileirados = 0
+        taxa_total_lote = None
+        taxa_distribuida = Decimal("0.00")
 
         for item in vendas_com_saldo:
             venda = item["venda"]
@@ -266,18 +292,25 @@ async def baixar_vendas_lote(
 
             # Criar pagamento
             # 🔒 ISOLAMENTO MULTI-TENANT: tenant_id obrigatório
-            pagamento = VendaPagamento(
-                venda_id=venda.id,
-                caixa_id=caixa_aberto.id,
-                tenant_id=tenant_id,  # ✅ Garantir isolamento entre empresas
-                forma_pagamento=forma_pagamento,
-                valor=valor_aplicar,
-                numero_transacao=numero_transacao,
-                status="confirmado",
-                data_pagamento=instante_recebimento,
-                baixa_lote_id=lote.id,
+            pagamento, dados_cartao, taxa_total_lote, taxa_distribuida = (
+                registrar_pagamento_lote(
+                    db=db,
+                    venda=venda,
+                    requisicao=requisicao,
+                    valor_aplicar=valor_aplicar,
+                    valor_total=valor_total,
+                    valor_restante=valor_restante,
+                    taxa_total_lote=taxa_total_lote,
+                    taxa_distribuida=taxa_distribuida,
+                    caixa_aberto=caixa_aberto,
+                    lote=lote,
+                    current_user=current_user,
+                    tenant_id=tenant_id,
+                    instante_recebimento=instante_recebimento,
+                    forma_pagamento=forma_pagamento,
+                    numero_transacao=numero_transacao,
+                )
             )
-            db.add(pagamento)
 
             # Atualizar status da venda
             novo_valor_pago = item["valor_ja_pago"] + valor_aplicar
@@ -411,23 +444,89 @@ async def baixar_vendas_lote(
                 novo_valor_recebido = valor_ja_recebido + valor_aplicar
 
                 conta_receber.valor_recebido = novo_valor_recebido
-                conta_receber.data_recebimento = instante_recebimento
+                conta_receber.data_recebimento = instante_recebimento.date()
 
                 if _money(conta_receber.valor_final) <= novo_valor_recebido:
-                    conta_receber.status = "pago"
+                    conta_receber.status = "recebido"
                 else:
-                    conta_receber.status = "baixa_parcial"
+                    conta_receber.status = "parcial"
 
                 # 🆕 Criar registro de recebimento
                 recebimento = Recebimento(
                     conta_receber_id=conta_receber.id,
                     valor_recebido=valor_aplicar,
                     data_recebimento=instante_recebimento.date(),
-                    observacoes=f"Baixa em lote - {forma_pagamento}",
+                    observacoes="\n".join(
+                        parte
+                        for parte in (
+                            f"Baixa em lote #{lote.id} - {forma_pagamento}",
+                            requisicao.get("observacoes"),
+                        )
+                        if parte
+                    ),
                     user_id=current_user.id,
                     tenant_id=tenant_id,  # ✅ Garantir isolamento multi-tenant
+                    caixa_id=caixa_aberto.id,
+                    conta_bancaria_id=banco.id if banco else None,
+                    forma_pagamento_id=requisicao.get("forma_pagamento_id"),
+                    numero_parcelas=requisicao.get("numero_parcelas", 1),
+                    operadora_id=pagamento.operadora_id,
+                    bandeira=pagamento.bandeira,
+                    nsu_cartao=pagamento.nsu_cartao,
                 )
                 db.add(recebimento)
+                db.flush()
+                repasse_ids = []
+                if (
+                    banco
+                    and str(forma_pagamento).strip().casefold() != "dinheiro"
+                    and not dados_cartao
+                ):
+                    from app.financeiro_models import MovimentacaoFinanceira
+
+                    db.add(
+                        MovimentacaoFinanceira(
+                            tenant_id=tenant_id,
+                            user_id=current_user.id,
+                            conta_bancaria_id=banco.id,
+                            forma_pagamento_id=requisicao.get("forma_pagamento_id"),
+                            tipo="entrada",
+                            status="realizado",
+                            valor=valor_aplicar,
+                            data_movimento=instante_recebimento,
+                            origem_tipo="recebimento",
+                            origem_id=recebimento.id,
+                            documento=f"RECEBIMENTO-{recebimento.id}",
+                            descricao=f"Baixa em lote #{lote.id} - {conta_receber.descricao}",
+                            observacoes=recebimento.observacoes,
+                        )
+                    )
+                    banco.saldo_atual = _money(banco.saldo_atual) + valor_aplicar
+                if dados_cartao:
+                    from app.financeiro import ContasReceberService
+
+                    criacao_repasse = ContasReceberService.criar_de_venda(
+                        venda=venda,
+                        pagamentos=[pagamento],
+                        user_id=current_user.id,
+                        db=db,
+                    )
+                    repasse_ids = criacao_repasse["contas_criadas"]
+                    for repasse in (
+                        db.query(ContaReceber)
+                        .filter(
+                            ContaReceber.tenant_id == tenant_id,
+                            ContaReceber.id.in_(repasse_ids),
+                        )
+                        .all()
+                    ):
+                        atualizar_previsao(
+                            db,
+                            tenant_id=tenant_id,
+                            conta=repasse,
+                            user_id=current_user.id,
+                            instante=instante_recebimento,
+                        )
 
                 # 🆕 CRIAR LANÇAMENTO REALIZADO NO FLUXO DE CAIXA
                 fluxo_realizado = FluxoCaixa(
@@ -442,8 +541,12 @@ async def baixar_vendas_lote(
                     origem_tipo="conta_receber",
                     origem_id=conta_receber.id,
                 )
-                db.add(fluxo_realizado)
-                fluxo_realizado.tenant_id = tenant_id
+                if dados_cartao:
+                    # O cliente pagou, mas o dinheiro só entra no repasse da operadora.
+                    fluxo_realizado = None
+                else:
+                    db.add(fluxo_realizado)
+                    fluxo_realizado.tenant_id = tenant_id
 
                 logger.info(
                     f"✅ Fluxo de caixa REALIZADO criado: R$ {valor_aplicar:.2f}"
@@ -468,6 +571,7 @@ async def baixar_vendas_lote(
                     previsao=fluxo_previsto,
                     evento=evento,
                     status_anterior=status_anterior,
+                    repasse_ids=repasse_ids,
                 )
 
             valor_restante -= valor_aplicar
@@ -503,7 +607,7 @@ async def baixar_vendas_lote(
         lote.resultado = resultado
         auditar_lote(db, lote, current_user, "registrar_baixa_lote")
         db.commit()
-        return resultado
+        return completar_comissoes_lote(db, lote)
     except IntegrityError:
         db.rollback()
         # Dois caixas podem reenviar a mesma chave ao mesmo tempo. A restrição
@@ -516,7 +620,7 @@ async def baixar_vendas_lote(
             requisicao=requisicao,
         )
         if repeticao and repeticao.resultado:
-            return repeticao.resultado
+            return completar_comissoes_lote(db, repeticao)
         logger.exception("Falha de integridade ao registrar baixa em lote")
         raise HTTPException(
             409,

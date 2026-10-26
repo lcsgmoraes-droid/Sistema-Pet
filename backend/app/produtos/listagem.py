@@ -21,6 +21,7 @@ from app.produtos_models import (
 from app.produtos.search import (
     _build_produto_search_order_clause,
     _produto_search_exact_conditions,
+    _produto_search_prefix_conditions,
     _produto_search_conditions,
     _produto_search_conditions_fast,
     _produto_search_sort_key,
@@ -253,10 +254,16 @@ def _buscar_pagina_produtos_listagem(
             .all()
         )
         limite_candidatos = min(max(page_size * 10, 120), 500)
+        produtos_prefixo = (
+            query.filter(_produto_search_prefix_conditions(termo_busca))
+            .options(*load_options)
+            .limit(page_size)
+            .all()
+        )
         candidatos = query.options(*load_options).limit(limite_candidatos).all()
         produtos_unicos = {
             produto.id: produto
-            for produto in [*produtos_exatos, *candidatos]
+            for produto in [*produtos_exatos, *produtos_prefixo, *candidatos]
             if produto is not None
         }
         produtos = sorted(

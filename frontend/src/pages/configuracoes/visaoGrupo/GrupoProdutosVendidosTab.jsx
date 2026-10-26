@@ -51,6 +51,7 @@ export default function GrupoProdutosVendidosTab({ grupoId, periodoDias }) {
   return (
     <div className="space-y-4">
       <GrupoAnaliseFiltros
+        entidadeBusca="produto"
         busca={busca}
         carregando={carregando}
         empresas={[]}

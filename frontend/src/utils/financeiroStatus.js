@@ -1,5 +1,18 @@
 const STATUS_CANCELADOS = new Set(["cancelado", "cancelada"]);
-const TIPOS_REPASSE_CARTAO = new Set(["cartao_credito", "cartao_debito"]);
+const TIPOS_REPASSE_CARTAO = new Set(["cartao_credito", "cartao_debito", "link_pagamento"]);
+
+export function obterStatusContaReceber(conta) {
+  if (ehLancamentoFinanceiroCancelado(conta)) return "cancelado";
+  const status = String(conta?.status || "pendente")
+    .trim()
+    .toLowerCase();
+  if (["pago", "recebido"].includes(status)) return "recebido";
+  const final = Number(conta?.valor_final);
+  const recebido = Number(conta?.valor_recebido);
+  if (Number.isFinite(final) && Number.isFinite(recebido) && final - recebido <= 0)
+    return "recebido";
+  return status === "baixa_parcial" ? "parcial" : status;
+}
 
 export function ehLancamentoFinanceiroCancelado(contaOuStatus) {
   const status = typeof contaOuStatus === "string" ? contaOuStatus : contaOuStatus?.status;

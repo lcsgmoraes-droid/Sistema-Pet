@@ -148,13 +148,17 @@ class ContasReceberService:
             .filter(
                 CategoriaFinanceira.nome.ilike("%vendas%"),
                 CategoriaFinanceira.tipo == "receita",
+                CategoriaFinanceira.tenant_id == venda.tenant_id,
             )
             .first()
         )
 
         if not categoria_receitas:
             categoria_receitas = CategoriaFinanceira(
-                nome="Receitas de Vendas", tipo="receita", user_id=user_id
+                nome="Receitas de Vendas",
+                tipo="receita",
+                user_id=user_id,
+                tenant_id=venda.tenant_id,
             )
             db.add(categoria_receitas)
             db.flush()

@@ -194,7 +194,7 @@ export default function ClienteInfoWidget({ clienteId }) {
               className="mb-1 max-w-full"
               codeClassName="bg-white/70"
               customer={cliente}
-              fallback={`Cliente #${clienteId}`}
+              fallback={"Cliente não informado"}
               nameClassName="text-lg font-bold text-gray-800"
               nameWrapperClassName="max-w-full"
             />

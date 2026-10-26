@@ -1,4 +1,7 @@
 import { COMMISSION_ITEM_ICONS } from "./comissoesConstants";
+import { Pencil, Trash2 } from "lucide-react";
+import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
+import { formatMoneyBRL } from "../../utils/formatters";
 
 export default function ComissaoConfiguredItems({ configuracao, onRemoveConfig, onSelectItem }) {
   const configuredItems = Object.entries(configuracao);
@@ -18,7 +21,9 @@ export default function ComissaoConfiguredItems({ configuracao, onRemoveConfig, 
             key={key}
             className="w-full flex items-center justify-between text-xs bg-white p-2 rounded hover:bg-gray-50 transition-colors group"
           >
-            <button
+            <BotaoInteracao
+              icon={Pencil}
+              tamanho="pequeno"
               onClick={() =>
                 onSelectItem(config.tipo, config.referencia_id, config.nome_item || "Item")
               }
@@ -31,17 +36,23 @@ export default function ComissaoConfiguredItems({ configuracao, onRemoveConfig, 
               )}
               <span className="text-gray-700">{config.nome_item || "Item"}</span>
               <span className="text-green-600 font-medium ml-auto">
-                {config.tipo_calculo === "percentual"
-                  ? `${config.percentual}%`
-                  : `Lucro ${config.percentual}%`}
+                {config.tipo_calculo === "fixo"
+                  ? `${formatMoneyBRL(config.valor_fixo)} / unidade`
+                  : config.tipo_calculo === "percentual"
+                    ? `${config.percentual}%`
+                    : `Lucro ${config.percentual}%`}
               </span>
-            </button>
-            <button
+            </BotaoInteracao>
+            <BotaoInteracao
+              icon={Trash2}
+              tamanho="pequeno"
+              title="Excluir configuração"
+              aria-label="Excluir configuração"
               onClick={() => onRemoveConfig(key, config)}
               className="ml-2 text-red-600 hover:text-red-800 opacity-0 group-hover:opacity-100 transition-opacity"
             >
-              🗑️
-            </button>
+              Excluir
+            </BotaoInteracao>
           </div>
         ))}
       </div>

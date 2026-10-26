@@ -116,6 +116,7 @@ def _create_schema(session):
             referencia_id INTEGER,
             tipo_calculo TEXT,
             percentual NUMERIC,
+            valor_fixo NUMERIC NOT NULL DEFAULT 0,
             percentual_loja NUMERIC,
             desconta_taxa_cartao BOOLEAN,
             desconta_impostos BOOLEAN,
@@ -168,6 +169,7 @@ def _create_schema(session):
             tipo_calculo TEXT,
             valor_base_calculo NUMERIC,
             percentual_comissao NUMERIC,
+            valor_fixo NUMERIC NOT NULL DEFAULT 0,
             valor_comissao NUMERIC,
             valor_comissao_gerada NUMERIC,
             percentual_pago NUMERIC,
@@ -450,6 +452,73 @@ def test_pagamento_total_gera_comissao_mesmo_com_parcial_desativada(db_session):
     assert len(rows) == 1
     assert float(rows[0].valor_pago_referencia) == pytest.approx(100.0)
     assert float(rows[0].valor_comissao_gerada) == pytest.approx(10.0)
+
+
+def test_fixo_em_duas_baixas_rateia_centavos_e_preserva_snapshot(db_session):
+    set_current_tenant(TENANT_A)
+    db_session.execute(
+        text(
+            "UPDATE comissoes_configuracao SET tipo_calculo = 'fixo', valor_fixo = 1.63, percentual = 0 WHERE tenant_id = :tenant_id"
+        ),
+        {"tenant_id": TENANT_A},
+    )
+    db_session.commit()
+    for parcela in (1, 2):
+        resultado = gerar_comissoes_venda(
+            venda_id=VENDA_ID,
+            funcionario_id=FUNCIONARIO_ID,
+            valor_pago=Decimal("50"),
+            forma_pagamento="Cartao",
+            parcela_numero=parcela,
+            db=db_session,
+        )
+        assert resultado["success"] is True
+    rows = _commission_rows(db_session)
+    assert [Decimal(str(row.valor_comissao_gerada)) for row in rows] == [
+        Decimal("0.82"),
+        Decimal("0.81"),
+    ]
+    assert sum(Decimal(str(row.valor_comissao_gerada)) for row in rows) == Decimal(
+        "1.63"
+    )
+    repetido = gerar_comissoes_venda(
+        venda_id=VENDA_ID,
+        funcionario_id=FUNCIONARIO_ID,
+        valor_pago=Decimal("50"),
+        forma_pagamento="Cartao",
+        parcela_numero=2,
+        db=db_session,
+    )
+    assert repetido["duplicated"] is True
+    assert len(_commission_rows(db_session)) == 2
+
+
+def test_fixo_novo_pagamento_nao_reconstitui_comissao_de_pagamento_antigo(db_session):
+    set_current_tenant(TENANT_A)
+    db_session.execute(
+        text(
+            "UPDATE comissoes_configuracao SET tipo_calculo = 'fixo', valor_fixo = 3.25, percentual = 0 WHERE tenant_id = :tenant_id"
+        ),
+        {"tenant_id": TENANT_A},
+    )
+    db_session.commit()
+    for parcela, pago_anterior in ((2, "50"), (3, "75")):
+        resultado = gerar_comissoes_venda(
+            venda_id=VENDA_ID,
+            funcionario_id=FUNCIONARIO_ID,
+            valor_pago=Decimal("25"),
+            valor_pago_anterior=Decimal(pago_anterior),
+            forma_pagamento="Cartao",
+            parcela_numero=parcela,
+            db=db_session,
+        )
+        assert resultado["success"] is True
+    rows = _commission_rows(db_session)
+    assert [Decimal(str(row.valor_comissao_gerada)) for row in rows] == [
+        Decimal("0.81"),
+        Decimal("0.81"),
+    ]
+    assert len(rows) == 2
 
 
 def test_reexecucao_nao_duplica_comissao_no_mesmo_tenant(db_session):

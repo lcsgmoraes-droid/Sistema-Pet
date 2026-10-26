@@ -91,7 +91,7 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
       if (prev?.id && String(prev.id) === String(tutorIdQuery)) return prev;
       return {
         id: tutorIdQuery,
-        nome: tutorNomeQuery || `Tutor #${tutorIdQuery}`,
+        nome: tutorNomeQuery || "Tutor não informado",
       };
     });
     if (novoPetIdQuery) {

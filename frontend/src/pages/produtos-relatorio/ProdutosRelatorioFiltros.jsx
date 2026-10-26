@@ -1,4 +1,5 @@
-import { RefreshCw, X } from "lucide-react";
+import BuscaProduto from "../../components/v2/BuscaProduto/BuscaProduto";
+import { RefreshCw } from "lucide-react";
 import ProductIdentity from "../../components/ui/ProductIdentity";
 import BotaoCancelar from "../../components/v2/BotaoCancelar/BotaoCancelar";
 import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
@@ -8,7 +9,6 @@ import InputData from "../../components/v2/InputData/InputData";
 import InputTexto from "../../components/v2/InputTexto/InputTexto";
 import SeletorOpcoes from "../../components/v2/SeletorOpcoes/SeletorOpcoes";
 import { PERIODOS } from "./produtosRelatorioConstants";
-import { formatarQuantidade } from "./produtosRelatorioFormatters";
 
 const OPCOES_QUANTIDADE = [
   { value: "", label: "Todas as quantidades" },
@@ -47,7 +47,7 @@ export default function ProdutosRelatorioFiltros({
   onFiltroChange,
   onBuscaProdutoChange,
   onBuscaProdutoFocus,
-  onLimparBuscaProduto,
+  onLimparBuscaProduto: _onLimparBuscaProduto,
   onSelecionarProduto,
   onLimparProduto,
   onLimparFiltros,
@@ -103,58 +103,18 @@ export default function ProdutosRelatorioFiltros({
               </div>
             </div>
           ) : (
-            <div className="relative">
-              <InputTexto
-                id="relatorio-busca-produto"
-                label="Produto"
-                value={buscaProduto}
-                onChange={onBuscaProdutoChange}
-                onFocus={onBuscaProdutoFocus}
-                placeholder="Buscar por nome, código, SKU ou código de barras"
-                right={
-                  buscaProduto ? (
-                    <BotaoLink onClick={onLimparBuscaProduto} aria-label="Limpar busca de produto">
-                      <X className="h-4 w-4" aria-hidden="true" />
-                    </BotaoLink>
-                  ) : null
-                }
-              />
-              {dropdownAberto && (buscaProduto.trim().length >= 2 || loadingBuscaProduto) && (
-                <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
-                  {loadingBuscaProduto ? (
-                    <div className="px-4 py-3 text-sm text-gray-500 dark:text-slate-400">
-                      Buscando produtos...
-                    </div>
-                  ) : sugestoesProdutos.length === 0 ? (
-                    <div className="px-4 py-3 text-sm text-gray-500 dark:text-slate-400">
-                      Nenhum produto encontrado para esse termo.
-                    </div>
-                  ) : (
-                    sugestoesProdutos.map((produto) => (
-                      <div key={produto.id} className="p-1">
-                        <BotaoInteracao larguraTotal onClick={() => onSelecionarProduto(produto)}>
-                          <span className="flex w-full min-w-0 items-center justify-between gap-3 text-left">
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-semibold">
-                                {produto.nome}
-                              </span>
-                              <span className="block truncate text-xs opacity-80">
-                                {[produto.codigo, produto.sku, produto.codigo_barras]
-                                  .filter(Boolean)
-                                  .join(" | ")}
-                              </span>
-                            </span>
-                            <span className="text-[11px]">
-                              Estoque {formatarQuantidade(produto.estoque_atual)}
-                            </span>
-                          </span>
-                        </BotaoInteracao>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
+            <BuscaProduto
+              id="relatorio-busca-produto"
+              label="Produto"
+              value={buscaProduto}
+              onChange={onBuscaProdutoChange}
+              onFocus={onBuscaProdutoFocus}
+              suggestions={sugestoesProdutos}
+              showSuggestions={dropdownAberto}
+              loading={loadingBuscaProduto}
+              onSelect={onSelecionarProduto}
+              placeholder="Buscar por nome, código, SKU ou código de barras"
+            />
           )}
         </div>
 

@@ -94,7 +94,7 @@ export function useVacinasRegistroActions({
 
     setTutorFormSelecionado(
       pessoaIdAtual
-        ? { id: pessoaIdAtual, nome: petAtual?.cliente_nome ?? `Pessoa #${pessoaIdAtual}` }
+        ? { id: pessoaIdAtual, nome: petAtual?.cliente_nome ?? "Pessoa não informada" }
         : null,
     );
 

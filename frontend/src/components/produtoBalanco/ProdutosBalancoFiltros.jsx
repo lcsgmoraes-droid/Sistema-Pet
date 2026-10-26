@@ -1,3 +1,4 @@
+import BuscaProduto from "../v2/BuscaProduto/BuscaProduto";
 import FornecedorSelector from "../fornecedores/FornecedorSelector";
 import { MarcaProdutoSelector } from "../produtos/CatalogoProdutoSelectors";
 import ActionButton from "../ui/ActionButton";
@@ -16,10 +17,10 @@ function ProdutosBalancoFiltros({
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <input
-          type="text"
+        <BuscaProduto
           value={filtros.busca}
-          onChange={(e) => onAtualizarFiltro("busca", e.target.value)}
+          onChange={(valor) => onAtualizarFiltro("busca", valor)}
+          showSuggestions={false}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();

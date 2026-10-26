@@ -1,3 +1,4 @@
+import { obterCodigoPessoaPublico } from "../../utils/codigosPublicos";
 import {
   AlertCircle,
   Copy,
@@ -120,7 +121,7 @@ export default function NFSaidaList({
                     </td>
                     <td className="px-6 py-4">
                       <CustomerIdentity
-                        code={nota.cliente?.codigo || nota.cliente_id || nota.cliente?.id}
+                        code={obterCodigoPessoaPublico(nota)}
                         customer={nota.cliente}
                         nameClassName="font-medium text-gray-900"
                       />

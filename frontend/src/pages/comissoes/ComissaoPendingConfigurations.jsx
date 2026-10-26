@@ -1,3 +1,8 @@
+import { Trash2 } from "lucide-react";
+import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
+import BotaoSalva from "../../components/v2/BotaoSalva/BotaoSalva";
+import { formatMoneyBRL } from "../../utils/formatters";
+
 export default function ComissaoPendingConfigurations({
   configuracoesParaSalvar,
   onRemove,
@@ -24,19 +29,26 @@ export default function ComissaoPendingConfigurations({
               <span className="font-medium">{config.nome}</span>
               <span className="text-gray-500 ml-2">
                 (
-                {config.tipo_calculo === "percentual"
-                  ? `${config.percentual}%`
-                  : `Lucro ${config.percentual}%`}
+                {config.tipo_calculo === "fixo"
+                  ? `${formatMoneyBRL(config.valor_fixo)} / unidade`
+                  : config.tipo_calculo === "percentual"
+                    ? `${config.percentual}%`
+                    : `Lucro ${config.percentual}%`}
                 )
               </span>
             </div>
-            <button onClick={() => onRemove(index)} className="text-red-600 hover:text-red-800">
-              ✕
-            </button>
+            <BotaoInteracao
+              icon={Trash2}
+              tamanho="pequeno"
+              onClick={() => onRemove(index)}
+              aria-label={`Remover ${config.nome}`}
+            >
+              Remover
+            </BotaoInteracao>
           </div>
         ))}
       </div>
-      <button
+      <BotaoSalva
         onClick={onSaveAll}
         disabled={salvando}
         className={`w-full py-2 rounded mt-4 text-white ${
@@ -50,7 +62,7 @@ export default function ComissaoPendingConfigurations({
         ) : (
           "💾 Salvar Todas as Configurações"
         )}
-      </button>
+      </BotaoSalva>
     </div>
   );
 }

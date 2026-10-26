@@ -114,7 +114,8 @@ def conferencia_com_filtros_avancados(
                     ci.saldo_restante,
                     p.nome as nome_produto,
                     cat.nome as nome_categoria,
-                    v.cliente_id
+                    v.cliente_id,
+                    ci.valor_fixo
                 FROM comissoes_itens ci
                 LEFT JOIN produtos p ON ci.produto_id = p.id AND p.tenant_id = ci.tenant_id
                 LEFT JOIN categorias cat ON ci.categoria_id = cat.id AND cat.tenant_id = ci.tenant_id
@@ -231,6 +232,7 @@ def conferencia_com_filtros_avancados(
                     else 0.0,
                     valor_comissao=valor_comissao,
                     tipo_calculo=row.tipo_calculo,
+                    valor_fixo=float(row.valor_fixo or 0),
                     status=row.status,
                     forma_pagamento=row.forma_pagamento,
                     valor_pago=valor_pago if valor_pago > 0 else None,
