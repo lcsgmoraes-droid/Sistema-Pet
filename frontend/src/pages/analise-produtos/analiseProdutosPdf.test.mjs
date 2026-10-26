@@ -167,3 +167,101 @@ test("PDF pagina tabelas extensas, mantém SKUs e quebra nomes compridos sem omi
   assert.match(conteudo, /Total geral/);
   assert.ok(conteudo.includes(`de ${pdf.internal.getNumberOfPages()}`));
 });
+
+test("vendedores são opcionais e não alteram totais, agrupamento ou produtos originais", async () => {
+  const itens = [
+    {
+      ...produtos[0],
+      vendedores: [
+        {
+          vendedor_id: null,
+          vendedor_nome: "",
+          quantidade: 0.125,
+          faturamento: 234.5,
+          participacao_faturamento_pct: 19,
+        },
+        {
+          vendedor_id: 4,
+          vendedor_nome: "Maria-SALES-004",
+          quantidade: 2,
+          faturamento: 1000,
+          participacao_faturamento_pct: 81,
+        },
+      ],
+    },
+    {
+      ...produtos[1],
+      vendedores: [
+        {
+          vendedor_id: 4,
+          vendedor_nome: "Maria-SALES-004",
+          quantidade: 3,
+          faturamento: 100,
+          participacao_faturamento_pct: 100,
+        },
+      ],
+    },
+  ];
+  const originais = structuredClone(itens);
+  const resumido = prepararDadosProdutosPorFornecedorPdf({ produtos: itens, filtros, geradoEm });
+  const detalhado = prepararDadosProdutosPorFornecedorPdf({
+    produtos: itens,
+    filtros,
+    geradoEm,
+    incluirVendedores: true,
+  });
+
+  assert.equal(resumido.incluirVendedores, false);
+  assert.deepEqual(resumido.grupos[0].linhasVendedores, []);
+  assert.equal(detalhado.incluirVendedores, true);
+  assert.equal(detalhado.totalizadores, resumido.totalizadores);
+  assert.equal(detalhado.grupos[0].quantidade, resumido.grupos[0].quantidade);
+  assert.equal(detalhado.grupos[0].faturamento, resumido.grupos[0].faturamento);
+  assert.deepEqual(detalhado.grupos[0].linhas, resumido.grupos[0].linhas);
+  assert.deepEqual(detalhado.grupos[0].linhasVendedores, [
+    [
+      ["Vendedor: Maria-SALES-004", "", "2", "R$ 1.000,00", "81,00%"],
+      ["Vendedor: Sem vendedor informado", "", "0,125", "R$ 234,50", "19,00%"],
+    ],
+    [["Vendedor: Maria-SALES-004", "", "3", "R$ 100,00", "100,00%"]],
+  ]);
+  assert.deepEqual(itens, originais);
+
+  const semVendedores = await criarPdfProdutosPorFornecedor({ produtos: itens, filtros, geradoEm });
+  const comVendedores = await criarPdfProdutosPorFornecedor({
+    produtos: itens,
+    filtros,
+    geradoEm,
+    incluirVendedores: true,
+  });
+  assert.doesNotMatch(semVendedores.output(), /SALES-004|Vendedor:/);
+  assert.match(comVendedores.output(), /SALES-004/);
+  assert.match(comVendedores.output(), /Sem vendedor informado/);
+  assert.match(comVendedores.output(), /81,00%/);
+  assert.match(comVendedores.output(), /Total geral/);
+});
+
+test("vendedores continuam após quebras de página sem perder nomes, quantidades ou participação", async () => {
+  const vendedores = Array.from({ length: 100 }, (_, indice) => ({
+    vendedor_id: indice + 1,
+    vendedor_nome: `${"Nome completo com muitos sobrenomes ".repeat(indice === 0 ? 120 : 3)} SALES-${String(indice + 1).padStart(3, "0")}`,
+    quantidade: 1,
+    faturamento: 1,
+    participacao_faturamento_pct: 1,
+  }));
+  const itens = [{ ...produtos[0], quantidade: 100, faturamento: 100, vendedores }];
+  const pdf = await criarPdfProdutosPorFornecedor({
+    produtos: itens,
+    filtros,
+    geradoEm,
+    incluirVendedores: true,
+  });
+  assert.ok(pdf.internal.getNumberOfPages() > 4);
+  const conteudo = pdf.output();
+  for (let indice = 1; indice <= vendedores.length; indice += 1)
+    assert.ok(conteudo.includes(`SALES-${String(indice).padStart(3, "0")}`));
+  assert.match(conteudo, /Vendedores de/);
+  assert.match(conteudo, /QUIMI-001/);
+  assert.match(conteudo, /1,00%/);
+  assert.match(conteudo, /Total geral/);
+});

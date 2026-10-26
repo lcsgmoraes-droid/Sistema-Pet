@@ -393,11 +393,13 @@ export const BASE_CONHECIMENTO = [
       },
       {
         titulo: "Como usar o relatório de produtos",
-        tags: ["relatório", "produto", "vendas", "análise", "fornecedor", "pdf", "csv"],
+        tags: ["relatório", "produto", "vendas", "vendedor", "análise", "fornecedor", "pdf", "csv"],
         conteudo: [
           "Acesse **Produtos / Estoque → Análise de Produtos** em `/produtos/analise` para acompanhar produtos vendidos, rankings, Curva ABC e grupos.",
           "Escolha o **período** e, se desejar, o **Fornecedor**. Clique em **Aplicar filtros** e aguarde o resultado antes de exportar.",
           "Clique em **Exportar produtos do filtro** para baixar um CSV que abre no Excel, ou em **Gerar PDF por fornecedor** para baixar o relatório com produtos, SKU, quantidades, faturamento e totais. As exportações usam o período e os filtros aplicados.",
+          "Em **Resultado por produto**, clique em **Ver vendedores** para expandir a quantidade, o faturamento e a participação de cada vendedor naquele produto. Vendas sem identificação aparecem como **Sem vendedor informado**.",
+          "Marque **Incluir vendedores no PDF** antes de gerar o arquivo para detalhar todos os vendedores dos produtos filtrados, mesmo com as linhas recolhidas na tela. Desmarque para gerar apenas o resumo dos produtos.",
           "Para comparar fornecedores, deixe **Todos os fornecedores** e abra **Grupos → Fornecedor**. Sem filtro, o agrupamento usa o fornecedor principal atual de cada produto.",
           "O filtro aceita o **fornecedor principal** ou um **vínculo alternativo ativo** no cadastro do produto. Esse vínculo atual não identifica de qual fornecedor veio o lote vendido.",
           "Se houver venda sem filtrar fornecedor, mas ela não aparecer ao selecionar um fornecedor, confira os vínculos no cadastro do produto. Produtos sem vínculo com o fornecedor escolhido ficam fora desse filtro; a venda e o histórico são preservados.",

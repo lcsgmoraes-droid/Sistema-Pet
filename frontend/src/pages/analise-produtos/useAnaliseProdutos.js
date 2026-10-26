@@ -22,6 +22,7 @@ export default function useAnaliseProdutos() {
   const [filtrosDosDados, setFiltrosDosDados] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [exportandoPdf, setExportandoPdf] = useState(false);
+  const [incluirVendedoresPdf, setIncluirVendedoresPdf] = useState(false);
   const [produtoSelecionado, setProdutoSelecionado] = useState(null);
   const [dadosProduto, setDadosProduto] = useState(null);
   const [carregandoProduto, setCarregandoProduto] = useState(false);
@@ -158,6 +159,7 @@ export default function useAnaliseProdutos() {
         filtros: filtrosAplicados,
         catalogos,
         empresa: user?.tenant,
+        incluirVendedores: incluirVendedoresPdf,
       });
       const fornecedor = filtrosAplicados.fornecedor_id ? `_${filtrosAplicados.fornecedor_id}` : "";
       pdf.save(
@@ -169,7 +171,15 @@ export default function useAnaliseProdutos() {
     } finally {
       setExportandoPdf(false);
     }
-  }, [podeExportar, exportandoPdf, dados.produtos, filtrosAplicados, catalogos, user?.tenant]);
+  }, [
+    podeExportar,
+    exportandoPdf,
+    dados.produtos,
+    filtrosAplicados,
+    catalogos,
+    user?.tenant,
+    incluirVendedoresPdf,
+  ]);
 
   return {
     catalogos,
@@ -179,6 +189,8 @@ export default function useAnaliseProdutos() {
     dados,
     carregando,
     exportandoPdf,
+    incluirVendedoresPdf,
+    setIncluirVendedoresPdf,
     podeExportar,
     produtoSelecionado,
     dadosProduto,

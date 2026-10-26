@@ -301,6 +301,76 @@ def _resumir(produtos: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _consultar_vendedores_por_produto(
+    db: Session,
+    *,
+    tenant_id,
+    access_ids,
+    inicio: datetime,
+    fim: datetime,
+    filtros: dict[str, Any],
+) -> dict[int, list[dict[str, Any]]]:
+    """Agrega os mesmos itens do relatorio pelo vendedor comercial da venda."""
+
+    # vendedor_id identifica o usuario operador. O vendedor escolhido no PDV
+    # fica em vendedor_funcionario_id; funcionario_id e o registro legado.
+    vendedor_registrado = func.coalesce(
+        Venda.vendedor_funcionario_id, Venda.funcionario_id
+    )
+    query = (
+        db.query(
+            Produto.id.label("produto_id"),
+            Cliente.id.label("vendedor_id"),
+            Cliente.nome.label("vendedor_nome"),
+            func.coalesce(func.sum(VendaItem.quantidade), 0).label("quantidade"),
+            func.coalesce(func.sum(VendaItem.subtotal), 0).label("faturamento"),
+        )
+        .select_from(VendaItem)
+        .join(Venda, Venda.id == VendaItem.venda_id)
+        .join(Produto, Produto.id == VendaItem.produto_id)
+        .outerjoin(
+            Cliente,
+            and_(
+                Cliente.id == vendedor_registrado,
+                Cliente.tenant_id == Venda.tenant_id,
+            ),
+        )
+    )
+    query = _filtros_base(
+        query,
+        tenant_id=tenant_id,
+        access_ids=access_ids,
+        inicio=inicio,
+        fim=fim,
+        **filtros,
+    )
+    por_produto: dict[int, list[dict[str, Any]]] = {}
+    rows = query.group_by(Produto.id, Cliente.id, Cliente.nome).all()
+    for row in rows:
+        por_produto.setdefault(row.produto_id, []).append(
+            {
+                "vendedor_id": row.vendedor_id,
+                "vendedor_nome": row.vendedor_nome or "Sem vendedor informado",
+                "quantidade": round(float(row.quantidade or 0), 3),
+                "faturamento": round(float(row.faturamento or 0), 2),
+            }
+        )
+    for vendedores in por_produto.values():
+        total = sum(item["faturamento"] for item in vendedores)
+        for vendedor in vendedores:
+            vendedor["participacao_faturamento_pct"] = round(
+                vendedor["faturamento"] / total * 100 if total else 0, 2
+            )
+        vendedores.sort(
+            key=lambda item: (
+                -item["faturamento"],
+                item["vendedor_nome"],
+                item["vendedor_id"] or 0,
+            )
+        )
+    return por_produto
+
+
 def _contar_vendas(
     db: Session,
     *,
@@ -368,6 +438,20 @@ def relatorio_analise_vendas(
         fim=fim,
         filtros=filtros,
     )
+    vendedores_por_produto = (
+        _consultar_vendedores_por_produto(
+            db,
+            tenant_id=tenant_id,
+            access_ids=access_ids,
+            inicio=inicio,
+            fim=fim,
+            filtros=filtros,
+        )
+        if produtos
+        else {}
+    )
+    for produto in produtos:
+        produto["vendedores"] = vendedores_por_produto.get(produto["produto_id"], [])
     anteriores = _consultar_produtos(
         db,
         tenant_id=tenant_id,
