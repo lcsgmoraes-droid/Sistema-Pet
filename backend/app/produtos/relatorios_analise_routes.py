@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -15,7 +15,13 @@ from app.models import Cliente
 from app.partner_utils import get_all_accessible_tenant_ids
 from app.produtos.relatorios import _parse_relatorio_datetime
 from app.produtos.validators import _validar_tenant_e_obter_usuario
-from app.produtos_models import Categoria, Departamento, Marca, Produto
+from app.produtos_models import (
+    Categoria,
+    Departamento,
+    Marca,
+    Produto,
+    ProdutoFornecedor,
+)
 from app.security.permissions_decorator import require_permission
 from app.vendas_models import Venda, VendaItem
 
@@ -145,7 +151,20 @@ def _filtros_base(
     if departamento_id:
         query = query.filter(Produto.departamento_id == departamento_id)
     if fornecedor_id:
-        query = query.filter(Produto.fornecedor_id == fornecedor_id)
+        # Um produto pode ter fornecedor ativo sem ele ser o principal.
+        # EXISTS preserva os totais mesmo com mais de um vinculo cadastrado.
+        query = query.filter(
+            or_(
+                Produto.fornecedor_id == fornecedor_id,
+                Produto.fornecedores_alternativos.any(
+                    and_(
+                        ProdutoFornecedor.fornecedor_id == fornecedor_id,
+                        ProdutoFornecedor.ativo.is_(True),
+                        ProdutoFornecedor.tenant_id == Produto.tenant_id,
+                    )
+                ),
+            )
+        )
     if canal:
         query = query.filter(Venda.canal == canal)
     if busca and busca.strip():
@@ -173,6 +192,13 @@ def _consultar_produtos(
     faturamento = func.coalesce(func.sum(VendaItem.subtotal), 0)
     custo = func.coalesce(
         func.sum(VendaItem.quantidade * func.coalesce(Produto.preco_custo, 0)), 0
+    )
+    # No recorte de um fornecedor, o agrupamento deve identificar quem foi
+    # selecionado, inclusive quando o vinculo e alternativo no cadastro.
+    fornecedor_relatorio = (
+        filtros["fornecedor_id"]
+        if filtros.get("fornecedor_id")
+        else Produto.fornecedor_id
     )
 
     query = (
@@ -204,7 +230,7 @@ def _consultar_produtos(
         .outerjoin(Categoria, Categoria.id == Produto.categoria_id)
         .outerjoin(Marca, Marca.id == Produto.marca_id)
         .outerjoin(Departamento, Departamento.id == Produto.departamento_id)
-        .outerjoin(Cliente, Cliente.id == Produto.fornecedor_id)
+        .outerjoin(Cliente, Cliente.id == fornecedor_relatorio)
     )
     query = _filtros_base(
         query,

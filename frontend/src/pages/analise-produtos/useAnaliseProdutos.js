@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { getAnaliseProdutos, getRelatorioProdutoVendas } from "../../api/produtos";
 import useProdutosCatalogos from "../../hooks/useProdutosCatalogos";
+import { useAuth } from "../../contexts/AuthContext";
+import { criarPdfProdutosPorFornecedor } from "./analiseProdutosPdf.js";
 import {
   criarFiltrosAnalise,
   criarPeriodo,
@@ -11,12 +13,15 @@ import {
 } from "./analiseProdutosUtils";
 
 export default function useAnaliseProdutos() {
+  const { user } = useAuth();
   const filtrosIniciais = useMemo(criarFiltrosAnalise, []);
   const [periodoAtivo, setPeriodoAtivo] = useState("30dias");
   const [filtrosForm, setFiltrosForm] = useState(filtrosIniciais);
   const [filtrosAplicados, setFiltrosAplicados] = useState(filtrosIniciais);
   const [dados, setDados] = useState(() => normalizarAnalise());
+  const [filtrosDosDados, setFiltrosDosDados] = useState(null);
   const [carregando, setCarregando] = useState(true);
+  const [exportandoPdf, setExportandoPdf] = useState(false);
   const [produtoSelecionado, setProdutoSelecionado] = useState(null);
   const [dadosProduto, setDadosProduto] = useState(null);
   const [carregandoProduto, setCarregandoProduto] = useState(false);
@@ -29,11 +34,15 @@ export default function useAnaliseProdutos() {
       try {
         setCarregando(true);
         const response = await getAnaliseProdutos(filtrosAplicados);
-        if (ativo) setDados(normalizarAnalise(response?.data));
+        if (ativo) {
+          setDados(normalizarAnalise(response?.data));
+          setFiltrosDosDados(filtrosAplicados);
+        }
       } catch (error) {
         console.error("Erro ao carregar análise de produtos:", error);
         if (ativo) {
           setDados(normalizarAnalise());
+          setFiltrosDosDados(null);
           toast.error(error?.response?.data?.detail || "Não foi possível carregar a análise.");
         }
       } finally {
@@ -93,6 +102,10 @@ export default function useAnaliseProdutos() {
   const aplicarFiltros = useCallback(
     (event) => {
       event?.preventDefault();
+      if (!filtrosForm.data_inicio || !filtrosForm.data_fim) {
+        toast.error("Informe a data inicial e a data final.");
+        return;
+      }
       if (filtrosForm.data_inicio > filtrosForm.data_fim) {
         toast.error("A data inicial deve ser anterior à data final.");
         return;
@@ -116,7 +129,11 @@ export default function useAnaliseProdutos() {
     setPaginaProduto(1);
   }, []);
 
+  const podeExportar =
+    !carregando && filtrosDosDados === filtrosAplicados && dados.produtos.length > 0;
+
   const exportarCsv = useCallback(() => {
+    if (carregando || filtrosDosDados !== filtrosAplicados) return;
     if (!dados.produtos.length) {
       toast("Não há produtos no filtro atual para exportar.");
       return;
@@ -130,7 +147,29 @@ export default function useAnaliseProdutos() {
     link.download = `analise_produtos_${filtrosAplicados.data_inicio}_${filtrosAplicados.data_fim}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-  }, [dados.produtos, filtrosAplicados.data_fim, filtrosAplicados.data_inicio]);
+  }, [carregando, dados.produtos, filtrosAplicados, filtrosDosDados]);
+
+  const exportarPdf = useCallback(async () => {
+    if (!podeExportar || exportandoPdf) return;
+    setExportandoPdf(true);
+    try {
+      const pdf = await criarPdfProdutosPorFornecedor({
+        produtos: dados.produtos,
+        filtros: filtrosAplicados,
+        catalogos,
+        empresa: user?.tenant,
+      });
+      const fornecedor = filtrosAplicados.fornecedor_id ? `_${filtrosAplicados.fornecedor_id}` : "";
+      pdf.save(
+        `produtos_vendidos_por_fornecedor${fornecedor}_${filtrosAplicados.data_inicio}_${filtrosAplicados.data_fim}.pdf`,
+      );
+    } catch (error) {
+      console.error("Erro ao exportar produtos por fornecedor:", error);
+      toast.error("Não foi possível gerar o PDF. Tente novamente.");
+    } finally {
+      setExportandoPdf(false);
+    }
+  }, [podeExportar, exportandoPdf, dados.produtos, filtrosAplicados, catalogos, user?.tenant]);
 
   return {
     catalogos,
@@ -139,6 +178,8 @@ export default function useAnaliseProdutos() {
     filtrosAplicados,
     dados,
     carregando,
+    exportandoPdf,
+    podeExportar,
     produtoSelecionado,
     dadosProduto,
     carregandoProduto,
@@ -154,5 +195,6 @@ export default function useAnaliseProdutos() {
     },
     setPaginaProduto,
     exportarCsv,
+    exportarPdf,
   };
 }
