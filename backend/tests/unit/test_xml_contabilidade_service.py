@@ -10,6 +10,8 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from tests.helpers.signed_nfe import make_key, sign_nfe
+
 from app.db import base as _registry  # noqa: F401
 from app.nfe_cache_models import BlingNotaFiscalCache
 from app.services import xml_contabilidade_service as service
@@ -24,7 +26,7 @@ from app.xml_contabilidade_models import (
     XmlContabilidadeTentativa,
 )
 
-CHAVE = "35261033590794000140650030000000441241595909"
+CHAVE = make_key("35261033590794000140650030000000441241595909")
 CNPJ = "33590794000140"
 NOW = datetime(2026, 10, 19, 15, 0, tzinfo=timezone.utc)
 
@@ -37,7 +39,9 @@ def xml_nota(
     cnpj=CNPJ,
     status="100",
 ):
-    return f"""<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe{chave}"><ide><mod>65</mod><dhEmi>{emissao}</dhEmi><tpAmb>{ambiente}</tpAmb><tpNF>{saida}</tpNF></ide><emit><CNPJ>{cnpj}</CNPJ><xNome>Empresa teste</xNome></emit></infNFe></NFe><protNFe><infProt><chNFe>{chave}</chNFe><cStat>{status}</cStat></infProt></protNFe></nfeProc>""".encode()
+    return sign_nfe(
+        f"""<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe{chave}"><ide><mod>65</mod><dhEmi>{emissao}</dhEmi><tpAmb>{ambiente}</tpAmb><tpNF>{saida}</tpNF></ide><emit><CNPJ>{cnpj}</CNPJ><xNome>Empresa teste</xNome></emit></infNFe></NFe><protNFe><infProt><chNFe>{chave}</chNFe><cStat>{status}</cStat></infProt></protNFe></nfeProc>"""
+    )
 
 
 def documento(xml=None, chave=CHAVE, status="autorizada", identificador="1"):
@@ -132,17 +136,15 @@ def test_periodo_inclusivo_xml_preservado_e_deduplicado(xml_context):
         assert manifesto["emitente_cnpj"] == CNPJ
 
 
-def test_saida_fornecedor_nao_e_saida_da_empresa(xml_context):
-    arquivos, notas = service._coletar_arquivos(
-        Mock(),
-        uuid4(),
-        [documento(xml_nota(cnpj="11111111000111"))],
-        date(2026, 10, 19),
-        date(2026, 10, 19),
-    )
-    assert not arquivos and not notas
-    with pytest.raises(service.XmlContabilidadeError, match="Nenhuma"):
-        documentos._zip(arquivos, notas, date(2026, 10, 19), date(2026, 10, 19))
+def test_xml_com_emitente_divergente_bloqueia_sem_arquivo_parcial(xml_context):
+    with pytest.raises(service.XmlContabilidadeError, match="integridade.*parcial"):
+        service._coletar_arquivos(
+            Mock(),
+            uuid4(),
+            [documento(xml_nota(cnpj="11111111000111"))],
+            date(2026, 10, 19),
+            date(2026, 10, 19),
+        )
 
 
 def test_xml_ausente_nunca_gera_zip_parcial(xml_context, monkeypatch):
@@ -177,19 +179,17 @@ def test_cancelada_sem_evento_bloqueia_pacote_incompleto(xml_context):
         )
 
 
-def test_evento_embutido_preserva_assinatura_sem_reserializar(xml_context):
+def test_evento_acrescentado_fora_do_perfil_nfeproc_bloqueia(xml_context):
     evento = f"""<procEventoNFe><evento><infEvento Id="ID110111{CHAVE}01"><tpAmb>1</tpAmb><CNPJ>{CNPJ}</CNPJ><chNFe>{CHAVE}</chNFe><tpEvento>110111</tpEvento><nSeqEvento>1</nSeqEvento></infEvento></evento><retEvento><infEvento><tpAmb>1</tpAmb><chNFe>{CHAVE}</chNFe><tpEvento>110111</tpEvento><nSeqEvento>1</nSeqEvento><cStat>135</cStat><nProt>135260000000001</nProt><dhRegEvento>2026-10-19T13:00:00-03:00</dhRegEvento></infEvento></retEvento></procEventoNFe>""".encode()
     xml = xml_nota().replace(b"</nfeProc>", evento + b"</nfeProc>")
-    arquivos, notas = service._coletar_arquivos(
-        Mock(),
-        uuid4(),
-        [documento(xml, status="cancelada")],
-        date(2026, 10, 19),
-        date(2026, 10, 19),
-    )
-    assert arquivos == [(f"{CHAVE}-nfe.xml", xml), (f"ID110111{CHAVE}01.xml", xml)]
-    assert notas[0]["eventos_incluidos"] == 1
-    assert "aviso" not in notas[0]
+    with pytest.raises(service.XmlContabilidadeError, match="integridade.*parcial"):
+        service._coletar_arquivos(
+            Mock(),
+            uuid4(),
+            [documento(xml, status="cancelada")],
+            date(2026, 10, 19),
+            date(2026, 10, 19),
+        )
 
 
 def test_limite_tamanho_impede_pacote(xml_context, monkeypatch):

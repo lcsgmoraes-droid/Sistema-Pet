@@ -148,8 +148,12 @@ def _obter_xml(db, tenant_id, doc):
         raise XmlContabilidadeError(
             "Somente notas emitidas no CorePet em produção podem ser enviadas.", 409
         )
+    cnpj = _cnpj_empresa(db, tenant_id)
     if doc.venda.nfe_xml:
-        return _xml_bytes(doc.venda.nfe_xml), {}
+        # O cache legado pode conter uma representação alterada pelo emissor.
+        # A recuperação comprovada pela assinatura existe somente em memória;
+        # o documento armazenado continua preservado para auditoria.
+        return _xml_assinado(doc.venda.nfe_xml, doc.chave, doc.modelo, cnpj), {}
     # A consulta usa a emissão CorePet já vinculada, sem commit intermediário.
     from app.intnfe.client import IntNFeClient
     from app.intnfe.emission import _access_token, _connection
@@ -158,8 +162,11 @@ def _obter_xml(db, tenant_id, doc):
     try:
         connection = _connection(db, tenant_id, require_enabled=False)
         token = _access_token(api, connection, doc.venda.nfe_ambiente)
-        xml = _xml_bytes(
-            api.document_xml(token, doc.venda.nfe_tipo, doc.venda.nfe_correlation_id)
+        xml = _xml_assinado(
+            api.document_xml(token, doc.venda.nfe_tipo, doc.venda.nfe_correlation_id),
+            doc.chave,
+            doc.modelo,
+            cnpj,
         )
     finally:
         api.close()
@@ -167,10 +174,32 @@ def _obter_xml(db, tenant_id, doc):
     return xml, {}
 
 
+def _xml_assinado(xml, chave, modelo, cnpj=None):
+    from app.intnfe.client import IntNFeError
+    from app.intnfe.xml_integrity import ensure_signed_xml
+
+    try:
+        document_type = {55: "nfe", 65: "nfce"}.get(int(modelo))
+        if document_type is None:
+            raise ValueError("Modelo fiscal não suportado.")
+        return ensure_signed_xml(
+            _xml_bytes(xml),
+            expected_key=chave,
+            expected_cnpj=cnpj,
+            document_type=document_type,
+        )
+    except (IntNFeError, ValueError, TypeError):
+        raise XmlContabilidadeError(
+            "Um XML não passou na verificação de integridade ou não corresponde "
+            "à nota desta empresa. Nenhum arquivo parcial foi gerado.",
+            409,
+        ) from None
+
+
 def validar_xml_saida(xml, chave, modelo):
     """Retorna (árvore, data civil) ou None para homologação/notas de entrada."""
     try:
-        root = ET.fromstring(_xml_bytes(xml))
+        root = ET.fromstring(_xml_assinado(xml, chave, modelo))
     except XmlContabilidadeError:
         raise
     except Exception:

@@ -33,9 +33,14 @@ def test_intnfe_autorizada_e_cancelada_priorizam_fila_sem_smtp(monkeypatch, stat
         nfe_protocolo=None,
         nfe_xml="<xml />",
         nfe_ambiente=1,
+        nfe_status="processando",
+        status="finalizada",
     )
-    db = SimpleNamespace(commit=Mock())
-    api = SimpleNamespace(document_status=Mock(return_value={"status": status}))
+    db = MagicMock()
+    api = SimpleNamespace(
+        document_status=Mock(return_value={"status": status}),
+        document_events=Mock(return_value=[]),
+    )
 
     emission.reconcile(db, venda, api, connection=object(), token="test-token")
 

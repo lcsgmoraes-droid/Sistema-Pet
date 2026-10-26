@@ -1,5 +1,6 @@
 import {
   AlertCircle,
+  Copy,
   Download,
   Eye,
   FileText,
@@ -12,6 +13,8 @@ import {
   Share2,
 } from "lucide-react";
 
+import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
+import BotaoMenuAcoes from "../../components/v2/BotaoMenuAcoes/BotaoMenuAcoes";
 import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import { formatMoneyBRL } from "../../utils/formatters";
 import { rejeicaoResponsavelTecnico } from "../../utils/fiscalRejectionGuidance.mjs";
@@ -27,6 +30,7 @@ export default function NFSaidaList({
   dataInicial,
   dataFinal,
   setModalCancelar,
+  clonarNota,
   excluirNota,
   reconciliarFluxoNota,
   reconciliandoNotaId,
@@ -155,8 +159,8 @@ export default function NFSaidaList({
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {nota.provedor === "intnfe" && nota.status?.toLowerCase() === "rejeitada" ? (
-                        <button
-                          type="button"
+                        <BotaoInteracao
+                          tamanho="pequeno"
                           onClick={() => abrirCorrecao(nota)}
                           disabled={diagnosticandoNotaId === String(nota.venda_id)}
                           className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium underline disabled:opacity-50 ${getSituacaoCor(nota.status)}`}
@@ -176,7 +180,7 @@ export default function NFSaidaList({
                           })
                             ? "Falar com suporte"
                             : "Corrigir erro"}
-                        </button>
+                        </BotaoInteracao>
                       ) : (
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getSituacaoCor(nota.status)}`}
@@ -197,109 +201,83 @@ export default function NFSaidaList({
                       {formatMoneyBRL(nota.valor)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {(nota.status?.toLowerCase() === "autorizada" ||
-                          nota.status?.toLowerCase() === "emitida danfe") && (
-                          <button
-                            onClick={() => setModalCancelar(nota)}
-                            className="text-red-600 hover:text-red-900 p-1 hover:bg-red-50 rounded"
-                            title="Cancelar NF-e"
-                          >
-                            <XCircle className="w-5 h-5" />
-                          </button>
-                        )}
-                        {nota.provedor !== "intnfe" && (
-                          <button
-                            onClick={() => excluirNota(nota.venda_id, nota.numero)}
-                            className="text-gray-600 hover:text-gray-900 p-1 hover:bg-gray-50 rounded"
-                            title="Excluir nota do sistema"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        )}
-                        {nota.provedor === "intnfe" &&
-                          nota.status?.toLowerCase() === "rejeitada" &&
-                          !rejeicaoResponsavelTecnico({
-                            codigo: nota.codigo_erro,
-                            motivo: nota.motivo_rejeicao,
-                          }) && (
-                            <>
-                              <button
-                                onClick={() => liberarVendaComRejeicao(nota)}
-                                disabled={liberandoVendaId === String(nota.venda_id)}
-                                className="text-teal-600 hover:text-teal-900 p-1 hover:bg-teal-50 rounded disabled:opacity-50"
-                                title="Liberar venda para escolher outro modelo de nota"
-                              >
-                                <Unlock
-                                  className={`w-5 h-5 ${
-                                    liberandoVendaId === String(nota.venda_id)
-                                      ? "animate-pulse"
-                                      : ""
-                                  }`}
-                                />
-                              </button>
-                              <button
-                                onClick={() => corrigirEReemitir(nota)}
-                                disabled={corrigindoNotaId === String(nota.venda_id)}
-                                className="text-purple-600 hover:text-purple-900 p-1 hover:bg-purple-50 rounded disabled:opacity-50"
-                                title={`Tentar novamente como ${Number(nota.modelo) === 55 ? "NF-e" : "NFC-e"}`}
-                              >
-                                <RotateCcw
-                                  className={`w-5 h-5 ${
-                                    corrigindoNotaId === String(nota.venda_id) ? "animate-spin" : ""
-                                  }`}
-                                />
-                              </button>
-                            </>
-                          )}
-                        <button
-                          onClick={() => reconciliarFluxoNota(nota)}
-                          disabled={reconciliandoNotaId === String(nota.id)}
-                          className="text-amber-600 hover:text-amber-900 p-1 hover:bg-amber-50 rounded disabled:opacity-50"
-                          title="Forçar reconciliação desta NF"
-                        >
-                          <Zap className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => baixarDanfe(nota)}
-                          disabled={
-                            documentoEmCurso === String(nota.venda_id || nota.id) ||
-                            (nota.provedor === "intnfe" &&
-                              nota.status?.toLowerCase() !== "autorizada")
-                          }
-                          className="text-blue-600 hover:text-blue-900 p-1 hover:bg-blue-50 rounded"
-                          title="Baixar DANFE"
-                        >
-                          <Printer className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => baixarXml(nota)}
-                          disabled={
-                            documentoEmCurso === String(nota.venda_id || nota.id) ||
-                            (nota.provedor === "intnfe" &&
-                              nota.status?.toLowerCase() !== "autorizada")
-                          }
-                          className="text-green-600 hover:text-green-900 p-1 hover:bg-green-50 rounded"
-                          title="Baixar XML"
-                        >
-                          <Download className="w-5 h-5" />
-                        </button>
-                        {nota.status?.toLowerCase() === "autorizada" && (
-                          <button
-                            onClick={() => compartilharNota(nota)}
-                            title="Compartilhar nota"
-                            className="text-green-700 hover:bg-green-50 p-1 rounded"
-                          >
-                            <Share2 className="w-5 h-5" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => abrirDetalhes(nota)}
-                          className="text-gray-600 hover:text-gray-900 p-1 hover:bg-gray-50 rounded"
-                          title="Ver Detalhes"
-                        >
-                          <Eye className="w-5 h-5" />
-                        </button>
+                      <div className="flex justify-end">
+                        <BotaoMenuAcoes
+                          rotulo={`Ações da nota ${nota.numero || "sem número"}`}
+                          acoes={[
+                            { icon: Copy, label: "Clonar nota", onClick: () => clonarNota(nota) },
+                            ["autorizada", "emitida danfe"].includes(
+                              nota.status?.toLowerCase(),
+                            ) && {
+                              icon: XCircle,
+                              label: "Cancelar NF-e",
+                              tom: "perigo",
+                              onClick: () => setModalCancelar(nota),
+                            },
+                            nota.provedor !== "intnfe" && {
+                              icon: Trash2,
+                              label: "Excluir nota do sistema",
+                              tom: "perigo",
+                              onClick: () => excluirNota(nota.venda_id, nota.numero),
+                            },
+                            nota.provedor === "intnfe" &&
+                              nota.status?.toLowerCase() === "rejeitada" &&
+                              !rejeicaoResponsavelTecnico({
+                                codigo: nota.codigo_erro,
+                                motivo: nota.motivo_rejeicao,
+                              }) && {
+                                icon: Unlock,
+                                label: "Escolher outro modelo de nota",
+                                disabled: liberandoVendaId === String(nota.venda_id),
+                                onClick: () => liberarVendaComRejeicao(nota),
+                              },
+                            nota.provedor === "intnfe" &&
+                              nota.status?.toLowerCase() === "rejeitada" &&
+                              !rejeicaoResponsavelTecnico({
+                                codigo: nota.codigo_erro,
+                                motivo: nota.motivo_rejeicao,
+                              }) && {
+                                icon: RotateCcw,
+                                label: `Tentar novamente como ${Number(nota.modelo) === 55 ? "NF-e" : "NFC-e"}`,
+                                disabled: corrigindoNotaId === String(nota.venda_id),
+                                onClick: () => corrigirEReemitir(nota),
+                              },
+                            {
+                              icon: Zap,
+                              label: "Atualizar situação da NF",
+                              disabled: reconciliandoNotaId === String(nota.id),
+                              onClick: () => reconciliarFluxoNota(nota),
+                            },
+                            {
+                              icon: Printer,
+                              label: "Baixar DANFE",
+                              disabled:
+                                documentoEmCurso === String(nota.venda_id || nota.id) ||
+                                (nota.provedor === "intnfe" &&
+                                  nota.status?.toLowerCase() !== "autorizada"),
+                              onClick: () => baixarDanfe(nota),
+                            },
+                            {
+                              icon: Download,
+                              label: "Baixar XML",
+                              disabled:
+                                documentoEmCurso === String(nota.venda_id || nota.id) ||
+                                (nota.provedor === "intnfe" &&
+                                  nota.status?.toLowerCase() !== "autorizada"),
+                              onClick: () => baixarXml(nota),
+                            },
+                            nota.status?.toLowerCase() === "autorizada" && {
+                              icon: Share2,
+                              label: "Compartilhar nota",
+                              onClick: () => compartilharNota(nota),
+                            },
+                            {
+                              icon: Eye,
+                              label: "Ver detalhes",
+                              onClick: () => abrirDetalhes(nota),
+                            },
+                          ]}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -317,20 +295,22 @@ export default function NFSaidaList({
             {Math.max(1, Math.ceil(totalNotas / 50))}
           </span>
           <div className="flex gap-2">
-            <button
+            <BotaoInteracao
+              tamanho="pequeno"
               disabled={pagina <= 1}
               onClick={() => setPagina(pagina - 1)}
               className="border rounded px-3 py-2 disabled:opacity-40"
             >
               Anterior
-            </button>
-            <button
+            </BotaoInteracao>
+            <BotaoInteracao
+              tamanho="pequeno"
               disabled={pagina * 50 >= totalNotas}
               onClick={() => setPagina(pagina + 1)}
               className="border rounded px-3 py-2 disabled:opacity-40"
             >
               Próxima
-            </button>
+            </BotaoInteracao>
           </div>
         </div>
       )}

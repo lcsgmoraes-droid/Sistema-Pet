@@ -195,6 +195,7 @@ class Venda(BaseTenantModel):
     nfe_idempotency_key = Column(String(128), nullable=True)
     nfe_payload_hash = Column(String(64), nullable=True)
     nfe_consumidor_cpf = Column(String(11), nullable=True)
+    nfe_contexto_comercial = Column(JSON, nullable=True)
 
     # Multi-tenant
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)

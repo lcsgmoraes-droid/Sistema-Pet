@@ -1095,3 +1095,148 @@ def test_saved_subtotal_with_more_than_one_cent_difference_is_blocked():
 
     with pytest.raises(emission.DirectEmissionError, match="subtotal salvo"):
         emission.build_payload(None, tenant, connection, sale, "nfe")
+
+
+def _amazon_commercial_data():
+    return {
+        "canal": "amazon",
+        "numero_pedido": "PEDIDO-EXTERNO-123",
+        "codigo_rastreamento": "RASTREIO-123",
+        "informacoes_complementares": "Enviar com a documentação da mercadoria.",
+        "intermediador_cnpj": "11444777000161",
+        "intermediador_identificacao": "LOJA-VENDEDOR-987",
+    }
+
+
+@pytest.mark.parametrize("financial_channel", ["loja_fisica", "amazon"])
+def test_nfe_manual_amazon_envia_intermediador_e_referencia_sem_alterar_venda(
+    financial_channel,
+):
+    tenant, connection, sale = _objects(channel=financial_channel)
+    sale.nfe_contexto_comercial = _amazon_commercial_data()
+    original_items = deepcopy(sale.itens)
+    original_payments = deepcopy(sale.pagamentos)
+
+    payload = emission.build_payload(None, tenant, connection, sale, "nfe")
+
+    assert payload["indicadorPresenca"] == "2"
+    assert payload["intermediador"] == {
+        "cnpj": "11444777000161",
+        "identificadorCadastro": "LOJA-VENDEDOR-987",
+    }
+    assert "Canal de venda: Amazon" in payload["informacoesAdicionais"]
+    assert "Nº Pedido Loja: PEDIDO-EXTERNO-123" in payload["informacoesAdicionais"]
+    assert "Código de rastreamento: RASTREIO-123" in payload["informacoesAdicionais"]
+    assert sale.canal == financial_channel
+    assert sale.total == "23.00"
+    assert sale.itens == original_items
+    assert sale.pagamentos == original_payments
+    assert "IBPT" not in payload["informacoesAdicionais"]
+    assert "vTotTrib" not in str(payload)
+
+
+def test_contexto_amazon_recusa_nfce_antes_de_transmitir():
+    tenant, connection, sale = _objects()
+    sale.nfe_contexto_comercial = _amazon_commercial_data()
+
+    with pytest.raises(emission.DirectEmissionError, match="modelo 55"):
+        emission.build_payload(None, tenant, connection, sale, "nfce")
+
+
+@pytest.mark.parametrize(
+    "missing_field",
+    ["numero_pedido", "intermediador_cnpj", "intermediador_identificacao"],
+)
+def test_contexto_amazon_incompleto_nao_vira_venda_direta(missing_field):
+    tenant, connection, sale = _objects()
+    sale.nfe_contexto_comercial = _amazon_commercial_data()
+    sale.nfe_contexto_comercial[missing_field] = ""
+
+    with pytest.raises(emission.DirectEmissionError, match="Amazon"):
+        emission.build_payload(None, tenant, connection, sale, "nfe")
+
+
+def test_contexto_amazon_nao_libera_outro_marketplace():
+    tenant, connection, sale = _objects(channel="shopee")
+    sale.nfe_contexto_comercial = _amazon_commercial_data()
+
+    with pytest.raises(emission.DirectEmissionError, match="apenas para vendas do PDV"):
+        emission.build_payload(None, tenant, connection, sale, "nfe")
+
+
+def test_venda_direta_online_envia_presenca_internet_sem_intermediador():
+    tenant, connection, sale = _objects()
+    sale.nfe_contexto_comercial = {
+        "canal": "venda_direta_online",
+        "numero_pedido": "WEB-123",
+    }
+
+    payload = emission.build_payload(None, tenant, connection, sale, "nfe")
+
+    assert payload["indicadorPresenca"] == "2"
+    assert "intermediador" not in payload
+    assert "Nº Pedido Loja: WEB-123" in payload["informacoesAdicionais"]
+
+
+def test_novo_campo_nulo_preserva_payload_pdv_existente():
+    tenant, connection, sale = _objects()
+    previous = emission.build_payload(None, tenant, connection, sale, "nfe")
+    sale.nfe_contexto_comercial = None
+
+    assert emission.build_payload(None, tenant, connection, sale, "nfe") == previous
+
+
+def test_preview_retorna_contexto_salvo_e_dados_que_serao_transmitidos(monkeypatch):
+    tenant, connection, sale = _objects()
+    sale.nfe_contexto_comercial = _amazon_commercial_data()
+    monkeypatch.setattr(emission, "_connection", lambda *_args: connection)
+
+    preview = emission.preview(None, tenant, sale, "nfe")
+    payload = emission.build_payload(None, tenant, connection, sale, "nfe")
+    previous_fingerprint = emission.emission_fingerprint(None, tenant, sale, "nfe")
+    sale.nfe_contexto_comercial["numero_pedido"] = "PEDIDO-OUTRO-456"
+
+    assert preview["contexto_comercial"]["numero_pedido"] == "PEDIDO-EXTERNO-123"
+    assert preview["informacoes_adicionais"] == payload["informacoesAdicionais"]
+    assert previous_fingerprint != emission.emission_fingerprint(
+        None, tenant, sale, "nfe"
+    )
+
+
+def test_contexto_novo_nunca_trunca_referencia_ou_observacoes():
+    tenant, connection, sale = _objects()
+    sale.nfe_contexto_comercial = _amazon_commercial_data()
+    sale.observacoes = "x" * 5000
+
+    with pytest.raises(emission.DirectEmissionError, match="5000 caracteres"):
+        emission.build_payload(None, tenant, connection, sale, "nfe")
+
+
+def test_detalhes_fiscais_exibem_presenca_e_intermediador_que_foram_salvos():
+    tenant, _connection, sale = _objects()
+    sale.id = 123
+    for field in (
+        "nfe_numero",
+        "nfe_serie",
+        "nfe_chave",
+        "nfe_codigo_erro",
+        "nfe_motivo_rejeicao",
+        "nfe_protocolo",
+        "nfe_data_emissao",
+    ):
+        setattr(sale, field, None)
+    sale.nfe_tipo, sale.nfe_modelo = "nfe", "55"
+    sale.nfe_status, sale.nfe_ambiente = "autorizada", 1
+    sale.nfe_contexto_comercial = _amazon_commercial_data()
+
+    details = emission.local_document_details(None, tenant, sale)
+
+    assert details["indicador_presenca"].startswith("2 -")
+    assert details["intermediador"] == {
+        "cnpj": "11444777000161",
+        "identificacao": "LOJA-VENDEDOR-987",
+    }
+    assert (
+        details["informacoes_adicionais"]["numero_pedido_loja"] == "PEDIDO-EXTERNO-123"
+    )
+    assert sale.canal == "loja_fisica"

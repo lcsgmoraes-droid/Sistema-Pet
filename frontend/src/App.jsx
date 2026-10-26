@@ -6,6 +6,7 @@ import AppRoutes from "./app/AppRoutes";
 import ErrorBoundary from "./components/ErrorBoundary";
 import CorePetDialogHost from "./components/ui/CorePetDialogHost";
 import FiscalCorrectionDialogHost from "./components/ui/FiscalCorrectionDialogHost";
+import NFeAdditionalDataDialogHost from "./components/ui/NFeAdditionalDataDialogHost";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ModulosProvider } from "./contexts/ModulosContext";
 import { PlatformAuthProvider } from "./contexts/PlatformAuthContext";
@@ -50,6 +51,7 @@ function App() {
                 <Toaster position="top-right" toastOptions={{ className: "corepet-toast" }} />
                 <CorePetDialogHost />
                 <FiscalCorrectionDialogHost />
+                <NFeAdditionalDataDialogHost />
                 <AppRoutePreloader />
                 <Suspense
                   fallback={

@@ -18,6 +18,18 @@ test("não exibe situação fiscal quando a venda nunca teve nota", () => {
   assert.equal(obterSituacaoFiscalVenda({ id: 10 }), null);
 });
 
+test("pendência salva com HTML 502 exibe orientação sem o corpo da página de erro", () => {
+  const pendencia = obterPendenciaCancelamentoFiscal({
+    id: 26,
+    status: "finalizada",
+    nfe_status: "autorizada",
+    nfe_cancelamento_status: "pendente",
+    nfe_cancelamento_motivo: "<html><body><h1>502 Bad Gateway</h1>nginx</body></html>",
+  });
+  assert.match(pendencia.detalhe, /temporariamente indisponível/);
+  assert.doesNotMatch(pendencia.detalhe, /html|nginx|Bad Gateway/);
+});
+
 test("resume uma NF-e rejeitada com código e motivo", () => {
   const situacao = obterSituacaoFiscalVenda({
     nfe_tipo: "nfe",

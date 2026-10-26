@@ -6,15 +6,19 @@ from uuid import uuid4
 from defusedxml import ElementTree as ET
 import pytest
 
+from tests.helpers.signed_nfe import make_key, sign_nfe
+
 from app.intnfe.client import IntNFeClient, IntNFeError
 from app.services import xml_contabilidade_documentos as documentos
 from app.services import xml_contabilidade_eventos as eventos
 from app.services.xml_contabilidade_common import XmlContabilidadeError
 
-CHAVE = "35261033590794000140650030000000441241595909"
+CHAVE = make_key("35261033590794000140650030000000441241595909")
 CNPJ = "33590794000140"
 PROT = "135260000000001"
-NOTA = f"""<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe{CHAVE}"><ide><mod>65</mod><dhEmi>2026-10-19T12:00:00-03:00</dhEmi><tpAmb>1</tpAmb><tpNF>1</tpNF></ide><emit><CNPJ>{CNPJ}</CNPJ></emit></infNFe></NFe><protNFe><infProt><chNFe>{CHAVE}</chNFe><cStat>100</cStat></infProt></protNFe></nfeProc>""".encode()
+NOTA = sign_nfe(
+    f"""<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe{CHAVE}"><ide><mod>65</mod><dhEmi>2026-10-19T12:00:00-03:00</dhEmi><tpAmb>1</tpAmb><tpNF>1</tpNF></ide><emit><CNPJ>{CNPJ}</CNPJ></emit></infNFe></NFe><protNFe><infProt><chNFe>{CHAVE}</chNFe><cStat>100</cStat></infProt></protNFe></nfeProc>"""
+)
 
 
 def xml_evento(

@@ -184,6 +184,78 @@ def test_timeout_preserva_incerteza_e_detalhe_legivel_sem_falsa_aceitacao(contex
     assert resposta.detail["cancelamento_status"] == "pendente"
     assert resposta.detail["cancelamento_solicitado"] is False
     assert venda.nfe_status == "autorizada"
+    api.document_status.assert_called_once()
+    api.cancel_document.assert_called_once()
+
+
+@pytest.mark.parametrize("confirmacao", ["status", "evento"])
+def test_falha_incerta_consulta_sem_repetir_post_e_recupera_confirmacao(
+    contexto, confirmacao
+):
+    venda, db, api, _audit = contexto
+    api.cancel_document.side_effect = IntNFeError("EmissorIndisponivel", uncertain=True)
+    if confirmacao == "status":
+        api.document_status.return_value = {"status": 5}
+    else:
+        api.document_events.return_value = [
+            {
+                **RECUSA_501,
+                "autorizado": True,
+                "protocolo": "135260000000001",
+                "codigoRetorno": "135",
+            }
+        ]
+
+    resultado = emission.cancel(db, venda, api, "Valor da nota fiscal incorreto")
+
+    assert resultado["success"] is True
+    assert resultado["cancelamento_status"] == "confirmado"
+    assert venda.nfe_status == "cancelada"
+    api.cancel_document.assert_called_once()
+    api.document_status.assert_called_once()
+
+
+def test_falha_incerta_com_consulta_indisponivel_preserva_pendente(contexto):
+    venda, db, api, _audit = contexto
+    api.cancel_document.side_effect = IntNFeError("EmissorIndisponivel", uncertain=True)
+    api.document_status.side_effect = IntNFeError("EmissorIndisponivel")
+
+    with pytest.raises(emission.DirectEmissionError) as erro:
+        emission.cancel(db, venda, api, "Valor da nota fiscal incorreto")
+
+    assert erro.value.cancelamento["cancelamento_status"] == "pendente"
+    assert venda.nfe_status == "autorizada"
+    api.cancel_document.assert_called_once()
+
+
+def test_evento_com_html_do_proxy_preserva_incerteza_sem_expor_pagina(contexto):
+    venda, db, api, _audit = contexto
+    api.cancel_document.return_value = {
+        **RECUSA_501,
+        "motivoRetorno": "<html><title>502 Bad Gateway</title><body>nginx</body></html>",
+    }
+
+    resultado = emission.cancel(db, venda, api, "Valor da nota fiscal incorreto")
+
+    assert resultado["cancelamento_status"] == "pendente"
+    assert resultado["processando"] is True
+    assert "temporariamente indisponível" in resultado["cancelamento_motivo"]
+    assert "<html>" not in resultado["cancelamento_motivo"]
+    assert venda.nfe_status == "autorizada"
+
+
+def test_listagem_sanitiza_motivo_html_ja_gravado(contexto):
+    venda, _db, _api, _audit = contexto
+    venda.nfe_cancelamento_status = "recusado"
+    venda.nfe_cancelamento_codigo = "502"
+    venda.nfe_cancelamento_motivo = "<html><title>502 Bad Gateway</title></html>"
+
+    nota = _normalizar_nota_venda_local(venda)
+
+    assert nota["cancelamento_status"] == "pendente"
+    assert nota["cancelamento_codigo"] == "EmissorIndisponivel"
+    assert "temporariamente indisponível" in nota["cancelamento_motivo"]
+    assert "<html>" not in str(nota)
 
 
 def test_post_aceito_com_get_indisponivel_preserva_solicitado(contexto):
@@ -353,6 +425,7 @@ def test_lista_real_enriquece_cache_intnfe_com_estado_atual_sem_vazar_payload(
     monkeypatch, vinculo
 ):
     from sqlalchemy.orm import Session
+    from app import caixa_models  # noqa: F401 - registra a FK vendas.caixa_id
     from app.nfe import listagem_rapida
     from app.nfe_cache_models import BlingNotaFiscalCache
     from app.vendas_models import Venda
