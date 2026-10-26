@@ -1,4 +1,4 @@
-import { formatMoneyBRL } from "../../utils/formatters.js";
+import { formatMoneyBRL, formatPercent } from "../../utils/formatters.js";
 import { CANAIS_VENDA } from "./analiseProdutosUtils.js";
 
 const numero = (valor) => (Number.isFinite(Number(valor)) ? Number(valor) : 0);
@@ -23,6 +23,7 @@ export function prepararDadosProdutosPorFornecedorPdf({
   catalogos = {},
   empresa = null,
   geradoEm = new Date(),
+  incluirVendedores = false,
 } = {}) {
   const resolverNome = (lista, id, campo) => {
     const cadastro = (Array.isArray(lista) ? lista : []).find(
@@ -71,23 +72,44 @@ export function prepararDadosProdutosPorFornecedorPdf({
   }
   const grupos = [...agrupados.values()]
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
-    .map((grupo) => ({
-      ...grupo,
-      quantidade: Number(grupo.quantidade.toFixed(3)),
-      faturamento: Number(grupo.faturamento.toFixed(2)),
-      linhas: [...grupo.produtos]
-        .sort(
-          (a, b) =>
-            numero(b.faturamento) - numero(a.faturamento) ||
-            String(a.produto_nome || "").localeCompare(String(b.produto_nome || ""), "pt-BR"),
-        )
-        .map((produto) => [
+    .map((grupo) => {
+      const ordenados = [...grupo.produtos].sort(
+        (a, b) =>
+          numero(b.faturamento) - numero(a.faturamento) ||
+          String(a.produto_nome || "").localeCompare(String(b.produto_nome || ""), "pt-BR"),
+      );
+      return {
+        ...grupo,
+        quantidade: Number(grupo.quantidade.toFixed(3)),
+        faturamento: Number(grupo.faturamento.toFixed(2)),
+        linhas: ordenados.map((produto) => [
           produto.produto_nome || "Produto sem nome",
           produto.codigo || "-",
           quantidade(produto.quantidade),
           formatMoneyBRL(numero(produto.faturamento)),
         ]),
-    }));
+        linhasVendedores: incluirVendedores
+          ? ordenados.map((produto) =>
+              [...(Array.isArray(produto.vendedores) ? produto.vendedores : [])]
+                .sort(
+                  (a, b) =>
+                    numero(b.faturamento) - numero(a.faturamento) ||
+                    String(a.vendedor_nome || "").localeCompare(
+                      String(b.vendedor_nome || ""),
+                      "pt-BR",
+                    ),
+                )
+                .map((vendedor) => [
+                  `Vendedor: ${vendedor.vendedor_nome || "Sem vendedor informado"}`,
+                  "",
+                  quantidade(vendedor.quantidade),
+                  formatMoneyBRL(numero(vendedor.faturamento)),
+                  formatPercent(numero(vendedor.participacao_faturamento_pct)),
+                ]),
+            )
+          : [],
+      };
+    });
   const totalQuantidade = produtos.reduce((soma, item) => soma + numero(item.quantidade), 0);
   const totalFaturamento = produtos.reduce((soma, item) => soma + numero(item.faturamento), 0);
 
@@ -97,6 +119,7 @@ export function prepararDadosProdutosPorFornecedorPdf({
     geradoEm: new Date(geradoEm).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
     fornecedor,
     filtros: filtrosDescricao.join(" | "),
+    incluirVendedores,
     grupos,
     totalizadores: `${produtos.length} produto(s) | Quantidade: ${quantidade(totalQuantidade)} | Faturamento: ${formatMoneyBRL(totalFaturamento)}`,
     nota: filtros.fornecedor_id
@@ -116,12 +139,20 @@ export async function criarPdfProdutosPorFornecedor(opcoes = {}) {
   const inicioConteudo = 37;
   const alturaLinha = 4.2;
   const padding = 2.5;
-  const colunas = [
-    { titulo: "Produto", proporcao: 0.55 },
-    { titulo: "Código / SKU", proporcao: 0.16 },
-    { titulo: "Quantidade", proporcao: 0.12, direita: true },
-    { titulo: "Faturamento", proporcao: 0.17, direita: true },
-  ];
+  const colunas = dados.incluirVendedores
+    ? [
+        { titulo: "Produto / vendedor", proporcao: 0.44 },
+        { titulo: "Código / SKU", proporcao: 0.15 },
+        { titulo: "Quantidade", proporcao: 0.12, direita: true },
+        { titulo: "Faturamento", proporcao: 0.17, direita: true },
+        { titulo: "% do produto", proporcao: 0.12, direita: true },
+      ]
+    : [
+        { titulo: "Produto", proporcao: 0.55 },
+        { titulo: "Código / SKU", proporcao: 0.16 },
+        { titulo: "Quantidade", proporcao: 0.12, direita: true },
+        { titulo: "Faturamento", proporcao: 0.17, direita: true },
+      ];
   const larguras = colunas.map((coluna) => largura * coluna.proporcao);
   let y = inicioConteudo;
 
@@ -203,30 +234,36 @@ export async function criarPdfProdutosPorFornecedor(opcoes = {}) {
 
     if (y + alturaSecao + 10 > limite) novaPagina();
     cabecalhoTabela();
-    grupo.linhas.forEach((valores, indiceLinha) => {
-      fonte(8.5);
+    const desenharLinha = (
+      valores,
+      { vendedor = false, alternada = false, aoContinuar = continuar } = {},
+    ) => {
+      fonte(8.5, dados.incluirVendedores && !vendedor);
       const celulas = valores.map((valor, indiceColuna) =>
-        pdf.splitTextToSize(textoPdf(valor), larguras[indiceColuna] - padding * 2),
+        pdf.splitTextToSize(
+          textoPdf(valor),
+          larguras[indiceColuna] - padding * 2 - (vendedor && indiceColuna === 0 ? 4 : 0),
+        ),
       );
       const totalLinhas = Math.max(1, ...celulas.map((linhas) => linhas.length));
       const alturaTotal = totalLinhas * alturaLinha + padding * 2;
       if (y + alturaTotal > limite && alturaTotal <= limite - inicioConteudo - alturaSecao)
-        continuar();
+        aoContinuar();
 
       let inicioLinha = 0;
       while (inicioLinha < totalLinhas) {
         let capacidade = Math.floor((limite - y - padding * 2) / alturaLinha);
         if (capacidade < 1) {
-          continuar();
+          aoContinuar();
           capacidade = Math.floor((limite - y - padding * 2) / alturaLinha);
         }
         const quantidadeLinhas = Math.min(capacidade, totalLinhas - inicioLinha);
         const altura = quantidadeLinhas * alturaLinha + padding * 2;
-        if (indiceLinha % 2 === 0) {
-          pdf.setFillColor(247, 249, 251);
+        if (vendedor || alternada) {
+          pdf.setFillColor(...(vendedor ? [241, 248, 247] : [247, 249, 251]));
           pdf.rect(margem, y, largura, altura, "F");
         }
-        fonte(8.5);
+        fonte(8.5, dados.incluirVendedores && !vendedor, vendedor ? [65, 88, 94] : [40, 50, 65]);
         let x = margem;
         celulas.forEach((linhas, indiceColuna) => {
           const parte = linhas.slice(inicioLinha, inicioLinha + quantidadeLinhas);
@@ -234,7 +271,9 @@ export async function criarPdfProdutosPorFornecedor(opcoes = {}) {
             const direita = colunas[indiceColuna].direita;
             escreverLinhas(
               parte,
-              direita ? x + larguras[indiceColuna] - padding : x + padding,
+              direita
+                ? x + larguras[indiceColuna] - padding
+                : x + padding + (vendedor && indiceColuna === 0 ? 4 : 0),
               y + 5.5,
               8.5,
               direita,
@@ -246,8 +285,28 @@ export async function criarPdfProdutosPorFornecedor(opcoes = {}) {
         pdf.line(margem, y + altura, margem + largura, y + altura);
         y += altura;
         inicioLinha += quantidadeLinhas;
-        if (inicioLinha < totalLinhas) continuar();
+        if (inicioLinha < totalLinhas) aoContinuar();
       }
+    };
+    grupo.linhas.forEach((valores, indiceLinha) => {
+      const vendedores = grupo.linhasVendedores[indiceLinha] || [];
+      // Evita deixar um produto sozinho no fim da página quando há vendedores abaixo.
+      if (vendedores.length && y + 25 > limite) continuar();
+      desenharLinha(valores, { alternada: indiceLinha % 2 === 0 });
+      const continuarVendedores = () => {
+        continuar();
+        fonte(8, true, [26, 70, 73]);
+        const contexto = pdf.splitTextToSize(
+          textoPdf(`Vendedores de ${valores[0]} (${valores[1]})`),
+          largura - padding * 2,
+        );
+        const rotulo = contexto.length > 2 ? [contexto[0], `${contexto[1]}...`] : contexto;
+        escreverLinhas(rotulo, margem + padding, y + 4.5, 8);
+        y += rotulo.length * alturaLinha + 4;
+      };
+      vendedores.forEach((linha) =>
+        desenharLinha(linha, { vendedor: true, aoContinuar: continuarVendedores }),
+      );
     });
     y += 5;
     paragrafo(
@@ -262,6 +321,11 @@ export async function criarPdfProdutosPorFornecedor(opcoes = {}) {
   paragrafo(dados.filtros, { tamanho: 8 });
   paragrafo(dados.totalizadores, { tamanho: 10, negrito: true, espacoDepois: 3 });
   paragrafo(dados.nota, { tamanho: 8, espacoDepois: 5 });
+  if (dados.incluirVendedores)
+    paragrafo(
+      "Vendedores abaixo de cada produto. A participação corresponde ao faturamento do vendedor sobre o total desse produto no filtro aplicado.",
+      { tamanho: 8, espacoDepois: 5 },
+    );
   if (!dados.grupos.length)
     paragrafo("Nenhuma venda de produto encontrada para os filtros aplicados.");
   for (const grupo of dados.grupos) tabelaGrupo(grupo);

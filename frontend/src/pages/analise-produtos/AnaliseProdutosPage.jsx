@@ -2,6 +2,7 @@ import { useState } from "react";
 import { BarChart3, Download, FileText } from "lucide-react";
 import ModuleTabs from "../../components/ui/ModuleTabs";
 import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
+import InputCheckTexto from "../../components/v2/InputCheckTexto/InputCheckTexto";
 import AnaliseProdutoEspecifico from "./AnaliseProdutoEspecifico";
 import AnaliseProdutosFiltros from "./AnaliseProdutosFiltros";
 import { CurvaAbcProdutos, GruposProdutos, VisaoGeralProdutos } from "./AnaliseProdutosViews";
@@ -43,14 +44,24 @@ export default function AnaliseProdutosPage() {
           >
             Exportar produtos do filtro
           </BotaoInteracao>
-          <BotaoInteracao
-            icon={FileText}
-            onClick={analise.exportarPdf}
-            disabled={!analise.podeExportar}
-            loading={analise.exportandoPdf}
-          >
-            Gerar PDF por fornecedor
-          </BotaoInteracao>
+          <div className="flex flex-col gap-2">
+            <BotaoInteracao
+              icon={FileText}
+              onClick={analise.exportarPdf}
+              disabled={!analise.podeExportar}
+              loading={analise.exportandoPdf}
+            >
+              Gerar PDF por fornecedor
+            </BotaoInteracao>
+            <InputCheckTexto
+              id="analise-incluir-vendedores-pdf"
+              checked={analise.incluirVendedoresPdf}
+              onChange={analise.setIncluirVendedoresPdf}
+              disabled={analise.exportandoPdf}
+            >
+              Incluir vendedores no PDF
+            </InputCheckTexto>
+          </div>
         </div>
       </header>
 

@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, func
+from sqlalchemy import create_engine, event, func
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
@@ -247,3 +247,196 @@ def test_todas_consultas_respeitam_fornecedor_periodo_status_e_empresa(relatorio
         key: value for key, value in relatorio.parametros.items() if key != "filtros"
     }
     assert analise._filtros_base(diaria, **parametros, **filtros).scalar() == 2
+
+
+def cadastrar_vendedor(relatorio, vendedor_id, nome, **extra):
+    relatorio.db.execute(
+        Cliente.__table__.insert().values(
+            id=vendedor_id,
+            tenant_id=extra.pop("tenant_id", relatorio.tenant),
+            user_id=1,
+            nome=nome,
+            is_funcionario=True,
+            **extra,
+        )
+    )
+    relatorio.db.commit()
+
+
+def test_vendedores_usa_vendedor_comercial_legado_e_sem_vendedor(relatorio):
+    cadastrar_vendedor(relatorio, 101, "Ana")
+    cadastrar_vendedor(relatorio, 102, "Bruno")
+    produto_id = relatorio.produto("Produto por vendedor", fornecedor_id=2)
+    relatorio.venda(
+        produto_id, quantidade=3, vendedor_funcionario_id=101, funcionario_id=102
+    )
+    relatorio.venda(produto_id, quantidade=2, funcionario_id=102)
+    # vendedor_id=1 e o operador; nao deve aparecer como vendedor do produto.
+    relatorio.venda(produto_id, quantidade=1)
+
+    vendedores = analise._consultar_vendedores_por_produto(
+        relatorio.db, **relatorio.parametros
+    )[produto_id]
+    [produto] = consultar(relatorio)
+
+    assert vendedores == [
+        {
+            "vendedor_id": 101,
+            "vendedor_nome": "Ana",
+            "quantidade": 3,
+            "faturamento": 75,
+            "participacao_faturamento_pct": 50,
+        },
+        {
+            "vendedor_id": 102,
+            "vendedor_nome": "Bruno",
+            "quantidade": 2,
+            "faturamento": 50,
+            "participacao_faturamento_pct": 33.33,
+        },
+        {
+            "vendedor_id": None,
+            "vendedor_nome": "Sem vendedor informado",
+            "quantidade": 1,
+            "faturamento": 25,
+            "participacao_faturamento_pct": 16.67,
+        },
+    ]
+    assert sum(item["quantidade"] for item in vendedores) == produto["quantidade"]
+    assert sum(item["faturamento"] for item in vendedores) == produto["faturamento"]
+
+
+def test_vendedores_preserva_homonimos_e_funcionario_inativo(relatorio):
+    cadastrar_vendedor(relatorio, 101, "Ana", ativo=False)
+    cadastrar_vendedor(relatorio, 102, "Ana")
+    produto_id = relatorio.produto("Produto", fornecedor_id=2)
+    relatorio.venda(produto_id, quantidade=3, vendedor_funcionario_id=101)
+    relatorio.venda(produto_id, quantidade=2, vendedor_funcionario_id=102)
+
+    vendedores = analise._consultar_vendedores_por_produto(
+        relatorio.db, **relatorio.parametros
+    )[produto_id]
+
+    assert [item["vendedor_id"] for item in vendedores] == [101, 102]
+    assert [item["faturamento"] for item in vendedores] == [75, 50]
+
+
+def test_vendedores_respeita_filtros_sem_duplicar_fornecedores(relatorio):
+    cadastrar_vendedor(relatorio, 101, "Ana")
+    for model in (Categoria, Marca, Departamento):
+        relatorio.db.execute(
+            model.__table__.insert().values(
+                id=10, tenant_id=relatorio.tenant, user_id=1, nome="Grupo"
+            )
+        )
+    relatorio.db.commit()
+    produto_id = relatorio.produto(
+        "Produto selecionado", categoria_id=10, marca_id=10, departamento_id=10
+    )
+    relatorio.vinculo(produto_id)
+    relatorio.vinculo(produto_id)
+    relatorio.venda(produto_id, vendedor_funcionario_id=101)
+    for extra in (
+        {"status": "cancelada"},
+        {"status": "devolvida"},
+        {"canal": "ecommerce"},
+        {"data_venda": datetime(2025, 12, 31)},
+        {"tenant_id": relatorio.outro_tenant},
+    ):
+        relatorio.venda(produto_id, vendedor_funcionario_id=101, **extra)
+    for extra in (
+        {"categoria_id": None},
+        {"marca_id": None},
+        {"departamento_id": None},
+        {"nome": "Outro nome"},
+        {"tenant_id": relatorio.outro_tenant},
+    ):
+        cadastro = dict(
+            nome="Produto selecionado", categoria_id=10, marca_id=10, departamento_id=10
+        )
+        cadastro.update(extra)
+        outro = relatorio.produto(**cadastro)
+        relatorio.vinculo(outro)
+        relatorio.venda(outro, vendedor_funcionario_id=101)
+    parametros = {
+        **relatorio.parametros,
+        "filtros": {
+            **relatorio.parametros["filtros"],
+            "categoria_id": 10,
+            "marca_id": 10,
+            "departamento_id": 10,
+            "canal": "loja_fisica",
+            "busca": "selecionado",
+        },
+    }
+
+    resultado = analise._consultar_vendedores_por_produto(relatorio.db, **parametros)
+
+    assert list(resultado) == [produto_id]
+    assert resultado[produto_id][0]["quantidade"] == 2
+    assert resultado[produto_id][0]["faturamento"] == 50
+
+
+def test_vendedores_nao_expoe_cadastro_de_outra_empresa(relatorio):
+    cadastrar_vendedor(
+        relatorio, 101, "Nome de outra empresa", tenant_id=relatorio.outro_tenant
+    )
+    produto_id = relatorio.produto("Produto", fornecedor_id=2)
+    relatorio.venda(produto_id, vendedor_funcionario_id=101)
+
+    [vendedor] = analise._consultar_vendedores_por_produto(
+        relatorio.db, **relatorio.parametros
+    )[produto_id]
+
+    assert vendedor["vendedor_id"] is None
+    assert vendedor["vendedor_nome"] == "Sem vendedor informado"
+    assert vendedor["faturamento"] == 50
+
+
+def test_vendedores_preserva_quantidade_fracionada_subtotal_e_receita_zero(relatorio):
+    cadastrar_vendedor(relatorio, 101, "Ana")
+    produto_id = relatorio.produto("Fracionado", fornecedor_id=2)
+    relatorio.venda(produto_id, quantidade=0.375, vendedor_funcionario_id=101)
+    relatorio.db.execute(VendaItem.__table__.update().values(subtotal=7.20))
+    outro_id = relatorio.produto("Sem receita", fornecedor_id=2)
+    relatorio.venda(outro_id, quantidade=0.625, vendedor_funcionario_id=101)
+    relatorio.db.execute(
+        VendaItem.__table__.update()
+        .where(VendaItem.produto_id == outro_id)
+        .values(subtotal=0)
+    )
+    relatorio.db.commit()
+
+    resultado = analise._consultar_vendedores_por_produto(
+        relatorio.db, **relatorio.parametros
+    )
+
+    assert resultado[produto_id][0]["quantidade"] == 0.375
+    assert resultado[produto_id][0]["faturamento"] == 7.20
+    assert resultado[produto_id][0]["participacao_faturamento_pct"] == 100
+    assert resultado[outro_id][0]["quantidade"] == 0.625
+    assert resultado[outro_id][0]["faturamento"] == 0
+    assert resultado[outro_id][0]["participacao_faturamento_pct"] == 0
+
+
+def test_vendedores_faz_uma_consulta_para_todos_produtos(relatorio):
+    cadastrar_vendedor(relatorio, 101, "Ana")
+    for indice in range(8):
+        produto_id = relatorio.produto(f"Produto {indice}", fornecedor_id=2)
+        relatorio.venda(produto_id, vendedor_funcionario_id=101)
+    consultas = []
+    engine = relatorio.db.get_bind()
+
+    def registrar(_conn, _cursor, statement, _parameters, _context, _executemany):
+        consultas.append(statement)
+
+    event.listen(engine, "before_cursor_execute", registrar)
+    try:
+        resultado = analise._consultar_vendedores_por_produto(
+            relatorio.db, **relatorio.parametros
+        )
+    finally:
+        event.remove(engine, "before_cursor_execute", registrar)
+
+    assert len(resultado) == 8
+    assert len(consultas) == 1

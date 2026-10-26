@@ -275,3 +275,41 @@ test("PDF mostra estado de geração, impede outra geração simultânea e liber
   assert.equal(env.salvos.length, 1);
   assert.equal(env.harness.tree.exportandoPdf, false);
 });
+
+test("PDF inclui todos os vendedores só quando marcado, sem recarregar ou mudar os filtros", async () => {
+  const env = preparar();
+  const produtoComVendedores = {
+    ...produto,
+    vendedores: [
+      {
+        vendedor_id: 11,
+        vendedor_nome: "Ana",
+        quantidade: 8,
+        faturamento: 160,
+        participacao_faturamento_pct: 66.67,
+      },
+      {
+        vendedor_id: null,
+        vendedor_nome: "Sem vendedor informado",
+        quantidade: 4,
+        faturamento: 80,
+        participacao_faturamento_pct: 33.33,
+      },
+    ],
+  };
+  assert.equal(env.harness.tree.incluirVendedoresPdf, false);
+  await env.responder(0, [produtoComVendedores]);
+  const filtrosAplicados = env.harness.tree.filtrosAplicados;
+
+  await env.harness.act(() => env.harness.tree.exportarPdf());
+  assert.equal(env.pdfs[0].incluirVendedores, false);
+  await env.harness.act(() => env.harness.tree.setIncluirVendedoresPdf(true));
+  await env.harness.act(() => env.harness.tree.exportarPdf());
+  assert.equal(env.pdfs[1].incluirVendedores, true);
+  assert.deepEqual(env.pdfs[1].produtos, [produtoComVendedores]);
+  assert.strictEqual(env.pdfs[1].filtros, filtrosAplicados);
+  assert.equal(env.consultas.length, 1);
+  assert.equal(env.salvos.length, 2);
+  assert.equal(env.harness.tree.exportandoPdf, false);
+  assert.deepEqual(env.erros, []);
+});
