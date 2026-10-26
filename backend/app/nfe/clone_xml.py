@@ -12,7 +12,8 @@ from defusedxml import ElementTree as ET
 from defusedxml.common import DefusedXmlException
 from fastapi import HTTPException
 
-NS = {"n": "http://www.portalfiscal.inf.br/nfe"}
+# Identificador do namespace oficial da NF-e (MOC), sem conexão HTTP.
+NS = {"n": "http://www.portalfiscal.inf.br/nfe"}  # NOSONAR
 
 
 class Reader:
