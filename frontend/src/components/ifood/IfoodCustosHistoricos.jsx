@@ -24,10 +24,10 @@ export default function IfoodCustosHistoricos({ order, vinculo }) {
         {origem} · {moedaIfood(order.effective_cmv)}
       </p>
       <p className="v2-texto-ajuda">
-        O vínculo com a venda do ERP precisa ser confirmado uma vez. Depois, o CMV é consultado
-        automaticamente nas saídas originais do estoque. Custo atual do produto não substitui o
-        histórico. Um CMV manual informado, inclusive zero, tem prioridade; sem ele, o histórico
-        comprovado pode ser usado.
+        Pedidos recebidos pelo CorePet são vinculados automaticamente à venda criada no PDV. Para
+        pedidos históricos, confira o vínculo com a venda do ERP. O CMV é consultado nas saídas
+        originais do estoque. Custo atual do produto não substitui o histórico. Um CMV manual
+        informado, inclusive zero, tem prioridade; sem ele, o histórico comprovado pode ser usado.
       </p>
       {historico?.sale ? (
         <p className="v2-texto">
@@ -43,8 +43,13 @@ export default function IfoodCustosHistoricos({ order, vinculo }) {
       )}
       {historico?.link ? (
         <p className="v2-texto-ajuda">
-          Vínculo confirmado em {dataFinanceira(historico.link.linked_at)} ·{" "}
-          {historico.link.source_note}
+          {historico.link.source === "pdv_bridge"
+            ? "Vínculo automático pela entrada do pedido no PDV"
+            : historico.link.source === "explicit_confirmation"
+              ? "Vínculo conferido manualmente"
+              : "Vínculo registrado"}
+          {" em "}
+          {dataFinanceira(historico.link.linked_at)} · {historico.link.source_note}
         </p>
       ) : null}
       {historico?.missing?.length ? (

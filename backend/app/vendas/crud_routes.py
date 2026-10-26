@@ -203,10 +203,12 @@ def buscar_venda(
     )
 
     from app.vendas.cupons_detalhes import carregar_cupons_detalhes_venda
+    from app.integrations.ifood.pdv_pilot import pdv_sale_summary
 
     return {
         **venda.to_dict(),
         "cupons_detalhes": carregar_cupons_detalhes_venda(db, venda, tenant_id),
+        "ifood_pdv_pilot": pdv_sale_summary(db, venda),
     }
 
 
@@ -398,6 +400,10 @@ def atualizar_venda(
 
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
+
+    from app.integrations.ifood.pdv_pilot import block_pilot_sale_edit
+
+    block_pilot_sale_edit(db, venda)
 
     vendedor_informado_id = dados.vendedor_funcionario_id or dados.funcionario_id
     exigir_vendedor_pdv(db, tenant_id, vendedor_informado_id, canal=venda.canal)
@@ -674,9 +680,9 @@ def atualizar_venda(
                 # Atualização: pode ser adição ou remoção, usar on_item_added genericamente
                 # (background processor analisa contexto internamente)
                 processor.on_item_added(
-                    cliente_id=UUID(str(dados.cliente_id))
-                    if dados.cliente_id
-                    else None,
+                    cliente_id=(
+                        UUID(str(dados.cliente_id)) if dados.cliente_id else None
+                    ),
                     itens_carrinho=itens_contexto,
                 )
     except Exception as e:

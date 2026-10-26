@@ -183,6 +183,24 @@ Invoke-GateStep 'Faturamento and cash audit reconciliation regression' $python @
     'tests/unit/test_vendas_comissao_reprocessamento_contract.py', '-q'
 ) $backend
 
+Invoke-GateStep 'Sale cancellation original stock regression' $python @(
+    '-m', 'pytest',
+    'tests/unit/test_venda_cancelamento_lotes.py',
+    'tests/unit/test_cancelamento_pagamentos_caixa.py',
+    'tests/unit/test_venda_cancelamento_fiscal.py',
+    'tests/unit/test_venda_cancelamento_comercial_fiscal.py',
+    'tests/unit/test_vendas_cancelamento_com_devolucao.py',
+    'tests/unit/test_vendas_devolucao_lotes.py',
+    'tests/unit/test_vendas_devolucao_atomicidade.py',
+    'tests/unit/test_finalizacao_pagamento_estoque.py',
+    'tests/unit/test_estoque_service_quantidade_decimal.py',
+    'tests/unit/test_grupo_comercial_estoque_compartilhado_service.py',
+    'tests/unit/test_venda_custo_original_proveniencia.py',
+    'tests/unit/test_venda_edicao_preserva_custo_original.py',
+    'tests/unit/test_pedido_cancelamento_fiscal_estoque_service.py',
+    'tests/unit/test_bling_estoque_sync_transaction.py', '-q'
+) $backend
+
 Invoke-GateStep 'Billing operational continuity regression' $python @(
     '-m', 'pytest',
     'tests/unit/test_plan_catalog_and_limits.py',
@@ -214,12 +232,33 @@ Invoke-GateStep 'Backend iFood safety contracts' $python @(
     '-m', 'pytest', 'tests/unit/test_ifood_management.py',
     'tests/unit/test_ifood_catalog_contract.py', 'tests/unit/test_ifood_routes_contract.py',
     'tests/unit/test_ifood_orders_contract.py', 'tests/unit/test_ifood_client_contract.py',
+    'tests/unit/test_ifood_pdv_pilot.py',
+    'tests/unit/test_ifood_pdv_cancellation.py',
+    'tests/unit/test_ifood_stock_sync.py',
+    'tests/unit/test_ifood_stock_sync_live.py',
+    'tests/unit/test_ifood_pdv_pilot_bypasses.py',
+    'tests/unit/test_ifood_pdv_pilot_permissions.py',
     'tests/unit/test_ifood_financial.py', 'tests/unit/test_ifood_financial_client.py',
     'tests/unit/test_ifood_financial_routes.py', 'tests/unit/test_ifood_contract_reference.py',
     'tests/unit/test_ifood_financial_costs.py', 'tests/unit/test_ifood_payouts.py',
     'tests/unit/test_ifood_financial_statement.py', 'tests/unit/test_ifood_portal_statement.py',
     'tests/unit/test_ifood_catalog_pilot.py', 'tests/unit/test_ifood_stock_pause_cycle.py',
     'tests/unit/test_produto_origem_historico.py', '-q'
+) $backend
+
+Invoke-GateStep 'iFood pending fees reporting regression' $python @(
+    '-m', 'pytest', 'tests/unit/test_ifood_rentabilidade_pendente.py',
+    'tests/unit/test_ifood_sale_financials.py',
+    'tests/unit/test_ifood_financial_report_consumers.py',
+    'tests/unit/test_ifood_financial_poller.py',
+    'tests/unit/test_ifood_rentabilidade_dre_pe_pendente.py',
+    'tests/unit/test_venda_rentabilidade_snapshot.py',
+    'tests/unit/test_venda_rentabilidade_reprocessamento_service.py',
+    'tests/unit/test_dashboard_resumo_numeric_types.py',
+    'tests/unit/test_aba6_chat_ia_metricas.py',
+    'tests/unit/test_aba6_chat_ia_periodos.py',
+    'tests/unit/test_aba6_chat_ia_respostas.py',
+    'tests/unit/test_app_mobile_gestor_contract.py', '-q'
 ) $backend
 
 if ($Nivel -eq 'rapido') {

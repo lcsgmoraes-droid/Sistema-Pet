@@ -1,17 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api";
 import { debugLog, debugWarn } from "../utils/debug";
+import { CANAL_IFOOD, normalizeSalesChannel } from "../utils/salesChannel";
 
 export function usePDVEntregadores(vendaAtual, setVendaAtual) {
   const [entregadores, setEntregadores] = useState([]);
   const [entregadorSelecionado, setEntregadorSelecionado] = useState(null);
   const [custoOperacionalEntrega, setCustoOperacionalEntrega] = useState(0);
+  const vendaAtualRef = useRef(vendaAtual);
+  vendaAtualRef.current = vendaAtual;
 
   useEffect(() => {
     const novoEntregadorId = entregadorSelecionado?.id || null;
 
     setVendaAtual((prev) => {
+      if (normalizeSalesChannel(prev.canal) === CANAL_IFOOD) return prev;
       if (prev.entregador_id === novoEntregadorId) {
         return prev;
       }
@@ -32,15 +36,20 @@ export function usePDVEntregadores(vendaAtual, setVendaAtual) {
   }, []);
 
   useEffect(() => {
+    if (normalizeSalesChannel(vendaAtual.canal) === CANAL_IFOOD) {
+      setEntregadorSelecionado(null);
+      setCustoOperacionalEntrega(0);
+      return;
+    }
     if (vendaAtual.tem_entrega && entregadorSelecionado) {
       void calcularCustoOperacional(entregadorSelecionado);
     } else {
       setCustoOperacionalEntrega(0);
     }
-  }, [entregadorSelecionado, vendaAtual.tem_entrega]);
+  }, [entregadorSelecionado, vendaAtual.tem_entrega, vendaAtual.canal]);
 
   const calcularCustoOperacional = async (entregador) => {
-    if (!entregador) {
+    if (!entregador || normalizeSalesChannel(vendaAtualRef.current.canal) === CANAL_IFOOD) {
       setCustoOperacionalEntrega(0);
       return;
     }
@@ -69,15 +78,23 @@ export function usePDVEntregadores(vendaAtual, setVendaAtual) {
       }
     }
 
-    setCustoOperacionalEntrega(custo);
+    setCustoOperacionalEntrega(
+      normalizeSalesChannel(vendaAtualRef.current.canal) === CANAL_IFOOD ? 0 : custo,
+    );
   };
 
   const selecionarEntregador = (entregador) => {
+    if (normalizeSalesChannel(vendaAtualRef.current.canal) === CANAL_IFOOD) {
+      setEntregadorSelecionado(null);
+      setCustoOperacionalEntrega(0);
+      return;
+    }
     setEntregadorSelecionado(entregador || null);
-    setVendaAtual((prev) => ({
-      ...prev,
-      entregador_id: entregador?.id || null,
-    }));
+    setVendaAtual((prev) =>
+      normalizeSalesChannel(prev.canal) === CANAL_IFOOD
+        ? prev
+        : { ...prev, entregador_id: entregador?.id || null },
+    );
 
     if (entregador) {
       void calcularCustoOperacional(entregador);
@@ -109,7 +126,7 @@ export function usePDVEntregadores(vendaAtual, setVendaAtual) {
         (entregador) => entregador.entregador_padrao === true,
       );
 
-      if (entregadorPadrao) {
+      if (entregadorPadrao && normalizeSalesChannel(vendaAtualRef.current.canal) !== CANAL_IFOOD) {
         selecionarEntregador(entregadorPadrao);
       }
     } catch (error) {

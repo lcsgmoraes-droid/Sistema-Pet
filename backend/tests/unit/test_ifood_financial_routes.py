@@ -19,6 +19,7 @@ from app.ifood_financial_models import (
     IfoodFinancialSnapshot,
 )
 from app.ifood_integration_models import IfoodMerchantConfig
+from app.ifood_order_models import IfoodPdvBridge
 from app.ifood_payout_models import IfoodPayoutSnapshot, IfoodReconciliationJob
 from app.integrations.ifood.client import IfoodClientError
 from app.routes import ifood_financial_routes as routes
@@ -50,6 +51,9 @@ def api(monkeypatch):
             CreateTable(
                 IfoodFinancialSaleLink.__table__, include_foreign_key_constraints=[]
             )
+        )
+        connection.execute(
+            CreateTable(IfoodPdvBridge.__table__, include_foreign_key_constraints=[])
         )
     db = Session(engine)
     tenant, other = uuid4(), uuid4()

@@ -11,6 +11,10 @@ from app.financeiro_models import FormaPagamento
 from app.models import Cliente
 from app.produtos_models import EstoqueMovimentacao
 from app.utils.timezone import now_brasilia
+from app.services.rentabilidade_pendencias import (
+    aplicar_pendencia_ifood,
+    venda_aguarda_financial_ifood,
+)
 from app.services.venda_descontos import (
     bruto_item,
     ratear_descontos_venda,
@@ -176,10 +180,17 @@ def _get_formas_pagamento_map(db: Session, tenant_id: Any) -> Dict[str, FormaPag
 def _resolve_taxa_cartao_total(
     venda: Any,
     formas_pagamento_map: Dict[str, FormaPagamento],
+    *,
+    ignore_ifood: bool = False,
 ) -> float:
     taxa_total = 0.0
 
     for pagamento in list(getattr(venda, "pagamentos", []) or []):
+        if (
+            ignore_ifood
+            and str(getattr(pagamento, "gateway_provider", "") or "").lower() == "ifood"
+        ):
+            continue
         taxa_gateway = getattr(pagamento, "gateway_fee_amount", None)
         if getattr(pagamento, "gateway_provider", None) and taxa_gateway is not None:
             taxa_total += _as_float(taxa_gateway)
@@ -280,12 +291,12 @@ def _resolve_gateway_financials(venda: Any) -> Dict[str, Any]:
         "gateway_provider": provider,
         "gateway_payment_ids": payment_ids,
         "taxa_gateway": _round_money(taxa_gateway) if has_fee else None,
-        "valor_liquido_gateway": _round_money(valor_liquido_gateway)
-        if has_net
-        else None,
-        "valor_bruto_gateway": _round_money(valor_bruto_gateway)
-        if has_gateway
-        else None,
+        "valor_liquido_gateway": (
+            _round_money(valor_liquido_gateway) if has_net else None
+        ),
+        "valor_bruto_gateway": (
+            _round_money(valor_bruto_gateway) if has_gateway else None
+        ),
     }
 
 
@@ -489,7 +500,7 @@ def _resolve_custo_unitario_item(
     return _round_money(getattr(produto, "preco_custo", 0))
 
 
-def build_venda_rentabilidade_snapshot(
+def _build_venda_rentabilidade_snapshot_base(
     venda: Any,
     db: Session,
     tenant_id: Any,
@@ -509,7 +520,9 @@ def build_venda_rentabilidade_snapshot(
     )
 
     gateway_financials = _resolve_gateway_financials(venda)
-    taxa_cartao_total = _resolve_taxa_cartao_total(venda, formas_pagamento_map)
+    taxa_cartao_total = _resolve_taxa_cartao_total(
+        venda, formas_pagamento_map, ignore_ifood=venda_aguarda_financial_ifood(venda)
+    )
     comissao_total = _resolve_comissao_total(db, tenant_id, venda.id, comissao_total)
     impostos_percentual = _resolve_impostos_percentual(
         db, tenant_id, impostos_percentual
@@ -628,9 +641,11 @@ def build_venda_rentabilidade_snapshot(
                 "taxa_loja": _round_money(taxa_loja_rateada),
                 "desconto": _round_money(desconto_rateado),
                 "desconto_item": float(descontos_item["desconto_item"]),
-                "desconto_venda": float(descontos_item["desconto_venda"])
-                if descontos_item["desconto_venda"] is not None
-                else None,
+                "desconto_venda": (
+                    float(descontos_item["desconto_venda"])
+                    if descontos_item["desconto_venda"] is not None
+                    else None
+                ),
                 "cupom_desconto": float(descontos_item["cupom"]),
                 "desconto_origem_legado": descontos_item["legado"],
                 "taxa_entrega": _round_money(taxa_entrega_rateada),
@@ -668,16 +683,21 @@ def build_venda_rentabilidade_snapshot(
     congelado = getattr(venda, "status", None) in FROZEN_STATUSES
     snapshot_em = now_brasilia().isoformat()
 
-    return {
+    snapshot = {
+        "rentabilidade_status": "complete",
+        "taxas_ifood_pendentes": False,
+        "pendencias_rentabilidade": [],
         "snapshot_version": SNAPSHOT_VERSION,
         "snapshot_em": snapshot_em,
         "snapshot_congelado": congelado,
         "venda_id": getattr(venda, "id", None),
         "numero_venda": getattr(venda, "numero_venda", None),
         "status": getattr(venda, "status", None),
-        "data_venda": getattr(venda, "data_venda", None).isoformat()
-        if getattr(venda, "data_venda", None)
-        else None,
+        "data_venda": (
+            getattr(venda, "data_venda", None).isoformat()
+            if getattr(venda, "data_venda", None)
+            else None
+        ),
         "cliente_nome": getattr(getattr(venda, "cliente", None), "nome", None)
         or "Sem cliente",
         "venda_bruta": _round_money(venda_bruta),
@@ -687,6 +707,11 @@ def build_venda_rentabilidade_snapshot(
         "taxa_entrega": _round_money(taxa_entrega_repasse),
         "taxa_operacional": _round_money(taxa_operacional_entrega),
         "taxa_cartao": _round_money(taxa_cartao_total),
+        **(
+            {"taxa_cartao_local": _round_money(taxa_cartao_total)}
+            if venda_aguarda_financial_ifood(venda)
+            else {}
+        ),
         "taxa_gateway": gateway_financials["taxa_gateway"],
         "valor_liquido_gateway": gateway_financials["valor_liquido_gateway"],
         "valor_bruto_gateway": gateway_financials["valor_bruto_gateway"],
@@ -705,6 +730,26 @@ def build_venda_rentabilidade_snapshot(
         "margem_sobre_custo": round(margem_sobre_custo, 1),
         "itens": itens_snapshot,
     }
+    return snapshot
+
+
+def _financial_atual(venda, db, tenant_id, ifood_financial):
+    if ifood_financial is not None or not venda_aguarda_financial_ifood(venda):
+        return ifood_financial
+    from app.services.ifood_rentabilidade_contexto import carregar_financial_das_vendas
+
+    return carregar_financial_das_vendas(db, tenant_id, [venda]).get(
+        getattr(venda, "id", None), {}
+    )
+
+
+def build_venda_rentabilidade_snapshot(
+    venda, db, tenant_id, *, ifood_financial=None, **kwargs
+):
+    base = _build_venda_rentabilidade_snapshot_base(venda, db, tenant_id, **kwargs)
+    return aplicar_pendencia_ifood(
+        venda, base, financial=_financial_atual(venda, db, tenant_id, ifood_financial)
+    )
 
 
 def get_or_build_venda_rentabilidade_snapshot(
@@ -721,6 +766,7 @@ def get_or_build_venda_rentabilidade_snapshot(
     comissao_total: Optional[float] = None,
     taxa_operacional_entrega: Optional[float] = None,
     estoque_custos_por_produto: Optional[Dict[int, Dict[str, float]]] = None,
+    ifood_financial: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     status_atual = getattr(venda, "status", None)
 
@@ -734,9 +780,18 @@ def get_or_build_venda_rentabilidade_snapshot(
         if getattr(venda, "desconto_venda_valor", None) is None:
             versoes_aceitas.add(5)
         if existing and int(existing.get("snapshot_version") or 0) in versoes_aceitas:
+            protegido = aplicar_pendencia_ifood(
+                venda,
+                existing,
+                financial=_financial_atual(venda, db, tenant_id, ifood_financial),
+            )
+            if venda_aguarda_financial_ifood(venda) or protegido.get(
+                "taxas_ifood_pendentes"
+            ):
+                return protegido
             return ajustar_snapshot_taxa_mista(venda, existing)
 
-    snapshot = build_venda_rentabilidade_snapshot(
+    snapshot = _build_venda_rentabilidade_snapshot_base(
         venda,
         db,
         tenant_id,
@@ -750,11 +805,17 @@ def get_or_build_venda_rentabilidade_snapshot(
     )
 
     if persist_if_missing and status_atual in FROZEN_STATUSES:
-        venda.rentabilidade_snapshot = snapshot
+        # Congela apenas a base ERP. Uma nova revisao Financial e aplicada em
+        # toda leitura, sem gravar de novo o CMV nem reaplicar taxas antigas.
+        venda.rentabilidade_snapshot = aplicar_pendencia_ifood(venda, snapshot)
         venda.rentabilidade_snapshot_em = now_brasilia()
         db.flush()
 
-    return snapshot
+    return aplicar_pendencia_ifood(
+        venda,
+        snapshot,
+        financial=_financial_atual(venda, db, tenant_id, ifood_financial),
+    )
 
 
 def invalidate_venda_rentabilidade_snapshot(venda: Any) -> None:

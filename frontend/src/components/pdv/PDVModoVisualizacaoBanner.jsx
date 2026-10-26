@@ -12,6 +12,7 @@ import ImprimirDocumentoFiscalButton from "./ImprimirDocumentoFiscalButton";
 import ModalSelecaoDocumentoFiscal from "./ModalSelecaoDocumentoFiscal";
 import ModalDadosVendaFinalizada from "./ModalDadosVendaFinalizada";
 import { mensagemCaixaIndisponivel } from "../../utils/caixaAbertoMonitor";
+import { CANAL_IFOOD, normalizeSalesChannel } from "../../utils/salesChannel";
 import {
   obterSituacaoFiscalVenda,
   podeCancelarVenda as vendaPermiteCancelamento,
@@ -40,7 +41,8 @@ export default function PDVModoVisualizacaoBanner({
     return null;
   }
 
-  const podeAbrirDevolucao = podeAbrirDevolucaoVenda(vendaAtual);
+  const origemIfood = normalizeSalesChannel(vendaAtual.canal) === CANAL_IFOOD;
+  const podeAbrirDevolucao = !origemIfood && podeAbrirDevolucaoVenda(vendaAtual);
   const textoDevolucao = getTextoDevolucaoVendaPDV(vendaAtual);
   const notaCancelada = obterSituacaoFiscalVenda(vendaAtual)?.status === "cancelada";
   const vendaCancelada = ["cancelada", "cancelado"].includes(vendaAtual.status);
@@ -63,19 +65,20 @@ export default function PDVModoVisualizacaoBanner({
               : vendaAtual.status === "pago_nf"
                 ? "com NF emitida"
                 : "Aberta");
-  const orientacao =
-    textoDevolucao?.orientacao ||
-    (vendaCancelada
-      ? "Cancelamento registrado no histórico."
-      : podeCancelarVenda && notaCancelada
-        ? "A nota foi cancelada. Use Cancelar venda para desfazer a venda."
-        : podeCancelarVenda
-          ? "Use Cancelar venda para desfazer a venda. A situação da nota é tratada separadamente."
-          : notaRejeitada
-            ? "Clique em Corrigir erro no aviso da nota para revisar os dados fiscais."
-            : vendaAtual.status === "aberta"
-              ? "Clique em Editar para modificar."
-              : "Reabra a venda para modificar.");
+  const orientacao = origemIfood
+    ? "Itens e valores vêm do pedido iFood. A finalização e o cancelamento preservam esse vínculo."
+    : textoDevolucao?.orientacao ||
+      (vendaCancelada
+        ? "Cancelamento registrado no histórico."
+        : podeCancelarVenda && notaCancelada
+          ? "A nota foi cancelada. Use Cancelar venda para desfazer a venda."
+          : podeCancelarVenda
+            ? "Use Cancelar venda para desfazer a venda. A situação da nota é tratada separadamente."
+            : notaRejeitada
+              ? "Clique em Corrigir erro no aviso da nota para revisar os dados fiscais."
+              : vendaAtual.status === "aberta"
+                ? "Clique em Editar para modificar."
+                : "Reabra a venda para modificar.");
 
   return (
     <>
@@ -153,21 +156,22 @@ export default function PDVModoVisualizacaoBanner({
                 </ActionButton>
               )}
 
-            {(vendaAtual.status === "finalizada" ||
-              vendaAtual.status === "baixa_parcial" ||
-              (notaCancelada && vendaAtual.status === "pago_nf")) && (
-              <ActionButton
-                onClick={mudarStatusParaAberta}
-                icon={AlertCircle}
-                intent="warning"
-                size="md"
-                className="min-w-[126px]"
-              >
-                Reabrir Venda
-              </ActionButton>
-            )}
+            {!origemIfood &&
+              (vendaAtual.status === "finalizada" ||
+                vendaAtual.status === "baixa_parcial" ||
+                (notaCancelada && vendaAtual.status === "pago_nf")) && (
+                <ActionButton
+                  onClick={mudarStatusParaAberta}
+                  icon={AlertCircle}
+                  intent="warning"
+                  size="md"
+                  className="min-w-[126px]"
+                >
+                  Reabrir Venda
+                </ActionButton>
+              )}
 
-            {vendaAtual.status === "aberta" && (
+            {!origemIfood && vendaAtual.status === "aberta" && (
               <ActionButton
                 onClick={habilitarEdicao}
                 intent="edit"

@@ -1,7 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { FiClock, FiEdit3, FiPackage, FiRefreshCw, FiTrash2 } from "react-icons/fi";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Clock, Package, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { api } from "../../services/api";
 import { confirmarCorePet } from "../../services/corepetDialog";
+import { formatMoneyBRL } from "../../utils/formatters";
+import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
+import InputQuantidade from "../../components/v2/InputQuantidade/InputQuantidade";
+import IfoodPedidoPdvPilot, {
+  canImportIfoodPdvPilot,
+} from "../../components/ifood/IfoodPedidoPdvPilot";
+import { canFinalizeIfoodOnlinePdvPilot } from "../../utils/ifoodPdvPilot";
 
 function errorMessage(error, fallback) {
   const detail = error?.response?.data?.detail;
@@ -9,10 +16,37 @@ function errorMessage(error, fallback) {
 }
 
 function money(value) {
-  return Number(value || 0).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
+  return formatMoneyBRL(value);
+}
+
+function orderDisplayTotal(order) {
+  if (order.pdv_bridge?.payment_mode !== "online") {
+    return { label: "Total", formatted: money(order.total), online: false };
+  }
+  const checkout = order.pdv_bridge.checkout || {};
+  const amounts = [
+    "items_total",
+    "delivery_fee",
+    "ifood_service_fee",
+    "operational_total",
+    "customer_total",
+  ].map((key) => {
+    const raw = checkout[key];
+    if (!["number", "string"].includes(typeof raw) || String(raw).trim() === "") return null;
+    const value = Number(raw);
+    return Number.isFinite(value) && value >= 0 ? Math.round(value * 100) : null;
   });
+  const [items, delivery, service, operational, customer] = amounts;
+  const valid =
+    amounts.every((value) => value !== null) &&
+    items > 0 &&
+    operational === items + delivery &&
+    customer === operational + service;
+  return {
+    label: "Total do consumidor",
+    formatted: valid ? money(customer / 100) : "Não informado",
+    online: true,
+  };
 }
 
 function dateTime(value) {
@@ -75,7 +109,15 @@ function benefitLines(payload) {
   });
 }
 
-function OrderDetails({ order, onAction, onItemAction, action }) {
+export function OrderDetails({
+  order,
+  onAction,
+  onItemAction,
+  onImportPdv,
+  onFinalizeOnlinePdv,
+  action,
+  actionsEnabled,
+}) {
   const [quantities, setQuantities] = useState({});
   const payload = order.payload || {};
   const delivery = payload.delivery || payload.operationMode?.delivery || {};
@@ -84,6 +126,9 @@ function OrderDetails({ order, onAction, onItemAction, action }) {
   const payments = paymentLines(payload);
   const benefits = benefitLines(payload);
   const items = values(payload.bag?.items || payload.items);
+  const controlsDisabled = !actionsEnabled || Boolean(action);
+  const pickingItemsDisabled = controlsDisabled || Boolean(order.pdv_bridge?.sale_id);
+  const displayTotal = orderDisplayTotal(order);
 
   useEffect(() => {
     setQuantities(
@@ -116,8 +161,8 @@ function OrderDetails({ order, onAction, onItemAction, action }) {
           <p>{order.customer_name || payload.customer?.name || "Não informado"}</p>
         </div>
         <div>
-          <p className="text-xs uppercase text-slate-500">Total</p>
-          <p>{money(order.total)}</p>
+          <p className="text-xs uppercase text-slate-500">{displayTotal.label}</p>
+          <p>{displayTotal.formatted}</p>
         </div>
         <div>
           <p className="text-xs uppercase text-slate-500">Recebido</p>
@@ -128,6 +173,13 @@ function OrderDetails({ order, onAction, onItemAction, action }) {
           <p className="font-mono">{phone.localizer || "Não informado"}</p>
         </div>
       </div>
+
+      <IfoodPedidoPdvPilot
+        bridge={order.pdv_bridge}
+        busy={Boolean(action)}
+        onImport={onImportPdv}
+        onFinalizeOnline={onFinalizeOnlinePdv}
+      />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-900">
@@ -167,42 +219,40 @@ function OrderDetails({ order, onAction, onItemAction, action }) {
                 </div>
                 {item.uniqueId && !item.unavailable ? (
                   <div className="mt-3 flex flex-wrap items-end gap-2">
-                    <label className="text-xs font-medium text-slate-600">
-                      Quantidade separada
-                      <input
-                        type="number"
-                        min="0.001"
-                        step="0.001"
+                    <div className="w-36">
+                      <InputQuantidade
+                        label="Quantidade separada"
+                        min={0.001}
+                        disabled={pickingItemsDisabled}
                         value={quantities[item.uniqueId] ?? item.quantity ?? 1}
-                        onChange={(event) =>
+                        onChange={(quantity) =>
                           setQuantities((current) => ({
                             ...current,
-                            [item.uniqueId]: event.target.value,
+                            [item.uniqueId]: quantity,
                           }))
                         }
-                        className="mt-1 block w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm"
                       />
-                    </label>
-                    <button
-                      type="button"
+                    </div>
+                    <BotaoInteracao
+                      icon={Pencil}
+                      tamanho="pequeno"
                       onClick={() =>
                         onItemAction("update", item.uniqueId, {
                           quantity: Number(quantities[item.uniqueId] ?? item.quantity ?? 1),
                         })
                       }
-                      disabled={Boolean(action)}
-                      className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-medium text-blue-800 disabled:opacity-50"
+                      disabled={pickingItemsDisabled}
                     >
-                      <FiEdit3 className="mr-1 inline" /> Atualizar quantidade
-                    </button>
-                    <button
-                      type="button"
+                      Atualizar quantidade
+                    </BotaoInteracao>
+                    <BotaoInteracao
+                      icon={Trash2}
+                      tamanho="pequeno"
                       onClick={() => onItemAction("remove", item.uniqueId)}
-                      disabled={Boolean(action)}
-                      className="rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-700 disabled:opacity-50"
+                      disabled={pickingItemsDisabled}
                     >
-                      <FiTrash2 className="mr-1 inline" /> Marcar indisponível
-                    </button>
+                      Marcar indisponível
+                    </BotaoInteracao>
                   </div>
                 ) : null}
               </div>
@@ -239,6 +289,13 @@ function OrderDetails({ order, onAction, onItemAction, action }) {
         </div>
       </div>
 
+      {order.pdv_bridge?.sale_id ? (
+        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+          Os itens estão vinculados à reserva do PDV. Quantidade e indisponibilidade ficam
+          bloqueadas neste piloto para preservar a conferência de estoque.
+        </p>
+      ) : null}
+
       {Object.keys(address).length ? (
         <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-900">
           <p className="text-xs font-semibold uppercase text-slate-500">Entrega</p>
@@ -252,59 +309,98 @@ function OrderDetails({ order, onAction, onItemAction, action }) {
       ) : null}
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          type="button"
+        <BotaoInteracao
+          icon={RefreshCw}
+          tamanho="pequeno"
           onClick={() => onAction("atualizar-sacola")}
-          disabled={Boolean(action)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium disabled:opacity-50"
+          disabled={controlsDisabled}
         >
-          <FiRefreshCw className="mr-1 inline" /> Consultar Orders Virtual Bag
-        </button>
-        <button
-          type="button"
+          Consultar Orders Virtual Bag
+        </BotaoInteracao>
+        <BotaoInteracao
+          icon={Clock}
+          tamanho="pequeno"
           onClick={() => onAction("iniciar-separacao")}
-          disabled={Boolean(action)}
-          className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+          disabled={controlsDisabled}
         >
-          <FiClock className="mr-1 inline" /> Iniciar separação
-        </button>
-        <button
-          type="button"
+          Iniciar separação
+        </BotaoInteracao>
+        <BotaoInteracao
+          icon={Package}
+          tamanho="pequeno"
           onClick={() => onAction("finalizar-separacao")}
-          disabled={Boolean(action)}
-          className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+          disabled={controlsDisabled}
         >
-          <FiPackage className="mr-1 inline" /> Finalizar separação e consultar sacola
-        </button>
+          Finalizar separação e consultar sacola
+        </BotaoInteracao>
       </div>
     </div>
   );
 }
 
-export default function IfoodPedidosPanel({ enabled, onMessage }) {
+export default function IfoodPedidosPanel({ enabled: externalEnabled, onMessage }) {
   const [orders, setOrders] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [selected, setSelected] = useState(null);
   const [action, setAction] = useState(null);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [loadingSelected, setLoadingSelected] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [selectedError, setSelectedError] = useState("");
+  const pilotImportRef = useRef(false);
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
 
-  const loadOrders = useCallback(async () => {
+  const loadOrders = useCallback(async (isCurrent = () => true) => {
     const response = await api.get("/integracoes/ifood/pedidos", { params: { limit: 30 } });
-    setOrders(response.data?.orders || []);
+    if (isCurrent()) {
+      setOrders(response.data?.orders || []);
+      setLoadError("");
+    }
   }, []);
 
   useEffect(() => {
-    void loadOrders().catch(() => null);
+    let active = true;
+    void loadOrders(() => active)
+      .catch(() => {
+        if (active) setLoadError("Não foi possível carregar os pedidos. Atualize a consulta.");
+      })
+      .finally(() => {
+        if (active) setLoadingOrders(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [loadOrders]);
 
   useEffect(() => {
     if (!selectedId) {
       setSelected(null);
+      setLoadingSelected(false);
+      setSelectedError("");
       return;
     }
+    let active = true;
+    setSelected(null);
+    setLoadingSelected(true);
+    setSelectedError("");
     void api
       .get(`/integracoes/ifood/pedidos/${selectedId}`)
-      .then((response) => setSelected(response.data))
-      .catch(() => setSelected(null));
+      .then((response) => {
+        if (active) setSelected(response.data);
+      })
+      .catch(() => {
+        if (active) {
+          setSelected(null);
+          setSelectedError("Não foi possível carregar este pedido. Atualize a consulta.");
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingSelected(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [selectedId]);
 
   const selectedSummary = useMemo(
@@ -312,7 +408,37 @@ export default function IfoodPedidosPanel({ enabled, onMessage }) {
     [orders, selectedId],
   );
 
+  function selectOrder(orderId) {
+    if (selectedId === orderId) return;
+    setSelected(null);
+    setSelectedError("");
+    setLoadingSelected(true);
+    setSelectedId(orderId);
+  }
+
+  async function refreshSelected(orderId = selectedId) {
+    if (!orderId) return;
+    const response = await api.get(`/integracoes/ifood/pedidos/${orderId}`);
+    if (selectedIdRef.current === orderId) {
+      setSelected(response.data);
+      setSelectedError("");
+    }
+  }
+
+  async function refreshLocalOrders() {
+    try {
+      setAction("refresh");
+      await loadOrders();
+      await refreshSelected();
+    } catch (error) {
+      onMessage("error", errorMessage(error, "Não foi possível atualizar os pedidos do CorePet."));
+    } finally {
+      setAction(null);
+    }
+  }
+
   async function poll() {
+    if (!externalEnabled) return;
     try {
       setAction("poll");
       const response = await api.post("/integracoes/ifood/pedidos/processar-eventos");
@@ -322,6 +448,7 @@ export default function IfoodPedidosPanel({ enabled, onMessage }) {
         `Eventos consultados: ${summary.received}; confirmados: ${summary.acknowledged}.`,
       );
       await loadOrders();
+      await refreshSelected();
     } catch (error) {
       onMessage("error", errorMessage(error, "Não foi possível consultar eventos de pedidos."));
     } finally {
@@ -330,7 +457,7 @@ export default function IfoodPedidosPanel({ enabled, onMessage }) {
   }
 
   async function runOrderAction(name, body) {
-    if (!selectedId) return;
+    if (!selectedId || !externalEnabled) return;
     try {
       setAction(name);
       const actionResponse = await api.post(
@@ -354,8 +481,59 @@ export default function IfoodPedidosPanel({ enabled, onMessage }) {
     }
   }
 
+  async function importPdvPilot() {
+    if (!selectedId || pilotImportRef.current || !canImportIfoodPdvPilot(selected?.pdv_bridge)) {
+      return;
+    }
+    const orderId = selectedId;
+    pilotImportRef.current = true;
+    try {
+      setAction("piloto-pdv/importar");
+      const response = await api.post(`/integracoes/ifood/pedidos/${orderId}/piloto-pdv/importar`);
+      if (selectedIdRef.current === orderId) setSelected(response.data);
+      await loadOrders();
+      onMessage(
+        "success",
+        response.data?.pdv_bridge?.payment_mode === "online"
+          ? "Pedido reservado. Confira o pagamento online e use Concluir venda e baixar estoque, sem nova cobrança."
+          : "Pedido de teste enviado ao PDV com reserva. A baixa ocorre ao finalizar a venda no PDV.",
+      );
+    } catch (error) {
+      onMessage("error", errorMessage(error, "Não foi possível enviar o pedido de teste ao PDV."));
+    } finally {
+      pilotImportRef.current = false;
+      setAction(null);
+    }
+  }
+
+  async function finalizeOnlinePdvPilot() {
+    if (
+      !selectedId ||
+      pilotImportRef.current ||
+      !canFinalizeIfoodOnlinePdvPilot(selected?.pdv_bridge)
+    ) {
+      return;
+    }
+    const orderId = selectedId;
+    pilotImportRef.current = true;
+    try {
+      setAction("piloto-pdv/finalizar-online");
+      const response = await api.post(
+        `/integracoes/ifood/pedidos/${orderId}/piloto-pdv/finalizar-online`,
+      );
+      if (selectedIdRef.current === orderId) setSelected(response.data);
+      await loadOrders();
+      onMessage("success", "Venda concluída com baixa de estoque. Repasse do iFood a conciliar.");
+    } catch (error) {
+      onMessage("error", errorMessage(error, "Não foi possível concluir a venda online de teste."));
+    } finally {
+      pilotImportRef.current = false;
+      setAction(null);
+    }
+  }
+
   async function runItemAction(name, uniqueId, body) {
-    if (!selectedId) return;
+    if (!selectedId || !externalEnabled || selected?.pdv_bridge?.sale_id) return;
     if (
       name === "remove" &&
       !(await confirmarCorePet(
@@ -398,48 +576,81 @@ export default function IfoodPedidosPanel({ enabled, onMessage }) {
             separação.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={poll}
-          disabled={!enabled || Boolean(action)}
-          className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-xs font-medium text-red-700 disabled:opacity-50"
-        >
-          <FiRefreshCw className={action === "poll" ? "animate-spin" : ""} /> Buscar eventos agora
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <BotaoInteracao
+            icon={RefreshCw}
+            tamanho="pequeno"
+            onClick={refreshLocalOrders}
+            disabled={Boolean(action)}
+            loading={action === "refresh"}
+          >
+            Atualizar pedidos
+          </BotaoInteracao>
+          <BotaoInteracao
+            icon={RefreshCw}
+            tamanho="pequeno"
+            onClick={poll}
+            disabled={!externalEnabled || Boolean(action)}
+            loading={action === "poll"}
+          >
+            Buscar eventos agora
+          </BotaoInteracao>
+        </div>
       </div>
 
-      {!enabled ? (
+      {!externalEnabled ? (
         <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          As ações de pedidos estão prontas, mas permanecem bloqueadas até a homologação assistida
-          ser iniciada.
+          A consulta de eventos e as ações no iFood permanecem bloqueadas. A importação local ao PDV
+          depende da autorização do piloto DEV mostrada em cada pedido.
         </p>
       ) : null}
 
-      {orders.length ? (
+      {loadingOrders ? (
+        <p role="status" className="mt-4 text-sm text-slate-500">
+          Carregando pedidos...
+        </p>
+      ) : loadError ? (
+        <p role="alert" className="mt-4 text-sm text-red-700 dark:text-red-300">
+          {loadError}
+        </p>
+      ) : orders.length ? (
         <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {orders.map((order) => (
-            <button
-              key={order.ifood_order_id}
-              type="button"
-              onClick={() => setSelectedId(order.ifood_order_id)}
-              className={`rounded-lg border p-3 text-left text-sm ${selectedId === order.ifood_order_id ? "border-red-400 bg-red-50" : "border-slate-200"}`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-medium">
-                  #{order.display_id || order.ifood_order_id.slice(0, 8)}
-                </span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[11px] ${statusClass(order.status)}`}
+          {orders.map((order) => {
+            const displayTotal = orderDisplayTotal(order);
+            return (
+              <div
+                key={order.ifood_order_id}
+                className={`rounded-lg border p-3 text-sm dark:text-slate-100 ${selectedId === order.ifood_order_id ? "border-red-400 bg-red-50 dark:bg-red-950/30" : "border-slate-200 dark:border-slate-800"}`}
+              >
+                <BotaoInteracao
+                  aria-pressed={selectedId === order.ifood_order_id}
+                  disabled={Boolean(action)}
+                  larguraTotal
+                  onClick={() => selectOrder(order.ifood_order_id)}
+                  tamanho="pequeno"
                 >
-                  {order.status}
-                </span>
+                  Ver pedido #{order.display_id || order.ifood_order_id.slice(0, 8)}
+                </BotaoInteracao>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">
+                    #{order.display_id || order.ifood_order_id.slice(0, 8)}
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[11px] ${statusClass(order.status)}`}
+                  >
+                    {order.status}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  {order.order_type} · {order.order_timing}
+                </p>
+                <p className="mt-2 font-medium">
+                  {displayTotal.online ? `${displayTotal.label}: ` : ""}
+                  {displayTotal.formatted}
+                </p>
               </div>
-              <p className="mt-1 text-xs text-slate-500">
-                {order.order_type} · {order.order_timing}
-              </p>
-              <p className="mt-2 font-medium">{money(order.total)}</p>
-            </button>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <p className="mt-4 text-sm text-slate-500">Nenhum pedido de teste recebido ainda.</p>
@@ -450,11 +661,21 @@ export default function IfoodPedidosPanel({ enabled, onMessage }) {
           order={selected}
           onAction={runOrderAction}
           onItemAction={runItemAction}
+          onImportPdv={importPdvPilot}
+          onFinalizeOnlinePdv={finalizeOnlinePdvPilot}
           action={action}
+          actionsEnabled={externalEnabled}
         />
       ) : null}
-      {!selected && selectedSummary ? (
-        <p className="mt-3 text-sm text-slate-500">Carregando pedido...</p>
+      {loadingSelected && selectedSummary ? (
+        <p role="status" className="mt-3 text-sm text-slate-500">
+          Carregando pedido...
+        </p>
+      ) : null}
+      {selectedError ? (
+        <p role="alert" className="mt-3 text-sm text-red-700 dark:text-red-300">
+          {selectedError}
+        </p>
       ) : null}
     </div>
   );

@@ -157,6 +157,12 @@ export function createControllerHarness(
       render();
       await settle();
     },
+    unmount() {
+      for (const slot of slots) {
+        slot?.cleanup?.();
+        if (slot) slot.cleanup = undefined;
+      }
+    },
   };
 }
 

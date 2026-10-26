@@ -308,6 +308,7 @@ def api(monkeypatch):
         IfoodCatalogLink,
         IfoodCatalogConfirmation,
         IfoodCatalogSubmission,
+        IfoodStockSyncState,
     )
     import app.pedido_integrado_models  # noqa: F401
     from app.security import permissions_decorator
@@ -329,6 +330,7 @@ def api(monkeypatch):
                 IfoodCatalogLink,
                 IfoodCatalogConfirmation,
                 IfoodCatalogSubmission,
+                IfoodStockSyncState,
                 PedidoIntegradoItem,
                 ProdutoKitComponente,
             )

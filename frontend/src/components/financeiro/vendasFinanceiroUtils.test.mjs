@@ -369,6 +369,7 @@ test("calcula totalizadores da lista de vendas financeiras", () => {
     custo_produtos: 70,
     lucro: 10,
     com_nf: 1,
+    vendas_rentabilidade_pendente: 0,
     margem_sobre_venda: 6.7,
     margem_sobre_custo: 14.3,
   });

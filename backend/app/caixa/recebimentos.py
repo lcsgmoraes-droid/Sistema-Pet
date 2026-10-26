@@ -109,7 +109,9 @@ def resumir_pagamentos_vendas_caixa(db, *, caixa_id, tenant_id):
         .all()
     )
     nomes = carregar_nomes_formas_pagamento(
-        db, tenant_id=tenant_id, forma_ids=[grupo.forma_pagamento_id for grupo in grupos]
+        db,
+        tenant_id=tenant_id,
+        forma_ids=[grupo.forma_pagamento_id for grupo in grupos],
     )
     por_forma = {}
     sem_caixa = {"quantidade": 0, "total": 0.0, "por_forma_pagamento": {}}

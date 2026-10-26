@@ -35,6 +35,11 @@ def poll_active_ifood_tenants_once() -> dict[str, int]:
         timeout_seconds=settings.IFOOD_REQUEST_TIMEOUT_SECONDS,
     ) as client:
         for tenant_id in tenant_ids:
+            if (
+                settings.IFOOD_PDV_PILOT_ENABLED
+                and str(tenant_id) != settings.IFOOD_PDV_PILOT_TENANT_ID
+            ):
+                continue
             with tenant_context(tenant_id):
                 db = SessionLocal()
                 try:

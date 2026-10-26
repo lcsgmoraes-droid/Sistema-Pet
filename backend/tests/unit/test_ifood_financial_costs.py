@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from decimal import Decimal
 from pathlib import Path
 import runpy
@@ -13,6 +14,7 @@ import pytest
 from sqlalchemy import create_engine, event, func, inspect, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.schema import CreateTable
 
 from app import caixa_models, financeiro_models, produtos_models  # noqa: F401 - relational registry
 from app.models import Cliente  # noqa: F401 - relational registry
@@ -23,7 +25,7 @@ from app.ifood_financial_models import (
     IfoodFinancialSnapshot,
 )
 from app.ifood_integration_models import IfoodMerchantConfig
-from app.ifood_order_models import IfoodOrder
+from app.ifood_order_models import IfoodOrder, IfoodPdvBridge
 from app.integrations.ifood.financial import (
     IfoodFinancialError,
     get_financial_order,
@@ -39,6 +41,8 @@ from app.integrations.ifood.financial_costs import (
 from app.tenancy.context import set_current_tenant, tenant_context
 from app.vendas_devolucoes_models import VendaDevolucao
 from app.vendas_models import Venda, VendaItem
+from app.utils.timezone import BRASILIA_TZ
+from app.vendas.custo_original import registrar_custo_original_saida
 
 MERCHANT = "184bad64-04a8-4877-9789-2e246b3ae4e4"
 ORDER = "003f1a11-63b5-45c6-a956-e6423f8a06ca"
@@ -61,6 +65,10 @@ def db():
     engine = create_engine("sqlite://")
     for model in TABLES:
         model.__table__.create(engine)
+    with engine.begin() as connection:
+        connection.execute(
+            CreateTable(IfoodPdvBridge.__table__, include_foreign_key_constraints=[])
+        )
     session = sessionmaker(bind=engine)()
     yield session
     session.close()
@@ -319,7 +327,10 @@ def test_same_stock_movement_cannot_prove_two_items(db):
         {"origem": "reprocessamento"},
         {"tenant_estoque_id": str(uuid4())},
         {"capturado_em": None},
-        {"capturado_em": "2025-03-01T10:00:00"},
+        {"capturado_em": "2025-03-01"},
+        {"capturado_em": "2025-02-30T10:00:00"},
+        {"capturado_em": "2025-03-01T10:00:00+99:99"},
+        {"capturado_em": "not-a-date"},
     ],
 )
 def test_invalid_original_proof_never_falls_back_to_reprocessed_or_current_cost(
@@ -525,7 +536,7 @@ def test_batch_is_bounded_queries_read_only_and_has_no_cost_product_lookup(db):
     finally:
         event.remove(db.bind, "before_cursor_execute", capture)
     assert len(result) == 301 and result[ORDER]["cmv"] == "60.00"
-    assert len(statements) == 6
+    assert len(statements) == 7
     assert all(
         statement.lstrip().upper().startswith("SELECT") for statement in statements
     )
@@ -553,7 +564,258 @@ def test_batch_chunks_more_than_one_thousand_orders_without_n_plus_one(db):
         event.remove(db.bind, "before_cursor_execute", capture)
     assert len(result) == 1002 and result[ORDER]["cmv"] == "60.00"
     assert result["order-1000"]["status"] == "pending"
-    assert len(statements) == 7
+    assert len(statements) == 9
+
+
+def canonical_scenario(db):
+    tenant, sale_id, item_id = scenario(
+        db, quantity="1", cost="43.94", subtotal=65, total=73.9
+    )
+    db.execute(
+        VendaItem.__table__.update()
+        .where(VendaItem.id == item_id)
+        .values(preco_unitario=65, subtotal=65)
+    )
+    db.execute(
+        IfoodOrder.__table__.insert().values(
+            tenant_id=tenant,
+            merchant_id=MERCHANT,
+            ifood_order_id=ORDER,
+            status="CONFIRMED",
+            payload={},
+        )
+    )
+    db.execute(
+        IfoodPdvBridge.__table__.insert().values(
+            tenant_id=tenant,
+            merchant_id=MERCHANT,
+            ifood_order_id=ORDER,
+            sale_id=sale_id,
+            reservation_id=1,
+            product_id=11,
+            quantity=1,
+            unit_price=65,
+            evidence_hash="a" * 64,
+            status="sold",
+            actor_id=7,
+            stock_decreased_at=NOW,
+        )
+    )
+    return tenant, sale_id, item_id
+
+
+def test_pdv_bridge_accepts_actual_stock_writer_brasilia_naive_timestamp_without_rewriting(
+    db, monkeypatch
+):
+    tenant, sale_id, item_id = canonical_scenario(db)
+    captured = datetime(2026, 10, 24, 20, 54, 53, 850428)
+    monkeypatch.setattr("app.vendas.custo_original.now_brasilia", lambda: captured)
+    item = SimpleNamespace(
+        id=item_id,
+        venda_id=sale_id,
+        produto_id=11,
+        tipo="produto",
+        quantidade=Decimal("1"),
+        custo_original_saida=None,
+    )
+    assert registrar_custo_original_saida(
+        item,
+        [
+            {
+                "produto_id": 11,
+                "movimentacao_id": item_id + 500,
+                "quantidade": Decimal("1"),
+                "valor_total": Decimal("43.94"),
+            }
+        ],
+        tenant,
+    )
+    original = deepcopy(item.custo_original_saida)
+    assert original["capturado_em"] == "2026-10-24T20:54:53.850428"
+    db.execute(
+        VendaItem.__table__.update()
+        .where(VendaItem.id == item_id)
+        .values(custo_original_saida=original)
+    )
+    result = cost(db, tenant)
+    assert result["status"] == "verified" and result["cmv"] == "43.94"
+    parsed = datetime.fromisoformat(result["items"][0]["proof_captured_at"])
+    assert parsed == captured.replace(tzinfo=BRASILIA_TZ)
+    assert parsed.utcoffset().total_seconds() == -3 * 60 * 60
+    assert (
+        db.execute(select(VendaItem.__table__.c.custo_original_saida)).scalar_one()
+        == original
+    )
+    assert (
+        db.execute(
+            select(func.count()).select_from(IfoodFinancialSaleLink.__table__)
+        ).scalar_one()
+        == 0
+    )
+
+
+def test_naive_timestamp_does_not_bypass_original_proof_identifiers(db):
+    tenant, sale_id, item_id = canonical_scenario(db)
+    proof(
+        db,
+        item_id,
+        capturado_em="2026-10-24T20:54:53.850428",
+        venda_item_id=item_id + 1,
+    )
+    result = cost(db, tenant)
+    assert result["cmv"] is None and result["status"] == "pending"
+
+
+def test_pdv_bridge_reads_original_cmv_without_fabricating_human_link_or_current_cost(
+    db,
+):
+    tenant, sale_id, item_id = canonical_scenario(db)
+    before = db.execute(select(VendaItem.__table__.c.custo_original_saida)).scalar_one()
+    result = cost(db, tenant)
+    assert result["status"] == "verified"
+    assert result["cmv"] == "43.94"
+    assert result["source"] == "erp_original_stock_out"
+    assert result["link"]["source"] == "pdv_bridge"
+    assert result["sale"]["id"] == sale_id
+    assert (
+        db.execute(
+            select(func.count()).select_from(IfoodFinancialSaleLink.__table__)
+        ).scalar_one()
+        == 0
+    )
+    assert (
+        db.execute(select(VendaItem.__table__.c.custo_original_saida)).scalar_one()
+        == before
+    )
+    assert cost(db, tenant) == result
+    # Confirmar o mesmo par e idempotente e continua usando a ponte; nao cria
+    # um manifesto humano a partir do conjunto atual dos itens.
+    assert link(db, tenant, sale_id)["link"]["source"] == "pdv_bridge"
+    assert (
+        db.execute(
+            select(func.count()).select_from(IfoodFinancialSaleLink.__table__)
+        ).scalar_one()
+        == 0
+    )
+    with tenant_context(tenant):
+        candidates = list_linkable_sales(db, tenant, MERCHANT, str(sale_id))
+    assert candidates["sales"][0]["linkable"] is False
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "price",
+        "quantity",
+        "product",
+        "open_bridge",
+        "no_stock_out",
+        "proof_id",
+        "extra_item",
+        "cancel_order",
+    ],
+)
+def test_pdv_bridge_cost_rejects_tampering_or_incomplete_stock_proof(db, change):
+    tenant, sale_id, item_id = canonical_scenario(db)
+    items, bridges = VendaItem.__table__, IfoodPdvBridge.__table__
+    if change == "price":
+        db.execute(
+            items.update().where(items.c.id == item_id).values(preco_unitario=66)
+        )
+    elif change == "quantity":
+        db.execute(items.update().where(items.c.id == item_id).values(quantidade=2))
+    elif change == "product":
+        db.execute(items.update().where(items.c.id == item_id).values(produto_id=12))
+    elif change == "open_bridge":
+        db.execute(
+            bridges.update()
+            .where(bridges.c.sale_id == sale_id)
+            .values(status="reserved")
+        )
+    elif change == "no_stock_out":
+        db.execute(
+            bridges.update()
+            .where(bridges.c.sale_id == sale_id)
+            .values(stock_decreased_at=None)
+        )
+    elif change == "proof_id":
+        proof(db, item_id, venda_item_id=item_id + 1)
+    elif change == "extra_item":
+        add_item(db, tenant, sale_id, quantity="1", cost="2", product_id=12)
+    elif change == "cancel_order":
+        db.execute(
+            IfoodOrder.__table__.update()
+            .where(IfoodOrder.ifood_order_id == ORDER)
+            .values(status="CANCELLED")
+        )
+    result = cost(db, tenant)
+    assert result["status"] == "pending" and result["cmv"] is None
+    assert result["link"]["source"] == "pdv_bridge"
+    assert result["missing"]
+
+
+def test_pdv_bridge_cannot_be_overridden_by_link_to_another_order(db):
+    tenant, sale_id, _ = canonical_scenario(db)
+    financial_order(db, tenant, order="another-order")
+    with pytest.raises(IfoodFinancialError) as caught:
+        link(db, tenant, sale_id, order="another-order")
+    assert caught.value.status_code == 409
+    # Simula legado inconsistente sem passar pela API protegida.
+    db.execute(
+        IfoodFinancialSaleLink.__table__.insert().values(
+            tenant_id=tenant,
+            merchant_id=MERCHANT,
+            mode="homologation",
+            order_id="another-order",
+            venda_id=sale_id,
+            source="explicit_confirmation",
+            source_note="Registro inconsistente do teste",
+            actor_id=7,
+            item_manifest=[],
+        )
+    )
+    for order_id in (ORDER, "another-order"):
+        result = cost(db, tenant, order=order_id)
+        assert result["status"] == "pending" and result["cmv"] is None
+        assert result["link"] is not None  # Custo manual nao pode ocultar conflito.
+
+
+def test_pdv_bridge_cmv_is_not_applied_in_production_or_other_merchant(db, monkeypatch):
+    tenant, _, _ = canonical_scenario(db)
+    monkeypatch.setattr(
+        "app.integrations.ifood.financial_costs.settings.ENVIRONMENT", "production"
+    )
+    assert cost(db, tenant)["cmv"] is None
+    monkeypatch.setattr(
+        "app.integrations.ifood.financial_costs.settings.ENVIRONMENT", "test"
+    )
+    replacement = str(uuid4())
+    db.execute(
+        IfoodMerchantConfig.__table__.update()
+        .where(IfoodMerchantConfig.tenant_id == tenant)
+        .values(merchant_id=replacement)
+    )
+    with tenant_context(tenant):
+        result = get_order_historical_cost(db, tenant, replacement, ORDER)
+    assert result["cmv"] is None and result["sale"] is None
+
+
+@pytest.mark.parametrize("alias", ["APP_ENV", "ENV", "ENVIRONMENT"])
+@pytest.mark.parametrize("environment", ["production", "prod", "staging"])
+def test_alias_estrito_nao_reutiliza_cmv_da_ponte_dev(
+    db, monkeypatch, alias, environment
+):
+    tenant, _, _ = canonical_scenario(db)
+    monkeypatch.setattr(
+        "app.integrations.ifood.financial_costs.settings.ENVIRONMENT", "test"
+    )
+    for key in ("APP_ENV", "ENV", "ENVIRONMENT"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv(alias, environment)
+    result = cost(db, tenant)
+    assert result["cmv"] is None
+    assert result["sale"] is None
+    assert result["status"] == "pending"
 
 
 def complete_financial_fees(db, tenant):

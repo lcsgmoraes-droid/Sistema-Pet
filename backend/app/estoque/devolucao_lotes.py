@@ -158,6 +158,7 @@ def preparar_devolucao_lotes(
     itens_venda,
     quantidades_por_item,
     bloquear=False,
+    motivo_entrada="devolucao",
 ):
     """Valida o historico sem escrever. O registro bloqueia os lotes envolvidos.
 
@@ -207,7 +208,7 @@ def preparar_devolucao_lotes(
             EstoqueMovimentacao.referencia_tipo == "venda",
             EstoqueMovimentacao.referencia_id == venda_id,
             EstoqueMovimentacao.tipo == "entrada",
-            EstoqueMovimentacao.motivo == "devolucao",
+            EstoqueMovimentacao.motivo == motivo_entrada,
             EstoqueMovimentacao.status != "cancelado",
         )
         .all()
@@ -264,7 +265,9 @@ def preparar_devolucao_lotes(
     )
 
 
-def recompor_lotes_devolucao(db, plano, item_id, quantidade, movimentacao_id):
+def recompor_lotes_devolucao(
+    db, plano, item_id, quantidade, movimentacao_id, *, motivo_entrada="devolucao"
+):
     """Aplica o plano na transacao do estoque/caixa e registra sua composicao."""
     if plano is None:
         return []
@@ -315,7 +318,7 @@ def recompor_lotes_devolucao(db, plano, item_id, quantidade, movimentacao_id):
             EstoqueMovimentacao.referencia_id == plano.venda_id,
             EstoqueMovimentacao.referencia_tipo == "venda",
             EstoqueMovimentacao.tipo == "entrada",
-            EstoqueMovimentacao.motivo == "devolucao",
+            EstoqueMovimentacao.motivo == motivo_entrada,
         )
         .first()
     )

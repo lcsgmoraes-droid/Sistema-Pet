@@ -37,7 +37,7 @@ export const PURCHASE_BENEFIT_CAMPAIGN_TYPES = new Set([
 ]);
 
 const ALL_CHANNELS = BENEFIT_CHANNEL_OPTIONS.map((option) => option.value);
-const LEGACY_BLOCKED_SERVICE_CHANNELS = new Set(["banho_tosa", "veterinario"]);
+const LEGACY_BLOCKED_SERVICE_CHANNELS = new Set(["banho_tosa", "veterinario", "ifood"]);
 
 export function normalizeBenefitChannel(channel) {
   return benefitChannelFromSalesChannel(channel);

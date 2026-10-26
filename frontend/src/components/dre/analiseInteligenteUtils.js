@@ -1,3 +1,14 @@
+import {
+  PENDENCIA_IFOOD_LABEL,
+  temRentabilidadePendente,
+} from "../financeiro/vendasFinanceiro/rentabilidadePendente.js";
+import { formatMoneyBRL, formatPercent } from "../../utils/formatters.js";
+
+export function formatarComparativoDRE(valor, chave) {
+  if (valor == null) return PENDENCIA_IFOOD_LABEL;
+  return chave === "margem" ? formatPercent(valor) : formatMoneyBRL(valor);
+}
+
 const numero = (valor) => {
   const resultado = Number(valor);
   return Number.isFinite(resultado) ? resultado : 0;
@@ -5,6 +16,8 @@ const numero = (valor) => {
 
 export function extrairIndicadoresDRE(dados) {
   const totais = dados?.totais || {};
+  const pendente = temRentabilidadePendente(dados) || temRentabilidadePendente(totais);
+  const resultado = (campo) => (pendente ? null : numero(totais[campo]));
   const despesasAdmin = (dados?.linhas || [])
     .filter((linha) => linha.campo === "despesas_administrativas")
     .reduce((soma, linha) => soma + numero(linha.valor), 0);
@@ -14,12 +27,12 @@ export function extrairIndicadoresDRE(dados) {
     receitaLiquida: numero(totais.receita_liquida),
     cmv: numero(totais.cmv),
     custosDiretos: numero(totais.custos_diretos),
-    lucroBruto: numero(totais.lucro_bruto),
-    despesasOperacionais: numero(totais.despesas_operacionais),
+    lucroBruto: resultado("lucro_bruto"),
+    despesasOperacionais: resultado("despesas_operacionais"),
     despesasAdmin,
-    lucroLiquido: numero(totais.lucro_liquido),
-    margemBruta: numero(totais.margem_bruta),
-    margemLiquida: numero(totais.margem_liquida),
+    lucroLiquido: resultado("lucro_liquido"),
+    margemBruta: resultado("margem_bruta"),
+    margemLiquida: resultado("margem_liquida"),
   };
 }
 
@@ -67,7 +80,9 @@ export function compararPeriodosDRE(atual, anterior) {
   const indicadoresAtuais = extrairIndicadoresDRE(atual);
   const indicadoresAnteriores = extrairIndicadoresDRE(anterior);
   const variacao = (valorAtual, valorAnterior) =>
-    valorAnterior === 0 ? null : ((valorAtual - valorAnterior) / Math.abs(valorAnterior)) * 100;
+    valorAtual == null || valorAnterior == null || valorAnterior === 0
+      ? null
+      : ((valorAtual - valorAnterior) / Math.abs(valorAnterior)) * 100;
   const comparar = (campo) => ({
     atual: indicadoresAtuais[campo],
     anterior: indicadoresAnteriores[campo],
@@ -81,7 +96,10 @@ export function compararPeriodosDRE(atual, anterior) {
     margem: {
       atual: indicadoresAtuais.margemLiquida,
       anterior: indicadoresAnteriores.margemLiquida,
-      variacao: indicadoresAtuais.margemLiquida - indicadoresAnteriores.margemLiquida,
+      variacao:
+        indicadoresAtuais.margemLiquida == null || indicadoresAnteriores.margemLiquida == null
+          ? null
+          : indicadoresAtuais.margemLiquida - indicadoresAnteriores.margemLiquida,
     },
   };
 }

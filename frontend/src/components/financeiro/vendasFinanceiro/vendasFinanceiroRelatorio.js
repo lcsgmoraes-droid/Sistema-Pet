@@ -1,4 +1,5 @@
 import { dataKeyLocal, parseDataLocal } from "./vendasFinanceiroDatas.js";
+import { temRentabilidadePendente } from "./rentabilidadePendente.js";
 
 export function normalizarFormaPagamentoLabel(valor) {
   const texto = String(valor || "").trim();
@@ -147,6 +148,12 @@ export function filtrarVendasRelatorio(
 
 export function ordenarVendasRelatorio(lista, ordenacao) {
   const copia = [...(lista || [])];
+  const compararLucro = (a, b, direcao) => {
+    const aPendente = temRentabilidadePendente(a);
+    const bPendente = temRentabilidadePendente(b);
+    if (aPendente !== bPendente) return aPendente ? 1 : -1;
+    return aPendente ? 0 : direcao * (Number(a.lucro || 0) - Number(b.lucro || 0));
+  };
   switch (ordenacao) {
     case "data_asc":
       return copia.sort((a, b) => parseDataLocal(a.data_venda) - parseDataLocal(b.data_venda));
@@ -155,9 +162,9 @@ export function ordenarVendasRelatorio(lista, ordenacao) {
     case "bruta_asc":
       return copia.sort((a, b) => Number(a.venda_bruta || 0) - Number(b.venda_bruta || 0));
     case "lucro_desc":
-      return copia.sort((a, b) => Number(b.lucro || 0) - Number(a.lucro || 0));
+      return copia.sort((a, b) => compararLucro(a, b, -1));
     case "lucro_asc":
-      return copia.sort((a, b) => Number(a.lucro || 0) - Number(b.lucro || 0));
+      return copia.sort((a, b) => compararLucro(a, b, 1));
     case "data_desc":
     default:
       return copia.sort((a, b) => parseDataLocal(b.data_venda) - parseDataLocal(a.data_venda));

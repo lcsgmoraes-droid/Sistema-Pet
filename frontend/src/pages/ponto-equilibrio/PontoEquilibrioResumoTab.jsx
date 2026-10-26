@@ -1,7 +1,8 @@
 import { DollarSign, ShoppingCart, Target, TrendingUp } from "lucide-react";
-import { formatMoneyBRL, formatPercent } from "../../utils/formatters";
+import { formatMoneyBRL } from "../../utils/formatters";
 import DetalhamentoMargemPanel from "./DetalhamentoMargemPanel";
 import PontoEquilibrioMetricCard from "./PontoEquilibrioMetricCard";
+import { valorCobrancaPontoEquilibrio, valorPontoEquilibrio } from "./pontoEquilibrioUtils";
 
 export default function PontoEquilibrioResumoTab({
   dados,
@@ -15,9 +16,7 @@ export default function PontoEquilibrioResumoTab({
         <PontoEquilibrioMetricCard
           icon={Target}
           title="Ponto minimo"
-          value={
-            dados.ponto_equilibrio == null ? "Indefinido" : formatMoneyBRL(dados.ponto_equilibrio)
-          }
+          value={valorPontoEquilibrio(dados.ponto_equilibrio, dados)}
           subtitle="Faturamento necessario para empatar"
           tone={dados.status === "atingido" ? "green" : "amber"}
         />
@@ -31,14 +30,20 @@ export default function PontoEquilibrioResumoTab({
         <PontoEquilibrioMetricCard
           icon={TrendingUp}
           title="Margem usada"
-          value={formatPercent(margemUsadaPercentual)}
-          subtitle={`${dados.margem_usada_label || "Fonte atual"} | Periodo: ${formatPercent(margemPeriodoPercentual)}`}
-          tone={margemUsadaPercentual > 0 ? "green" : "red"}
+          value={valorPontoEquilibrio(margemUsadaPercentual, dados, true)}
+          subtitle={`${dados.margem_usada_label || "Fonte atual"} | Periodo: ${valorPontoEquilibrio(margemPeriodoPercentual, dados, true)}`}
+          tone={
+            margemUsadaPercentual == null ? "amber" : margemUsadaPercentual > 0 ? "green" : "red"
+          }
         />
         <PontoEquilibrioMetricCard
           icon={ShoppingCart}
           title="Vendas necessarias"
-          value={dados.vendas_necessarias == null ? "-" : String(dados.vendas_necessarias)}
+          value={
+            dados.vendas_necessarias == null
+              ? valorPontoEquilibrio(null, dados)
+              : String(dados.vendas_necessarias)
+          }
           subtitle={`Ticket medio ${formatMoneyBRL(dados.ticket_medio_usado ?? dados.ticket_medio)}`}
           tone="slate"
         />
@@ -75,13 +80,15 @@ export default function PontoEquilibrioResumoTab({
             <div className="flex justify-between gap-4">
               <span className="text-slate-600">Custos de venda</span>
               <span className="font-semibold text-red-700">
-                - {formatMoneyBRL(dados.despesas_variaveis)}
+                {dados.despesas_variaveis != null && "- "}
+                {valorPontoEquilibrio(dados.despesas_variaveis, dados)}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2 rounded-md bg-slate-50 p-3 text-xs text-slate-600">
               <span>Descontos: {formatMoneyBRL(dados.descontos || 0)}</span>
               <span>Campanhas: {formatMoneyBRL(dados.beneficios_campanhas || 0)}</span>
-              <span>Cartao: {formatMoneyBRL(dados.taxas_cartao || 0)}</span>
+              <span>Cartao: {valorCobrancaPontoEquilibrio(dados, "taxas_cartao")}</span>
+              <span>Taxas iFood: {valorCobrancaPontoEquilibrio(dados, "taxas_ifood")}</span>
               <span>
                 Entrega:{" "}
                 {formatMoneyBRL(
@@ -98,13 +105,13 @@ export default function PontoEquilibrioResumoTab({
                   Margem de contribuicao do periodo
                 </span>
                 <span className="font-bold text-emerald-700">
-                  {formatMoneyBRL(dados.margem_contribuicao)}
+                  {valorPontoEquilibrio(dados.margem_contribuicao, dados)}
                 </span>
               </div>
               <div className="mt-2 flex justify-between gap-4 text-xs text-slate-500">
                 <span>Margem usada no calculo</span>
                 <span>
-                  {formatPercent(margemUsadaPercentual)} (
+                  {valorPontoEquilibrio(margemUsadaPercentual, dados, true)} (
                   {dados.margem_usada_label || "Fonte atual"})
                 </span>
               </div>
@@ -124,7 +131,7 @@ export default function PontoEquilibrioResumoTab({
             <div className="flex justify-between gap-4">
               <span className="text-slate-600">Custos variaveis totais</span>
               <span className="font-semibold text-slate-900">
-                {formatMoneyBRL(dados.custos_variaveis)}
+                {valorPontoEquilibrio(dados.custos_variaveis, dados)}
               </span>
             </div>
             <div className="flex justify-between gap-4">

@@ -16,6 +16,10 @@ from .dre_schemas import DREResponse
 router = APIRouter(prefix="/financeiro/dre", tags=["DRE"])
 
 
+def _percentual_exportacao(valor) -> str:
+    return "Pendente iFood" if valor is None else f"{valor:.2f}%".replace(".", ",")
+
+
 def _dre_para_exportacao(
     *,
     ano: int,
@@ -38,16 +42,20 @@ def _dre_para_exportacao(
     )
     totais = dre_canais.totais
 
-    def valor_total(campo: str) -> Decimal:
-        return Decimal(str(totais.get(campo, 0) or 0))
+    def valor_total(campo: str) -> Decimal | None:
+        valor = totais.get(campo, 0)
+        return Decimal(str(valor)) if valor is not None else None
 
-    def valor_linhas(campo: str) -> Decimal:
+    def valor_linhas(campo: str) -> Decimal | None:
+        linhas = [
+            linha
+            for linha in dre_canais.linhas
+            if linha.campo == campo and linha.canal != "total"
+        ]
+        if any(linha.valor is None for linha in linhas):
+            return None
         return sum(
-            (
-                Decimal(str(linha.valor))
-                for linha in dre_canais.linhas
-                if linha.campo == campo and linha.canal != "total"
-            ),
+            (Decimal(str(linha.valor)) for linha in linhas),
             Decimal("0"),
         )
 
@@ -74,28 +82,36 @@ def _dre_para_exportacao(
         cmv=valor_total("cmv"),
         custo_servicos=valor_total("custo_servicos"),
         lucro_bruto=valor_total("lucro_bruto"),
-        margem_bruta=float(totais.get("margem_bruta", 0) or 0),
+        margem_bruta=totais.get("margem_bruta", 0),
         despesas_operacionais=despesas_operacionais,
         despesas_pessoal=despesas_pessoal,
         despesas_administrativas=despesas_administrativas,
         taxas_cartao=taxas_cartao,
         outras_despesas=(
-            despesas_operacionais
-            - despesas_pessoal
-            - despesas_administrativas
-            - taxas_cartao
+            (
+                despesas_operacionais
+                - despesas_pessoal
+                - despesas_administrativas
+                - taxas_cartao
+            )
+            if despesas_operacionais is not None and taxas_cartao is not None
+            else None
         ),
         resultado_operacional=resultado_operacional,
         margem_operacional=(
             round(float(resultado_operacional / receita_liquida * 100), 2)
-            if receita_liquida > 0
-            else 0
+            if receita_liquida > 0 and resultado_operacional is not None
+            else (None if resultado_operacional is None else 0)
         ),
-        resultado_financeiro=Decimal("0"),
+        resultado_financeiro=None if dre_canais.taxas_ifood_pendentes else Decimal("0"),
         receitas_financeiras=Decimal("0"),
         despesas_financeiras=Decimal("0"),
         lucro_liquido=valor_total("lucro_liquido"),
-        margem_liquida=float(totais.get("margem_liquida", 0) or 0),
+        margem_liquida=totais.get("margem_liquida", 0),
+        rentabilidade_status=dre_canais.rentabilidade_status,
+        taxas_ifood_pendentes=dre_canais.taxas_ifood_pendentes,
+        vendas_rentabilidade_pendente=dre_canais.vendas_rentabilidade_pendente,
+        pendencias_rentabilidade=dre_canais.pendencias_rentabilidade,
     )
 
 
@@ -184,10 +200,20 @@ async def exportar_dre_pdf(
     )
     periodo_text = f"Período: {dre.periodo}"
     elements.append(Paragraph(periodo_text, subtitle_style))
+    if dre.taxas_ifood_pendentes:
+        elements.append(
+            Paragraph(
+                "Pendente iFood: cobrancas ainda nao conciliadas. "
+                "Receitas e custos conhecidos foram preservados; lucro e margem finais estao pendentes.",
+                styles["Normal"],
+            )
+        )
     elements.append(Spacer(1, 10 * mm))
 
     # Função para formatar moeda
     def formatar_moeda(valor):
+        if valor is None:
+            return "Pendente iFood"
         return (
             f"R$ {float(valor):,.2f}".replace(",", "X")
             .replace(".", ",")
@@ -241,7 +267,7 @@ async def exportar_dre_pdf(
         [
             "(=) LUCRO BRUTO",
             formatar_moeda(dre.lucro_bruto),
-            f"{dre.margem_bruta:.2f}%",
+            _percentual_exportacao(dre.margem_bruta),
         ],
         ["", "", ""],
         ["(-) DESPESAS OPERACIONAIS", formatar_moeda(dre.despesas_operacionais), ""],
@@ -257,7 +283,7 @@ async def exportar_dre_pdf(
         [
             "(=) RESULTADO OPERACIONAL",
             formatar_moeda(dre.resultado_operacional),
-            f"{dre.margem_operacional:.2f}%",
+            _percentual_exportacao(dre.margem_operacional),
         ],
         ["", "", ""],
         ["RESULTADO FINANCEIRO", formatar_moeda(dre.resultado_financeiro), ""],
@@ -267,7 +293,7 @@ async def exportar_dre_pdf(
         [
             "(=) LUCRO LÍQUIDO",
             formatar_moeda(dre.lucro_liquido),
-            f"{dre.margem_liquida:.2f}%",
+            _percentual_exportacao(dre.margem_liquida),
         ],
     ]
 
@@ -476,6 +502,14 @@ async def exportar_dre_excel(
     ws["A2"] = f"Período: {dre.periodo}"
     ws.merge_cells("A2:C2")
     ws["A2"].alignment = Alignment(horizontal="center")
+    if dre.taxas_ifood_pendentes:
+        ws["A3"] = (
+            "Pendente iFood: cobrancas ainda nao conciliadas. "
+            "Receitas e custos conhecidos preservados; lucro e margem finais pendentes."
+        )
+        ws.merge_cells("A3:C3")
+        ws["A3"].alignment = Alignment(wrap_text=True, vertical="center")
+        ws.row_dimensions[3].height = 42
 
     # Cabeçalho
     row = 4
@@ -493,7 +527,7 @@ async def exportar_dre_excel(
         nonlocal row
         row += 1
         ws[f"A{row}"] = descricao
-        ws[f"B{row}"] = float(valor) if valor else ""
+        ws[f"B{row}"] = float(valor) if valor is not None else "Pendente iFood"
         ws[f"C{row}"] = percentual
 
         # Aplicar estilos
@@ -554,7 +588,10 @@ async def exportar_dre_excel(
     add_row("(-) Custo dos Serviços Prestados", dre.custo_servicos)
     row += 1
     add_row(
-        "(=) LUCRO BRUTO", dre.lucro_bruto, f"{dre.margem_bruta:.2f}%", is_total=True
+        "(=) LUCRO BRUTO",
+        dre.lucro_bruto,
+        _percentual_exportacao(dre.margem_bruta),
+        is_total=True,
     )
     row += 1
     add_row("(-) DESPESAS OPERACIONAIS", dre.despesas_operacionais)
@@ -566,7 +603,7 @@ async def exportar_dre_excel(
     add_row(
         "(=) RESULTADO OPERACIONAL",
         dre.resultado_operacional,
-        f"{dre.margem_operacional:.2f}%",
+        _percentual_exportacao(dre.margem_operacional),
         is_total=True,
     )
     row += 1
@@ -577,7 +614,7 @@ async def exportar_dre_excel(
     add_row(
         "(=) LUCRO LÍQUIDO",
         dre.lucro_liquido,
-        f"{dre.margem_liquida:.2f}%",
+        _percentual_exportacao(dre.margem_liquida),
         is_final=True,
     )
 

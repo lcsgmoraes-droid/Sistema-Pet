@@ -447,17 +447,87 @@ def montar_linhas_dre_competencia(
         "resultado_financeiro": 0.0,
         "lucro_liquido": float(lucro_liquido_total),
         "margem_bruta": round(
-            (float(lucro_bruto_total) / float(receita_liquida_total) * 100)
-            if receita_liquida_total > 0
-            else 0,
+            (
+                (float(lucro_bruto_total) / float(receita_liquida_total) * 100)
+                if receita_liquida_total > 0
+                else 0
+            ),
             2,
         ),
         "margem_liquida": round(
-            (float(lucro_liquido_total) / float(receita_liquida_total) * 100)
-            if receita_liquida_total > 0
-            else 0,
+            (
+                (float(lucro_liquido_total) / float(receita_liquida_total) * 100)
+                if receita_liquida_total > 0
+                else 0
+            ),
             2,
         ),
     }
+
+    quantidade_pendente = sum(
+        int(dados.get("vendas_rentabilidade_pendente") or 0)
+        for dados in dados_canais.values()
+    )
+    pendencias = list(
+        dict.fromkeys(
+            mensagem
+            for dados in dados_canais.values()
+            for mensagem in dados.get("pendencias_rentabilidade", []) or []
+        )
+    )
+    status = "pending_ifood_financial" if quantidade_pendente else "complete"
+    totais.update(
+        rentabilidade_status=status,
+        taxas_ifood_pendentes=bool(quantidade_pendente),
+        vendas_rentabilidade_pendente=quantidade_pendente,
+        pendencias_rentabilidade=pendencias,
+    )
+    if quantidade_pendente:
+        # Receita comercial e custos comprovados continuam visiveis. As parcelas
+        # conhecidas nao sao um total de despesas nem uma margem final.
+        for campo in (
+            "lucro_bruto",
+            "lucro_liquido",
+            "margem_bruta",
+            "margem_liquida",
+            "resultado_operacional",
+            "resultado_financeiro",
+            "despesas_variaveis",
+            "despesas_operacionais",
+        ):
+            if campo.startswith("despesas_"):
+                totais[f"{campo}_conhecidas"] = totais[campo]
+            totais[campo] = None
+        for linha in linhas:
+            canal_pendente = linha.canal == "total" or bool(
+                dados_canais.get(linha.canal, {}).get("vendas_rentabilidade_pendente")
+            )
+            canais_linha = (
+                dados_canais.values()
+                if linha.canal == "total"
+                else [dados_canais.get(linha.canal, {})]
+            )
+            taxa_pendente = linha.campo in {
+                "taxas_cartao",
+                "taxas_marketplace",
+            } and any(
+                dados.get("vendas_rentabilidade_pendente")
+                and linha.campo
+                in dados.get(
+                    "campos_taxas_pendentes", {"taxas_cartao", "taxas_marketplace"}
+                )
+                for dados in canais_linha
+            )
+            if canal_pendente and (
+                linha.tipo == "lucro"
+                or taxa_pendente
+                or linha.descricao == "(-) CUSTOS E DESPESAS VARIAVEIS DE VENDA"
+            ):
+                if linha.tipo != "lucro":
+                    linha.valor_conhecido = linha.valor
+                linha.valor = None
+                linha.percentual = None
+                linha.rentabilidade_status = status
+                linha.taxas_ifood_pendentes = True
 
     return linhas, totais

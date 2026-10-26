@@ -1,6 +1,7 @@
 import { campaignAllowsSaleChannel } from "../utils/campaignChannelScope.js";
 import { formatMoneyBRL } from "../utils/formatters.js";
 import { arredondarDinheiro } from "../utils/pdvCarrinhoItensUtils.js";
+import { CANAL_IFOOD, normalizeSalesChannel } from "../utils/salesChannel.js";
 
 const centavos = (valor) => Math.round(arredondarDinheiro(valor) * 100);
 
@@ -221,6 +222,16 @@ export async function persistirVendaAbertaParaPagamento({
   onVendaPersistida,
 }) {
   const vendaId = vendaParaPersistir.id || vendaIdPersistida;
+
+  if (normalizeSalesChannel(vendaParaPersistir.canal) === CANAL_IFOOD) {
+    const idExistente = Number(vendaParaPersistir.id);
+    if (!Number.isSafeInteger(idExistente) || idExistente <= 0) {
+      throw new Error("Abra a venda existente do pedido iFood antes de registrar o pagamento.");
+    }
+    // O pedido importado e imutavel. O finalizador valida novamente o vinculo,
+    // os itens, a entrega e o pagamento no servidor antes de qualquer baixa.
+    return idExistente;
+  }
 
   if (vendaId) {
     const atualizada = await atualizarVenda(vendaId, payloadVenda);

@@ -1,4 +1,8 @@
 import {
+  PENDENCIA_IFOOD_LABEL,
+  temRentabilidadePendente,
+} from "./vendasFinanceiro/rentabilidadePendente.js";
+import {
   Bar,
   BarChart,
   CartesianGrid,
@@ -151,11 +155,14 @@ export default function VendasFinanceiroGraficosResumo({
           </h3>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
             <span>
-              Melhor dia: {melhorDiaSemana?.nome || "-"} com{" "}
-              {formatarMoeda(melhorDiaSemana?.valor_liquido || 0)}.
+              {temRentabilidadePendente(melhorDiaSemana)
+                ? `Melhor dia: ${PENDENCIA_IFOOD_LABEL}`
+                : `Melhor dia: ${melhorDiaSemana?.nome || "-"} com ${formatarMoeda(melhorDiaSemana?.valor_liquido || 0)}.`}
             </span>
             <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
-              {melhorDiaSemana?.quantidade || 0} venda(s)
+              {temRentabilidadePendente(melhorDiaSemana)
+                ? "Aguardando taxas"
+                : `${melhorDiaSemana?.quantidade || 0} venda(s)`}
             </span>
           </p>
         </div>
@@ -195,11 +202,14 @@ export default function VendasFinanceiroGraficosResumo({
           <h3 className="text-base font-semibold text-gray-800 sm:text-lg">Vendas por horario</h3>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
             <span>
-              Pico: {melhorHorario?.faixa || "-"} com{" "}
-              {formatarMoeda(melhorHorario?.valor_liquido || 0)}.
+              {temRentabilidadePendente(melhorHorario)
+                ? `Pico: ${PENDENCIA_IFOOD_LABEL}`
+                : `Pico: ${melhorHorario?.faixa || "-"} com ${formatarMoeda(melhorHorario?.valor_liquido || 0)}.`}
             </span>
             <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-              {melhorHorario?.quantidade || 0} venda(s)
+              {temRentabilidadePendente(melhorHorario)
+                ? "Aguardando taxas"
+                : `${melhorHorario?.quantidade || 0} venda(s)`}
             </span>
           </p>
         </div>

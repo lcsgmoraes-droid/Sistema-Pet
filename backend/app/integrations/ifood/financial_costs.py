@@ -10,12 +10,15 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 import json
+import re
 
 from sqlalchemy import or_, select
 
+from app.config import _is_strict_runtime_environment, settings
 from app.ifood_financial_cost_models import IfoodFinancialSaleLink
 from app.ifood_financial_models import IfoodFinancialEvent, IfoodFinancialSnapshot
-from app.ifood_order_models import IfoodOrder
+from app.ifood_order_models import IfoodOrder, IfoodPdvBridge
+from app.utils.timezone import BRASILIA_TZ
 
 SOURCE = "erp_original_stock_out"
 MODE = "homologation"
@@ -77,6 +80,22 @@ def _hash(proof):
     ).hexdigest()
 
 
+def _proof_capture_time(value):
+    if not isinstance(value, str) or not re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})?",
+        value,
+    ):
+        return None
+    try:
+        captured = datetime.fromisoformat(value)
+    except (ValueError, TypeError):
+        return None
+    # O escritor original usa now_brasilia().isoformat(): horario local naive
+    # por contrato historico do ERP. Interpretar na leitura, sem reescrever ou
+    # modificar o hash/manifesto da prova write-once.
+    return captured.replace(tzinfo=BRASILIA_TZ) if captured.tzinfo is None else captured
+
+
 def _item_cost(item, sale, tenant):
     missing = []
     quantity = _decimal(item["quantidade"], "0.001")
@@ -102,12 +121,7 @@ def _item_cost(item, sale, tenant):
         )
         proof_quantity = _decimal(proof.get("quantidade"), "0.001")
         cost = _decimal(proof.get("custo_total"), "0.01")
-        try:
-            captured = datetime.fromisoformat(proof.get("capturado_em", ""))
-            if captured.tzinfo is None:
-                raise ValueError
-        except (ValueError, TypeError):
-            captured = None
+        captured = _proof_capture_time(proof.get("capturado_em"))
         if (
             not identifiers
             or quantity is None
@@ -158,6 +172,26 @@ def _empty():
     }
 
 
+def _link_view(link):
+    return {
+        "id": link["id"],
+        "source": link["source"],
+        "actor_id": link["actor_id"],
+        "linked_at": _iso(link["created_at"]),
+        "source_note": link["source_note"],
+    }
+
+
+def _bridge_link_view(bridge):
+    return {
+        "id": bridge["id"],
+        "source": "pdv_bridge",
+        "actor_id": bridge["actor_id"],
+        "linked_at": _iso(bridge["created_at"]),
+        "source_note": "Vinculo canonico criado na importacao do pedido para o PDV.",
+    }
+
+
 def _sale_view(sale, items, tenant, *, returned=False, link=None):
     result = _empty()
     missing = []
@@ -192,13 +226,7 @@ def _sale_view(sale, items, tenant, *, returned=False, link=None):
     if len(movements) != len(set(movements)):
         missing.append("Movimentação de estoque repetida em mais de um item da venda.")
     if link is not None:
-        result["link"] = {
-            "id": link["id"],
-            "source": link["source"],
-            "actor_id": link["actor_id"],
-            "linked_at": _iso(link["created_at"]),
-            "source_note": link["source_note"],
-        }
+        result["link"] = _link_view(link)
         if link["item_manifest"] != _manifest(items):
             missing.append(
                 "O conjunto de itens ou comprovantes mudou após o vínculo; revisão necessária."
@@ -234,6 +262,7 @@ def _sale_data(db, tenant, sale_ids, *, lock=False):
             items_table.c.produto_id,
             items_table.c.tipo,
             items_table.c.quantidade,
+            items_table.c.preco_unitario,
             items_table.c.custo_original_saida,
             items_table.c.estoque_origem_tenant_id,
         )
@@ -287,11 +316,68 @@ def _historical_batch(db, tenant, merchant, ids, mode):
             )
         ).mappings()
     )
-    sale_ids = [link["venda_id"] for link in links]
+    # A ponte do PDV e um vinculo canonico ja criado na importacao do pedido.
+    # Nao inventar uma confirmacao humana ou copiar o manifesto atual como se
+    # houvesse sido conferido no passado. A prova de custo segue write-once.
+    bridge_rows = []
+    if not _is_strict_runtime_environment() and str(
+        settings.ENVIRONMENT
+    ).strip().lower() in {
+        "development",
+        "dev",
+        "test",
+        "testing",
+    }:
+        bridge_table = IfoodPdvBridge.__table__
+        bridge_rows = list(
+            db.execute(
+                select(
+                    bridge_table,
+                    table.c.order_id.label("linked_order_id"),
+                    table.c.merchant_id.label("linked_merchant_id"),
+                )
+                .outerjoin(
+                    table,
+                    (table.c.tenant_id == bridge_table.c.tenant_id)
+                    & (table.c.venda_id == bridge_table.c.sale_id)
+                    & (table.c.mode == mode),
+                )
+                .where(
+                    bridge_table.c.tenant_id == tenant,
+                    or_(
+                        (bridge_table.c.merchant_id == merchant)
+                        & bridge_table.c.ifood_order_id.in_(ids),
+                        bridge_table.c.sale_id.in_(
+                            [link["venda_id"] for link in links]
+                        ),
+                    ),
+                )
+            ).mappings()
+        )
+    bridges_by_sale = {bridge["sale_id"]: bridge for bridge in bridge_rows}
+    bridges_by_order = {
+        bridge["ifood_order_id"]: bridge
+        for bridge in bridge_rows
+        if bridge["merchant_id"] == merchant and bridge["ifood_order_id"] in result
+    }
+    sale_ids = list(
+        {link["venda_id"] for link in links}
+        | {bridge["sale_id"] for bridge in bridges_by_order.values()}
+    )
     if not sale_ids:
         return result
     sales, items, returned = _sale_data(db, tenant, sale_ids)
     for link in links:
+        bridge = bridges_by_sale.get(link["venda_id"])
+        if bridge and (
+            bridge["merchant_id"] != merchant
+            or bridge["ifood_order_id"] != link["order_id"]
+        ):
+            result[link["order_id"]]["missing"] = [
+                "A ponte do PDV e o vinculo financeiro apontam para pedidos diferentes."
+            ]
+            result[link["order_id"]]["link"] = _link_view(link)
+            continue
         sale = sales.get(link["venda_id"])
         if sale is None:
             result[link["order_id"]]["missing"] = [
@@ -304,6 +390,50 @@ def _historical_batch(db, tenant, merchant, ids, mode):
                 tenant,
                 returned=sale["id"] in returned,
                 link=link,
+            )
+    for order_id, bridge in bridges_by_order.items():
+        # O outer join tambem detecta vinculo manual para outro pedido/loja
+        # que nao faz parte do lote consultado.
+        if bridge["linked_order_id"] and (
+            bridge["linked_order_id"] != order_id
+            or bridge["linked_merchant_id"] != merchant
+        ):
+            result[order_id]["missing"] = [
+                "A ponte do PDV e o vinculo financeiro apontam para pedidos diferentes."
+            ]
+            result[order_id].update(status="pending", cmv=None)
+            result[order_id]["link"] = _bridge_link_view(bridge)
+            continue
+        sale = sales.get(bridge["sale_id"])
+        if sale is None:
+            result[order_id]["missing"] = [
+                "Venda da ponte nao disponivel nesta empresa."
+            ]
+            continue
+        sale_items = items[sale["id"]]
+        if not any(link["order_id"] == order_id for link in links):
+            result[order_id] = _sale_view(
+                sale, sale_items, tenant, returned=sale["id"] in returned
+            )
+            result[order_id]["link"] = _bridge_link_view(bridge)
+        cost = result[order_id]
+        exact_item = (
+            len(sale_items) == 1
+            and sale_items[0]["tipo"] == "produto"
+            and sale_items[0]["produto_id"] == bridge["product_id"]
+            and _decimal(sale_items[0]["quantidade"], "0.001")
+            == _decimal(bridge["quantity"], "0.001")
+            and _decimal(sale_items[0]["preco_unitario"], "0.01")
+            == _decimal(bridge["unit_price"], "0.01")
+        )
+        if (
+            bridge["status"] != "sold"
+            or bridge["stock_decreased_at"] is None
+            or not exact_item
+        ):
+            cost.update(status="pending", cmv=None)
+            cost["missing"].append(
+                "A ponte nao comprova conclusao e baixa, ou produto, quantidade e preco nao correspondem ao item importado."
             )
     orders = IfoodOrder.__table__
     for order in db.execute(
@@ -399,6 +529,38 @@ def link_order_sale(
             "Pedido ou venda já possui outro vínculo histórico; não será substituído.",
             409,
         )
+    if not _is_strict_runtime_environment() and str(
+        settings.ENVIRONMENT
+    ).strip().lower() in {
+        "development",
+        "dev",
+        "test",
+        "testing",
+    }:
+        bridge_table = IfoodPdvBridge.__table__
+        bridge = (
+            db.execute(
+                select(bridge_table).where(
+                    bridge_table.c.tenant_id == tenant,
+                    bridge_table.c.sale_id == sale_id,
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if bridge:
+            if (
+                bridge["merchant_id"] != merchant
+                or bridge["ifood_order_id"] != order_id
+            ):
+                raise _error(
+                    "A venda ja pertence a outro pedido pela ponte do PDV.", 409
+                )
+            cost = get_order_historical_cost(db, tenant, merchant, order_id, mode)
+            if cost["status"] != "verified":
+                raise _error(" ".join(cost["missing"]), 409)
+            # Reutiliza a prova canonica; nao simula confirmacao humana nova.
+            return cost
     sales, items, returned = _sale_data(db, tenant, [sale_id], lock=True)
     sale = sales.get(sale_id)
     if sale is None:
@@ -473,6 +635,23 @@ def list_linkable_sales(db, tenant_id, merchant_id, search="", limit=20, mode=MO
             )
         ).scalars()
     )
+    if not _is_strict_runtime_environment() and str(
+        settings.ENVIRONMENT
+    ).strip().lower() in {
+        "development",
+        "dev",
+        "test",
+        "testing",
+    }:
+        bridge_table = IfoodPdvBridge.__table__
+        linked_ids.update(
+            db.execute(
+                select(bridge_table.c.sale_id).where(
+                    bridge_table.c.tenant_id == tenant,
+                    bridge_table.c.sale_id.in_(ids),
+                )
+            ).scalars()
+        )
     result = []
     for sale_id in ids:
         cost = _sale_view(

@@ -26,6 +26,7 @@ class IfoodClient:
         base_url: str = "https://merchant-api.ifood.com.br",
         timeout_seconds: int = 15,
         transport: httpx.BaseTransport | None = None,
+        trust_env: bool = True,
     ) -> None:
         self.client_id = client_id.strip()
         self.client_secret = client_secret.strip()
@@ -34,6 +35,7 @@ class IfoodClient:
             base_url=self.base_url,
             timeout=max(1, timeout_seconds),
             transport=transport,
+            trust_env=trust_env,
         )
         self._access_token: str | None = None
         self._token_expires_at = 0.0

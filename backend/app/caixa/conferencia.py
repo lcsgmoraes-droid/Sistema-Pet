@@ -75,7 +75,8 @@ def indicadores_vendas_recebimentos(
     recebimentos = {
         forma: dados
         for forma, dados in pagamentos_por_forma.items()
-        if not excluir_planos or forma.strip().casefold() not in FORMAS_PAGAMENTO_A_PRAZO
+        if not excluir_planos
+        or forma.strip().casefold() not in FORMAS_PAGAMENTO_A_PRAZO
     }
     return {
         "total_vendido": float(moeda(total_vendido)),
