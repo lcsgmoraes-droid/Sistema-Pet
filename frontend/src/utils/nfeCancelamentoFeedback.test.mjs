@@ -59,3 +59,22 @@ test("resposta vazia ou sucesso genérico nunca inventa cancelamento fiscal", ()
     assert.match(feedback.mensagem, /não foi confirmado/);
   }
 });
+
+test("falha 502 em HTML vira orientação sem confirmar cancelamento", () => {
+  const html = "<html><head><title>502 Bad Gateway</title></head><body>nginx</body></html>";
+  for (const payload of [html, { detail: html }, { cancelamento_motivo: { mensagem: html } }]) {
+    const feedback = resumirCancelamentoNota(payload);
+    assert.equal(feedback.confirmado, false);
+    assert.equal(feedback.solicitado, false);
+    assert.match(feedback.mensagem, /temporariamente indisponível/);
+    assert.match(feedback.mensagem, /Consulte a situação da nota/);
+    assert.doesNotMatch(feedback.mensagem, /<html|nginx|Bad Gateway/);
+  }
+});
+
+test("falha de rede não expõe exceção técnica nem confirma cancelamento", () => {
+  const feedback = resumirCancelamentoNota({ mensagem: "Network Error" });
+  assert.equal(feedback.confirmado, false);
+  assert.match(feedback.motivo, /temporariamente indisponível/);
+  assert.doesNotMatch(feedback.mensagem, /Network Error/);
+});

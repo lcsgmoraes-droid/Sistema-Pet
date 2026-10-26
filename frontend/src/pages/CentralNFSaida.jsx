@@ -84,6 +84,7 @@ export default function CentralNFSaida() {
   const [carregandoDetalhe, setCarregandoDetalhe] = useState(false);
   const [erroDetalhe, setErroDetalhe] = useState("");
   const [modalCancelar, setModalCancelar] = useState(null);
+  const [notaParaClonar, setNotaParaClonar] = useState(null);
   const [justificativa, setJustificativa] = useState("");
   const [cancelando, setCancelando] = useState(false);
   const [reconciliandoNotaId, setReconciliandoNotaId] = useState("");
@@ -678,6 +679,9 @@ export default function CentralNFSaida() {
         erro={erro}
         notasFiltradas={notas}
         setModalCancelar={setModalCancelar}
+        clonarNota={setNotaParaClonar}
+        notaParaClonar={notaParaClonar}
+        fecharClonagem={() => setNotaParaClonar(null)}
         excluirNota={excluirNota}
         reconciliarFluxoNota={reconciliarFluxoNota}
         reconciliandoNotaId={reconciliandoNotaId}

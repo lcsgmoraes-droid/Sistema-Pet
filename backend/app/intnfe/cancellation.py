@@ -7,6 +7,10 @@ from app.utils.serialization import safe_datetime_to_iso
 from app.vendas.fiscal_status import pendencia_fiscal_cancelamento
 
 STATUS_CANCELAMENTO = {"pendente", "solicitado", "recusado", "confirmado"}
+MENSAGEM_EMISSOR_INDISPONIVEL = (
+    "O emissor está temporariamente indisponível. O cancelamento ainda não foi "
+    "confirmado. Atualize a situação da nota antes de tentar novamente."
+)
 
 
 def motivo_seguro(value):
@@ -36,6 +40,8 @@ def data_evento(value):
 
 
 def resultado_cancelamento(payload, *, somente_evento=False):
+    from app.intnfe.client import _provider_unavailable_message
+
     if not isinstance(payload, dict):
         return None
     tipo = str(payload.get("tipoEventoCodigo") or "")
@@ -46,6 +52,12 @@ def resultado_cancelamento(payload, *, somente_evento=False):
     motivo = motivo_seguro(payload.get("motivoRetorno") or payload.get("mensagem"))
     if payload.get("autorizado") is True and payload.get("protocolo"):
         status = "confirmado"
+    elif _provider_unavailable_message(
+        payload.get("motivoRetorno") or payload.get("mensagem")
+    ):
+        status = "pendente"
+        codigo = "EmissorIndisponivel"
+        motivo = MENSAGEM_EMISSOR_INDISPONIVEL
     elif (
         payload.get("autorizado") is False
         or payload.get("success") is False
@@ -100,6 +112,8 @@ def aplicar_resultado_cancelamento(venda, resultado):
 
 
 def campos_cancelamento(venda):
+    from app.intnfe.client import _provider_unavailable_message
+
     pendencia = pendencia_fiscal_cancelamento(venda)
     status = getattr(venda, "nfe_cancelamento_status", None)
     status = (
@@ -114,11 +128,16 @@ def campos_cancelamento(venda):
         status = "pendente"
     codigo = getattr(venda, "nfe_cancelamento_codigo", None)
     motivo = getattr(venda, "nfe_cancelamento_motivo", None)
+    if _provider_unavailable_message(motivo):
+        motivo = MENSAGEM_EMISSOR_INDISPONIVEL
+        if status != "confirmado":
+            status = "pendente"
+            codigo = "EmissorIndisponivel"
     solicitado_em = getattr(venda, "nfe_cancelamento_solicitado_em", None)
     return {
         "cancelamento_status": status,
         "cancelamento_codigo": codigo if isinstance(codigo, str) else None,
-        "cancelamento_motivo": motivo if isinstance(motivo, str) else None,
+        "cancelamento_motivo": motivo_seguro(motivo),
         "cancelamento_solicitado_em": safe_datetime_to_iso(solicitado_em)
         if isinstance(solicitado_em, datetime)
         else None,

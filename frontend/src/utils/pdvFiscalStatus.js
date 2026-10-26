@@ -177,7 +177,18 @@ export function obterPendenciaCancelamentoFiscal(venda = {}) {
 
 export function textoRespostaFiscal(valor) {
   if (valor === null || valor === undefined) return "";
-  if (typeof valor === "string" || typeof valor === "number") return String(valor);
+  if (typeof valor === "string" || typeof valor === "number") {
+    const texto = String(valor).trim();
+    if (
+      /<!doctype\s+html|<\/?(?:html|head|body|title|center|h1|script|style)\b/i.test(texto) ||
+      /\b(?:502\s+bad gateway|503\s+service unavailable|504\s+gateway time.?out|Network Error|ECONNRESET|ECONNREFUSED|AxiosError|timeout of \d+ms exceeded)\b/i.test(
+        texto,
+      )
+    ) {
+      return "O serviço emissor está temporariamente indisponível. Consulte a situação da nota antes de tentar novamente.";
+    }
+    return texto;
+  }
   if (Array.isArray(valor)) return valor.map(textoRespostaFiscal).filter(Boolean).join("; ");
   if (typeof valor === "object") {
     const partes = [

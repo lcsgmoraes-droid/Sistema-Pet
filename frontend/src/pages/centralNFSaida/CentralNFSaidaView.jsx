@@ -6,6 +6,7 @@ import NFSaidaList from "./NFSaidaList";
 import SefazConsultasSessao from "./SefazConsultasSessao";
 import SefazToolsPanel from "./SefazToolsPanel";
 import VendasSemNotaPanel from "./VendasSemNotaPanel";
+import NFSaidaClonagem from "./NFSaidaClonagem";
 
 export default function CentralNFSaidaView({
   painelSefazAberto,
@@ -50,6 +51,9 @@ export default function CentralNFSaidaView({
   erro,
   notasFiltradas,
   setModalCancelar,
+  clonarNota,
+  notaParaClonar,
+  fecharClonagem,
   excluirNota,
   reconciliarFluxoNota,
   reconciliandoNotaId,
@@ -104,6 +108,12 @@ export default function CentralNFSaidaView({
 
       <VendasSemNotaPanel onEmissaoConcluida={() => carregarNotas(true)} />
 
+      <NFSaidaClonagem
+        nota={notaParaClonar}
+        aoFechar={fecharClonagem}
+        aoAtualizar={() => carregarNotas(true)}
+      />
+
       <NFSaidaFilters
         filtroCanal={filtroCanal}
         setFiltroCanal={setFiltroCanal}
@@ -137,6 +147,7 @@ export default function CentralNFSaidaView({
         dataInicial={dataInicial}
         dataFinal={dataFinal}
         setModalCancelar={setModalCancelar}
+        clonarNota={clonarNota}
         excluirNota={excluirNota}
         reconciliarFluxoNota={reconciliarFluxoNota}
         reconciliandoNotaId={reconciliandoNotaId}

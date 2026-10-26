@@ -50,6 +50,7 @@ from app.intnfe.recovery import (
 from app.bling_integration_fiscal import prevalidar_produtos_fiscais_venda
 from app.nfe.danfe_nfce import gerar_danfe_nfce
 from app.nfe.correcao_routes import router as correcao_router
+from app.nfe.clone_routes import router as clone_router
 from app.nfe.operacional_routes import (
     CancelarNFeRequest as CancelarNFeRequest,
     CartaCorrecaoRequest as CartaCorrecaoRequest,
@@ -826,5 +827,6 @@ async def reconciliar_pendentes_nfe(
 
 router.include_router(listagem_rapida_router)
 router.include_router(vendas_sem_nota_router)
+router.include_router(clone_router)
 router.include_router(operacional_router)
 router.include_router(correcao_router)

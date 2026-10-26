@@ -28,6 +28,8 @@ async function prepararApi(
     consultasFiscais: 0,
     envios: [],
     avisos: [],
+    clones: [],
+    operacoesClone: [],
     venda: {
       id: vendaId,
       numero_venda: "QA-NOTA-CANCELADA",
@@ -76,6 +78,58 @@ async function prepararApi(
     async (route) => {
       const request = route.request();
       const path = new URL(request.url()).pathname;
+      if (path === "/api/nfe/clones/preparar") {
+        estado.operacoesClone.push({ path, payload: request.postDataJSON() });
+        return route.fulfill({
+          json: {
+            origem: { numero: 18574, modelo: 65, venda_id: vendaId, provedor: "intnfe" },
+            dados: {
+              serie: "1",
+              ambienteCodigo: 2,
+              naturezaOperacao: "Venda de mercadoria",
+              consumidor: { nome: "Cliente Sintético", cpf: "52998224725" },
+              produtos: [
+                {
+                  codigoProduto: "QA-42004",
+                  descricao: "Produto Sintético QA",
+                  quantidade: 1,
+                  unidade: "UN",
+                  valorUnitario: 39.9,
+                  valorTotal: 39.9,
+                  impostos: { icms: { cst: "102", origem: "0" } },
+                },
+              ],
+              pagamentos: [{ formaPagamento: "01", valor: 39.9 }],
+              informacoesAdicionais: "Dados da nota original",
+            },
+            avisos: [],
+          },
+        });
+      }
+      if (path === "/api/nfe/clones") {
+        if (request.method() === "GET") {
+          return route.fulfill({ json: { rascunhos: estado.clones } });
+        }
+        const payload = request.postDataJSON();
+        estado.operacoesClone.push({ path, payload });
+        const clone = { ...payload, id: 77, status: "rascunho" };
+        estado.clones = [clone];
+        return route.fulfill({ json: clone });
+      }
+      if (path === "/api/nfe/clones/77") {
+        if (request.method() === "PUT") {
+          const payload = request.postDataJSON();
+          estado.operacoesClone.push({ path, payload });
+          estado.clones[0] = { ...estado.clones[0], ...payload };
+        }
+        return route.fulfill({ json: estado.clones[0] });
+      }
+      if (path === "/api/nfe/clones/77/emitir") {
+        estado.operacoesClone.push({ path });
+        // Outra nota avançou a sequência; clonar nunca deve usar origem + 1.
+        estado.clones[0] = { ...estado.clones[0], numero: "18590", status: "autorizada" };
+        return route.fulfill({ json: estado.clones[0] });
+      }
       if (path === apiStatus) {
         estado.consultasFiscais += 1;
         if (estado.falharConsulta) {
@@ -171,6 +225,11 @@ async function prepararApi(
     dialog.accept();
   });
   return estado;
+}
+
+async function abrirAcaoNota(page, nome) {
+  await page.getByRole("button", { name: "Ações da nota 18574", exact: true }).click();
+  await page.getByRole("menuitem", { name: nome, exact: true }).click();
 }
 
 test.describe("PDV — cancelamento após nota fiscal cancelada", () => {
@@ -285,7 +344,7 @@ test.describe("PDV — cancelamento após nota fiscal cancelada", () => {
       },
     });
     await page.goto("/notas-fiscais/saida");
-    await page.getByTitle("Cancelar NF-e", { exact: true }).click();
+    await abrirAcaoNota(page, "Cancelar NF-e");
     const modal = page.getByRole("dialog", { name: "Cancelar Nota Fiscal" });
     await modal.getByLabel(/Justificativa/).fill("Nota a cancelar após desfazer venda.");
     await modal.getByRole("button", { name: "Confirmar Cancelamento" }).click();
@@ -313,7 +372,7 @@ test.describe("PDV — cancelamento após nota fiscal cancelada", () => {
       statusVenda: "cancelada",
     });
     await page.goto("/notas-fiscais/saida");
-    await page.getByTitle("Cancelar NF-e", { exact: true }).click();
+    await abrirAcaoNota(page, "Cancelar NF-e");
     const modal = page.getByRole("dialog", { name: "Cancelar Nota Fiscal" });
     await modal.getByLabel(/Justificativa/).fill("Nota a cancelar após desfazer venda.");
     await modal.getByRole("button", { name: "Confirmar Cancelamento" }).click();
@@ -326,11 +385,81 @@ test.describe("PDV — cancelamento após nota fiscal cancelada", () => {
     ).toBeVisible();
     expect(estado.venda.nfe_status).toBe("autorizada");
     estado.statusFiscal = "cancelada";
-    await page.getByTitle("Forçar reconciliação desta NF", { exact: true }).click();
+    await abrirAcaoNota(page, "Atualizar situação da NF");
     await expect(page.getByText("Cancelamento da nota em andamento", { exact: true })).toHaveCount(
       0,
     );
     expect(estado.venda.nfe_status).toBe("cancelada");
     expect(estado.venda.status).toBe("cancelada");
+  });
+
+  test("falha 502 não exibe HTML nem transforma nota autorizada em cancelada", async ({ page }) => {
+    const estado = await prepararApi(page, {
+      statusFiscal: "autorizada",
+      resultadoFiscal: {
+        cancelamento_status: "pendente",
+        cancelamento_motivo:
+          "<html><head><title>502 Bad Gateway</title></head><body><h1>502 Bad Gateway</h1><center>nginx</center></body></html>",
+        success: false,
+      },
+    });
+    await page.goto("/notas-fiscais/saida");
+    await abrirAcaoNota(page, "Cancelar NF-e");
+    const modal = page.getByRole("dialog", { name: "Cancelar Nota Fiscal" });
+    await modal.getByLabel(/Justificativa/).fill("Valor incorreto, preciso corrigir a nota.");
+    await modal.getByRole("button", { name: "Confirmar Cancelamento" }).click();
+    await expect(modal.getByRole("alert")).toContainText("temporariamente indisponível");
+    await expect(page.locator("body")).not.toContainText(/<html>|<head>|nginx|Bad Gateway/);
+    await expect(
+      page.getByRole("status").filter({ hasText: "ainda não foi confirmado" }),
+    ).toBeVisible();
+    expect(estado.venda.nfe_status).toBe("autorizada");
+    expect(estado.venda.nfe_cancelamento_status).toBe("pendente");
+  });
+
+  test("clona para revisão, salva e só emite na confirmação com a nova numeração", async ({
+    page,
+  }) => {
+    const estado = await prepararApi(page, { statusFiscal: "autorizada" });
+    const vendaOriginal = structuredClone(estado.venda);
+    await page.goto("/notas-fiscais/saida");
+    await abrirAcaoNota(page, "Clonar nota");
+    const modal = page.getByRole("dialog", { name: "Clonar nota fiscal", exact: true });
+    await expect(modal.getByLabel("Descrição do item 1")).toHaveValue("Produto Sintético QA");
+    await expect(modal.getByLabel("Nome", { exact: true })).toHaveValue("Cliente Sintético");
+    await expect(modal.getByLabel("Informações adicionais")).toHaveValue("Dados da nota original");
+    expect(estado.operacoesClone.map((item) => item.path)).toEqual(["/api/nfe/clones/preparar"]);
+    expect(estado.clones).toHaveLength(0);
+    await expect(modal.getByRole("note")).toContainText(
+      "A nota original continua com efeito fiscal até o cancelamento ser confirmado",
+    );
+
+    await modal.getByLabel("Preço unitário do item 1").click();
+    await modal.getByLabel("Preço unitário do item 1").press("ControlOrMeta+A");
+    await modal.getByLabel("Preço unitário do item 1").pressSequentially("4990");
+    await expect(modal.getByText("Total da nota: R$ 49,90", { exact: true })).toBeVisible();
+    await modal.getByLabel("Valor", { exact: true }).click();
+    await modal.getByLabel("Valor", { exact: true }).press("ControlOrMeta+A");
+    await modal.getByLabel("Valor", { exact: true }).pressSequentially("4990");
+    await modal.getByRole("button", { name: "Salvar rascunho", exact: true }).click();
+    await expect(modal.getByText(/Rascunho salvo/)).toBeVisible();
+    expect(estado.clones[0].dados.produtos[0].valorUnitario).toBe(49.9);
+    expect(estado.clones[0].dados.produtos[0].valorTotal).toBe(49.9);
+    expect(estado.clones[0].dados.pagamentos[0].valor).toBe(49.9);
+    expect(estado.operacoesClone.some((item) => item.path.endsWith("/emitir"))).toBe(false);
+
+    await modal.getByRole("button", { name: "Fechar", exact: true }).click();
+    await page.getByRole("button", { name: "Abrir cópia", exact: true }).click();
+    await expect(modal.getByLabel("Preço unitário do item 1")).toHaveValue("49,90");
+    await modal.getByRole("button", { name: "Emitir nova nota", exact: true }).click();
+    const confirmacao = page.getByRole("dialog", { name: "Confirmar ação", exact: true });
+    await expect(confirmacao).toBeVisible();
+    expect(estado.operacoesClone.some((item) => item.path.endsWith("/emitir"))).toBe(false);
+    await confirmacao.getByRole("button", { name: "Confirmar", exact: true }).click();
+    await expect(modal.getByText("Nota clonada autorizada.", { exact: true })).toBeVisible();
+    await expect(modal.getByText(/Nova nota: 18590/)).toBeVisible();
+    expect(estado.operacoesClone.filter((item) => item.path.endsWith("/emitir"))).toHaveLength(1);
+    expect(estado.venda).toEqual(vendaOriginal);
+    expect(estado.envios).toHaveLength(0);
   });
 });

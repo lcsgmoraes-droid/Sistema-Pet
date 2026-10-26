@@ -76,6 +76,46 @@ def test_bad_request_is_reported_as_invalid_data(api):
     assert not error.value.uncertain
 
 
+@pytest.mark.parametrize("status", [200, 422, 502])
+def test_cancellation_gateway_page_inside_json_is_uncertain_and_not_exposed(
+    api, status
+):
+    api.session.request.return_value = response(
+        status,
+        {
+            "autorizado": False,
+            "codigoRetorno": "502",
+            "motivoRetorno": "<html><head><title>502 Bad Gateway</title></head><body>nginx</body></html>",
+        },
+    )
+
+    with pytest.raises(IntNFeError) as error:
+        api.cancel_document(
+            "token", "nfe", "correlacao-teste", "Valor da nota incorreto"
+        )
+
+    assert error.value.uncertain is True
+    assert error.value.provider_message is None
+    assert "html" not in str(error.value).lower()
+    assert "nginx" not in str(error.value).lower()
+    assert api.session.request.call_count == 1
+
+
+def test_cancellation_plain_gateway_page_is_uncertain_and_not_exposed(api):
+    result = response(502)
+    result.json.side_effect = ValueError("<html>502 Bad Gateway</html>")
+    api.session.request.return_value = result
+
+    with pytest.raises(IntNFeError) as error:
+        api.cancel_document(
+            "token", "nfe", "correlacao-teste", "Valor da nota incorreto"
+        )
+
+    assert error.value.uncertain is True
+    assert error.value.code == "EmissorIndisponivel"
+    assert error.value.provider_message is None
+
+
 def test_nfce_validation_errors_are_available_without_exposing_personal_data(api):
     api.session.request.return_value = response(
         422,

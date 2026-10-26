@@ -1724,6 +1724,31 @@ def cancel(db, venda, api, justification, *, user_id=None):
             token, venda.nfe_tipo, venda.nfe_correlation_id, justification.strip()
         )
     except IntNFeError as exc:
+        if exc.uncertain:
+            # O proxy pode falhar depois que o emissor recebeu o evento.
+            # Consultar é seguro; repetir o POST aqui duplicaria a tentativa.
+            try:
+                consultado = reconcile(
+                    db,
+                    venda,
+                    api,
+                    connection=connection,
+                    token=token,
+                    commit=False,
+                )
+            except DirectEmissionError:
+                consultado = None
+            if consultado and consultado["cancelamento_status"] in {
+                "confirmado",
+                "recusado",
+            }:
+                _auditar_cancelamento(db, venda, user_id, "resultado")
+                db.commit()
+                consultado["success"] = (
+                    consultado["cancelamento_status"] == "confirmado"
+                )
+                consultado["processando"] = False
+                return consultado
         with db.no_autoflush:
             db.refresh(
                 venda,
