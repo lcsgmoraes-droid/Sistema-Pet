@@ -9,6 +9,7 @@ from fastapi import HTTPException
 
 from app.audit_log import log_action
 from app.intnfe.client import IntNFeError
+from app.intnfe.commercial_context import CommercialContextError, context_data
 from app.intnfe.cancellation import (
     data_evento,
     motivo_seguro,
@@ -23,6 +24,7 @@ from app.intnfe.emission import (
 )
 from app.intnfe.numbering import NumberingError, read_numbering
 from app.intnfe.repository import get_tenant
+from app.intnfe.xml_integrity import INVALID_MESSAGE, ensure_signed_xml
 from app.nfe.clone_models import NotaFiscalClone
 from app.nfe.clone_xml import NS, payload_from_xml
 from app.nfe.danfe_nfce import validar_xml_nota
@@ -59,12 +61,21 @@ def source_xml(db, tenant_id, api, origin):
         xml = sale.nfe_xml
         if not xml:
             xml = download_document(db, sale, api, "xml")
-        if isinstance(xml, bytes):
-            xml = xml.decode("utf-8-sig")
         if not sale.nfe_chave:
             raise HTTPException(
                 422, "A nota original ainda não possui chave fiscal confirmada."
             )
+        tenant = get_tenant(db, tenant_id)
+        try:
+            xml = ensure_signed_xml(
+                xml,
+                expected_cnpj="".join(filter(str.isdigit, str(tenant.cnpj or ""))),
+                expected_key=sale.nfe_chave,
+                document_type=sale.nfe_tipo,
+            )
+        except IntNFeError:
+            raise HTTPException(502, INVALID_MESSAGE) from None
+        xml = xml.decode("utf-8-sig")
         validar_xml_nota(xml.encode("utf-8"), sale.nfe_chave, int(sale.nfe_modelo))
         identity = {
             "provedor": provider,
@@ -138,7 +149,67 @@ def prepare(db, tenant_id, api, origin):
     }, xml
 
 
-def normalize_data(data, original, *, previous=None):
+def _normalize_commercial_fields(result, original, model):
+    fields = ("indicadorPresenca", "intermediador")
+    if model != 55:
+        if any(result.get(key) != original.get(key) for key in fields):
+            raise HTTPException(
+                422,
+                "A revisão de presença e intermediador está disponível somente para NF-e (55).",
+            )
+        return
+    raw_presence = result.get("indicadorPresenca", "1")
+    if type(raw_presence) not in (str, int):
+        raise HTTPException(
+            422, "Informe um indicador de presença válido para a operação."
+        )
+    presence = str(raw_presence).strip()
+    if presence not in {"0", "1", "2", "3", "4", "5", "9"}:
+        raise HTTPException(
+            422, "Informe um indicador de presença válido para a operação."
+        )
+    result["indicadorPresenca"] = presence
+    intermediary = result.get("intermediador")
+    if intermediary is None:
+        result.pop("intermediador", None)
+        return
+    if not isinstance(intermediary, dict) or set(intermediary) != {
+        "cnpj",
+        "identificadorCadastro",
+    }:
+        raise HTTPException(
+            422, "Informe somente CNPJ e identificação de cadastro do intermediador."
+        )
+    try:
+        commercial = context_data(
+            None,
+            override={
+                "canal": "venda_direta_online",
+                "intermediador_cnpj": intermediary["cnpj"],
+                "intermediador_identificacao": intermediary["identificadorCadastro"],
+            },
+        )
+    except CommercialContextError as exc:
+        raise HTTPException(422, str(exc)) from None
+    if (
+        not commercial["intermediador_cnpj"]
+        or not commercial["intermediador_identificacao"]
+    ):
+        raise HTTPException(
+            422,
+            "Complete o CNPJ e a identificação da loja ou vendedor no intermediador.",
+        )
+    if presence != "2":
+        raise HTTPException(
+            422, "Uma operação intermediada deve usar presença pela internet (2)."
+        )
+    result["intermediador"] = {
+        "cnpj": commercial["intermediador_cnpj"],
+        "identificadorCadastro": commercial["intermediador_identificacao"],
+    }
+
+
+def normalize_data(data, original, *, previous=None, modelo=55):
     """Permite revisão comercial sem alterar identidade, ambiente ou tributação."""
     if not isinstance(data, dict):
         raise HTTPException(422, "Os dados da nota são inválidos.")
@@ -151,17 +222,17 @@ def normalize_data(data, original, *, previous=None):
             "ambienteCodigo",
             "tipoOperacao",
             "finalidade",
-            "intermediador",
             "documentosReferenciados",
         )
     ):
         raise HTTPException(
             422, "Preserve emitente, série, ambiente e finalidade da nota clonada."
         )
-    if set(result) - set(original):
+    if set(result) - set(original) - {"intermediador", "indicadorPresenca"}:
         raise HTTPException(
             422, "A nota contém campos desconhecidos. Reabra o rascunho."
         )
+    _normalize_commercial_fields(result, original, modelo)
     products = result.get("produtos")
     if not isinstance(products, list) or len(products) != len(original["produtos"]):
         raise HTTPException(422, "Preserve todos os itens da nota original.")
@@ -358,7 +429,7 @@ def create(db, tenant_id, user_id, api, origin, data):
     row = NotaFiscalClone(
         tenant_id=tenant_id,
         origem=prepared["origem"],
-        dados=normalize_data(data, prepared["dados"]),
+        dados=normalize_data(data, prepared["dados"], modelo=prepared["modelo"]),
         xml_origem=xml,
         modelo=prepared["modelo"],
         status="rascunho",
@@ -388,7 +459,7 @@ def update(db, tenant_id, user_id, clone_id, data):
         cnpj=row.dados["emitente"]["cnpj"],
         environment=row.dados["ambienteCodigo"],
     )
-    row.dados = normalize_data(data, original, previous=row.dados)
+    row.dados = normalize_data(data, original, previous=row.dados, modelo=row.modelo)
     log_action(
         db,
         user_id,

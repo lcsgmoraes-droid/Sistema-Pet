@@ -8,6 +8,8 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from tests.helpers.signed_nfe import make_key, sign_nfe
+
 from app.db import base as _registry  # noqa: F401
 from app.models import Tenant
 from app.nfe_cache_models import BlingNotaFiscalCache
@@ -42,7 +44,7 @@ def banco():
 
 
 def chave(cnpj, numero):
-    return f"352609{cnpj}55003{numero:09d}1000000010"
+    return make_key(f"352609{cnpj}55003{numero:09d}1000000010")
 
 
 def incluir(db, tenant, origem, numero, key):
@@ -82,7 +84,9 @@ def incluir(db, tenant, origem, numero, key):
 
 
 def xml_saida(key):
-    return f"""<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe{key}"><ide><mod>55</mod><dhEmi>2026-09-03T12:00:00-03:00</dhEmi><tpAmb>1</tpAmb><tpNF>1</tpNF></ide><emit><CNPJ>{CNPJ}</CNPJ></emit></infNFe></NFe><protNFe><infProt><chNFe>{key}</chNFe><cStat>100</cStat></infProt></protNFe></nfeProc>""".encode()
+    return sign_nfe(
+        f"""<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe{key}"><ide><mod>55</mod><dhEmi>2026-09-03T12:00:00-03:00</dhEmi><tpAmb>1</tpAmb><tpNF>1</tpNF></ide><emit><CNPJ>{CNPJ}</CNPJ></emit></infNFe></NFe><protNFe><infProt><chNFe>{key}</chNFe><cStat>100</cStat></infProt></protNFe></nfeProc>"""
+    )
 
 
 @pytest.mark.parametrize(
@@ -139,7 +143,7 @@ def test_chave_invalida_nao_e_ocultada_como_nota_de_fornecedor(banco, monkeypatc
     db.commit()
     docs = documentos._listar_documentos(db, tenant, DIA, DIA)
     monkeypatch.setattr(documentos, "_obter_xml", lambda *_: (xml_saida(key), {}))
-    with pytest.raises(documentos.XmlContabilidadeError, match="chave/modelo"):
+    with pytest.raises(documentos.XmlContabilidadeError, match="parcial"):
         documentos._coletar_arquivos(db, tenant, docs, DIA, DIA)
 
 

@@ -12,6 +12,8 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from tests.helpers.signed_nfe import make_key, sign_nfe
+
 from app.db import base as _registry  # noqa: F401
 from app.models import Tenant
 from app.services import xml_contabilidade_documentos as documentos
@@ -38,7 +40,9 @@ def xml_nota(chave, *, valor="100.50", data="2026-10-18T12:00:00-03:00"):
         if valor is not None
         else ""
     )
-    return f'<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe{chave}"><ide><nNF>123</nNF><mod>55</mod><dhEmi>{data}</dhEmi><tpAmb>1</tpAmb><tpNF>1</tpNF></ide><emit><CNPJ>{CNPJ}</CNPJ></emit>{total}</infNFe></NFe><protNFe><infProt><chNFe>{chave}</chNFe><cStat>100</cStat></infProt></protNFe></nfeProc>'
+    return sign_nfe(
+        f'<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe{chave}"><ide><nNF>123</nNF><mod>55</mod><dhEmi>{data}</dhEmi><tpAmb>1</tpAmb><tpNF>1</tpNF></ide><emit><CNPJ>{CNPJ}</CNPJ></emit>{total}</infNFe></NFe><protNFe><infProt><chNFe>{chave}</chNFe><cStat>100</cStat></infProt></protNFe></nfeProc>'
+    ).decode()
 
 
 def evento(chave, tipo="110110", seq=1):
@@ -99,8 +103,10 @@ def nota(
     provider="intnfe",
     antiga=False,
 ):
-    chave = f"352610{CNPJ}55003{numero:09d}1000000010"
     data = "2026-09-18T12:00:00-03:00" if antiga else "2026-10-18T12:00:00-03:00"
+    chave = make_key(
+        f"35{datetime.fromisoformat(data):%y%m}{CNPJ}55003{numero:09d}1000000010"
+    )
     venda = Venda(
         tenant_id=tenant,
         numero_venda=f"V{numero}",
@@ -236,8 +242,8 @@ def test_xml_autorizado_invalido_ainda_bloqueia_todo_lote_com_motivo(banco):
     assert resumo["resultado"] == "bloqueado"
     assert resumo["contagens"]["notas_preparadas"] == 1
     assert resumo["contagens"]["notas_enviadas"] == 0
-    assert "protocolo" in resumo["motivo"]
-    assert "protocolo" in detalhe(db, tenant, resumo)["documentos"][1]["motivo"]
+    assert "integridade" in resumo["motivo"]
+    assert "integridade" in detalhe(db, tenant, resumo)["documentos"][1]["motivo"]
     enviar.assert_not_called()
 
 
@@ -428,6 +434,11 @@ def test_duas_vendas_mesma_chave_contam_uma_nota_e_um_valor(banco):
 def test_data_oficial_fora_do_periodo_nao_infla_notas_encontradas(banco, data_xml):
     db, tenant, enviar = banco
     venda = nota(db, tenant)
+    venda.nfe_chave = make_key(
+        venda.nfe_chave[:2]
+        + datetime.fromisoformat(data_xml).strftime("%y%m")
+        + venda.nfe_chave[6:]
+    )
     venda.nfe_xml = xml_nota(venda.nfe_chave, data=data_xml)
     db.commit()
     _, resumo = executar(db, tenant)

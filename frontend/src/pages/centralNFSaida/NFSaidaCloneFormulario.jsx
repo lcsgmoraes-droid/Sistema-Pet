@@ -4,6 +4,7 @@ import InputTexto from "../../components/v2/InputTexto/InputTexto";
 import InputTextoLongo from "../../components/v2/InputTextoLongo/InputTextoLongo";
 import { formatMoneyBRL } from "../../utils/formatters";
 import { totalClonagem } from "./clonagemNotaUtils";
+import NFSaidaCloneComercial from "./NFSaidaCloneComercial";
 
 const ROTULOS = {
   razaoSocial: "Nome / razão social",
@@ -118,10 +119,20 @@ function Campos({ valor, caminho, alterar, disabled }) {
   });
 }
 
-export default function NFSaidaCloneFormulario({ dados, alterar, disabled }) {
+export default function NFSaidaCloneFormulario({
+  dados,
+  alterar,
+  alterarCanal,
+  disabled,
+  modelo = 55,
+}) {
   const chaveCliente = dados.destinatario ? "destinatario" : "consumidor";
   const extras = Object.fromEntries(
-    Object.entries(dados).filter(([campo]) => !CAMPOS_PRINCIPAIS.has(campo)),
+    Object.entries(dados).filter(
+      ([campo]) =>
+        !CAMPOS_PRINCIPAIS.has(campo) &&
+        !(Number(modelo) === 55 && ["indicadorPresenca", "intermediador"].includes(campo)),
+    ),
   );
   return (
     <div className="space-y-5">
@@ -129,6 +140,13 @@ export default function NFSaidaCloneFormulario({ dados, alterar, disabled }) {
         label="Natureza da operação"
         value={dados.naturezaOperacao}
         onChange={(valor) => alterar("naturezaOperacao", valor)}
+        disabled={disabled}
+      />
+      <NFSaidaCloneComercial
+        dados={dados}
+        modelo={modelo}
+        alterar={alterar}
+        alterarCanal={alterarCanal}
         disabled={disabled}
       />
       {dados[chaveCliente] && (

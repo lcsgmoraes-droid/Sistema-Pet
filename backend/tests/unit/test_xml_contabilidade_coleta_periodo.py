@@ -9,6 +9,8 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from tests.helpers.signed_nfe import make_key, sign_nfe
+
 from app.db import base as _registry  # noqa: F401
 from app.models import Tenant
 from app.nfe_cache_models import BlingNotaFiscalCache
@@ -62,7 +64,7 @@ def banco(monkeypatch):
 
 def nota(db, tenant, numero, *, provider="intnfe", antiga=False):
     data = datetime(2026, 9 if antiga else 10, 3, 12)
-    key = f"35{data:%y%m}{CNPJ}55003{numero:09d}1000000010"
+    key = make_key(f"35{data:%y%m}{CNPJ}55003{numero:09d}1000000010")
     if provider == "intnfe":
         obj = Venda(
             tenant_id=tenant,
@@ -96,7 +98,9 @@ def nota(db, tenant, numero, *, provider="intnfe", antiga=False):
 
 
 def xml_nota(key, data):
-    return f"""<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe{key}"><ide><mod>55</mod><dhEmi>{data.replace(tzinfo=BRASILIA).isoformat()}</dhEmi><tpAmb>1</tpAmb><tpNF>1</tpNF></ide><emit><CNPJ>{CNPJ}</CNPJ></emit></infNFe></NFe><protNFe><infProt><chNFe>{key}</chNFe><cStat>100</cStat></infProt></protNFe></nfeProc>""".encode()
+    return sign_nfe(
+        f"""<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe{key}"><ide><mod>55</mod><dhEmi>{data.replace(tzinfo=BRASILIA).isoformat()}</dhEmi><tpAmb>1</tpAmb><tpNF>1</tpNF></ide><emit><CNPJ>{CNPJ}</CNPJ></emit></infNFe></NFe><protNFe><infProt><chNFe>{key}</chNFe><cStat>100</cStat></infProt></protNFe></nfeProc>"""
+    )
 
 
 def evento(key, *, seq=1, data="2026-10-19T12:01:00-03:00", cnpj=CNPJ):

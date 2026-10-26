@@ -148,6 +148,8 @@ export default function NFSaidaClonagem({ nota, aoFechar, aoAtualizar }) {
                     <NFSaidaCloneFormulario
                       dados={registro.dados}
                       alterar={clone.alterar}
+                      alterarCanal={clone.alterarCanal}
+                      modelo={registro.modelo || registro.origem?.modelo}
                       disabled={clone.ocupado || !editavel}
                     />
                   </>

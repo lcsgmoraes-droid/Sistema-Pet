@@ -512,12 +512,15 @@ class IntNFeClient:
         return result
 
     def document_xml(self, token, document_type, correlation_id):
-        return self._binary_request(
+        from app.intnfe.xml_integrity import ensure_signed_xml
+
+        content = self._binary_request(
             "GET",
             self._document_path(document_type, correlation_id, "xml"),
             token=token,
             accept="application/xml, text/xml",
         )
+        return ensure_signed_xml(content, document_type=document_type)
 
     def document_events(self, token, document_type, correlation_id):
         # Contrato oficial: https://intnfe.com.br/api/doc#ep-eventos

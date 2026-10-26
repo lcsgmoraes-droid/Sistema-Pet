@@ -151,3 +151,31 @@ test("download fiscal apresenta o detalhe do erro JSON recebido como Blob", asyn
   assert.equal(env.harness.tree.erro, "O XML ainda não está disponível.");
   assert.equal(env.harness.tree.registro.status, "autorizada");
 });
+
+test("salvar revisão Amazon envia presença e cadastro ao backend sem emitir a cópia", async () => {
+  const env = setup();
+  await env.ready();
+  await env.harness.act(() => env.harness.tree.alterarCanal("amazon"));
+  await env.harness.act(() =>
+    env.harness.tree.alterar("intermediador.identificadorCadastro", "LOJA-QA-CLONE"),
+  );
+  let saving;
+  await env.harness.act(() => {
+    saving = env.harness.tree.salvar();
+  });
+  const request = env.requests.at(-1);
+  assert.equal(request.path, "/nfe/clones");
+  assert.equal(request.body.dados.indicadorPresenca, "2");
+  assert.deepEqual(request.body.dados.intermediador, {
+    cnpj: "15436940000103",
+    identificadorCadastro: "LOJA-QA-CLONE",
+  });
+  assert.equal(request.body.dados.produtos[0].valorTotal, 145);
+  request.resolve({ data: { ...request.body, id: 12, status: "rascunho" } });
+  await saving;
+  await env.harness.settle();
+  assert.equal(
+    env.requests.some((item) => item.path.endsWith("/emitir")),
+    false,
+  );
+});

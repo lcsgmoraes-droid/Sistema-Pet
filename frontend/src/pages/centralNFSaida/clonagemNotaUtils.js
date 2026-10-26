@@ -7,6 +7,38 @@ export function referenciaClonagem(nota) {
   };
 }
 
+// CNPJ público da Amazon Serviços de Varejo do Brasil Ltda.; sempre revisável.
+export const CNPJ_PUBLICO_AMAZON = "15436940000103";
+export const FONTE_CNPJ_AMAZON = "https://venda.amazon.com.br/termos/stone";
+
+export function canalComercialClone(dados = {}) {
+  if (dados.intermediador) {
+    return String(dados.intermediador.cnpj || "").replaceAll(/\D/g, "") === CNPJ_PUBLICO_AMAZON
+      ? "amazon"
+      : "intermediacao_existente";
+  }
+  if (String(dados.indicadorPresenca) === "1") return "loja_fisica";
+  if (String(dados.indicadorPresenca) === "2") return "venda_direta_online";
+  return "preservar";
+}
+
+export function atualizarCanalClone(dados, canal) {
+  const copia = structuredClone(dados);
+  if (canal === "amazon") {
+    const mesmaAmazon =
+      String(copia.intermediador?.cnpj || "").replaceAll(/\D/g, "") === CNPJ_PUBLICO_AMAZON;
+    copia.indicadorPresenca = "2";
+    copia.intermediador = {
+      cnpj: CNPJ_PUBLICO_AMAZON,
+      identificadorCadastro: mesmaAmazon ? copia.intermediador.identificadorCadastro || "" : "",
+    };
+  } else if (["loja_fisica", "venda_direta_online"].includes(canal)) {
+    copia.indicadorPresenca = canal === "loja_fisica" ? "1" : "2";
+    delete copia.intermediador;
+  }
+  return copia;
+}
+
 export function atualizarCampoClone(dados, caminho, valor) {
   const copia = structuredClone(dados);
   const partes = caminho.split(".");

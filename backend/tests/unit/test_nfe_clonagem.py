@@ -2,6 +2,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import Mock
+import unicodedata
 
 import pytest
 from fastapi import HTTPException
@@ -9,6 +10,8 @@ from fastapi import HTTPException
 from app.intnfe.client import IntNFeError
 from app.nfe import clone_service as service
 from app.nfe.clone_xml import payload_from_xml
+from app.intnfe.xml_integrity import INVALID_MESSAGE
+from tests.helpers.signed_nfe import make_key, sign_nfe
 
 TENANT = "11111111-1111-1111-1111-111111111111"
 CNPJ = "33590794000140"
@@ -22,6 +25,145 @@ XML = f"""<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="N
 
 def payload():
     return payload_from_xml(XML, cnpj=CNPJ, environment=1)[0]
+
+
+@pytest.fixture(scope="module")
+def signed_clone_source():
+    cnpj = "11222333000181"
+    key = make_key("352610" + cnpj + "55001000001648112345678")
+    xml = "".join(
+        character
+        for character in unicodedata.normalize("NFD", XML)
+        if not unicodedata.combining(character)
+    )
+    xml = xml.replace(CNPJ, cnpj).replace("1" * 44, key)
+    xml = xml.replace(
+        "</ide>", "<dhEmi>2026-10-26T10:00:00-03:00</dhEmi></ide>"
+    ).replace(
+        "</nfeProc>",
+        f"<protNFe><infProt><chNFe>{key}</chNFe><cStat>100</cStat>"
+        "</infProt></protNFe></nfeProc>",
+    )
+    return SimpleNamespace(cnpj=cnpj, key=key, unsigned=xml, xml=sign_nfe(xml))
+
+
+def source_context(monkeypatch, document, **overrides):
+    sale = SimpleNamespace(
+        id=42,
+        nfe_provider="intnfe",
+        nfe_correlation_id="source-document",
+        nfe_chave=document.key,
+        nfe_modelo=55,
+        nfe_tipo="nfe",
+        nfe_numero=1648,
+        nfe_serie="1",
+        nfe_status="autorizada",
+        nfe_xml=document.xml,
+    )
+    sale.__dict__.update(overrides)
+    db = Mock()
+    db.query.return_value.filter.return_value.first.return_value = sale
+    monkeypatch.setattr(
+        service, "get_tenant", Mock(return_value=SimpleNamespace(cnpj=document.cnpj))
+    )
+    monkeypatch.setattr(
+        service, "_connection", lambda *_args: SimpleNamespace(emission_environment=1)
+    )
+    download = Mock(return_value=document.xml)
+    monkeypatch.setattr(service, "download_document", download)
+    return sale, db, download
+
+
+@pytest.mark.parametrize("as_text", [False, True])
+def test_preparar_valida_assinatura_do_cache_sem_alterar_original(
+    monkeypatch, signed_clone_source, as_text
+):
+    source = signed_clone_source
+    cached = source.xml.decode() if as_text else source.xml
+    sale, db, download = source_context(monkeypatch, source, nfe_xml=cached)
+
+    result, xml = service.prepare(
+        db, TENANT, Mock(), {"provedor": "intnfe", "venda_id": sale.id}
+    )
+
+    assert result["dados"]["produtos"][0]["descricao"] == "Racao"
+    assert result["numero"] is None
+    assert result["origem"]["numero"] == "1648"
+    assert xml == source.xml.decode()
+    assert sale.nfe_xml is cached
+    download.assert_not_called()
+    db.commit.assert_not_called()
+
+
+def test_preparar_recupera_so_conteudo_comprovado_pela_assinatura_sem_regravar_cache(
+    monkeypatch, signed_clone_source
+):
+    source = signed_clone_source
+    damaged = source.xml.decode().replace("Racao", "Ração")
+    sale, db, download = source_context(monkeypatch, source, nfe_xml=damaged)
+
+    result, verified = service.prepare(
+        db, TENANT, Mock(), {"provedor": "intnfe", "venda_id": sale.id}
+    )
+
+    assert result["dados"]["produtos"][0]["descricao"] == "Racao"
+    assert "Ração" not in verified
+    assert sale.nfe_xml is damaged
+    download.assert_not_called()
+    db.commit.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "invalid_source",
+    ["unsigned", "changed_value", "wrong_key", "wrong_company", "wrong_model"],
+)
+def test_preparar_recusa_origem_sem_assinatura_e_vinculo_validos(
+    monkeypatch, signed_clone_source, invalid_source
+):
+    source = signed_clone_source
+    sale, db, download = source_context(monkeypatch, source)
+    if invalid_source == "unsigned":
+        sale.nfe_xml = source.unsigned
+    elif invalid_source == "changed_value":
+        sale.nfe_xml = source.xml.replace(b"<vProd>20</vProd>", b"<vProd>21</vProd>")
+    elif invalid_source == "wrong_key":
+        sale.nfe_chave = make_key("352610" + source.cnpj + "55001000001649112345678")
+    elif invalid_source == "wrong_company":
+        service.get_tenant.return_value.cnpj = CNPJ
+    else:
+        sale.nfe_tipo = "nfce"
+    cached = sale.nfe_xml
+
+    with pytest.raises(HTTPException) as failure:
+        service.prepare(db, TENANT, Mock(), {"provedor": "intnfe", "venda_id": sale.id})
+
+    assert failure.value.status_code == 502
+    assert failure.value.detail == INVALID_MESSAGE
+    assert sale.nfe_xml is cached
+    download.assert_not_called()
+    db.commit.assert_not_called()
+
+
+def test_clonagem_nao_expoe_erro_tecnico_do_guardiao(monkeypatch, signed_clone_source):
+    sale, db, _download = source_context(monkeypatch, signed_clone_source)
+    monkeypatch.setattr(
+        service,
+        "ensure_signed_xml",
+        Mock(
+            side_effect=IntNFeError(
+                "XmlInvalido", provider_message="<html>privado</html>"
+            )
+        ),
+    )
+
+    with pytest.raises(HTTPException) as failure:
+        service.source_xml(
+            db, TENANT, Mock(), {"provedor": "intnfe", "venda_id": sale.id}
+        )
+
+    assert failure.value.status_code == 502
+    assert failure.value.detail == INVALID_MESSAGE
+    assert "privado" not in failure.value.detail
 
 
 def row(**overrides):
@@ -137,6 +279,174 @@ def test_recalcula_tributos_e_permite_salvar_novamente():
     assert result["produtos"][0]["impostos"]["pis"]["valor"] == 0.5
     assert service.normalize_data(result, original, previous=result) == result
     assert original["produtos"][0]["impostos"]["icms"]["valor"] == 3.6
+
+
+def test_clone_permite_revisar_operacao_intermediada_sem_alterar_identidade_fiscal():
+    original = payload()
+    edited = deepcopy(original)
+    edited["indicadorPresenca"] = "2"
+    edited["intermediador"] = {
+        "cnpj": "15.436.940/0001-03",
+        "identificadorCadastro": "  LOJA-QA-CLONE  ",
+    }
+    result = service.normalize_data(edited, original, modelo=55)
+    assert result["indicadorPresenca"] == "2"
+    assert result["intermediador"] == {
+        "cnpj": "15436940000103",
+        "identificadorCadastro": "LOJA-QA-CLONE",
+    }
+    for field in ("emitente", "serie", "ambienteCodigo", "produtos", "pagamentos"):
+        assert result[field] == original[field]
+    assert original["indicadorPresenca"] == "1"
+    assert "intermediador" not in original
+    assert (
+        service.normalize_data(result, original, previous=result, modelo=55) == result
+    )
+
+
+@pytest.mark.parametrize("presence", ["1", "9", "", "99", True, []])
+def test_intermediador_exige_presenca_internet_valida(presence):
+    original = payload()
+    edited = deepcopy(original)
+    edited.update(
+        indicadorPresenca=presence,
+        intermediador={"cnpj": "11222333000181", "identificadorCadastro": "LOJA-QA"},
+    )
+    with pytest.raises(HTTPException) as exc:
+        service.normalize_data(edited, original, modelo=55)
+    assert exc.value.status_code == 422
+    assert "presença" in exc.value.detail
+
+
+@pytest.mark.parametrize(
+    "intermediary",
+    [
+        {},
+        {"cnpj": "11222333000181"},
+        {"cnpj": "00000000000000", "identificadorCadastro": "LOJA-QA"},
+        {"cnpj": "11222333000182", "identificadorCadastro": "LOJA-QA"},
+        {"cnpj": "11222333000181", "identificadorCadastro": "   "},
+        {"cnpj": "11222333000181", "identificadorCadastro": "x" * 61},
+        {"cnpj": "11222333000181", "identificadorCadastro": 123},
+        {
+            "cnpj": "11222333000181",
+            "identificadorCadastro": "LOJA-QA",
+            "token": "indevido",
+        },
+        "11222333000181",
+    ],
+)
+def test_intermediador_invalido_e_recusado_antes_de_salvar(intermediary):
+    original = payload()
+    edited = deepcopy(original)
+    edited.update(indicadorPresenca="2", intermediador=intermediary)
+    with pytest.raises(HTTPException) as exc:
+        service.normalize_data(edited, original, modelo=55)
+    assert exc.value.status_code == 422
+
+
+def test_clone_nfce_preserva_presenca_e_recusa_nova_intermediacao():
+    original = payload()
+    assert service.normalize_data(deepcopy(original), original, modelo=65) == original
+    for change in (
+        {"indicadorPresenca": "2"},
+        {
+            "intermediador": {
+                "cnpj": "11222333000181",
+                "identificadorCadastro": "LOJA-QA",
+            }
+        },
+    ):
+        edited = deepcopy(original)
+        edited.update(change)
+        with pytest.raises(HTTPException) as exc:
+            service.normalize_data(edited, original, modelo=65)
+        assert exc.value.status_code == 422
+        assert "somente para NF-e" in exc.value.detail
+
+
+def test_clone_permite_operacao_direta_sem_carregar_intermediador_anterior():
+    original = payload()
+    original.update(
+        indicadorPresenca="2",
+        intermediador={
+            "cnpj": "11222333000181",
+            "identificadorCadastro": "LOJA-ANTERIOR",
+        },
+    )
+    edited = deepcopy(original)
+    edited["indicadorPresenca"] = "1"
+    del edited["intermediador"]
+    result = service.normalize_data(edited, original, modelo=55)
+    assert "intermediador" not in result
+    assert result["indicadorPresenca"] == "1"
+    assert result["produtos"] == original["produtos"]
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        lambda data: data.update(serie="7"),
+        lambda data: data.update(ambienteCodigo=2),
+        lambda data: data.update(finalidade="4"),
+        lambda data: data.update(tipoOperacao="0"),
+        lambda data: data["produtos"][0].update(ncm="00000000"),
+        lambda data: data["produtos"][0]["impostos"]["icms"].update(cst="40"),
+    ],
+)
+def test_revisao_comercial_nao_libera_alterar_identidade_ou_tributacao(change):
+    original = payload()
+    edited = deepcopy(original)
+    edited.update(
+        indicadorPresenca="2",
+        intermediador={"cnpj": "11222333000181", "identificadorCadastro": "LOJA-QA"},
+    )
+    change(edited)
+    with pytest.raises(HTTPException) as exc:
+        service.normalize_data(edited, original, modelo=55)
+    assert exc.value.status_code == 422
+
+
+def test_criar_clone_nfce_nao_libera_intermediacao_nem_persiste_dados_invalidos(
+    monkeypatch,
+):
+    original = payload()
+    monkeypatch.setattr(
+        service,
+        "prepare",
+        lambda *_args: (
+            {"dados": original, "origem": {"modelo": 65}, "modelo": 65},
+            XML,
+        ),
+    )
+    edited = deepcopy(original)
+    edited.update(
+        indicadorPresenca="2",
+        intermediador={"cnpj": "11222333000181", "identificadorCadastro": "LOJA-QA"},
+    )
+    db, api = Mock(), Mock()
+    with pytest.raises(HTTPException) as exc:
+        service.create(db, TENANT, 1, api, {}, edited)
+    assert exc.value.status_code == 422
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+    api.issue_document.assert_not_called()
+
+
+def test_clone_ja_enviado_nao_permite_revisar_intermediador(monkeypatch):
+    record = row(status="autorizada", correlation_id="clone-ja-enviado")
+    monkeypatch.setattr(service, "get_clone", lambda *_args, **_kwargs: record)
+    edited = deepcopy(record.dados)
+    edited.update(
+        indicadorPresenca="2",
+        intermediador={"cnpj": "11222333000181", "identificadorCadastro": "LOJA-QA"},
+    )
+    db = Mock()
+    with pytest.raises(HTTPException) as exc:
+        service.update(db, TENANT, 1, record.id, edited)
+    assert exc.value.status_code == 409
+    assert "intermediador" not in record.dados
+    db.commit.assert_not_called()
 
 
 @pytest.mark.parametrize(

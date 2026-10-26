@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import api from "../../api";
 import { textoRespostaFiscal } from "../../utils/pdvFiscalStatus";
 import { resumirCancelamentoNota } from "../../utils/nfeCancelamentoFeedback";
-import { atualizarCampoClone, referenciaClonagem } from "./clonagemNotaUtils";
+import { atualizarCampoClone, atualizarCanalClone, referenciaClonagem } from "./clonagemNotaUtils";
 
 async function mensagemErro(error) {
   let dados = error.response?.data;
@@ -106,6 +106,12 @@ export default function useClonagemNota(nota, aoFechar, aoAtualizar) {
   function alterar(caminho, valor) {
     if (operacaoRef.current || (registro?.id && registro.status !== "rascunho")) return;
     setRegistro((atual) => ({ ...atual, dados: atualizarCampoClone(atual.dados, caminho, valor) }));
+    setMensagem("");
+  }
+
+  function alterarCanal(canal) {
+    if (operacaoRef.current || (registro?.id && registro.status !== "rascunho")) return;
+    setRegistro((atual) => ({ ...atual, dados: atualizarCanalClone(atual.dados, canal) }));
     setMensagem("");
   }
 
@@ -224,6 +230,7 @@ export default function useClonagemNota(nota, aoFechar, aoAtualizar) {
     fechar,
     abrirSalvo,
     alterar,
+    alterarCanal,
     salvar,
     emitir,
     consultar,

@@ -18,7 +18,13 @@ test.skip(
 
 async function prepararApi(
   page,
-  { statusFiscal = "cancelada", statusVenda = "pago_nf", resultadoFiscal, semNota = false } = {},
+  {
+    statusFiscal = "cancelada",
+    statusVenda = "pago_nf",
+    resultadoFiscal,
+    semNota = false,
+    modeloClone = 65,
+  } = {},
 ) {
   const tenant = { id: "tenant-sintetico-qa", name: "Loja Sintética QA", login_name: "qa" };
   const user = { id: 42002, name: "Usuário QA", is_admin: true, role: { name: "admin" }, tenant };
@@ -166,12 +172,16 @@ async function prepararApi(
         estado.operacoesClone.push({ path, payload: request.postDataJSON() });
         return route.fulfill({
           json: {
-            origem: { numero: 18574, modelo: 65, venda_id: vendaId, provedor: "intnfe" },
+            origem: { numero: 18574, modelo: modeloClone, venda_id: vendaId, provedor: "intnfe" },
             dados: {
               serie: "1",
               ambienteCodigo: 2,
               naturezaOperacao: "Venda de mercadoria",
-              consumidor: { nome: "Cliente Sintético", cpf: "52998224725" },
+              indicadorPresenca: "1",
+              [modeloClone === 55 ? "destinatario" : "consumidor"]: {
+                nome: "Cliente Sintético",
+                cpf: "52998224725",
+              },
               produtos: [
                 {
                   codigoProduto: "QA-42004",
@@ -545,6 +555,35 @@ test.describe("PDV — cancelamento após nota fiscal cancelada", () => {
     expect(estado.operacoesClone.filter((item) => item.path.endsWith("/emitir"))).toHaveLength(1);
     expect(estado.venda).toEqual(vendaOriginal);
     expect(estado.envios).toHaveLength(0);
+  });
+
+  test("cópia NF-e permite revisar Amazon sem alterar a venda nem transmitir ao salvar", async ({
+    page,
+  }) => {
+    const estado = await prepararApi(page, { statusFiscal: "autorizada", modeloClone: 55 });
+    const vendaOriginal = structuredClone(estado.venda);
+    await page.goto("/notas-fiscais/saida");
+    await abrirAcaoNota(page, "Clonar nota");
+    const modal = page.getByRole("dialog", { name: "Clonar nota fiscal", exact: true });
+    await modal.getByRole("combobox", { name: "Canal da cópia", exact: true }).fill("Amazon");
+    await modal.getByRole("option", { name: "Amazon", exact: true }).click();
+    await modal
+      .getByLabel("Identificação da loja ou vendedor no intermediador")
+      .fill("VENDEDOR-QA");
+    await modal.getByLabel("Informações adicionais").fill("Pedido Amazon QA-0001");
+    await modal.getByRole("button", { name: "Salvar rascunho", exact: true }).click();
+    await expect(modal.getByText(/Rascunho salvo/)).toBeVisible();
+    const copia = estado.clones[0].dados;
+    expect(copia.indicadorPresenca).toBe("2");
+    expect(copia.intermediador.cnpj.replace(/\D/g, "")).toBe("15436940000103");
+    expect(copia.intermediador.identificadorCadastro).toBe("VENDEDOR-QA");
+    expect(copia.informacoesAdicionais).toBe("Pedido Amazon QA-0001");
+    expect(copia.produtos[0].valorTotal).toBe(39.9);
+    expect(copia.pagamentos[0].valor).toBe(39.9);
+    expect(estado.operacoesClone.some((item) => item.path.endsWith("/emitir"))).toBe(false);
+    expect(estado.venda).toEqual(vendaOriginal);
+    expect(estado.envios).toHaveLength(0);
+    await page.screenshot({ path: test.info().outputPath("clone-amazon-revisado.png") });
   });
 
   test("NF-e manual revisa pedido Amazon e mostra o complemento antes da transmissão", async ({

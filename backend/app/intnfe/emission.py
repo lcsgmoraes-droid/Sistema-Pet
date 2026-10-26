@@ -1696,15 +1696,42 @@ def download_document(db, venda, api, kind):
     try:
         if kind == "xml":
             content = api.document_xml(token, venda.nfe_tipo, venda.nfe_correlation_id)
-            if not venda.nfe_xml:
-                try:
-                    venda.nfe_xml = content.decode("utf-8-sig")
-                    db.commit()
-                except UnicodeDecodeError:
-                    pass
+            try:
+                verified_xml = content.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                # A integridade já foi verificada pelo cliente. Preservar os
+                # bytes de outra codificação sem gravá-los no cache UTF-8.
+                return content
+            if venda.nfe_xml != verified_xml:
+                previous_xml = venda.nfe_xml
+                venda.nfe_xml = verified_xml
+                if previous_xml:
+                    log_action(
+                        db,
+                        None,
+                        action="nfe_xml_integridade_atualizada",
+                        entity_type="Venda",
+                        entity_id=venda.id,
+                        old_value={
+                            "sha256": hashlib.sha256(
+                                previous_xml.encode("utf-8")
+                            ).hexdigest()
+                        },
+                        new_value={"sha256": hashlib.sha256(content).hexdigest()},
+                        tenant_id=venda.tenant_id,
+                        commit=False,
+                    )
+                db.commit()
             return content
         return api.document_danfe(token, venda.nfe_tipo, venda.nfe_correlation_id)
     except IntNFeError as exc:
+        if exc.code == "XmlInvalido":
+            raise DirectEmissionError(
+                "O XML recebido do emissor não passou na verificação de integridade. "
+                "Consulte novamente antes de usar o documento.",
+                status=502,
+                code=exc.code,
+            ) from None
         raise DirectEmissionError(
             "O arquivo ainda não está disponível no emissor.",
             status=409 if exc.status in {404, 409} else 503,
