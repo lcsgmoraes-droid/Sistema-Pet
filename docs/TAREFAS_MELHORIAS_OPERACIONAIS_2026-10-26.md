@@ -212,3 +212,12 @@ Os códigos públicos foram auditados também nas APIs de NF, entregas e relató
 - Comparação do catálogo antes/depois confirmou os dez módulos extraídos e seus
   30 artigos idênticos, incluindo ícones, ordem, títulos, tags e textos. Respostas
   HTTP 400/404/409 documentadas nas rotas novas; testes focados e OpenAPI passaram.
+- Sonar aprovado na head `56400ec0a`, duplicação **1,4%**. Gate completo e oito
+  checks oficiais aprovados nessa revisão.
+- Durante a integração, `main` recebeu o PR #1568 (fiscal Amazon). Resolvidos os
+  conflitos preservando a matriz de nove casos de validade e a semântica ARIA do
+  modal; códigos públicos e fluxo fiscal revisados sem perda. **106 backend**,
+  **21 frontend** e **3/3 E2E** aprovados com a main integrada.
+- Criada a união vazia de migrations `zzzzzb20261027a1`, com pais A4 e fiscal
+  `zzzzza20261027a1`, sem mudar dados. DEV e três bancos efêmeros chegaram à única
+  head; RLS **3/3** e **18** aprovações PostgreSQL. Bancos temporários removidos.

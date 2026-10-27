@@ -129,6 +129,9 @@ def _sincronizar_fontes_locais_nfe_em_cache(
 
     _sincronizar_vendas_em_cache(db, tenant_id, desde=desde)
     _sincronizar_pedidos_integrados_em_cache(db, tenant_id, desde=desde)
+    from app.ecommerceai_fiscal.central import sync_notes
+
+    sync_notes(db, tenant_id, desde=desde)
 
 
 def _enriquecer_notas_com_vendas(db: Session, tenant_id, notas: list[dict]) -> None:

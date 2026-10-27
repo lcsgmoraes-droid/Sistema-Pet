@@ -34,7 +34,9 @@ from app.tenancy.context import set_current_tenant
 
 
 router = APIRouter(prefix="/integracoes/ecommerceai", tags=["EcommerceAI"])
-SUPPORTED_SCOPES = {"catalog:read", "events:write"}
+LEGACY_SCOPES = {"catalog:read", "events:write"}
+FISCAL_SCOPES = {"fiscal:prepare", "fiscal:issue", "fiscal:read"}
+SUPPORTED_SCOPES = LEGACY_SCOPES | FISCAL_SCOPES
 SUPPORTED_EVENTS = {"integration.test", "company.overview.snapshot"}
 SIGNATURE_TOLERANCE_SECONDS = 300
 
@@ -46,9 +48,7 @@ class ConnectionRequestPayload(BaseModel):
     account_email: str | None = Field(default=None, max_length=255)
     callback_url: str = Field(min_length=8, max_length=1000)
     state: str = Field(min_length=32, max_length=255)
-    requested_scopes: list[str] = Field(
-        default_factory=lambda: sorted(SUPPORTED_SCOPES)
-    )
+    requested_scopes: list[str] = Field(default_factory=lambda: sorted(LEGACY_SCOPES))
 
 
 class InboundEventPayload(BaseModel):
@@ -57,6 +57,10 @@ class InboundEventPayload(BaseModel):
     schema_version: str = Field(default="1.0", min_length=1, max_length=20)
     occurred_at: datetime
     payload: dict[str, Any]
+
+
+class ScopeApprovalPayload(BaseModel):
+    confirm_fiscal_scopes: bool = Field(default=False, strict=True)
 
 
 def _utcnow() -> datetime:
@@ -383,6 +387,7 @@ def integration_status(
 @router.post("/requests/{request_id}/approve")
 def approve_connection_request(
     request_id: str,
+    body: ScopeApprovalPayload | None = None,
     user_and_tenant: tuple[User, UUID] = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session),
 ):
@@ -390,6 +395,8 @@ def approve_connection_request(
     item = (
         db.query(EcommerceAIConnectionRequest)
         .filter(EcommerceAIConnectionRequest.request_id == request_id)
+        .populate_existing()
+        .with_for_update()
         .first()
     )
     if not item:
@@ -407,6 +414,22 @@ def approve_connection_request(
     if item.status not in {"pending", "callback_failed"}:
         raise HTTPException(
             status_code=409, detail=f"Solicitacao ja esta {item.status}."
+        )
+
+    if set(item.requested_scopes or []) & FISCAL_SCOPES:
+        if not body or not body.confirm_fiscal_scopes:
+            raise HTTPException(
+                403,
+                "Confirme explicitamente os novos poderes fiscais antes de autorizar.",
+            )
+        from app.security.permissions_service import check_permission
+
+        check_permission(
+            db,
+            current_user.id,
+            "configuracoes.editar",
+            tenant_id,
+            current_user=current_user,
         )
 
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()

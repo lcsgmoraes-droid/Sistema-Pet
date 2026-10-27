@@ -58,6 +58,7 @@ from app import ecommerce_analytics_models  # noqa
 from app import dre_plano_contas_models  # noqa
 from app import nfe_cache_models  # noqa
 from app.nfe import clone_models  # noqa: F401
+from app.ecommerceai_fiscal import models as ecommerceai_fiscal_models  # noqa: F401
 from app import xml_contabilidade_models  # noqa: F401
 from app import compras_pendencias_models  # noqa
 from app import bling_pedido_webhook_queue_models  # noqa
