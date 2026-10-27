@@ -1,6 +1,7 @@
 """Ponte entre atendimento de Banho & Tosa e venda do PDV."""
 
 from decimal import Decimal
+import re
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
@@ -24,12 +25,6 @@ def gerar_venda_atendimento(
         raise HTTPException(
             status_code=422, detail="Atendimento cancelado/no-show nao pode gerar venda"
         )
-    if atendimento.pacote_credito_id:
-        raise HTTPException(
-            status_code=422,
-            detail="Atendimento ja foi quitado por pacote e nao deve gerar nova venda",
-        )
-
     venda_existente = _obter_venda_existente(db, tenant_id, atendimento)
     if venda_existente:
         return _resposta_venda(atendimento.id, venda_existente, ja_existia=True)
@@ -38,7 +33,7 @@ def gerar_venda_atendimento(
     if not itens:
         raise HTTPException(
             status_code=422,
-            detail="Atendimento nao possui valor ou servicos para gerar venda",
+            detail="Atendimento sem valor a cobrar. Confirme a entrega sem cobranca com um motivo, ou confira os servicos do agendamento.",
         )
 
     payload = {
@@ -95,14 +90,22 @@ def _obter_venda_existente(db: Session, tenant_id, atendimento):
     if atendimento.venda_id and atendimento.venda:
         return atendimento.venda
     token = f"BT_ATENDIMENTO:{atendimento.id}"
-    venda = (
+    candidatas = (
         db.query(Venda)
         .filter(
             Venda.tenant_id == tenant_id,
             Venda.observacoes.contains(token),
             Venda.status != "cancelada",
         )
-        .first()
+        .all()
+    )
+    venda = next(
+        (
+            item
+            for item in candidatas
+            if venda_identifica_atendimento(item, atendimento.id)
+        ),
+        None,
     )
     if venda and not atendimento.venda_id:
         atendimento.venda_id = venda.id
@@ -110,29 +113,48 @@ def _obter_venda_existente(db: Session, tenant_id, atendimento):
     return venda
 
 
+def venda_identifica_atendimento(venda, atendimento_id: int) -> bool:
+    """O token do atendimento #1 não pode atingir a venda do atendimento #10."""
+    return (
+        re.search(rf"BT_ATENDIMENTO:{atendimento_id}(?!\d)", venda.observacoes or "")
+        is not None
+    )
+
+
 def _montar_itens_venda(db: Session, tenant_id, atendimento) -> list[dict]:
     itens = []
-    agendamento = atendimento.agendamento
+    agendamento = getattr(atendimento, "agendamento", None)
     if agendamento:
         for servico in agendamento.servicos or []:
-            subtotal = _subtotal(
-                servico.quantidade, servico.valor_unitario, servico.desconto
+            quantidade = Decimal(str(servico.quantidade or 0))
+            coberta = min(
+                quantidade, Decimal(str(getattr(servico, "pacote_quantidade", 0) or 0))
             )
+            quantidade_cobrar = quantidade - coberta
+            if quantidade_cobrar <= 0:
+                continue
+            # Distribui o desconto proporcionalmente quando parte da quantidade usa pacote.
+            desconto = (
+                Decimal(str(servico.desconto or 0)) * quantidade_cobrar / quantidade
+                if quantidade
+                else Decimal("0")
+            )
+            subtotal = _subtotal(quantidade_cobrar, servico.valor_unitario, desconto)
             if subtotal <= 0:
                 continue
             itens.append(
                 _item_servico(
                     servico.nome_servico_snapshot,
-                    servico.quantidade,
+                    quantidade_cobrar,
                     servico.valor_unitario,
-                    servico.desconto,
+                    desconto,
                     subtotal,
                     atendimento.pet_id,
                 )
             )
         itens.extend(_itens_taxi_dog(db, tenant_id, agendamento, atendimento.pet_id))
 
-    if not itens:
+    if not itens and not (agendamento and agendamento.servicos):
         valor = Decimal(
             str(getattr(agendamento, "valor_previsto", 0) if agendamento else 0)
         )

@@ -26,6 +26,8 @@ class BanhoTosaMoverEtapaInput(BaseModel):
     recurso_id: Optional[int] = None
     observacoes: Optional[str] = None
     observacoes_saida: Optional[str] = None
+    entrega_sem_cobranca: bool = False
+    motivo_sem_cobranca: Optional[str] = Field(default=None, max_length=1000)
     finalizar_etapa_atual: bool = True
     iniciar_timer: bool = True
     resetar_fluxo: bool = False
@@ -92,6 +94,12 @@ class BanhoTosaAtendimentoResponse(BaseModel):
     venda_total_pago: Optional[Decimal] = None
     venda_valor_restante: Optional[Decimal] = None
     venda_status_pagamento: Optional[str] = None
+    valor_cobranca_pendente: Optional[Decimal] = None
+    entrega_sem_cobranca: bool = False
+    pacote_status_pagamento: Optional[str] = None
+    pacote_valor_restante: Optional[Decimal] = None
+    pacote_pdv_url: Optional[str] = None
+    pacotes_financeiro: List[dict] = Field(default_factory=list)
     conta_receber_id: Optional[int] = None
     pacote_credito_id: Optional[int] = None
     pacote_movimento_id: Optional[int] = None

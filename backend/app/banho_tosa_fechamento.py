@@ -7,6 +7,8 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.banho_tosa_models import BanhoTosaAtendimento
+from app.banho_tosa_entrega import entrega_sem_cobranca_registrada
+from app.banho_tosa_vendas import _montar_itens_venda
 from app.financeiro_models import ContaReceber
 from app.vendas_models import Venda
 
@@ -37,7 +39,31 @@ def sincronizar_fechamento_atendimento(
 
 
 def listar_pendencias_fechamento(db: Session, tenant_id, limit: int = 200) -> dict:
-    atendimentos = _query_pendencias(db, tenant_id).limit(limit).all()
+    atendimentos = []
+    query = _query_pendencias(db, tenant_id)
+    ultimo_id = None
+    while len(atendimentos) < limit:
+        pagina = query
+        if ultimo_id is not None:
+            pagina = pagina.filter(BanhoTosaAtendimento.id < ultimo_id)
+        lote = pagina.limit(limit).all()
+        if not lote:
+            break
+        for item in lote:
+            if not item.venda_id and entrega_sem_cobranca_registrada(item):
+                continue
+            if (
+                not item.venda_id
+                and item.pacote_credito_id
+                and not _montar_itens_venda(db, tenant_id, item)
+            ):
+                continue
+            atendimentos.append(item)
+            if len(atendimentos) == limit:
+                break
+        ultimo_id = lote[-1].id
+        if len(lote) < limit:
+            break
     contas_por_venda = _contas_por_venda(
         db, tenant_id, [item.venda_id for item in atendimentos if item.venda_id]
     )
@@ -116,7 +142,6 @@ def _query_pendencias(db: Session, tenant_id):
         .filter(
             BanhoTosaAtendimento.tenant_id == tenant_id,
             BanhoTosaAtendimento.status.in_(["pronto", "entregue"]),
-            BanhoTosaAtendimento.pacote_credito_id.is_(None),
             or_(
                 BanhoTosaAtendimento.venda_id.is_(None),
                 BanhoTosaAtendimento.conta_receber_id.is_(None),
@@ -231,13 +256,15 @@ def _montar_alertas(
 
 
 def _resumo_sem_venda(atendimento) -> dict:
-    if atendimento.pacote_credito_id:
+    if atendimento.pacote_credito_id or entrega_sem_cobranca_registrada(atendimento):
         return {
             "atendimento_id": atendimento.id,
             "venda_id": None,
             "conta_receber_id": atendimento.conta_receber_id,
             "venda_status": None,
-            "status_pagamento": "quitado_pacote",
+            "status_pagamento": "coberto_pacote"
+            if atendimento.pacote_credito_id
+            else "sem_cobranca",
             "total": Decimal("0"),
             "total_pago": Decimal("0"),
             "valor_restante": Decimal("0"),

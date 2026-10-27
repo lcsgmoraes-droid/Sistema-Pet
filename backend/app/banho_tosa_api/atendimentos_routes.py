@@ -30,7 +30,8 @@ from app.banho_tosa_api.utils import (
 from app.banho_tosa_custos import validar_transicao_status
 from app.banho_tosa_custos_reais import recalcular_snapshot_atendimento
 from app.banho_tosa_cancelamento import cancelar_processo_atendimento
-from app.banho_tosa_vendas import gerar_venda_atendimento
+from app.banho_tosa_vendas import gerar_venda_atendimento, _montar_itens_venda
+from app.banho_tosa_entrega import registrar_entrega_sem_cobranca
 from app.banho_tosa_models import (
     BanhoTosaAtendimento,
     BanhoTosaEtapa,
@@ -83,7 +84,11 @@ def obter_atendimento(
     _, tenant_id = _get_tenant(current)
     atendimento = obter_atendimento_ou_404(db, tenant_id, atendimento_id)
     config = obter_ou_criar_configuracao(db, tenant_id)
-    return serializar_atendimento(atendimento, config)
+    resposta = serializar_atendimento(atendimento, config)
+    resposta["valor_cobranca_pendente"] = sum(
+        item["subtotal"] for item in _montar_itens_venda(db, tenant_id, atendimento)
+    )
+    return resposta
 
 
 @router.patch(
@@ -102,6 +107,12 @@ def atualizar_status_atendimento(
         novo_status = validar_transicao_status(atendimento.status, body.status)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    if novo_status in STATUS_ATENDIMENTO_FINAIS and novo_status != atendimento.status:
+        raise HTTPException(
+            422,
+            "Use a confirmacao de entrega ou o cancelamento com motivo para encerrar o atendimento.",
+        )
 
     aplicar_status_atendimento(db, tenant_id, atendimento, novo_status)
     if body.observacoes_saida is not None:
@@ -152,6 +163,10 @@ def mover_etapa_atendimento(
         )
 
     tipo = body.tipo.strip().lower()
+    if body.entrega_sem_cobranca and tipo != "entregue":
+        raise HTTPException(
+            422, "Entrega sem cobranca so pode ser confirmada na entrega."
+        )
     config = obter_ou_criar_configuracao(db, tenant_id)
     fluxo = fluxo_da_config(config)
     etapas_validas = set(fluxo) | {"entregue"}
@@ -161,6 +176,10 @@ def mover_etapa_atendimento(
         )
     if tipo in ETAPAS_OPERACIONAIS and body.iniciar_timer:
         validar_responsavel_recurso(db, tenant_id, body.responsavel_id, body.recurso_id)
+    if body.entrega_sem_cobranca:
+        registrar_entrega_sem_cobranca(
+            db, tenant_id, current_user.id, atendimento, body.motivo_sem_cobranca
+        )
 
     agora = datetime.now()
     if body.resetar_fluxo:
@@ -215,8 +234,12 @@ def mover_etapa_atendimento(
     aplicar_status_atendimento(db, tenant_id, atendimento, status_por_etapa(tipo))
     if tipo == "entregue" and body.observacoes_saida is not None:
         atendimento.observacoes_saida = body.observacoes_saida.strip() or None
-    if tipo == "entregue" and not atendimento.pacote_credito_id:
-        gerar_venda_atendimento(db, tenant_id, current_user.id, atendimento.id)
+    if tipo == "entregue":
+        if not body.entrega_sem_cobranca and (
+            not atendimento.pacote_credito_id
+            or _montar_itens_venda(db, tenant_id, atendimento)
+        ):
+            gerar_venda_atendimento(db, tenant_id, current_user.id, atendimento.id)
     if tipo in {"pronto", "entregue"}:
         db.flush()
         recalcular_snapshot_atendimento(db, tenant_id, atendimento.id)

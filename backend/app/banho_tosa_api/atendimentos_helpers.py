@@ -11,6 +11,7 @@ from app.banho_tosa_models import (
     BanhoTosaAtendimento,
     BanhoTosaEtapa,
     BanhoTosaPacoteCredito,
+    BanhoTosaPacoteMovimento,
     BanhoTosaRecurso,
 )
 from app.models import Cliente
@@ -26,9 +27,14 @@ def query_atendimento_completo(db: Session, tenant_id):
         .options(
             joinedload(BanhoTosaAtendimento.cliente),
             joinedload(BanhoTosaAtendimento.pet),
-            joinedload(BanhoTosaAtendimento.agendamento),
+            joinedload(BanhoTosaAtendimento.agendamento).joinedload(
+                BanhoTosaAgendamento.servicos
+            ),
             joinedload(BanhoTosaAtendimento.pacote_credito).joinedload(
                 BanhoTosaPacoteCredito.pacote
+            ),
+            joinedload(BanhoTosaAtendimento.pacote_consumos).joinedload(
+                BanhoTosaPacoteMovimento.credito
             ),
             joinedload(BanhoTosaAtendimento.venda).joinedload(Venda.pagamentos),
             joinedload(BanhoTosaAtendimento.etapas).joinedload(

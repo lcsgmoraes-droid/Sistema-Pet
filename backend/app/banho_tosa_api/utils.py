@@ -150,6 +150,9 @@ def serializar_atendimento(
     atendimento: BanhoTosaAtendimento,
     config: Optional[BanhoTosaConfiguracao] = None,
 ) -> dict:
+    from app.banho_tosa_entrega import entrega_sem_cobranca_registrada
+    from app.banho_tosa_pacotes_serializers import resumo_financeiro_credito
+
     pet = atendimento.pet
     cliente = atendimento.cliente
     agendamento = getattr(atendimento, "agendamento", None)
@@ -162,6 +165,39 @@ def serializar_atendimento(
     )
     venda = getattr(atendimento, "venda", None)
     pacote_credito = getattr(atendimento, "pacote_credito", None)
+    creditos = {pacote_credito.id: pacote_credito} if pacote_credito else {}
+    consumos = getattr(atendimento, "pacote_consumos", []) or []
+    if consumos:
+        creditos = {}
+        for movimento in consumos:
+            credito = movimento.credito
+            if credito and not any(
+                item.tipo == "estorno" and item.movimento_origem_id == movimento.id
+                for item in credito.movimentos
+            ):
+                creditos[movimento.credito_id] = credito
+    pacotes_financeiro = [
+        {
+            "credito_id": credito.id,
+            "pacote_nome": credito.pacote.nome if credito.pacote else "Pacote",
+            **resumo_financeiro_credito(credito),
+        }
+        for credito in creditos.values()
+    ]
+    situacoes = {item["status_pagamento"] for item in pacotes_financeiro}
+    status_pacote = None
+    if situacoes:
+        status_pacote = (
+            "pago"
+            if situacoes == {"pago"}
+            else "cancelado"
+            if "cancelado" in situacoes
+            else "parcial"
+            if "parcial" in situacoes or "pago" in situacoes
+            else "sem_venda"
+            if situacoes == {"sem_venda"}
+            else "pendente"
+        )
     valor_pago = sum(float(pag.valor or 0) for pag in venda.pagamentos) if venda else 0
     venda_total = safe_decimal_to_float(venda.total) if venda else None
     status_pagamento = None
@@ -210,6 +246,15 @@ def serializar_atendimento(
         "venda_total_pago": valor_pago,
         "venda_valor_restante": max((venda_total or 0) - valor_pago, 0),
         "venda_status_pagamento": status_pagamento,
+        "entrega_sem_cobranca": entrega_sem_cobranca_registrada(atendimento),
+        "pacote_status_pagamento": status_pacote,
+        "pacote_valor_restante": sum(
+            (item["valor_restante"] for item in pacotes_financeiro), Decimal("0")
+        ),
+        "pacote_pdv_url": pacotes_financeiro[0]["pdv_url"]
+        if pacotes_financeiro
+        else None,
+        "pacotes_financeiro": pacotes_financeiro,
         "conta_receber_id": atendimento.conta_receber_id,
         "pacote_credito_id": atendimento.pacote_credito_id,
         "pacote_movimento_id": atendimento.pacote_movimento_id,
@@ -221,6 +266,7 @@ def serializar_atendimento(
                 pacote_credito.creditos_total,
                 pacote_credito.creditos_usados,
                 pacote_credito.creditos_cancelados,
+                getattr(pacote_credito, "creditos_reservados", 0),
             )
             if pacote_credito
             else None
@@ -240,7 +286,11 @@ def serializar_atendimento(
 def _alertas_fechamento_atendimento(
     atendimento, venda, status_pagamento: Optional[str]
 ) -> list[str]:
-    if atendimento.pacote_credito_id:
+    from app.banho_tosa_entrega import entrega_sem_cobranca_registrada
+
+    if not venda and (
+        atendimento.pacote_credito_id or entrega_sem_cobranca_registrada(atendimento)
+    ):
         return []
     if not venda:
         return (

@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { AlertTriangle, CalendarDays, Clock3, Plus, RefreshCw, UsersRound } from "lucide-react";
 import { useLocation, useSearchParams } from "react-router-dom";
-import ActionButton from "../../../components/ui/ActionButton";
+import BotaoInteracao from "../../../components/v2/BotaoInteracao/BotaoInteracao";
+import InputData from "../../../components/v2/InputData/InputData";
 import { api } from "../../../services/api";
 import MetricCard from "../../../components/ui/MetricCard";
 import MetricGrid from "../../../components/ui/MetricGrid";
@@ -10,6 +11,7 @@ import Panel from "../../../components/ui/Panel";
 import { buildReturnTo } from "../../../utils/petReturnFlow";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
+import { formatarCreditos } from "../banhoTosaPacotesUtils";
 import BanhoTosaAgendaCriacaoPanel from "./BanhoTosaAgendaCriacaoPanel";
 import BanhoTosaAgendaList from "./BanhoTosaAgendaList";
 import { confirmarCorePet } from "../../../services/corepetDialog";
@@ -30,7 +32,8 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
   const [agendamentos, setAgendamentos] = useState([]);
   const [capacidade, setCapacidade] = useState(null);
   const [sugestoes, setSugestoes] = useState([]);
-  const [loadingAgenda, setLoadingAgenda] = useState(false);
+  const [loadingAgenda, setLoadingAgenda] = useState(true);
+  const ultimaCargaAgenda = useRef(0);
   const [loadingSugestoes, setLoadingSugestoes] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -57,6 +60,7 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
   );
 
   async function carregarAgenda() {
+    const carga = ++ultimaCargaAgenda.current;
     setLoadingAgenda(true);
     try {
       const [agendaRes, capacidadeRes] = await Promise.all([
@@ -66,19 +70,24 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
         }),
         banhoTosaApi.obterCapacidadeAgenda(dataRef),
       ]);
+      if (carga !== ultimaCargaAgenda.current) return;
       setAgendamentos(Array.isArray(agendaRes.data) ? agendaRes.data : []);
       setCapacidade(capacidadeRes.data || null);
     } catch (error) {
+      if (carga !== ultimaCargaAgenda.current) return;
       toast.error(getApiErrorMessage(error, "Nao foi possivel carregar a agenda."));
       setAgendamentos([]);
       setCapacidade(null);
     } finally {
-      setLoadingAgenda(false);
+      if (carga === ultimaCargaAgenda.current) setLoadingAgenda(false);
     }
   }
 
   useEffect(() => {
     carregarAgenda();
+    return () => {
+      ultimaCargaAgenda.current += 1;
+    };
   }, [dataRef]);
 
   useEffect(() => {
@@ -201,7 +210,7 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
     const servico = servicos.find((item) => String(item.id) === String(form.servico_id));
     setSaving(true);
     try {
-      await banhoTosaApi.criarAgendamento({
+      const response = await banhoTosaApi.criarAgendamento({
         cliente_id: Number(tutorSelecionado.id),
         pet_id: Number(form.pet_id),
         data_hora_inicio: `${dataRef}T${form.hora}:00`,
@@ -211,7 +220,15 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
         servicos: [montarServicoPayload(servico)],
       });
 
-      toast.success("Agendamento criado.");
+      const reservado = (response.data?.servicos || []).reduce(
+        (total, item) => total + Number(item.pacote_quantidade || 0),
+        0,
+      );
+      toast.success(
+        reservado > 0
+          ? `Agendamento criado: ${formatarCreditos(reservado)} crédito(s) reservado(s) automaticamente.${reservado < 1 ? " O valor não coberto continua a cobrar." : ""}`
+          : "Agendamento criado.",
+      );
       resetarFormularioAgendamento();
       setFormOpen(false);
       await carregarAgenda();
@@ -263,7 +280,7 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
 
   async function cancelar(agendamento) {
     const confirmou = await confirmarCorePet(
-      `Cancelar o agendamento de ${agendamento.pet_nome || "este pet"}?`,
+      `Cancelar o agendamento de ${agendamento.pet_nome || "este pet"}? Se houver reserva de pacote, ela será devolvida ao saldo.`,
     );
     if (!confirmou) return;
     try {
@@ -284,36 +301,30 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
       <Panel
         actions={
           <>
-            <ActionButton
+            <BotaoInteracao
               className="w-full justify-center sm:w-auto"
               icon={RefreshCw}
-              intent="neutral"
               onClick={carregarAgenda}
-              tone="soft"
             >
               Atualizar
-            </ActionButton>
-            <ActionButton
+            </BotaoInteracao>
+            <BotaoInteracao
               className="w-full justify-center sm:w-auto"
               icon={Plus}
-              intent="create"
               onClick={abrirNovoAgendamento}
             >
               Agendar
-            </ActionButton>
+            </BotaoInteracao>
           </>
         }
         subtitle="Acompanhe o dia antes de abrir um novo cadastro."
         title="Agenda de Banho & Tosa"
       >
         <div className="mb-3 max-w-xs sm:max-w-sm">
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Data da agenda
-          </label>
-          <input
-            className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:h-9"
-            onChange={(event) => setDataRef(event.target.value)}
-            type="date"
+          <InputData
+            id="bt-agenda-data-filtro"
+            label="Data da agenda"
+            onChange={(value) => value && setDataRef(value)}
             value={dataRef}
           />
         </div>

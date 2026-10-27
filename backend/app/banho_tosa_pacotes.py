@@ -13,8 +13,10 @@ from app.banho_tosa_models import (
 )
 
 
-def calcular_saldo_creditos(total, usados=0, cancelados=0) -> Decimal:
-    saldo = _decimal(total) - _decimal(usados) - _decimal(cancelados)
+def calcular_saldo_creditos(total, usados=0, cancelados=0, reservados=0) -> Decimal:
+    saldo = (
+        _decimal(total) - _decimal(usados) - _decimal(cancelados) - _decimal(reservados)
+    )
     return max(saldo, Decimal("0"))
 
 
@@ -26,9 +28,13 @@ def credito_disponivel(credito, hoje: date | None = None) -> bool:
     hoje = hoje or date.today()
     return (
         credito.status == "ativo"
+        and (not getattr(credito, "data_inicio", None) or credito.data_inicio <= hoje)
         and credito.data_validade >= hoje
         and calcular_saldo_creditos(
-            credito.creditos_total, credito.creditos_usados, credito.creditos_cancelados
+            credito.creditos_total,
+            credito.creditos_usados,
+            credito.creditos_cancelados,
+            getattr(credito, "creditos_reservados", 0),
         )
         > 0
     )
@@ -45,7 +51,6 @@ def consumir_credito_atendimento(
 ):
     credito = _obter_credito(db, tenant_id, credito_id)
     atendimento = _obter_atendimento(db, tenant_id, atendimento_id)
-    _validar_credito_para_atendimento(credito, atendimento)
 
     movimento_existente = _movimento_consumo_ativo_atendimento(
         db, tenant_id, atendimento_id
@@ -57,9 +62,14 @@ def consumir_credito_atendimento(
             )
         return credito, movimento_existente, True
 
+    _validar_credito_para_atendimento(credito, atendimento)
+
     quantidade = _decimal(quantidade)
     saldo_atual = calcular_saldo_creditos(
-        credito.creditos_total, credito.creditos_usados, credito.creditos_cancelados
+        credito.creditos_total,
+        credito.creditos_usados,
+        credito.creditos_cancelados,
+        getattr(credito, "creditos_reservados", 0),
     )
     if quantidade <= 0:
         raise HTTPException(
@@ -75,17 +85,52 @@ def consumir_credito_atendimento(
             detail="Atendimento ja possui venda vinculada; ajuste o PDV antes de consumir pacote.",
         )
 
+    from app.banho_tosa_pacote_reservas import saldos_por_servico
+
+    composicao = saldos_por_servico(credito)
+    servico_coberto = None
+    for servico in (
+        getattr(getattr(atendimento, "agendamento", None), "servicos", []) or []
+    ):
+        saldo_servico = next(
+            (
+                item["saldo_creditos"]
+                for item in composicao
+                if item["servico_id"] == servico.servico_id
+            ),
+            Decimal("0"),
+        )
+        nao_coberto = _decimal(servico.quantidade) - _decimal(
+            getattr(servico, "pacote_quantidade", 0)
+        )
+        if saldo_servico >= quantidade and nao_coberto >= quantidade:
+            servico_coberto = servico
+            break
+    if composicao and not servico_coberto:
+        raise HTTPException(
+            status_code=422,
+            detail="Pacote sem saldo do serviço solicitado; o uso automático é calculado por serviço no agendamento.",
+        )
+
     credito.creditos_usados = _decimal(credito.creditos_usados) + quantidade
     saldo_apos = calcular_saldo_creditos(
-        credito.creditos_total, credito.creditos_usados, credito.creditos_cancelados
+        credito.creditos_total,
+        credito.creditos_usados,
+        credito.creditos_cancelados,
+        getattr(credito, "creditos_reservados", 0),
     )
-    if saldo_apos <= 0:
+    if _decimal(credito.creditos_usados) + _decimal(
+        credito.creditos_cancelados
+    ) >= _decimal(credito.creditos_total):
         credito.status = "esgotado"
 
     movimento = BanhoTosaPacoteMovimento(
         tenant_id=tenant_id,
         credito_id=credito.id,
         atendimento_id=atendimento.id,
+        agendamento_id=atendimento.agendamento_id,
+        agendamento_servico_id=servico_coberto.id if servico_coberto else None,
+        servico_id=servico_coberto.servico_id if servico_coberto else None,
         tipo="consumo",
         quantidade=quantidade,
         saldo_apos=saldo_apos,
@@ -93,6 +138,11 @@ def consumir_credito_atendimento(
         created_by=user_id,
     )
     db.add(movimento)
+    if servico_coberto:
+        servico_coberto.pacote_credito_id = credito.id
+        servico_coberto.pacote_quantidade = (
+            _decimal(servico_coberto.pacote_quantidade) + quantidade
+        )
     db.flush()
 
     atendimento.pacote_credito_id = credito.id
@@ -136,12 +186,18 @@ def estornar_consumo_atendimento(
         credito.status = "ativo"
 
     saldo_apos = calcular_saldo_creditos(
-        credito.creditos_total, credito.creditos_usados, credito.creditos_cancelados
+        credito.creditos_total,
+        credito.creditos_usados,
+        credito.creditos_cancelados,
+        getattr(credito, "creditos_reservados", 0),
     )
     estorno = BanhoTosaPacoteMovimento(
         tenant_id=tenant_id,
         credito_id=credito.id,
         atendimento_id=movimento.atendimento_id,
+        agendamento_id=getattr(movimento, "agendamento_id", None),
+        agendamento_servico_id=getattr(movimento, "agendamento_servico_id", None),
+        servico_id=getattr(movimento, "servico_id", None),
         movimento_origem_id=movimento.id,
         tipo="estorno",
         quantidade=quantidade,
@@ -151,14 +207,34 @@ def estornar_consumo_atendimento(
     )
     db.add(estorno)
 
+    if getattr(movimento, "agendamento_servico_id", None):
+        from app.banho_tosa_models import BanhoTosaAgendamentoServico
+
+        servico = (
+            db.query(BanhoTosaAgendamentoServico)
+            .filter(
+                BanhoTosaAgendamentoServico.id == movimento.agendamento_servico_id,
+                BanhoTosaAgendamentoServico.tenant_id == tenant_id,
+            )
+            .first()
+        )
+        if servico:
+            servico.pacote_quantidade = max(
+                _decimal(servico.pacote_quantidade) - quantidade, Decimal("0")
+            )
+            if servico.pacote_quantidade <= 0:
+                servico.pacote_credito_id = None
+
     atendimento = (
         _obter_atendimento(db, tenant_id, movimento.atendimento_id)
         if movimento.atendimento_id
         else None
     )
     if atendimento and atendimento.pacote_movimento_id == movimento.id:
-        atendimento.pacote_credito_id = None
-        atendimento.pacote_movimento_id = None
+        db.flush()
+        restante = _movimento_consumo_ativo_atendimento(db, tenant_id, atendimento.id)
+        atendimento.pacote_credito_id = restante.credito_id if restante else None
+        atendimento.pacote_movimento_id = restante.id if restante else None
 
     db.commit()
     db.refresh(credito)
@@ -180,10 +256,11 @@ def _validar_credito_para_atendimento(credito, atendimento) -> None:
         raise HTTPException(
             status_code=422, detail="Atendimento cancelado/no-show nao consome pacote."
         )
-    if (
-        credito.pacote
-        and credito.pacote.servico_id
-        and not _atendimento_tem_servico(atendimento, credito.pacote.servico_id)
+    from app.banho_tosa_pacote_reservas import composicao_contrato
+
+    composicao = composicao_contrato(credito)
+    if composicao and not any(
+        _atendimento_tem_servico(atendimento, item["servico_id"]) for item in composicao
     ):
         raise HTTPException(
             status_code=422, detail="Pacote nao cobre o servico desse atendimento."
@@ -207,6 +284,8 @@ def _obter_credito(db: Session, tenant_id, credito_id: int):
             BanhoTosaPacoteCredito.id == credito_id,
             BanhoTosaPacoteCredito.tenant_id == tenant_id,
         )
+        .with_for_update(of=BanhoTosaPacoteCredito)
+        .populate_existing()
         .first()
     )
     if not credito:
@@ -241,7 +320,10 @@ def _obter_movimento_estornavel(
         query = query.filter(BanhoTosaPacoteMovimento.id == movimento_id)
     elif atendimento_id:
         atendimento = _obter_atendimento(db, tenant_id, atendimento_id)
-        if atendimento.pacote_movimento_id:
+        if (
+            atendimento.pacote_movimento_id
+            and atendimento.pacote_credito_id == credito_id
+        ):
             query = query.filter(
                 BanhoTosaPacoteMovimento.id == atendimento.pacote_movimento_id
             )

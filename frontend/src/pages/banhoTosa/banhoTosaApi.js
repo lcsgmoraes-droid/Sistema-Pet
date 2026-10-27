@@ -87,6 +87,10 @@ export const banhoTosaApi = {
   removerPacote: (id) => api.delete(`${BASE}/pacotes/${id}`),
   listarCreditosPacote: (params) => api.get(`${BASE}/pacotes/creditos`, { params }),
   criarCreditoPacote: (data) => api.post(`${BASE}/pacotes/creditos`, data),
+  prorrogarCreditoPacote: (id, data) => api.post(`${BASE}/pacotes/creditos/${id}/prorrogar`, data),
+  encerrarCreditoPacote: (id, data) => api.post(`${BASE}/pacotes/creditos/${id}/encerrar`, data),
+  listarMovimentosCreditoPacote: (id) => api.get(`${BASE}/pacotes/creditos/${id}/movimentos`),
+  gerarVendaCreditoPacote: (id) => api.post(`${BASE}/pacotes/creditos/${id}/gerar-venda`),
   consumirCreditoPacote: (creditoId, data) =>
     api.post(`${BASE}/pacotes/creditos/${creditoId}/consumir`, data),
   estornarCreditoPacote: (creditoId, data) =>
