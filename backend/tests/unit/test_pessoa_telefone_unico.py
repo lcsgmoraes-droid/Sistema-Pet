@@ -22,9 +22,10 @@ from app.clientes.contatos import (
 from app.clientes.schemas import ClienteContatoInput
 from app.clientes.duplicidades_routes import verificar_duplicata
 from app.grupo_comercial_models import GrupoComercial, GrupoComercialMembro
-from app.models import Cliente, ClienteContato, FornecedorGrupo
+from app.models import Cliente, ClienteContato, FornecedorGrupo, PessoaMergeLog, User
 from app.routes import ecommerce_auth_profiles as perfil
 from app.routes import ecommerce_auth_cliente as cliente_app
+from app.routes import ecommerce_auth_public as cadastro_publico
 from app.scripts.seed_banho_tosa_ux_support import ensure_person
 from app.services.pessoa_telefone import (
     CONSTRAINT_TELEFONE,
@@ -49,6 +50,8 @@ def cadastro(tenant_context):
         ClienteContato,
         GrupoComercial,
         GrupoComercialMembro,
+        User,
+        PessoaMergeLog,
     ):
         model.__table__.create(engine)
     tenant = uuid4()
@@ -458,3 +461,67 @@ def test_login_sms_ddi_nao_toma_cadastro_vinculado_a_outra_conta(cadastro, monke
     assert original.auth_user_id == 2
     assert original.merged_into_id is None
     assert c.db.query(Cliente).count() == 1
+
+
+def test_signup_com_duas_pessoas_legadas_nao_cria_user_nem_funde_historico(
+    cadastro, monkeypatch
+):
+    c = cadastro
+    cpf = "52998224725"
+    primeiro = pessoa(
+        c,
+        nome="Primeira Pessoa QA",
+        codigo="1848",
+        telefone="18997401641",
+        cpf=cpf,
+        is_cliente=True,
+        ativo=True,
+    )
+    segundo = pessoa(
+        c,
+        nome="Segunda Pessoa QA",
+        codigo="1849",
+        celular="+55 18 99740-1641",
+        cpf=cpf,
+        is_cliente=True,
+        ativo=True,
+    )
+    c.db.commit()
+    monkeypatch.setattr(
+        cadastro_publico, "_extract_tenant_id_from_request", lambda _: c.tenant
+    )
+    app = FastAPI()
+    app.include_router(cadastro_publico.router)
+    app.dependency_overrides[_db.get_session] = lambda: c.db
+    with TestClient(app) as client:
+        resposta = client.post(
+            "/registrar",
+            json={
+                "email": "qa-cadastro-duplicado@example.com",
+                "password": "SenhaQA123!",
+                "nome": "Nova Conta QA",
+                "telefone": "0055 18 99740-1641",
+                "cpf": cpf,
+                "accepted_terms": True,
+                "accepted_privacy": True,
+            },
+        )
+    assert resposta.status_code == 409
+    detalhe = resposta.json()["detail"]
+    assert isinstance(detalhe, str) and "ERP" in detalhe
+    for dado in (
+        primeiro.nome,
+        segundo.nome,
+        primeiro.codigo,
+        segundo.codigo,
+        cpf,
+        "18997401641",
+    ):
+        assert dado not in detalhe
+    assert c.db.query(User).count() == 0
+    assert c.db.query(PessoaMergeLog).count() == 0
+    assert c.db.query(Cliente).count() == 2
+    assert primeiro.auth_user_id is segundo.auth_user_id is None
+    assert primeiro.merged_into_id is segundo.merged_into_id is None
+    assert primeiro.telefone == "18997401641"
+    assert segundo.celular == "+55 18 99740-1641"
