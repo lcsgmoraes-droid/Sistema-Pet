@@ -68,3 +68,15 @@ def test_ops_so_mostra_modulos_da_propria_plataforma():
     from app.routes.modulos_routes import MODULOS_PREMIUM
 
     assert "bling" in MODULOS_PREMIUM and "campanhas" in MODULOS_PREMIUM
+
+
+def test_todo_modulo_tem_nome_no_catalogo_do_painel():
+    from app.routes.modulos_routes import MODULOS_PREMIUM
+    from app.services.ops_lojas_modulos_service import (
+        CATALOGO_DE_MODULOS,
+        catalogo_de_modulos,
+    )
+
+    assert set(CATALOGO_DE_MODULOS) == set(MODULOS_PREMIUM)
+    assert [m["codigo"] for m in catalogo_de_modulos()] == sorted(MODULOS_PREMIUM)
+    assert all(m["nome"] and m["descricao"] for m in catalogo_de_modulos())

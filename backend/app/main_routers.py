@@ -189,6 +189,7 @@ from app.routes.ops_grupo_comercial_routes import (
     router as ops_grupo_comercial_router,
 )  # Onboarding assistido de grupo comercial (1 -> N)
 from app.platform_auth import router as platform_auth_router
+from app.adm_auth import router as adm_auth_router
 from app.routes.evolucao_routes import router as evolucao_router
 from app.lgpd_routes import router as lgpd_router  # LGPD operacional
 
@@ -263,6 +264,7 @@ def register_routers(app: FastAPI) -> None:
     """Register application routers in the same precedence order used by main.py."""
     app.include_router(health_check_router, tags=["Infrastructure"])
     app.include_router(platform_auth_router)
+    app.include_router(adm_auth_router)
     app.include_router(error_events_router)
     app.include_router(ops_tenants_router)
     app.include_router(ops_lojas_router)

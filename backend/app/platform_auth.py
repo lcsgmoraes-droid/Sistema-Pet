@@ -146,6 +146,11 @@ def get_platform_auth_context(
 def require_platform_admin(
     context: PlatformAuthContext = Depends(get_platform_auth_context),
 ) -> PlatformAdmin:
+    if getattr(context.admin, "must_change_password", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Troque a senha provisória para continuar.",
+        )
     return context.admin
 
 

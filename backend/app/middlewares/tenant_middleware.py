@@ -32,6 +32,7 @@ TENANT_EXEMPT_PATHS = {
 PLATFORM_ADMIN_PATH_PREFIXES = (
     "/platform-auth",
     "/admin",
+    "/adm",
 )
 
 

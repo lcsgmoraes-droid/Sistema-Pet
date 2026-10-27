@@ -13,7 +13,11 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.models import Tenant
-from app.services.ops_lojas_modulos_service import OpsLojaError, _modulos_da_loja
+from app.services.ops_lojas_modulos_service import (
+    OpsLojaError,
+    _modulos_da_loja,
+    catalogo_de_modulos,
+)
 from app.services.ops_tenants_read_service import _fetch_tenant_item
 from app.tenancy.context import tenant_context
 from app.tenancy.rls import sync_rls_tenant
@@ -151,5 +155,6 @@ def detalhe_da_loja(db: Session, tenant_id: str) -> dict[str, Any]:
             "total": len(usuarios),
             "ativos": sum(1 for u in usuarios if u["ativo"]),
         },
+        "catalogo_de_modulos": catalogo_de_modulos(),
         **modulos,
     }
