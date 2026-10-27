@@ -14,6 +14,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.utils.correlation import current_correlation_id
+from app.crm.mensagens_service import anotar_mensagem_no_crm
 from app.whatsapp import ledger_service
 from app.whatsapp.meta_cloud import MetaCloudClient
 from app.whatsapp.models import TenantWhatsAppConfig, WhatsAppSession, WhatsAppMessage
@@ -392,6 +393,14 @@ async def _send_whatsapp_message_with_context(
             origem=origem,
             tipo_conteudo="imagem" if message_type == "image" else "texto",
         )
+        anotar_mensagem_no_crm(
+            db,
+            tenant_id=tenant_id,
+            session=session,
+            direcao="enviada",
+            texto=message,
+            origem=origem,
+        )
 
         return db_message
 
@@ -546,6 +555,14 @@ async def _send_whatsapp_template_with_context(
             tipo_conteudo="modelo",
             template_nome=template_name,
             template_categoria=categoria,
+        )
+        anotar_mensagem_no_crm(
+            db,
+            tenant_id=tenant_id,
+            session=session,
+            direcao="enviada",
+            texto=conteudo,
+            origem=origem,
         )
         return db_message
     except Exception as erro:

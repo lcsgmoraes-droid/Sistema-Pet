@@ -221,6 +221,14 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 - [~] 2.12 Desempenho com muitos cartões (paginação por coluna) e uso no celular. **Quadro limitado a 50 cards por coluna no servidor; falta paginação "ver mais" e a tela.**
 - [ ] 2.13 Testes e documentação.
 
+**Histórico e vínculo da pessoa (27/10/2026) — feito**
+- [x] Cada mensagem de WhatsApp enviada ou recebida entra na **linha do tempo do card** (resumo de até 120 letras, com quem enviou) e atualiza o **último contato** automaticamente.
+- [x] O livro-razão guarda o **card de cada mensagem**; a ficha mostra o **gasto da pessoa** (enviadas, recebidas, cobráveis e custo estimado).
+- [x] **Vínculo automático:** ao cadastrar ou editar uma pessoa, o card sem cadastro com o mesmo telefone passa a ser dela — só quando o número tem um único dono e a pessoa ainda não tem card.
+- [x] **Conversas antigas:** ao ativar o CRM numa loja (OPS), as conversas que já existiam ganham card; o mesmo pode ser repetido por `POST /crm/importar-conversas` (por rodadas de 2.000).
+- [ ] Limite mensal de gasto por loja com aviso e bloqueio `[?] DECIDIR` (avisar ou bloquear).
+- [ ] Gerar oportunidades automáticas (Etapa 2.7) `[?] DECIDIR` quais sinais.
+
 ### Etapa 3 — Ficha 360 e sinais do tutor
 
 - [ ] 3.1 Linha do tempo unificada do tutor: compras, contas a receber, pets, vacinas, consultas, exames, banho e tosa, lembretes, contatos, mensagens, cashback, pedidos online, entregas e avaliações. Substitui a linha do tempo atual (que só cobre vendas, contas e pets).
@@ -372,6 +380,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 | 22/10/2026 | Etapa 2 (API do quadro): leitura do quadro por loja(s), criar card, mover, registrar ação, agendar próximo passo, configurar colunas e ficha do card, com permissões por loja. Telas ainda não feitas. |
 | 22/10/2026 | Etapa 2 (regras do funil no servidor): colunas configuráveis, movimentação, ciclos e oportunidades com testes. Telas ainda não feitas. |
 | 22/10/2026 | Etapa 1.6: número novo no WhatsApp vira card sem cadastro (ou usa o cadastro do tutor); funil padrão provisório criado sob demanda. |
+| 27/10/2026 | Histórico da pessoa: mensagens na linha do tempo do card, último contato automático, gasto por pessoa na ficha, vínculo automático ao cadastrar a pessoa e cards para as conversas antigas ao ativar o CRM. |
 | 27/10/2026 | Controle de custos fechado do nosso lado: tarifas, custo estimado, fechamento mensal com repasse, fatura da Meta e divergência, telas da loja e do OPS, e envio de modelo registrando a categoria. Falta só o que depende de uma conta real da Meta. |
 | 26/10/2026 | Controle de mensagens: livro-razão de envio/recebimento por loja (estado de entrega, cobrança informada pela Meta, janela de 24h, falhas) e consultas de consumo (loja e OPS). Falta conferência com a Meta, créditos e telas. |
 | 26/10/2026 | Canal oficial da Meta (início da Etapa 4): decisão registrada; cliente da API oficial (envio de texto, imagem e modelo), webhook da Meta com assinatura do segredo do app, rotas de salvar/testar/inscrever/ativar e página de apoio com 9 passos. Nada muda no atendimento atual até a loja ativar. |

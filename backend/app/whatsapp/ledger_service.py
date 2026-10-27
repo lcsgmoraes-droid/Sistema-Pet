@@ -90,6 +90,15 @@ def janela_aberta(
     return bool(ultima and _naive_utc(ultima) >= limite)
 
 
+def _lead_da_sessao(db: Session, tenant_id: Any, session: Any) -> int | None:
+    """Card da pessoa dona da conversa (para ver o gasto por pessoa)."""
+    if session is None:
+        return None
+    from app.crm.mensagens_service import lead_id_da_sessao
+
+    return lead_id_da_sessao(db, tenant_id, session)
+
+
 def _gravar(db: Session, linha: WhatsAppLedger) -> bool:
     try:
         with db.begin_nested():
@@ -138,6 +147,7 @@ def anotar_envio(
                 template_nome=template_nome,
                 template_categoria=template_categoria,
                 janela_24h=janela,
+                lead_id=_lead_da_sessao(db, tenant_id, session),
                 estado=ESTADO_ENVIADA,
                 ocorrido_em=agora,
                 enviado_em=agora,
@@ -172,6 +182,7 @@ def anotar_falha_de_envio(
                 session_id=str(session_id) if session_id else None,
                 telefone=getattr(session, "phone_number", None),
                 tipo_conteudo=tipo_conteudo,
+                lead_id=_lead_da_sessao(db, tenant_id, session),
                 estado=ESTADO_FALHOU,
                 ocorrido_em=agora,
                 falhou_em=agora,
@@ -206,6 +217,7 @@ def anotar_recebimento(
                 message_id=str(message_row.id),
                 wa_message_id=wa_message_id,
                 telefone=getattr(session, "phone_number", None),
+                lead_id=_lead_da_sessao(db, tenant_id, session),
                 estado=ESTADO_RECEBIDA,
                 ocorrido_em=agora,
             ),

@@ -9,6 +9,7 @@ import InputDataHora from "../../components/v2/InputDataHora/InputDataHora";
 import InputTextoLongo from "../../components/v2/InputTextoLongo/InputTextoLongo";
 import ModalPadrao from "../../components/v2/ModalPadrao/ModalPadrao";
 import CrmBuscaTutor from "./CrmBuscaTutor";
+import { formatarReais } from "../../utils/consumoWhatsapp";
 import { whatsappUrl } from "../lembretes/lembretesUtils";
 import { rotuloDaOportunidade } from "./crmUtils";
 
@@ -177,6 +178,14 @@ export default function CrmFichaModal({ card, onAlterado, onFechar }) {
                 Ligar ao cadastro
               </BotaoInteracao>
             </section>
+          ) : null}
+
+          {ficha.mensagens && ficha.mensagens.enviadas + ficha.mensagens.recebidas > 0 ? (
+            <p className="text-sm text-slate-700 dark:text-slate-300">
+              Mensagens de WhatsApp: {ficha.mensagens.enviadas} enviada(s),{" "}
+              {ficha.mensagens.recebidas} recebida(s) · {ficha.mensagens.cobraveis} cobrável(is) ·
+              custo estimado {formatarReais(ficha.mensagens.custo_estimado)}
+            </p>
           ) : null}
 
           <section aria-labelledby="crm-ficha-oportunidades">

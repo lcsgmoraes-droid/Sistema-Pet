@@ -158,6 +158,24 @@ async def quadro(
     return {"lojas": consultar_por_loja(db, escolhidas, _consulta, tenant_atual)}
 
 
+@router.post("/importar-conversas")
+async def importar_conversas(
+    loja_id: str | None = None,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Cria o card das conversas de WhatsApp que ainda nao tem (pode repetir ate `ha_mais` ser falso)."""
+    from app.crm.mensagens_service import criar_cards_das_conversas
+
+    return _executar(
+        db,
+        user_and_tenant,
+        loja_id,
+        PERM_CONFIGURAR,
+        lambda tenant_id: criar_cards_das_conversas(db, tenant_id),
+    )
+
+
 @router.get("/tutores")
 async def buscar_tutores(
     busca: str = Query(min_length=2, max_length=100),

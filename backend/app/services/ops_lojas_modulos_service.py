@@ -11,6 +11,7 @@ desliga por aqui: a resposta informa de onde ele vem.
 from __future__ import annotations
 
 import json
+import logging
 from datetime import UTC, datetime, timezone
 from typing import Any
 from uuid import UUID
@@ -36,6 +37,8 @@ from app.services.ops_tenant_log_service import (
 from app.services.ops_tenants_read_service import _grupo_comercial_info, _principal_user
 from app.tenancy.context import tenant_context
 from app.tenancy.rls import sync_rls_tenant
+
+logger = logging.getLogger(__name__)
 
 LIMITE_DE_LOJAS = 200
 
@@ -158,6 +161,18 @@ def _tenant(db: Session, tenant_id: str) -> Tenant:
     return tenant
 
 
+def _criar_cards_das_conversas(db: Session, tenant_uuid: UUID) -> dict | None:
+    """Ao ligar o CRM, cria o card das conversas de WhatsApp que ja existiam."""
+    from app.crm.mensagens_service import criar_cards_das_conversas
+
+    try:
+        with db.begin_nested():
+            return criar_cards_das_conversas(db, tenant_uuid)
+    except Exception:  # nunca impede a ativacao do modulo
+        logger.warning("CRM: cards das conversas existentes nao criados", exc_info=True)
+        return None
+
+
 def alterar_modulo(
     db: Session,
     *,
@@ -179,6 +194,7 @@ def alterar_modulo(
     with tenant_context(tenant_uuid):
         sync_rls_tenant(db, tenant_uuid)
         antes = sorted(_normalizar_modulos_ativos(tenant.modulos_ativos))
+        cards_das_conversas = None
         if ativar:
             ativar_modulo_manual(
                 db,
@@ -188,6 +204,9 @@ def alterar_modulo(
                 ativado_por_user_id=None,
                 commit=False,
             )
+            if modulo == "crm":
+                # As conversas que ja existiam ganham card (idempotente).
+                cards_das_conversas = _criar_cards_das_conversas(db, tenant_uuid)
         else:
             atuais = [m for m in antes if m != modulo]
             tenant.modulos_ativos = json.dumps(atuais)
@@ -230,5 +249,6 @@ def alterar_modulo(
         "origens": item["origens"],
         # Desligou mas ele continua ativo: vem do plano ou do teste gratis.
         "continua_ativo": (not ativar) and item["ativo"],
+        "cards_das_conversas": cards_das_conversas,
         **estado,
     }

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.crm.funil_service import RegraDoCrm, oportunidades_abertas
 from app.crm.leads_service import _lead_principal, _novo_lead
+from app.crm.mensagens_service import consumo_do_lead
 from app.crm.models import (
     TIPOS_DE_ACAO,
     TIPOS_DE_PASSO,
@@ -217,6 +218,7 @@ def detalhe_do_lead(db: Session, lead: CrmLead, limite: int = 100) -> dict[str, 
         "ultimo_contato_em": lead.ultimo_contato_em.isoformat()
         if lead.ultimo_contato_em
         else None,
+        "mensagens": consumo_do_lead(db, lead.tenant_id, lead.id),
         "oportunidades_abertas": [o.id for o in oportunidades_abertas(db, lead)],
         "oportunidades": [
             {

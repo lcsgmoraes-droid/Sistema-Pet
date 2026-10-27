@@ -26,6 +26,7 @@ from app.whatsapp.consent_service import (
     recusou_mensagens,
     registrar_recusa,
 )
+from app.crm.mensagens_service import anotar_mensagem_no_crm
 from app.whatsapp import ledger_service
 from app.whatsapp.log_safety import mascarar_telefone
 from app.whatsapp.message_views import serializar_mensagem
@@ -253,6 +254,14 @@ def _anotar_recebimento_no_ledger(
             session=session,
             message_row=message,
             wa_message_id=provider_message_id,
+        )
+        anotar_mensagem_no_crm(
+            db,
+            tenant_id=tenant_id,
+            session=session,
+            direcao="recebida",
+            texto=getattr(message, "conteudo", None),
+            origem="tutor",
         )
     except Exception as erro:
         logger.warning("Livro-razao: recebimento nao registrado (%s)", type(erro).__name__)

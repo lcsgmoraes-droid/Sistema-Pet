@@ -15,6 +15,8 @@ from app.crm.models import CrmColuna, CrmLead
 from app.crm.quadro_service import montar_quadro
 from app.db import Base
 from app.models import Cliente, Pet
+from app.whatsapp import consumo_models  # noqa: F401
+from app.whatsapp import ledger_models  # noqa: F401
 from app.tenancy.context import clear_current_tenant, set_current_tenant
 from app.whatsapp.customer_lookup import SITUACAO_NENHUM, ResolucaoTutor
 
@@ -42,6 +44,7 @@ def db(monkeypatch):
         "clientes",
         "pets",
         "users",
+        "whatsapp_ledger",
     )
     Base.metadata.create_all(
         engine, tables=[Base.metadata.tables[nome] for nome in nomes]

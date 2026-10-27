@@ -47,6 +47,7 @@ from app.models import (
 )
 from app.segmentacao_models import ClienteSegmento
 from app.vendas_models import Venda
+from app.crm.mensagens_service import vincular_leads_ao_cliente_com_seguranca
 from app.partner_utils import get_all_accessible_tenant_ids
 from app.grupo_comercial_contexto import listar_empresas_do_grupo
 from app.security.permissions_decorator import require_permission
@@ -219,6 +220,7 @@ def create_cliente(
         ) from exc
 
     db.refresh(novo_cliente)
+    vincular_leads_ao_cliente_com_seguranca(db, tenant_id, novo_cliente)
     log_create(
         db,
         current_user.id,
@@ -634,6 +636,7 @@ def update_cliente(
     cliente.updated_at = dt.utcnow()
     db.commit()
     db.refresh(cliente)
+    vincular_leads_ao_cliente_com_seguranca(db, tenant_id, cliente)
 
     log_update(db, current_user.id, "cliente", cliente.id, old_data, update_data)
     _anexar_metadados_criacao_cliente(db, cliente)
