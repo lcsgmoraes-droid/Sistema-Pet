@@ -179,7 +179,11 @@ export default function CentralNFSaida() {
     );
     if (!notaDireta) return;
     notaDiretaAbertaRef.current = true;
-    if (corrigirNotaInicial && notaDireta.status?.toLowerCase() === "rejeitada") {
+    if (
+      !notaDireta.fiscal_order_id &&
+      corrigirNotaInicial &&
+      notaDireta.status?.toLowerCase() === "rejeitada"
+    ) {
       await abrirCorrecao(notaDireta);
     } else {
       await abrirDetalhes(notaDireta);
@@ -275,12 +279,16 @@ export default function CentralNFSaida() {
 
     try {
       setReconciliandoNotaId(notaId);
-      const response =
-        nota.provedor === "intnfe"
+      const response = nota.fiscal_order_id
+        ? await api.post(
+            `/integracoes/ecommerceai/fiscal/manage/orders/${nota.fiscal_order_id}/consultar`,
+            {},
+          )
+        : nota.provedor === "intnfe"
           ? await api.get(`/nfe/vendas/${nota.venda_id}/status`)
           : await api.post(`/nfe/${notaId}/reconciliar-fluxo`);
       const numero = response.data?.numero || response.data?.nf_numero || nota.numero || notaId;
-      const situacao = response.data?.situacao;
+      const situacao = response.data?.situacao || response.data?.status;
       const rejeicao = rejeicaoResponsavelTecnico({
         codigo: response.data?.codigo_erro,
         motivo: response.data?.motivo_rejeicao,
@@ -425,6 +433,10 @@ export default function CentralNFSaida() {
   }
 
   async function abrirDetalhes(nota) {
+    if (nota.fiscal_order_id) {
+      setNotaSelecionada(nota);
+      return;
+    }
     if (nota.provedor === "intnfe" && nota.status?.toLowerCase() === "rejeitada") {
       await abrirCorrecao(nota);
       return;

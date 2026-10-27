@@ -693,6 +693,8 @@ def register_routers(app: FastAPI) -> None:
     )  # Artes e jornais promocionais
     app.include_router(asaas_billing_router)
     app.include_router(ecommerceai_integration_router)
+    from app.ecommerceai_fiscal.routes import router as ecommerceai_fiscal_router
+    app.include_router(ecommerceai_fiscal_router)
     app.include_router(ifood_integration_router)
     app.include_router(ifood_catalog_pilot_router)
     app.include_router(ifood_order_router)
