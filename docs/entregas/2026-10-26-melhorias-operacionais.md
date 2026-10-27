@@ -7,7 +7,7 @@
 | Data                   | 26/10/2026                                                                            |
 | Responsável de negócio | Lucas Guerra                                                                          |
 | Executor técnico       | Codex, com revisão entre as frentes                                                   |
-| Issue/PR               | PR ainda em preparação na branch `feat/20261019-1708-cadastro-e-central-ifood`        |
+| Issue/PR               | PR #1567 integrado por squash na `main`: `3f2e78f34ecfae558431008832452fa9ad22dfb6`   |
 | Prioridade             | P1: integridade financeira e continuidade da operação                                 |
 | Risco                  | Alto: recebimentos, comissões, migrations e correção administrativa de vínculo de app |
 | Domínios               | Pessoas, produtos, PDV, campanhas, histórico, financeiro, caixas e app mobile         |
@@ -28,8 +28,9 @@ O aceite é editar a pessoa preservando a venda, pesquisar por código público 
 palavras com prioridade consistente, abrir históricos por páginas e registrar
 recebimentos completos com parcelas, caixa, data e observação. Comissões devem
 permitir grupos reutilizáveis e valor por unidade para novas vendas, sem duplicar
-contas nem recalcular snapshots anteriores. A correção real do vínculo do app tem
-aceite próprio e permanece pendente de execução.
+contas nem recalcular snapshots anteriores. A correção real do vínculo do app foi
+executada e validada tecnicamente; a conferência no aparelho físico permanece
+como acompanhamento separado.
 
 O escopo abrange os 15 itens do checklist e 85 campos/telas/adaptadores mapeados.
 Regras de elegibilidade de estoque, permissões, scanner e consultas especializadas
@@ -59,7 +60,8 @@ comissões antigas ficam fora do escopo.
   versões anteriores que nunca foram guardadas. Alterações futuras, inclusões e
   desativações/exclusões são versionadas no mesmo commit.
 - Migrations A1/A2/A3 criam grupos/valor fixo, dados de recebimento/caixa e índices
-  para histórico. Foram aplicadas em PostgreSQL DEV; produção ainda não foi migrada.
+  para histórico. A publicação oficial aplicou o grafo de migrations até a head
+  única `zzzzzb20261027a1`, incluindo A4 e o caminho fiscal integrado da `main`.
 - A4 acrescenta a âncora técnica e o histórico de vigência, com RLS e vínculo de
   pessoa preservável na fusão. A âncora não aceita alteração nem data enviada
   pelo usuário; snapshots de comissão anteriores permanecem intactos.
@@ -82,8 +84,8 @@ o provisionamento de comissões. O histórico pagina no banco com índices próp
 Duplicar os formulários e recalcular comissão histórica foram descartados para
 preservar manutenção e rastreabilidade.
 
-Não há integração externa nova. A publicação mobile usa EAS Update após o backend,
-nos runtimes 1.0.3 e 1.0.4 para Android/iOS. Falhas de rede nas consultas mantêm erro
+Não há integração externa nova neste escopo operacional. A publicação mobile usou
+EAS Update após o backend, nos runtimes 1.0.3 e 1.0.4 para Android/iOS. Falhas de rede nas consultas mantêm erro
 visível e tentativa de atualização; falhas financeiras não devem confirmar baixa
 parcial de um lote transacional.
 
@@ -94,7 +96,8 @@ grupos, provisionamento e recebimentos filtram tenant; referências estrangeiras
 não podem ser reutilizadas por outra empresa. A fusão exige autorização e revisão
 administrativa, sem alterar o papel de acesso ou quitar cobranças.
 
-O caso real foi consultado com autorização, em modo de leitura. Credenciais,
+O caso real foi consultado com autorização, em modo de leitura, e a fusão
+administrativa foi executada após a autorização específica. Credenciais,
 tokens, telefones e prévias completas ficam fora do Git. Logs identificam operação,
 estado e referências necessárias à auditoria; não devem registrar segredos.
 Os dados pessoais continuam destinados ao cadastro, atendimento, acesso e histórico
@@ -139,23 +142,27 @@ duas vendas da mesma empresa e operações de outra empresa continuam concorrent
 Os seis cenários PostgreSQL passaram após essa correção; a fusão adquire o mesmo
 bloqueio antes de bloquear pessoas, preservando a ordem de aquisição.
 
-Build frontend de produção, ESLint e Prettier completos passaram na etapa
-registrada. O check inicial e as frentes focadas passaram; o
-`FLUXO_UNICO.bat release-check` completo segue pendente de conclusão após as
-últimas correções. Isso não declara toda a suíte ou a produção aprovadas.
+Build frontend de produção, ESLint e Prettier completos passaram. O
+`FLUXO_UNICO.bat release-check` completo foi aprovado sobre a árvore `6dbed4d3`,
+integrada pelo PR #1567. Os oito checks oficiais passaram no commit da `main`
+`3f2e78f34ecfae558431008832452fa9ad22dfb6`; a evidência está em
+`runtime/tarefas-melhorias-20261026/release-gate-main-3f2e78f3.json`. As contagens
+anteriores registram suas etapas de validação e não devem ser somadas.
 
 ## 6. Ambientes e homologação
 
-Testes com escrita usaram DEV local e massa fictícia, com autenticação própria.
+Testes automatizados com escrita usaram DEV local e massa fictícia, com autenticação própria.
 Ensaios PostgreSQL da fusão usaram transação e rollback; não persistiram o caso
 real. Credenciais de teste e capturas de navegador ficam em diretórios ignorados.
-Em produção ocorreram somente as consultas autorizadas registradas no checklist.
+Em produção foram executados o deploy oficial, as migrations e a fusão autorizada
+do vínculo da Michele, além das consultas e verificações registradas no checklist.
 
-O checklist e o procedimento de vínculo registram a homologação técnica local.
-Não foi emitido aceite humano de funcionamento no aparelho da cliente: a
-correção real da Michele, a atualização OTA aplicada e a conferência no app
-autenticado permanecem pendentes. A falha preexistente da suíte de política de
-push está descrita no inventário; ela não foi ocultada nem declarada aprovada.
+O checklist e o procedimento de vínculo registram a homologação técnica e os
+resultados produtivos. A correção real da Michele e a publicação OTA dos dois
+runtimes foram concluídas; o handler de benefícios para a conta 84 retorna o
+saldo correto. A conferência humana no aparelho físico permanece pendente, separada do
+aceite técnico publicado. A falha preexistente da suíte de política de push está
+descrita no inventário; ela não foi ocultada nem declarada aprovada.
 
 O contrato `test-modal-nova-conta-pagar-refactor.mjs` também já falha em
 `origin/main`: exige a rota antiga `/clientes/?tipo_cadastro=fornecedor`, ausente
@@ -167,19 +174,46 @@ registrada sem alterar esse teste ou ampliar o escopo da entrega.
 ## 7. Publicação e rollback
 
 Entrega de backend, frontend, migrations, documentação e mobile OTA. Checkpoints
-registrados: implementação `ac143f11a` e integração da main `297059ce8`. O commit
-final e o PR deverão constar no registro de publicação quando preparados.
+históricos: implementação `ac143f11a` e integração da main `297059ce8`. O PR
+**#1567** foi integrado por squash no commit
+**`3f2e78f34ecfae558431008832452fa9ad22dfb6`** da `main`.
 
-Sequência prevista: concluir o gate e a revisão; finalizar a branch/PR pelo fluxo
-oficial; aplicar A1 → A2 → A3 → A4 e publicar backend/frontend; conferir health,
-revisão implantada e smoke; executar a correção administrativa autorizada do
-vínculo após conferir a prévia; publicar a OTA nos dois runtimes. Preservar
-versão, runtime e números dos binários instalados, seguindo o
-[guia de release mobile](../GUIA_RELEASE_APP_MOBILE_EAS.md).
+O deploy oficial foi concluído em **26/10/2026 às 22:35:49 BRT**, com a head
+`zzzzzb20261027a1` e revisão servida `3f2e78f3`. Os **cinco containers estão
+healthy**; health público e watchdog também foram conferidos. O upgrade seguiu o
+grafo oficial até a união de A4 com a linha fiscal da `main`.
 
-Publicação, migrations de produção, OTA e correção real ainda não ocorreram nesta
-ficha. A autorização e seus limites estão registrados no checklist; a execução
-continua condicionada às etapas pendentes.
+Backups registrados:
+
+- Banco: `/opt/petshop/backups/db/petshop_prod_20261026_223444.dump`.
+- Operacional: `/opt/petshop/backups/deploy_20261026_223341`.
+
+Publicação OTA concluída com saída zero no canal `production`, para Android e
+iOS, usando o mesmo JavaScript/assets do commit publicado:
+
+| Runtime | Horário da publicação em 26/10/2026 (BRT) | Grupo OTA                              |
+| ------- | ----------------------------------------- | -------------------------------------- |
+| 1.0.4   | 22:36:47                                  | `9e3a71b4-8882-4a7d-a778-0e8fbaffa060` |
+| 1.0.3   | 22:37:02                                  | `b736b409-f55d-41e7-aad1-348339ee6c99` |
+
+Versões, runtimes, números e configurações dos binários foram preservados,
+conforme o [guia de release mobile](../GUIA_RELEASE_APP_MOBILE_EAS.md). O resumo
+dos quatro updates, com IDs por plataforma e horários UTC, está em
+`runtime/tarefas-melhorias-20261026/ota-publicacao-resumo.json`.
+
+A fusão autorizada foi concluída às **22:38:01 BRT**, auditoria **227**:
+principal **47188/código 2061**, duplicado **50401/código 10851** inativo e
+apontando ao principal. Conta **84**, cargos de `UserTenant`, crédito zero e
+flags de cliente/funcionária foram preservados. As **306 vendas** mantiveram IDs,
+números, status e totais; carimbo **13739** preservado, com retorno de **1/meta 12**
+no handler `meus_beneficios`.
+
+Os seis grants **391–396** conservaram IDs, datas, notas e concedentes ao serem
+transferidos. O total final é de **sete perfis**: o serviço materializou o perfil
+`funcionario` derivado da flag legada já existente, com grant **458** auditado pelo
+ator **83**. A conferência posterior somente de leitura aprovou essa derivação
+específica, sem aceitar perfis adicionais arbitrários. O procedimento detalhado
+e os limites de preservação estão no documento de vínculo.
 
 Abortar diante de falha no gate, migration, health, isolamento, saldo ou conferência
 da prévia. Rollback de aplicação/OTA usa a revisão/grupo anterior pelo fluxo
@@ -200,8 +234,21 @@ primeiro lugar, saldo pago fora de vencidos, ausência de comissão duplicada e
 carimbo disponível na pessoa correta após a correção autorizada. Divergência de
 saldo, repasse ou acesso entre empresas é incidente P1: interromper a operação
 afetada e investigar pelos vínculos/auditoria, sem repetir baixas ou carimbos.
-Enquanto não houver publicação, usar os fluxos existentes; recorrência após o
-smoke deve reabrir o item correspondente do checklist.
+Recorrência após a publicação deve reabrir o item correspondente do checklist.
+
+Na conferência operacional de produção, o histórico de Fernanda abriu em
+**1.584 ms** (aproximadamente **1,58 s**) e a paginação avançou de **1/21** para
+**2/21**. O título **11119** de Osvaldo consta como **recebido integralmente**,
+com saldo **zero**, data **26/10/2026** e observação
+**“Baixa em lote - pix”** no histórico. As consultas não registraram baixa nem
+outra alteração financeira.
+
+Essa conferência também encontrou uma pendência de exibição: o modal de detalhes
+da conta ainda mostra o ID interno **47644** como código do cliente, em vez do
+código público **1848**. O item 05 do checklist foi reaberto; a correção pontual
+está em andamento e ainda requer validação e publicação. Evidências em
+`runtime/tarefas-melhorias-20261026/fernanda-historico-producao.json` e
+`runtime/tarefas-melhorias-20261026/osvaldo-conta-producao.json`.
 
 ## 9. Mudança, comunicação e treinamento
 
@@ -213,8 +260,9 @@ carrega esse catálogo; não foi criado outro fluxo de ajuda.
 Após disponibilização, orientar operadores sobre o lápis da pessoa, conferência
 do caixa e dados do cartão. Orientar gestores sobre seleção múltipla, grupos,
 valor por unidade para novas vendas e diferença entre pagamento e repasse.
-Conferir o carimbo no app real depois da correção e aplicação da OTA. Não anunciar
-essas etapas como concluídas antes do registro de publicação e do smoke.
+O vínculo, saldo do carimbo e publicação OTA já foram confirmados tecnicamente.
+A conferência no aparelho físico da cliente continua como acompanhamento humano;
+não declarar esse teste como realizado sem sua confirmação.
 
 ## 10. Fechamento
 
@@ -222,10 +270,13 @@ essas etapas como concluídas antes do registro de publicação e do smoke.
 - [x] Tenant, permissões, dados e auditoria avaliados.
 - [x] Documentação e Central de Ajuda atualizadas.
 - [x] Plano de publicação, observabilidade, rollback e comunicação definido.
-- [ ] Gate completo final e PR revisável concluídos.
-- [ ] Publicação e smoke registrados.
-- [ ] Correção real do vínculo e conferência no aparelho concluídas.
+- [x] Gate completo final e PR integrado registrados.
+- [x] Publicação principal, migrations, OTA e smoke técnico registrados.
+- [x] Correção real do vínculo e saldo do benefício conferidos em produção.
+- [ ] Correção pontual do código público no modal de detalhes validada e publicada.
+- [ ] Conferência humana no aparelho físico da cliente, como acompanhamento separado.
 
-Decisão: **aceite técnico DEV com pendências de fechamento**. Lucas e o executor
-concluirão as etapas abertas na sequência do checklist; não há prazo de publicação
-confirmado nesta ficha.
+Decisão: **entrega principal publicada, com ajuste pontual de exibição em
+fechamento**. O item 05 permanece aberto até a correção do modal ser validada e
+publicada. A conferência no aparelho físico não bloqueia a entrega técnica do
+vínculo; seu estado permanece explícito no checklist.

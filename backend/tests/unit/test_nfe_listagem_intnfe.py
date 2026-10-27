@@ -1,6 +1,9 @@
 from types import SimpleNamespace
 
-from app.nfe.listagem_normalizacao import _normalizar_nota_venda_local
+from app.nfe.listagem_normalizacao import (
+    _normalizar_detalhe_nota_bling,
+    _normalizar_nota_venda_local,
+)
 from app.nfe.listagem_sync import _aplicar_cliente_venda_em_nota
 
 
@@ -55,3 +58,25 @@ def test_cache_fiscal_enriquecido_com_codigo_publico_do_cliente_local():
     assert nota["cliente"]["codigo"] == "C-987"
     assert nota["cliente"]["id"] == "id-do-provedor"
     assert nota["cliente"]["nome"] == "Pessoa no provedor"
+
+
+def test_detalhe_bling_expoe_so_codigo_publico_do_cadastro_local_vinculado():
+    payload = {
+        "id": 123,
+        "contato": {"id": 47644, "codigo": "PROVEDOR-1", "nome": "Pessoa externa"},
+    }
+    venda = SimpleNamespace(
+        id=12,
+        canal="pdv",
+        numero_venda="VEN-FICTICIA",
+        loja_origem="Loja ficticia",
+        vendedor=None,
+        cliente=SimpleNamespace(id=47644, codigo="1848", nome="Pessoa local"),
+    )
+
+    detalhe = _normalizar_detalhe_nota_bling(payload, 55, venda)
+    assert detalhe["cliente"]["codigo"] == "1848"
+    assert detalhe["cliente"]["nome"] == "Pessoa externa"
+
+    sem_vinculo = _normalizar_detalhe_nota_bling(payload, 55)
+    assert sem_vinculo["cliente"]["codigo"] is None

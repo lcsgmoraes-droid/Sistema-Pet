@@ -18,50 +18,55 @@ testes que gravam dados devem acontecer em DEV.
 ## Lista de tarefas
 
 - [x] **01 — Editar cliente no PDV.** Botão pequeno junto ao cliente selecionado,
-  reutilizando a célula de edição de pessoas. Atualizar os dados exibidos após
-  salvar, sem perder a venda em andamento.
+      reutilizando a célula de edição de pessoas. Atualizar os dados exibidos após
+      salvar, sem perder a venda em andamento.
 - [x] **02 — Melhorar e centralizar a busca.** Células reutilizáveis para pessoas
-  e produtos, baseadas no PDV; melhorar a busca durante a digitação e priorizar
-  código/nome exatos, prefixos e correspondências mais próximas.
+      e produtos, baseadas no PDV; melhorar a busca durante a digitação e priorizar
+      código/nome exatos, prefixos e correspondências mais próximas.
 - [x] **03 — Padronizar buscas em todas as telas.** Mapear as buscas de pessoas
-  e produtos e adotar as células compartilhadas. Registrar o inventário e as
-  migrações para conferir a cobertura tela por tela.
+      e produtos e adotar as células compartilhadas. Registrar o inventário e as
+      migrações para conferir a cobertura tela por tela.
 - [x] **04 — Busca no gestor de campanhas.** Aplicar a busca compartilhada,
-  priorizando o cliente com código ou nome mais próximo do termo digitado.
-- [x] **05 — Códigos visíveis ao usuário.** Exibir o código público de clientes
-  e produtos em todas as telas; IDs internos continuam apenas nas referências
-  técnicas. Conferir também seleção e pesquisa por código.
+      priorizando o cliente com código ou nome mais próximo do termo digitado.
+- [ ] **05 — Códigos visíveis ao usuário.** Exibir o código público de clientes
+      e produtos em todas as telas; IDs internos continuam apenas nas referências
+      técnicas. Conferir também seleção e pesquisa por código. Reaberto após a
+      conferência produtiva: o modal de detalhes da conta 11119 ainda mostra o ID
+      interno 47644 em vez do código público 1848. Correção pontual em andamento,
+      ainda sem validação/publicação confirmadas.
 - [x] **06 — Célula compartilhada de recebimento.** Reutilizar o recebimento do
-  PDV em pagamentos de contas a receber, preservando formas de pagamento,
-  valores, parcelas e regras financeiras existentes.
+      PDV em pagamentos de contas a receber, preservando formas de pagamento,
+      valores, parcelas e regras financeiras existentes.
 - [x] **07 — Parcelamento na baixa de vendas em aberto.** Permitir receber
-  parcelado usando a mesma célula, com consistência entre venda, recebíveis,
-  parcelas e caixa.
+      parcelado usando a mesma célula, com consistência entre venda, recebíveis,
+      parcelas e caixa.
 - [x] **08 — Histórico rápido e paginado.** Corrigir demora/falha na abertura,
-  paginar dados e evitar carregar todo o histórico de uma vez. Caso de consulta:
-  Fernanda Pedraza, tenant `james_dionizio`.
+      paginar dados e evitar carregar todo o histórico de uma vez. Caso de consulta:
+      Fernanda Pedraza, tenant `james_dionizio`.
 - [x] **09 — Conferir alcance da importação Simplesvet.** Vendas importadas até
-  **18/09/2026**, total de 111.266 vendas, primeira em 19/11/2019. Consulta de
-  produção somente de leitura confirmada. A data/hora da execução não foi
-  comprovada: `created_at` conserva a data original do Simplesvet.
-- [ ] **10 — Carimbo manual no app.** Investigar e corrigir por que o carimbo
-  manual de Michele Pelegrino, tenant `james_dionizio`, não apareceu no aplicativo.
+      **18/09/2026**, total de 111.266 vendas, primeira em 19/11/2019. Consulta de
+      produção somente de leitura confirmada. A data/hora da execução não foi
+      comprovada: `created_at` conserva a data original do Simplesvet.
+- [x] **10 — Carimbo manual no app.** Causa corrigida em código e produção: o
+      acesso foi unificado no cadastro 2061, preservando o carimbo 13739; o handler
+      de benefícios passou a retornar um carimbo de meta 12. A conferência no aparelho
+      físico da cliente permanece como acompanhamento separado, abaixo.
 - [x] **11 — Caixas reabertos simultaneamente.** Permitir reabrir mais de um
-  caixa e selecionar em qual caixa registrar cada recebimento, respeitando
-  permissões e identificação do operador.
+      caixa e selecionar em qual caixa registrar cada recebimento, respeitando
+      permissões e identificação do operador.
 - [x] **12 — Status depois de baixa em lote.** Corrigir títulos pagos que
-  permanecem vencidos no contas a receber. Caso de consulta: Osvaldo Cano,
-  referência informada 47644 (ID interno confirmado; código público **1848**),
-  tenant `james_dionizio`.
+      permanecem vencidos no contas a receber. Caso de consulta: Osvaldo Cano,
+      referência informada 47644 (ID interno confirmado; código público **1848**),
+      tenant `james_dionizio`.
 - [x] **13 — Histórico financeiro completo.** Exibir movimentos de todo o fluxo
-  de baixa, incluindo data e observação, especialmente nas baixas em lote.
-  Preservar rastreabilidade de recebimentos e estornos sem duplicar valores.
+      de baixa, incluindo data e observação, especialmente nas baixas em lote.
+      Preservar rastreabilidade de recebimentos e estornos sem duplicar valores.
 - [x] **14 — Grupos de produtos para comissão.** Em vendas por vendedor,
-  melhorar filtros, selecionar múltiplos produtos, salvar grupos reutilizáveis
-  para comissão e gerar contas a pagar sem duplicidade.
+      melhorar filtros, selecionar múltiplos produtos, salvar grupos reutilizáveis
+      para comissão e gerar contas a pagar sem duplicidade.
 - [x] **15 — Comissão por valor fixo.** Novo tipo em reais por unidade vendida:
-  R$ 5,00 por unidade gera R$ 10,00 ao vender duas. Cadastro, cálculo e exibição
-  completos; vale somente para novas vendas, sem recalcular as anteriores.
+      R$ 5,00 por unidade gera R$ 10,00 ao vender duas. Cadastro, cálculo e exibição
+      completos; vale somente para novas vendas, sem recalcular as anteriores.
 
 ## Validação e publicação
 
@@ -71,11 +76,14 @@ testes que gravam dados devem acontecer em DEV.
 - [x] Casos relatados investigados por consulta, sem alterações em produção.
 - [x] Testes automatizados focados aprovados por frente.
 - [x] Fluxos revisados no ambiente DEV, incluindo isolamento entre empresas.
-- [ ] Build do frontend e `FLUXO_UNICO.bat release-check` aprovados.
-- [ ] Mudanças revisadas, commitadas e enviadas pela branch/PR.
-- [ ] Publicação pelo fluxo oficial e verificação após publicação.
+- [x] Build do frontend e `FLUXO_UNICO.bat release-check` aprovados.
+- [x] Mudanças revisadas, commitadas e integradas pelo PR #1567.
+- [x] Publicação pelo fluxo oficial e verificação técnica após publicação.
 
 ## Evidências e andamento
+
+Os registros de etapas abaixo preservam o estado observado na ocasião. O estado
+atual da entrega está no fechamento confirmado ao final deste documento.
 
 ### Abertura — 26/10/2026
 
@@ -145,7 +153,7 @@ Os códigos públicos foram auditados também nas APIs de NF, entregas e relató
 - Ruff aprovado nos 67 arquivos Python alterados e ESLint aprovado nas 152
   fontes JS/JSX alteradas, antes do gate completo.
 
-### Gate final em andamento — 26/10/2026
+### Gate e revisão — histórico das etapas de 26/10/2026
 
 - `origin/main` incorporada sem conflitos no commit `297059ce8`, após o
   checkpoint de implementação `ac143f11a`.
@@ -221,3 +229,71 @@ Os códigos públicos foram auditados também nas APIs de NF, entregas e relató
 - Criada a união vazia de migrations `zzzzzb20261027a1`, com pais A4 e fiscal
   `zzzzza20261027a1`, sem mudar dados. DEV e três bancos efêmeros chegaram à única
   head; RLS **3/3** e **18** aprovações PostgreSQL. Bancos temporários removidos.
+
+### Fechamento confirmado em produção — 26/10/2026
+
+- PR **#1567** integrado por squash na `main`, commit
+  **`3f2e78f34ecfae558431008832452fa9ad22dfb6`**. O gate completo passou sobre a
+  árvore `6dbed4d3`; os **oito checks oficiais** passaram no commit integrado.
+  Evidência: `runtime/tarefas-melhorias-20261026/release-gate-main-3f2e78f3.json`.
+- Deploy oficial concluído às **22:35:49 BRT**. A revisão servida é `3f2e78f3`, a
+  head do banco é `zzzzzb20261027a1`, os **cinco containers estão healthy**, o
+  health público respondeu corretamente e o watchdog está healthy.
+- Backups registrados pelo deploy: banco
+  `/opt/petshop/backups/db/petshop_prod_20261026_223444.dump` e operacional
+  `/opt/petshop/backups/deploy_20261026_223341`.
+- OTA concluída com saída zero no canal `production`, para Android e iOS:
+  runtime **1.0.4**, grupo `9e3a71b4-8882-4a7d-a778-0e8fbaffa060`, às
+  **22:36:47 BRT**; runtime **1.0.3**, grupo
+  `b736b409-f55d-41e7-aad1-348339ee6c99`, às **22:37:02 BRT**. Os dois grupos
+  usam o mesmo JavaScript/assets do commit `3f2e78f3`; versões, runtimes e
+  configurações dos binários foram preservados. Resumo dos quatro updates em
+  `runtime/tarefas-melhorias-20261026/ota-publicacao-resumo.json`.
+- Fusão autorizada da Michele concluída às **22:38:01 BRT**, auditoria **227**:
+  principal **2061/47188**, duplicado **10851/50401** inativo e apontando ao
+  principal. Conta 84 e cargos de `UserTenant` preservados; as **306 vendas**
+  conservaram IDs, números, status e totais. Carimbo **13739** preservado; o
+  handler `meus_beneficios` passou a retornar **1 carimbo, meta 12**.
+- Os seis grants **391–396** foram transferidos ao principal com IDs, datas,
+  notas e concedentes intactos. O total final é de **sete perfis**, pois a
+  sincronização materializou o perfil `funcionario` da flag legada já existente:
+  grant **458**, ator **83**, auditado. Não confundir os seis grants preservados
+  com o total de perfis após a operação. Mantidos `is_cliente`, `is_funcionario`
+  e crédito zero; conferência posterior somente de leitura aprovada.
+
+### Acompanhamento após a publicação
+
+- [x] Histórico de Fernanda Pedraza consultado em produção somente para leitura:
+      abertura em **1.584 ms** (aproximadamente **1,58 s**), página **1/21 → 2/21**.
+- [x] Osvaldo Cano: título **11119**, **recebido integralmente**, com saldo
+      **zero**. Histórico mostra **26/10/2026** e **“Baixa em lote - pix”**.
+      Nenhuma baixa ou outra escrita financeira foi realizada nessa conferência.
+- [ ] Corrigir, validar e publicar a exibição do código público **1848** no modal
+      de detalhes dessa conta, que ainda apresenta o ID interno **47644**. Essa
+      pendência mantém o item 05 aberto, sem alterar o saldo confirmado.
+- [ ] Conferir o cartão e a atualização dos benefícios no aparelho físico da
+      Michele. A correção técnica do vínculo e o saldo em produção já foram validados;
+      a conferência humana no aparelho não bloqueia a entrega técnica desse vínculo.
+
+Evidências das consultas em
+`runtime/tarefas-melhorias-20261026/fernanda-historico-producao.json` e
+`runtime/tarefas-melhorias-20261026/osvaldo-conta-producao.json`. A entrega
+principal está publicada; o ajuste pontual do código no modal permanece em
+fechamento, sem declarar o checklist integralmente encerrado.
+
+### Correção dos detalhes de código público — validação local
+
+A consulta de detalhes de contas a receber/pagar passou a retornar o código
+público da pessoa. O modal de recebíveis e os dois modais fiscais deixaram de
+usar IDs internos como alternativa. O detalhe fiscal Bling também conserva o
+código do cadastro local vinculado; sem código, a interface mostra “—”.
+Regressões com código público diferente do ID, nulo e ausente passaram:
+**33 testes financeiros backend, 10 frontend financeiros, 96 backend fiscais e
+6 frontend fiscais**. Ruff, ESLint e Prettier focados passaram. A publicação
+desse ajuste permanece condicionada ao gate completo e aos checks do PR/main.
+
+O aceite HTTP em DEV também revelou que detalhes de contas a pagar de comissão
+falhavam quando desconto, juros ou multa estavam nulos. A leitura agora devolve
+zero nesses três campos opcionais, sem gravar alterações nem recalcular os
+valores original, pago, final ou saldo. **36 testes financeiros backend** passaram,
+incluindo nulo, zero e valor positivo com conferência dos dados persistidos.
