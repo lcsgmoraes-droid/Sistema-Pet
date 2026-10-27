@@ -14,6 +14,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.utils.correlation import current_correlation_id
+from app.whatsapp import ledger_service
 from app.whatsapp.meta_cloud import MetaCloudClient
 from app.whatsapp.models import TenantWhatsAppConfig, WhatsAppSession, WhatsAppMessage
 from app.whatsapp.tenant_context import whatsapp_tenant_context
@@ -332,6 +333,9 @@ async def _send_whatsapp_message_with_context(
     Returns:
         WhatsAppMessage criada ou None se falhar
     """
+    client_obj = None
+    session = None
+    origem = ledger_service.origem_do_envio(message_type, sent_by_user_id)
     try:
         # 1. Buscar config/cliente e sessão
         client_obj = _build_whatsapp_client(db, tenant_id)
@@ -377,6 +381,18 @@ async def _send_whatsapp_message_with_context(
 
         logger.info(f"✅ Mensagem enviada: {whatsapp_message_id}")
 
+        # 6. Livro-razao (controle de entrega e custo). Nunca atrapalha o envio.
+        ledger_service.anotar_envio(
+            db,
+            tenant_id=tenant_id,
+            provedor=ledger_service.provedor_do_cliente(client_obj),
+            session=session,
+            message_row=db_message,
+            wa_message_id=whatsapp_message_id,
+            origem=origem,
+            tipo_conteudo="imagem" if message_type == "image" else "texto",
+        )
+
         return db_message
 
     except httpx.HTTPStatusError as e:
@@ -384,9 +400,30 @@ async def _send_whatsapp_message_with_context(
             f"❌ Erro HTTP ao enviar mensagem: {e.response.status_code} - {e.response.text}"
         )
         db.rollback()
+        ledger_service.anotar_falha_de_envio(
+            db,
+            tenant_id=tenant_id,
+            provedor=ledger_service.provedor_do_cliente(client_obj),
+            session=session,
+            session_id=session_id,
+            origem=origem,
+            erro_codigo=e.response.status_code,
+            erro_mensagem=f"HTTP {e.response.status_code}",
+        )
         return None
 
     except Exception as e:
         logger.error(f"❌ Erro ao enviar mensagem: {e}")
         db.rollback()
+        if client_obj is not None:
+            ledger_service.anotar_falha_de_envio(
+                db,
+                tenant_id=tenant_id,
+                provedor=ledger_service.provedor_do_cliente(client_obj),
+                session=session,
+                session_id=session_id,
+                origem=origem,
+                erro_codigo=getattr(e, "codigo", None),
+                erro_mensagem=getattr(e, "mensagem", None) or type(e).__name__,
+            )
         return None

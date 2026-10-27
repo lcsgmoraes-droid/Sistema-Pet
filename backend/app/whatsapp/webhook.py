@@ -26,6 +26,7 @@ from app.whatsapp.consent_service import (
     recusou_mensagens,
     registrar_recusa,
 )
+from app.whatsapp import ledger_service
 from app.whatsapp.log_safety import mascarar_telefone
 from app.whatsapp.message_views import serializar_mensagem
 from app.whatsapp.usage_limits import LIMITE_DIARIO, avaliar_limites
@@ -223,6 +224,40 @@ async def receive_webhook(
         return {"status": "error", "message": str(e)}
 
 
+async def _provedor_da_loja(db: Session, tenant_id: str) -> str:
+    try:
+        config = (
+            db.query(TenantWhatsAppConfig)
+            .filter(TenantWhatsAppConfig.tenant_id == tenant_id)
+            .first()
+        )
+        return (getattr(config, "provider", None) or "meta_cloud").lower()
+    except Exception:
+        return "meta_cloud"
+
+
+def _anotar_recebimento_no_ledger(
+    db: Session, tenant_id: str, session: Any, message: Any, provider_message_id: str | None
+) -> None:
+    """Registra a mensagem do tutor no livro-razao (nunca atrapalha o atendimento)."""
+    try:
+        config = (
+            db.query(TenantWhatsAppConfig)
+            .filter(TenantWhatsAppConfig.tenant_id == tenant_id)
+            .first()
+        )
+        ledger_service.anotar_recebimento(
+            db,
+            tenant_id=tenant_id,
+            provedor=(getattr(config, "provider", None) or "360dialog").lower(),
+            session=session,
+            message_row=message,
+            wa_message_id=provider_message_id,
+        )
+    except Exception as erro:
+        logger.warning("Livro-razao: recebimento nao registrado (%s)", type(erro).__name__)
+
+
 def _registrar_webhook_recebido(db: Session, tenant_id: str, config: Any) -> None:
     """Guarda quando a Meta falou com a gente pela ultima vez (prova que o webhook funciona)."""
     try:
@@ -279,6 +314,14 @@ async def process_webhook_payload(
         for change in entry.get("changes", []):
             value = change.get("value", {})
             messages = value.get("messages", [])
+
+            # Avisos de estado (enviada, entregue, lida, falhou) e de cobranca da Meta.
+            avisos = value.get("statuses") or []
+            if avisos:
+                with whatsapp_tenant_context(tenant_id):
+                    ledger_service.aplicar_avisos_de_estado(
+                        db, tenant_id, avisos, provedor=await _provedor_da_loja(db, tenant_id)
+                    )
 
             # Processar cada mensagem
             for msg in messages:
@@ -474,6 +517,7 @@ async def _process_incoming_message_with_context(
 
         try:
             db.commit()
+            _anotar_recebimento_no_ledger(db, tenant_id, session, message, provider_message_id)
         except IntegrityError:
             db.rollback()
             existing = _find_message_by_provider_id(
