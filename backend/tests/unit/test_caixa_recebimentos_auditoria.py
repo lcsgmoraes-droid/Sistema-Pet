@@ -15,6 +15,7 @@ from app.caixa.auditoria_routes import (
     conferir_item_caixa,
     obter_auditoria_caixa,
 )
+from app.caixa.escopo import buscar_caixa_para_recebimento
 from app.caixa_routes import (
     ReabrirCaixaSchema,
     listar_vendas_caixa,
@@ -478,17 +479,48 @@ def test_reabertura_preserva_fechamento_completo_e_justificativa(recebimentos):
     assert evento.details == "Recontagem dos valores de caixa"
 
 
-def test_reabertura_nao_cria_segundo_caixa_ativo(recebimentos):
+def test_reabertura_simultanea_preserva_caixas_e_exige_escolha_no_recebimento(
+    recebimentos,
+):
     caso = recebimentos
+    resultado = reabrir_caixa(
+        caso.original.id,
+        ReabrirCaixaSchema(motivo="Recontagem dos valores de caixa"),
+        db=caso.db,
+        current_user_and_tenant=caso.auth,
+    )
+    assert resultado["status"] == "aberto"
+    assert caso.original.status == caso.atual.status == "aberto"
+    assert caso.db.query(Caixa).filter_by(status="aberto").count() == 2
+    assert caso.venda.caixa_id == caso.original.id
+    assert [pagamento.caixa_id for pagamento in caso.pagamentos] == [
+        caso.original.id,
+        caso.atual.id,
+        caso.atual.id,
+    ]
+    evento = caso.db.query(AuditLog).filter_by(action="caixa_reaberto").one()
+    assert evento.entity_id == caso.original.id
+    assert json.loads(evento.old_value)["resumo"]["caixa"]["status"] == "fechado"
+    assert evento.details == "Recontagem dos valores de caixa"
+
     with pytest.raises(HTTPException) as erro:
-        reabrir_caixa(
-            caso.original.id,
-            ReabrirCaixaSchema(motivo="Recontagem dos valores de caixa"),
-            db=caso.db,
-            current_user_and_tenant=caso.auth,
+        buscar_caixa_para_recebimento(
+            caso.db, tenant_id=caso.auth[1], usuario_id=caso.auth[0].id
         )
     assert erro.value.status_code == 400
-    assert caso.original.status == "fechado"
+    assert "Selecione" in erro.value.detail
+    for caixa, recebido in [(caso.original, 30), (caso.atual, 60)]:
+        selecionado, _ = buscar_caixa_para_recebimento(
+            caso.db,
+            tenant_id=caso.auth[1],
+            usuario_id=caso.auth[0].id,
+            caixa_id=caixa.id,
+        )
+        assert selecionado.id == caixa.id
+        resumo = obter_resumo_caixa(
+            caixa.id, db=caso.db, current_user_and_tenant=caso.auth
+        )
+        assert resumo["total_recebido"] == recebido
 
 
 def test_caixa_antigo_reaberto_nao_absorve_recebimento_legado_ambiguo(recebimentos):

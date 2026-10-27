@@ -44,6 +44,11 @@ class Venda(BaseTenantModel):
         ),
     )
 
+    # UTC técnico, imutável no banco; data_venda/created_at legados não definem vigência.
+    comissao_ancora_em = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
     numero_venda = Column(String(20), nullable=False)  # VEN-YYYYMMDD-XXXX
 
     # Cliente e Vendedor

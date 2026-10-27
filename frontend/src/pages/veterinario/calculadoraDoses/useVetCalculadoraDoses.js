@@ -51,7 +51,7 @@ export function useVetCalculadoraDoses() {
     }));
     setTutorSelecionado(
       pet?.cliente_id
-        ? { id: String(pet.cliente_id), nome: pet.cliente_nome ?? `Pessoa #${pet.cliente_id}` }
+        ? { id: String(pet.cliente_id), nome: pet.cliente_nome ?? "Pessoa não informada" }
         : null,
     );
   }, [petIdQuery, novoPetIdQuery, pets]);
@@ -60,7 +60,7 @@ export function useVetCalculadoraDoses() {
     if (!tutorIdQuery || tutorSelecionado?.id) return;
     setTutorSelecionado({
       id: String(tutorIdQuery),
-      nome: tutorNomeQuery || `Pessoa #${tutorIdQuery}`,
+      nome: tutorNomeQuery || "Pessoa não informada",
     });
     setForm((prev) => ({
       ...prev,

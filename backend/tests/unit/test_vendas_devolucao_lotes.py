@@ -13,6 +13,7 @@ from sqlalchemy.orm import Query, Session
 from sqlalchemy.sql.sqltypes import Uuid
 
 from app import caixa_models, ecommerceai_integration_models, ofertas_estudio_models  # noqa: F401
+import app.produto_identidade_models  # noqa: F401 - FK da fixture de produto isolada
 from app.estoque import service as estoque_service
 from app.grupo_comercial_estoque_compartilhado_service import contexto_tenant_estoque
 from app.financeiro_models import ContaReceber
@@ -455,17 +456,31 @@ def test_historico_incompleto_ou_duplicado_nao_recompoe_lotes(dados, historico):
 
 
 @pytest.mark.parametrize("status", ["bloqueado", "vencido", "esgotado"])
-def test_recomposicao_nao_libera_lote_vencido_ou_bloqueado(dados, status, monkeypatch):
-    # A validade usa o dia em Brasilia; nao depender do fuso do runner do CI.
-    agora = datetime(2026, 10, 26, 12)
-    monkeypatch.setattr("app.estoque.devolucao_lotes.now_brasilia", lambda: agora)
+@pytest.mark.parametrize(
+    "validade,status_esgotado",
+    [
+        (datetime(2026, 10, 25, 23, 59), "vencido"),
+        (datetime(2026, 10, 26), "ativo"),
+        (datetime(2026, 10, 27), "ativo"),
+    ],
+    ids=["ontem", "hoje", "amanha"],
+)
+def test_recomposicao_nao_libera_lote_vencido_ou_bloqueado(
+    dados, monkeypatch, status, validade, status_esgotado
+):
+    # Na virada UTC, datetime.now() do SO já pode estar no dia seguinte ao
+    # calendário de Brasília usado pelo domínio. Controle ambos os lados.
+    monkeypatch.setattr(
+        "app.estoque.devolucao_lotes.now_brasilia",
+        lambda: datetime(2026, 10, 26, 21, 7),
+    )
     caso = dados()
     lote = caso.db.get(ProdutoLote, 12)
     lote.status = status
-    lote.data_validade = agora - timedelta(days=1)
+    lote.data_validade = validade
     caso.db.commit()
     caso.devolver(1)
     assert caso.saldo_lote(12) == 1
     assert caso.db.get(ProdutoLote, 12).status == (
-        "vencido" if status == "esgotado" else status
+        status_esgotado if status == "esgotado" else status
     )

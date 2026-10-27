@@ -54,7 +54,7 @@ export default function CampanhasCodigosOfflineModal({
                     <td className="p-2 text-center font-mono font-semibold text-gray-700">
                       {c.numero}
                     </td>
-                    <td className="p-2 text-gray-700">{c.nome || `Cliente #${c.customer_id}`}</td>
+                    <td className="p-2 text-gray-700">{c.nome || "Cliente não informado"}</td>
                     <td className="p-2 text-center text-xs text-gray-500">
                       {c.rank_level
                         ? `${RANK_LABELS[c.rank_level]?.emoji || ""} ${RANK_LABELS[c.rank_level]?.label || c.rank_level}`

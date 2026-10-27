@@ -429,6 +429,7 @@ def criar_venda(
             status="previsto",
             categoria_id=categoria_receitas.id,
             documento=f"VENDA-{venda.id}",
+            gerado_automaticamente=True,
             fornecedor_cliente=(
                 venda.cliente.nome if venda.cliente else "Cliente Avulso"
             ),

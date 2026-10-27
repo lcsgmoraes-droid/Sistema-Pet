@@ -1,3 +1,4 @@
+import BuscaProduto from "../../components/v2/BuscaProduto/BuscaProduto";
 import { formatCurrency, resolveMediaUrl } from "./ecommerceMvpUtils";
 
 function CartIcon({ size = 17 }) {
@@ -233,14 +234,13 @@ function StoreHeader({
         >
           <div style={{ position: "relative", width: "100%" }}>
             <SearchIcon />
-            <input
+            <BuscaProduto
               id="ecommerce-header-search"
               name="header_search"
               aria-label="Buscar produtos"
               value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
+              onChange={onSearchChange}
               placeholder="Buscar produtos para o seu pet..."
-              style={{ ...S.formInput, paddingLeft: 36, borderRadius: 24, fontSize: 13 }}
             />
           </div>
         </div>

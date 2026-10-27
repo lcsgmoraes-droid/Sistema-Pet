@@ -64,7 +64,7 @@ export default function useTutorPetSelection({
       if (prev?.id && String(prev.id) === String(tutorIdQuery)) return prev;
       return {
         id: String(tutorIdQuery),
-        nome: tutorNomeQuery || `Tutor #${tutorIdQuery}`,
+        nome: tutorNomeQuery || "Tutor não informado",
         telefone: "",
         celular: "",
       };

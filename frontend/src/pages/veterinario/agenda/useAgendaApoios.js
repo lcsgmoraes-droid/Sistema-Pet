@@ -118,7 +118,7 @@ export function useAgendaApoios({
       }
       return {
         id: String(tutorIdQuery),
-        nome: tutorNomeQuery || `Tutor #${tutorIdQuery}`,
+        nome: tutorNomeQuery || "Tutor não informado",
       };
     });
   }, [novoAberto, setTutorSelecionado, tutorIdQuery, tutorNomeQuery]);

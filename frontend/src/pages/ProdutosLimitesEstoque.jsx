@@ -1,3 +1,4 @@
+import BuscaProduto from "../components/v2/BuscaProduto/BuscaProduto";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Download, RefreshCw } from "lucide-react";
@@ -122,11 +123,11 @@ export default function ProdutosLimitesEstoque({ embedded = false }) {
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="text-sm text-gray-700">
             Produto, código ou EAN
-            <input
-              className={`${campoClasse} mt-1`}
+            <BuscaProduto
               placeholder="Buscar produto..."
               value={filtros.busca}
-              onChange={(event) => alterarFiltro("busca", event.target.value)}
+              onChange={(valor) => alterarFiltro("busca", valor)}
+              showSuggestions={false}
             />
           </label>
           <div>

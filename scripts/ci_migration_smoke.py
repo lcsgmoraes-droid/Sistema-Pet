@@ -176,6 +176,38 @@ def _assert_rls_no_debt(database_url: URL) -> None:
     )
 
 
+def _assert_commission_effective_rules(database_url: URL) -> None:
+    """Exercita as regras temporais no próprio banco efêmero já migrado."""
+    env = os.environ.copy()
+    target = database_url.render_as_string(hide_password=False)
+    env.update(
+        {
+            "DATABASE_URL": target,
+            "COMISSOES_VIGENCIA_TEST_POSTGRES_URL": target,
+            "ENVIRONMENT": "testing",
+            "ENV": "testing",
+            "DEBUG": "false",
+            "JWT_SECRET_KEY": "migration-smoke-secret-key-with-more-than-32-characters",
+            "EMAIL_VERIFICATION_REQUIRED": "false",
+            "BLING_SYNC_SCHEDULER_ENABLED": "false",
+            "SEFAZ_IMPORTACAO_AUTOMATICA": "false",
+        }
+    )
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "tests/integration/test_comissoes_vigencia_limites_local.py",
+            "-q",
+            "--tb=short",
+        ],
+        cwd=BACKEND_DIR,
+        env=env,
+        check=True,
+    )
+
+
 def _expected_head(database_url: URL) -> str:
     env = os.environ.copy()
     env.setdefault("DATABASE_URL", database_url.render_as_string(hide_password=False))
@@ -267,6 +299,7 @@ def main() -> int:
             _run_alembic(target_url, "upgrade", "head")
             _assert_database_at_head(target_url, expected_head)
             _assert_rls_no_debt(target_url)
+            _assert_commission_effective_rules(target_url)
             print(f"migration_smoke_status label={database.label} status=ok")
         finally:
             if keep_databases:

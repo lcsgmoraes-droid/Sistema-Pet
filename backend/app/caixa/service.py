@@ -92,6 +92,7 @@ class CaixaService:
         caixa_id: Optional[int] = None,
         permitir_caixa_tenant: bool = False,
         permitir_fechado: bool = False,
+        exigir_selecao: bool = False,
     ) -> Dict[str, Any]:
         """
         Valida se existe um caixa aberto para o usuário.
@@ -151,6 +152,10 @@ class CaixaService:
             query = query.filter(Caixa.usuario_id == user_id)
 
         # Compartilha a trava com o fechamento até o commit do recebimento.
+        if exigir_selecao and caixa_id is None and query.count() > 1:
+            raise HTTPException(
+                400, "Há mais de um caixa aberto. Selecione o caixa deste recebimento."
+            )
         caixa_aberto = query.populate_existing().with_for_update().first()
 
         if not caixa_aberto:

@@ -97,6 +97,9 @@ function preparar({ post, listar, detalhes } = {}) {
     ].map((name) => [`./ui/${name}`, padrao(name)]),
     ["./ui/MoneyCell", { ...padrao("MoneyCell"), formatMoneyCellValue: String }],
     ["./ModalNovaContaReceber", padrao("ModalNovaContaReceber")],
+    ["./v2/InputCheckbox/InputCheckbox", padrao("InputCheckbox")],
+    ["./v2/BotaoInteracao/BotaoInteracao", padrao("BotaoInteracao")],
+    ["./v2/BotaoMenuAcoes/BotaoMenuAcoes", padrao("BotaoMenuAcoes")],
     ["./contasReceber/ComprovanteRecebimentoModal", padrao("ComprovanteRecebimentoModal")],
     ["./contasReceber/ContasReceberAnalise", padrao("ContasReceberAnalise")],
     [

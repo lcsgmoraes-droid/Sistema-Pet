@@ -92,6 +92,7 @@ class ComissaoItemSchema(BaseModel):
     percentual_comissao: float
     valor_comissao: float
     tipo_calculo: str
+    valor_fixo: float = 0
     status: str
     forma_pagamento: Optional[str]
     valor_pago: Optional[float]

@@ -431,7 +431,9 @@ const ConferenciaAvancada = () => {
                     R$ {comissao.valor_base_calculo.toFixed(2)}
                   </td>
                   <td className="px-4 py-3 text-sm text-right">
-                    {comissao.percentual_comissao.toFixed(2)}%
+                    {comissao.tipo_calculo === "fixo"
+                      ? `${formatMoneyBRL(comissao.valor_fixo)} / un.`
+                      : `${comissao.percentual_comissao.toFixed(2)}%`}
                   </td>
                   <td className="px-4 py-3 text-sm text-right font-semibold text-green-600">
                     R$ {comissao.valor_comissao.toFixed(2)}

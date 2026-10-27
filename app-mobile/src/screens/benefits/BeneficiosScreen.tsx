@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
-import React, { useCallback, useEffect, useState } from "react";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import React, { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -28,25 +28,32 @@ export default function BeneficiosScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [erro, setErro] = useState(false);
+  const requisicaoAtual = useRef(0);
 
   const carregar = useCallback(async () => {
+    const requisicao = ++requisicaoAtual.current;
     try {
       setErro(false);
       const { data } = await api.get<Beneficios>(
         "/ecommerce/auth/meus-beneficios",
       );
-      setDados(normalizarBeneficios(data));
+      if (requisicao === requisicaoAtual.current) {
+        setDados(normalizarBeneficios(data));
+      }
     } catch {
-      setErro(true);
+      if (requisicao === requisicaoAtual.current) setErro(true);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (requisicao === requisicaoAtual.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, []);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     carregar();
-  }, [carregar]);
+    return () => { requisicaoAtual.current += 1; };
+  }, [carregar]));
 
   const onRefresh = () => {
     setRefreshing(true);

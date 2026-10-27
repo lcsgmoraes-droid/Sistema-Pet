@@ -28,7 +28,7 @@ export default function CampanhasRankingClientesTable({ ranking, rankLabels, for
                     <td className="px-4 py-3 text-gray-400 font-medium">{index + 1}</td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-900">
-                        {cliente.nome || `Cliente #${cliente.customer_id}`}
+                        {cliente.nome || "Cliente não informado"}
                       </p>
                       {cliente.telefone && (
                         <p className="text-xs text-gray-400">{cliente.telefone}</p>

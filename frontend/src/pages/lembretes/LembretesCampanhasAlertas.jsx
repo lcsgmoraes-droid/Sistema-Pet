@@ -1,3 +1,4 @@
+import { obterCodigoPessoaPublico } from "../../utils/codigosPublicos";
 import { FiBell } from "react-icons/fi";
 import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import { formatarDataCurta } from "./lembretesFormatters";
@@ -129,7 +130,7 @@ function CampanhaAlertaCard({ card }) {
           className="mt-1 text-xs text-slate-700 dark:text-slate-300"
         >
           <CustomerIdentity
-            code={brinde.customer_id}
+            code={obterCodigoPessoaPublico(brinde)}
             fallback="Cliente nao informado"
             layout="inline"
             name={brinde.nome_cliente}

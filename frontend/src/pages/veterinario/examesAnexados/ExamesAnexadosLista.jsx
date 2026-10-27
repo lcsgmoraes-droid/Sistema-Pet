@@ -65,7 +65,7 @@ function ExameAnexadoItem({
             <span>Tutor:</span>
             <CustomerIdentity
               codeLabel="Cod. tutor"
-              fallback={item.tutor_id ? `Tutor #${item.tutor_id}` : ""}
+              fallback={item.tutor_id ? "Tutor não informado" : ""}
               layout="inline"
               nameClassName="font-medium text-gray-700"
               record={item}

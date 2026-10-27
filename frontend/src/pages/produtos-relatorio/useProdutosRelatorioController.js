@@ -84,7 +84,7 @@ export default function useProdutosRelatorioController() {
 
   useEffect(() => {
     const termo = buscaProduto.trim();
-    if (produtoSelecionado || termo.length < 2) {
+    if (produtoSelecionado || termo.length < 1) {
       setSugestoesProdutos([]);
       setLoadingBuscaProduto(false);
       return undefined;

@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 from app.nfe.listagem_normalizacao import _normalizar_nota_venda_local
+from app.nfe.listagem_sync import _aplicar_cliente_venda_em_nota
 
 
 def test_normalizacao_local_expoe_diagnostico_da_intnfe():
@@ -20,7 +21,9 @@ def test_normalizacao_local_expoe_diagnostico_da_intnfe():
         nfe_data_emissao=None,
         nfe_provider="intnfe",
         total=159.89,
-        cliente=None,
+        cliente=SimpleNamespace(
+            id=321, codigo="C-987", nome="Pessoa fictícia", cpf=None, cnpj=None
+        ),
         canal="pdv",
         loja_origem="Loja física",
         numero_venda="202609120005",
@@ -35,3 +38,20 @@ def test_normalizacao_local_expoe_diagnostico_da_intnfe():
     assert nota["codigo_erro"] == "999"
     assert nota["motivo_rejeicao"] == "Motivo fiscal retornado pelo emissor"
     assert nota["ambiente_codigo"] == 1
+    assert nota["cliente"]["codigo"] == "C-987"
+    assert nota["cliente"]["id"] == 321
+
+
+def test_cache_fiscal_enriquecido_com_codigo_publico_do_cliente_local():
+    nota = {"cliente": {"id": "id-do-provedor", "nome": "Pessoa no provedor"}}
+    venda = SimpleNamespace(
+        cliente=SimpleNamespace(
+            id=321, codigo="C-987", nome="Pessoa local", cpf=None, cnpj=None
+        )
+    )
+
+    _aplicar_cliente_venda_em_nota(nota, venda)
+
+    assert nota["cliente"]["codigo"] == "C-987"
+    assert nota["cliente"]["id"] == "id-do-provedor"
+    assert nota["cliente"]["nome"] == "Pessoa no provedor"

@@ -1,3 +1,5 @@
+import BuscaPessoa from "../../../components/v2/BuscaPessoa/BuscaPessoa";
+import useBuscaEntidadeLocal from "../../../components/v2/BuscaEntidade/useBuscaEntidadeLocal";
 export default function HistoricoInternacoesFiltros({
   pessoas,
   petsHistoricoDaPessoa,
@@ -10,6 +12,12 @@ export default function HistoricoInternacoesFiltros({
   onChangePessoaHistorico,
   onChangePetHistorico,
 }) {
+  const buscaPessoa = useBuscaEntidadeLocal({
+    itens: pessoas,
+    valueId: filtroPessoaHistorico,
+    onChangeId: onChangePessoaHistorico,
+    tipo: "pessoa",
+  });
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4">
       <p className="text-sm font-semibold text-gray-700 mb-3">Filtros do histórico</p>
@@ -34,18 +42,7 @@ export default function HistoricoInternacoesFiltros({
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Pessoa (tutor)</label>
-          <select
-            value={filtroPessoaHistorico}
-            onChange={(event) => onChangePessoaHistorico(event.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
-          >
-            <option value="">Todas</option>
-            {pessoas.map((pessoa) => (
-              <option key={pessoa.id} value={pessoa.id}>
-                {pessoa.nome}
-              </option>
-            ))}
-          </select>
+          <BuscaPessoa {...buscaPessoa} placeholder="Código ou nome do tutor" />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Pet</label>

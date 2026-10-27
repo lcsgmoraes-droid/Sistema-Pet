@@ -90,7 +90,7 @@ export default function GerenciarAgendamentoModal({
             <p className="mt-1 text-sm text-gray-800">
               <CustomerIdentity
                 codeLabel="Cod. tutor"
-                fallback={agendamento.cliente_id ? `Tutor #${agendamento.cliente_id}` : ""}
+                fallback={agendamento.cliente_id ? "Tutor não informado" : ""}
                 nameClassName="font-medium text-gray-800"
                 record={agendamento}
               />

@@ -73,7 +73,7 @@ function ResumoInternacao({ internacao }) {
         <CustomerIdentity
           className="mt-0.5 text-xs text-gray-500"
           codeLabel="Cod. tutor"
-          fallback={`Tutor #${internacao.tutor_id || "-"}`}
+          fallback={"Tutor não informado"}
           label="Tutor"
           nameClassName="font-medium text-gray-600"
           record={internacao}

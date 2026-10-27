@@ -1,3 +1,7 @@
+import BuscaPessoa from "../v2/BuscaPessoa/BuscaPessoa";
+import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
+import InputCombobox from "../v2/InputCombobox/InputCombobox";
+
 export default function CampanhasGestorHeader({
   gestorModo,
   setGestorModo,
@@ -26,7 +30,7 @@ export default function CampanhasGestorHeader({
         </div>
 
         <div className="flex gap-2 shrink-0">
-          <button
+          <BotaoInteracao
             onClick={() => setGestorModo("cliente")}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               gestorModo === "cliente"
@@ -35,8 +39,8 @@ export default function CampanhasGestorHeader({
             }`}
           >
             Por Cliente
-          </button>
-          <button
+          </BotaoInteracao>
+          <BotaoInteracao
             onClick={() => setGestorModo("campanha")}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               gestorModo === "campanha"
@@ -45,73 +49,51 @@ export default function CampanhasGestorHeader({
             }`}
           >
             Por Campanha
-          </button>
+          </BotaoInteracao>
         </div>
       </div>
 
       {gestorModo === "cliente" && (
         <div className="relative max-w-md">
-          <input
-            type="text"
+          <BuscaPessoa
             value={gestorSearch}
-            onChange={(e) => {
-              setGestorSearch(e.target.value);
-              buscarClientesGestor(e.target.value);
+            onChange={(valor) => {
+              setGestorSearch(valor);
+              buscarClientesGestor(valor);
             }}
-            onKeyDown={(e) => e.key === "Escape" && setGestorSugestoes([])}
+            onKeyDown={(evento) => {
+              if (evento.key === "Escape") setGestorSugestoes([]);
+            }}
+            onSelect={selecionarClienteGestor}
+            suggestions={gestorSugestoes}
+            showSuggestions={gestorSugestoes.length > 0}
+            loading={gestorBuscando}
             placeholder="Codigo, nome, CPF ou telefone..."
-            className="w-full border rounded-lg px-3 py-2.5 text-sm"
-            autoComplete="off"
           />
-
-          {gestorBuscando && (
-            <span className="absolute right-3 top-3 text-xs text-gray-400 animate-pulse">
-              Buscando...
-            </span>
-          )}
-
-          {gestorSugestoes.length > 0 && (
-            <div className="absolute z-20 mt-1 w-full bg-white rounded-xl border shadow-xl overflow-hidden max-h-72 overflow-y-auto">
-              {gestorSugestoes.map((cliente) => (
-                <button
-                  key={cliente.id}
-                  onClick={() => selecionarClienteGestor(cliente)}
-                  className="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors border-b last:border-b-0"
-                >
-                  <p className="text-sm font-medium text-gray-900">{cliente.nome}</p>
-                  <p className="text-xs text-gray-400">
-                    {cliente.codigo ? `Cod.: ${cliente.codigo}` : ""}
-                    {cliente.codigo && (cliente.cpf || cliente.telefone) ? " - " : ""}
-                    {cliente.cpf ? `CPF: ${cliente.cpf}` : ""}
-                    {cliente.cpf && cliente.telefone ? " - " : ""}
-                    {cliente.telefone || ""}
-                  </p>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       )}
 
       {gestorModo === "campanha" && (
         <div className="flex gap-3 flex-wrap items-center">
-          <select
+          <InputCombobox
             value={gestorCampanhaTipo}
-            onChange={(e) => setGestorCampanhaTipo(e.target.value)}
-            className="border rounded-lg px-3 py-2 text-sm min-w-[200px]"
-          >
-            <option value="carimbos">Cartao Fidelidade</option>
-            <option value="cashback">Cashback (saldo positivo)</option>
-            <option value="cupons">Cupons Ativos</option>
-            <option value="ranking">Ranking (mes atual)</option>
-          </select>
-          <button
+            onChange={setGestorCampanhaTipo}
+            label="Tipo de campanha"
+            permitirLimpar={false}
+            opcoes={[
+              { value: "carimbos", label: "Cartao Fidelidade" },
+              { value: "cashback", label: "Cashback (saldo positivo)" },
+              { value: "cupons", label: "Cupons Ativos" },
+              { value: "ranking", label: "Ranking (mes atual)" },
+            ]}
+          />
+          <BotaoInteracao
             onClick={() => carregarClientesPorCampanha(gestorCampanhaTipo)}
             disabled={gestorCampanhaCarregando}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
           >
             {gestorCampanhaCarregando ? "Carregando..." : "Buscar Clientes"}
-          </button>
+          </BotaoInteracao>
         </div>
       )}
     </div>

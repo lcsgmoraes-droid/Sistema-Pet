@@ -1,3 +1,4 @@
+import { obterCodigoProdutoPublico } from "../../utils/codigosPublicos.js";
 export const formatarQuantidade = (valor) =>
   new Intl.NumberFormat("pt-BR", {
     minimumFractionDigits: 0,
@@ -766,12 +767,12 @@ export function montarCupomTransferencia(
     if (mostrarCodigo && mostrarQuantidade) {
       linhas.push(
         parCupom(
-          `Cod ${item.codigo || item.produto_id || "-"}`,
+          `Cod ${obterCodigoProdutoPublico(item) || "-"}`,
           `Qtd ${formatarQuantidade(item.quantidade)}`,
         ),
       );
     } else if (mostrarCodigo) {
-      linhas.push(cortarCupom(`Cod ${item.codigo || item.produto_id || "-"}`));
+      linhas.push(cortarCupom(`Cod ${obterCodigoProdutoPublico(item) || "-"}`));
     } else if (mostrarQuantidade) {
       linhas.push(cortarCupom(`Qtd ${formatarQuantidade(item.quantidade)}`));
     }

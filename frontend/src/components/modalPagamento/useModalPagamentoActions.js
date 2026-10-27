@@ -45,6 +45,7 @@ export function useModalPagamentoActions({
   setContextoExcedenteServidor,
   setErroPagamentosExistentes,
   bandeira,
+  caixaRecebimentoId,
   corParcelamentoAtual,
   cupomParaFinalizar,
   descricaoCupomMargem,
@@ -333,6 +334,7 @@ export function useModalPagamentoActions({
         return;
       }
       const opcoesFinalizacao = {
+        caixa_id: caixaRecebimentoId || null,
         cupom_code: cupomParaFinalizar?.code || null,
         cupom_discount_applied: cupomParaFinalizar?.discount_applied ?? null,
         nao_gerar_beneficios: naoGerarBeneficios,

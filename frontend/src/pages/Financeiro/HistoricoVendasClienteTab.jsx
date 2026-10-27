@@ -1,11 +1,9 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../api";
-import { buscarClientes as buscarClientesAPI } from "../../api/clientes";
+import TutorAutocomplete from "../../components/TutorAutocomplete";
+import BotaoCancelar from "../../components/v2/BotaoCancelar/BotaoCancelar";
 import {
-  FiSearch,
-  FiUser,
-  FiX,
   FiFilter,
   FiCalendar,
   FiDollarSign,
@@ -555,142 +553,33 @@ const HistoricoInline = ({ clienteId, clienteInfo }) => {
    Componente principal: busca de cliente + histórico inline
    ----------------------------------------------------------------------- */
 const HistoricoVendasClienteTab = () => {
-  const [busca, setBusca] = useState("");
-  const [resultados, setResultados] = useState([]);
-  const [loadingBusca, setLoadingBusca] = useState(false);
   const [clienteSelecionado, setClienteSelecionado] = useState(null);
-  const [mostrarDropdown, setMostrarDropdown] = useState(false);
-  const debounceRef = useRef(null);
-  const wrapperRef = useRef(null);
-
-  // Fecha dropdown ao clicar fora
-  useEffect(() => {
-    const handler = (e) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setMostrarDropdown(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const buscarClientes = (termo) => {
-    clearTimeout(debounceRef.current);
-    setBusca(termo);
-    if (!termo || termo.trim().length < 2) {
-      setResultados([]);
-      setMostrarDropdown(false);
-      return;
-    }
-    debounceRef.current = setTimeout(async () => {
-      try {
-        setLoadingBusca(true);
-        const lista = await buscarClientesAPI({ search: termo, limit: 10 });
-        setResultados(Array.isArray(lista) ? lista : []);
-        setMostrarDropdown(true);
-      } catch {
-        setResultados([]);
-      } finally {
-        setLoadingBusca(false);
-      }
-    }, 350);
-  };
-
-  const selecionarCliente = (cliente) => {
-    setClienteSelecionado(cliente);
-    setBusca(cliente.nome);
-    setMostrarDropdown(false);
-    setResultados([]);
-  };
-
-  const limparCliente = () => {
-    setClienteSelecionado(null);
-    setBusca("");
-    setResultados([]);
-    setMostrarDropdown(false);
-  };
-
   return (
     <div className="p-6">
-      {/* Cabeçalho */}
       <div className="mb-5">
-        <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-          <FiUser className="text-purple-600" />
-          Histórico de Vendas por Cliente
-        </h2>
-        <p className="text-sm text-gray-500 mt-1">
-          Pesquise um cliente pelo nome, código ou telefone para visualizar seu histórico financeiro
-          completo.
+        <h2 className="text-xl font-bold text-gray-800">Histórico de Vendas por Cliente</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Pesquise pelo código, nome, documento ou telefone.
         </p>
       </div>
-
-      {/* Campo de busca */}
-      <div ref={wrapperRef} className="relative max-w-xl">
-        <div className="flex items-center gap-2 border border-gray-300 rounded-xl px-4 py-2.5 bg-white shadow-sm focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-transparent">
-          <FiSearch className="text-gray-400 flex-shrink-0" />
-          <input
-            type="text"
-            value={busca}
-            onChange={(e) => buscarClientes(e.target.value)}
-            placeholder="Buscar por nome, código ou telefone..."
-            className="flex-1 outline-none text-sm text-gray-800 bg-transparent"
-            onFocus={() => resultados.length > 0 && setMostrarDropdown(true)}
-          />
-          {loadingBusca && (
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-500 flex-shrink-0" />
-          )}
-          {busca && !loadingBusca && (
-            <button
-              onClick={limparCliente}
-              className="text-gray-400 hover:text-gray-600 flex-shrink-0"
-            >
-              <FiX size={16} />
-            </button>
-          )}
-        </div>
-
-        {/* Dropdown de resultados */}
-        {mostrarDropdown && resultados.length > 0 && (
-          <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden max-h-60 overflow-y-auto">
-            {resultados.map((c) => (
-              <button
-                key={c.id}
-                onMouseDown={() => selecionarCliente(c)}
-                className="w-full text-left px-4 py-3 hover:bg-purple-50 flex items-center gap-3 border-b border-gray-100 last:border-0"
-              >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                  {c.nome?.[0]?.toUpperCase() || "?"}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{c.nome}</p>
-                  <p className="text-xs text-gray-500">
-                    Cód: {c.codigo || "-"}
-                    {c.telefone && ` · ${c.telefone}`}
-                  </p>
-                </div>
-              </button>
-            ))}
-          </div>
+      <div className="max-w-xl space-y-2">
+        <TutorAutocomplete
+          label="Cliente"
+          inputId="historico-financeiro-cliente"
+          selectedTutor={clienteSelecionado}
+          onSelect={setClienteSelecionado}
+        />
+        {clienteSelecionado && (
+          <BotaoCancelar tamanho="pequeno" onClick={() => setClienteSelecionado(null)}>
+            Limpar cliente
+          </BotaoCancelar>
         )}
-
-        {mostrarDropdown &&
-          !loadingBusca &&
-          resultados.length === 0 &&
-          busca.trim().length >= 2 && (
-            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 px-4 py-3 text-sm text-gray-500">
-              Nenhum cliente encontrado para "{busca}"
-            </div>
-          )}
       </div>
-
-      {/* Estado inicial sem cliente */}
       {!clienteSelecionado && (
-        <div className="mt-12 text-center text-gray-400">
-          <FiUser className="text-6xl mx-auto mb-3 opacity-30" />
-          <p className="text-lg font-medium">Selecione um cliente acima</p>
-          <p className="text-sm mt-1">O histórico financeiro completo será exibido aqui</p>
-        </div>
+        <p className="mt-12 text-center text-gray-500">
+          Selecione um cliente acima para consultar seu histórico financeiro.
+        </p>
       )}
-
-      {/* Histórico do cliente selecionado */}
       {clienteSelecionado && (
         <HistoricoInline
           key={clienteSelecionado.id}

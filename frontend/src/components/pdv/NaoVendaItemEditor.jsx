@@ -1,3 +1,5 @@
+import BuscaProduto from "../v2/BuscaProduto/BuscaProduto";
+import FornecedorSelector from "../fornecedores/FornecedorSelector";
 import { CheckCircle2, PackageSearch, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -36,7 +38,7 @@ export default function NaoVendaItemEditor({
 
   useEffect(() => {
     const termo = String(item.produto_nome || "").trim();
-    if (item.produto_id || termo.length < 2) {
+    if (item.produto_id || termo.length < 1) {
       setSugestoes([]);
       return undefined;
     }
@@ -143,34 +145,15 @@ export default function NaoVendaItemEditor({
           <span className="mb-1 block text-xs font-medium text-slate-600">
             Produto ou descrição livre
           </span>
-          <input
+          <BuscaProduto
             value={item.produto_nome}
-            onChange={(event) => alterarNomeProduto(event.target.value)}
-            placeholder="Busque no catálogo ou escreva o que o cliente pediu"
-            className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            onChange={alterarNomeProduto}
+            suggestions={sugestoes}
+            showSuggestions={!item.produto_id}
+            loading={buscando}
+            onSelect={selecionarProduto}
+            placeholder="Código, nome ou descrição livre do produto procurado"
           />
-          {buscando && (
-            <span className="absolute right-3 top-8 text-xs text-slate-400">Buscando...</span>
-          )}
-          {sugestoes.length > 0 && (
-            <div className="absolute z-30 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl">
-              {sugestoes.map((produto) => (
-                <button
-                  key={produto.id}
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => selecionarProduto(produto)}
-                  className="block w-full border-b border-slate-100 px-3 py-2 text-left last:border-0 hover:bg-blue-50"
-                >
-                  <p className="text-sm font-medium text-slate-800">{produto.nome}</p>
-                  <p className="text-xs text-slate-500">
-                    SKU {produto.codigo || "não informado"}
-                    {produto.marca?.nome ? ` • ${produto.marca.nome}` : ""}
-                  </p>
-                </button>
-              ))}
-            </div>
-          )}
         </label>
 
         <label className="md:col-span-3">
@@ -191,18 +174,20 @@ export default function NaoVendaItemEditor({
 
         <label className="md:col-span-3">
           <span className="mb-1 block text-xs font-medium text-slate-600">Fornecedor opcional</span>
-          <input
-            list={`fornecedores-nao-venda-${item.chave}`}
+          <FornecedorSelector
             value={item.fornecedor_nome}
-            onChange={(event) => alterarFornecedor(event.target.value)}
-            placeholder="Fornecedor"
-            className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            onInputChange={alterarFornecedor}
+            fornecedores={fornecedores}
+            allowCreate={false}
+            showLabel={false}
+            onSelect={(fornecedor) =>
+              onChange({
+                fornecedor_id: fornecedor.id,
+                fornecedor_nome: nomeFornecedor(fornecedor),
+              })
+            }
+            placeholder="Código ou nome do fornecedor opcional"
           />
-          <datalist id={`fornecedores-nao-venda-${item.chave}`}>
-            {fornecedores.map((fornecedor) => (
-              <option key={fornecedor.id} value={nomeFornecedor(fornecedor)} />
-            ))}
-          </datalist>
         </label>
 
         <label className="md:col-span-2">

@@ -164,6 +164,7 @@ def finalizar_venda(
             caixa_id=caixa_id,
             permitir_caixa_tenant=permitir_caixa_tenant,
             permitir_fechado=data_ocorrencia is not None,
+            exigir_selecao=True,
         )
         caixa_aberto_id = caixa_info["caixa_id"]
         logger.debug(f"✅ Caixa validado: ID={caixa_aberto_id}")

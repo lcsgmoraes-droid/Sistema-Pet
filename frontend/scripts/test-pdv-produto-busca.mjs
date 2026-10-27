@@ -25,6 +25,15 @@ assert.equal(encontrarProdutoPorCodigo([produto], "7891000100103")?.id, 6083);
 assert.equal(produtoCorrespondeBusca(produto, "018636.1"), true);
 assert.equal(produtoCorrespondeBusca(produto, "sku-6083 7891000100103"), true);
 assert.equal(produtoCorrespondeBusca(produto, "9999999999999"), false);
+assert.equal(
+  encontrarProdutoPorCodigo([{ id: 1, codigo: "QA-OPER-1234567" }], "Produto QA 1234567"),
+  null,
+);
+assert.equal(encontrarProdutoPorCodigo([{ id: 1, codigo: "QA-OPER-1234567" }], "1234567"), null);
+assert.equal(
+  produtoCorrespondeBusca({ codigo: "1234567", nome: "Outro" }, "inexistente1234567"),
+  false,
+);
 
 assert.equal(
   deveAdicionarProdutoAutomaticamente({

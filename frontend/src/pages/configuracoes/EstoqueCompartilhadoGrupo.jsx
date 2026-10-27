@@ -1,3 +1,4 @@
+import BuscaProduto from "../../components/v2/BuscaProduto/BuscaProduto";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { FiPackage, FiSearch, FiShare2, FiTrash2 } from "react-icons/fi";
@@ -199,9 +200,10 @@ export default function EstoqueCompartilhadoGrupo({ empresaAtualId, grupo }) {
             </option>
           ))}
         </select>
-        <input
+        <BuscaProduto
           value={busca}
-          onChange={(event) => setBusca(event.target.value)}
+          onChange={setBusca}
+          showSuggestions={false}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.preventDefault();

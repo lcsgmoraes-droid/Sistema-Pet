@@ -110,7 +110,7 @@ export default function BanhoTosaAtendimentoPanel({
                   {dados?.pet_nome || "Carregando pet..."}
                 </h2>
                 <p className="truncate text-sm text-slate-500">
-                  Tutor: {dados?.cliente_nome || `#${dados?.cliente_id || "-"}`}
+                  Tutor: {dados?.cliente_nome || "Tutor não informado"}
                 </p>
               </div>
             </div>

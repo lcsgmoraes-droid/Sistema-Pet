@@ -5,6 +5,7 @@ import {
   calcularSaldoFinanceiro,
   ehContaDeRepasseCartao,
   ehLancamentoFinanceiroCancelado,
+  obterStatusContaReceber,
 } from "./financeiroStatus.js";
 
 assert.equal(ehLancamentoFinanceiroCancelado("cancelado"), true);
@@ -55,3 +56,19 @@ assert.equal(
 );
 
 console.log("financeiroStatus: ok");
+assert.equal(
+  obterStatusContaReceber({ status: "pago", valor_final: 100, valor_recebido: 100 }),
+  "recebido",
+);
+assert.equal(
+  obterStatusContaReceber({ status: "vencido", valor_final: 100, valor_recebido: 100 }),
+  "recebido",
+);
+assert.equal(
+  obterStatusContaReceber({ status: "baixa_parcial", valor_final: 100, valor_recebido: 50 }),
+  "parcial",
+);
+assert.equal(
+  obterStatusContaReceber({ status: "cancelado", valor_final: 100, valor_recebido: 100 }),
+  "cancelado",
+);

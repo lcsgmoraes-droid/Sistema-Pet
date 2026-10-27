@@ -1,3 +1,4 @@
+import { obterCodigoPessoaPublico } from "../../utils/codigosPublicos.js";
 import { formatMoneyBRL } from "../../utils/formatters.js";
 
 const statusLabels = {
@@ -11,6 +12,9 @@ const statusLabels = {
 const tipoLabels = {
   venda: "Vendas",
   devolucao: "Devoluções",
+  conta_receber: "Contas a receber",
+  recebimento: "Recebimentos",
+  credito: "Créditos",
 };
 
 const formatarData = (valor) => {
@@ -62,7 +66,7 @@ export async function gerarPdfComprasCliente({ cliente, filtros, transacoes }) {
   };
 
   pdf.setTextColor(26, 45, 73);
-  escrever("CorePet | Histórico de compras", 16, true, 8);
+  escrever("CorePet | Histórico financeiro", 16, true, 8);
   pdf.setTextColor(40, 50, 65);
   escrever(
     `Cliente: ${cliente?.nome || "Cliente"}${cliente?.codigo ? ` (${cliente.codigo})` : ""}`,
@@ -78,13 +82,13 @@ export async function gerarPdfComprasCliente({ cliente, filtros, transacoes }) {
   escrever(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, 8);
   y += 5;
 
-  const total = transacoes.reduce((soma, transacao) => soma + Number(transacao.valor || 0), 0);
-  escrever(
-    `${transacoes.length} transação(ões) | Total do período: ${formatMoneyBRL(total)}`,
-    11,
-    true,
-    7,
-  );
+  escrever(`${transacoes.length} transação(ões) no período`, 11, true, 7);
+  for (const [tipo, label] of Object.entries(tipoLabels)) {
+    const movimentos = transacoes.filter((transacao) => transacao.tipo === tipo);
+    if (!movimentos.length) continue;
+    const total = movimentos.reduce((soma, transacao) => soma + Number(transacao.valor || 0), 0);
+    escrever(`${label}: ${formatMoneyBRL(total)}`, 9);
+  }
   if (filtros.status === "aberta") {
     escrever("Valores das vendas; o saldo devedor atualizado pode ser diferente.", 8);
   }
@@ -92,7 +96,10 @@ export async function gerarPdfComprasCliente({ cliente, filtros, transacoes }) {
 
   for (const transacao of transacoes) {
     const numero = transacao.detalhes?.numero_venda || transacao.detalhes?.venda_id || "-";
-    const titulo = `${formatarData(transacao.data)}  |  ${transacao.tipo === "devolucao" ? "Devolução" : "Venda"} #${numero}`;
+    const referencia = ["venda", "devolucao"].includes(transacao.tipo)
+      ? `${transacao.tipo === "devolucao" ? "Devolução" : "Venda"} #${numero}`
+      : transacao.descricao || tipoLabels[transacao.tipo] || "Movimento";
+    const titulo = `${formatarData(transacao.data)}  |  ${referencia}`;
     const valor = formatMoneyBRL(transacao.valor);
     const status = statusLabels[transacao.status] || transacao.status || "-";
     const tituloLinhas = pdf.splitTextToSize(titulo, largura);
@@ -104,6 +111,12 @@ export async function gerarPdfComprasCliente({ cliente, filtros, transacoes }) {
     pdf.line(margem, y - 4, margem + largura, y - 4);
     escrever(titulo, 10, true);
     escrever(`Valor: ${valor}    Status: ${status}`);
+    if (transacao.detalhes?.data_baixa) {
+      escrever(`Data da baixa: ${formatarData(transacao.detalhes.data_baixa)}`, 8);
+    }
+    if (transacao.detalhes?.observacoes) {
+      escrever(`Observação: ${transacao.detalhes.observacoes}`, 8);
+    }
     if (Number(transacao.detalhes?.desconto) > 0) {
       escrever(`Desconto: ${formatMoneyBRL(transacao.detalhes.desconto)}`, 8);
     }
@@ -119,6 +132,9 @@ export async function gerarPdfComprasCliente({ cliente, filtros, transacoes }) {
     pdf.text(`Página ${pagina} de ${totalPaginas}`, margem + largura, 287, { align: "right" });
   }
 
-  const codigo = String(cliente?.codigo || cliente?.id || "cliente").replace(/[^a-zA-Z0-9-]/g, "");
+  const codigo = String(obterCodigoPessoaPublico(cliente) || "cliente").replace(
+    /[^a-zA-Z0-9-]/g,
+    "",
+  );
   pdf.save(`corepet-compras-${codigo}-${new Date().toISOString().slice(0, 10)}.pdf`);
 }

@@ -252,7 +252,8 @@ def detalhe_fechamento(
                     ci.observacao_pagamento,
                     ci.data_fechamento,
                     p.nome as nome_produto,
-                    v.cliente_id
+                    v.cliente_id,
+                    ci.valor_fixo
                 FROM comissoes_itens ci
                 LEFT JOIN produtos p ON ci.produto_id = p.id AND p.{tenant_filter}
                 LEFT JOIN vendas v ON ci.venda_id = v.id AND v.{tenant_filter}
@@ -329,6 +330,7 @@ def detalhe_fechamento(
                     "valor_comissao_gerada": float(row[7]) if row[7] else 0.0,
                     "valor_comissao": float(row[7]) if row[7] else 0.0,
                     "tipo_calculo": row[8],
+                    "valor_fixo": float(row[14] or 0),
                 }
 
                 comissoes.append(comissao)

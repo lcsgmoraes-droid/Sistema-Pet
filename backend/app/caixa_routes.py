@@ -542,24 +542,7 @@ def reabrir_caixa(
             400, "Descreva o motivo da reabertura com pelo menos 10 caracteres."
         )
 
-    caixa_aberto, compartilhado = buscar_caixa_aberto(
-        db,
-        tenant_id=tenant_id,
-        usuario_id=current_user.id,
-        bloquear_config=True,
-    )
-
-    if caixa_aberto:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "A empresa já possui um caixa compartilhado aberto. Feche-o antes de reabrir outro."
-                if compartilhado
-                else "Você já possui um caixa aberto. Feche-o antes de reabrir outro."
-            ),
-        )
-
-    caixa, _ = buscar_caixa_acessivel(
+    caixa, compartilhado = buscar_caixa_acessivel(
         db,
         caixa_id=caixa_id,
         tenant_id=tenant_id,
@@ -707,6 +690,18 @@ def obter_resumo_caixa(
         data_venda, _forma, _forma_id, quantidade, total = pagamento
         forma = nome_forma_pagamento(pagamento, nomes_formas)
         somar_recebimento(data_venda, forma, quantidade, total, "pagamento")
+    for movimento in movimentacoes:
+        if (
+            movimento.tipo == "recebimento"
+            and movimento.categoria == "recebimento_conta"
+        ):
+            somar_recebimento(
+                None,
+                movimento.forma_pagamento or "Recebimento de conta",
+                1,
+                movimento.valor,
+                "recebimento",
+            )
 
     total_vendido = (
         db.query(func.sum(Venda.total))

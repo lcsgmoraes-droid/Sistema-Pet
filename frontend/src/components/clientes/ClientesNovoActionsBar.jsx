@@ -1,6 +1,7 @@
-import { FileText, GitMerge, Plus, Search, UploadCloud, X } from "lucide-react";
-import ActionButton from "../ui/ActionButton";
-import IconActionButton from "../ui/IconActionButton";
+import { FileText, GitMerge, Plus, UploadCloud, X } from "lucide-react";
+import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
+import BuscaPessoa from "../v2/BuscaPessoa/BuscaPessoa";
+import BotaoCancelar from "../v2/BotaoCancelar/BotaoCancelar";
 import Panel from "../ui/Panel";
 
 const ClientesNovoActionsBar = ({
@@ -31,16 +32,13 @@ const ClientesNovoActionsBar = ({
     <Panel className="mb-6" padding="md">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative min-w-0 flex-1 lg:max-w-xl">
-          <Search
-            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-            aria-hidden="true"
-          />
-          <input
+          <BuscaPessoa
             className="h-10 w-full rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             type="text"
             placeholder="Buscar por codigo, nome, CPF/CNPJ, email ou telefone..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={setSearchTerm}
+            showSuggestions={false}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
@@ -58,7 +56,7 @@ const ClientesNovoActionsBar = ({
                   ? "2 pessoas selecionadas"
                   : "Selecione mais 1 pessoa para fundir"}
               </span>
-              <ActionButton
+              <BotaoInteracao
                 disabled={pessoasSelecionadasFusao.length !== 2}
                 icon={GitMerge}
                 intent="warning"
@@ -71,8 +69,8 @@ const ClientesNovoActionsBar = ({
                 }
               >
                 Fundir ({pessoasSelecionadasFusao.length})
-              </ActionButton>
-              <IconActionButton
+              </BotaoInteracao>
+              <BotaoCancelar
                 aria-label="Cancelar fusao"
                 icon={X}
                 intent="warning"
@@ -83,7 +81,7 @@ const ClientesNovoActionsBar = ({
               />
             </div>
           )}
-          <ActionButton
+          <BotaoInteracao
             icon={FileText}
             intent="info"
             onClick={onAbrirRelatorio}
@@ -91,8 +89,8 @@ const ClientesNovoActionsBar = ({
             tone="soft"
           >
             Relatorios
-          </ActionButton>
-          <ActionButton
+          </BotaoInteracao>
+          <BotaoInteracao
             icon={UploadCloud}
             intent="neutral"
             onClick={() => setShowModalImportacao(true)}
@@ -100,15 +98,15 @@ const ClientesNovoActionsBar = ({
             tone="soft"
           >
             Importar Excel
-          </ActionButton>
-          <ActionButton
+          </BotaoInteracao>
+          <BotaoInteracao
             icon={Plus}
             intent="create"
             onClick={() => openModal(null, tipoFiltro)}
             size="lg"
           >
             Novo {labelNovo}
-          </ActionButton>
+          </BotaoInteracao>
         </div>
       </div>
     </Panel>

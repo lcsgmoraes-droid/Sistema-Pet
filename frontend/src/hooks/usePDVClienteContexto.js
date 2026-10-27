@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../api";
 import { useModulos } from "../contexts/ModulosContext";
 import { copyTextToClipboard } from "../utils/clipboard";
@@ -11,6 +11,9 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
   const [copiadoClienteCampo, setCopiadoClienteCampo] = useState("");
   const [vendasEmAbertoInfo, setVendasEmAbertoInfo] = useState(null);
   const [saldoCampanhas, setSaldoCampanhas] = useState(null);
+  const clienteAtualRef = useRef(vendaAtual.cliente?.id);
+  const consultaVendasRef = useRef(0);
+  clienteAtualRef.current = vendaAtual.cliente?.id;
   const atualizadorCampanhas = useMemo(
     () =>
       criarAtualizadorSaldoCampanhas({
@@ -18,8 +21,12 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
           const response = await api.get(`/campanhas/clientes/${clienteId}/saldo`, options);
           return response.data;
         },
-        onSaldo: setSaldoCampanhas,
+        onSaldo: (saldo) => {
+          if (String(saldo?.customer_id) === String(clienteAtualRef.current))
+            setSaldoCampanhas(saldo);
+        },
         onInicio: (clienteId) =>
+          String(clienteId) === String(clienteAtualRef.current) &&
           setSaldoCampanhas((prev) => ({
             ...(String(prev?.customer_id) === String(clienteId) ? prev : {}),
             customer_id: clienteId,
@@ -28,16 +35,21 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
             beneficios_consulta_limite: false,
           })),
         onErro: () =>
-          setSaldoCampanhas((prev) => ({
-            ...prev,
-            beneficios_atualizando: false,
-            beneficios_erro_atualizacao: true,
-          })),
+          setSaldoCampanhas((prev) =>
+            String(prev?.customer_id) === String(clienteAtualRef.current)
+              ? {
+                  ...prev,
+                  beneficios_atualizando: false,
+                  beneficios_erro_atualizacao: true,
+                }
+              : prev,
+          ),
       }),
     [],
   );
 
   const carregarVendasEmAbertoCliente = async (clienteId) => {
+    const consulta = ++consultaVendasRef.current;
     if (!clienteId) {
       setVendasEmAbertoInfo(null);
       return;
@@ -45,6 +57,11 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
 
     try {
       const response = await api.get(`/clientes/${clienteId}/vendas-em-aberto`);
+      if (
+        consulta !== consultaVendasRef.current ||
+        String(clienteId) !== String(clienteAtualRef.current)
+      )
+        return;
       const resumo = response.data?.resumo;
       if (resumo?.total_vendas > 0 || resumo?.total_parcelas_crediario > 0) {
         setVendasEmAbertoInfo(resumo);
@@ -52,12 +69,18 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
         setVendasEmAbertoInfo(null);
       }
     } catch (error) {
+      if (
+        consulta !== consultaVendasRef.current ||
+        String(clienteId) !== String(clienteAtualRef.current)
+      )
+        return;
       console.error("Erro ao verificar vendas em aberto:", error);
       setVendasEmAbertoInfo(null);
     }
   };
 
   const carregarSaldoCampanhasCliente = async (clienteId) => {
+    if (clienteId && String(clienteId) !== String(clienteAtualRef.current)) return;
     if (!moduloCampanhasAtivo) {
       atualizadorCampanhas.cancelar();
       setSaldoCampanhas(null);
@@ -74,6 +97,8 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
   };
 
   const limparClienteSelecionado = () => {
+    clienteAtualRef.current = null;
+    consultaVendasRef.current += 1;
     atualizadorCampanhas.cancelar();
     setVendaAtual((prev) => ({
       ...prev,
@@ -146,7 +171,10 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
     }
 
     void recarregarContextoClientePorId(clienteId);
-    return () => atualizadorCampanhas.cancelar();
+    return () => {
+      consultaVendasRef.current += 1;
+      atualizadorCampanhas.cancelar();
+    };
   }, [moduloCampanhasAtivo, vendaAtual.cliente?.id]);
 
   return {

@@ -1,4 +1,5 @@
-import { Search, Sparkles } from "lucide-react";
+import BuscaProduto from "../../components/v2/BuscaProduto/BuscaProduto";
+import { Sparkles } from "lucide-react";
 
 import OfertaProdutoCard from "./OfertaProdutoCard";
 import { ESTRATEGIAS } from "./ofertasEstudioUtils";
@@ -79,10 +80,10 @@ export default function OfertaSelecao({
 
       <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="relative flex-1">
-          <Search size={17} className="absolute left-3 top-3 text-slate-400" />
-          <input
+          <BuscaProduto
             value={busca}
-            onChange={(event) => onBusca(event.target.value)}
+            onChange={onBusca}
+            showSuggestions={false}
             className="h-10 w-full rounded-lg border border-slate-300 pl-10 pr-3 text-sm"
             placeholder="Buscar por nome, código ou código de barras"
           />
