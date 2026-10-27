@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import func
@@ -216,6 +217,54 @@ def anotar_recebimento(
         return False
 
 
+def tarifa_vigente(db: Session, categoria: str | None, dia: Any) -> Decimal | None:
+    """Preco (em reais) por mensagem da categoria no dia, ou None se nao houver tarifa."""
+    if not categoria:
+        return None
+    from app.whatsapp.consumo_models import WhatsAppTarifa
+
+    dia = dia.date() if isinstance(dia, datetime) else dia
+    tarifa = (
+        db.query(WhatsAppTarifa)
+        .filter(
+            WhatsAppTarifa.categoria == categoria, WhatsAppTarifa.vigente_desde <= dia
+        )
+        .order_by(WhatsAppTarifa.vigente_desde.desc())
+        .first()
+    )
+    return Decimal(tarifa.valor) if tarifa else None
+
+
+def estimar_custo(db: Session, linha: WhatsAppLedger) -> bool:
+    """Preenche o custo estimado de uma mensagem cobravel com a tarifa do dia."""
+    if linha.cobravel is not True or not linha.categoria_cobranca:
+        return False
+    valor = tarifa_vigente(db, linha.categoria_cobranca, linha.ocorrido_em or _agora())
+    if valor is None:
+        return False
+    linha.custo_estimado = valor
+    linha.moeda = "BRL"
+    return True
+
+
+def recalcular_custos(
+    db: Session, tenant_id: Any, inicio: datetime, fim: datetime
+) -> int:
+    """Refaz o custo estimado do periodo (ex.: depois de cadastrar uma tarifa nova)."""
+    atualizadas = 0
+    consulta = db.query(WhatsAppLedger).filter(
+        WhatsAppLedger.tenant_id == tenant_id,
+        WhatsAppLedger.ocorrido_em >= inicio,
+        WhatsAppLedger.ocorrido_em < fim,
+        WhatsAppLedger.cobravel.is_(True),
+    )
+    for linha in consulta:
+        antes = linha.custo_estimado
+        if estimar_custo(db, linha) and linha.custo_estimado != antes:
+            atualizadas += 1
+    return atualizadas
+
+
 def _de_unix(valor: Any) -> datetime:
     try:
         return datetime.fromtimestamp(int(valor), UTC)
@@ -291,6 +340,7 @@ def aplicar_estado_da_meta(
             linha.categoria_cobranca = str(preco["category"]).lower()[:30]
         if preco.get("pricing_model"):
             linha.modelo_de_preco = str(preco["pricing_model"])[:30]
+        estimar_custo(db, linha)
     return "criada" if criada else "atualizada"
 
 
@@ -351,7 +401,7 @@ def resumo_do_periodo(
             WhatsAppLedger.cobravel,
             WhatsAppLedger.janela_24h,
             func.count(WhatsAppLedger.id),
-            func.coalesce(func.sum(WhatsAppLedger.custo_estimado_centavos), 0),
+            func.coalesce(func.sum(WhatsAppLedger.custo_estimado), 0),
         )
         .filter(
             WhatsAppLedger.tenant_id == tenant_id,
@@ -373,12 +423,13 @@ def resumo_do_periodo(
         "recebidas": 0,
         "falhas": 0,
         "cobraveis": 0,
+        "cobraveis_sem_tarifa": 0,
         "sem_informacao_de_cobranca": 0,
     }
     por_categoria: dict[str, int] = {}
     por_origem: dict[str, int] = {}
     por_estado: dict[str, int] = {}
-    custo_centavos = 0
+    custo_estimado = Decimal(0)
     for (
         direcao,
         origem,
@@ -390,7 +441,7 @@ def resumo_do_periodo(
         custo,
     ) in linhas:
         quantidade = int(quantidade)
-        custo_centavos += int(custo or 0)
+        custo_estimado += Decimal(custo or 0)
         por_estado[estado] = por_estado.get(estado, 0) + quantidade
         if direcao == DIRECAO_RECEBIDA:
             total["recebidas"] += quantidade
@@ -406,13 +457,26 @@ def resumo_do_periodo(
         elif cobravel is None and estado != ESTADO_FALHOU:
             # A Meta ainda nao informou a cobranca (ou o provedor nao informa).
             total["sem_informacao_de_cobranca"] += quantidade
+    # Cobraveis sem tarifa cadastrada: o custo estimado fica subestimado ate cadastrar.
+    total["cobraveis_sem_tarifa"] = int(
+        db.query(func.count(WhatsAppLedger.id))
+        .filter(
+            WhatsAppLedger.tenant_id == tenant_id,
+            WhatsAppLedger.ocorrido_em >= inicio,
+            WhatsAppLedger.ocorrido_em < fim,
+            WhatsAppLedger.cobravel.is_(True),
+            WhatsAppLedger.custo_estimado.is_(None),
+        )
+        .scalar()
+        or 0
+    )
     return {
         "periodo": {"inicio": inicio.isoformat(), "fim": fim.isoformat()},
         "totais": total,
         "cobraveis_por_categoria": por_categoria,
         "enviadas_por_origem": por_origem,
         "por_estado": por_estado,
-        "custo_estimado_centavos": custo_centavos,
+        "custo_estimado": float(round(custo_estimado, 2)),
     }
 
 

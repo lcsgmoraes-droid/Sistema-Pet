@@ -16,7 +16,6 @@ from app.services.ops_lojas_modulos_service import (
     listar_lojas,
 )
 from app.services.ops_tenant_log_service import listar_historico
-from app.services.ops_whatsapp_consumo_service import consumo_do_mes
 
 router = APIRouter(prefix="/admin/lojas", tags=["Admin - Lojas e módulos"])
 
@@ -28,19 +27,6 @@ def listar(
     db: Session = Depends(get_session),
 ) -> dict[str, Any]:
     return listar_lojas(db, search=search)
-
-
-@router.get("/consumo-whatsapp")
-def consumo_whatsapp(
-    mes: str | None = Query(None, description="AAAA-MM; vazio = mês atual"),
-    _admin: PlatformAdmin = Depends(require_platform_admin),
-    db: Session = Depends(get_session),
-) -> dict[str, Any]:
-    """Mensagens de WhatsApp por loja no mês, para conferir e repassar o custo da Meta."""
-    try:
-        return consumo_do_mes(db, mes)
-    except ValueError as erro:
-        raise HTTPException(status_code=422, detail=str(erro)) from erro
 
 
 @router.get("/historico")

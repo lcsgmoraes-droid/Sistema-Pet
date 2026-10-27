@@ -427,3 +427,140 @@ async def _send_whatsapp_message_with_context(
                 erro_mensagem=getattr(e, "mensagem", None) or type(e).__name__,
             )
         return None
+
+
+# ============================================================================
+# ENVIO DE MODELO APROVADO (mensagem proativa, fora da janela de 24h)
+# ============================================================================
+
+CATEGORIAS_DE_MODELO = ("marketing", "utility", "authentication")
+
+
+async def send_whatsapp_template(
+    db: Session,
+    tenant_id: str,
+    session_id: str,
+    template_name: str,
+    categoria: str,
+    parameters: Optional[list] = None,
+    language_code: str = "pt_BR",
+    origem: str = "automacao",
+    texto_para_chat: Optional[str] = None,
+) -> Optional[WhatsAppMessage]:
+    """Envia um modelo aprovado pela Meta e registra no chat e no livro-razao.
+
+    A categoria (marketing, utility ou authentication) e a que o modelo tem na Meta:
+    e ela que define o preco cobrado, entao e gravada para a conferencia de custos.
+    Respeita quem recusou mensagens; o bloqueio tambem fica registrado.
+    """
+    if categoria not in CATEGORIAS_DE_MODELO:
+        raise ValueError(f"Categoria de modelo inválida: {categoria}")
+    with whatsapp_tenant_context(tenant_id):
+        return await _send_whatsapp_template_with_context(
+            db=db,
+            tenant_id=tenant_id,
+            session_id=session_id,
+            template_name=template_name,
+            categoria=categoria,
+            parameters=parameters,
+            language_code=language_code,
+            origem=origem,
+            texto_para_chat=texto_para_chat,
+        )
+
+
+async def _send_whatsapp_template_with_context(
+    *,
+    db: Session,
+    tenant_id: str,
+    session_id: str,
+    template_name: str,
+    categoria: str,
+    parameters: Optional[list],
+    language_code: str,
+    origem: str,
+    texto_para_chat: Optional[str],
+) -> Optional[WhatsAppMessage]:
+    from app.whatsapp.consent_service import pode_enviar_whatsapp
+
+    client_obj = None
+    session = None
+    try:
+        client_obj = _build_whatsapp_client(db, tenant_id)
+        if not client_obj:
+            return None
+        session = db.query(WhatsAppSession).get(session_id)
+        if not session:
+            logger.error(f"Sessão {session_id} não encontrada")
+            return None
+        provedor = ledger_service.provedor_do_cliente(client_obj)
+
+        permitido, motivo = pode_enviar_whatsapp(
+            db, tenant_id, session.phone_number, session.cliente_id
+        )
+        if not permitido:
+            ledger_service.anotar_falha_de_envio(
+                db,
+                tenant_id=tenant_id,
+                provedor=provedor,
+                session=session,
+                session_id=session_id,
+                origem=origem,
+                erro_codigo="bloqueado",
+                erro_mensagem=f"Envio bloqueado: {motivo}",
+                tipo_conteudo="modelo",
+            )
+            return None
+
+        response = await client_obj.send_template_message(
+            to=session.phone_number,
+            template_name=template_name,
+            language_code=language_code,
+            parameters=parameters,
+        )
+        whatsapp_message_id = response.get("messages", [{}])[0].get("id")
+
+        conteudo = texto_para_chat or f"[Modelo: {template_name}]"
+        db_message = WhatsAppMessage(
+            session_id=session_id,
+            tenant_id=tenant_id,
+            tipo="enviada",
+            conteudo=conteudo,
+            whatsapp_message_id=whatsapp_message_id,
+            created_at=datetime.utcnow(),
+        )
+        db.add(db_message)
+        session.message_count += 1
+        session.last_message_at = datetime.utcnow()
+        db.commit()
+        db.refresh(db_message)
+
+        ledger_service.anotar_envio(
+            db,
+            tenant_id=tenant_id,
+            provedor=provedor,
+            session=session,
+            message_row=db_message,
+            wa_message_id=whatsapp_message_id,
+            origem=origem,
+            tipo_conteudo="modelo",
+            template_nome=template_name,
+            template_categoria=categoria,
+        )
+        return db_message
+    except Exception as erro:
+        logger.error("Erro ao enviar modelo %s: %s", template_name, type(erro).__name__)
+        db.rollback()
+        if client_obj is not None:
+            ledger_service.anotar_falha_de_envio(
+                db,
+                tenant_id=tenant_id,
+                provedor=ledger_service.provedor_do_cliente(client_obj),
+                session=session,
+                session_id=session_id,
+                origem=origem,
+                erro_codigo=getattr(erro, "codigo", None),
+                erro_mensagem=getattr(erro, "mensagem", None) or type(erro).__name__,
+                tipo_conteudo="modelo",
+            )
+        return None

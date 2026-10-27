@@ -11,6 +11,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.db import Base
 from app.tenancy.context import clear_current_tenant, set_current_tenant
+from app.whatsapp import consumo_models  # noqa: F401  (cria a tabela de tarifas)
 from app.whatsapp import ledger_service as ledger
 from app.whatsapp import models_handoff  # noqa: F401  (mapeia WhatsAppHandoff)
 from app.whatsapp.ledger_models import WhatsAppLedger
@@ -34,6 +35,7 @@ def db():
             Base.metadata.tables[nome]
             for nome in (
                 "whatsapp_ledger",
+                "whatsapp_tarifas",
                 "whatsapp_ia_sessions",
                 "whatsapp_ia_messages",
             )
@@ -280,6 +282,7 @@ def test_resumo_separa_enviadas_recebidas_falhas_e_cobraveis(db):
         "recebidas": 1,
         "falhas": 1,
         "cobraveis": 1,
+        "cobraveis_sem_tarifa": 1,  # ainda nao ha tarifa cadastrada
         "sem_informacao_de_cobranca": 0,
     }
     assert resumo["cobraveis_por_categoria"] == {"marketing": 1}
@@ -328,7 +331,7 @@ def test_envio_e_webhook_alimentam_o_livro_razao():
     webhook = (RAIZ / "app/whatsapp/webhook.py").read_text(encoding="utf-8")
 
     assert "ledger_service.anotar_envio(" in sender
-    assert sender.count("ledger_service.anotar_falha_de_envio(") == 2
+    assert sender.count("ledger_service.anotar_falha_de_envio(") >= 2
     assert "ledger_service.aplicar_avisos_de_estado(" in webhook
     assert "_anotar_recebimento_no_ledger(" in webhook
 

@@ -6,12 +6,12 @@ categoria de cobranca, a janela de 24 horas e o motivo de cada falha.
 """
 
 from sqlalchemy import (
-    BigInteger,
     Boolean,
     Column,
     DateTime,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     text,
@@ -88,7 +88,8 @@ class WhatsAppLedger(BaseTenantModel):
     categoria_cobranca = Column(String(30), nullable=True)
     modelo_de_preco = Column(String(30), nullable=True)
     # Preenchidos depois, na conferencia com a tabela de precos / relatorio da Meta.
-    custo_estimado_centavos = Column(BigInteger, nullable=True)
+    # Em reais, com fracao de centavo (tarifa vigente x mensagem cobravel).
+    custo_estimado = Column(Numeric(14, 6), nullable=True)
     moeda = Column(String(3), nullable=True)
 
     # Para a sessao e o card do CRM poderem ser ligados depois.
