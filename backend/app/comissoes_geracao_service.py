@@ -12,6 +12,7 @@ from app.tenancy.context import set_tenant_context
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal
 from app.utils.tenant_safe_sql import execute_tenant_safe
 from app.services.venda_descontos import bruto_item, ratear_descontos_venda
+from app.comissoes_vigencia import carregar_configuracoes_vigentes
 
 from app.comissoes_config_service import (
     _require_tenant_id,
@@ -68,7 +69,7 @@ def gerar_comissoes_venda(
             db,
             """
             SELECT id, total, status, desconto_valor, taxa_entrega, tem_entrega, data_venda, tenant_id, entregador_id,
-                   desconto_venda_valor, cupom_discount_applied, funcionario_id
+                   desconto_venda_valor, cupom_discount_applied, funcionario_id, comissao_ancora_em
             FROM vendas
             WHERE id = :venda_id
               AND {tenant_filter}
@@ -96,6 +97,7 @@ def gerar_comissoes_venda(
             "desconto_venda_valor": venda_row[9] if len(venda_row) > 9 else None,
             "cupom_discount_applied": venda_row[10] if len(venda_row) > 10 else None,
             "funcionario_id": venda_row[11],
+            "comissao_ancora_em": venda_row[12],
         }
 
         # O vendedor informado na venda não implica autorização para comissão.
@@ -481,6 +483,9 @@ def gerar_comissoes_venda(
         # ETAPAS 4, 5, 6: PARA CADA ITEM
         # ═══════════════════════════════════════════════════════════
 
+        configuracoes_vigentes = carregar_configuracoes_vigentes(
+            db, funcionario_id, venda["comissao_ancora_em"], tenant_id=tenant_id
+        )
         for item_norm in itens_normalizados:
             # Buscar configuração de comissão
             config = buscar_configuracao_comissao(
@@ -488,6 +493,8 @@ def gerar_comissoes_venda(
                 funcionario_id,
                 item_norm["produto_id"],
                 tenant_id=tenant_id,
+                criada_em=venda["comissao_ancora_em"],
+                configuracoes_vigentes=configuracoes_vigentes,
             )
 
             if not config:

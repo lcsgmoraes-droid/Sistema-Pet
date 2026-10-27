@@ -8,6 +8,9 @@ let user;
 let parceiro;
 let produtos;
 let vendaAnterior;
+let vendaAbertaAnterior;
+let vendaParcialAnterior;
+let vendaSemRegraAnterior;
 let caixaId;
 const nomeGrupo = `QA Comissao UI ${Date.now()}`;
 
@@ -25,8 +28,8 @@ test.describe("Comissão fixa e grupos em DEV", () => {
     return resposta.json();
   }
 
-  async function vender(request) {
-    const venda = await api(request, "post", "/vendas", {
+  async function criarVenda(request) {
+    return api(request, "post", "/vendas", {
       funcionario_id: parceiro.id,
       vendedor_funcionario_id: parceiro.id,
       itens: produtos.map((produto) => ({
@@ -39,10 +42,18 @@ test.describe("Comissão fixa e grupos em DEV", () => {
       observacoes: nomeGrupo,
       tem_entrega: false,
     });
+  }
+
+  async function receber(request, venda, valor) {
     await api(request, "post", `/vendas/${venda.id}/finalizar`, {
       caixa_id: caixaId,
-      pagamentos: [{ forma_pagamento: "Dinheiro", valor: 80 }],
+      pagamentos: [{ forma_pagamento: "Dinheiro", valor }],
     });
+  }
+
+  async function vender(request) {
+    const venda = await criarVenda(request);
+    await receber(request, venda, 80);
     return venda;
   }
 
@@ -79,13 +90,14 @@ test.describe("Comissão fixa e grupos em DEV", () => {
       });
       await api(request, "post", "/estoque/entrada", {
         produto_id: produto.id,
-        quantidade: 10,
+        quantidade: 30,
         custo_unitario: 5,
         motivo: "ajuste",
         observacao: nomeGrupo,
       });
       produtos.push(produto);
     }
+    vendaSemRegraAnterior = await criarVenda(request);
     await api(request, "post", "/comissoes/configuracoes/batch", {
       configuracoes: produtos.map((produto) => ({
         funcionario_id: parceiro.id,
@@ -98,13 +110,17 @@ test.describe("Comissão fixa e grupos em DEV", () => {
       })),
     });
     vendaAnterior = await vender(request);
-    const hoje = new Date().toISOString().slice(0, 10);
+    vendaAbertaAnterior = await criarVenda(request);
+    vendaParcialAnterior = await criarVenda(request);
+    await receber(request, vendaParcialAnterior, 40);
+    const hoje = String(vendaAnterior.data_venda).slice(0, 10);
     const relatorio = await api(
       request,
       "get",
       `/relatorios/vendas/relatorio?data_inicio=${hoje}&data_fim=${hoje}`,
     );
     const vendaNoRelatorio = relatorio.lista_vendas.find((venda) => venda.id === vendaAnterior.id);
+    expect(vendaNoRelatorio).toBeDefined();
     expect(vendaNoRelatorio.itens.map((item) => item.produto_codigo).sort()).toEqual(
       produtos.map((produto) => produto.codigo).sort(),
     );
@@ -198,6 +214,29 @@ test.describe("Comissão fixa e grupos em DEV", () => {
     expect(
       anteriores.lista.every((item) => item.valor_fixo === 3 && item.valor_comissao_gerada === 6),
     ).toBe(true);
+    // Recebimentos futuros preservam a regra da inclusão, mesmo sem snapshot anterior.
+    await receber(request, vendaAbertaAnterior, 80);
+    const abertaAntiga = await api(request, "get", `/comissoes?venda_id=${vendaAbertaAnterior.id}`);
+    expect(abertaAntiga.lista).toHaveLength(2);
+    expect(
+      abertaAntiga.lista.every((item) => item.valor_fixo === 3 && item.valor_comissao_gerada === 6),
+    ).toBe(true);
+    await receber(request, vendaParcialAnterior, 40);
+    const parcelasAntigas = await api(
+      request,
+      "get",
+      `/comissoes?venda_id=${vendaParcialAnterior.id}`,
+    );
+    expect(parcelasAntigas.lista).toHaveLength(4);
+    expect(
+      parcelasAntigas.lista.every(
+        (item) => item.valor_fixo === 3 && item.valor_comissao_gerada === 3,
+      ),
+    ).toBe(true);
+    await receber(request, vendaSemRegraAnterior, 80);
+    expect(
+      (await api(request, "get", `/comissoes?venda_id=${vendaSemRegraAnterior.id}`)).lista,
+    ).toEqual([]);
     const novaVenda = await vender(request);
     const novas = await api(
       request,

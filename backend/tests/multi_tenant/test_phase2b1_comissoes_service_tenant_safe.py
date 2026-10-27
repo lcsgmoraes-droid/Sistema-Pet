@@ -77,7 +77,8 @@ def _create_schema(session):
             entregador_id INTEGER,
             valor_taxa_entregador NUMERIC,
             funcionario_id INTEGER,
-            vendedor_funcionario_id INTEGER
+            vendedor_funcionario_id INTEGER,
+            comissao_ancora_em TEXT NOT NULL DEFAULT '2026-05-12 00:00:00'
         )
         """,
         """
@@ -198,9 +199,54 @@ def _create_schema(session):
             valor_final NUMERIC
         )
         """,
+        """
+        CREATE TABLE comissoes_configuracao_versoes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT NOT NULL,
+            funcionario_id INTEGER NOT NULL,
+            configuracao_id INTEGER NOT NULL,
+            tipo TEXT NOT NULL,
+            referencia_id INTEGER NOT NULL,
+            vigente_desde TEXT NOT NULL,
+            payload TEXT NOT NULL
+        )
+        """,
     ]
     for statement in statements:
         session.execute(text(statement))
+    # Estas fixtures preparam regras de baseline, anteriores à venda. A vigência
+    # real posterior é exercitada separadamente com triggers no PostgreSQL DEV.
+    campos = (
+        "id",
+        "funcionario_id",
+        "tipo",
+        "referencia_id",
+        "tipo_calculo",
+        "percentual",
+        "valor_fixo",
+        "percentual_loja",
+        "desconta_taxa_cartao",
+        "desconta_impostos",
+        "desconta_custo_entrega",
+        "comissao_venda_parcial",
+        "permite_edicao_venda",
+        "observacoes",
+    )
+    payload = ", ".join(f"'{campo}', NEW.{campo}" for campo in campos)
+    payload += ", 'ativo', json(CASE WHEN NEW.ativo = 1 THEN 'true' ELSE 'false' END)"
+    for evento in ("INSERT", "UPDATE"):
+        session.execute(
+            text(f"""
+            CREATE TRIGGER versao_baseline_{evento.lower()}
+            AFTER {evento} ON comissoes_configuracao
+            BEGIN
+                INSERT INTO comissoes_configuracao_versoes
+                    (tenant_id, funcionario_id, configuracao_id, tipo, referencia_id, vigente_desde, payload)
+                VALUES (NEW.tenant_id, NEW.funcionario_id, NEW.id, NEW.tipo, NEW.referencia_id,
+                        '0001-01-01 00:00:00', json_object({payload}));
+            END
+        """)
+        )
     session.commit()
 
 

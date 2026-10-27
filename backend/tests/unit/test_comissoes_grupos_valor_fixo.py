@@ -85,7 +85,7 @@ def test_fixo_parcelado_distribui_centavos_sem_ultrapassar_total():
     assert sum(
         calcular_comissao_fixa_parcela("0.01", 1, 3, pago) for pago in (0, 1, 2)
     ) == Decimal("0.01")
-    # Uma regra nova só vale para o recebimento atual, sem recalcular o anterior.
+    # O helper apenas rateia centavos; a vigência é resolvida pela âncora da venda.
     assert calcular_comissao_fixa_parcela("5", 5, 10, 5) == Decimal("2.50")
     assert calcular_comissao_fixa_parcela("5", 10, 10, 10) == 0
 

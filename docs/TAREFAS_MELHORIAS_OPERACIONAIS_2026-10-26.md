@@ -176,3 +176,23 @@ Os códigos públicos foram auditados também nas APIs de NF, entregas e relató
 - Migration smoke oficial aprovado no PostgreSQL local: banco limpo, revisão
   histórica e simulação local de tenant UUID chegaram a `zzzzz20261026a3`, com
   RLS validado nos três cenários. Bancos temporários removidos e DEV preservado.
+- Gate completo aprovado no commit `c6c2b433c`, incluindo 777 testes de tenant
+  aprovados (22 pulados) e 104 testes mobile mais os dois testes do carimbo.
+  PR #1567 aberto; teste de validade no CI revelou dependência do fuso da
+  fixture. Ajuste determinístico em andamento, sem alterar a regra de produção.
+- Revisão adicional encontrou que uma venda antiga ainda aberta adotaria a
+  regra de comissão atual ao receber. O item 15 foi reaberto para preservar a
+  regra conforme a venda, inclusive nas parcelas posteriores; publicar somente
+  depois dessa correção e de repetir o gate.
+- A4 concluída e validada em DEV: âncora técnica imutável da venda e versões
+  das regras preservam o valor aplicável às parcelas, independentemente da data
+  comercial editável. Baseline registra a regra legada conhecida na implantação;
+  não reconstrói alterações históricas que o sistema anterior não guardava.
+- Aceite real de navegador da vigência **1/1**: venda antiga sem pagamento e
+  antiga parcialmente paga mantiveram R$ 3,00 após alteração para R$ 5,00;
+  venda anterior à primeira regra continuou sem comissão; venda nova usou
+  R$ 5,00. Snapshots anteriores e rateio R$ 0,82 + R$ 0,81 preservados.
+- Migration smoke A4 aprovado nos três bancos efêmeros, RLS **3/3** e **12/12**
+  aprovações da regressão PostgreSQL. Os bancos temporários foram removidos.
+- Teste de validade corrigido para datas fixas: **212/212** no Linux UTC e
+  **26/26** seletivos no Windows. Nenhuma regra de estoque foi alterada.

@@ -51,8 +51,18 @@ comissões antigas ficam fora do escopo.
   recebimentos parciais são proporcionais. Novas configurações não recalculam
   vendas anteriores; grupos provisionam somente comissões já calculadas e sem
   conta a pagar.
+- A vigência passa a usar a inclusão técnica imutável da venda, com relógio do
+  banco e fuso explícito. Venda já aberta mantém a regra de sua inclusão, mesmo
+  quando o primeiro pagamento ou outras parcelas ocorrem após a mudança. A data
+  comercial editável não troca a regra. Na entrada dessa proteção, as regras
+  legadas atuais formam o baseline das vendas existentes; não se reconstituem
+  versões anteriores que nunca foram guardadas. Alterações futuras, inclusões e
+  desativações/exclusões são versionadas no mesmo commit.
 - Migrations A1/A2/A3 criam grupos/valor fixo, dados de recebimento/caixa e índices
   para histórico. Foram aplicadas em PostgreSQL DEV; produção ainda não foi migrada.
+- A4 acrescenta a âncora técnica e o histórico de vigência, com RLS e vínculo de
+  pessoa preservável na fusão. A âncora não aceita alteração nem data enviada
+  pelo usuário; snapshots de comissão anteriores permanecem intactos.
 - A consulta confirmou dados importados do Simplesvet até 18/09/2026: 111.266
   vendas, desde 19/11/2019. Isso não comprova a data de execução da importação.
 - A correção do caso real exige unificação administrativa revisada. Histórico,
@@ -114,6 +124,14 @@ histórico e comissão fixa; o navegador comprovou seleção múltipla, persist�
 do grupo e preservação da venda anterior. Duas baixas de comissão totalizaram
 R$ 0,82 + R$ 0,81 = R$ 1,63, sem duplicação no reenvio.
 
+Na complementação A4, quatro cenários PostgreSQL verificaram fronteiras de
+vigência, fuso de São Paulo, exclusão/desativação, tenant, transferência na fusão
+e recusa da alteração da âncora. Foram repetidos nos três bancos descartáveis do
+smoke de migração. O aceite em navegador também recebeu uma venda ainda aberta e
+uma parcela pendente após mudar R$ 3,00 para R$ 5,00: ambas mantiveram R$ 3,00.
+A venda criada antes da primeira regra permaneceu sem comissão; somente a nova
+venda recebeu R$ 5,00. Esses aceites não substituem o novo gate da revisão final.
+
 Build frontend de produção, ESLint e Prettier completos passaram na etapa
 registrada. O check inicial e as frentes focadas passaram; o
 `FLUXO_UNICO.bat release-check` completo segue pendente de conclusão após as
@@ -146,7 +164,7 @@ registrados: implementação `ac143f11a` e integração da main `297059ce8`. O c
 final e o PR deverão constar no registro de publicação quando preparados.
 
 Sequência prevista: concluir o gate e a revisão; finalizar a branch/PR pelo fluxo
-oficial; aplicar A1 → A2 → A3 e publicar backend/frontend; conferir health,
+oficial; aplicar A1 → A2 → A3 → A4 e publicar backend/frontend; conferir health,
 revisão implantada e smoke; executar a correção administrativa autorizada do
 vínculo após conferir a prévia; publicar a OTA nos dois runtimes. Preservar
 versão, runtime e números dos binários instalados, seguindo o

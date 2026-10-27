@@ -119,6 +119,14 @@ um ativo do duplicado. A auditoria foi conferida, assim como seis perfis
 ativos finais, cargo, conta ativa, 306 vendas e carimbo. O teste unitário
 também cobre grant revogado sem colisão e sua permanência como revogado.
 
+Após acrescentar a vigência das comissões, outro ensaio PostgreSQL confirmou
+que a fusão também transfere a FK de funcionário das versões históricas das
+regras. A regra de R$ 3,00 de uma venda anterior continua sendo encontrada
+depois da fusão no principal. O JSON original da versão é preservado, e a
+referência técnica de criação da venda permanece imutável. A cobertura está
+em `backend/tests/integration/test_comissoes_vigencia_limites_local.py`, com
+rollback obrigatório e execução prevista também nos bancos efêmeros do CI.
+
 A prévia antiga chamava a leitura com bloqueio de linhas e foi recusada numa
 transação de produção marcada `READ ONLY`, sem escrever dados. O código DEV
 agora usa `bloquear=False` somente na prévia; a execução mantém o padrão de

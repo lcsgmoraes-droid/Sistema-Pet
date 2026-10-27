@@ -470,6 +470,7 @@ export const BASE_CONHECIMENTO = [
           "Para pagar em reais por produto vendido, selecione **Valor fixo por unidade**, preencha **Valor por unidade vendida (R$)** e clique em **Salvar agora**. Confira o grupo e o parceiro na confirmação.",
           "Exemplo: R$ 5,00 por unidade gera R$ 10,00 ao vender duas unidades. Quantidades fracionadas e pagamentos parciais são proporcionais; taxas não reduzem esse valor fixo.",
           "A nova regra vale **somente para novas vendas**. Salvar ou configurar um grupo não recalcula comissões de vendas anteriores.",
+          "Uma venda que já estava aberta mantém a regra de quando foi incluída, mesmo se o primeiro pagamento ou as próximas parcelas ocorrerem depois da mudança. Alterar a data comercial da venda não muda essa regra.",
           "Use **Gerar contas a pagar** para provisionar as comissões já calculadas, ainda sem conta a pagar, respeitando o período e o vendedor do relatório. Comissões já provisionadas não são duplicadas. Essa ação exige permissão para os fechamentos de comissão.",
           "**Conferência:** revise os produtos do grupo, o parceiro, o valor por unidade e as contas geradas. Gerar uma conta a pagar não registra seu pagamento.",
         ],
