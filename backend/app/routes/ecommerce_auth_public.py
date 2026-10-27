@@ -39,7 +39,6 @@ from app.services.auth_security import (
     register_successful_login,
     remaining_lock_seconds,
 )
-from app.services.pessoa_merge_service import executar_fusao_pessoas
 from app.services.sales_channel import normalize_online_sales_channel
 from app.tenancy.rls import sync_rls_auth_email
 
@@ -136,6 +135,14 @@ def registrar_cliente(
         in {_phone_digits(person.telefone), _phone_digits(person.celular)}
         and not person.merged_into_id
     ]
+    if len(people) > 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Encontramos mais de um cadastro para este telefone. "
+                "Solicite a revisão dos cadastros no ERP antes de criar a conta."
+            ),
+        )
     if any(person.auth_user_id for person in people):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -184,21 +191,6 @@ def registrar_cliente(
     if existing_person:
         cliente = existing_person
         cliente.auth_user_id = user.id
-        for duplicate in people:
-            if duplicate.id == cliente.id:
-                continue
-            executar_fusao_pessoas(
-                db,
-                tenant_id=tenant_id,
-                principal_id=cliente.id,
-                duplicado_id=duplicate.id,
-                decisoes_campos={},
-                user_id=user.id,
-                observacao="Unificacao por telefone no cadastro publico.",
-                modo="ecommerce_cadastro",
-                motivo="telefone_e_cpf_compativeis",
-                commit=False,
-            )
     else:
         cliente = _get_or_create_cliente_for_user(
             db, user, origem_cliente=canal_registro

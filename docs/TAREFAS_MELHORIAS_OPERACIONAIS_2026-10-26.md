@@ -66,6 +66,11 @@ testes que gravam dados devem acontecer em DEV.
 - [x] **15 — Comissão por valor fixo.** Novo tipo em reais por unidade vendida:
       R$ 5,00 por unidade gera R$ 10,00 ao vender duas. Cadastro, cálculo e exibição
       completos; vale somente para novas vendas, sem recalcular as anteriores.
+- [ ] **16 — Impedir telefone compartilhado por pessoas diferentes.** Solicitação
+      complementar: aplicar a mesma regra entre todas as lojas do grupo, conforme
+      confirmação do Lucas. Comparar telefone, celular e contatos adicionais com
+      máscara/DDI normalizados; proteger API, importações e gravações concorrentes
+      no banco. Preservar legados e aliases fundidos, sem fusão automática.
 
 ## Validação e publicação
 
@@ -329,3 +334,21 @@ incluindo nulo, zero e valor positivo com conferência dos dados persistidos.
 **Decisão: entrega técnica concluída**, com os 15 itens atendidos, validados e
 publicados. Os registros anteriores de deploy, OTA e fusão permanecem preservados;
 a conferência no aparelho físico da Michele segue como acompanhamento separado.
+
+### Solicitação complementar — telefone único entre lojas, 27/10/2026
+
+O item 16 foi acrescentado após a primeira entrega. A validação antiga apenas
+avisava parte das duplicidades e não cobria campos cruzados, DDI, SQL direto ou
+concorrência. A implementação usa um normalizador compartilhado, erro 409 textual
+e por campo, além de proteção PostgreSQL. Alterações de grupo também não podem
+introduzir uma colisão nova entre lojas. Empresas independentes permanecem
+separadas; parceiros veterinários não ampliam o escopo de unicidade.
+
+Os testes focados de API/interface passaram. **18 testes PostgreSQL** passaram em
+banco descartável local, incluindo concorrência, rollback, RLS com role sem
+BYPASSRLS, múltiplos grupos e preservação de legado/fusão. O smoke de migrations
+passou nos três cenários, com RLS 3/3 e 24 testes PostgreSQL por cenário (18 de
+telefone e 6 de vigência financeira). O gate completo e a publicação do item 16
+ainda estão em andamento.
+
+Detalhes e limites na [ficha de telefone único](entregas/2026-10-27-telefone-unico-pessoas.md).

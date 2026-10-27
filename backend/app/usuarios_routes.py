@@ -43,6 +43,11 @@ from app.services.auth_security import (
     register_password_reset_requested,
 )
 from app.services.pessoa_merge_service import executar_fusao_pessoas
+from app.services.pessoa_telefone import (
+    PessoaTelefoneDuplicado,
+    erro_telefone_duplicado,
+    validar_telefones_pessoa,
+)
 from app.security.crediario_override import definir_liberacao_crediario
 from app.services.user_account_service import (
     UserAccountError,
@@ -316,6 +321,7 @@ def _vincular_ou_criar_pessoa_para_usuario(
         pessoa.auth_user_id = user.id
         return pessoa
 
+    validar_telefones_pessoa(db, tenant_id, celular=login_phone)
     nome_pessoa = (
         nome
         or user.nome
@@ -377,6 +383,9 @@ def _criar_pessoa_operacional_para_usuario(
     tenant_id,
     user: User,
 ) -> Cliente:
+    validar_telefones_pessoa(
+        db, tenant_id, celular=user.login_phone, telefone=user.telefone
+    )
     pessoa = Cliente(
         tenant_id=tenant_id,
         user_id=actor.id,
@@ -653,8 +662,13 @@ def criar_usuario(
     except UserAccountError as exc:
         db.rollback()
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except PessoaTelefoneDuplicado:
+        db.rollback()
+        raise
     except IntegrityError as exc:
         db.rollback()
+        if erro_telefone_duplicado(exc):
+            raise PessoaTelefoneDuplicado() from exc
         if _is_unique_email_violation(exc):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -781,6 +795,8 @@ def excluir_usuario(
         db.commit()
     except IntegrityError as exc:
         db.rollback()
+        if erro_telefone_duplicado(exc):
+            raise PessoaTelefoneDuplicado() from exc
         raise HTTPException(
             status_code=409,
             detail="Nao foi possivel remover esta conta. Revise os vinculos e tente novamente.",
@@ -947,8 +963,13 @@ def atualizar_credenciais_usuario(
     except UserAccountError as exc:
         db.rollback()
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except PessoaTelefoneDuplicado:
+        db.rollback()
+        raise
     except IntegrityError as exc:
         db.rollback()
+        if erro_telefone_duplicado(exc):
+            raise PessoaTelefoneDuplicado() from exc
         if is_unique_username_violation(exc):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

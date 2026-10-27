@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.grupo_comercial_models import (
@@ -43,6 +44,12 @@ class GrupoComercialService:
     def __init__(self, db: Session, *, agora: datetime | None = None):
         self.db = db
         self.agora = _agora_utc(agora)
+
+    def _bloquear_topologia_telefones(self) -> None:
+        # Antes de FOR UPDATE: nunca esperar a barreira segurando uma tupla
+        # que um cadastro de pessoa já travado possa precisar consultar.
+        if self.db.get_bind().dialect.name == "postgresql":
+            self.db.execute(text("SELECT pg_advisory_xact_lock(1735281201, 1)"))
 
     @staticmethod
     def _empresa_id(empresa_id) -> str:
@@ -235,6 +242,7 @@ class GrupoComercialService:
         titular_tipo_pessoa: str = "PF",
         titular_telefone: str | None = None,
     ) -> dict:
+        self._bloquear_topologia_telefones()
         if titular_tipo_pessoa not in ("PF", "PJ"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -300,6 +308,7 @@ class GrupoComercialService:
         grupo_id: int,
         membro_empresa_id: str,
     ) -> dict:
+        self._bloquear_topologia_telefones()
         empresa_id = self._empresa_id(empresa_id)
         grupo = self._grupo_ativo(grupo_id, travar=True)
         self._membro_ativo(grupo.id, empresa_id, exigir_responsavel=True)
@@ -385,6 +394,7 @@ class GrupoComercialService:
         master precisar de acesso a loja movida, isso e um passo manual
         separado.
         """
+        self._bloquear_topologia_telefones()
         empresa_id = self._empresa_id(empresa_id)
         self._empresa_ativa(empresa_id)
         grupo_destino = self._grupo_ativo(grupo_destino_id, travar=True)
@@ -611,6 +621,7 @@ class GrupoComercialService:
         loja ao próprio grupo não deve ganhar os 30 dias de acesso completo
         gratuito de um cliente novo (decisão de negócio de 21/09/2026).
         """
+        self._bloquear_topologia_telefones()
         grupo = self._grupo_ativo(grupo_id, travar=True)
         if empresa_acionadora_id is not None:
             self._membro_ativo(grupo.id, empresa_acionadora_id, exigir_responsavel=True)

@@ -193,7 +193,11 @@ Invoke-GateStep 'Operational search history receipts and commissions regression'
     'tests/unit/test_recebimento_caixa_parcelamento.py',
     'tests/unit/test_recebimento_repasse_comissao.py',
     'tests/unit/test_comissoes_grupos_valor_fixo.py',
-    'tests/unit/test_comissoes_pagamentos_lote.py', '-q'
+    'tests/unit/test_comissoes_pagamentos_lote.py',
+    'tests/unit/test_pessoa_telefone_unico.py',
+    'tests/unit/test_pessoa_telefone_import_mobile.py',
+    'tests/unit/test_pessoa_telefone_usuarios.py',
+    'tests/unit/test_main_http_error_sanitization.py', '-q'
 ) $backend
 
 Invoke-GateStep 'Sale cancellation original stock regression' $python @(

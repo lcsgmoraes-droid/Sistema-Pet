@@ -19,7 +19,7 @@ from app.campaigns.models import (
     CustomerRankHistory,
     LoyaltyStamp,
 )
-from app.models import Cliente
+from app.models import Cliente, ClienteContato
 from app.routes.ecommerce_auth_beneficios import meus_beneficios
 from app.routes.ecommerce_auth_cliente import _get_or_create_cliente_for_user
 from app.tenancy.context import clear_current_tenant, set_current_tenant
@@ -118,6 +118,9 @@ def test_login_por_telefone_reusa_cadastro_sem_sobrescrever_vinculo(
     with engine.begin() as connection:
         connection.execute(
             CreateTable(Cliente.__table__, include_foreign_key_constraints=[])
+        )
+        connection.execute(
+            CreateTable(ClienteContato.__table__, include_foreign_key_constraints=[])
         )
     tenant = uuid4()
     monkeypatch.setattr(

@@ -177,13 +177,14 @@ def _assert_rls_no_debt(database_url: URL) -> None:
 
 
 def _assert_commission_effective_rules(database_url: URL) -> None:
-    """Exercita as regras temporais no próprio banco efêmero já migrado."""
+    """Exercita vigência financeira e unicidade da pessoa no banco descartável."""
     env = os.environ.copy()
     target = database_url.render_as_string(hide_password=False)
     env.update(
         {
             "DATABASE_URL": target,
             "COMISSOES_VIGENCIA_TEST_POSTGRES_URL": target,
+            "PESSOA_TELEFONE_TEST_POSTGRES_URL": target,
             "ENVIRONMENT": "testing",
             "ENV": "testing",
             "DEBUG": "false",
@@ -199,6 +200,7 @@ def _assert_commission_effective_rules(database_url: URL) -> None:
             "-m",
             "pytest",
             "tests/integration/test_comissoes_vigencia_limites_local.py",
+            "tests/integration/test_pessoa_telefone_unico_postgres.py",
             "-q",
             "--tb=short",
         ],
