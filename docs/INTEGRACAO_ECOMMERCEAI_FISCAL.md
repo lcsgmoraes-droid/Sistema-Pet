@@ -209,3 +209,11 @@ sera emitida por testes. Lucas autorizou a publicacao nos dois sistemas em
 2026-10-26. A publicacao preserva os controles desligados; a ativacao da conta
 ocorre exclusivamente na tela CorePet, apos configurar produtos e validar a
 conexao. A aprovacao de publicacao nao expande escopos de conexoes antigas.
+
+O Compose de producao repassa ao backend o segredo HMAC ja existente no `.env`
+seguro (`ECOMMERCEAI_INTEGRATION_BOOTSTRAP_SECRET`), o client ID, as origens de
+callback permitidas e as URLs publicas. Cadastrar a chave apenas no arquivo do
+host nao basta se a variavel nao chegar ao container. Conferir somente presenca
+e correspondencia entre os sistemas, sem exibir o segredo nem grava-lo no Git.
+Sem chave valida, o bootstrap deve continuar bloqueado. A URL padrao do painel
+em producao usa `https://corepet.com.br`, onde fica a sessao autenticada.
