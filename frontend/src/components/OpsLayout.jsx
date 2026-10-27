@@ -4,6 +4,7 @@ import {
   FiArrowLeft,
   FiAlertTriangle,
   FiBarChart2,
+  FiCreditCard,
   FiDatabase,
   FiGrid,
   FiHome,
@@ -49,6 +50,12 @@ const navItems = [
     label: "Consumo de WhatsApp",
     description: "Mensagens, custo e repasse",
     icon: FiMessageSquare,
+  },
+  {
+    to: "/ops/creditos-whatsapp",
+    label: "Créditos de WhatsApp",
+    description: "Pacotes, pedidos e limites",
+    icon: FiCreditCard,
   },
   {
     to: "/ops/observabilidade",

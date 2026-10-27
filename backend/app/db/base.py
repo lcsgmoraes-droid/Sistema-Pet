@@ -61,6 +61,7 @@ from app import xml_contabilidade_models  # noqa: F401
 from app.crm import models as crm_models  # noqa: F401
 from app import ops_tenant_log_models  # noqa: F401
 from app.whatsapp import consumo_models  # noqa: F401
+from app.whatsapp import creditos_models  # noqa: F401
 from app.whatsapp import ledger_models  # noqa: F401
 from app import compras_pendencias_models  # noqa
 from app import bling_pedido_webhook_queue_models  # noqa

@@ -79,3 +79,39 @@ export function leituraDaDivergencia(divergencia) {
     ? { tom: "atencao", texto: `Fatura ${valor} acima do estimado` }
     : { tom: "atencao", texto: `Fatura ${valor} abaixo do estimado` };
 }
+
+export const ROTULO_DO_NIVEL = {
+  desligado: "Controle de créditos desligado",
+  ok: "Saldo em dia",
+  baixo: "Saldo baixo",
+  esgotado: "Saldo esgotado: os envios estão bloqueados",
+};
+
+export const ROTULO_DA_COMPRA = {
+  pendente: "Aguardando pagamento",
+  paga: "Paga e liberada",
+  cancelada: "Cancelada",
+};
+
+export function formatarCreditos(valor) {
+  return `${Number(valor || 0).toLocaleString("pt-BR")} créditos`;
+}
+
+/** Aviso para a loja conforme o saldo, ou null quando está tudo bem. */
+export function avisoDoSaldo(saldo) {
+  if (!saldo || !saldo.controle_ativo) return null;
+  if (saldo.nivel === "esgotado") {
+    return {
+      tom: "erro",
+      texto:
+        "Seus créditos de WhatsApp acabaram. A IA e os envios estão bloqueados até você comprar um pacote.",
+    };
+  }
+  if (saldo.nivel === "baixo") {
+    return {
+      tom: "atencao",
+      texto: `Seu saldo está baixo (${formatarCreditos(saldo.disponivel)}). Compre um pacote antes que acabe.`,
+    };
+  }
+  return null;
+}

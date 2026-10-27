@@ -22,6 +22,7 @@ from app.whatsapp.models import WhatsAppMessage
 
 LIMITE_DIARIO = "limite_diario"
 EXCESSO_DE_MENSAGENS = "excesso_de_mensagens"
+SEM_CREDITOS = "sem_creditos"
 
 LIMITE_DIARIO_TOKENS_PADRAO = 1_000_000
 MENSAGENS_POR_JANELA_PADRAO = 15
@@ -95,6 +96,13 @@ def mensagens_recentes_do_telefone(
 
 def avaliar_limites(db, tenant_id, session_id) -> str | None:
     """Devolve o motivo de bloquear a IA agora, ou None se pode responder."""
+    # Creditos: com o controle ligado e sem saldo, a IA para (a conversa vai para um atendente).
+    from app.whatsapp import creditos_service
+
+    if not creditos_service.pode_gastar(
+        db, tenant_id, creditos_service.custo_em_creditos(db, "ia")
+    ):
+        return SEM_CREDITOS
     limite_tokens = limite_diario_tokens()
     if limite_tokens > 0 and tokens_usados_hoje(db, tenant_id) >= limite_tokens:
         return LIMITE_DIARIO

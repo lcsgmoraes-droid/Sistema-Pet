@@ -164,6 +164,7 @@ from app.routers.whatsapp_handoff import router as whatsapp_handoff_router  # Sp
 from app.crm.routes import router as crm_router
 from app.routers.whatsapp_meta import router as whatsapp_meta_router
 from app.routers.whatsapp_ledger import router as whatsapp_ledger_router
+from app.routers.whatsapp_creditos import router as whatsapp_creditos_router
 from app.routers.whatsapp_websocket import (
     router as whatsapp_websocket_router,
 )  # Sprint 5: WebSocket
@@ -186,6 +187,7 @@ from app.routes.error_events_routes import (
 )  # Observabilidade operacional
 from app.routes.ops_lojas_routes import router as ops_lojas_router
 from app.routes.ops_whatsapp_consumo_routes import router as ops_whatsapp_consumo_router
+from app.routes.ops_whatsapp_creditos_routes import router as ops_whatsapp_creditos_router
 from app.routes.ops_tenants_routes import (
     router as ops_tenants_router,
 )  # Gestao operacional de tenants
@@ -269,6 +271,7 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(ops_tenants_router)
     app.include_router(ops_lojas_router)
     app.include_router(ops_whatsapp_consumo_router)
+    app.include_router(ops_whatsapp_creditos_router)
     app.include_router(ops_grupo_comercial_router)
     app.include_router(evolucao_router)
     app.include_router(product_images_public_router)
@@ -644,6 +647,9 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(
         whatsapp_ledger_router, dependencies=_module_dependencies("crm")
     )  # Consumo de mensagens (livro-razão)
+    app.include_router(
+        whatsapp_creditos_router, dependencies=_module_dependencies("crm")
+    )  # Créditos de WhatsApp (saldo e pacotes)
     app.include_router(whatsapp_websocket_router)  # Sprint 5: WebSocket Real-time
     app.include_router(
         whatsapp_api_router, dependencies=_module_dependencies("whatsapp")

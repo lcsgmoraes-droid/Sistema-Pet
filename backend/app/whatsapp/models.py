@@ -74,6 +74,10 @@ class TenantWhatsAppConfig(TenantScoped, Base):
     meta_qualidade = Column(String(20))
     meta_ultimo_webhook_em = Column(DateTime)
 
+    # Creditos de WhatsApp (franquia mensal + pacotes avulsos). Desligado por padrao.
+    creditos_controle_ativo = Column(Boolean, nullable=False, default=False)
+    creditos_franquia_mensal = Column(Integer, nullable=False, default=0)
+
     # IA Config
     _openai_api_key_legacy = Column("openai_api_key", Text)
     _openai_api_key_encrypted = Column("openai_api_key_encrypted", Text)

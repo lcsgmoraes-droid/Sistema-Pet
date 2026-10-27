@@ -30,3 +30,16 @@ test("rotulo devolve a própria chave quando não conhece", () => {
   assert.equal(rotulo({ a: "A" }, "a"), "A");
   assert.equal(rotulo({ a: "A" }, "x"), "x");
 });
+
+test("avisoDoSaldo só avisa quando o controle está ligado e o saldo está baixo ou esgotado", async () => {
+  const { avisoDoSaldo, formatarCreditos } = await import("./consumoWhatsapp.js");
+
+  assert.equal(avisoDoSaldo({ controle_ativo: false, nivel: "esgotado" }), null);
+  assert.equal(avisoDoSaldo({ controle_ativo: true, nivel: "ok" }), null);
+  assert.equal(avisoDoSaldo({ controle_ativo: true, nivel: "esgotado" }).tom, "erro");
+  assert.match(
+    avisoDoSaldo({ controle_ativo: true, nivel: "baixo", disponivel: 40 }).texto,
+    /40 créditos/,
+  );
+  assert.equal(formatarCreditos(1500), "1.500 créditos");
+});

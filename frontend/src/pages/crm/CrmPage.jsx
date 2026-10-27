@@ -1,9 +1,12 @@
 import { MessageCircle, Plus, SearchX, Settings2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import api from "../../api";
+import { avisoDoSaldo } from "../../utils/consumoWhatsapp";
 import { useAuth } from "../../contexts/AuthContext";
 import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
 import EstadoVazio from "../../components/v2/EstadoVazio/EstadoVazio";
+import LinkPadrao from "../../components/v2/LinkPadrao/LinkPadrao";
 import InputComboboxMultiplo from "../../components/v2/InputComboboxMultiplo/InputComboboxMultiplo";
 import InputTexto from "../../components/v2/InputTexto/InputTexto";
 import CrmColunasModal from "./CrmColunasModal";
@@ -34,6 +37,24 @@ export default function CrmPage() {
   const podeCriar = permissoes.includes("crm.leads");
   const podeConfigurar = permissoes.includes("crm.configurar");
   const [configurando, setConfigurando] = useState(false);
+  const [avisoDeCreditos, setAvisoDeCreditos] = useState(null);
+
+  // Quem configura o canal vê logo aqui quando os créditos estão acabando ou acabaram.
+  useEffect(() => {
+    if (!podeConfigurar) return undefined;
+    let ativo = true;
+    (async () => {
+      try {
+        const { data } = await api.get("/whatsapp/creditos");
+        if (ativo) setAvisoDeCreditos(avisoDoSaldo(data.saldo));
+      } catch {
+        // O aviso é só um apoio: se falhar, o quadro segue normalmente.
+      }
+    })();
+    return () => {
+      ativo = false;
+    };
+  }, [podeConfigurar]);
   const [novoCard, setNovoCard] = useState(false);
   const [fichaDoCard, setFichaDoCard] = useState(null);
   const semCards = crm.colunas.every((coluna) => coluna.total === 0);
@@ -90,6 +111,21 @@ export default function CrmPage() {
           />
         ) : null}
       </div>
+
+      {avisoDeCreditos ? (
+        <p
+          role="status"
+          className={[
+            "mb-3 flex flex-wrap items-center gap-2 text-sm font-semibold",
+            avisoDeCreditos.tom === "erro"
+              ? "text-red-700 dark:text-red-300"
+              : "text-amber-800 dark:text-amber-300",
+          ].join(" ")}
+        >
+          {avisoDeCreditos.texto}
+          <LinkPadrao to="/crm/whatsapp/consumo">Ver créditos</LinkPadrao>
+        </p>
+      ) : null}
 
       {crm.erro ? (
         <p role="alert" className="mb-3 text-sm font-medium text-red-700 dark:text-red-300">

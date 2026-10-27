@@ -3,6 +3,7 @@ import {
   Observabilidade,
   OpsDashboard,
   OpsConsumoWhatsApp,
+  OpsCreditosWhatsApp,
   OpsIncidentes,
   OpsLojas,
   OpsTenants,
@@ -17,6 +18,7 @@ export function createOpsRoutes() {
       <Route path="tenants" element={<OpsTenants />} />
       <Route path="lojas" element={<OpsLojas />} />
       <Route path="consumo-whatsapp" element={<OpsConsumoWhatsApp />} />
+      <Route path="creditos-whatsapp" element={<OpsCreditosWhatsApp />} />
       <Route path="observabilidade" element={<Observabilidade />} />
       <Route path="styleguide" element={<StyleGuide />} />
     </>

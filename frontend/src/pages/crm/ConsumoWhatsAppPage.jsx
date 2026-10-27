@@ -8,6 +8,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import api from "../../api";
 import CartaoIndicador from "../../components/v2/CartaoIndicador/CartaoIndicador";
+import CreditosSecao from "./CreditosSecao";
 import EstadoVazio from "../../components/v2/EstadoVazio/EstadoVazio";
 import InputCombobox from "../../components/v2/InputCombobox/InputCombobox";
 import LinkPadrao from "../../components/v2/LinkPadrao/LinkPadrao";
@@ -96,6 +97,8 @@ export default function ConsumoWhatsAppPage() {
           O custo é uma estimativa feita com as tarifas da Meta; o valor final é o da fatura.
         </p>
       </header>
+
+      <CreditosSecao />
 
       <div className="max-w-xs">
         <InputCombobox id="consumo-mes" label="Mês" value={mes} opcoes={meses} onChange={setMes} />

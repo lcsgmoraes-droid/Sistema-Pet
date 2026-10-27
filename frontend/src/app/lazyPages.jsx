@@ -94,6 +94,9 @@ export const ConsumoWhatsApp = lazy(() => import("../pages/crm/ConsumoWhatsAppPa
 export const OpsConsumoWhatsApp = lazy(
   () => import("../pages/ops-consumo/OpsConsumoWhatsAppPage.jsx"),
 );
+export const OpsCreditosWhatsApp = lazy(
+  () => import("../pages/ops-creditos/OpsCreditosWhatsAppPage.jsx"),
+);
 export const ConectarWhatsApp = lazy(() => import("../pages/crm/ConectarWhatsAppPage"));
 export const AlertasRacao = lazy(() => import("../components/AlertasRacao"));
 export const OpcoesRacao = lazy(() => import("../components/OpcoesRacao"));

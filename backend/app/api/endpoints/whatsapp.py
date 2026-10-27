@@ -382,6 +382,16 @@ async def enviar_mensagem_do_atendente(
     if not texto:
         raise HTTPException(status_code=422, detail="Escreva a mensagem")
 
+    from app.whatsapp import creditos_service
+
+    if not creditos_service.pode_gastar(
+        db, tenant_id, creditos_service.custo_em_creditos(db, "atendente")
+    ):
+        raise HTTPException(
+            status_code=402,
+            detail="O saldo de créditos de WhatsApp acabou. Compre um pacote para voltar a enviar.",
+        )
+
     permitido, _motivo = pode_enviar_whatsapp(
         db,
         tenant_id,

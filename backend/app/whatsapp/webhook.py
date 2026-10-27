@@ -30,7 +30,7 @@ from app.crm.mensagens_service import anotar_mensagem_no_crm
 from app.whatsapp import ledger_service
 from app.whatsapp.log_safety import mascarar_telefone
 from app.whatsapp.message_views import serializar_mensagem
-from app.whatsapp.usage_limits import LIMITE_DIARIO, avaliar_limites
+from app.whatsapp.usage_limits import LIMITE_DIARIO, SEM_CREDITOS, avaliar_limites
 from app.whatsapp.tenant_context import whatsapp_tenant_context
 from app.whatsapp.customer_lookup import SITUACAO_AMBIGUO, resolver_tutor_por_telefone
 
@@ -669,7 +669,7 @@ async def _bloquear_ia_por_limite(
         session.id,
         motivo,
     )
-    if motivo != LIMITE_DIARIO:
+    if motivo not in (LIMITE_DIARIO, SEM_CREDITOS):
         # Excesso de mensagens: silencio. Nao ha resposta nem novo atendimento.
         return False
     try:
@@ -680,10 +680,12 @@ async def _bloquear_ia_por_limite(
             handoff = gerente.create_handoff(
                 session_id=session.id,
                 phone_number=session.phone_number,
-                reason="ia_limite_diario",
+                reason="ia_sem_creditos" if motivo == SEM_CREDITOS else "ia_limite_diario",
                 priority="medium",
                 reason_details=(
-                    "Limite diario de uso da IA atingido: atendimento humano."
+                    "Creditos de WhatsApp esgotados: atendimento humano."
+                    if motivo == SEM_CREDITOS
+                    else "Limite diario de uso da IA atingido: atendimento humano."
                 ),
             )
             from app.whatsapp.websocket import emit_new_handoff

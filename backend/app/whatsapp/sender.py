@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.utils.correlation import current_correlation_id
 from app.crm.mensagens_service import anotar_mensagem_no_crm
-from app.whatsapp import ledger_service
+from app.whatsapp import creditos_service, ledger_service
 from app.whatsapp.meta_cloud import MetaCloudClient
 from app.whatsapp.models import TenantWhatsAppConfig, WhatsAppSession, WhatsAppMessage
 from app.whatsapp.tenant_context import whatsapp_tenant_context
@@ -348,6 +348,23 @@ async def _send_whatsapp_message_with_context(
             logger.error(f"Sessão {session_id} não encontrada")
             return None
 
+        # 1b. Creditos: sem saldo, o envio e barrado (e fica registrado).
+        tipo_do_envio = "imagem" if message_type == "image" else "texto"
+        creditos = creditos_service.custo_em_creditos(db, origem, tipo_do_envio)
+        if not creditos_service.pode_gastar(db, tenant_id, creditos):
+            ledger_service.anotar_falha_de_envio(
+                db,
+                tenant_id=tenant_id,
+                provedor=ledger_service.provedor_do_cliente(client_obj),
+                session=session,
+                session_id=session_id,
+                origem=origem,
+                erro_codigo="sem_creditos",
+                erro_mensagem="Saldo de créditos esgotado",
+                tipo_conteudo=tipo_do_envio,
+            )
+            return None
+
         # 2. Enviar via API
         response = await _send_api_message(
             client_obj=client_obj,
@@ -381,6 +398,11 @@ async def _send_whatsapp_message_with_context(
         db.refresh(db_message)
 
         logger.info(f"✅ Mensagem enviada: {whatsapp_message_id}")
+
+        # 5b. Consumo de creditos (nunca derruba o envio que ja saiu).
+        creditos_service.debitar(
+            db, tenant_id, creditos, referencia=whatsapp_message_id, descricao=origem
+        )
 
         # 6. Livro-razao (controle de entrega e custo). Nunca atrapalha o envio.
         ledger_service.anotar_envio(
@@ -503,6 +525,7 @@ async def _send_whatsapp_template_with_context(
             logger.error(f"Sessão {session_id} não encontrada")
             return None
         provedor = ledger_service.provedor_do_cliente(client_obj)
+        creditos = creditos_service.custo_em_creditos(db, origem, "modelo", categoria)
 
         permitido, motivo = pode_enviar_whatsapp(
             db, tenant_id, session.phone_number, session.cliente_id
@@ -517,6 +540,20 @@ async def _send_whatsapp_template_with_context(
                 origem=origem,
                 erro_codigo="bloqueado",
                 erro_mensagem=f"Envio bloqueado: {motivo}",
+                tipo_conteudo="modelo",
+            )
+            return None
+
+        if not creditos_service.pode_gastar(db, tenant_id, creditos):
+            ledger_service.anotar_falha_de_envio(
+                db,
+                tenant_id=tenant_id,
+                provedor=provedor,
+                session=session,
+                session_id=session_id,
+                origem=origem,
+                erro_codigo="sem_creditos",
+                erro_mensagem="Saldo de créditos esgotado",
                 tipo_conteudo="modelo",
             )
             return None
@@ -544,6 +581,13 @@ async def _send_whatsapp_template_with_context(
         db.commit()
         db.refresh(db_message)
 
+        creditos_service.debitar(
+            db,
+            tenant_id,
+            creditos,
+            referencia=whatsapp_message_id,
+            descricao=f"modelo {template_name}",
+        )
         ledger_service.anotar_envio(
             db,
             tenant_id=tenant_id,
