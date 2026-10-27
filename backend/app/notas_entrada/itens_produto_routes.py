@@ -57,7 +57,14 @@ def _buscar_nota_item_por_tenant(
     return nota, item
 
 
-@router.post("/{nota_id}/itens/{item_id}/vincular")
+@router.post(
+    "/{nota_id}/itens/{item_id}/vincular",
+    responses={
+        400: {
+            "description": "Produto incompatível: o vínculo exige produto simples ou variação."
+        },
+    },
+)
 def vincular_produto(
     nota_id: int,
     item_id: int,

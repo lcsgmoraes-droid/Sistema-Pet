@@ -19,6 +19,16 @@ from app.security.permissions_decorator import require_permission_dependency
 
 router = APIRouter()
 
+RESPOSTAS_PRODUTOS_INVALIDOS = {
+    400: {"description": "O grupo contém produtos não disponíveis nesta empresa"},
+}
+RESPOSTAS_GRUPO_NAO_ENCONTRADO = {
+    404: {"description": "Grupo de produtos não encontrado"},
+}
+RESPOSTAS_NOME_DUPLICADO = {
+    409: {"description": "Já existe um grupo com esse nome"},
+}
+
 
 class GrupoProdutosPayload(BaseModel):
     nome: str = Field(min_length=1, max_length=120)
@@ -119,6 +129,7 @@ def listar_grupos(
 @router.post(
     "/grupos-produtos",
     dependencies=[Depends(require_permission_dependency("comissoes.configurar"))],
+    responses={**RESPOSTAS_PRODUTOS_INVALIDOS, **RESPOSTAS_NOME_DUPLICADO},
 )
 def salvar_grupo(
     payload: GrupoProdutosPayload,
@@ -148,6 +159,11 @@ def salvar_grupo(
 @router.put(
     "/grupos-produtos/{grupo_id}",
     dependencies=[Depends(require_permission_dependency("comissoes.configurar"))],
+    responses={
+        **RESPOSTAS_PRODUTOS_INVALIDOS,
+        **RESPOSTAS_GRUPO_NAO_ENCONTRADO,
+        **RESPOSTAS_NOME_DUPLICADO,
+    },
 )
 def atualizar_grupo(
     grupo_id: int,
@@ -177,6 +193,11 @@ def atualizar_grupo(
 @router.post(
     "/grupos-produtos/{grupo_id}/provisionar",
     dependencies=[Depends(require_permission_dependency("comissoes.fechamentos"))],
+    responses={
+        400: {"description": "O início do período deve ser anterior ao fim"},
+        **RESPOSTAS_GRUPO_NAO_ENCONTRADO,
+        409: {"description": "Conflito ao provisionar as comissões selecionadas"},
+    },
 )
 def provisionar_grupo(
     grupo_id: int,

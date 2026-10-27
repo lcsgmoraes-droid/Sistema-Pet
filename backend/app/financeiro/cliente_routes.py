@@ -27,7 +27,18 @@ def _divida_do_cliente(tenant_id):
     )
 
 
-@router.get("/cliente/{cliente_id}")
+@router.get(
+    "/cliente/{cliente_id}",
+    responses={
+        400: {
+            "description": (
+                "Filtros inválidos: paginação fora do intervalo, datas fora do "
+                "formato YYYY-MM-DD ou em ordem invertida, ou tipo de movimento "
+                "não suportado."
+            )
+        }
+    },
+)
 async def get_historico_financeiro_cliente(
     cliente_id: int,
     page: int = 1,

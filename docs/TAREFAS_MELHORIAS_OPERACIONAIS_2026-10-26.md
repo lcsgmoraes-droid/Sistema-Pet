@@ -204,3 +204,11 @@ Os códigos públicos foram auditados também nas APIs de NF, entregas e relató
   nos três bancos do smoke com RLS, **69** regressões de código e E2E **1/1**
   repetido após restart do DEV. Nenhuma contagem operacional foi alterada pela
   atualização do DDL de teste; todos os bancos efêmeros foram removidos.
+- Os oito checks oficiais passaram na head `1ea504840`. A análise adicional do
+  Sonar apontou uma promessa sem tratamento explícito, execução dinâmica no
+  harness mobile e duplicação na base estática de Ajuda. Correções aplicadas sem
+  alterar negócios: catch com guarda de desmontagem, compilação de fontes locais
+  com whitelist/realpath/imports restritos e artigos estáticos em JSON.
+- Comparação do catálogo antes/depois confirmou os dez módulos extraídos e seus
+  30 artigos idênticos, incluindo ícones, ordem, títulos, tags e textos. Respostas
+  HTTP 400/404/409 documentadas nas rotas novas; testes focados e OpenAPI passaram.

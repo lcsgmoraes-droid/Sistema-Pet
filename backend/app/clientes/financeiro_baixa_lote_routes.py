@@ -117,7 +117,19 @@ def _criar_conta_receber_faltante_baixa_lote(
     return conta
 
 
-@router.post("/{cliente_id}/baixar-vendas-lote")
+@router.post(
+    "/{cliente_id}/baixar-vendas-lote",
+    responses={
+        400: {
+            "description": (
+                "Recebimento inválido: valor fora do saldo disponível, vendas "
+                "que não estão em aberto, ausência ou falta de seleção do caixa, "
+                "banco ou forma de pagamento inválidos, ou dados de cartão "
+                "inconsistentes."
+            )
+        }
+    },
+)
 async def baixar_vendas_lote(
     cliente_id: int,
     dados: dict,

@@ -1,21 +1,39 @@
 const assert = require("node:assert/strict");
-const { readFileSync } = require("node:fs");
+const { readFileSync, realpathSync } = require("node:fs");
 const { resolve } = require("node:path");
 const test = require("node:test");
+const { compileFunction } = require("node:vm");
 const ts = require("typescript");
 
+const sourceRoot = realpathSync(resolve(__dirname, "../src/screens/benefits"));
+const allowedSources = new Set([
+  resolve(sourceRoot, "BeneficiosScreen.tsx"),
+  resolve(sourceRoot, "beneficios/BeneficiosUtils.ts"),
+  resolve(sourceRoot, "beneficios/BeneficiosStampAndLevelsSections.tsx"),
+]);
+
 function carregar(relativePath, mocks = {}) {
-  const filename = resolve(__dirname, "../src/screens/benefits", relativePath);
-  const { outputText } = ts.transpileModule(readFileSync(filename, "utf8"), {
+  const filename = resolve(sourceRoot, relativePath);
+  if (!allowedSources.has(filename) || realpathSync(filename) !== filename) {
+    throw new Error("O harness aceita somente os três arquivos locais de benefícios autorizados.");
+  }
+  const { outputText, diagnostics } = ts.transpileModule(readFileSync(filename, "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, esModuleInterop: true },
     fileName: filename,
+    reportDiagnostics: true,
   });
+  assert.equal(diagnostics.filter((item) => item.category === ts.DiagnosticCategory.Error).length, 0);
   const module = { exports: {} };
   const requireMock = (name) => {
-    if (!(name in mocks)) throw new Error(`Importação inesperada no teste: ${name}`);
+    if (!Object.hasOwn(mocks, name)) throw new Error(`Importação inesperada no teste: ${name}`);
     return mocks[name];
   };
-  new Function("require", "module", "exports", outputText)(requireMock, module, module.exports);
+  // Compila apenas fonte fixa da whitelist acima, com imports explicitamente simulados.
+  compileFunction(outputText, ["require", "module", "exports"], { filename })(
+    requireMock,
+    module,
+    module.exports,
+  );
   return module.exports;
 }
 

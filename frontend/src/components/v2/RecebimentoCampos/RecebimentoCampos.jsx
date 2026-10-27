@@ -32,13 +32,17 @@ export default function RecebimentoCampos({
       api.get("/financeiro/formas-pagamento", { params: { apenas_ativas: true } }),
       api.get("/operadoras-cartao", { params: { apenas_ativas: true } }),
       api.get("/contas-bancarias", { params: { apenas_ativas: true } }),
-    ]).then(([f, o, b]) => {
-      if (!ativo) return;
-      if (f.status === "fulfilled") setFormas(safeArray(f.value.data));
-      else setErro("Não foi possível consultar as formas de recebimento.");
-      if (o.status === "fulfilled") setOperadoras(safeArray(o.value.data));
-      if (b.status === "fulfilled") setBancos(safeArray(b.value.data));
-    });
+    ])
+      .then(([f, o, b]) => {
+        if (!ativo) return;
+        if (f.status === "fulfilled") setFormas(safeArray(f.value.data));
+        else setErro("Não foi possível consultar as formas de recebimento.");
+        if (o.status === "fulfilled") setOperadoras(safeArray(o.value.data));
+        if (b.status === "fulfilled") setBancos(safeArray(b.value.data));
+      })
+      .catch(() => {
+        if (ativo) setErro("Não foi possível carregar os dados de recebimento.");
+      });
     return () => {
       ativo = false;
     };
