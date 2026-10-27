@@ -32,6 +32,7 @@ export default function Fechamento({
     encerrado,
     contratos,
   } = estadoFechamento(atendimento, semCobranca, motivoSemCobranca);
+  const resumoValor = valorResumoAtendimento(atendimento, custo, cobertoPorPacote, valorPendente);
   const mensagemEncerramento =
     atendimento?.status === "entregue"
       ? "Atendimento já entregue e encerrado."
@@ -99,15 +100,10 @@ export default function Fechamento({
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
-        <ResumoCard
-          label="Valor"
-          value={formatMoneyBRL(
-            atendimento?.venda_total ?? valorPendente ?? custo?.valor_cobrado ?? 0,
-          )}
-        />
+        <ResumoCard label={resumoValor.label} value={formatMoneyBRL(resumoValor.valor)} />
         <ResumoCard label="Custo" value={formatMoneyBRL(custo?.custo_total || 0)} />
         <ResumoCard
-          label="Margem"
+          label="Margem prevista"
           value={formatMoneyBRL(custo?.margem_valor || 0)}
           subtitle={`${formatNumber(custo?.margem_percentual || 0, 1)}%`}
         />
@@ -350,6 +346,16 @@ function CobrancaAtendimento({
     );
   }
   return null;
+}
+
+function valorResumoAtendimento(atendimento, custo, cobertoPorPacote, valorPendente) {
+  if (cobertoPorPacote) {
+    return { label: "Valor de tabela", valor: custo?.valor_cobrado ?? 0 };
+  }
+  return {
+    label: "Valor",
+    valor: atendimento?.venda_total ?? valorPendente ?? custo?.valor_cobrado ?? 0,
+  };
 }
 
 function labelPagamento(status) {
