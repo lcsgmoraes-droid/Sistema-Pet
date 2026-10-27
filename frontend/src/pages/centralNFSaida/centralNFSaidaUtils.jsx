@@ -100,10 +100,13 @@ export function valorBooleanoLabel(valor) {
 }
 
 export function identificadorDocumentoFiscal(nota) {
+  if (nota.fiscal_order_id) return `fiscal-externa-${nota.fiscal_order_id}`;
   return nota.provedor === "intnfe" ? nota.venda_id : nota.id;
 }
 
 export function rotaDocumentoFiscal(nota, tipo) {
+  if (nota.fiscal_order_id)
+    return `/integracoes/ecommerceai/fiscal/manage/orders/${nota.fiscal_order_id}/${tipo}`;
   return nota.provedor === "intnfe"
     ? `/nfe/vendas/${nota.venda_id}/${tipo}`
     : `/nfe/${nota.id}/${tipo}`;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FiActivity,
   FiAlertTriangle,
@@ -11,6 +11,11 @@ import {
 } from "react-icons/fi";
 import { api } from "../../services/api";
 import { confirmarCorePet } from "../../services/corepetDialog";
+import BotaoCancelar from "../../components/v2/BotaoCancelar/BotaoCancelar";
+import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
+import InputCheck from "../../components/v2/InputCheck/InputCheck";
+import AmazonFiscalPanel from "./amazonFiscal/AmazonFiscalPanel";
+import { fiscalError, SCOPE_LABELS } from "./amazonFiscal/amazonFiscalUtils";
 
 const money = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -37,78 +42,103 @@ export default function EcommerceAIIntegracaoCard() {
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState(null);
   const [message, setMessage] = useState(null);
+  const [fiscalConsent, setFiscalConsent] = useState(false);
+  const actionRef = useRef(false);
 
-  const load = useCallback(async () => {
-    try {
-      const response = await api.get("/integracoes/ecommerceai/status", {
-        params: requestId ? { request_id: requestId } : undefined,
-      });
-      setData(response.data);
-      setMessage(null);
-    } catch (error) {
-      setMessage({
-        type: "error",
-        text: error?.response?.data?.detail || "Não foi possível consultar a integração.",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [requestId]);
+  const load = useCallback(
+    async ({ active = () => true, preserveMessage = false } = {}) => {
+      try {
+        const response = await api.get("/integracoes/ecommerceai/status", {
+          params: requestId ? { request_id: requestId } : undefined,
+        });
+        if (!active()) return;
+        setData(response.data);
+        if (!preserveMessage) setMessage(null);
+      } catch (error) {
+        const text = await fiscalError(error);
+        if (active())
+          setMessage({
+            type: "error",
+            text,
+          });
+      } finally {
+        if (active()) setLoading(false);
+      }
+    },
+    [requestId],
+  );
 
   useEffect(() => {
-    void load();
+    let active = true;
+    void load({ active: () => active });
+    return () => {
+      active = false;
+    };
   }, [load]);
 
   async function approve() {
-    if (!requestId) return;
+    if (!requestId || actionRef.current) return;
+    const requestsFiscal = data?.request?.requested_scopes?.some((scope) =>
+      scope.startsWith("fiscal:"),
+    );
+    if (requestsFiscal && !fiscalConsent) return;
+    actionRef.current = true;
     try {
       setAction("approve");
-      await api.post(`/integracoes/ecommerceai/requests/${requestId}/approve`);
+      await api.post(
+        `/integracoes/ecommerceai/requests/${requestId}/approve`,
+        requestsFiscal ? { confirm_fiscal_scopes: true } : undefined,
+      );
       setMessage({ type: "success", text: "EcommerceAI conectado com sucesso." });
-      await load();
+      await load({ preserveMessage: true });
     } catch (error) {
       setMessage({
         type: "error",
-        text:
-          error?.response?.data?.detail ||
-          "O aceite foi registrado, mas não foi possível confirmar com o EcommerceAI.",
+        text: await fiscalError(error),
       });
-      await load();
+      await load({ preserveMessage: true });
     } finally {
+      actionRef.current = false;
       setAction(null);
     }
   }
 
   async function reject() {
-    if (!requestId) return;
+    if (!requestId || actionRef.current) return;
+    actionRef.current = true;
     try {
       setAction("reject");
       await api.post(`/integracoes/ecommerceai/requests/${requestId}/reject`);
       setMessage({ type: "success", text: "Solicitação recusada." });
-      await load();
+      await load({ preserveMessage: true });
     } catch (error) {
       setMessage({
         type: "error",
-        text: error?.response?.data?.detail || "Não foi possível recusar a solicitação.",
+        text: await fiscalError(error),
       });
     } finally {
+      actionRef.current = false;
       setAction(null);
     }
   }
 
   async function disconnect() {
+    if (actionRef.current) return;
     if (!(await confirmarCorePet("Desconectar o EcommerceAI do CorePet?"))) return;
+    if (actionRef.current) return;
+    actionRef.current = true;
     try {
       setAction("disconnect");
       await api.post("/integracoes/ecommerceai/disconnect");
       setMessage({ type: "success", text: "Integração desconectada." });
-      await load();
+      await load({ preserveMessage: true });
     } catch (error) {
       setMessage({
         type: "error",
-        text: error?.response?.data?.detail || "Não foi possível desconectar.",
+        text: await fiscalError(error),
       });
     } finally {
+      actionRef.current = false;
       setAction(null);
     }
   }
@@ -117,9 +147,12 @@ export default function EcommerceAIIntegracaoCard() {
   const pendingRequest = data?.request;
   const overview = data?.latest_overview;
   const isPending = ["pending", "callback_failed"].includes(pendingRequest?.status);
+  const fiscalRequested = pendingRequest?.requested_scopes?.some((scope) =>
+    scope.startsWith("fiscal:"),
+  );
 
   return (
-    <section className="rounded-2xl border border-cyan-100 bg-white p-6 shadow-sm">
+    <section className="rounded-2xl border border-cyan-100 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-3">
           <div className="rounded-xl bg-cyan-100 p-2 text-cyan-700">
@@ -176,32 +209,42 @@ export default function EcommerceAIIntegracaoCard() {
                 {pendingRequest.account_name || pendingRequest.account_email || "EcommerceAI"}
               </p>
               <p className="mt-1 text-xs text-amber-700">
-                Permissões: leitura do catálogo e envio de eventos. Expira em{" "}
-                {formatDate(pendingRequest.expires_at)}.
+                Permissões solicitadas abaixo. Expira em {formatDate(pendingRequest.expires_at)}.
               </p>
+              <ul className="mt-2 list-inside list-disc text-sm text-amber-900 dark:text-amber-200">
+                {(pendingRequest.requested_scopes || []).map((scope) => (
+                  <li key={scope}>{SCOPE_LABELS[scope] || scope}</li>
+                ))}
+              </ul>
+              {fiscalRequested && (
+                <div className="mt-3">
+                  <InputCheck
+                    id="ecommerceai-fiscal-scope-consent"
+                    label="Autorizo as permissões fiscais solicitadas para esta empresa"
+                    checked={fiscalConsent}
+                    onChange={setFiscalConsent}
+                    disabled={Boolean(action)}
+                    help="Preparação, emissão e consulta somente nos escopos acima. A emissão automática também exige ativação da conta fiscal."
+                  />
+                </div>
+              )}
               {pendingRequest.callback_error ? (
                 <p className="mt-2 text-xs text-red-700">
                   A confirmação anterior falhou. Você pode tentar aprovar novamente.
                 </p>
               ) : null}
               <div className="mt-4 flex flex-wrap gap-2">
-                <button
+                <BotaoInteracao
                   type="button"
                   onClick={approve}
-                  disabled={Boolean(action)}
-                  className="inline-flex items-center gap-2 rounded-xl bg-cyan-700 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-800 disabled:opacity-60"
+                  disabled={Boolean(action) || (fiscalRequested && !fiscalConsent)}
                 >
                   <FiCheckCircle /> {action === "approve" ? "Conectando..." : "Aceitar e conectar"}
-                </button>
+                </BotaoInteracao>
                 {pendingRequest.status === "pending" ? (
-                  <button
-                    type="button"
-                    onClick={reject}
-                    disabled={Boolean(action)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white disabled:opacity-60"
-                  >
+                  <BotaoCancelar type="button" onClick={reject} disabled={Boolean(action)}>
                     <FiXCircle /> Recusar
-                  </button>
+                  </BotaoCancelar>
                 ) : null}
               </div>
             </div>
@@ -283,14 +326,13 @@ export default function EcommerceAIIntegracaoCard() {
               <div className="flex items-center gap-2 text-sm font-medium text-slate-800">
                 <FiSend /> Últimos recebimentos
               </div>
-              <button
+              <BotaoInteracao
                 type="button"
                 onClick={() => void load()}
-                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
                 aria-label="Atualizar integração"
               >
                 <FiRefreshCw />
-              </button>
+              </BotaoInteracao>
             </div>
             <div className="mt-2 overflow-hidden rounded-xl border border-slate-100">
               {(data.events || []).length ? (
@@ -317,17 +359,13 @@ export default function EcommerceAIIntegracaoCard() {
           </div>
 
           <div className="mt-5 flex justify-end">
-            <button
-              type="button"
-              onClick={disconnect}
-              disabled={Boolean(action)}
-              className="rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
-            >
+            <BotaoCancelar type="button" onClick={disconnect} disabled={Boolean(action)}>
               {action === "disconnect" ? "Desconectando..." : "Desconectar"}
-            </button>
+            </BotaoCancelar>
           </div>
         </>
       ) : null}
+      {!loading && <AmazonFiscalPanel scopes={connection?.scopes || []} />}
     </section>
   );
 }

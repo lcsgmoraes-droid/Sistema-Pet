@@ -26,6 +26,7 @@ Guia mestre:
 | Testar NF-e de produto na IntNFe | `docs/FISCAL_INTNFE_PILOTO_HOMOLOGACAO.md` | Acesso, empresa/certificado e evidencias do teste em homologacao |
 | Validar NF-e de marketplace, NFC-e e Nota Fiscal Paulista | `docs/DIAGNOSTICO_INTNFE_BLING_MULTICANAL_2026-09-11.md` | Testes multicanal, bloqueios e proxima matriz de homologacao |
 | Configurar NF-e e NFC-e no CorePet | `docs/GUIA_CONFIGURACAO_FISCAL_NFE_NFCE.md` | A1, credenciamento, CSC, vínculo IntNFe, numeração e checklist para produção |
+| Integrar pedidos Amazon do EcommerceAI com NF-e CorePet | `docs/INTEGRACAO_ECOMMERCEAI_FISCAL.md` | Consentimento, SKU exato, fila, XML e aceite Amazon; ficha de entrega em `docs/entregas/2026-10-26-integracao-fiscal-ecommerceai.md` |
 | Planejar o modulo fiscal do CorePet | `docs/ESTUDO_BLING_E_ESTRUTURA_FISCAL_COREPET.md` | Estudo do Bling, capacidades do emissor e resultados do piloto |
 | Preparar entrega relevante | `docs/templates/FICHA_ENTREGA.md` | Criterios de aceite, risco, testes e rollback |
 | Registrar homologacao | `docs/templates/REGISTRO_HOMOLOGACAO.md` | Evidencias conforme `docs/PADRAO_EVIDENCIA.md` |

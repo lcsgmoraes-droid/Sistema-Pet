@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import { useId } from "react";
 
 const LARGURAS = {
   pequena: "max-w-md",
@@ -12,16 +13,22 @@ const LARGURAS = {
 // escurecido, de propósito): o usuário só sai por um botão explícito (o X aqui, ou Cancelar/Salvar
 // que a tela passa no `rodape`) — evita perder preenchimento por um clique sem querer.
 export default function ModalPadrao({ children, onFechar, rodape, tamanho = "normal", titulo }) {
+  const titleId = useId();
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50 p-4">
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className={[
           "flex max-h-[90vh] w-full flex-col overflow-hidden rounded-xl bg-white shadow-2xl dark:bg-slate-900",
           LARGURAS[tamanho] || LARGURAS.normal,
         ].join(" ")}
       >
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-slate-100">{titulo}</h3>
+          <h3 id={titleId} className="text-xl font-bold text-gray-900 dark:text-slate-100">
+            {titulo}
+          </h3>
           <button
             type="button"
             onClick={onFechar}
