@@ -2,8 +2,9 @@
 
 from datetime import datetime
 from decimal import Decimal
+import sqlite3
 from types import SimpleNamespace
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -17,12 +18,16 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.clientes.financeiro_routes import router as financeiro_router
 from app.db import get_session
 from app.financeiro_models import ContaReceber
+from app.grupo_comercial_models import GrupoComercial, GrupoComercialMembro
 from app.models import Cliente
 from app.tenancy.context import clear_current_tenant, set_current_tenant
 from app.vendas_models import Venda, VendaItem, VendaPagamento
 
 
-def test_historico_compras_nao_exibe_divida_para_venda_cancelada():
+def test_historico_compras_nao_exibe_divida_para_venda_cancelada(monkeypatch):
+    # A comparação do grupo usa CAST(... AS VARCHAR), sem o binder UUID do ORM.
+    # Mantém o filtro real e adapta somente o DBAPI da fixture SQLite.
+    monkeypatch.setitem(sqlite3.adapters, (UUID, sqlite3.PrepareProtocol), str)
     tenant_id = uuid4()
     usuario_id = 91
     engine = create_engine(
@@ -31,7 +36,15 @@ def test_historico_compras_nao_exibe_divida_para_venda_cancelada():
         poolclass=StaticPool,
     )
     with engine.begin() as connection:
-        for modelo in (Cliente, Venda, VendaItem, VendaPagamento, ContaReceber):
+        for modelo in (
+            GrupoComercial,
+            GrupoComercialMembro,
+            Cliente,
+            Venda,
+            VendaItem,
+            VendaPagamento,
+            ContaReceber,
+        ):
             connection.execute(
                 CreateTable(modelo.__table__, include_foreign_key_constraints=[])
             )

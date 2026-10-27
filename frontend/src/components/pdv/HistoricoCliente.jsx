@@ -1,6 +1,5 @@
 ﻿import { useState, useEffect } from "react";
 import {
-  X,
   ShoppingBag,
   TrendingUp,
   Calendar,
@@ -22,7 +21,9 @@ import SaleReference from "../ui/SaleReference";
 import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
 import BotaoCancelar from "../v2/BotaoCancelar/BotaoCancelar";
 import InputCombobox from "../v2/InputCombobox/InputCombobox";
+import HistoricoRecebimentosVenda from "./HistoricoRecebimentosVenda";
 import { formatMoneyBRL as formatBRL } from "../../utils/formatters";
+import { formatarDataHistorico, obterStatusHistorico } from "../../utils/historicoFinanceiro";
 
 const obterStatusVenda = (venda) =>
   venda.status === "cancelada" ? "cancelada" : venda.status_pagamento || venda.status;
@@ -187,36 +188,19 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
     }));
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (venda) => {
+    const { label, tom } = obterStatusHistorico({ ...venda, tipo: "venda" });
     const badges = {
-      em_aberto: "bg-blue-100 text-blue-800",
-      pago: "bg-green-100 text-green-800",
-      parcial: "bg-yellow-100 text-yellow-800",
-      aberta: "bg-blue-100 text-blue-800",
-      finalizada: "bg-green-100 text-green-800",
-      baixa_parcial: "bg-yellow-100 text-yellow-800",
-      pendente: "bg-orange-100 text-orange-800",
-      cancelada: "bg-red-100 text-red-800",
-      finalizada_devolucao_parcial: "bg-orange-100 text-orange-800",
-      finalizada_devolucao_total: "bg-gray-100 text-gray-800",
-    };
-    const labels = {
-      em_aberto: "Em aberto",
-      pago: "Pago",
-      parcial: "Parcial",
-      aberta: "Aberta",
-      finalizada: "Finalizada",
-      baixa_parcial: "Baixa Parcial",
-      pendente: "Pendente",
-      cancelada: "Cancelada",
-      finalizada_devolucao_parcial: "Dev. Parcial",
-      finalizada_devolucao_total: "Dev. Total",
+      sucesso: "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200",
+      atencao: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200",
+      perigo: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200",
+      neutro: "bg-gray-100 text-gray-800 dark:bg-slate-800 dark:text-slate-200",
     };
     return (
       <span
-        className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${badges[status] || "bg-gray-100 text-gray-800"}`}
+        className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${badges[tom] || badges.neutro}`}
       >
-        {labels[status] || status}
+        {label}
       </span>
     );
   };
@@ -308,7 +292,7 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
                 {mostrarResumoGerencial ? "Ocultar valores" : "Ver valores"}
               </BotaoInteracao>
               <BotaoCancelar onClick={onClose} aria-label="Fechar histórico" tamanho="pequeno">
-                <X className="w-6 h-6" />
+                Fechar
               </BotaoCancelar>
             </div>
           </div>
@@ -362,12 +346,7 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
             <div className="mt-4 bg-white rounded-lg p-3 shadow-sm flex items-center space-x-2 text-sm">
               <Calendar className="w-4 h-4 text-gray-500" />
               <span className="text-gray-600">
-                Última compra:{" "}
-                {new Date(historico.ultima_compra).toLocaleDateString("pt-BR", {
-                  day: "2-digit",
-                  month: "long",
-                  year: "numeric",
-                })}
+                Última compra: {formatarDataHistorico(historico.ultima_compra)}
               </span>
             </div>
           )}
@@ -419,7 +398,6 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
                   {(() => {
                     const itensDaVenda = obterItensVenda(venda);
                     const pagamentosDaVenda = obterPagamentosVenda(venda);
-                    const temDetalhes = venda.total_itens > 0 || pagamentosDaVenda.length > 0;
                     const carregandoVenda = !!loadingDetalhes[venda.id];
 
                     return (
@@ -432,14 +410,14 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
                                 <h3 className="text-lg font-semibold text-gray-900">
                                   <SaleReference sale={venda} />
                                 </h3>
-                                {getStatusBadge(obterStatusVenda(venda))}
+                                {getStatusBadge(venda)}
                               </div>
 
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                 <div>
                                   <span className="text-gray-500">Data:</span>
                                   <div className="font-medium text-gray-900">
-                                    {new Date(venda.data_venda).toLocaleDateString("pt-BR")}
+                                    {formatarDataHistorico(venda.data_venda)}
                                   </div>
                                 </div>
 
@@ -505,25 +483,24 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
                           </div>
 
                           {/* Botao Ver Detalhes */}
-                          {temDetalhes && (
-                            <BotaoInteracao
-                              tamanho="pequeno"
-                              onClick={() => toggleExpandir(venda)}
-                              className="mt-3 flex items-center space-x-1 text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
-                            >
-                              {expandidos[venda.id] ? (
-                                <>
-                                  <ChevronUp className="w-4 h-4" />
-                                  <span>Ocultar detalhes</span>
-                                </>
-                              ) : (
-                                <>
-                                  <ChevronDown className="w-4 h-4" />
-                                  <span>Ver detalhes da compra</span>
-                                </>
-                              )}
-                            </BotaoInteracao>
-                          )}
+                          <BotaoInteracao
+                            tamanho="pequeno"
+                            onClick={() => toggleExpandir(venda)}
+                            aria-expanded={!!expandidos[venda.id]}
+                            className="mt-3 flex items-center space-x-1 text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                          >
+                            {expandidos[venda.id] ? (
+                              <>
+                                <ChevronUp className="w-4 h-4" />
+                                <span>Ocultar detalhes</span>
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDown className="w-4 h-4" />
+                                <span>Ver detalhes da compra</span>
+                              </>
+                            )}
+                          </BotaoInteracao>
                         </div>
 
                         {/* Painel expansivel: itens + pagamentos */}
@@ -669,13 +646,7 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
                               </div>
                             )}
 
-                            {!carregandoVenda &&
-                              itensDaVenda.length === 0 &&
-                              pagamentosDaVenda.length === 0 && (
-                                <div className="text-sm text-gray-500">
-                                  Nao ha detalhes para esta venda.
-                                </div>
-                              )}
+                            <HistoricoRecebimentosVenda key={venda.id} vendaId={venda.id} />
                           </div>
                         )}
                       </>

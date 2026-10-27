@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, selectinload
 
 from app.audit_log import log_action
@@ -164,6 +164,29 @@ def listar_pagamentos_venda(
         "status_pagamento": status_pagamento,
         "pagamentos": [p.to_dict() for p in pagamentos],
     }
+
+
+@router.get(
+    "/{venda_id}/recebimentos-historico",
+    responses={404: {"description": "Venda não encontrada na empresa atual."}},
+)
+def listar_recebimentos_historico_venda(
+    venda_id: int,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Recibos efetivos e estornos, sem repetir os espelhos em pagamentos."""
+    from app.financeiro.recebimentos_historico import consultar_recebimentos_venda
+
+    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    venda = db.query(Venda.id).filter_by(id=venda_id, tenant_id=tenant_id).first()
+    if not venda:
+        raise HTTPException(status_code=404, detail="Venda não encontrada")
+    return consultar_recebimentos_venda(
+        db, tenant_id=tenant_id, venda_id=venda_id, page=page, per_page=per_page
+    )
 
 
 @router.delete("/pagamentos/{pagamento_id}")

@@ -1,7 +1,6 @@
 import React from "react";
 import {
   FiArrowLeft,
-  FiCalendar,
   FiChevronDown,
   FiChevronLeft,
   FiChevronRight,
@@ -13,10 +12,8 @@ import {
   FiShoppingCart,
 } from "react-icons/fi";
 
-import ActionButton from "../../components/ui/ActionButton";
 import EmptyState from "../../components/ui/EmptyState";
 import ErrorState from "../../components/ui/ErrorState";
-import IconActionButton from "../../components/ui/IconActionButton";
 import LoadingState from "../../components/ui/LoadingState";
 import MetricCard from "../../components/ui/MetricCard";
 import MetricGrid from "../../components/ui/MetricGrid";
@@ -26,7 +23,15 @@ import ProductIdentity from "../../components/ui/ProductIdentity";
 import SaleReference from "../../components/ui/SaleReference";
 import ClienteBaixasLotePanel from "../../components/clientes/ClienteBaixasLotePanel";
 
-const formatCurrency = (value) => `R$ ${(Number(value) || 0).toFixed(2).replace(".", ",")}`;
+import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
+import InputData from "../../components/v2/InputData/InputData";
+import InputCombobox from "../../components/v2/InputCombobox/InputCombobox";
+import { formatMoneyBRL } from "../../utils/formatters.js";
+import {
+  camposDetalhesHistorico,
+  formatarDataHistorico,
+  obterStatusHistorico,
+} from "../../utils/historicoFinanceiro.js";
 
 const getTipoIcon = (tipo) => {
   switch (tipo) {
@@ -62,18 +67,13 @@ const getTipoLabel = (tipo) => {
   }
 };
 
-const getStatusBadge = (status) => {
-  const badges = {
-    finalizada: "bg-green-100 text-green-700",
-    concluida: "bg-green-100 text-green-700",
-    pendente: "bg-yellow-100 text-yellow-700",
-    paga: "bg-blue-100 text-blue-700",
-    cancelada: "bg-red-100 text-red-700",
-    devolvida: "bg-red-100 text-red-700",
-    efetivado: "bg-green-100 text-green-700",
-  };
-  return badges[status] || "bg-gray-100 text-gray-700";
-};
+const getStatusBadge = (tom) =>
+  ({
+    sucesso: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-200",
+    atencao: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200",
+    perigo: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-200",
+    neutro: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
+  })[tom] || "bg-slate-100 text-slate-700";
 
 export default function ClienteFinanceiroView({
   cliente,
@@ -118,14 +118,9 @@ export default function ClienteFinanceiroView({
             title="Erro ao carregar dados"
             description={error}
             action={
-              <ActionButton
-                onClick={onVoltarClientes}
-                intent="neutral"
-                icon={FiArrowLeft}
-                size="md"
-              >
+              <BotaoInteracao onClick={onVoltarClientes} icon={FiArrowLeft}>
                 Voltar para Clientes
-              </ActionButton>
+              </BotaoInteracao>
             }
           />
         </div>
@@ -137,9 +132,9 @@ export default function ClienteFinanceiroView({
     <div className="min-h-screen bg-slate-50 p-6">
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="space-y-4">
-          <ActionButton onClick={onVoltarClientes} intent="neutral" tone="ghost" icon={FiArrowLeft}>
+          <BotaoInteracao onClick={onVoltarClientes} icon={FiArrowLeft}>
             Voltar para Clientes
-          </ActionButton>
+          </BotaoInteracao>
 
           <PageHeader
             icon={FiCreditCard}
@@ -157,25 +152,25 @@ export default function ClienteFinanceiroView({
             <MetricCard
               intent="violet"
               label="Credito disponivel"
-              value={formatCurrency(cliente?.credito_atual)}
+              value={formatMoneyBRL(cliente?.credito_atual)}
             />
             <MetricCard
               intent="blue"
               label="Total vendas (90d)"
-              value={formatCurrency(resumo.total_vendas_90d)}
+              value={formatMoneyBRL(resumo.total_vendas_90d)}
             />
             <MetricCard
               intent="amber"
               label="Total em aberto"
-              value={formatCurrency(resumo.total_em_aberto)}
+              value={formatMoneyBRL(resumo.total_em_aberto)}
             />
             <MetricCard
               intent="emerald"
               label="Ultima compra"
-              value={resumo.ultima_compra ? formatCurrency(resumo.ultima_compra.valor) : "-"}
+              value={resumo.ultima_compra ? formatMoneyBRL(resumo.ultima_compra.valor) : "-"}
               subtitle={
                 resumo.ultima_compra?.data
-                  ? new Date(resumo.ultima_compra.data).toLocaleDateString("pt-BR")
+                  ? formatarDataHistorico(resumo.ultima_compra.data)
                   : "Nenhuma compra"
               }
             />
@@ -200,85 +195,66 @@ export default function ClienteFinanceiroView({
           subtitle="Refine o historico por periodo, tipo, status e quantidade por pagina."
           actions={
             <div className="flex flex-wrap items-center gap-2">
-              <ActionButton onClick={onLimparFiltros} intent="neutral" tone="ghost" size="sm">
+              <BotaoInteracao onClick={onLimparFiltros} tamanho="pequeno">
                 Limpar filtros
-              </ActionButton>
-              <ActionButton
+              </BotaoInteracao>
+              <BotaoInteracao
                 onClick={onExportarPdf}
                 disabled={loading || !paginacao?.total_itens}
                 loading={gerandoPdf}
                 icon={FiDownload}
-                intent="edit"
-                size="sm"
+                tamanho="pequeno"
               >
                 {gerandoPdf ? "Gerando PDF..." : "Gerar PDF"}
-              </ActionButton>
+              </BotaoInteracao>
             </div>
           }
         >
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                <FiCalendar className="inline mr-1" />
-                Data Inicio
-              </label>
-              <input
-                type="date"
-                value={filtros.data_inicio}
-                onChange={(e) => onAplicarFiltros({ data_inicio: e.target.value })}
-                className="h-9 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                <FiCalendar className="inline mr-1" />
-                Data Fim
-              </label>
-              <input
-                type="date"
-                value={filtros.data_fim}
-                onChange={(e) => onAplicarFiltros({ data_fim: e.target.value })}
-                className="h-9 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Tipo</label>
-              <select
-                value={filtros.tipo}
-                onChange={(e) => onAplicarFiltros({ tipo: e.target.value })}
-                className="h-9 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              >
-                <option value="">Todas as transacoes</option>
-                <option value="venda">Vendas</option>
-                <option value="devolucao">Devolucoes</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-              <select
-                value={filtros.status}
-                onChange={(e) => onAplicarFiltros({ status: e.target.value })}
-                className="h-9 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              >
-                <option value="">Todos os status</option>
-                <option value="aberta">Em Aberto</option>
-                <option value="finalizada">Finalizada (Paga)</option>
-                <option value="cancelada">Cancelada</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Por pagina</label>
-              <select
-                value={filtros.per_page}
-                onChange={(e) => onAplicarFiltros({ per_page: parseInt(e.target.value, 10) })}
-                className="h-9 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              >
-                <option value="10">10</option>
-                <option value="20">20</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-              </select>
-            </div>
+            <InputData
+              label="Data inicial"
+              value={filtros.data_inicio}
+              onChange={(data_inicio) => onAplicarFiltros({ data_inicio })}
+            />
+            <InputData
+              label="Data final"
+              value={filtros.data_fim}
+              onChange={(data_fim) => onAplicarFiltros({ data_fim })}
+            />
+            <InputCombobox
+              label="Tipo"
+              value={filtros.tipo}
+              onChange={(tipo) => onAplicarFiltros({ tipo: tipo || "" })}
+              opcoes={[
+                { value: "", label: "Todas as transações" },
+                { value: "venda", label: "Vendas" },
+                { value: "devolucao", label: "Devoluções" },
+                { value: "conta_receber", label: "Contas a receber" },
+                { value: "recebimento", label: "Recebimentos" },
+                { value: "credito", label: "Créditos" },
+              ]}
+            />
+            <InputCombobox
+              label="Situação"
+              value={filtros.status}
+              onChange={(status) => onAplicarFiltros({ status: status || "" })}
+              opcoes={[
+                { value: "", label: "Todas as situações" },
+                { value: "em_aberto", label: "Em aberto" },
+                { value: "vencido", label: "Vencido" },
+                { value: "parcial", label: "Parcial" },
+                { value: "recebido", label: "Pago / recebido" },
+                { value: "cancelado", label: "Cancelada" },
+                { value: "estornado", label: "Estornado" },
+              ]}
+            />
+            <InputCombobox
+              label="Por página"
+              value={filtros.per_page}
+              onChange={(per_page) => onAplicarFiltros({ per_page: Number(per_page) || 20 })}
+              permitirLimpar={false}
+              opcoes={[10, 20, 50, 100].map((value) => ({ value, label: String(value) }))}
+            />
           </div>
         </Panel>
 
@@ -315,6 +291,7 @@ export default function ClienteFinanceiroView({
                   <tbody className="bg-white divide-y divide-gray-200">
                     {historico.map((transacao, index) => {
                       const key = `${transacao.tipo}-${index}`;
+                      const situacao = obterStatusHistorico(transacao);
                       const isExpanded = expandedRows[key];
                       const vendaId = transacao.detalhes?.venda_id;
                       const detalhes = vendaId ? detalhesVendas[vendaId] : null;
@@ -323,18 +300,17 @@ export default function ClienteFinanceiroView({
                         <React.Fragment key={key}>
                           <tr className="hover:bg-gray-50 transition-colors">
                             <td className="px-4 py-4 text-center">
-                              <IconActionButton
+                              <BotaoInteracao
                                 icon={isExpanded ? FiChevronUp : FiChevronDown}
-                                intent="neutral"
-                                tone="ghost"
                                 onClick={() => onToggleExpansao(transacao, index)}
                                 title={isExpanded ? "Recolher detalhes" : "Ver detalhes"}
+                                aria-label={isExpanded ? "Recolher detalhes" : "Ver detalhes"}
+                                aria-expanded={isExpanded}
+                                tamanho="pequeno"
                               />
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {transacao.data
-                                ? new Date(transacao.data).toLocaleDateString("pt-BR")
-                                : "-"}
+                              {transacao.data ? formatarDataHistorico(transacao.data) : "-"}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className="inline-flex items-center gap-2 text-sm font-medium">
@@ -345,7 +321,9 @@ export default function ClienteFinanceiroView({
                               </span>
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-900 max-w-md">
-                              <div className="truncate">{transacao.descricao}</div>
+                              <div className="whitespace-pre-wrap break-words">
+                                {transacao.descricao}
+                              </div>
                               {transacao.detalhes?.numero_venda && (
                                 <div className="text-xs text-blue-600 mt-1">
                                   <SaleReference
@@ -362,28 +340,27 @@ export default function ClienteFinanceiroView({
                                 }`}
                               >
                                 {transacao.valor < 0 ? "- " : "+ "}
-                                {formatCurrency(Math.abs(transacao.valor))}
+                                {formatMoneyBRL(Math.abs(transacao.valor))}
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
                               <span
                                 className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadge(
-                                  transacao.status,
+                                  situacao.tom,
                                 )}`}
                               >
-                                {transacao.status}
+                                {situacao.label}
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
                               {transacao.tipo === "venda" && vendaId && (
-                                <ActionButton
+                                <BotaoInteracao
                                   onClick={() => onNavegarParaVenda(vendaId)}
-                                  intent="edit"
                                   icon={FiShoppingCart}
-                                  size="xs"
+                                  tamanho="pequeno"
                                 >
                                   Ver no PDV
-                                </ActionButton>
+                                </BotaoInteracao>
                               )}
                             </td>
                           </tr>
@@ -421,28 +398,25 @@ export default function ClienteFinanceiroView({
                       de {paginacao.total_itens} transacoes
                     </div>
                     <div className="flex items-center gap-2">
-                      <ActionButton
+                      <BotaoInteracao
                         onClick={() => onMudarPagina(paginacao.pagina_atual - 1)}
                         disabled={!paginacao.tem_anterior}
-                        intent="neutral"
                         icon={FiChevronLeft}
-                        size="sm"
+                        tamanho="pequeno"
                       >
                         Anterior
-                      </ActionButton>
+                      </BotaoInteracao>
                       <span className="px-4 py-2 text-sm text-gray-700">
                         Pagina {paginacao.pagina_atual} de {paginacao.total_paginas}
                       </span>
-                      <ActionButton
+                      <BotaoInteracao
                         onClick={() => onMudarPagina(paginacao.pagina_atual + 1)}
                         disabled={!paginacao.tem_proxima}
-                        intent="neutral"
                         icon={FiChevronRight}
-                        iconPosition="right"
-                        size="sm"
+                        tamanho="pequeno"
                       >
                         Proxima
-                      </ActionButton>
+                      </BotaoInteracao>
                     </div>
                   </div>
                 </div>
@@ -459,9 +433,7 @@ export default function ClienteFinanceiroView({
               }
               action={
                 temFiltros ? (
-                  <ActionButton onClick={onLimparFiltros} intent="neutral" size="md">
-                    Limpar filtros
-                  </ActionButton>
+                  <BotaoInteracao onClick={onLimparFiltros}>Limpar filtros</BotaoInteracao>
                 ) : null
               }
             />
@@ -498,14 +470,14 @@ function DetalhesVenda({ detalhes, loading }) {
           />
         </h4>
         <div className="text-sm text-gray-600">
-          {new Date(detalhes.data_venda).toLocaleString("pt-BR")}
+          {formatarDataHistorico(detalhes.data_venda, { comHora: true })}
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white rounded-lg p-4 border border-gray-200">
         <div>
           <p className="text-xs text-gray-500 mb-1">Total da Venda</p>
-          <p className="text-xl font-bold text-green-600">{formatCurrency(detalhes.total)}</p>
+          <p className="text-xl font-bold text-green-600">{formatMoneyBRL(detalhes.total)}</p>
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-1">Total de Itens</p>
@@ -513,7 +485,7 @@ function DetalhesVenda({ detalhes, loading }) {
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-1">Desconto Total</p>
-          <p className="text-xl font-bold text-orange-600">{formatCurrency(detalhes.desconto)}</p>
+          <p className="text-xl font-bold text-orange-600">{formatMoneyBRL(detalhes.desconto)}</p>
         </div>
       </div>
 
@@ -555,16 +527,16 @@ function DetalhesVenda({ detalhes, loading }) {
                       {item.quantidade}
                     </td>
                     <td className="px-4 py-3 text-sm text-right text-gray-700">
-                      {formatCurrency(item.preco_unitario)}
+                      {formatMoneyBRL(item.preco_unitario)}
                     </td>
                     <td className="px-4 py-3 text-sm text-right text-orange-600">
                       {item.desconto_percentual || 0}%
                     </td>
                     <td className="px-4 py-3 text-sm text-right text-orange-600">
-                      {formatCurrency(item.desconto)}
+                      {formatMoneyBRL(item.desconto)}
                     </td>
                     <td className="px-4 py-3 text-sm text-right font-bold text-green-600">
-                      {formatCurrency(item.subtotal)}
+                      {formatMoneyBRL(item.subtotal)}
                     </td>
                   </tr>
                 ))}
@@ -578,7 +550,7 @@ function DetalhesVenda({ detalhes, loading }) {
                     Total Geral:
                   </td>
                   <td className="px-4 py-3 text-right text-lg font-bold text-green-600">
-                    {formatCurrency(detalhes.total)}
+                    {formatMoneyBRL(detalhes.total)}
                   </td>
                 </tr>
               </tfoot>
@@ -590,27 +562,35 @@ function DetalhesVenda({ detalhes, loading }) {
       {detalhes.observacoes && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
           <p className="text-xs font-semibold text-yellow-800 mb-1">Observacoes:</p>
-          <p className="text-sm text-gray-700">{detalhes.observacoes}</p>
+          <p className="whitespace-pre-wrap break-words text-sm text-gray-700">
+            {detalhes.observacoes}
+          </p>
         </div>
       )}
     </div>
   );
 }
 
-function DetalhesTransacao({ transacao }) {
+export function DetalhesTransacao({ transacao }) {
+  const detalhes = camposDetalhesHistorico(transacao);
   return (
-    <div className="bg-white rounded-lg p-4 border border-gray-200">
-      <h5 className="font-semibold text-gray-800 mb-3">Detalhes da Transacao</h5>
-      <div className="grid grid-cols-2 gap-3 text-sm">
-        {Object.entries(transacao.detalhes || {}).map(([key, value]) => (
-          <div key={key} className="flex justify-between border-b border-gray-100 pb-2">
-            <span className="text-gray-600 capitalize">{key.replace(/_/g, " ")}:</span>
-            <span className="font-semibold text-gray-900">
-              {typeof value === "number" ? formatCurrency(value) : value?.toString() || "N/A"}
-            </span>
+    <div className="bg-white rounded-lg p-4 border border-gray-200 dark:bg-slate-900 dark:border-slate-700">
+      <h5 className="font-semibold text-gray-800 mb-3 dark:text-slate-100">
+        {getTipoLabel(transacao.tipo)} — detalhes
+      </h5>
+      <dl className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+        {detalhes.map(({ chave, label, tipo, valor }) => (
+          <div
+            key={chave}
+            className={`border-b border-gray-100 pb-2 dark:border-slate-700 ${tipo === "observacao" ? "md:col-span-2" : ""}`}
+          >
+            <dt className="text-gray-600 dark:text-slate-400">{label}</dt>
+            <dd className="whitespace-pre-wrap break-words font-semibold text-gray-900 dark:text-slate-100">
+              {valor}
+            </dd>
           </div>
         ))}
-      </div>
+      </dl>
     </div>
   );
 }
