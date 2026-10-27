@@ -127,6 +127,12 @@ referência técnica de criação da venda permanece imutável. A cobertura est�
 em `backend/tests/integration/test_comissoes_vigencia_limites_local.py`, com
 rollback obrigatório e execução prevista também nos bancos efêmeros do CI.
 
+A fusão adquire o bloqueio da vigência por empresa antes de bloquear as pessoas
+e transferir regras. A mesma ordem é usada pela criação de vendas e alteração
+de regras, evitando um ciclo entre o vínculo do funcionário da venda e a fusão.
+As vendas compartilham o bloqueio entre si; só alterações de regra/fusão
+precisam aguardar o término das inclusões já iniciadas na mesma empresa.
+
 A prévia antiga chamava a leitura com bloqueio de linhas e foi recusada numa
 transação de produção marcada `READ ONLY`, sem escrever dados. O código DEV
 agora usa `bloquear=False` somente na prévia; a execução mantém o padrão de

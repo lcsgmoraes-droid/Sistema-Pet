@@ -132,6 +132,13 @@ uma parcela pendente após mudar R$ 3,00 para R$ 5,00: ambas mantiveram R$ 3,00.
 A venda criada antes da primeira regra permaneceu sem comissão; somente a nova
 venda recebeu R$ 5,00. Esses aceites não substituem o novo gate da revisão final.
 
+Dois cenários adicionais com conexões simultâneas reproduziram a troca indevida
+de regra após um commit concorrente. O bloqueio por empresa foi corrigido:
+alterações de regra e inclusão da venda aguardam a transação anterior, enquanto
+duas vendas da mesma empresa e operações de outra empresa continuam concorrentes.
+Os seis cenários PostgreSQL passaram após essa correção; a fusão adquire o mesmo
+bloqueio antes de bloquear pessoas, preservando a ordem de aquisição.
+
 Build frontend de produção, ESLint e Prettier completos passaram na etapa
 registrada. O check inicial e as frentes focadas passaram; o
 `FLUXO_UNICO.bat release-check` completo segue pendente de conclusão após as

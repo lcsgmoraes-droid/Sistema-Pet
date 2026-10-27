@@ -1,8 +1,11 @@
 """Fronteiras da vigencia no PostgreSQL local/CI, sempre com rollback."""
 
 from datetime import datetime, timedelta, timezone
+from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 import os
+from threading import Event
+import time
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -299,3 +302,188 @@ def test_versoes_isoladas_por_tenant_e_migradas_na_fusao_da_pessoa(caso):
         "app.tenant_id" in (qual or "") and "app.tenant_id" in (check or "")
         for qual, check in politicas
     )
+
+
+def _contexto_conexao(db, tenant):
+    set_current_tenant(tenant)
+    db.execute(
+        text("SELECT set_config('app.tenant_id', :tenant, true)"),
+        {"tenant": str(tenant)},
+    )
+    db.execute(text("SET LOCAL statement_timeout = '8s'"))
+
+
+@pytest.fixture
+def concorrente(caso):
+    # Duas conexoes precisam enxergar o seed confirmado. Permitido somente nos
+    # bancos descartaveis de teste; o caminho *_dev continua so com rollback.
+    if not os.getenv("COMISSOES_VIGENCIA_TEST_POSTGRES_URL"):
+        pytest.skip("Concorrencia exige URL explicita de banco efemero de teste")
+    config_a = _configurar(caso, 3)
+    dados_a = SimpleNamespace(
+        tenant=caso.tenant,
+        user_id=caso.usuario.id,
+        funcionario_id=caso.funcionario.id,
+        config_id=config_a.id,
+        sufixo=caso.sufixo,
+    )
+    tenant_b = uuid4()
+    _contexto_conexao(caso.db, tenant_b)
+    empresa_b = Tenant(
+        id=str(tenant_b),
+        name=f"Outra vigencia {caso.sufixo}",
+        name_normalized=f"outra vigencia {caso.sufixo}",
+    )
+    caso.db.add(empresa_b)
+    caso.db.flush()
+    user_b = User(
+        tenant_id=tenant_b, username=f"concorrente-{caso.sufixo}", is_active=True
+    )
+    caso.db.add(user_b)
+    caso.db.flush()
+    pessoa_b = Cliente(
+        tenant_id=tenant_b, user_id=user_b.id, nome="Outra pessoa ficticia", ativo=True
+    )
+    caso.db.add(pessoa_b)
+    caso.db.flush()
+    config_b = ComissaoConfiguracao(
+        tenant_id=tenant_b,
+        funcionario_id=pessoa_b.id,
+        tipo="geral",
+        referencia_id=0,
+        tipo_calculo="fixo",
+        percentual=0,
+        valor_fixo=9,
+        ativo=True,
+    )
+    caso.db.add(config_b)
+    caso.db.flush()
+    dados_b = SimpleNamespace(tenant=tenant_b, config_id=config_b.id)
+    caso.db.commit()
+    _contexto_conexao(caso.db, caso.tenant)
+    try:
+        yield SimpleNamespace(
+            caso=caso, a=dados_a, b=dados_b, engine=caso.db.get_bind()
+        )
+    finally:
+        caso.db.rollback()
+        for tenant in (dados_a.tenant, dados_b.tenant):
+            _contexto_conexao(caso.db, tenant)
+            for tabela in (
+                "vendas",
+                "comissoes_configuracao",
+                "comissoes_configuracao_versoes",
+                "produtos",
+                "clientes",
+                "users",
+            ):
+                caso.db.execute(
+                    text(f"DELETE FROM {tabela} WHERE tenant_id=:tenant"),
+                    {"tenant": tenant},
+                )
+            caso.db.execute(
+                text("DELETE FROM tenants WHERE id::text=:tenant"),
+                {"tenant": str(tenant)},
+            )
+        caso.db.commit()
+
+
+def _operacao_concorrente(engine, dados, *, numero=None, sinal=None):
+    with Session(engine) as db:
+        try:
+            _contexto_conexao(db, dados.tenant)
+            if sinal:
+                sinal.pid = db.execute(text("SELECT pg_backend_pid()")).scalar_one()
+                sinal.iniciada.set()
+            if numero is None:
+                db.execute(
+                    text(
+                        "UPDATE comissoes_configuracao SET valor_fixo=5 WHERE tenant_id=:tenant AND id=:id"
+                    ),
+                    {"tenant": dados.tenant, "id": dados.config_id},
+                )
+                resultado = None
+            else:
+                venda = Venda(
+                    tenant_id=dados.tenant,
+                    user_id=dados.user_id,
+                    vendedor_id=dados.user_id,
+                    funcionario_id=dados.funcionario_id,
+                    numero_venda=f"VC-{dados.sufixo}-{numero}",
+                    subtotal=10,
+                    total=10,
+                    status="aberta",
+                )
+                db.add(venda)
+                db.flush()
+                resultado = venda.comissao_ancora_em
+            db.commit()
+            return resultado
+        finally:
+            if sinal:
+                sinal.concluida.set()
+            clear_current_tenant()
+
+
+def _aguardar_advisory(engine, sinal):
+    assert sinal.iniciada.wait(3), "Conexao de teste nao iniciou"
+    limite = time.monotonic() + 3
+    with engine.connect() as observador:
+        while time.monotonic() < limite:
+            bloqueado = observador.execute(
+                text(
+                    "SELECT EXISTS (SELECT 1 FROM pg_locks WHERE pid=:pid AND locktype='advisory' AND NOT granted)"
+                ),
+                {"pid": sinal.pid},
+            ).scalar_one()
+            if bloqueado:
+                return
+            if sinal.concluida.is_set():
+                break
+            time.sleep(0.01)
+    pytest.fail("Operacao concorrente nao aguardou o commit sob lock advisory")
+
+
+def test_configuracao_pendente_bloqueia_nova_venda_mas_nao_outro_tenant(concorrente):
+    ctx = concorrente
+    ctx.caso.db.execute(
+        text(
+            "UPDATE comissoes_configuracao SET valor_fixo=5 WHERE tenant_id=:tenant AND id=:id"
+        ),
+        {"tenant": ctx.a.tenant, "id": ctx.a.config_id},
+    )
+    sinal = SimpleNamespace(iniciada=Event(), concluida=Event(), pid=None)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        venda = pool.submit(
+            _operacao_concorrente, ctx.engine, ctx.a, numero=1, sinal=sinal
+        )
+        try:
+            _aguardar_advisory(ctx.engine, sinal)
+            # Outra empresa nao participa do lock da configuracao A.
+            pool.submit(_operacao_concorrente, ctx.engine, ctx.b).result(timeout=3)
+            ctx.caso.db.commit()
+            ancora = venda.result(timeout=5)
+        finally:
+            ctx.caso.db.rollback()
+    assert Decimal(str(_vigente(ctx.caso, ancora)["valor_fixo"])) == 5
+
+
+def test_venda_pendente_bloqueia_configuracao_mas_permite_vendas_paralelas(concorrente):
+    ctx = concorrente
+    antiga = _venda(ctx.caso, 1, datetime(2026, 1, 1))
+    ancora_antiga = antiga.comissao_ancora_em
+    sinal = SimpleNamespace(iniciada=Event(), concluida=Event(), pid=None)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        # Duas inclusoes de venda compartilham o lock, sem serializar vendas.
+        outra_ancora = pool.submit(
+            _operacao_concorrente, ctx.engine, ctx.a, numero=2
+        ).result(timeout=3)
+        alteracao = pool.submit(_operacao_concorrente, ctx.engine, ctx.a, sinal=sinal)
+        try:
+            _aguardar_advisory(ctx.engine, sinal)
+            ctx.caso.db.commit()
+            alteracao.result(timeout=5)
+        finally:
+            ctx.caso.db.rollback()
+    assert Decimal(str(_vigente(ctx.caso, ancora_antiga)["valor_fixo"])) == 3
+    assert Decimal(str(_vigente(ctx.caso, outra_ancora)["valor_fixo"])) == 3

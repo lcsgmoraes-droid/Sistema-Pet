@@ -196,3 +196,11 @@ Os códigos públicos foram auditados também nas APIs de NF, entregas e relató
   aprovações da regressão PostgreSQL. Os bancos temporários foram removidos.
 - Teste de validade corrigido para datas fixas: **212/212** no Linux UTC e
   **26/26** seletivos no Windows. Nenhuma regra de estoque foi alterada.
+- A revisão concorrente reproduziu uma alteração ainda não commitada sendo
+  escolhida depois para uma venda aberta no intervalo. A4 agora ordena a gravação
+  da regra e a criação da venda por empresa, mantendo vendas paralelas e outras
+  empresas livres. Fusão adquire a proteção antes de bloquear pessoas.
+- Validação final dessa proteção: **6/6** cenários PostgreSQL, **18 aprovações**
+  nos três bancos do smoke com RLS, **69** regressões de código e E2E **1/1**
+  repetido após restart do DEV. Nenhuma contagem operacional foi alterada pela
+  atualização do DDL de teste; todos os bancos efêmeros foram removidos.

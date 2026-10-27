@@ -12,12 +12,14 @@ from sqlalchemy import (
     Integer,
     JSON,
     String,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.base_models import TenantScoped
 from app.db import Base
 from app.tenancy.context import get_current_tenant_id
+from app.tenancy.rls import sync_rls_tenant
 from app.utils.tenant_safe_sql import TenantSafeSQLError, execute_tenant_safe
 
 
@@ -42,6 +44,19 @@ class ComissaoConfiguracaoVersao(TenantScoped, Base):
     referencia_id = Column(Integer, nullable=False)
     vigente_desde = Column(DateTime(timezone=True), nullable=False)
     payload = Column(JSON().with_variant(JSONB(), "postgresql"), nullable=False)
+
+
+def bloquear_alteracao_comissao_por_tenant(db, tenant_id):
+    """A fusão adquire este lock antes dos locks de pessoa; SQLite é só fixture."""
+    if db.get_bind().dialect.name != "postgresql":
+        return
+    sync_rls_tenant(db, tenant_id)
+    db.execute(
+        text(
+            "SELECT public.bloquear_vigencia_comissao_empresa(CAST(:tenant_id AS uuid), true)"
+        ),
+        {"tenant_id": str(tenant_id)},
+    )
 
 
 def normalizar_instante_utc(valor):

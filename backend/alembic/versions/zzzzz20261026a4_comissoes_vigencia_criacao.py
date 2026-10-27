@@ -12,6 +12,86 @@ branch_labels = None
 depends_on = None
 
 
+SERIALIZACAO_SQL = (
+    """
+    CREATE OR REPLACE FUNCTION public.bloquear_vigencia_comissao_empresa(
+        empresa uuid, exclusivo boolean
+    ) RETURNS void LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+    DECLARE chave bigint;
+    BEGIN
+        IF empresa IS NULL THEN
+            RAISE EXCEPTION 'Tenant obrigatório para ordenar a vigência de comissão'
+                USING ERRCODE = '42501';
+        END IF;
+        chave := hashtextextended('corepet:comissao:' || empresa::text, 0);
+        IF exclusivo THEN
+            PERFORM pg_advisory_xact_lock(chave);
+        ELSE
+            PERFORM pg_advisory_xact_lock_shared(chave);
+        END IF;
+    END;
+    $$
+    """,
+    """
+    CREATE OR REPLACE FUNCTION public.bloquear_alteracao_comissao() RETURNS trigger
+    LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+    BEGIN
+        PERFORM public.bloquear_vigencia_comissao_empresa(
+            NULLIF(current_setting('app.tenant_id', true), '')::uuid, true
+        );
+        RETURN NULL;
+    END;
+    $$
+    """,
+    """
+    CREATE OR REPLACE FUNCTION public.validar_empresa_regra_comissao() RETURNS trigger
+    LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+    DECLARE empresa uuid := NULLIF(current_setting('app.tenant_id', true), '')::uuid;
+    BEGIN
+        IF TG_OP <> 'INSERT' AND OLD.tenant_id IS DISTINCT FROM empresa THEN
+            RAISE EXCEPTION 'A regra de comissão deve pertencer ao tenant da transação'
+                USING ERRCODE = '42501';
+        END IF;
+        IF TG_OP <> 'DELETE' AND NEW.tenant_id IS DISTINCT FROM empresa THEN
+            RAISE EXCEPTION 'A regra de comissão deve pertencer ao tenant da transação'
+                USING ERRCODE = '42501';
+        END IF;
+        IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+        RETURN NEW;
+    END;
+    $$
+    """,
+    "DROP TRIGGER IF EXISTS comissao_bloquear_alteracao ON public.comissoes_configuracao",
+    """
+    CREATE TRIGGER comissao_bloquear_alteracao
+    BEFORE INSERT OR UPDATE OR DELETE ON public.comissoes_configuracao
+    FOR EACH STATEMENT EXECUTE FUNCTION public.bloquear_alteracao_comissao()
+    """,
+    "DROP TRIGGER IF EXISTS comissao_validar_empresa ON public.comissoes_configuracao",
+    """
+    CREATE TRIGGER comissao_validar_empresa
+    BEFORE INSERT OR UPDATE OR DELETE ON public.comissoes_configuracao
+    FOR EACH ROW EXECUTE FUNCTION public.validar_empresa_regra_comissao()
+    """,
+)
+
+ANCORA_SQL = """
+    CREATE OR REPLACE FUNCTION public.proteger_ancora_comissao_venda() RETURNS trigger
+    LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+    BEGIN
+        IF TG_OP = 'INSERT' THEN
+            PERFORM public.bloquear_vigencia_comissao_empresa(NEW.tenant_id, false);
+            NEW.comissao_ancora_em := clock_timestamp();
+        ELSIF NEW.comissao_ancora_em IS DISTINCT FROM OLD.comissao_ancora_em THEN
+            RAISE EXCEPTION 'A inclusão técnica da venda para comissão é imutável'
+                USING ERRCODE = '23514';
+        END IF;
+        RETURN NEW;
+    END;
+    $$
+"""
+
+
 def upgrade():
     # Fecha a janela entre fotografar o baseline e instalar o trigger. Escritas
     # aguardam o mesmo commit; nenhuma alteração de regra fica sem versão.
@@ -68,6 +148,10 @@ def upgrade():
         enable=True,
     )
     op.execute("SET LOCAL row_security = on")
+    # Antes dos locks de linha da configuração. Vendas seguem em paralelo,
+    # mas nenhuma inclusão cruza uma alteração ainda sem commit.
+    for sql in SERIALIZACAO_SQL:
+        op.execute(sql)
     op.execute("""
         CREATE FUNCTION public.registrar_versao_comissao() RETURNS trigger
         LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
@@ -105,20 +189,7 @@ def upgrade():
         AFTER INSERT OR UPDATE OR DELETE ON public.comissoes_configuracao
         FOR EACH ROW EXECUTE FUNCTION public.registrar_versao_comissao()
     """)
-    op.execute("""
-        CREATE FUNCTION public.proteger_ancora_comissao_venda() RETURNS trigger
-        LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
-        BEGIN
-            IF TG_OP = 'INSERT' THEN
-                NEW.comissao_ancora_em := clock_timestamp();
-            ELSIF NEW.comissao_ancora_em IS DISTINCT FROM OLD.comissao_ancora_em THEN
-                RAISE EXCEPTION 'A inclusão técnica da venda para comissão é imutável'
-                    USING ERRCODE = '23514';
-            END IF;
-            RETURN NEW;
-        END;
-        $$
-    """)
+    op.execute(ANCORA_SQL)
     op.execute("""
         CREATE TRIGGER venda_proteger_ancora_comissao
         BEFORE INSERT OR UPDATE ON public.vendas
@@ -148,5 +219,12 @@ def downgrade():
         "DROP TRIGGER comissao_registrar_versao ON public.comissoes_configuracao"
     )
     op.execute("DROP FUNCTION public.registrar_versao_comissao()")
+    op.execute(
+        "DROP TRIGGER comissao_bloquear_alteracao ON public.comissoes_configuracao"
+    )
+    op.execute("DROP TRIGGER comissao_validar_empresa ON public.comissoes_configuracao")
+    op.execute("DROP FUNCTION public.bloquear_alteracao_comissao()")
+    op.execute("DROP FUNCTION public.validar_empresa_regra_comissao()")
+    op.execute("DROP FUNCTION public.bloquear_vigencia_comissao_empresa(uuid, boolean)")
     op.drop_table("comissoes_configuracao_versoes")
     op.drop_column("vendas", "comissao_ancora_em")

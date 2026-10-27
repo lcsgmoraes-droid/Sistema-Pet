@@ -628,6 +628,10 @@ def executar_fusao_pessoas(
     motivo: str | None = None,
     commit: bool = True,
 ) -> dict[str, Any]:
+    # Tenant → pessoas → configurações evita ciclo com as FKs da nova venda.
+    from app.comissoes_vigencia import bloquear_alteracao_comissao_por_tenant
+
+    bloquear_alteracao_comissao_por_tenant(db, tenant_id)
     principal, duplicado = _obter_pessoas(db, tenant_id, principal_id, duplicado_id)
     agora = datetime.utcnow()
     decisoes_campos = decisoes_campos or {}
