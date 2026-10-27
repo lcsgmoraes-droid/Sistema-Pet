@@ -1,3 +1,4 @@
+import { obterCodigoPessoaPublico } from "../../utils/codigosPublicos";
 import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import ProductIdentity from "../../components/ui/ProductIdentity";
 
@@ -75,7 +76,7 @@ function RotaVendaDetalhes({ loading, venda, onFechar }) {
               <div>
                 <strong>👤 Cliente:</strong>{" "}
                 <CustomerIdentity
-                  code={venda.cliente?.codigo || venda.cliente_id || venda.cliente?.id}
+                  code={obterCodigoPessoaPublico(venda)}
                   customer={venda.cliente}
                   fallback="N/A"
                   layout="inline"

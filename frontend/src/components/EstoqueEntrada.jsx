@@ -1,3 +1,5 @@
+import BuscaProduto from "./v2/BuscaProduto/BuscaProduto";
+import useBuscaEntidadeLocal from "./v2/BuscaEntidade/useBuscaEntidadeLocal";
 import { useState, useEffect } from "react";
 import api from "../api";
 import { toast } from "react-hot-toast";
@@ -18,6 +20,13 @@ const EstoqueEntrada = () => {
     observacoes: "",
   });
 
+  const buscaProduto = useBuscaEntidadeLocal({
+    itens: produtos,
+    valueId: formData.produto_id,
+    onChangeId: (produto_id) => setFormData((atual) => ({ ...atual, produto_id })),
+    tipo: "produto",
+  });
+
   useEffect(() => {
     carregarProdutos();
   }, []);
@@ -25,7 +34,7 @@ const EstoqueEntrada = () => {
   const carregarProdutos = async () => {
     try {
       const response = await api.get(`/produtos/`);
-      setProdutos(response.data);
+      setProdutos(Array.isArray(response.data) ? response.data : response.data?.items || []);
     } catch (error) {
       console.error("Erro ao carregar produtos:", error);
     }
@@ -33,6 +42,10 @@ const EstoqueEntrada = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.produto_id) {
+      toast.error("Selecione um produto do catálogo.");
+      return;
+    }
     setLoading(true);
 
     try {
@@ -88,19 +101,21 @@ const EstoqueEntrada = () => {
           {/* Produto */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Produto *</label>
-            <select
-              value={formData.produto_id}
-              onChange={(e) => setFormData({ ...formData, produto_id: e.target.value })}
+            <BuscaProduto
+              {...buscaProduto}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">Selecione um produto</option>
-              {produtos.map((produto) => (
-                <option key={produto.id} value={produto.id}>
-                  {produto.codigo} - {produto.nome} (Estoque atual: {produto.estoque_atual || 0})
-                </option>
-              ))}
-            </select>
+              placeholder="Código, nome ou código de barras do produto"
+              renderSuggestionContent={(produto) => (
+                <>
+                  <span className="block font-medium">
+                    {produto.codigo || "Sem código"} - {produto.nome}
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    Estoque: {produto.estoque_atual || 0}
+                  </span>
+                </>
+              )}
+            />
           </div>
 
           {/* Informações do Produto Selecionado */}

@@ -27,7 +27,8 @@ def test_pessoa_formulario_usa_api_canonica_de_clientes_e_exibe_erro_real():
 
     assert 'await api.post("/clientes/", clienteData)' in source
     assert "await api.put(`/clientes/${pessoaAtual.id}`, clienteData)" in source
-    assert "error.response?.data?.details" in source
+    assert "const resposta = error.response?.data" in source
+    assert "resposta?.details" in source
     assert "detalhe.msg" in source
 
 

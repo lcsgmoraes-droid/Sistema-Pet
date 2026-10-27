@@ -356,6 +356,9 @@ def _normalizar_detalhe_nota_bling(
     )
 
     cliente = {
+        "codigo": getattr(venda.cliente, "codigo", None)
+        if venda and venda.cliente
+        else None,
         "nome": _texto(
             _primeiro_preenchido(
                 contato.get("nome"),
@@ -691,6 +694,7 @@ def _normalizar_nota_venda_local(venda: Venda) -> dict:
         "valor": float(venda.total or 0),
         "cliente": {
             "id": venda.cliente.id if venda.cliente else None,
+            "codigo": getattr(venda.cliente, "codigo", None) if venda.cliente else None,
             "nome": venda.cliente.nome if venda.cliente else None,
             "cpf_cnpj": (
                 (venda.cliente.cpf or venda.cliente.cnpj) if venda.cliente else None

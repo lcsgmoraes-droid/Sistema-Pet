@@ -95,7 +95,7 @@ function InsumosProcedimento({ procedimento, index }) {
           key={`${procedimento.id ?? index}_insumo_${insumoIndex}`}
           className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700"
         >
-          {insumo.nome || `Produto #${insumo.produto_id}`} -{" "}
+          {insumo.nome || "Produto não informado"} -{" "}
           {formatQuantity(insumo.quantidade, insumo.unidade)}
         </span>
       ))}

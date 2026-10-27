@@ -385,11 +385,15 @@ const ComissoesFechamentoFuncionario = () => {
                         {comissao.quantidade}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm text-gray-900">
-                        {formatarMoeda(comissao.valor_base_calculo)}
+                        {comissao.tipo_calculo === "fixo"
+                          ? `${Number(comissao.valor_base_calculo).toLocaleString("pt-BR", { maximumFractionDigits: 3 })} un.`
+                          : formatarMoeda(comissao.valor_base_calculo)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-center">
                         <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                          {comissao.percentual_comissao}%
+                          {comissao.tipo_calculo === "fixo"
+                            ? `${formatarMoeda(comissao.valor_fixo)} / un.`
+                            : `${comissao.percentual_comissao}%`}
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-semibold text-green-600">

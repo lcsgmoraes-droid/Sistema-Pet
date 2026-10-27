@@ -22,6 +22,11 @@ from app.services.pessoa_merge_service import (
     executar_fusao_pessoas,
     montar_preview_fusao_pessoas,
 )
+from app.services.pessoa_telefone import (
+    buscar_pessoa_telefone,
+    normalizar_telefone_pessoa,
+    telefone_em_uso,
+)
 from app.clientes.schemas import (
     PessoaFusaoAssistidaNomeRequest,
     PessoaFusaoExecutarRequest,
@@ -162,54 +167,25 @@ def verificar_duplicata(
             }
             return resultado
 
-    # Verificar celular
-    if celular:
-        query = db.query(Cliente).filter(
-            Cliente.tenant_id.in_(access_ids),
-            _igual_normalizado(Cliente.celular, celular),
-            Cliente.ativo.is_not(False),
-        )
-        if cliente_id:
-            query = query.filter(Cliente.id != cliente_id)
-
-        cliente = query.first()
-        if cliente:
+    for campo, valor in (("celular", celular), ("telefone", telefone)):
+        chave = normalizar_telefone_pessoa(valor)
+        if chave and telefone_em_uso(db, tenant_id, chave, cliente_id):
+            cliente = buscar_pessoa_telefone(db, tenant_id, chave, cliente_id)
             resultado["duplicado"] = True
-            resultado["campo"] = "celular"
-            resultado["cliente"] = {
-                "id": cliente.id,
-                "codigo": cliente.codigo,
-                "nome": cliente.nome,
-                "cpf": cliente.cpf,
-                "telefone": cliente.telefone,
-                "celular": cliente.celular,
-                "email": cliente.email,
-            }
-            return resultado
-
-    # Verificar telefone
-    if telefone:
-        query = db.query(Cliente).filter(
-            Cliente.tenant_id.in_(access_ids),
-            _igual_normalizado(Cliente.telefone, telefone),
-            Cliente.ativo.is_not(False),
-        )
-        if cliente_id:
-            query = query.filter(Cliente.id != cliente_id)
-
-        cliente = query.first()
-        if cliente:
-            resultado["duplicado"] = True
-            resultado["campo"] = "telefone"
-            resultado["cliente"] = {
-                "id": cliente.id,
-                "codigo": cliente.codigo,
-                "nome": cliente.nome,
-                "cpf": cliente.cpf,
-                "telefone": cliente.telefone,
-                "celular": cliente.celular,
-                "email": cliente.email,
-            }
+            resultado["campo"] = campo
+            resultado["cliente"] = (
+                {
+                    "id": cliente.id,
+                    "codigo": cliente.codigo,
+                    "nome": cliente.nome,
+                    "cpf": cliente.cpf,
+                    "telefone": cliente.telefone,
+                    "celular": cliente.celular,
+                    "email": cliente.email,
+                }
+                if cliente
+                else None
+            )
             return resultado
 
     # Verificar e-mail

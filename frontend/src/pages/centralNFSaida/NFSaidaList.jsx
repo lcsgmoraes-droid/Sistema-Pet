@@ -1,3 +1,4 @@
+import { obterCodigoPessoaPublico } from "../../utils/codigosPublicos";
 import {
   AlertCircle,
   Copy,
@@ -120,7 +121,7 @@ export default function NFSaidaList({
                     </td>
                     <td className="px-6 py-4">
                       <CustomerIdentity
-                        code={nota.cliente?.codigo || nota.cliente_id || nota.cliente?.id}
+                        code={obterCodigoPessoaPublico(nota)}
                         customer={nota.cliente}
                         nameClassName="font-medium text-gray-900"
                       />
@@ -158,7 +159,9 @@ export default function NFSaidaList({
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {nota.provedor === "intnfe" && nota.status?.toLowerCase() === "rejeitada" ? (
+                      {!nota.fiscal_order_id &&
+                      nota.provedor === "intnfe" &&
+                      nota.status?.toLowerCase() === "rejeitada" ? (
                         <BotaoInteracao
                           tamanho="pequeno"
                           onClick={() => abrirCorrecao(nota)}
@@ -204,79 +207,117 @@ export default function NFSaidaList({
                       <div className="flex justify-end">
                         <BotaoMenuAcoes
                           rotulo={`Ações da nota ${nota.numero || "sem número"}`}
-                          acoes={[
-                            { icon: Copy, label: "Clonar nota", onClick: () => clonarNota(nota) },
-                            ["autorizada", "emitida danfe"].includes(
-                              nota.status?.toLowerCase(),
-                            ) && {
-                              icon: XCircle,
-                              label: "Cancelar NF-e",
-                              tom: "perigo",
-                              onClick: () => setModalCancelar(nota),
-                            },
-                            nota.provedor !== "intnfe" && {
-                              icon: Trash2,
-                              label: "Excluir nota do sistema",
-                              tom: "perigo",
-                              onClick: () => excluirNota(nota.venda_id, nota.numero),
-                            },
-                            nota.provedor === "intnfe" &&
-                              nota.status?.toLowerCase() === "rejeitada" &&
-                              !rejeicaoResponsavelTecnico({
-                                codigo: nota.codigo_erro,
-                                motivo: nota.motivo_rejeicao,
-                              }) && {
-                                icon: Unlock,
-                                label: "Escolher outro modelo de nota",
-                                disabled: liberandoVendaId === String(nota.venda_id),
-                                onClick: () => liberarVendaComRejeicao(nota),
-                              },
-                            nota.provedor === "intnfe" &&
-                              nota.status?.toLowerCase() === "rejeitada" &&
-                              !rejeicaoResponsavelTecnico({
-                                codigo: nota.codigo_erro,
-                                motivo: nota.motivo_rejeicao,
-                              }) && {
-                                icon: RotateCcw,
-                                label: `Tentar novamente como ${Number(nota.modelo) === 55 ? "NF-e" : "NFC-e"}`,
-                                disabled: corrigindoNotaId === String(nota.venda_id),
-                                onClick: () => corrigirEReemitir(nota),
-                              },
-                            {
-                              icon: Zap,
-                              label: "Atualizar situação da NF",
-                              disabled: reconciliandoNotaId === String(nota.id),
-                              onClick: () => reconciliarFluxoNota(nota),
-                            },
-                            {
-                              icon: Printer,
-                              label: "Baixar DANFE",
-                              disabled:
-                                documentoEmCurso === String(nota.venda_id || nota.id) ||
-                                (nota.provedor === "intnfe" &&
-                                  nota.status?.toLowerCase() !== "autorizada"),
-                              onClick: () => baixarDanfe(nota),
-                            },
-                            {
-                              icon: Download,
-                              label: "Baixar XML",
-                              disabled:
-                                documentoEmCurso === String(nota.venda_id || nota.id) ||
-                                (nota.provedor === "intnfe" &&
-                                  nota.status?.toLowerCase() !== "autorizada"),
-                              onClick: () => baixarXml(nota),
-                            },
-                            nota.status?.toLowerCase() === "autorizada" && {
-                              icon: Share2,
-                              label: "Compartilhar nota",
-                              onClick: () => compartilharNota(nota),
-                            },
-                            {
-                              icon: Eye,
-                              label: "Ver detalhes",
-                              onClick: () => abrirDetalhes(nota),
-                            },
-                          ]}
+                          acoes={
+                            nota.fiscal_order_id
+                              ? [
+                                  {
+                                    icon: Eye,
+                                    label: "Ver detalhes",
+                                    onClick: () => abrirDetalhes(nota),
+                                  },
+                                  {
+                                    icon: Zap,
+                                    label: "Atualizar situação da NF",
+                                    onClick: () => reconciliarFluxoNota(nota),
+                                    disabled: reconciliandoNotaId === String(nota.id),
+                                  },
+                                  {
+                                    icon: Printer,
+                                    label: "Baixar DANFE",
+                                    onClick: () => baixarDanfe(nota),
+                                    disabled:
+                                      documentoEmCurso ===
+                                        `fiscal-externa-${nota.fiscal_order_id}` ||
+                                      nota.status?.toLowerCase() !== "autorizada",
+                                  },
+                                  {
+                                    icon: Download,
+                                    label: "Baixar XML",
+                                    onClick: () => baixarXml(nota),
+                                    disabled:
+                                      documentoEmCurso ===
+                                        `fiscal-externa-${nota.fiscal_order_id}` ||
+                                      nota.status?.toLowerCase() !== "autorizada",
+                                  },
+                                ]
+                              : [
+                                  {
+                                    icon: Copy,
+                                    label: "Clonar nota",
+                                    onClick: () => clonarNota(nota),
+                                  },
+                                  ["autorizada", "emitida danfe"].includes(
+                                    nota.status?.toLowerCase(),
+                                  ) && {
+                                    icon: XCircle,
+                                    label: "Cancelar NF-e",
+                                    tom: "perigo",
+                                    onClick: () => setModalCancelar(nota),
+                                  },
+                                  nota.provedor !== "intnfe" && {
+                                    icon: Trash2,
+                                    label: "Excluir nota do sistema",
+                                    tom: "perigo",
+                                    onClick: () => excluirNota(nota.venda_id, nota.numero),
+                                  },
+                                  nota.provedor === "intnfe" &&
+                                    nota.status?.toLowerCase() === "rejeitada" &&
+                                    !rejeicaoResponsavelTecnico({
+                                      codigo: nota.codigo_erro,
+                                      motivo: nota.motivo_rejeicao,
+                                    }) && {
+                                      icon: Unlock,
+                                      label: "Escolher outro modelo de nota",
+                                      disabled: liberandoVendaId === String(nota.venda_id),
+                                      onClick: () => liberarVendaComRejeicao(nota),
+                                    },
+                                  nota.provedor === "intnfe" &&
+                                    nota.status?.toLowerCase() === "rejeitada" &&
+                                    !rejeicaoResponsavelTecnico({
+                                      codigo: nota.codigo_erro,
+                                      motivo: nota.motivo_rejeicao,
+                                    }) && {
+                                      icon: RotateCcw,
+                                      label: `Tentar novamente como ${Number(nota.modelo) === 55 ? "NF-e" : "NFC-e"}`,
+                                      disabled: corrigindoNotaId === String(nota.venda_id),
+                                      onClick: () => corrigirEReemitir(nota),
+                                    },
+                                  {
+                                    icon: Zap,
+                                    label: "Atualizar situação da NF",
+                                    disabled: reconciliandoNotaId === String(nota.id),
+                                    onClick: () => reconciliarFluxoNota(nota),
+                                  },
+                                  {
+                                    icon: Printer,
+                                    label: "Baixar DANFE",
+                                    disabled:
+                                      documentoEmCurso === String(nota.venda_id || nota.id) ||
+                                      (nota.provedor === "intnfe" &&
+                                        nota.status?.toLowerCase() !== "autorizada"),
+                                    onClick: () => baixarDanfe(nota),
+                                  },
+                                  {
+                                    icon: Download,
+                                    label: "Baixar XML",
+                                    disabled:
+                                      documentoEmCurso === String(nota.venda_id || nota.id) ||
+                                      (nota.provedor === "intnfe" &&
+                                        nota.status?.toLowerCase() !== "autorizada"),
+                                    onClick: () => baixarXml(nota),
+                                  },
+                                  nota.status?.toLowerCase() === "autorizada" && {
+                                    icon: Share2,
+                                    label: "Compartilhar nota",
+                                    onClick: () => compartilharNota(nota),
+                                  },
+                                  {
+                                    icon: Eye,
+                                    label: "Ver detalhes",
+                                    onClick: () => abrirDetalhes(nota),
+                                  },
+                                ]
+                          }
                         />
                       </div>
                     </td>

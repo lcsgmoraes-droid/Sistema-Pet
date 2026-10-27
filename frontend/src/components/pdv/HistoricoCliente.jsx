@@ -1,6 +1,5 @@
 ﻿import { useState, useEffect } from "react";
 import {
-  X,
   ShoppingBag,
   TrendingUp,
   Calendar,
@@ -19,12 +18,12 @@ import { toast } from "react-hot-toast";
 import api from "../../api";
 import CustomerIdentity from "../ui/CustomerIdentity";
 import SaleReference from "../ui/SaleReference";
-
-// Formata numero como R$ 4.029,80
-const formatBRL = (value) => {
-  const num = Number(value) || 0;
-  return num.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-};
+import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
+import BotaoCancelar from "../v2/BotaoCancelar/BotaoCancelar";
+import InputCombobox from "../v2/InputCombobox/InputCombobox";
+import HistoricoRecebimentosVenda from "./HistoricoRecebimentosVenda";
+import { formatMoneyBRL as formatBRL } from "../../utils/formatters";
+import { formatarDataHistorico, obterStatusHistorico } from "../../utils/historicoFinanceiro";
 
 const obterStatusVenda = (venda) =>
   venda.status === "cancelada" ? "cancelada" : venda.status_pagamento || venda.status;
@@ -38,23 +37,41 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
   const [loadingDetalhes, setLoadingDetalhes] = useState({});
   const [copiadoCampo, setCopiadoCampo] = useState("");
   const [mostrarResumoGerencial, setMostrarResumoGerencial] = useState(false);
+  const [pagina, setPagina] = useState(1);
+  const [erro, setErro] = useState("");
+  const [tentativa, setTentativa] = useState(0);
 
   useEffect(() => {
-    carregarHistorico();
+    setPagina(1);
+    setFiltroStatus("todos");
+    setExpandidos({});
+    setDetalhesVenda({});
   }, [clienteId]);
 
-  const carregarHistorico = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get(`/clientes/${clienteId}/historico-compras`);
-      setHistorico(response.data);
-    } catch (error) {
-      console.error("Erro ao carregar historico:", error);
-      toast.error("Erro ao carregar historico do cliente");
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    let ativo = true;
+    setLoading(true);
+    setErro("");
+    const params = { page: pagina, per_page: 20 };
+    if (filtroStatus !== "todos") params.status_pagamento = filtroStatus;
+    api
+      .get(`/clientes/${clienteId}/historico-compras`, { params })
+      .then(({ data }) => {
+        if (ativo) {
+          setHistorico(data);
+          setExpandidos({});
+        }
+      })
+      .catch(() => {
+        if (ativo) setErro("Não foi possível carregar o histórico do cliente.");
+      })
+      .finally(() => {
+        if (ativo) setLoading(false);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [clienteId, pagina, filtroStatus, tentativa]);
 
   const carregarDetalhesVenda = async (vendaId) => {
     if (detalhesVenda[vendaId] || loadingDetalhes[vendaId]) return;
@@ -171,65 +188,76 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
     }));
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (venda) => {
+    const { label, tom } = obterStatusHistorico({ ...venda, tipo: "venda" });
     const badges = {
-      em_aberto: "bg-blue-100 text-blue-800",
-      pago: "bg-green-100 text-green-800",
-      parcial: "bg-yellow-100 text-yellow-800",
-      aberta: "bg-blue-100 text-blue-800",
-      finalizada: "bg-green-100 text-green-800",
-      baixa_parcial: "bg-yellow-100 text-yellow-800",
-      pendente: "bg-orange-100 text-orange-800",
-      cancelada: "bg-red-100 text-red-800",
-      finalizada_devolucao_parcial: "bg-orange-100 text-orange-800",
-      finalizada_devolucao_total: "bg-gray-100 text-gray-800",
-    };
-    const labels = {
-      em_aberto: "Em aberto",
-      pago: "Pago",
-      parcial: "Parcial",
-      aberta: "Aberta",
-      finalizada: "Finalizada",
-      baixa_parcial: "Baixa Parcial",
-      pendente: "Pendente",
-      cancelada: "Cancelada",
-      finalizada_devolucao_parcial: "Dev. Parcial",
-      finalizada_devolucao_total: "Dev. Total",
+      sucesso: "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200",
+      atencao: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200",
+      perigo: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200",
+      neutro: "bg-gray-100 text-gray-800 dark:bg-slate-800 dark:text-slate-200",
     };
     return (
       <span
-        className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${badges[status] || "bg-gray-100 text-gray-800"}`}
+        className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${badges[tom] || badges.neutro}`}
       >
-        {labels[status] || status}
+        {label}
       </span>
     );
   };
 
-  const vendasFiltradas =
-    historico?.vendas?.filter((venda) => {
-      if (filtroStatus === "todos") return true;
-      return obterStatusVenda(venda) === filtroStatus;
-    }) || [];
+  const vendasFiltradas = historico?.vendas || [];
+  const paginacao = historico?.paginacao;
 
   const valorResumo = (valor) => (mostrarResumoGerencial ? valor : "••••");
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Histórico de compras"
+        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      >
         <div className="bg-white rounded-lg p-8 max-w-4xl w-full mx-4">
           <div className="flex items-center justify-center">
             <Loader className="w-8 h-8 animate-spin text-blue-600" />
             <span className="ml-3 text-gray-600">Carregando...</span>
+            <BotaoCancelar onClick={onClose} tamanho="pequeno">
+              Fechar
+            </BotaoCancelar>
           </div>
         </div>
       </div>
     );
   }
 
+  if (erro)
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Histórico de compras"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      >
+        <div role="alert" className="space-y-4 rounded-lg bg-white p-6 dark:bg-slate-900">
+          <p>{erro}</p>
+          <BotaoInteracao onClick={() => setTentativa((atual) => atual + 1)}>
+            Tentar novamente
+          </BotaoInteracao>
+          <BotaoCancelar onClick={onClose}>Fechar</BotaoCancelar>
+        </div>
+      </div>
+    );
+
   if (!historico) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Histórico de compras"
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+    >
       <div className="bg-white rounded-lg max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
@@ -240,15 +268,16 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
                 <CustomerIdentity
                   className="max-w-full"
                   customer={cliente}
-                  fallback={clienteNome || `Cliente #${clienteId}`}
+                  fallback={clienteNome || "Cliente não informado"}
                   nameClassName="text-sm font-medium text-gray-700"
                   nameWrapperClassName="max-w-full"
                 />
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button
+              <BotaoInteracao
                 type="button"
+                tamanho="pequeno"
                 onClick={() => setMostrarResumoGerencial((prev) => !prev)}
                 className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm transition-colors hover:bg-blue-50"
                 title={
@@ -261,10 +290,10 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
                   <Eye className="h-4 w-4" />
                 )}
                 {mostrarResumoGerencial ? "Ocultar valores" : "Ver valores"}
-              </button>
-              <button onClick={onClose} className="p-2 hover:bg-white rounded-lg transition-colors">
-                <X className="w-6 h-6" />
-              </button>
+              </BotaoInteracao>
+              <BotaoCancelar onClick={onClose} aria-label="Fechar histórico" tamanho="pequeno">
+                Fechar
+              </BotaoCancelar>
             </div>
           </div>
 
@@ -317,12 +346,7 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
             <div className="mt-4 bg-white rounded-lg p-3 shadow-sm flex items-center space-x-2 text-sm">
               <Calendar className="w-4 h-4 text-gray-500" />
               <span className="text-gray-600">
-                Última compra:{" "}
-                {new Date(historico.ultima_compra).toLocaleDateString("pt-BR", {
-                  day: "2-digit",
-                  month: "long",
-                  year: "numeric",
-                })}
+                Última compra: {formatarDataHistorico(historico.ultima_compra)}
               </span>
             </div>
           )}
@@ -332,17 +356,23 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
         <div className="p-4 border-b border-gray-200 bg-gray-50">
           <div className="flex items-center space-x-2">
             <span className="text-sm font-medium text-gray-700">Filtrar por status:</span>
-            <select
+            <InputCombobox
+              id="historico-compras-status"
+              label="Status"
               value={filtroStatus}
-              onChange={(e) => setFiltroStatus(e.target.value)}
-              className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="todos">Todos ({historico.vendas?.length || 0})</option>
-              <option value="em_aberto">Em aberto</option>
-              <option value="parcial">Parcial</option>
-              <option value="pago">Pago</option>
-              <option value="cancelada">Canceladas</option>
-            </select>
+              onChange={(value) => {
+                setFiltroStatus(value);
+                setPagina(1);
+              }}
+              permitirLimpar={false}
+              opcoes={[
+                { value: "todos", label: `Todos (${historico.total_compras || 0})` },
+                { value: "em_aberto", label: "Em aberto" },
+                { value: "parcial", label: "Parcial" },
+                { value: "pago", label: "Pago" },
+                { value: "cancelada", label: "Canceladas" },
+              ]}
+            />
           </div>
         </div>
 
@@ -368,7 +398,6 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
                   {(() => {
                     const itensDaVenda = obterItensVenda(venda);
                     const pagamentosDaVenda = obterPagamentosVenda(venda);
-                    const temDetalhes = venda.total_itens > 0 || pagamentosDaVenda.length > 0;
                     const carregandoVenda = !!loadingDetalhes[venda.id];
 
                     return (
@@ -381,14 +410,14 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
                                 <h3 className="text-lg font-semibold text-gray-900">
                                   <SaleReference sale={venda} />
                                 </h3>
-                                {getStatusBadge(obterStatusVenda(venda))}
+                                {getStatusBadge(venda)}
                               </div>
 
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                 <div>
                                   <span className="text-gray-500">Data:</span>
                                   <div className="font-medium text-gray-900">
-                                    {new Date(venda.data_venda).toLocaleDateString("pt-BR")}
+                                    {formatarDataHistorico(venda.data_venda)}
                                   </div>
                                 </div>
 
@@ -454,24 +483,24 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
                           </div>
 
                           {/* Botao Ver Detalhes */}
-                          {temDetalhes && (
-                            <button
-                              onClick={() => toggleExpandir(venda)}
-                              className="mt-3 flex items-center space-x-1 text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
-                            >
-                              {expandidos[venda.id] ? (
-                                <>
-                                  <ChevronUp className="w-4 h-4" />
-                                  <span>Ocultar detalhes</span>
-                                </>
-                              ) : (
-                                <>
-                                  <ChevronDown className="w-4 h-4" />
-                                  <span>Ver detalhes da compra</span>
-                                </>
-                              )}
-                            </button>
-                          )}
+                          <BotaoInteracao
+                            tamanho="pequeno"
+                            onClick={() => toggleExpandir(venda)}
+                            aria-expanded={!!expandidos[venda.id]}
+                            className="mt-3 flex items-center space-x-1 text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                          >
+                            {expandidos[venda.id] ? (
+                              <>
+                                <ChevronUp className="w-4 h-4" />
+                                <span>Ocultar detalhes</span>
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDown className="w-4 h-4" />
+                                <span>Ver detalhes da compra</span>
+                              </>
+                            )}
+                          </BotaoInteracao>
                         </div>
 
                         {/* Painel expansivel: itens + pagamentos */}
@@ -521,7 +550,8 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
                                                 <div className="flex flex-wrap items-center gap-1.5">
                                                   <span>{item.nome}</span>
                                                   {nomeItem && (
-                                                    <button
+                                                    <BotaoInteracao
+                                                      tamanho="pequeno"
                                                       type="button"
                                                       onClick={() =>
                                                         copiarCampoItem(
@@ -538,7 +568,7 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
                                                       ) : (
                                                         <Copy className="w-3.5 h-3.5" />
                                                       )}
-                                                    </button>
+                                                    </BotaoInteracao>
                                                   )}
                                                 </div>
                                                 {itemSku && (
@@ -546,7 +576,8 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
                                                     <span className="font-mono">
                                                       SKU: {itemSku}
                                                     </span>
-                                                    <button
+                                                    <BotaoInteracao
+                                                      tamanho="pequeno"
                                                       type="button"
                                                       onClick={() =>
                                                         copiarCampoItem(
@@ -563,7 +594,7 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
                                                       ) : (
                                                         <Copy className="w-3.5 h-3.5" />
                                                       )}
-                                                    </button>
+                                                    </BotaoInteracao>
                                                   </div>
                                                 )}
                                               </div>
@@ -615,13 +646,7 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
                               </div>
                             )}
 
-                            {!carregandoVenda &&
-                              itensDaVenda.length === 0 &&
-                              pagamentosDaVenda.length === 0 && (
-                                <div className="text-sm text-gray-500">
-                                  Nao ha detalhes para esta venda.
-                                </div>
-                              )}
+                            <HistoricoRecebimentosVenda key={venda.id} vendaId={venda.id} />
                           </div>
                         )}
                       </>
@@ -637,14 +662,30 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
         <div className="p-4 border-t border-gray-200 bg-gray-50">
           <div className="flex justify-between items-center text-sm text-gray-600">
             <span>
-              Mostrando {vendasFiltradas.length} de {historico.vendas?.length || 0} vendas
+              Mostrando {vendasFiltradas.length} de {paginacao?.total_itens || 0} vendas
             </span>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
-            >
-              Fechar
-            </button>
+            <div className="flex items-center gap-2">
+              <BotaoInteracao
+                tamanho="pequeno"
+                disabled={!paginacao?.tem_anterior}
+                onClick={() => setPagina((p) => p - 1)}
+              >
+                Anterior
+              </BotaoInteracao>
+              <span>
+                Página {pagina} de {Math.max(paginacao?.total_paginas || 0, 1)}
+              </span>
+              <BotaoInteracao
+                tamanho="pequeno"
+                disabled={!paginacao?.tem_proxima}
+                onClick={() => setPagina((p) => p + 1)}
+              >
+                Próxima
+              </BotaoInteracao>
+              <BotaoCancelar tamanho="pequeno" onClick={onClose}>
+                Fechar
+              </BotaoCancelar>
+            </div>
           </div>
         </div>
       </div>

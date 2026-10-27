@@ -17,6 +17,7 @@ from app.models import (
     AppAccessProfile,
     AuditLog,
     Cliente,
+    ClienteContato,
     Role,
     Tenant,
     User,
@@ -43,8 +44,10 @@ def cenario(monkeypatch):
             Role.__table__,
             UserTenant.__table__,
             Cliente.__table__,
+            ClienteContato.__table__,
             AppAccessProfile.__table__,
             AuditLog.__table__,
+            GrupoComercial.__table__,
             GrupoComercialMembro.__table__,
         ],
     )

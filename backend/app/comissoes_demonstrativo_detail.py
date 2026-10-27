@@ -71,6 +71,7 @@ def montar_detalhe_comissao_snapshot(r: Any) -> Dict[str, Any]:
         valor_comissao=r["valor_comissao"],
         valor_comissao_gerada=r["valor_comissao_gerada"],
         percentual_aplicado=r["percentual_aplicado"],
+        valor_fixo=r.get("valor_fixo") or 0,
     )
     deducoes_aplicadas = sum(
         linha["valor"]
@@ -86,6 +87,7 @@ def montar_detalhe_comissao_snapshot(r: Any) -> Dict[str, Any]:
         "data_venda": str(r["data_venda"]) if r["data_venda"] else None,
         "funcionario_id": r["funcionario_id"],
         "produto_id": r["produto_id"],
+        "produto_codigo": r.get("produto_codigo"),
         "venda_item_id": r["venda_item_id"],
         "quantidade": decimal_to_float(r["quantidade"]),
         "parcela_numero": r["parcela_numero"],
@@ -147,6 +149,7 @@ def montar_detalhe_comissao_snapshot(r: Any) -> Dict[str, Any]:
         },
         "calculo": {
             "tipo_calculo": r["tipo_calculo"],
+            "valor_fixo": decimal_to_float(r.get("valor_fixo")),
             "valor_base_calculo": valor_base_calculo,
             "percentual_comissao": decimal_to_float(r["percentual_comissao"]),
             "percentual_aplicado": decimal_to_float(r["percentual_aplicado"]),

@@ -46,6 +46,7 @@ test("baixa reutiliza request_id após falha e troca a chave quando o valor muda
     "InputMoeda",
     "InputTexto",
     "InputTextoLongo",
+    "RecebimentoCampos",
   ];
   const harness = createControllerHarness(
     fileURLToPath(new URL("./VendasEmAberto.jsx", import.meta.url)),
@@ -105,8 +106,17 @@ test("baixa reutiliza request_id após falha e troca a chave quando o valor muda
   const definirValor = (value) =>
     harness.act(() =>
       elements(harness.tree)
-        .find((node) => node.type === "InputMoeda")
-        .props.onChange(value),
+        .find((node) => node.type === "RecebimentoCampos")
+        .props.onChange((atual) => ({
+          ...atual,
+          valor_recebido: value,
+          caixa_id: 8,
+          forma_pagamento_id: 3,
+          forma_pagamento: "cartao_credito",
+          numero_parcelas: 3,
+          bandeira: "visa",
+          operadora_id: 2,
+        })),
     );
   const enviar = () =>
     harness.act(() =>
@@ -126,5 +136,8 @@ test("baixa reutiliza request_id após falha e troca a chave quando o valor muda
   await enviar();
   assert.notEqual(envios[2].request_id, envios[0].request_id);
   assert.equal(envios[2].valor_total, 70);
+  assert.equal(envios[2].caixa_id, 8);
+  assert.equal(envios[2].numero_parcelas, 3);
+  assert.equal(envios[2].forma_pagamento_id, 3);
   assert.equal(fechamentos, 1);
 });

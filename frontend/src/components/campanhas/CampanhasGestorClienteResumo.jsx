@@ -1,3 +1,4 @@
+import { obterCodigoPessoaPublico } from "../../utils/codigosPublicos";
 function getRankMeta(rankLabels, rankLevel) {
   return rankLabels[rankLevel] || rankLabels.bronze;
 }
@@ -17,7 +18,7 @@ export default function CampanhasGestorClienteResumo({ gestorCliente, gestorSald
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-gray-900 truncate">{gestorCliente.nome}</p>
         <p className="text-xs text-gray-400">
-          ID #{gestorCliente.id} -{" "}
+          Código {obterCodigoPessoaPublico(gestorCliente) || "Não informado"} -{" "}
           {gestorCliente.telefone || gestorCliente.celular || "Sem telefone"}
         </p>
       </div>

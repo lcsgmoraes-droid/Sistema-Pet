@@ -1,7 +1,7 @@
 export function criarTutorAPartirDoPet(pet, fallback = {}) {
   return {
     id: pet.cliente_id,
-    nome: pet.cliente_nome ?? fallback.nome ?? `Tutor #${pet.cliente_id}`,
+    nome: pet.cliente_nome ?? fallback.nome ?? "Tutor não informado",
     telefone: pet.cliente_telefone ?? fallback.telefone ?? "",
     celular: pet.cliente_celular ?? fallback.celular ?? "",
   };

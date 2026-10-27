@@ -442,7 +442,11 @@ def get_fluxo_caixa(
         ):
             # O fluxo é espelho da baixa. Mantemos um fluxo legado sem baixa.
             continue
-        numero_venda_fluxo = numeros_venda_por_conta.get(fluxo.origem_id)
+        numero_venda_fluxo = (
+            numeros_venda_por_conta.get(fluxo.origem_id)
+            if fluxo.origem_tipo == "conta_receber"
+            else None
+        )
 
         movimentacoes.append(
             FluxoCaixaMovimentacao(

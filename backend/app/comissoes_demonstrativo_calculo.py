@@ -32,9 +32,50 @@ def montar_demonstrativo_calculo_comissao(
     valor_comissao: Any,
     valor_comissao_gerada: Any,
     percentual_aplicado: Any,
+    valor_fixo: Any = 0,
 ) -> Dict[str, Any]:
     """Monta o extrato da comissao sem recalcular o valor salvo."""
     tipo_normalizado = (tipo_calculo or "percentual").lower()
+    if tipo_normalizado == "fixo":
+        quantidade = decimal_to_float(valor_base_calculo)
+        valor_fixo = round_money(valor_fixo)
+        return {
+            "tipo_calculo": "fixo",
+            "formula_resumo": "quantidade comissionada × valor fixo por unidade = comissão",
+            "linhas": [
+                {
+                    "chave": "base_calculo",
+                    "label": "Quantidade comissionada (proporcional ao recebimento)",
+                    "operador": "=",
+                    "tipo": "quantidade",
+                    "valor": quantidade,
+                    "entra_na_base": False,
+                },
+                {
+                    "chave": "percentual_comissao",
+                    "label": "Valor fixo por unidade",
+                    "operador": "x",
+                    "tipo": "moeda",
+                    "valor": valor_fixo,
+                    "entra_na_base": False,
+                },
+                {
+                    "chave": "comissao_final",
+                    "label": "Comissão gerada para pagamento",
+                    "operador": "=",
+                    "tipo": "final",
+                    "valor": round_money(valor_comissao_gerada),
+                    "entra_na_base": False,
+                },
+            ],
+            "lucro_conferido": None,
+            "conferencia_ok": abs(
+                round_money(quantidade * valor_fixo)
+                - round_money(valor_comissao_gerada)
+            )
+            <= 0.01,
+            "observacao": "Valor fixo por unidade vendida, proporcional ao recebimento. Custos, descontos e taxas não reduzem o valor por unidade.",
+        }
     desconto = round_money(desconto)
     beneficio = round_money(beneficio)
     taxa_cartao = round_money(taxa_cartao)

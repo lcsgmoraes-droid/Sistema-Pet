@@ -184,15 +184,7 @@ export default function NFSaidaDetalhesModal({
             <div>
               <label className="text-sm font-medium text-gray-600">Cliente</label>
               <p>
-                <CustomerIdentity
-                  code={
-                    notaSelecionada.cliente?.codigo ||
-                    notaSelecionada.cliente_id ||
-                    notaSelecionada.cliente?.id
-                  }
-                  customer={notaSelecionada.cliente}
-                  fallback="N/A"
-                />
+                <CustomerIdentity customer={notaSelecionada.cliente} fallback="N/A" />
               </p>
             </div>
             <div>

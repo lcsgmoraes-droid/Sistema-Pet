@@ -1,3 +1,4 @@
+import { obterCodigoProdutoPublico } from "../../utils/codigosPublicos";
 export default function ProdutosConflitoExclusaoModal({
   autoSelecionarConflito,
   bloqueiosExclusao,
@@ -112,11 +113,11 @@ export default function ProdutosConflitoExclusaoModal({
                               className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                             />
                             <span className="text-sm text-gray-800">
-                              {corrigirTextoQuebrado(variacao.nome || `Variacao #${variacao.id}`)}
+                              {corrigirTextoQuebrado(variacao.nome || "Variação sem nome")}
                             </span>
                           </div>
                           <span className="text-xs text-gray-500 font-mono">
-                            {variacao.codigo || variacao.sku || `ID ${variacao.id}`}
+                            {obterCodigoProdutoPublico(variacao) || "Código não informado"}
                           </span>
                         </label>
                       ))}

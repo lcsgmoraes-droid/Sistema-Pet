@@ -6,13 +6,18 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import Float, Integer, and_, case, cast, func, or_
+from sqlalchemy import Float, Integer, and_, cast, func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.audit_log import log_action, log_create, log_delete, log_update
 from app.auth.dependencies import get_current_user_and_tenant
 from app.services.cliente_historico_service import registrar_alteracoes_cliente
+from app.services.pessoa_telefone import (
+    PessoaTelefoneDuplicado,
+    erro_telefone_duplicado,
+    normalizar_telefone_pessoa,
+)
 from app.clientes.common import (
     _anexar_metadados_criacao_cliente,
     _obter_cliente_ou_404,
@@ -39,7 +44,6 @@ from app.db import get_session
 from app.models import (
     AppAccessProfile,
     Cliente,
-    ClienteContato,
     Role,
     Tenant,
     User,
@@ -70,6 +74,12 @@ from app.services.user_account_service import (
 )
 from app.utils.tenant_safe_sql import execute_tenant_safe
 from app.utils.search_query import desativar_jit_busca
+
+from app.clientes.search import (
+    _aplicar_filtro_busca,
+    _aplicar_filtro_ativo,
+    _ordenar_query_listagem,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -214,6 +224,8 @@ def create_cliente(
         db.commit()
     except IntegrityError as exc:
         db.rollback()
+        if erro_telefone_duplicado(exc):
+            raise PessoaTelefoneDuplicado() from exc
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Código de cliente já em uso. Tente cadastrar novamente.",
@@ -484,6 +496,7 @@ def update_cliente(
             else cliente.contatos_adicionais,
             dados_payload.get("celular", cliente.celular),
             dados_payload.get("telefone", cliente.telefone),
+            pessoa_atual=cliente,
         )
     auth_user_informado = "auth_user_id" in dados_payload
     perfis_informados = "app_access_profiles" in dados_payload
@@ -891,11 +904,14 @@ def _preparar_dados_cliente(
 
 def _normalizar_campos_identidade(dados_cliente: dict) -> None:
     """Grava identificadores em formato estavel para prevenir novas duplicidades."""
-    for campo in ("cpf", "cnpj", "telefone", "celular", "cep"):
+    for campo in ("cpf", "cnpj", "cep"):
         if campo in dados_cliente and dados_cliente[campo] is not None:
             dados_cliente[campo] = (
                 "".join(ch for ch in str(dados_cliente[campo]) if ch.isdigit()) or None
             )
+    for campo in ("telefone", "celular"):
+        if campo in dados_cliente:
+            dados_cliente[campo] = normalizar_telefone_pessoa(dados_cliente[campo])
     if "email" in dados_cliente and dados_cliente["email"] is not None:
         dados_cliente["email"] = str(dados_cliente["email"]).strip().casefold() or None
     if "crmv" in dados_cliente and dados_cliente["crmv"] is not None:
@@ -1033,121 +1049,6 @@ def _montar_query_listagem_clientes(
             or_(Cliente.celular.is_(None), func.trim(Cliente.celular) == ""),
         )
     return query
-
-
-def _aplicar_filtro_busca(query, search):
-    termo_busca = (search or "").strip()
-    if not termo_busca:
-        return query
-
-    telefone_digitos = _somente_digitos_coluna(Cliente.telefone)
-    celular_digitos = _somente_digitos_coluna(Cliente.celular)
-    for palavra in [p.strip() for p in termo_busca.split() if p.strip()]:
-        like = f"%{palavra}%"
-        filtros = [
-            Cliente.codigo.ilike(like),
-            Cliente.nome.ilike(like),
-            Cliente.nome_fantasia.ilike(like),
-            Cliente.razao_social.ilike(like),
-            Cliente.cpf.ilike(like),
-            Cliente.cnpj.ilike(like),
-            Cliente.email.ilike(like),
-            Cliente.telefone.ilike(like),
-            Cliente.celular.ilike(like),
-            Cliente.contatos_adicionais.any(
-                (ClienteContato.tenant_id == Cliente.tenant_id)
-                & (
-                    ClienteContato.numero.ilike(like)
-                    | ClienteContato.vinculo.ilike(like)
-                )
-            ),
-        ]
-        palavra_digitos = "".join(ch for ch in palavra if ch.isdigit())
-        if palavra_digitos:
-            like_digitos = f"%{palavra_digitos}%"
-            if not any(ch.isalpha() for ch in palavra):
-                filtros.extend(
-                    [
-                        _somente_digitos_coluna(Cliente.cpf).ilike(like_digitos),
-                        _somente_digitos_coluna(Cliente.cnpj).ilike(like_digitos),
-                    ]
-                )
-            filtros.extend(
-                [
-                    telefone_digitos.ilike(like_digitos),
-                    celular_digitos.ilike(like_digitos),
-                    Cliente.contatos_adicionais.any(
-                        (ClienteContato.tenant_id == Cliente.tenant_id)
-                        & ClienteContato.numero_digitos.ilike(like_digitos)
-                    ),
-                ]
-            )
-        query = query.filter(or_(*filtros))
-    return query
-
-
-def _aplicar_filtro_ativo(query, ativo):
-    if ativo is None:
-        ativo = True
-    if ativo:
-        return query.filter(or_(Cliente.ativo.is_(True), Cliente.ativo.is_(None)))
-    return query.filter(Cliente.ativo.is_(False))
-
-
-def _ordenar_query_listagem(query, search):
-    termo_busca = (search or "").strip()
-    if not termo_busca:
-        return query.order_by(Cliente.nome)
-
-    termo_lower = termo_busca.lower()
-    termo_digitos = "".join(ch for ch in termo_busca if ch.isdigit())
-    if termo_digitos:
-        return query.order_by(
-            case(
-                (func.lower(Cliente.codigo) == termo_lower, 1),
-                (_somente_digitos_coluna(Cliente.telefone) == termo_digitos, 2),
-                (_somente_digitos_coluna(Cliente.celular) == termo_digitos, 3),
-                (
-                    Cliente.contatos_adicionais.any(
-                        (ClienteContato.tenant_id == Cliente.tenant_id)
-                        & (ClienteContato.numero_digitos == termo_digitos)
-                    ),
-                    4,
-                ),
-                (Cliente.codigo.ilike(f"{termo_digitos}%"), 5),
-                (
-                    _somente_digitos_coluna(Cliente.telefone).ilike(
-                        f"{termo_digitos}%"
-                    ),
-                    6,
-                ),
-                (
-                    _somente_digitos_coluna(Cliente.celular).ilike(f"{termo_digitos}%"),
-                    7,
-                ),
-                (func.lower(Cliente.nome) == termo_lower, 8),
-                (Cliente.nome.ilike(f"{termo_busca}%"), 9),
-                (Cliente.nome_fantasia.ilike(f"{termo_busca}%"), 10),
-                (Cliente.razao_social.ilike(f"{termo_busca}%"), 11),
-                else_=12,
-            ),
-            Cliente.nome,
-        )
-
-    return query.order_by(
-        case(
-            (func.lower(Cliente.codigo) == termo_lower, 1),
-            (func.lower(Cliente.nome) == termo_lower, 2),
-            (func.lower(Cliente.nome_fantasia) == termo_lower, 3),
-            (func.lower(Cliente.razao_social) == termo_lower, 4),
-            (Cliente.codigo.ilike(f"{termo_busca}%"), 5),
-            (Cliente.nome.ilike(f"{termo_busca}%"), 6),
-            (Cliente.nome_fantasia.ilike(f"{termo_busca}%"), 7),
-            (Cliente.razao_social.ilike(f"{termo_busca}%"), 8),
-            else_=9,
-        ),
-        Cliente.nome,
-    )
 
 
 def _marcar_clientes_de_parceiro(clientes, tenant_id: int) -> None:

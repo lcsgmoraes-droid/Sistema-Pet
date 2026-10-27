@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import api from "../api";
 import { confirmarCorePet, perguntarCorePet } from "../services/corepetDialog";
 
@@ -27,27 +27,49 @@ export default function useCampanhasGestor({ clienteCodigoInicial } = {}) {
   const [gestorCampanhaTipo, setGestorCampanhaTipo] = useState("carimbos");
   const [gestorCampanhaLista, setGestorCampanhaLista] = useState(null);
   const [gestorCampanhaCarregando, setGestorCampanhaCarregando] = useState(false);
+  const buscaGestorRef = useRef({ sequencia: 0, timer: null, controller: null });
+  useEffect(
+    () => () => {
+      buscaGestorRef.current.sequencia += 1;
+      clearTimeout(buscaGestorRef.current.timer);
+      buscaGestorRef.current.controller?.abort();
+    },
+    [],
+  );
 
   const buscarClientesGestor = async (termo) => {
-    if (!termo || termo.length < 2) {
+    const controle = buscaGestorRef.current;
+    const sequencia = ++controle.sequencia;
+    clearTimeout(controle.timer);
+    controle.controller?.abort();
+    if (!termo?.trim()) {
       setGestorSugestoes([]);
+      setGestorBuscando(false);
       return;
     }
 
     setGestorBuscando(true);
-    try {
-      const res = await api.get(
-        `/campanhas/clientes/buscar?search=${encodeURIComponent(termo)}&limit=10`,
-      );
-      setGestorSugestoes(res.data?.clientes || []);
-    } catch {
-      setGestorSugestoes([]);
-    } finally {
-      setGestorBuscando(false);
-    }
+    controle.timer = setTimeout(async () => {
+      controle.controller = new AbortController();
+      try {
+        const res = await api.get(
+          `/campanhas/clientes/buscar?search=${encodeURIComponent(termo)}&limit=10`,
+          { signal: controle.controller.signal },
+        );
+        if (sequencia === controle.sequencia) setGestorSugestoes(res.data?.clientes || []);
+      } catch {
+        if (sequencia === controle.sequencia) setGestorSugestoes([]);
+      } finally {
+        if (sequencia === controle.sequencia) setGestorBuscando(false);
+      }
+    }, 250);
   };
 
   const selecionarClienteGestor = useCallback(async (cliente) => {
+    buscaGestorRef.current.sequencia += 1;
+    clearTimeout(buscaGestorRef.current.timer);
+    buscaGestorRef.current.controller?.abort();
+    setGestorBuscando(false);
     setGestorCliente(cliente);
     setGestorSearch(cliente.nome);
     setGestorSugestoes([]);

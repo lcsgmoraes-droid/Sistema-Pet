@@ -81,7 +81,7 @@ export function produtoCorrespondeBusca(
     if (correspondeTexto) return true;
 
     const termoDigitos = apenasDigitos(termoBusca);
-    if (!termoDigitos) return false;
+    if (!termoDigitos || /\p{L}/u.test(termoBusca)) return false;
 
     return camposDigitos.some((campo) => campo.includes(termoDigitos));
   });
@@ -98,6 +98,7 @@ export function encontrarProdutoPorCodigo(produtos, termo) {
       codigosProdutoParaBusca(produto).some((codigo) => {
         const codigoNormalizado = normalizarCodigoProdutoBusca(codigo);
         if (codigoNormalizado === termoNormalizado) return true;
+        if (/\p{L}/u.test(termoNormalizado) || /\p{L}/u.test(codigoNormalizado)) return false;
 
         const codigoDigitos = apenasDigitos(codigo);
         return (

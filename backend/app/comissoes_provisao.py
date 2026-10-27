@@ -10,6 +10,8 @@ CONCEITO-CHAVE: Comissão é DESPESA por COMPETÊNCIA, não depende de pagamento
 """
 
 import logging
+import calendar
+from contextlib import nullcontext
 from decimal import Decimal
 from datetime import date, datetime, timedelta
 from typing import Dict, Optional
@@ -261,6 +263,8 @@ def provisionar_comissoes_venda(
     tenant_id: Optional[str] = None,
     db: Optional[Session] = None,
     user_id: Optional[int] = None,
+    comissao_ids: Optional[list[int]] = None,
+    commit: bool = True,
 ) -> Dict:
     """
     Cria provisões (Contas a Pagar + DRE) para todas as comissões de uma venda.
@@ -299,7 +303,7 @@ def provisionar_comissoes_venda(
 
     tenant_id = _require_tenant_id(tenant_id)
 
-    with transactional_session(db):
+    with transactional_session(db) if commit else nullcontext(db):
         usuario_responsavel_id = _resolver_usuario_responsavel(db, tenant_id, user_id)
 
         # ============================================================
@@ -350,9 +354,28 @@ def provisionar_comissoes_venda(
         # ETAPA 2: BUSCAR COMISSÕES NÃO PROVISIONADAS
         # ============================================================
 
+        parametros_comissoes = {"venda_id": venda_id}
+        filtro_itens = ""
+        if comissao_ids is not None:
+            if not comissao_ids:
+                return {
+                    "success": True,
+                    "comissoes_provisionadas": 0,
+                    "valor_total": 0.0,
+                    "contas_criadas": [],
+                    "message": "Nenhuma comissão selecionada",
+                }
+            chaves = []
+            for indice, comissao_id in enumerate(sorted(set(comissao_ids))):
+                chave = f"comissao_id_{indice}"
+                parametros_comissoes[chave] = int(comissao_id)
+                chaves.append(f":{chave}")
+            filtro_itens = f" AND id IN ({', '.join(chaves)})"
+
+        lock_itens = "FOR UPDATE" if db.get_bind().dialect.name == "postgresql" else ""
         result_comissoes = execute_tenant_safe(
             db,
-            """
+            f"""
             SELECT 
                 id, funcionario_id, valor_comissao_gerada, produto_id
             FROM comissoes_itens
@@ -360,9 +383,13 @@ def provisionar_comissoes_venda(
               AND status = 'pendente'
               AND valor_comissao_gerada > 0
               AND COALESCE(comissao_provisionada, false) = false
-              AND {tenant_filter}
+              AND conta_pagar_id IS NULL
+              {filtro_itens}
+              AND {{tenant_filter}}
+            ORDER BY id
+            {lock_itens}
         """,
-            {"venda_id": venda_id},
+            parametros_comissoes,
             tenant_id=tenant_id,
         )
 
@@ -423,9 +450,15 @@ def provisionar_comissoes_venda(
             if funcionario and funcionario[1]:
                 # Calcular próxima data de fechamento após a data da venda
                 dia_fechamento = funcionario[1]
-                if data_competencia.day <= dia_fechamento:
+                dia_mes_atual = min(
+                    dia_fechamento,
+                    calendar.monthrange(data_competencia.year, data_competencia.month)[
+                        1
+                    ],
+                )
+                if data_competencia.day <= dia_mes_atual:
                     # Mesmo mês
-                    data_vencimento = data_competencia.replace(day=dia_fechamento)
+                    data_vencimento = data_competencia.replace(day=dia_mes_atual)
                 else:
                     # Próximo mês
                     if data_competencia.month == 12:
@@ -434,7 +467,13 @@ def provisionar_comissoes_venda(
                         )
                     else:
                         data_vencimento = data_competencia.replace(
-                            month=data_competencia.month + 1, day=dia_fechamento
+                            month=data_competencia.month + 1,
+                            day=min(
+                                dia_fechamento,
+                                calendar.monthrange(
+                                    data_competencia.year, data_competencia.month + 1
+                                )[1],
+                            ),
                         )
             else:
                 # Padrão: 30 dias após a venda

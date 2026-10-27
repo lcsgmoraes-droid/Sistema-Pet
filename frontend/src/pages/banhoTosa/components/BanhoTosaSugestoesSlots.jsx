@@ -164,7 +164,7 @@ function CompromissoCard({ agendamento }) {
           <CustomerIdentity
             className="mt-0.5 text-xs text-slate-500"
             codeLabel="Cod. tutor"
-            fallback={`Tutor #${agendamento.cliente_id || "-"}`}
+            fallback={"Tutor não informado"}
             label="Tutor"
             nameClassName="font-medium text-slate-500"
             record={agendamento}

@@ -94,6 +94,46 @@ export const styleGuideCatalog = [
         descricao: "Busca, teclado, limpar seleção, ghost selection (Tab confirma)",
       },
       {
+        nome: "BuscaPessoa / BuscaProduto",
+        status: "pronto",
+        arquivo:
+          "components/v2/BuscaPessoa/BuscaPessoa.jsx, components/v2/BuscaProduto/BuscaProduto.jsx",
+        descricao:
+          "Células de busca compartilhadas do PDV e demais telas; código público, relevância, teclado, label/error/help e modo escuro. Consultas controladas preservam o escopo e filtros de cada operação.",
+      },
+      {
+        nome: "BuscaProdutoMultiplo",
+        status: "pronto",
+        arquivo: "components/v2/BuscaProdutoMultiplo/BuscaProdutoMultiplo.jsx",
+        descricao:
+          "Busca do PDV com seleção de vários produtos e chips removíveis; aceita produtos históricos do relatório.",
+      },
+      {
+        nome: "SeletorFormaRecebimento",
+        status: "pronto",
+        arquivo: "components/v2/SeletorFormaRecebimento/SeletorFormaRecebimento.jsx",
+        descricao: "Formas de recebimento compartilhadas pelo PDV e financeiro.",
+      },
+      {
+        nome: "CamposCartaoRecebimento",
+        status: "pronto",
+        arquivo: "components/v2/CamposCartaoRecebimento/CamposCartaoRecebimento.jsx",
+        descricao: "Operadora, bandeira, NSU e parcelas com as mesmas regras do PDV.",
+      },
+      {
+        nome: "SeletorCaixaRecebimento",
+        status: "pronto",
+        arquivo: "components/v2/SeletorCaixaRecebimento/SeletorCaixaRecebimento.jsx",
+        descricao: "Escolha explícita entre caixas permitidos ao registrar recebimentos.",
+      },
+      {
+        nome: "RecebimentoCampos",
+        status: "pronto",
+        arquivo: "components/v2/RecebimentoCampos/RecebimentoCampos.jsx",
+        descricao:
+          "Célula comum de pagamento e parcelamento para contas a receber e vendas abertas.",
+      },
+      {
         nome: "InputComboboxMultiplo",
         status: "pronto",
         arquivo: "components/v2/InputComboboxMultiplo/InputComboboxMultiplo.jsx",

@@ -2,13 +2,15 @@ import { Wallet, AlertCircle } from "lucide-react";
 
 import InputMoeda from "../v2/InputMoeda/InputMoeda";
 import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
-import PaymentMethodIcon from "../PaymentMethodIcon";
+import SeletorFormaRecebimento from "../v2/SeletorFormaRecebimento/SeletorFormaRecebimento";
+import CamposCartaoRecebimento from "../v2/CamposCartaoRecebimento/CamposCartaoRecebimento";
+import InputTexto from "../v2/InputTexto/InputTexto";
+import InputQuantidade from "../v2/InputQuantidade/InputQuantidade";
+import InputCombobox from "../v2/InputCombobox/InputCombobox";
 import { formatMoneyBRL, formatPercent } from "../../utils/formatters";
 import {
   gerarPlanoCrediario,
   mascararDataCrediario,
-  obterCorVisualParcelamento,
-  obterEstiloVisualParcelamento,
   vencimentoPadraoCrediario,
 } from "../modalPagamentoUtils";
 
@@ -36,7 +38,6 @@ export default function ModalPagamentoFormaPanel({
   nsuCartao,
   opcoesParcelamentoRef,
   estiloVisualParcelamento,
-  simulacoesParcelamento,
   adicionarPagamento,
   bandeirasDisponiveis,
   parcelasDisponiveis,
@@ -62,7 +63,7 @@ export default function ModalPagamentoFormaPanel({
           <div className="grid grid-cols-2 gap-3">
             {/* Crédito Cliente (exibir primeiro se disponível) */}
             {venda.cliente && saldoCreditoDisponivel > 0 && (
-              <button
+              <BotaoInteracao
                 onClick={() => {
                   setFormaPagamentoSelecionada({
                     id: "credito_cliente",
@@ -96,12 +97,12 @@ export default function ModalPagamentoFormaPanel({
                 <div className="text-xs text-purple-600 mt-1 font-semibold">
                   {formatMoneyBRL(saldoCreditoDisponivel)}
                 </div>
-              </button>
+              </BotaoInteracao>
             )}
 
             {/* Cashback de campanhas (exibir se disponível) */}
             {venda.cliente && saldoCashbackTotal > 0 && (
-              <button
+              <BotaoInteracao
                 disabled={saldoCashback <= 0}
                 onClick={() => {
                   setFormaPagamentoSelecionada({
@@ -142,50 +143,32 @@ export default function ModalPagamentoFormaPanel({
                     Limite: {formatPercent(cashbackLimitPercent)} da compra
                   </div>
                 )}
-              </button>
+              </BotaoInteracao>
             )}
 
-            {/* Formas de pagamento cadastradas */}
-            {formasPagamento.map((forma) => {
-              const selecionada = formaPagamentoSelecionada?.id === forma.id;
-
-              return (
-                <button
-                  key={forma.id}
-                  onClick={() => {
-                    setFormaPagamentoSelecionada(
-                      forma.tipo === "crediario"
-                        ? {
-                            ...forma,
-                            data_vencimento_crediario: vencimentoPadraoCrediario(
-                              forma.prazo_dias || forma.prazo_recebimento || 30,
-                            ),
-                            intervalo_crediario: "mensal",
-                          }
-                        : forma,
-                    );
-                    setNumeroParcelas(1);
-                    setBandeira("");
-                    setNsuCartao(""); // Limpar NSU
-                    setValorRecebido(valorRestante); // Pré-preencher valor restante
-                  }}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    selecionada
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  <div className="flex justify-center mb-1 text-gray-500">
-                    <PaymentMethodIcon icone={forma.icone} nome={forma.nome} />
-                  </div>
-                  <div
-                    className={`text-sm font-medium ${selecionada ? "text-blue-900" : "text-gray-700"}`}
-                  >
-                    {forma.nome}
-                  </div>
-                </button>
-              );
-            })}
+            <div className="col-span-2 min-w-0">
+              <SeletorFormaRecebimento
+                formas={formasPagamento}
+                value={formaPagamentoSelecionada?.id}
+                onChange={(forma) => {
+                  setFormaPagamentoSelecionada(
+                    forma.tipo === "crediario"
+                      ? {
+                          ...forma,
+                          data_vencimento_crediario: vencimentoPadraoCrediario(
+                            forma.prazo_dias || forma.prazo_recebimento || 30,
+                          ),
+                          intervalo_crediario: "mensal",
+                        }
+                      : forma,
+                  );
+                  setNumeroParcelas(1);
+                  setBandeira("");
+                  setNsuCartao("");
+                  setValorRecebido(valorRestante);
+                }}
+              />
+            </div>
           </div>
         </div>
 
@@ -265,36 +248,31 @@ export default function ModalPagamentoFormaPanel({
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Primeira data de vencimento
                 </label>
-                <input
-                  type="text"
+                <InputTexto
+                  label="Primeira data de vencimento"
                   inputMode="numeric"
                   value={formaPagamentoSelecionada.data_vencimento_crediario || ""}
-                  onChange={(event) =>
-                    setFormaPagamentoSelecionada((formaAtual) => ({
-                      ...formaAtual,
-                      data_vencimento_crediario: mascararDataCrediario(event.target.value),
+                  onChange={(texto) =>
+                    setFormaPagamentoSelecionada((atual) => ({
+                      ...atual,
+                      data_vencimento_crediario: mascararDataCrediario(texto),
                     }))
                   }
                   placeholder="DD-MM-AAAA"
                   maxLength={10}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Quantidade de parcelas
                     </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="60"
+                    <InputQuantidade
+                      label="Quantidade de parcelas"
+                      min={1}
                       value={numeroParcelas}
-                      onChange={(event) =>
-                        setNumeroParcelas(
-                          Math.max(1, Math.min(60, Number.parseInt(event.target.value || "1", 10))),
-                        )
+                      onChange={(valor) =>
+                        setNumeroParcelas(Math.max(1, Math.min(60, Math.floor(valor))))
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   {numeroParcelas > 1 && (
@@ -302,20 +280,22 @@ export default function ModalPagamentoFormaPanel({
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Intervalo
                       </label>
-                      <select
+                      <InputCombobox
+                        label="Intervalo"
                         value={formaPagamentoSelecionada.intervalo_crediario || "mensal"}
-                        onChange={(event) =>
-                          setFormaPagamentoSelecionada((formaAtual) => ({
-                            ...formaAtual,
-                            intervalo_crediario: event.target.value,
+                        permitirLimpar={false}
+                        opcoes={[
+                          { value: "7_dias", label: "A cada 7 dias" },
+                          { value: "15_dias", label: "A cada 15 dias" },
+                          { value: "mensal", label: "Mensal" },
+                        ]}
+                        onChange={(intervalo_crediario) =>
+                          setFormaPagamentoSelecionada((atual) => ({
+                            ...atual,
+                            intervalo_crediario,
                           }))
                         }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="7_dias">A cada 7 dias</option>
-                        <option value="15_dias">A cada 15 dias</option>
-                        <option value="mensal">Mensal</option>
-                      </select>
+                      />
                     </div>
                   )}
                 </div>
@@ -385,132 +365,45 @@ export default function ModalPagamentoFormaPanel({
               </div>
             )}
 
-            {/* Bandeira do cartão */}
-            {formaPagamentoSelecionada?.tipo &&
-              ["cartao_credito", "cartao_debito", "link_pagamento"].includes(
-                formaPagamentoSelecionada.tipo,
-              ) && (
-                <>
-                  {/* 🆕 OPERADORA DE CARTÃO */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Operadora *
-                    </label>
-                    <select
-                      value={operadoraSelecionada?.id || ""}
-                      onChange={(e) => {
-                        const op = operadoras.find((o) => o.id === parseInt(e.target.value));
-                        setOperadoraSelecionada(op);
-                        // Ajustar parcelas se exceder o máximo da nova operadora
-                        if (op && numeroParcelas > op.max_parcelas) {
-                          setNumeroParcelas(op.max_parcelas);
-                        }
-                      }}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Selecione a operadora...</option>
-                      {operadoras.map((op) => (
-                        <option key={op.id} value={op.id}>
-                          {op.nome} ({op.max_parcelas}x máx)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Bandeira</label>
-                    <select
-                      value={bandeira}
-                      onChange={(e) => setBandeira(e.target.value)}
-                      disabled={!bandeirasDisponiveis.length}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Selecione...</option>
-                      {!bandeirasDisponiveis.length && (
-                        <option value="">Nenhuma bandeira disponivel</option>
-                      )}
-                      {bandeirasDisponiveis.map((b) => (
-                        <option key={b} value={b}>
-                          {b}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {bandeira &&
-                    operadoraSelecionada?.taxas_configuradas > 0 &&
-                    !taxaCartaoSelecionada && (
-                      <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                        Esta combinacao nao esta disponivel. Escolha outra bandeira ou quantidade de
-                        parcelas.
-                      </div>
-                    )}
-
-                  {/* NSU da transação (para conciliação bancária) */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      NSU (Número Sequencial Único)
-                      <span className="text-gray-500 text-xs ml-1">
-                        (Opcional - para conciliação)
-                      </span>
-                    </label>
-                    <input
-                      type="text"
-                      value={nsuCartao}
-                      onChange={(e) => setNsuCartao(e.target.value)}
-                      placeholder="Ex: 123456789"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </>
-              )}
-
-            {/* Número de parcelas (apenas para cartão de crédito parcelado) */}
-            {formaPagamentoSelecionada?.permite_parcelamento && (
+            {["cartao_credito", "cartao_debito", "link_pagamento"].includes(
+              formaPagamentoSelecionada.tipo,
+            ) && (
               <div ref={opcoesParcelamentoRef}>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Número de Parcelas
-                </label>
-                <select
-                  value={numeroParcelas}
-                  onChange={(e) => setNumeroParcelas(parseInt(e.target.value))}
-                  disabled={!parcelasDisponiveis.length}
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${estiloVisualParcelamento.selectClass}`}
-                >
-                  {!parcelasDisponiveis.length && (
-                    <option value="">Nenhuma parcela disponivel</option>
+                <CamposCartaoRecebimento
+                  operadoras={operadoras}
+                  operadoraId={operadoraSelecionada?.id}
+                  onOperadoraChange={(id) => {
+                    setOperadoraSelecionada(operadoras.find((o) => o.id === id) || null);
+                    setNumeroParcelas(1);
+                  }}
+                  bandeiras={bandeirasDisponiveis}
+                  bandeira={bandeira}
+                  onBandeiraChange={setBandeira}
+                  nsu={nsuCartao}
+                  onNsuChange={setNsuCartao}
+                  parcelas={parcelasDisponiveis}
+                  numeroParcelas={numeroParcelas}
+                  onParcelasChange={setNumeroParcelas}
+                  valor={valorRecebido || valorRestante}
+                  permiteParcelamento={Boolean(formaPagamentoSelecionada.permite_parcelamento)}
+                />
+                {bandeira &&
+                  operadoraSelecionada?.taxas_configuradas > 0 &&
+                  !taxaCartaoSelecionada && (
+                    <p role="alert" className="mt-2 text-sm text-red-700 dark:text-red-400">
+                      Esta combinação não está disponível. Confira bandeira e parcelas.
+                    </p>
                   )}
-                  {parcelasDisponiveis.map((n) => {
-                    const valorParaParcelar = valorRecebido || valorRestante;
-                    const valorParcela = valorParaParcelar / n;
-                    const cor = obterCorVisualParcelamento({
-                      formaPagamento: formaPagamentoSelecionada,
-                      simulacoesParcelamento,
-                      numeroParcelas: n,
-                      statusMargem: "verde",
-                    });
-                    const estilo = obterEstiloVisualParcelamento(cor);
-
-                    return (
-                      <option key={n} value={n} className={estilo.optionClass}>
-                        {estilo.prefixo}
-                        {n}x de {formatMoneyBRL(valorParcela)}{" "}
-                        {valorRecebido > 0 ? `(Total: ${formatMoneyBRL(valorParaParcelar)})` : ""}
-                      </option>
-                    );
-                  })}
-                </select>
                 {valorRecebido > 0 && numeroParcelas > 1 && (
                   <div
-                    className={`mt-2 p-3 border rounded-lg ${estiloVisualParcelamento.painelClass}`}
+                    className={`mt-2 rounded-lg border p-3 ${estiloVisualParcelamento.painelClass}`}
                   >
                     <p className={`text-sm font-medium ${estiloVisualParcelamento.tituloClass}`}>
                       {estiloVisualParcelamento.prefixo}
-                      💳 {numeroParcelas}x de {formatMoneyBRL(valorRecebido / numeroParcelas)}
+                      {numeroParcelas}x de {formatMoneyBRL(valorRecebido / numeroParcelas)}
                     </p>
-                    <p className={`text-xs mt-1 ${estiloVisualParcelamento.descricaoClass}`}>
-                      Valor total parcelado: {formatMoneyBRL(valorRecebido)}
-                      {estiloVisualParcelamento.aviso}
+                    <p className={`text-xs ${estiloVisualParcelamento.descricaoClass}`}>
+                      Total: {formatMoneyBRL(valorRecebido)} {estiloVisualParcelamento.aviso}
                     </p>
                   </div>
                 )}

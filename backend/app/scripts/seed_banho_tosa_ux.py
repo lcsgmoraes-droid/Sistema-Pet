@@ -602,6 +602,7 @@ def seed(db, *, email: str, base_date: date, dry_run: bool) -> dict[str, Any]:
         codigo="DEMO-FUNC-001",
         nome="Beatriz Vendedora Demo",
         tipo="funcionario",
+        telefone="11900000001",
     )
     motorista_id = _ensure_person(
         db,
@@ -610,6 +611,7 @@ def seed(db, *, email: str, base_date: date, dry_run: bool) -> dict[str, Any]:
         codigo="DEMO-ENT-001",
         nome="Carlos Entregador Demo",
         tipo="funcionario",
+        telefone="11900000002",
         is_entregador=True,
     )
     _grant_profile(
@@ -645,6 +647,7 @@ def seed(db, *, email: str, base_date: date, dry_run: bool) -> dict[str, Any]:
             codigo=codigo,
             nome=f"Tutor(a) de {nome}",
             tipo="cliente",
+            telefone=f"1190000{index + 3:04d}",
         )
         pet_id = _ensure_pet(
             db,

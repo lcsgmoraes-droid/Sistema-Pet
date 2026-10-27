@@ -3,6 +3,9 @@ import toast from "react-hot-toast";
 
 import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
 import InputCombobox from "../v2/InputCombobox/InputCombobox";
+import BuscaProdutoMultiplo from "../v2/BuscaProdutoMultiplo/BuscaProdutoMultiplo";
+import useVendasGruposProdutos from "./useVendasGruposProdutos";
+import VendasGruposProdutosPanel from "./VendasGruposProdutosPanel";
 import { formatMoneyBRL } from "../../utils/formatters";
 import { exportarPlanilhasExcel } from "./vendasFinanceiro/vendasFinanceiroExcel";
 import {
@@ -16,14 +19,46 @@ const formatarQuantidade = (valor) =>
 
 export default function VendasPorVendedorPanel({ vendas, dataInicio, dataFim, formatarData }) {
   const [vendedorSelecionado, setVendedorSelecionado] = useState("");
-  const [produtoSelecionado, setProdutoSelecionado] = useState("");
+  const [produtosSelecionados, setProdutosSelecionados] = useState([]);
   const [exportando, setExportando] = useState("");
-  const produtos = useMemo(() => opcoesProdutosVendas(vendas), [vendas]);
-  const produto = produtos.find((opcao) => opcao.value === produtoSelecionado);
-  const filtrandoProduto = Boolean(produtoSelecionado);
+  const controleGrupos = useVendasGruposProdutos({
+    dataInicio,
+    dataFim,
+    vendedorSelecionado,
+    produtosSelecionados,
+    setProdutosSelecionados,
+  });
+  const produtos = useMemo(() => {
+    const porId = new Map(opcoesProdutosVendas(vendas).map((opcao) => [opcao.value, opcao]));
+    for (const salvo of controleGrupos.gruposSalvos) {
+      for (const item of salvo.produtos || []) {
+        const value = String(item.id);
+        // Relatórios históricos podem omitir o código; o grupo traz o cadastro atual.
+        const produto = { ...porId.get(value)?.produto, ...item };
+        porId.set(value, {
+          value,
+          label: `${produto.nome}${produto.codigo ? ` (${produto.codigo})` : ""}`,
+          produto,
+        });
+      }
+    }
+    return [...porId.values()].sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+  }, [vendas, controleGrupos.gruposSalvos]);
+  const produto = produtosSelecionados.length
+    ? {
+        label:
+          (!controleGrupos.grupoAlterado && controleGrupos.grupo?.nome) ||
+          produtos
+            .filter((opcao) => produtosSelecionados.includes(opcao.value))
+            .map((opcao) => opcao.label)
+            .join(", ") ||
+          "Produtos selecionados",
+      }
+    : null;
+  const filtrandoProduto = produtosSelecionados.length > 0;
   const grupos = useMemo(
-    () => agruparVendasPorVendedor(vendas, produtoSelecionado),
-    [vendas, produtoSelecionado],
+    () => agruparVendasPorVendedor(vendas, produtosSelecionados),
+    [vendas, produtosSelecionados],
   );
   const opcoes = useMemo(
     () =>
@@ -57,7 +92,7 @@ export default function VendasPorVendedorPanel({ vendas, dataInicio, dataFim, fo
     setExportando(formato);
     try {
       const periodo = { inicio: dataInicio, fim: dataFim };
-      const nome = `vendas_por_vendedor_${filtrandoProduto ? `produto_${produtoSelecionado}_` : ""}${dataInicio}_${dataFim}`;
+      const nome = `vendas_por_vendedor_${filtrandoProduto ? "produtos_" : ""}${dataInicio}_${dataFim}`;
       if (formato === "pdf") {
         const { criarPdfVendasPorVendedor } = await import("./vendasPorVendedorPdf");
         const pdf = await criarPdfVendasPorVendedor({
@@ -113,14 +148,13 @@ export default function VendasPorVendedorPanel({ vendas, dataInicio, dataFim, fo
           </div>
         </div>
         <div className="mt-4 grid max-w-3xl gap-4 sm:grid-cols-2">
-          <InputCombobox
+          <BuscaProdutoMultiplo
             id="relatorio-produto-vendedor"
-            label="Produto"
-            placeholder="Todos os produtos"
-            value={produtoSelecionado}
-            onChange={setProdutoSelecionado}
+            label="Produtos"
+            value={produtosSelecionados}
+            onChange={setProdutosSelecionados}
             opcoes={produtos}
-            help="Busque pelo nome ou ID entre os produtos vendidos no período."
+            help="Selecione vários produtos por nome ou código. Inclui o catálogo e os produtos vendidos no período."
           />
           <InputCombobox
             id="relatorio-vendedor"
@@ -131,6 +165,11 @@ export default function VendasPorVendedorPanel({ vendas, dataInicio, dataFim, fo
             opcoes={opcoes}
           />
         </div>
+        <VendasGruposProdutosPanel
+          controle={controleGrupos}
+          produtosSelecionados={produtosSelecionados}
+          vendedorSelecionado={vendedorSelecionado}
+        />
         <p className="mt-4 text-sm text-slate-700 dark:text-slate-200">
           {quantidade} venda(s)
           {filtrandoProduto &&

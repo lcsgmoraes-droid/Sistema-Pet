@@ -50,8 +50,9 @@ export function createSelectedCommissionItem(tipo, id, nome, configExistente) {
     id,
     nome,
     tipo_calculo: configExistente?.tipo_calculo || "percentual",
-    percentual: configExistente?.percentual || 10,
-    percentual_loja: configExistente?.percentual_loja || 50,
+    percentual: configExistente?.percentual ?? 10,
+    valor_fixo: configExistente?.valor_fixo ?? 0,
+    percentual_loja: configExistente?.percentual_loja ?? 50,
     permite_edicao_venda: configExistente?.permite_edicao_venda || false,
     observacoes: configExistente?.observacoes || "",
   };
@@ -67,6 +68,7 @@ export function buildPendingConfiguration(itemSelecionado) {
     referencia_id: itemSelecionado.id,
     nome: itemSelecionado.nome,
     tipo_calculo: itemSelecionado.tipo_calculo,
+    valor_fixo: parseCommissionNumber(itemSelecionado.valor_fixo),
     percentual: parseCommissionNumber(itemSelecionado.percentual),
     percentual_loja:
       itemSelecionado.tipo_calculo === "lucro"
@@ -93,6 +95,7 @@ export function buildBatchPayload(configuracoesParaSalvar, funcionarioId, regras
     tipo: config.tipo,
     referencia_id: config.referencia_id,
     tipo_calculo: config.tipo_calculo,
+    valor_fixo: parseCommissionNumber(config.valor_fixo),
     percentual: parseFloat(config.percentual),
     percentual_loja: config.percentual_loja ? parseCommissionNumber(config.percentual_loja) : null,
     permite_edicao_venda: config.permite_edicao_venda || false,
@@ -106,6 +109,7 @@ export function buildExistingRulesPayload(config, funcionarioId, regras) {
     tipo: config.tipo,
     referencia_id: config.referencia_id,
     tipo_calculo: config.tipo_calculo,
+    valor_fixo: parseCommissionNumber(config.valor_fixo),
     percentual: parseCommissionNumber(config.percentual),
     percentual_loja: config.percentual_loja ? parseCommissionNumber(config.percentual_loja) : null,
     permite_edicao_venda: config.permite_edicao_venda,
@@ -119,6 +123,7 @@ export function buildSelectedItemPayload(itemSelecionado, funcionarioId, regras)
     tipo: itemSelecionado.tipo,
     referencia_id: itemSelecionado.id,
     tipo_calculo: itemSelecionado.tipo_calculo,
+    valor_fixo: parseCommissionNumber(itemSelecionado.valor_fixo),
     percentual: parseFloat(itemSelecionado.percentual),
     percentual_loja:
       itemSelecionado.tipo_calculo === "lucro" ? parseFloat(itemSelecionado.percentual_loja) : null,

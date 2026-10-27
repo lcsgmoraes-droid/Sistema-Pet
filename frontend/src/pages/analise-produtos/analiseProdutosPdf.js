@@ -32,7 +32,7 @@ export function prepararDadosProdutosPorFornecedorPdf({
     return (
       nomeCadastro(cadastro) ||
       produtos.find((item) => String(item[`${campo}_id`]) === String(id))?.[`${campo}_nome`] ||
-      `Código ${id}`
+      (campo === "fornecedor" ? "Fornecedor sem nome informado" : `Código ${id}`)
     );
   };
   const fornecedor = filtros.fornecedor_id

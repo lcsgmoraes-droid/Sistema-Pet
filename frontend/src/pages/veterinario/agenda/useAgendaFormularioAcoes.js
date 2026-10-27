@@ -60,7 +60,7 @@ export function useAgendaFormularioAcoes({
         setAgendamentoEditandoId(agendamentoBase.id);
         setTutorSelecionado({
           id: agendamentoBase.cliente_id,
-          nome: agendamentoBase.cliente_nome || `Tutor #${agendamentoBase.cliente_id}`,
+          nome: agendamentoBase.cliente_nome || "Tutor não informado",
         });
         setFormNovo({
           pet_id: String(agendamentoBase.pet_id || ""),

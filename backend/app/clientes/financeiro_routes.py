@@ -3,7 +3,7 @@
 import logging
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import or_
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -95,33 +95,62 @@ def get_extrato_credito(
 @router.get("/{cliente_id}/historico-compras")
 async def get_historico_compras(
     cliente_id: int,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+    status_pagamento: str | None = Query(
+        None, pattern="^(em_aberto|parcial|pago|cancelada)$"
+    ),
+    incluir_detalhes: bool = False,
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Retorna o histórico de compras do cliente"""
-    from app.vendas_models import Venda
+    """Retorna compras paginadas e os totais do historico completo."""
+    from app.vendas_models import Venda, VendaItem
+    from app.clientes.historico_compras import status_pagamento_sql
     from app.vendas.status_pagamento import calcular_resumo_pagamento_venda
     from sqlalchemy import desc
 
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
 
-    # Buscar vendas do cliente
-    vendas = (
-        db.query(Venda)
-        .options(selectinload(Venda.contas_receber))
+    consulta = db.query(Venda).filter(
+        Venda.cliente_id == cliente_id, Venda.tenant_id == tenant_id
+    )
+    total_compras, total_gasto, ultima_compra = (
+        db.query(
+            func.count(Venda.id),
+            func.coalesce(
+                func.sum(case((Venda.status == "finalizada", Venda.total), else_=0)), 0
+            ),
+            func.max(Venda.data_venda),
+        )
         .filter(Venda.cliente_id == cliente_id, Venda.tenant_id == tenant_id)
-        .order_by(desc(Venda.data_venda))
+        .one()
+    )
+    total_gasto = float(total_gasto)
+    ticket_medio = total_gasto / total_compras if total_compras > 0 else 0
+    if status_pagamento:
+        pagamentos, contas, expressao_status = status_pagamento_sql(tenant_id)
+        consulta = (
+            consulta.outerjoin(pagamentos, pagamentos.c.venda_id == Venda.id)
+            .outerjoin(contas, contas.c.venda_id == Venda.id)
+            .filter(expressao_status == status_pagamento)
+        )
+    total_filtrado = consulta.count() if status_pagamento else total_compras
+    opcoes = [
+        selectinload(Venda.contas_receber),
+        selectinload(Venda.pagamentos),
+        selectinload(Venda.itens),
+    ]
+    if incluir_detalhes:
+        opcoes.append(selectinload(Venda.itens).joinedload(VendaItem.produto))
+    vendas = (
+        consulta.options(*opcoes)
+        .order_by(desc(Venda.data_venda), desc(Venda.id))
+        .offset((page - 1) * per_page)
+        .limit(per_page)
         .all()
     )
-
-    # Estatísticas
-    total_compras = len(vendas)
-    total_gasto = sum(float(v.total or 0) for v in vendas if v.status == "finalizada")
-    ticket_medio = total_gasto / total_compras if total_compras > 0 else 0
-
-    # Última compra
-    ultima_compra = vendas[0].data_venda if vendas else None
     resumo_pagamento_por_venda = {}
     for venda in vendas:
         resumo_pagamento = calcular_resumo_pagamento_venda(
@@ -142,6 +171,14 @@ async def get_historico_compras(
         "valor_total_gasto": round(total_gasto, 2),
         "ticket_medio": round(ticket_medio, 2),
         "ultima_compra": ultima_compra.isoformat() if ultima_compra else None,
+        "paginacao": {
+            "pagina_atual": page,
+            "itens_por_pagina": per_page,
+            "total_itens": total_filtrado,
+            "total_paginas": (total_filtrado + per_page - 1) // per_page,
+            "tem_proxima": page * per_page < total_filtrado,
+            "tem_anterior": page > 1,
+        },
         # Mantendo estatisticas também para compatibilidade
         "estatisticas": {
             "total_compras": total_compras,
@@ -225,6 +262,7 @@ async def get_historico_compras(
                         "tipo": item.tipo or "produto",
                     }
                     for item in (v.itens or [])
+                    if incluir_detalhes
                 ],
             }
             for v in vendas

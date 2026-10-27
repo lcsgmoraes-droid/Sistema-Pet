@@ -292,6 +292,12 @@ def _enriquecer_itens_promocionais(
             produto, item_modelo, venda, item_snapshot
         )
         item_enriquecido = {**item_snapshot, **info_promocao}
+        if produto is not None:
+            # Produto já vem carregado em lote pelo relatório. Snapshots antigos
+            # não guardavam o código público, mas continuam pesquisáveis por ele.
+            codigo_publico = str(getattr(produto, "codigo", None) or "").strip()
+            if codigo_publico:
+                item_enriquecido["produto_codigo"] = codigo_publico
         quantidade_original = getattr(item_modelo, "quantidade", None)
         if quantidade_original is not None:
             # O snapshot financeiro arredonda quantidades a duas casas. A

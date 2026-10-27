@@ -10,6 +10,7 @@ const InputTexto = forwardRef(function InputTexto(
     help = "",
     id,
     inputMode,
+    inputProps = {},
     label,
     left = null,
     maxLength,
@@ -41,6 +42,7 @@ const InputTexto = forwardRef(function InputTexto(
       ) : null}
       <span className="relative mt-1 block">
         <input
+          {...inputProps}
           ref={ref}
           id={id}
           name={name || id}

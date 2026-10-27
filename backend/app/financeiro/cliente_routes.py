@@ -4,17 +4,41 @@ from datetime import date, datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import desc, func
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import and_, desc, func
+from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
-from app.services.venda_descontos import resumo_descontos_venda
 
 router = APIRouter()
 
 
-@router.get("/cliente/{cliente_id}")
+def _divida_do_cliente(tenant_id):
+    from app.financeiro_models import ContaReceber, FormaPagamento
+    from app.financeiro.recebiveis_operadora import TIPOS_RECEBIVEL_OPERADORA
+
+    # A venda no cartao ja foi paga pelo cliente. O saldo a repassar pertence
+    # a operadora, mesmo quando guarda cliente_id para rastrear a origem.
+    return ~ContaReceber.forma_pagamento.has(
+        and_(
+            FormaPagamento.tenant_id == tenant_id,
+            FormaPagamento.tipo.in_(TIPOS_RECEBIVEL_OPERADORA),
+        )
+    )
+
+
+@router.get(
+    "/cliente/{cliente_id}",
+    responses={
+        400: {
+            "description": (
+                "Filtros inválidos: paginação fora do intervalo, datas fora do "
+                "formato YYYY-MM-DD ou em ordem invertida, ou tipo de movimento "
+                "não suportado."
+            )
+        }
+    },
+)
 async def get_historico_financeiro_cliente(
     cliente_id: int,
     page: int = 1,
@@ -103,131 +127,32 @@ async def get_historico_financeiro_cliente(
                 status_code=400, detail="data_fim inválida (use YYYY-MM-DD)"
             )
 
-    # ========== MONTAR HISTÓRICO COM QUERIES SEPARADAS ==========
-    historico = []
+    from app.financeiro.cliente_historico import consultar_movimentos_cliente
 
-    # ========== BUSCAR APENAS VENDAS (não incluir contas a receber/recebimentos) ==========
-    # Para evitar duplicação, mostramos apenas as vendas que já incluem todas as informações
-
-    # 1. VENDAS FINALIZADAS E EM ABERTO (se não houver filtro de tipo ou tipo=venda)
-    if not tipo or tipo == "venda":
-        query_vendas = (
-            db.query(Venda)
-            .filter(
-                Venda.cliente_id == cliente_id,
-                Venda.tenant_id == tenant_id,
-                Venda.status.notin_(["cancelada", "devolvida"]),
-            )
-            .options(
-                joinedload(
-                    Venda.pagamentos
-                )  # Carregar pagamentos para obter forma de pagamento
-            )
+    if tipo and tipo not in {
+        "venda",
+        "devolucao",
+        "conta_receber",
+        "recebimento",
+        "credito",
+    }:
+        raise HTTPException(status_code=400, detail="Tipo de movimento invalido")
+    if filtro_data_inicio and filtro_data_fim and filtro_data_inicio > filtro_data_fim:
+        raise HTTPException(
+            status_code=400, detail="Data inicial deve ser anterior a data final"
         )
-
-        # Aplicar filtros
-        if filtro_data_inicio:
-            query_vendas = query_vendas.filter(Venda.data_venda >= filtro_data_inicio)
-        if filtro_data_fim:
-            query_vendas = query_vendas.filter(
-                Venda.data_venda < filtro_data_fim + timedelta(days=1)
-            )
-        if status:
-            query_vendas = query_vendas.filter(Venda.status == status)
-
-        vendas = query_vendas.all()
-
-        for venda in vendas:
-            # Obter forma de pagamento do primeiro pagamento (se existir)
-            forma_pagamento = "Não informado"
-            if venda.pagamentos and len(venda.pagamentos) > 0:
-                forma_pagamento = venda.pagamentos[0].forma_pagamento or "Não informado"
-
-            historico.append(
-                {
-                    "tipo": "venda",
-                    "data": venda.data_venda.isoformat() if venda.data_venda else None,
-                    "descricao": f"Venda #{venda.numero_venda}",
-                    "valor": float(venda.total) if venda.total else 0,
-                    "status": venda.status,
-                    "detalhes": {
-                        "venda_id": venda.id,
-                        "numero_venda": venda.numero_venda,
-                        "subtotal": float(venda.subtotal) if venda.subtotal else 0,
-                        "desconto": (
-                            float(venda.desconto_valor) if venda.desconto_valor else 0
-                        ),
-                        **resumo_descontos_venda(venda),
-                        "cupom_discount_applied": float(
-                            venda.cupom_discount_applied or 0
-                        ),
-                        "total": float(venda.total) if venda.total else 0,
-                        "canal": venda.canal,
-                        "forma_pagamento": forma_pagamento,
-                        "observacoes": venda.observacoes,
-                    },
-                }
-            )
-
-    # 2. DEVOLUÇÕES (se não houver filtro de tipo ou tipo=devolucao)
-    if not tipo or tipo == "devolucao":
-        query_devolucoes = (
-            db.query(Venda)
-            .filter(
-                Venda.cliente_id == cliente_id,
-                Venda.tenant_id == tenant_id,
-                Venda.status.in_(["cancelada", "devolvida"]),
-            )
-            .options(joinedload(Venda.pagamentos))
-        )
-
-        if filtro_data_inicio:
-            query_devolucoes = query_devolucoes.filter(
-                Venda.data_venda >= filtro_data_inicio
-            )
-        if filtro_data_fim:
-            query_devolucoes = query_devolucoes.filter(
-                Venda.data_venda < filtro_data_fim + timedelta(days=1)
-            )
-
-        devolucoes = query_devolucoes.all()
-
-        for dev in devolucoes:
-            # Obter forma de pagamento do primeiro pagamento (se existir)
-            forma_pagamento = "Não informado"
-            if dev.pagamentos and len(dev.pagamentos) > 0:
-                forma_pagamento = dev.pagamentos[0].forma_pagamento or "Não informado"
-
-            historico.append(
-                {
-                    "tipo": "devolucao",
-                    "data": dev.data_venda.isoformat() if dev.data_venda else None,
-                    "descricao": f"Devolução - Venda #{dev.numero_venda}",
-                    "valor": -float(dev.total) if dev.total else 0,
-                    "status": dev.status,
-                    "detalhes": {
-                        "numero_venda": dev.numero_venda,
-                        "total": float(dev.total) if dev.total else 0,
-                        "motivo": dev.observacoes,
-                        "forma_pagamento": forma_pagamento,
-                    },
-                }
-            )
-
-    # ========== NOTA: Removido contas a receber e recebimentos ==========
-    # Para evitar duplicação, mostramos apenas as vendas.
-    # As vendas já indicam se estão pagas (status=finalizada) ou em aberto (status=aberta)
-
-    # ========== ORDENAR POR DATA (DESC) ==========
-    historico.sort(key=lambda x: x["data"] if x["data"] else "", reverse=True)
-
-    # ========== APLICAR PAGINAÇÃO ==========
-    total_items = len(historico)
+    historico_paginado, total_items = consultar_movimentos_cliente(
+        db,
+        tenant_id=tenant_id,
+        cliente_id=cliente_id,
+        page=page,
+        per_page=per_page,
+        data_inicio=filtro_data_inicio,
+        data_fim=filtro_data_fim + timedelta(days=1) if filtro_data_fim else None,
+        tipo=tipo,
+        status=status,
+    )
     total_pages = (total_items + per_page - 1) // per_page
-
-    start_idx = (page - 1) * per_page
-    end_idx = start_idx + per_page
-    historico_paginado = historico[start_idx:end_idx]
 
     # ========== CALCULAR RESUMO (últimos 90 dias) ==========
     data_90_dias_atras = date.today() - timedelta(days=90)
@@ -255,7 +180,10 @@ async def get_historico_financeiro_cliente(
         .filter(
             ContaReceber.cliente_id == cliente_id,
             ContaReceber.tenant_id == tenant_id,
-            ContaReceber.status.in_(("pendente", "parcial", "vencido", "vencida")),
+            ContaReceber.status.in_(
+                ("pendente", "parcial", "baixa_parcial", "vencido", "vencida")
+            ),
+            _divida_do_cliente(tenant_id),
         )
         .scalar()
         or 0
@@ -263,7 +191,7 @@ async def get_historico_financeiro_cliente(
 
     # Última compra
     ultima_venda = (
-        db.query(Venda)
+        db.query(Venda.data_venda, Venda.total, Venda.numero_venda)
         .filter(
             Venda.cliente_id == cliente_id,
             Venda.tenant_id == tenant_id,
@@ -398,7 +326,10 @@ async def get_resumo_financeiro_cliente(
         .filter(
             ContaReceber.cliente_id == cliente_id,
             ContaReceber.tenant_id == tenant_id,
-            ContaReceber.status.in_(("pendente", "parcial", "vencido", "vencida")),
+            ContaReceber.status.in_(
+                ("pendente", "parcial", "baixa_parcial", "vencido", "vencida")
+            ),
+            _divida_do_cliente(tenant_id),
         )
         .scalar()
         or 0
@@ -414,7 +345,10 @@ async def get_resumo_financeiro_cliente(
         .filter(
             ContaReceber.cliente_id == cliente_id,
             ContaReceber.tenant_id == tenant_id,
-            ContaReceber.status.in_(("pendente", "parcial", "vencido", "vencida")),
+            ContaReceber.status.in_(
+                ("pendente", "parcial", "baixa_parcial", "vencido", "vencida")
+            ),
+            _divida_do_cliente(tenant_id),
             ContaReceber.data_vencimento < date.today(),
         )
         .scalar()
@@ -423,7 +357,7 @@ async def get_resumo_financeiro_cliente(
 
     # 5. Última compra (só buscar 1 registro)
     ultima_venda = (
-        db.query(Venda)
+        db.query(Venda.data_venda, Venda.total, Venda.numero_venda)
         .filter(
             Venda.cliente_id == cliente_id,
             Venda.tenant_id == tenant_id,

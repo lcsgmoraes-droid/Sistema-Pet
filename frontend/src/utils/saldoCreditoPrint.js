@@ -1,3 +1,4 @@
+import { obterCodigoPessoaPublico } from "./codigosPublicos.js";
 import { formatMoneyBRL } from "./formatters.js";
 
 const LARGURA = 42;
@@ -35,7 +36,7 @@ function quebrar(texto) {
 
 export function montarTextoSaldoCredito(cliente, saldo, emitidoEm = new Date()) {
   const separador = "-".repeat(LARGURA);
-  const codigo = cliente?.codigo || cliente?.id || "-";
+  const codigo = obterCodigoPessoaPublico(cliente) || "-";
   return [
     centralizar("PET SHOP PRO"),
     centralizar("COMPROVANTE DE CREDITO"),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import unicodedata
 from typing import Optional
 
 from sqlalchemy import case, func, or_
@@ -130,6 +131,18 @@ def _produto_search_exact_conditions(termo_busca: Optional[str]):
     return or_(*conditions)
 
 
+def _produto_search_prefix_conditions(termo_busca: Optional[str]):
+    """Garante prefixos relevantes mesmo fora do conjunto limitado de candidatos."""
+    termo = (termo_busca or "").strip()
+    if not termo:
+        return False
+    prefixo = f"{termo}%"
+    return or_(
+        *[column.ilike(prefixo) for column in PRODUTO_CODIGO_EXATO_COLUMNS],
+        _unaccent_ilike(Produto.nome, prefixo),
+    )
+
+
 def _scale_code_variants(codigo_balanca: str) -> tuple[str, ...]:
     """Representacoes de um codigo da balanca com zeros a esquerda opcionais."""
     if len(codigo_balanca) != 6 or not codigo_balanca.isdigit():
@@ -177,8 +190,20 @@ def _valores_codigo_produto(produto) -> list[str]:
 
 def _produto_search_sort_key(produto, termo_busca: Optional[str]):
     """Replica em memória a prioridade da busca sem ordenar milhares de linhas no banco."""
-    termo = (termo_busca or "").strip().lower()
-    nome = str(getattr(produto, "nome", "") or "").strip().lower()
+
+    def normalizar(valor):
+        return (
+            "".join(
+                ch
+                for ch in unicodedata.normalize("NFD", str(valor or ""))
+                if not unicodedata.combining(ch)
+            )
+            .strip()
+            .lower()
+        )
+
+    termo = normalizar(termo_busca)
+    nome = normalizar(getattr(produto, "nome", ""))
     codigos = _valores_codigo_produto(produto)
 
     if termo and termo in codigos:
@@ -189,6 +214,11 @@ def _produto_search_sort_key(produto, termo_busca: Optional[str]):
         prioridade = 2
     elif termo and nome.startswith(termo):
         prioridade = 3
+    elif termo and all(
+        any(parte.startswith(palavra) for parte in nome.split())
+        for palavra in termo.split()
+    ):
+        prioridade = 4
     elif termo and any(termo in codigo for codigo in codigos):
         prioridade = 4
     elif termo and termo in nome:
@@ -276,7 +306,7 @@ def _produto_search_conditions_fast(palavra: str):
             for column in PRODUTO_EAN_SEARCH_COLUMNS
             if column is not PRODUTO_EAN_ALTERNATIVO_COLUMN
         ],
-        Produto.nome.ilike(contains_pattern),
+        _unaccent_ilike(Produto.nome, contains_pattern),
     ]
 
     if PRODUTO_SKU_COLUMN is not None:

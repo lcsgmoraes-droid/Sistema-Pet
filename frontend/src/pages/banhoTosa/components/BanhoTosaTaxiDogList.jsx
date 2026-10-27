@@ -84,7 +84,7 @@ function TaxiCard({ item, saving, onAtualizarMedicao, onSalvarMedicao, onStatus 
                 <span>/</span>
                 <CustomerIdentity
                   codeLabel="Cod. tutor"
-                  fallback={`Tutor #${item.cliente_id || "-"}`}
+                  fallback={"Tutor não informado"}
                   layout="inline"
                   nameClassName="font-semibold text-slate-900"
                   record={item}

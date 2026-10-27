@@ -47,6 +47,12 @@ class RecebimentoCreate(BaseModel):
     valor_recebido: float = Field(ge=0)
     data_recebimento: date
     forma_pagamento_id: Optional[int] = None
+    caixa_id: Optional[int] = Field(default=None, gt=0)
+    conta_bancaria_id: Optional[int] = Field(default=None, gt=0)
+    numero_parcelas: int = Field(default=1, ge=1, le=60)
+    operadora_id: Optional[int] = Field(default=None, gt=0)
+    bandeira: Optional[str] = Field(default=None, max_length=30)
+    nsu_cartao: Optional[str] = Field(default=None, max_length=100)
     valor_juros: float = Field(default=0, ge=0)
     valor_multa: float = Field(default=0, ge=0)
     valor_desconto: float = Field(default=0, ge=0)
@@ -59,6 +65,12 @@ class RecebimentoLoteCreate(BaseModel):
     conta_ids: List[int] = Field(min_length=1, max_length=500)
     data_recebimento: date
     forma_pagamento_id: Optional[int] = None
+    caixa_id: Optional[int] = Field(default=None, gt=0)
+    conta_bancaria_id: Optional[int] = Field(default=None, gt=0)
+    numero_parcelas: int = Field(default=1, ge=1, le=60)
+    operadora_id: Optional[int] = Field(default=None, gt=0)
+    bandeira: Optional[str] = Field(default=None, max_length=30)
+    nsu_cartao: Optional[str] = Field(default=None, max_length=100)
     observacoes: Optional[str] = None
     aplicar_encargos_automaticos: bool = True
 

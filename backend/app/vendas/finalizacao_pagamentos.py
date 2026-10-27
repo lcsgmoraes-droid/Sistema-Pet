@@ -411,6 +411,7 @@ def processar_pagamentos_finalizacao(
     db: Session,
     caixa_aberto_id: int,
     data_ocorrencia=None,
+    baixa_lote_id=None,
 ) -> List[int]:
     from app.caixa.service import CaixaService
     from app.campaigns.models import (
@@ -436,7 +437,7 @@ def processar_pagamentos_finalizacao(
         normalize_card_brand,
         resolve_card_fee,
     )
-    from app.vendas_models import Venda, VendaPagamento
+    from app.vendas_models import VendaPagamento
 
     movimentacoes_caixa_ids: List[int] = []
     tem_cashback = any(
@@ -646,31 +647,19 @@ def processar_pagamentos_finalizacao(
                     f"{operadora.max_parcelas}x. Você tentou {numero_parcelas}x.",
                 )
 
-        nsu_informado = pag_data.get("nsu_cartao")
-        if nsu_informado and operadora_id:
-            nsu_duplicado = (
-                db.query(VendaPagamento)
-                .filter(
-                    VendaPagamento.tenant_id == tenant_id,
-                    VendaPagamento.nsu_cartao == nsu_informado,
-                    VendaPagamento.operadora_id == operadora_id,
-                )
-                .first()
-            )
+        from app.financeiro.recebimento_nsu import validar_nsu_recebimento
 
-            if nsu_duplicado:
-                venda_duplicada = (
-                    db.query(Venda).filter_by(id=nsu_duplicado.venda_id).first()
-                )
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"❌ NSU DUPLICADO: O NSU '{nsu_informado}' já está vinculado à "
-                    f"Venda {venda_duplicada.numero_venda if venda_duplicada else nsu_duplicado.venda_id}. "
-                    f"Cada NSU deve ser usado apenas uma vez por operadora.",
-                )
+        validar_nsu_recebimento(
+            db,
+            tenant_id=tenant_id,
+            operadora_id=operadora_id,
+            nsu=pag_data.get("nsu_cartao"),
+            baixa_lote_id=baixa_lote_id,
+        )
 
         pagamento = VendaPagamento(
             caixa_id=caixa_aberto_id,
+            baixa_lote_id=baixa_lote_id,
             **_montar_campos_venda_pagamento(
                 venda_id=venda.id,
                 tenant_id=tenant_id,

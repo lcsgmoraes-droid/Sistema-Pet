@@ -1,3 +1,4 @@
+import { obterCodigoPessoaPublico } from "../utils/codigosPublicos";
 import { useState, useEffect } from "react";
 import {
   FileText,
@@ -326,7 +327,7 @@ export default function NotasFiscais() {
                   </td>
                   <td className="px-6 py-4">
                     <CustomerIdentity
-                      code={nota.cliente?.codigo || nota.cliente_id || nota.cliente?.id}
+                      code={obterCodigoPessoaPublico(nota)}
                       customer={nota.cliente}
                       nameClassName="font-medium text-gray-900"
                     />
@@ -450,11 +451,7 @@ export default function NotasFiscais() {
                   <label className="text-sm font-medium text-gray-600">Cliente</label>
                   <p className="text-gray-900">
                     <CustomerIdentity
-                      code={
-                        notaSelecionada.cliente?.codigo ||
-                        notaSelecionada.cliente_id ||
-                        notaSelecionada.cliente?.id
-                      }
+                      code={obterCodigoPessoaPublico(notaSelecionada)}
                       customer={notaSelecionada.cliente}
                       fallback="N/A"
                     />
@@ -526,11 +523,7 @@ export default function NotasFiscais() {
                 <p className="text-sm text-gray-600">
                   <strong>Cliente:</strong>{" "}
                   <CustomerIdentity
-                    code={
-                      modalCancelar.cliente?.codigo ||
-                      modalCancelar.cliente_id ||
-                      modalCancelar.cliente?.id
-                    }
+                    code={obterCodigoPessoaPublico(modalCancelar)}
                     customer={modalCancelar.cliente}
                     fallback="N/A"
                     layout="inline"

@@ -319,12 +319,16 @@ const ComissoesFechamentoDetalhe = () => {
                         {comissao.quantidade}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm text-gray-900">
-                        {formatarMoeda(
-                          comissao.valor_venda_snapshot ?? comissao.valor_base_calculo,
-                        )}
+                        {comissao.tipo_calculo === "fixo"
+                          ? `${Number(comissao.valor_base_calculo).toLocaleString("pt-BR", { maximumFractionDigits: 3 })} un.`
+                          : formatarMoeda(
+                              comissao.valor_venda_snapshot ?? comissao.valor_base_calculo,
+                            )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-center text-sm text-gray-600">
-                        {comissao.percentual_snapshot ?? comissao.percentual_comissao}%
+                        {comissao.tipo_calculo === "fixo"
+                          ? `${formatarMoeda(comissao.valor_fixo)} / un.`
+                          : `${comissao.percentual_snapshot ?? comissao.percentual_comissao}%`}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-semibold text-green-600">
                         {formatarMoeda(comissao.valor_comissao ?? comissao.valor_comissao_gerada)}

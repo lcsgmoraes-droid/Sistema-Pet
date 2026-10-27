@@ -554,6 +554,7 @@ def test_comissao_recebe_liquido_do_proprio_item_sem_ratear_di(
                     g,
                     c,
                     1,
+                    datetime(2026, 10, 9),
                 )
             )
         if "COUNT(*)" in sql:
@@ -573,11 +574,15 @@ def test_comissao_recebe_liquido_do_proprio_item_sem_ratear_di(
             "valor_comissao": liquido / 10,
             "tipo_calculo": "percentual",
             "percentual": 10,
+            "valor_fixo": 0,
             "valor_liquido": liquido,
             "custo_item": 0,
         }
 
     monkeypatch.setattr(comissoes, "execute_tenant_safe", executar)
+    monkeypatch.setattr(
+        comissoes, "carregar_configuracoes_vigentes", lambda *a, **kw: {}
+    )
     monkeypatch.setattr(
         comissoes,
         "buscar_configuracao_comissao",

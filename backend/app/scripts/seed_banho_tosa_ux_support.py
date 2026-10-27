@@ -31,11 +31,34 @@ def ensure_person(
     codigo: str,
     nome: str,
     tipo: str,
+    telefone: str,
     is_entregador: bool = False,
 ) -> int:
     # tipo e sempre um literal interno fixo deste script (nunca entrada de
     # usuario), seguro pra entrar no nome da coluna.
     campo_flag = CAMPO_FLAG_POR_TIPO[tipo]
+    existente = one(
+        db,
+        "SELECT id FROM clientes WHERE tenant_id = :tenant_id AND codigo = :codigo",
+        {"tenant_id": tenant_id, "codigo": codigo},
+    )
+    if existente:
+        db.execute(
+            text(f"""
+            UPDATE clientes SET nome = :nome, {campo_flag} = true,
+                telefone = :telefone, is_entregador = :is_entregador,
+                entregador_ativo = true, ativo = true, updated_at = CURRENT_TIMESTAMP
+            WHERE id = :id AND tenant_id = :tenant_id
+        """),
+            {
+                "id": existente["id"],
+                "tenant_id": tenant_id,
+                "nome": nome,
+                "telefone": telefone,
+                "is_entregador": is_entregador,
+            },
+        )
+        return int(existente["id"])
     return int(
         db.execute(
             text(
@@ -51,19 +74,12 @@ def ensure_person(
                     parceiro_dia_acerto, parceiro_notificar, ativo, credito
                 ) VALUES (
                     :tenant_id, :user_id, :codigo, true, 'PF', :nome,
-                    '(11) 90000-0000', 'Rua das Acacias', '120', 'Centro',
+                    :telefone, 'Rua das Acacias', '120', 'Centro',
                     'Sao Paulo', 'SP', '01001-000', :is_entregador, false,
                     :is_entregador, :is_entregador, :is_entregador,
                     true, :is_entregador, false, :is_entregador, true, true,
                     'automatico', 0, false, 'mensal', 1, true, true, 0
                 )
-                ON CONFLICT (tenant_id, codigo) DO UPDATE SET
-                    nome = EXCLUDED.nome,
-                    {campo_flag} = true,
-                    is_entregador = EXCLUDED.is_entregador,
-                    entregador_ativo = true,
-                    ativo = true,
-                    updated_at = now()
                 RETURNING id
                 """
             ),
@@ -72,6 +88,7 @@ def ensure_person(
                 "user_id": user_id,
                 "codigo": codigo,
                 "nome": nome,
+                "telefone": telefone,
                 "is_entregador": is_entregador,
             },
         ).scalar_one()

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth import hash_password, verify_password
+from app.clientes.common import _somente_digitos_coluna
 from app.db import get_session
 from app.models import (
     AppAccessProfile,
@@ -18,12 +19,9 @@ from app.models import (
 )
 from app.pedido_models import Pedido, PedidoItem
 from app.routes.ecommerce_auth_cliente import (
-    _copy_missing_cliente_fields,
     _digits_only,
     _extract_ecommerce_delivery_details,
-    _find_cliente_match,
     _get_or_create_cliente_for_user,
-    _select_preferred_cliente,
     _upsert_delivery_details,
 )
 from app.routes.ecommerce_auth_common import (
@@ -43,7 +41,7 @@ from app.services.app_access_profile_service import (
     resolve_user_app_profiles,
 )
 from app.services.lgpd_service import PrivacyOpsService, utcnow
-from app.services.pessoa_merge_service import executar_fusao_pessoas
+from app.services.pessoa_telefone import validar_telefones_pessoa
 
 router = APIRouter()
 
@@ -270,87 +268,53 @@ def atualizar_perfil(
             detail="Informe nome completo (nome e sobrenome)",
         )
 
-    current_user.nome = nome_final
-    cliente.nome = nome_final
-
     if payload.telefone is not None:
         telefone = payload.telefone.strip()
         if len(_digits_only(telefone)) < 10:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Telefone obrigatorio"
             )
-        current_user.telefone = telefone or None
-        cliente.telefone = telefone or None
+        validar_telefones_pessoa(
+            db,
+            cliente.tenant_id,
+            pessoa_atual=cliente,
+            telefone=telefone or None,
+        )
     elif len(_digits_only(current_user.telefone or cliente.telefone)) < 10:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Telefone obrigatorio"
         )
 
+    if payload.cpf is not None and _digits_only(payload.cpf) != _digits_only(
+        cliente.cpf
+    ):
+        potential_match = (
+            db.query(Cliente.id)
+            .filter(
+                Cliente.tenant_id == cliente.tenant_id,
+                Cliente.id != cliente.id,
+                Cliente.merged_into_id.is_(None),
+                _somente_digitos_coluna(Cliente.cpf) == _digits_only(payload.cpf),
+            )
+            .first()
+            if _digits_only(payload.cpf)
+            else None
+        )
+        if potential_match:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Este CPF já está vinculado a outro cadastro. Revise em Pessoas.",
+            )
+
+    current_user.nome = nome_final
+    cliente.nome = nome_final
+    if payload.telefone is not None:
+        current_user.telefone = telefone or None
+        cliente.telefone = telefone or None
     if payload.cpf is not None:
         cpf = payload.cpf.strip()
         current_user.cpf_cnpj = cpf or None
         cliente.cpf = cpf or None
-
-    potential_match = _find_cliente_match(
-        db,
-        tenant_id=str(current_user.tenant_id),
-        user_id=current_user.id,
-        email=current_user.email,
-        cpf=current_user.cpf_cnpj,
-        telefone=current_user.telefone,
-        exclude_cliente_id=cliente.id,
-    )
-
-    if potential_match and potential_match.id != cliente.id:
-        canonical_cliente = (
-            _select_preferred_cliente(
-                [cliente, potential_match],
-                email=current_user.email,
-                cpf=current_user.cpf_cnpj,
-                telefone=current_user.telefone,
-                prefer_operational=True,
-            )
-            or cliente
-        )
-        previous_cliente = (
-            potential_match if canonical_cliente.id == cliente.id else cliente
-        )
-
-        contas_encontradas = {
-            int(conta_id)
-            for conta_id in (
-                getattr(canonical_cliente, "auth_user_id", None),
-                getattr(previous_cliente, "auth_user_id", None),
-            )
-            if conta_id
-        }
-        if contas_encontradas - {int(current_user.id)}:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    "Encontramos outro cadastro ligado a uma conta diferente. "
-                    "Revise os acessos em Pessoas antes de continuar."
-                ),
-            )
-
-        _copy_missing_cliente_fields(canonical_cliente, previous_cliente)
-        previous_cliente.auth_user_id = None
-        db.flush()
-        canonical_cliente.auth_user_id = current_user.id
-        canonical_cliente.ativo = True
-        executar_fusao_pessoas(
-            db,
-            tenant_id=str(current_user.tenant_id),
-            principal_id=canonical_cliente.id,
-            duplicado_id=previous_cliente.id,
-            decisoes_campos={},
-            user_id=current_user.id,
-            observacao="Unificacao segura durante atualizacao do perfil do app.",
-            modo="ecommerce_perfil",
-            motivo="identidade_confirmada_no_app",
-            commit=False,
-        )
-        cliente = canonical_cliente
 
     if payload.endereco is not None:
         cliente.endereco = payload.endereco.strip() or None

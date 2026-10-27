@@ -104,6 +104,7 @@ export default function GrupoReposicaoInteligenteTab({ grupoId, periodoDias }) {
       </Panel>
 
       <GrupoAnaliseFiltros
+        entidadeBusca="produto"
         busca={busca}
         carregando={carregando}
         empresas={[]}

@@ -5,6 +5,9 @@ import toast from "react-hot-toast";
 import api from "../../api";
 import { safeArray } from "../../utils/safeArray";
 import ActionButton from "../ui/ActionButton";
+import BuscaPessoa from "../v2/BuscaPessoa/BuscaPessoa";
+import InputCombobox from "../v2/InputCombobox/InputCombobox";
+import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
 
 const CANAIS_RECEBER = [
   { id: "todos", label: "Todos" },
@@ -74,7 +77,7 @@ function PainelResumo({ titulo, valor, detalhe, destaque = "slate", onClick }) {
   };
 
   return (
-    <button
+    <BotaoInteracao
       type="button"
       onClick={onClick}
       className={`min-h-[96px] rounded-lg border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
@@ -84,7 +87,7 @@ function PainelResumo({ titulo, valor, detalhe, destaque = "slate", onClick }) {
       <div className="text-xs font-semibold uppercase">{titulo}</div>
       <div className="mt-2 text-xl font-bold leading-tight">{valor}</div>
       <div className="mt-1 text-xs opacity-80">{detalhe}</div>
-    </button>
+    </BotaoInteracao>
   );
 }
 
@@ -143,31 +146,6 @@ export default function ContasReceberAnalise({
     });
     return Array.from(porId.values());
   }, [clientes, clientesSelecionados, filtros.cliente_ids]);
-
-  const clientesFiltrados = useMemo(() => {
-    const termo = filtros.cliente_busca.trim().toLocaleLowerCase("pt-BR");
-    if (termo.length < 2) return [];
-
-    return safeArray(clientes)
-      .filter((cliente) => {
-        if (filtros.cliente_ids.includes(String(cliente.id))) return false;
-        const haystack = [
-          cliente?.nome,
-          cliente?.razao_social,
-          cliente?.nome_fantasia,
-          cliente?.fantasia,
-          cliente?.cpf,
-          cliente?.cnpj,
-          cliente?.telefone,
-          cliente?.celular,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLocaleLowerCase("pt-BR");
-        return haystack.includes(termo);
-      })
-      .slice(0, 12);
-  }, [clientes, filtros.cliente_busca, filtros.cliente_ids]);
 
   const carregarAnalise = async (filtrosParaAplicar = filtros) => {
     try {
@@ -268,76 +246,54 @@ export default function ContasReceberAnalise({
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Cliente</label>
-            <select
+            <InputCombobox
+              id="receber-analise-modo"
+              label="Modo de filtro"
               value={filtros.cliente_modo}
-              onChange={(event) => setFiltros({ ...filtros, cliente_modo: event.target.value })}
-              className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm"
-            >
-              <option value="incluir">Incluir selecionados</option>
-              <option value="excluir">Excluir selecionados</option>
-            </select>
-          </div>
-          <div className="relative md:col-span-2">
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Adicionar cliente
-            </label>
-            <input
-              type="text"
-              value={filtros.cliente_busca}
-              onChange={(event) => setFiltros({ ...filtros, cliente_busca: event.target.value })}
-              placeholder="Buscar cliente para incluir/excluir..."
-              className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm"
+              permitirLimpar={false}
+              opcoes={[
+                { value: "incluir", label: "Incluir selecionados" },
+                { value: "excluir", label: "Excluir selecionados" },
+              ]}
+              onChange={(cliente_modo) => setFiltros((atual) => ({ ...atual, cliente_modo }))}
             />
-            {clientesFiltrados.length > 0 ? (
-              <div className="absolute z-20 mt-2 max-h-72 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
-                {clientesFiltrados.map((cliente) => (
-                  <button
-                    key={cliente.id}
-                    type="button"
-                    onClick={() => selecionarCliente(cliente)}
-                    className="w-full border-b border-slate-100 px-4 py-3 text-left last:border-b-0 hover:bg-slate-50"
-                  >
-                    <div className="font-medium text-slate-900">{getClienteNome(cliente)}</div>
-                    <div className="text-xs text-slate-500">
-                      {[cliente.cpf || cliente.cnpj, cliente.telefone || cliente.celular]
-                        .filter(Boolean)
-                        .join(" - ")}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            ) : null}
+          </div>
+          <div className="md:col-span-2">
+            <BuscaPessoa
+              label="Adicionar cliente"
+              value={filtros.cliente_busca}
+              showSuggestions
+              autoSearch
+              onChange={(cliente_busca) => setFiltros((atuais) => ({ ...atuais, cliente_busca }))}
+              onSelect={selecionarCliente}
+              placeholder="Código, nome, CPF/CNPJ ou telefone..."
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Forma pagamento</label>
-            <select
+            <InputCombobox
+              id="receber-analise-forma"
+              label="Forma de pagamento"
               value={filtros.forma_pagamento_id}
-              onChange={(event) =>
-                setFiltros({ ...filtros, forma_pagamento_id: event.target.value })
+              opcoes={safeArray(formasPagamento).map((forma) => ({
+                value: forma.id,
+                label: forma.nome,
+              }))}
+              onChange={(forma_pagamento_id) =>
+                setFiltros((atual) => ({ ...atual, forma_pagamento_id: forma_pagamento_id || "" }))
               }
-              className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm"
-            >
-              <option value="">Todas</option>
-              {safeArray(formasPagamento).map((forma) => (
-                <option key={forma.id} value={forma.id}>
-                  {forma.nome}
-                </option>
-              ))}
-            </select>
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Canal</label>
-            <select
+            <InputCombobox
+              id="receber-analise-canal"
+              label="Canal"
               value={filtros.canal}
-              onChange={(event) => setFiltros({ ...filtros, canal: event.target.value })}
-              className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm"
-            >
-              {CANAIS_RECEBER.map((canal) => (
-                <option key={canal.id} value={canal.id}>
-                  {canal.label}
-                </option>
-              ))}
-            </select>
+              permitirLimpar={false}
+              opcoes={CANAIS_RECEBER.map((canal) => ({ value: canal.id, label: canal.label }))}
+              onChange={(canal) => setFiltros((atual) => ({ ...atual, canal }))}
+            />
           </div>
         </div>
 
@@ -348,14 +304,14 @@ export default function ContasReceberAnalise({
               className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-sm font-medium text-blue-800"
             >
               {getClienteNome(cliente)}
-              <button
+              <BotaoInteracao
                 type="button"
                 onClick={() => removerCliente(cliente.id)}
                 className="rounded-full p-0.5 hover:bg-blue-100"
                 title="Remover cliente"
               >
                 <X className="h-3.5 w-3.5" />
-              </button>
+              </BotaoInteracao>
             </span>
           ))}
           {clientesSelecionadosResolvidos.length === 0 ? (

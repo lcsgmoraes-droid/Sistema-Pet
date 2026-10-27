@@ -14,6 +14,11 @@ from app.evolucao_corepet import registrar_uso_funcionalidade
 from app.models import Cliente, ClienteContato, User
 from app.routes.ecommerce_auth import _get_current_ecommerce_user
 from app.services.cliente_origem import opcoes_origem_cliente
+from app.services.pessoa_telefone import (
+    PessoaTelefoneDuplicado,
+    erro_telefone_duplicado,
+    validar_telefones_pessoa,
+)
 
 from .auth import _get_funcionario_operacional_or_403
 from .common import _somente_digitos_funcionario_pdv
@@ -202,9 +207,10 @@ def criar_cliente_rapido_funcionario_pdv(
     """Cria uma pessoa sem tirar o funcionario da venda atual."""
 
     _funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
+    telefone = _somente_digitos_funcionario_pdv(payload.telefone) or None
+    validar_telefones_pessoa(db, tenant_id, telefone=telefone)
     codigo = gerar_codigo_cliente(db, "PF", tenant_id)
     nome = (payload.nome or "").strip() or f"Cliente {codigo}"
-    telefone = _somente_digitos_funcionario_pdv(payload.telefone) or None
     endereco = (payload.endereco or "").strip() or None
     cliente = Cliente(
         origem_cliente=payload.origem_cliente,
@@ -223,6 +229,8 @@ def criar_cliente_rapido_funcionario_pdv(
         db.commit()
     except IntegrityError as exc:
         db.rollback()
+        if erro_telefone_duplicado(exc):
+            raise PessoaTelefoneDuplicado() from exc
         raise HTTPException(
             status_code=409,
             detail="Nao foi possivel gerar o codigo da pessoa. Tente novamente.",

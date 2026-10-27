@@ -53,6 +53,7 @@ export const atualizarVenda = async (vendaId, dados) => {
  */
 export const finalizarVenda = async (vendaId, pagamentos, options = {}) => {
   const response = await api.post(`/vendas/${vendaId}/finalizar`, {
+    caixa_id: options.caixa_id || null,
     pagamentos,
     cupom_code: options.cupom_code || null,
     cupom_discount_applied: options.cupom_discount_applied ?? null,

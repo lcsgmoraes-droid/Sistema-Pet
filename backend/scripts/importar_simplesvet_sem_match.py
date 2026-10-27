@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+from contextlib import ExitStack
 import re
 import sys
 import unicodedata
@@ -31,6 +32,8 @@ if str(BACKEND_ROOT) not in sys.path:
 from app.db import SessionLocal
 from app.models import Cliente, User
 from app.produtos_models import Categoria, Marca, Produto, ProdutoFornecedor
+from app.tenancy.context import tenant_context
+from app.tenancy.rls import sync_rls_tenant
 
 
 @dataclass
@@ -232,6 +235,7 @@ def run(args: argparse.Namespace) -> None:
 
     output_dir = Path(args.output_dir).resolve()
     db = resolve_session(args.database_url)
+    tenant_scope = ExitStack()
     created_rows: list[dict] = []
     skipped_rows: list[dict] = []
 
@@ -239,6 +243,8 @@ def run(args: argparse.Namespace) -> None:
         tenant_id = (
             UUID(args.tenant_id) if args.tenant_id else detect_single_tenant_id(db)
         )
+        tenant_scope.enter_context(tenant_context(tenant_id))
+        sync_rls_tenant(db, tenant_id)
 
         user = (
             db.query(User)
@@ -450,6 +456,7 @@ def run(args: argparse.Namespace) -> None:
         print(f"Relatorios em: {output_dir}")
     finally:
         db.close()
+        tenant_scope.close()
 
 
 def build_parser() -> argparse.ArgumentParser:
