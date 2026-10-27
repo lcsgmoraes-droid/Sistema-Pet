@@ -51,6 +51,8 @@ class BanhoTosaAgendamentoServicoResponse(BaseModel):
     valor_unitario: Decimal
     desconto: Decimal
     tempo_previsto_minutos: int
+    pacote_credito_id: Optional[int] = None
+    pacote_quantidade: Decimal = Decimal("0")
 
     class Config:
         from_attributes = True

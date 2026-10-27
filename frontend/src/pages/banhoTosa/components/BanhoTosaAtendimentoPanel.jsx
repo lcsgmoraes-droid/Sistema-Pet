@@ -1,17 +1,16 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
 import {
   AlertTriangle,
   Camera,
-  CheckCircle2,
   ClipboardList,
-  ExternalLink,
   PackagePlus,
-  Receipt,
   RefreshCw,
   Trash2,
   X,
 } from "lucide-react";
+import BotaoInteracao from "../../../components/v2/BotaoInteracao/BotaoInteracao";
 import ActionButton from "../../../components/ui/ActionButton";
 import { CheckboxField, SelectField, TextField } from "../../../components/ui/FormField";
 import PetAvatar from "../../../components/ui/PetAvatar";
@@ -19,6 +18,9 @@ import { formatMoneyBRL } from "../../../utils/formatters";
 import { resolveMediaUrl } from "../../../utils/mediaUrl";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { formatNumber, getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
+
+import Fechamento from "./BanhoTosaAtendimentoFechamento";
+import ResumoCard from "./BanhoTosaAtendimentoResumoCard";
 
 const ABAS = [
   { id: "resumo", label: "Resumo" },
@@ -49,10 +51,24 @@ export default function BanhoTosaAtendimentoPanel({
   }, [atendimentoId, initialTab]);
 
   useEffect(() => {
-    carregarFicha();
+    let ativo = true;
+    setDados(null);
+    void carregarFicha(false, () => ativo);
+    return () => {
+      ativo = false;
+    };
   }, [atendimentoId]);
 
-  async function carregarFicha(silent = false) {
+  useEffect(() => {
+    function fecharComEscape(event) {
+      if (event.key === "Escape" && !document.querySelector('[data-modal-panel="corepet-dialog"]'))
+        onClose?.();
+    }
+    document.addEventListener("keydown", fecharComEscape);
+    return () => document.removeEventListener("keydown", fecharComEscape);
+  }, [onClose]);
+
+  async function carregarFicha(silent = false, ativo = () => true) {
     if (!silent) setLoading(true);
     try {
       const [atendimentoRes, insumosRes, ocorrenciasRes, fotosRes, custoRes] = await Promise.all([
@@ -62,15 +78,17 @@ export default function BanhoTosaAtendimentoPanel({
         banhoTosaApi.listarFotosAtendimento(atendimentoId),
         banhoTosaApi.obterCustoAtendimento(atendimentoId),
       ]);
+      if (!ativo()) return;
       setDados(atendimentoRes.data || null);
       setInsumos(Array.isArray(insumosRes.data) ? insumosRes.data : []);
       setOcorrencias(Array.isArray(ocorrenciasRes.data) ? ocorrenciasRes.data : []);
       setFotos(Array.isArray(fotosRes.data) ? fotosRes.data : []);
       setCusto(custoRes.data || null);
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Não foi possível carregar a ficha operacional."));
+      if (ativo())
+        toast.error(getApiErrorMessage(error, "Não foi possível carregar a ficha operacional."));
     } finally {
-      setLoading(false);
+      if (ativo()) setLoading(false);
     }
   }
 
@@ -81,8 +99,10 @@ export default function BanhoTosaAtendimentoPanel({
       toast.success(mensagem);
       await carregarFicha(true);
       await onChanged?.();
+      return true;
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Não foi possível concluir a operação."));
+      return false;
     } finally {
       setSaving("");
     }
@@ -90,8 +110,8 @@ export default function BanhoTosaAtendimentoPanel({
 
   if (!atendimentoId) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-[1px]">
+  return createPortal(
+    <div className="fixed inset-0 z-[80] bg-slate-950/40 backdrop-blur-[1px]">
       <aside
         aria-label="Ficha operacional do atendimento"
         aria-modal="true"
@@ -115,28 +135,28 @@ export default function BanhoTosaAtendimentoPanel({
               </div>
             </div>
             <div className="flex gap-1">
-              <button
+              <BotaoInteracao
                 aria-label="Atualizar ficha"
                 className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
                 type="button"
                 onClick={() => carregarFicha()}
               >
                 <RefreshCw size={19} className={loading ? "animate-spin" : ""} />
-              </button>
-              <button
+              </BotaoInteracao>
+              <BotaoInteracao
                 aria-label="Fechar ficha"
                 className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
                 type="button"
                 onClick={onClose}
               >
                 <X size={20} />
-              </button>
+              </BotaoInteracao>
             </div>
           </div>
 
           <nav className="-mx-1 mt-3 flex gap-1 overflow-x-auto px-1 pb-1">
             {ABAS.map((item) => (
-              <button
+              <BotaoInteracao
                 key={item.id}
                 className={[
                   "whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition",
@@ -146,7 +166,7 @@ export default function BanhoTosaAtendimentoPanel({
                 onClick={() => setAba(item.id)}
               >
                 {item.label}
-              </button>
+              </BotaoInteracao>
             ))}
           </nav>
         </header>
@@ -192,13 +212,15 @@ export default function BanhoTosaAtendimentoPanel({
                   saving={saving}
                   executar={executar}
                   onDelivered={() => setAba("resumo")}
+                  onCancelled={onClose}
                 />
               )}
             </>
           )}
         </div>
       </aside>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -502,20 +524,22 @@ function Ocorrencias({ atendimentoId, funcionarios, ocorrencias, saving, executa
                     <p className="text-sm font-semibold text-slate-800">
                       {item.tipo} · {item.gravidade}
                     </p>
-                    <button
-                      aria-label="Remover ocorrência"
-                      className="text-slate-400 hover:text-red-600"
-                      type="button"
-                      onClick={() =>
-                        executar(
-                          `ocorrencia-${item.id}`,
-                          () => banhoTosaApi.removerOcorrenciaAtendimento(atendimentoId, item.id),
-                          "Ocorrência removida.",
-                        )
-                      }
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {!item.system_generated && (
+                      <BotaoInteracao
+                        aria-label="Remover ocorrência"
+                        className="text-slate-400 hover:text-red-600"
+                        type="button"
+                        onClick={() =>
+                          executar(
+                            `ocorrencia-${item.id}`,
+                            () => banhoTosaApi.removerOcorrenciaAtendimento(atendimentoId, item.id),
+                            "Ocorrência removida.",
+                          )
+                        }
+                      >
+                        <Trash2 size={16} />
+                      </BotaoInteracao>
+                    )}
                   </div>
                   <p className="mt-1 text-sm text-slate-600">{item.descricao}</p>
                   {item.responsavel_nome && (
@@ -632,188 +656,6 @@ function Fotos({ atendimentoId, fotos, saving, executar }) {
   );
 }
 
-function Fechamento({ atendimento, custo, saving, executar, onDelivered }) {
-  const [confirmado, setConfirmado] = useState(false);
-  const [observacoesSaida, setObservacoesSaida] = useState(atendimento?.observacoes_saida || "");
-  const quitadoPorPacote = Boolean(atendimento?.pacote_credito_id);
-  const temVenda = Boolean(atendimento?.venda_id);
-  const podeEntregar = quitadoPorPacote || temVenda;
-
-  async function gerarVenda() {
-    let pdvUrl = null;
-    await executar(
-      "venda",
-      async () => {
-        const response = await banhoTosaApi.gerarVendaAtendimento(atendimento.id);
-        pdvUrl = response.data?.pdv_url;
-      },
-      "Cobrança enviada ao PDV.",
-    );
-    if (pdvUrl) window.open(pdvUrl, "_blank", "noopener,noreferrer");
-  }
-
-  async function entregar() {
-    await executar(
-      "entrega",
-      () =>
-        banhoTosaApi.moverEtapaAtendimento(atendimento.id, {
-          tipo: "entregue",
-          iniciar_timer: false,
-          observacoes_saida: observacoesSaida.trim() || null,
-        }),
-      "Entrega confirmada e atendimento encerrado.",
-    );
-    setConfirmado(false);
-    onDelivered?.();
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-3">
-        <ResumoCard
-          label="Valor"
-          value={formatMoneyBRL(atendimento?.venda_total || custo?.valor_cobrado || 0)}
-        />
-        <ResumoCard label="Custo" value={formatMoneyBRL(custo?.custo_total || 0)} />
-        <ResumoCard
-          label="Margem"
-          value={formatMoneyBRL(custo?.margem_valor || 0)}
-          subtitle={`${formatNumber(custo?.margem_percentual || 0, 1)}%`}
-        />
-      </div>
-
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <div className="flex items-center gap-2">
-          <Receipt size={19} className="text-blue-600" />
-          <h3 className="font-semibold text-slate-950">Cobrança</h3>
-        </div>
-        {quitadoPorPacote ? (
-          <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">
-            Quitado pelo pacote {atendimento.pacote_nome || ""}.
-          </div>
-        ) : temVenda ? (
-          <div className="mt-3">
-            <p className="text-sm font-semibold text-slate-800">
-              Venda {atendimento.venda_numero || `#${atendimento.venda_id}`} ·{" "}
-              {labelPagamento(atendimento.venda_status_pagamento)}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              Pago: {formatMoneyBRL(atendimento.venda_total_pago || 0)} · Restante:{" "}
-              {formatMoneyBRL(atendimento.venda_valor_restante || 0)}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <ActionButton
-                icon={ExternalLink}
-                intent="info"
-                onClick={() => window.open(atendimento.pdv_url, "_blank", "noopener,noreferrer")}
-              >
-                Abrir no PDV
-              </ActionButton>
-              <ActionButton
-                icon={RefreshCw}
-                intent="neutral"
-                loading={saving === "sync"}
-                tone="soft"
-                onClick={() =>
-                  executar(
-                    "sync",
-                    () => banhoTosaApi.sincronizarFechamentoAtendimento(atendimento.id),
-                    "Fechamento sincronizado.",
-                  )
-                }
-              >
-                Sincronizar
-              </ActionButton>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-3">
-            <p className="text-sm text-slate-600">
-              Gere a venda antes de confirmar a entrega. O PDV abrirá com os serviços do
-              atendimento.
-            </p>
-            <ActionButton
-              className="mt-3"
-              icon={Receipt}
-              intent="create"
-              loading={saving === "venda"}
-              onClick={gerarVenda}
-            >
-              Gerar cobrança no PDV
-            </ActionButton>
-          </div>
-        )}
-      </section>
-
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <div className="flex items-center gap-2">
-          <CheckCircle2 size={19} className="text-emerald-600" />
-          <h3 className="font-semibold text-slate-950">Entrega do pet</h3>
-        </div>
-        {atendimento?.status === "entregue" ? (
-          <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">
-            Atendimento já entregue e encerrado.
-          </p>
-        ) : (
-          <>
-            <TextField
-              className="mt-3"
-              label="Observações de saída"
-              placeholder="Orientações passadas ao tutor"
-              value={observacoesSaida}
-              onChange={setObservacoesSaida}
-            />
-            <CheckboxField
-              className="mt-3"
-              checked={confirmado}
-              disabled={!podeEntregar}
-              label="Confirmo que o pet foi entregue ao tutor e a cobrança foi orientada"
-              onChange={setConfirmado}
-            />
-            {!podeEntregar && (
-              <p className="mt-2 text-xs font-medium text-amber-700">
-                Gere a cobrança ou vincule um pacote antes da entrega.
-              </p>
-            )}
-            <ActionButton
-              className="mt-4 w-full justify-center"
-              disabled={!confirmado || !podeEntregar}
-              icon={CheckCircle2}
-              intent="create"
-              loading={saving === "entrega"}
-              size="md"
-              onClick={entregar}
-            >
-              Confirmar entrega e encerrar
-            </ActionButton>
-          </>
-        )}
-      </section>
-    </div>
-  );
-}
-
-function ResumoCard({ alerta = false, label, subtitle, value }) {
-  return (
-    <div
-      className={[
-        "rounded-xl border bg-white p-4",
-        alerta ? "border-red-200" : "border-slate-200",
-      ].join(" ")}
-    >
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p
-        className={["mt-1 text-lg font-semibold", alerta ? "text-red-600" : "text-slate-950"].join(
-          " ",
-        )}
-      >
-        {value}
-      </p>
-      {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
-    </div>
-  );
-}
-
 function formatarDuracao(segundos) {
   const total = Math.max(0, Number(segundos || 0));
   const horas = Math.floor(total / 3600);
@@ -826,15 +668,4 @@ function labelEtapa(etapa) {
   return String(etapa || "")
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letra) => letra.toUpperCase());
-}
-
-function labelPagamento(status) {
-  return (
-    {
-      pago: "Pago",
-      parcial: "Pagamento parcial",
-      pendente: "Pagamento pendente",
-      quitado_pacote: "Quitado por pacote",
-    }[status] || "Aguardando pagamento"
-  );
 }

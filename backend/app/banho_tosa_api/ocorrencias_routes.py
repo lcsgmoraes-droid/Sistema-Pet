@@ -11,6 +11,7 @@ from app.banho_tosa_fotos_storage import (
     thumbnail_url_banho_tosa,
 )
 from app.banho_tosa_models import BanhoTosaAtendimento, BanhoTosaFoto
+from app.banho_tosa_entrega import TIPO_ENTREGA_SEM_COBRANCA
 from app.banho_tosa_schemas import (
     BanhoTosaFotoCreate,
     BanhoTosaFotoResponse,
@@ -35,7 +36,13 @@ def listar_ocorrencias_atendimento(
     return atendimento.ocorrencias or []
 
 
-@router.post("/atendimentos/{atendimento_id}/ocorrencias", status_code=201)
+@router.post(
+    "/atendimentos/{atendimento_id}/ocorrencias",
+    status_code=201,
+    responses={
+        422: {"description": "Tipo reservado a registro automatico de entrega."}
+    },
+)
 def registrar_ocorrencia_atendimento(
     atendimento_id: int,
     body: BanhoTosaOcorrenciaCreate,
@@ -43,6 +50,10 @@ def registrar_ocorrencia_atendimento(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
+    if body.tipo.strip().lower() == TIPO_ENTREGA_SEM_COBRANCA:
+        raise HTTPException(
+            422, "Entrega sem cobranca deve ser registrada no fechamento."
+        )
     atendimento = _obter_atendimento_ou_404(db, tenant_id, atendimento_id)
     responsavel = _obter_responsavel(db, tenant_id, body.responsavel_id)
     ocorrencia = {
@@ -61,7 +72,11 @@ def registrar_ocorrencia_atendimento(
 
 
 @router.delete(
-    "/atendimentos/{atendimento_id}/ocorrencias/{ocorrencia_id}", status_code=204
+    "/atendimentos/{atendimento_id}/ocorrencias/{ocorrencia_id}",
+    status_code=204,
+    responses={
+        422: {"description": "Registro automatico de entrega deve ser preservado."}
+    },
 )
 def remover_ocorrencia_atendimento(
     atendimento_id: int,
@@ -72,6 +87,13 @@ def remover_ocorrencia_atendimento(
     _, tenant_id = _get_tenant(current)
     atendimento = _obter_atendimento_ou_404(db, tenant_id, atendimento_id)
     originais = atendimento.ocorrencias or []
+    if any(
+        item.get("id") == ocorrencia_id and item.get("system_generated")
+        for item in originais
+    ):
+        raise HTTPException(
+            422, "O registro automatico de entrega deve ser preservado no historico."
+        )
     novas = [item for item in originais if item.get("id") != ocorrencia_id]
     if len(novas) == len(originais):
         raise HTTPException(status_code=404, detail="Ocorrencia nao encontrada")

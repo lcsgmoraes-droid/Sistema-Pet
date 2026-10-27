@@ -27,7 +27,13 @@ __all__ = ["cancelar_venda"]
 
 
 def cancelar_venda(
-    venda_id: int, motivo: str, user_id: int, tenant_id: str, db: Session
+    venda_id: int,
+    motivo: str,
+    user_id: int,
+    tenant_id: str,
+    db: Session,
+    *,
+    commit: bool = True,
 ) -> Dict[str, Any]:
     """
     Cancela uma venda realizando estorno completo de todas as operações.
@@ -97,7 +103,7 @@ def cancelar_venda(
 
     logger.info(f"🔴 Iniciando cancelamento ATÔMICO da venda #{venda_id}")
 
-    with transactional_session(db):
+    with transactional_session(db, commit=commit):
         # ============================================================
         # ETAPA 1: VALIDAR VENDA E PERMISSÕES
         # ============================================================

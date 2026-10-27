@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 
 @contextmanager
-def transactional_session(db: Session):
+def transactional_session(db: Session, *, commit: bool = True):
     """
     Context manager para gerenciamento explícito de transactions.
 
@@ -114,7 +114,11 @@ def transactional_session(db: Session):
     """
     try:
         yield db
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            # Operações compostas fazem o commit apenas depois de todas as etapas.
+            db.flush()
     except Exception:
         db.rollback()
         raise

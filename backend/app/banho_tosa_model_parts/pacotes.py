@@ -7,6 +7,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     Numeric,
     String,
     Text,
@@ -15,6 +16,8 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.base_models import BaseTenantModel
+
+SERVICO_FOREIGN_KEY = "banho_tosa_servicos.id"
 
 
 class BanhoTosaPacote(BaseTenantModel):
@@ -27,12 +30,14 @@ class BanhoTosaPacote(BaseTenantModel):
     nome = Column(String(160), nullable=False, index=True)
     descricao = Column(Text, nullable=True)
     servico_id = Column(
-        Integer, ForeignKey("banho_tosa_servicos.id"), nullable=True, index=True
+        Integer, ForeignKey(SERVICO_FOREIGN_KEY), nullable=True, index=True
     )
     quantidade_creditos = Column(Numeric(12, 3), nullable=False, default=1)
     validade_dias = Column(Integer, nullable=False, default=30)
     preco = Column(Numeric(12, 2), nullable=False, default=0)
     ativo = Column(Boolean, nullable=False, default=True)
+    # Quantidades por serviço; copiado para o contrato para preservar o combinado.
+    servicos = Column(JSON, nullable=True)
 
     servico = relationship("BanhoTosaServico")
     creditos = relationship("BanhoTosaPacoteCredito", back_populates="pacote")
@@ -55,6 +60,9 @@ class BanhoTosaPacoteCredito(BaseTenantModel):
     creditos_total = Column(Numeric(12, 3), nullable=False, default=0)
     creditos_usados = Column(Numeric(12, 3), nullable=False, default=0)
     creditos_cancelados = Column(Numeric(12, 3), nullable=False, default=0)
+    creditos_reservados = Column(Numeric(12, 3), nullable=False, default=0)
+    servicos = Column(JSON, nullable=True)
+    valor_pacote = Column(Numeric(12, 2), nullable=False, default=0)
     data_inicio = Column(Date, nullable=False)
     data_validade = Column(Date, nullable=False, index=True)
     observacoes = Column(Text, nullable=True)
@@ -62,6 +70,7 @@ class BanhoTosaPacoteCredito(BaseTenantModel):
     pacote = relationship("BanhoTosaPacote", back_populates="creditos")
     cliente = relationship("Cliente", foreign_keys=[cliente_id])
     pet = relationship("Pet", foreign_keys=[pet_id])
+    venda = relationship("Venda", foreign_keys=[venda_id])
     movimentos = relationship(
         "BanhoTosaPacoteMovimento",
         back_populates="credito",
@@ -91,6 +100,16 @@ class BanhoTosaPacoteMovimento(BaseTenantModel):
         nullable=True,
         index=True,
     )
+    agendamento_id = Column(
+        Integer, ForeignKey("banho_tosa_agendamentos.id"), nullable=True, index=True
+    )
+    agendamento_servico_id = Column(
+        Integer,
+        ForeignKey("banho_tosa_agendamento_servicos.id"),
+        nullable=True,
+        index=True,
+    )
+    servico_id = Column(Integer, ForeignKey(SERVICO_FOREIGN_KEY), nullable=True)
     tipo = Column(String(30), nullable=False, index=True)
     quantidade = Column(Numeric(12, 3), nullable=False, default=0)
     saldo_apos = Column(Numeric(12, 3), nullable=False, default=0)
@@ -109,7 +128,7 @@ class BanhoTosaRecorrencia(BaseTenantModel):
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False, index=True)
     pet_id = Column(Integer, ForeignKey("pets.id"), nullable=False, index=True)
     servico_id = Column(
-        Integer, ForeignKey("banho_tosa_servicos.id"), nullable=True, index=True
+        Integer, ForeignKey(SERVICO_FOREIGN_KEY), nullable=True, index=True
     )
     pacote_credito_id = Column(
         Integer, ForeignKey("banho_tosa_pacote_creditos.id"), nullable=True, index=True

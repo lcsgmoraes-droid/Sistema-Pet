@@ -1,40 +1,44 @@
 import { useEffect, useState } from "react";
-import { Save, X } from "lucide-react";
 import toast from "react-hot-toast";
 import TutorAutocomplete from "../../../components/TutorAutocomplete";
-import ActionButton from "../../../components/ui/ActionButton";
-import { SelectField, TextField } from "../../../components/ui/FormField";
+import BotaoCancelar from "../../../components/v2/BotaoCancelar/BotaoCancelar";
+import BotaoSalva from "../../../components/v2/BotaoSalva/BotaoSalva";
+import InputCheck from "../../../components/v2/InputCheck/InputCheck";
+import InputCombobox from "../../../components/v2/InputCombobox/InputCombobox";
+import InputData from "../../../components/v2/InputData/InputData";
+import InputTexto from "../../../components/v2/InputTexto/InputTexto";
 import Panel from "../../../components/ui/Panel";
 import { api } from "../../../services/api";
 import { banhoTosaApi } from "../banhoTosaApi";
-import { getApiErrorMessage } from "../banhoTosaUtils";
+import { formatCurrency, getApiErrorMessage } from "../banhoTosaUtils";
 import { formatarDataLocal } from "../../../utils/drePeriodos";
 
-const todayIso = () => formatarDataLocal();
-const initialForm = {
+const initialForm = () => ({
   pacote_id: "",
   pet_id: "",
-  data_inicio: todayIso(),
+  data_inicio: formatarDataLocal(),
   data_validade: "",
   observacoes: "",
-};
+  gerar_cobranca: true,
+});
 
 export default function BanhoTosaCreditoForm({ pacotes = [], onCancel, onChanged }) {
   const [form, setForm] = useState(initialForm);
   const [tutor, setTutor] = useState(null);
   const [pets, setPets] = useState([]);
   const [loadingPets, setLoadingPets] = useState(false);
+  const [erroPets, setErroPets] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!tutor?.id) {
       setPets([]);
-      setForm((prev) => ({ ...prev, pet_id: "" }));
+      setLoadingPets(false);
       return;
     }
-
     let active = true;
     setLoadingPets(true);
+    setErroPets("");
     api
       .get("/vet/pets", { params: { cliente_id: tutor.id, limit: 100 } })
       .then((response) => {
@@ -42,9 +46,17 @@ export default function BanhoTosaCreditoForm({ pacotes = [], onCancel, onChanged
         const lista = response.data?.items ?? response.data ?? [];
         setPets(Array.isArray(lista) ? lista : []);
       })
-      .catch(() => active && setPets([]))
+      .catch((error) => {
+        if (!active) return;
+        setPets([]);
+        setErroPets(
+          getApiErrorMessage(
+            error,
+            "Não foi possível carregar os pets. Selecione o tutor novamente.",
+          ),
+        );
+      })
       .finally(() => active && setLoadingPets(false));
-
     return () => {
       active = false;
     };
@@ -53,30 +65,50 @@ export default function BanhoTosaCreditoForm({ pacotes = [], onCancel, onChanged
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
+  const pacote = pacotes.find((item) => String(item.id) === String(form.pacote_id));
+  const placeholderPet = obterPlaceholderPet(loadingPets, tutor?.id);
 
   async function liberarCredito(event) {
     event.preventDefault();
-    if (!form.pacote_id || !tutor?.id) {
-      toast.error("Selecione pacote e tutor.");
-      return;
+    if (!form.pacote_id || !tutor?.id || !form.pet_id) {
+      return toast.error("Selecione pacote, tutor e o pet que usará os serviços.");
     }
-
+    if (!form.data_inicio || (form.data_validade && form.data_validade < form.data_inicio)) {
+      return toast.error(
+        "Informe as datas do pacote; a validade deve ser igual ou posterior ao início.",
+      );
+    }
     setSaving(true);
     try {
-      await banhoTosaApi.criarCreditoPacote({
+      const response = await banhoTosaApi.criarCreditoPacote({
         pacote_id: Number(form.pacote_id),
         cliente_id: Number(tutor.id),
-        pet_id: form.pet_id ? Number(form.pet_id) : null,
-        data_inicio: form.data_inicio || null,
+        pet_id: Number(form.pet_id),
+        data_inicio: form.data_inicio,
         data_validade: form.data_validade || null,
-        observacoes: form.observacoes || null,
+        observacoes: form.observacoes.trim() || null,
       });
-      toast.success("Credito liberado para o tutor.");
-      setForm(initialForm);
-      setTutor(null);
+      if (form.gerar_cobranca && Number(pacote?.preco || 0) > 0) {
+        try {
+          await banhoTosaApi.gerarVendaCreditoPacote(response.data.id);
+          toast.success(
+            "Pacote vinculado ao pet e cobrança aberta no PDV. Registre o recebimento para constar como pago.",
+          );
+        } catch (error) {
+          toast.error(
+            getApiErrorMessage(
+              error,
+              "Pacote vinculado, mas a cobrança não foi gerada. Use Gerar cobrança na lista de saldos.",
+            ),
+          );
+        }
+      } else
+        toast.success(
+          "Pacote vinculado ao pet. O pagamento continua separado do saldo de serviços.",
+        );
       await onChanged?.();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Nao foi possivel liberar o credito."));
+      toast.error(getApiErrorMessage(error, "Não foi possível vincular o pacote."));
     } finally {
       setSaving(false);
     }
@@ -84,77 +116,100 @@ export default function BanhoTosaCreditoForm({ pacotes = [], onCancel, onChanged
 
   return (
     <Panel
-      title="Liberar pacote para cliente"
-      subtitle="Vincule um pacote ativo ao tutor e, se precisar, a um pet especifico."
+      title="Vincular pacote ao pet"
+      subtitle="O saldo será reservado automaticamente no agendamento e confirmado no check-in, mesmo com pagamento pendente."
     >
       <form onSubmit={liberarCredito} className="space-y-4">
-        <SelectField
+        <InputCombobox
+          id="bt-credito-pacote"
           label="Pacote"
+          required
           value={form.pacote_id}
           onChange={(value) => updateField("pacote_id", value)}
-        >
-          <option value="">Selecione</option>
-          {pacotes
+          opcoes={pacotes
             .filter((item) => item.ativo)
-            .map((pacote) => (
-              <option key={pacote.id} value={pacote.id}>
-                {pacote.nome} - {pacote.quantidade_creditos} creditos
-              </option>
-            ))}
-        </SelectField>
-
+            .map((item) => ({
+              value: String(item.id),
+              label: `${item.nome} — ${formatCurrency(item.preco)}`,
+            }))}
+        />
+        {pacote && (
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {(pacote.servicos || [])
+              .map((item) => `${item.quantidade_creditos} × ${item.servico_nome || "serviço"}`)
+              .join(" · ") || `${pacote.quantidade_creditos} créditos`}
+            {` · validade padrão de ${pacote.validade_dias} dias`}
+          </p>
+        )}
         <TutorAutocomplete
           label="Tutor"
           inputId="bt-pacote-tutor"
           selectedTutor={tutor}
-          onSelect={setTutor}
+          onSelect={(value) => {
+            setTutor(value);
+            setPets([]);
+            updateField("pet_id", "");
+          }}
         />
-
-        <SelectField
+        <InputCombobox
+          id="bt-credito-pet"
           label="Pet vinculado"
+          required
           value={form.pet_id}
           disabled={!tutor?.id || loadingPets}
+          error={erroPets}
+          placeholder={placeholderPet}
+          opcoes={pets.map(opcaoPet)}
           onChange={(value) => updateField("pet_id", value)}
-        >
-          <option value="">
-            {!tutor?.id ? "Selecione o tutor primeiro" : "Todos os pets do tutor"}
-          </option>
-          {pets.map((pet) => (
-            <option key={pet.id} value={pet.id}>
-              {pet.nome} {pet.especie ? `(${pet.especie})` : ""}
-            </option>
-          ))}
-        </SelectField>
-
+        />
         <div className="grid gap-3 sm:grid-cols-2">
-          <TextField
-            label="Inicio"
-            type="date"
+          <InputData
+            id="bt-credito-inicio"
+            label="Início"
+            required
             value={form.data_inicio}
             onChange={(value) => updateField("data_inicio", value)}
           />
-          <TextField
-            label="Validade manual"
-            type="date"
+          <InputData
+            id="bt-credito-validade"
+            label="Validade combinada (opcional)"
             value={form.data_validade}
+            help="Em branco, usa a validade do pacote. Depois é possível prorrogar com motivo."
             onChange={(value) => updateField("data_validade", value)}
           />
         </div>
-        <TextField
-          label="Observacoes"
+        <InputTexto
+          id="bt-credito-observacoes"
+          label="Combinados com o cliente"
           value={form.observacoes}
           onChange={(value) => updateField("observacoes", value)}
         />
-
+        {Number(pacote?.preco || 0) > 0 && (
+          <InputCheck
+            id="bt-credito-cobranca"
+            label="Gerar cobrança no PDV"
+            checked={form.gerar_cobranca}
+            help="Cria uma venda em aberto. O pacote só aparece como pago após registrar o recebimento no PDV."
+            onChange={(value) => updateField("gerar_cobranca", value)}
+          />
+        )}
         <div className="flex flex-wrap justify-end gap-2">
-          <ActionButton icon={X} intent="neutral" onClick={onCancel} tone="soft">
-            Cancelar
-          </ActionButton>
-          <ActionButton icon={Save} intent="create" loading={saving} type="submit">
-            Liberar credito
-          </ActionButton>
+          <BotaoCancelar onClick={onCancel} disabled={saving} />
+          <BotaoSalva loading={saving}>Vincular pacote ao pet</BotaoSalva>
         </div>
       </form>
     </Panel>
   );
+}
+
+function obterPlaceholderPet(loadingPets, tutorId) {
+  if (loadingPets) return "Carregando pets...";
+  if (!tutorId) return "Selecione o tutor primeiro";
+  return "Selecione o pet";
+}
+
+function opcaoPet(pet) {
+  let label = pet.nome;
+  if (pet.especie) label += ` (${pet.especie})`;
+  return { value: String(pet.id), label };
 }

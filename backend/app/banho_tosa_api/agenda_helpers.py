@@ -7,8 +7,10 @@ from app.banho_tosa_models import (
 )
 
 
-def buscar_agendamento_completo(db: Session, tenant_id, agendamento_id: int):
-    return (
+def buscar_agendamento_completo(
+    db: Session, tenant_id, agendamento_id: int, bloquear=False
+):
+    query = (
         db.query(BanhoTosaAgendamento)
         .options(
             joinedload(BanhoTosaAgendamento.cliente),
@@ -20,8 +22,10 @@ def buscar_agendamento_completo(db: Session, tenant_id, agendamento_id: int):
             BanhoTosaAgendamento.id == agendamento_id,
             BanhoTosaAgendamento.tenant_id == tenant_id,
         )
-        .first()
     )
+    if bloquear:
+        query = query.with_for_update(of=BanhoTosaAgendamento).populate_existing()
+    return query.first()
 
 
 def buscar_atendimento_completo(db: Session, tenant_id, atendimento_id: int):

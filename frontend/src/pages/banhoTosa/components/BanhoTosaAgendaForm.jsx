@@ -1,7 +1,11 @@
 import { Plus } from "lucide-react";
-import ActionButton from "../../../components/ui/ActionButton";
-import { SelectField, TextField } from "../../../components/ui/FormField";
+import BotaoInteracao from "../../../components/v2/BotaoInteracao/BotaoInteracao";
+import InputCombobox from "../../../components/v2/InputCombobox/InputCombobox";
+import InputData from "../../../components/v2/InputData/InputData";
+import InputMoeda from "../../../components/v2/InputMoeda/InputMoeda";
+import InputTexto from "../../../components/v2/InputTexto/InputTexto";
 import TutorPetSelector from "../../../components/veterinario/TutorPetSelector";
+import BanhoTosaAgendaPacoteAviso from "./BanhoTosaAgendaPacoteAviso";
 
 export default function BanhoTosaAgendaForm({
   dataRef,
@@ -34,63 +38,76 @@ export default function BanhoTosaAgendaForm({
           onSelectTutor={onSelectTutor}
           onSelectPet={(petId) => onChangeField("pet_id", petId)}
         />
-
         <div className="grid gap-4 sm:grid-cols-2">
-          <TextField label="Data" type="date" value={dataRef} onChange={onChangeData} />
-          <TextField
+          <InputData
+            id="bt-agenda-data"
+            label="Data"
+            required
+            value={dataRef}
+            onChange={onChangeData}
+          />
+          <InputTexto
+            id="bt-agenda-hora"
             label="Hora"
+            required
             type="time"
             value={form.hora}
             onChange={(value) => onChangeField("hora", value)}
           />
         </div>
-
-        <SelectField
+        <InputCombobox
+          id="bt-agenda-recurso"
           label="Recurso / box"
           value={form.recurso_id}
+          placeholder="Sem recurso definido"
           onChange={(value) => onChangeField("recurso_id", value)}
-        >
-          <option value="">Sem recurso definido</option>
-          {recursos
+          opcoes={recursos
             .filter((item) => item.ativo)
-            .map((recurso) => (
-              <option key={recurso.id} value={recurso.id}>
-                {recurso.nome} - cap. {recurso.capacidade_simultanea}
-              </option>
-            ))}
-        </SelectField>
-
-        <SelectField label="Servico" value={form.servico_id} onChange={onChangeServico}>
-          <option value="">Banho & Tosa avulso</option>
-          {servicos
+            .map((item) => ({
+              value: String(item.id),
+              label: `${item.nome} — cap. ${item.capacidade_simultanea}`,
+            }))}
+        />
+        <InputCombobox
+          id="bt-agenda-servico"
+          label="Serviço"
+          value={form.servico_id}
+          onChange={onChangeServico}
+          placeholder="Banho & Tosa avulso"
+          opcoes={servicos
             .filter((item) => item.ativo)
-            .map((servico) => (
-              <option key={servico.id} value={servico.id}>
-                {servico.nome} - {servico.duracao_padrao_minutos} min
-              </option>
-            ))}
-        </SelectField>
-
+            .map((item) => ({
+              value: String(item.id),
+              label: `${item.nome} — ${item.duracao_padrao_minutos} min`,
+            }))}
+        />
+        <BanhoTosaAgendaPacoteAviso
+          clienteId={tutorSelecionado?.id}
+          petId={form.pet_id}
+          servicoId={form.servico_id}
+          data={dataRef}
+        />
         <div className="grid gap-4 sm:grid-cols-2">
-          <TextField
-            label="Valor previsto"
-            type="number"
+          <InputMoeda
+            id="bt-agenda-valor"
+            label="Valor de tabela"
             value={form.valor_unitario}
+            help="A parte coberta pelo pacote não será cobrada de novo no atendimento."
             onChange={(value) => onChangeField("valor_unitario", value)}
           />
-          <TextField
-            label="Observacoes"
+          <InputTexto
+            id="bt-agenda-observacoes"
+            label="Observações"
             value={form.observacoes}
             onChange={(value) => onChangeField("observacoes", value)}
           />
         </div>
       </div>
-
       {showActions && (
         <div className="flex justify-end">
-          <ActionButton icon={Plus} intent="create" loading={saving} size="md" type="submit">
+          <BotaoInteracao icon={Plus} loading={saving} type="submit">
             Criar agendamento
-          </ActionButton>
+          </BotaoInteracao>
         </div>
       )}
     </form>

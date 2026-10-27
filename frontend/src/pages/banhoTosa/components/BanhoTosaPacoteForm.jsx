@@ -1,43 +1,48 @@
 import { useEffect, useState } from "react";
-import { Save, X } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
-import ActionButton from "../../../components/ui/ActionButton";
-import { CheckboxField, SelectField, TextField } from "../../../components/ui/FormField";
+import BotaoCancelar from "../../../components/v2/BotaoCancelar/BotaoCancelar";
+import BotaoInteracao from "../../../components/v2/BotaoInteracao/BotaoInteracao";
+import BotaoSalva from "../../../components/v2/BotaoSalva/BotaoSalva";
+import InputCheck from "../../../components/v2/InputCheck/InputCheck";
+import InputCombobox from "../../../components/v2/InputCombobox/InputCombobox";
+import InputMoeda from "../../../components/v2/InputMoeda/InputMoeda";
+import InputQuantidade from "../../../components/v2/InputQuantidade/InputQuantidade";
+import InputTexto from "../../../components/v2/InputTexto/InputTexto";
 import Panel from "../../../components/ui/Panel";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
 
-const initialForm = {
+const novoServico = () => ({ chave: crypto.randomUUID(), servico_id: "", quantidade_creditos: 4 });
+const initialForm = () => ({
   nome: "",
   descricao: "",
-  servico_id: "",
-  quantidade_creditos: "4",
-  validade_dias: "90",
-  preco: "0",
+  servicos: [novoServico()],
+  validade_dias: 30,
+  preco: 0,
   ativo: true,
-};
+});
 
 function formFromPacote(pacote) {
+  const servicos = pacote.servicos?.length
+    ? pacote.servicos
+    : [
+        {
+          servico_id: pacote.servico_id,
+          quantidade_creditos: pacote.quantidade_creditos,
+        },
+      ];
   return {
     nome: pacote.nome || "",
     descricao: pacote.descricao || "",
-    servico_id: pacote.servico_id ? String(pacote.servico_id) : "",
-    quantidade_creditos: String(pacote.quantidade_creditos ?? "1"),
-    validade_dias: String(pacote.validade_dias || 30),
-    preco: String(pacote.preco ?? "0"),
+    servicos: servicos.map((item) => ({
+      chave: crypto.randomUUID(),
+      servico_id: item.servico_id ? String(item.servico_id) : "",
+      quantidade_creditos: Number(item.quantidade_creditos || 1),
+    })),
+    validade_dias: Number(pacote.validade_dias || 30),
+    preco: Number(pacote.preco || 0),
     ativo: Boolean(pacote.ativo),
-  };
-}
-
-function payloadFromPacoteForm(form) {
-  return {
-    nome: form.nome.trim(),
-    descricao: form.descricao.trim() || null,
-    servico_id: form.servico_id ? Number(form.servico_id) : null,
-    quantidade_creditos: toApiDecimal(form.quantidade_creditos, "1"),
-    validade_dias: Number(form.validade_dias || 30),
-    preco: toApiDecimal(form.preco),
-    ativo: Boolean(form.ativo),
   };
 }
 
@@ -47,115 +52,171 @@ export default function BanhoTosaPacoteForm({
   onCancelEdit,
   onChanged,
 }) {
-  const [form, setForm] = useState(initialForm);
+  const [form, setForm] = useState(() =>
+    editingPacote ? formFromPacote(editingPacote) : initialForm(),
+  );
   const [saving, setSaving] = useState(false);
-
   useEffect(() => {
-    setForm(editingPacote ? formFromPacote(editingPacote) : initialForm);
-  }, [editingPacote?.id]);
+    setForm(editingPacote ? formFromPacote(editingPacote) : initialForm());
+  }, [editingPacote]);
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
+  function atualizarServico(chave, field, value) {
+    setForm((prev) => ({
+      ...prev,
+      servicos: prev.servicos.map((item) =>
+        item.chave === chave ? { ...item, [field]: value } : item,
+      ),
+    }));
+  }
 
   async function salvar(event) {
     event.preventDefault();
-    if (!form.nome.trim()) {
-      toast.error("Informe o nome do pacote.");
-      return;
+    if (!form.nome.trim()) return toast.error("Informe o nome do pacote.");
+    if (form.servicos.some((item) => !item.servico_id || !(Number(item.quantidade_creditos) > 0))) {
+      return toast.error("Informe o serviço e a quantidade de cada item do pacote.");
     }
-
+    if (
+      new Set(form.servicos.map((item) => String(item.servico_id))).size !== form.servicos.length
+    ) {
+      return toast.error("Cada serviço deve aparecer uma única vez no pacote.");
+    }
+    if (
+      !Number.isInteger(Number(form.validade_dias)) ||
+      Number(form.validade_dias) < 1 ||
+      Number(form.validade_dias) > 3650
+    ) {
+      return toast.error("Informe uma validade de 1 a 3650 dias inteiros.");
+    }
     setSaving(true);
     try {
-      const payload = payloadFromPacoteForm(form);
-      if (editingPacote) {
-        await banhoTosaApi.atualizarPacote(editingPacote.id, payload);
-        toast.success("Pacote atualizado.");
-      } else {
-        await banhoTosaApi.criarPacote(payload);
-        toast.success("Pacote cadastrado.");
-      }
-      setForm(initialForm);
+      const payload = {
+        nome: form.nome.trim(),
+        descricao: form.descricao.trim() || null,
+        servicos: form.servicos.map((item) => ({
+          servico_id: Number(item.servico_id),
+          quantidade_creditos: toApiDecimal(item.quantidade_creditos, "1"),
+        })),
+        quantidade_creditos: toApiDecimal(
+          form.servicos.reduce((total, item) => total + Number(item.quantidade_creditos), 0),
+        ),
+        validade_dias: Number(form.validade_dias),
+        preco: toApiDecimal(form.preco),
+        ativo: form.ativo,
+      };
+      if (editingPacote) await banhoTosaApi.atualizarPacote(editingPacote.id, payload);
+      else await banhoTosaApi.criarPacote(payload);
+      toast.success(editingPacote ? "Pacote atualizado." : "Pacote cadastrado.");
       await onChanged?.();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Nao foi possivel salvar o pacote."));
+      toast.error(getApiErrorMessage(error, "Não foi possível salvar o pacote."));
     } finally {
       setSaving(false);
     }
   }
 
-  const servicosDisponiveis = servicos.filter(
-    (item) => (item.ativo && item.permite_pacote) || item.id === Number(form.servico_id),
-  );
-
+  const opcoes = servicos
+    .filter(
+      (item) =>
+        (item.ativo && item.permite_pacote) ||
+        form.servicos.some((selecionado) => Number(selecionado.servico_id) === item.id),
+    )
+    .map((item) => ({ value: String(item.id), label: item.nome }));
   return (
     <Panel
       title={editingPacote ? "Editar pacote" : "Novo pacote"}
-      subtitle="Defina creditos, validade e servico coberto."
+      subtitle="Defina os serviços e as quantidades incluídas. Novas contratações recebem estas condições."
     >
       <form onSubmit={salvar} className="space-y-4">
-        <TextField
+        <InputTexto
+          id="bt-pacote-nome"
           label="Nome"
+          required
           value={form.nome}
           onChange={(value) => updateField("nome", value)}
         />
-        <TextField
-          label="Descricao"
+        <InputTexto
+          id="bt-pacote-descricao"
+          label="Descrição"
           value={form.descricao}
           onChange={(value) => updateField("descricao", value)}
         />
-        <SelectField
-          label="Servico coberto"
-          value={form.servico_id}
-          onChange={(value) => updateField("servico_id", value)}
-        >
-          <option value="">Qualquer servico do atendimento</option>
-          {servicosDisponiveis.map((servico) => (
-            <option key={servico.id} value={servico.id}>
-              {servico.nome}
-            </option>
+        <div className="space-y-3">
+          {form.servicos.map((item) => (
+            <div
+              key={item.chave}
+              className="grid items-end gap-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700 sm:grid-cols-[1fr_7rem_auto]"
+            >
+              <InputCombobox
+                id={`bt-pacote-servico-${item.chave}`}
+                label="Serviço incluído"
+                required
+                opcoes={opcoes}
+                value={item.servico_id}
+                onChange={(value) => atualizarServico(item.chave, "servico_id", value)}
+              />
+              <InputQuantidade
+                id={`bt-pacote-quantidade-${item.chave}`}
+                label="Quantidade"
+                min={1}
+                required
+                value={item.quantidade_creditos}
+                onChange={(value) => atualizarServico(item.chave, "quantidade_creditos", value)}
+              />
+              <BotaoInteracao
+                icon={Trash2}
+                tamanho="pequeno"
+                disabled={form.servicos.length === 1}
+                onClick={() =>
+                  updateField(
+                    "servicos",
+                    form.servicos.filter((selecionado) => selecionado.chave !== item.chave),
+                  )
+                }
+              >
+                Remover
+              </BotaoInteracao>
+            </div>
           ))}
-        </SelectField>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <TextField
-            label="Creditos"
-            type="number"
-            value={form.quantidade_creditos}
-            onChange={(value) => updateField("quantidade_creditos", value)}
-          />
-          <TextField
-            label="Validade dias"
-            type="number"
+          <BotaoInteracao
+            icon={Plus}
+            tamanho="pequeno"
+            onClick={() => updateField("servicos", [...form.servicos, novoServico()])}
+          >
+            Adicionar serviço
+          </BotaoInteracao>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <InputQuantidade
+            id="bt-pacote-validade"
+            label="Validade em dias"
+            min={1}
+            required
             value={form.validade_dias}
             onChange={(value) => updateField("validade_dias", value)}
           />
-          <TextField
-            label="Preco"
-            type="number"
+          <InputMoeda
+            id="bt-pacote-preco"
+            label="Preço do pacote"
             value={form.preco}
             onChange={(value) => updateField("preco", value)}
           />
         </div>
         {editingPacote && (
-          <CheckboxField
+          <InputCheck
+            id="bt-pacote-ativo"
             label="Ativo"
             checked={form.ativo}
             onChange={(value) => updateField("ativo", value)}
           />
         )}
-
         <div className="flex flex-wrap justify-end gap-2">
-          <ActionButton icon={X} intent="neutral" onClick={onCancelEdit} tone="soft">
-            Cancelar
-          </ActionButton>
-          <ActionButton
-            icon={Save}
-            intent={editingPacote ? "edit" : "create"}
-            loading={saving}
-            type="submit"
-          >
-            {editingPacote ? "Salvar alteracoes" : "Cadastrar pacote"}
-          </ActionButton>
+          <BotaoCancelar onClick={onCancelEdit} disabled={saving} />
+          <BotaoSalva loading={saving}>
+            {editingPacote ? "Salvar alterações" : "Cadastrar pacote"}
+          </BotaoSalva>
         </div>
       </form>
     </Panel>

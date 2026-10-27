@@ -19,6 +19,9 @@ class _QueryResultado:
     def first(self):
         return self.resultado
 
+    def with_for_update(self, *args, **kwargs):
+        return self
+
 
 class _DbComResultados:
     def __init__(self, *resultados):
@@ -29,6 +32,8 @@ class _DbComResultados:
 
 
 def test_checkin_bloqueia_pet_que_ja_esta_na_fila(monkeypatch):
+    # Este teste simula consultas; não precisa configurar relacionamentos ORM.
+    monkeypatch.setattr(agenda_routes, "joinedload", lambda *args, **kwargs: None)
     agendamento = SimpleNamespace(
         id=42,
         pet_id=7,
