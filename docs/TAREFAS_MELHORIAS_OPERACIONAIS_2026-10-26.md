@@ -39,9 +39,11 @@ testes que gravam dados devem acontecer em DEV.
 - [x] **07 — Parcelamento na baixa de vendas em aberto.** Permitir receber
       parcelado usando a mesma célula, com consistência entre venda, recebíveis,
       parcelas e caixa.
-- [x] **08 — Histórico rápido e paginado.** Corrigir demora/falha na abertura,
+- [ ] **08 — Histórico rápido e paginado.** Corrigir demora/falha na abertura,
       paginar dados e evitar carregar todo o histórico de uma vez. Caso de consulta:
-      Fernanda Pedraza, tenant `james_dionizio`.
+      Fernanda Pedraza, tenant `james_dionizio`. Aceite reaberto em 27/10/2026 para
+      corrigir fechamento duplicado e conteúdo do histórico no PDV; preservar a
+      paginação, os filtros e a tentativa de atualização já entregues.
 - [x] **09 — Conferir alcance da importação Simplesvet.** Vendas importadas até
       **18/09/2026**, total de 111.266 vendas, primeira em 19/11/2019. Consulta de
       produção somente de leitura confirmada. A data/hora da execução não foi
@@ -57,9 +59,11 @@ testes que gravam dados devem acontecer em DEV.
       permanecem vencidos no contas a receber. Caso de consulta: Osvaldo Cano,
       referência informada 47644 (ID interno confirmado; código público **1848**),
       tenant `james_dionizio`.
-- [x] **13 — Histórico financeiro completo.** Exibir movimentos de todo o fluxo
+- [ ] **13 — Histórico financeiro completo.** Exibir movimentos de todo o fluxo
       de baixa, incluindo data e observação, especialmente nas baixas em lote.
       Preservar rastreabilidade de recebimentos e estornos sem duplicar valores.
+      Aceite reaberto em 27/10/2026: data/observação ausentes no PDV e detalhes
+      financeiros com IDs tratados como moeda, datas cruas e status pouco claros.
 - [x] **14 — Grupos de produtos para comissão.** Em vendas por vendedor,
       melhorar filtros, selecionar múltiplos produtos, salvar grupos reutilizáveis
       para comissão e gerar contas a pagar sem duplicidade.
@@ -394,3 +398,65 @@ OTAs e da fusão autorizada permanecem preservados; a conferência humana no
 aparelho físico da Michele continua como acompanhamento separado, ainda pendente.
 
 Detalhes e limites na [ficha de telefone único](entregas/2026-10-27-telefone-unico-pessoas.md).
+
+### Aceite reaberto — históricos e baixas, 27/10/2026
+
+Novos prints enviados pelo Lucas apontam dois ícones de fechar no histórico do
+PDV, ausência de data/observação da baixa nesse histórico e detalhes financeiros
+que exibem IDs como valores em reais, datas ISO sem apresentação local,
+"registrado em" redundante e status confusos. Os itens **08 e 13 estão novamente
+abertos**. Os registros anteriores de publicação e seus aceites permanecem como
+evidência histórica; não comprovam o novo aceite completo dessas duas telas.
+
+O item 12 mantém a quitação e o saldo já conferidos. A clareza dos status, dos
+filtros e de seus respectivos movimentos será revalidada nesta correção; não há
+nova comprovação de saldo incorreto nem autorização para refazer baixas reais.
+
+Critérios pendentes:
+
+- [x] Histórico do PDV com um único ícone na ação de fechar, sem perder a venda
+      em andamento ao abrir ou fechar a janela.
+- [x] Data da baixa, forma, valor e observação visíveis junto ao recebimento
+      correspondente; baixa em lote conferida por HTTP e nas telas em DEV.
+- [x] Observação da baixa preservada; observação da venda não pode substituí-la.
+- [x] Nas duas apresentações financeiras, IDs/referências não aparecem como
+      dinheiro; somente valores monetários usam reais com formato brasileiro.
+- [x] Datas sem ISO cru ou mudança indevida de dia; a data de negócio fica clara
+      e o horário técnico de registro não aparece como informação redundante.
+- [ ] Status legíveis e coerentes com o tipo de movimento, saldo e filtros;
+      distinguir finalização da venda de recebimento efetivo quando necessário.
+- [x] Aceites HTTP e de interface em DEV nas três entradas, com evidências do
+      mesmo recebimento, preservação dos valores e nenhuma nova movimentação.
+- [ ] Regressões, gate completo, PR e publicação pelo fluxo oficial.
+
+A revisão de código confirmou o armazenamento da observação em lote/recebimento
+e sua ausência no resumo de pagamentos do PDV. Confirmou também o uso de
+formatação monetária para todo número no renderer genérico financeiro. Esses
+achados motivaram a rota paginada `/vendas/{id}/recebimentos-historico`, que usa o
+vínculo explícito do lote para recuperar a observação original, e a apresentação
+compartilhada por tipo de campo. Venda finalizada e recebimento efetivo passaram
+a ter estados separados na resposta e rótulos claros na interface.
+
+O aceite DEV reutilizou a massa fictícia existente: pessoa **10035**, lote **13**,
+duas vendas e dois recebimentos. Não foi criada nova massa financeira. Após o
+reinício do backend, a rota nova e o financeiro devolveram os mesmos recibos,
+data de negócio **26-10-2026**, observação integral e formas/valores preservados.
+Os **3/3 fluxos de navegador headless** passaram: histórico do PDV, financeiro
+principal e aba Histórico por Cliente da consulta de vendas. O botão superior de
+fechar contém um SVG; abrir/fechar preservou cliente, produto e subtotal do PDV.
+As referências dos recibos apareceram sem moeda, sem ISO cru e sem "Registrado em".
+O filtro "Pago / recebido" da aba encontrou os dois movimentos.
+
+Snapshots de IDs, valores, datas e observações dos recibos permaneceram iguais
+antes/depois; contagem de pessoas **41 → 41**, sem POST de venda/financeiro.
+Provas e capturas inspecionadas em
+`runtime/correcao-historicos-baixas-20261027/aceite-http.json`, `aceite-ui.json` e
+`aceite-ui-clone.json`. O caso visual usa lote confirmado; recebimentos parciais,
+estornos e navegação com várias páginas ficam nas regressões automatizadas, sem
+criar baixas extras apenas para gerar tela. A consolidação final dos filtros de
+contas, regressões integradas, gate, CI e publicação permanece pendente.
+
+**Estado atual: aceites DEV aprovados; itens 08 e 13 continuam abertos até o
+fechamento das validações e da publicação.**
+A conferência humana no aparelho físico da Michele continua separada e pendente.
+Detalhes na [ficha da correção dos históricos](entregas/2026-10-27-correcao-historicos-baixas.md).

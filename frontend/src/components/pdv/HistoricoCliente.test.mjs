@@ -20,6 +20,7 @@ function preparar(get) {
     ["../v2/BotaoInteracao/BotaoInteracao", "BotaoInteracao"],
     ["../v2/BotaoCancelar/BotaoCancelar", "BotaoCancelar"],
     ["../v2/InputCombobox/InputCombobox", "InputCombobox"],
+    ["./HistoricoRecebimentosVenda", "HistoricoRecebimentosVenda"],
   ])
     mocks.set(modulo, { __esModule: true, default: componente });
   return createControllerHarness(
@@ -73,4 +74,28 @@ test("timeout mantém erro visível e permite tentar novamente", async () => {
   await harness.act(() => retentar.props.onClick());
   assert.equal(chamadas, 2);
   assert.doesNotMatch(elementText(harness.tree), /Não foi possível carregar/);
+});
+
+test("venda sem itens ou pagamentos também permite consultar as baixas", async () => {
+  const harness = preparar(async (url) => ({
+    data: url.includes("historico-compras")
+      ? {
+          vendas: [{ id: 11, total_itens: 0, status: "finalizada", status_pagamento: "pago" }],
+          paginacao: {},
+        }
+      : {},
+  }));
+  await harness.settle();
+  const expandir = elements(harness.tree).find(
+    (node) =>
+      node.type === "BotaoInteracao" && elementText(node).trim() === "Ver detalhes da compra",
+  );
+  assert.ok(expandir);
+  await harness.act(() => expandir.props.onClick());
+  const recebimentos = elements(harness.tree).find(
+    (node) => node.type === "HistoricoRecebimentosVenda",
+  );
+  assert.equal(recebimentos.props.vendaId, 11);
+  assert.match(elementText(harness.tree), /Pago/);
+  assert.doesNotMatch(elementText(harness.tree), /Finalizada/);
 });

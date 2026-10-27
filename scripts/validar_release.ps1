@@ -187,6 +187,7 @@ Invoke-GateStep 'Operational search history receipts and commissions regression'
     '-m', 'pytest',
     'tests/unit/test_clientes_busca_relevancia.py',
     'tests/unit/test_cliente_historico_paginacao.py',
+    'tests/unit/test_clientes_historico_compras_cancelamento.py',
     'tests/unit/test_beneficio_carimbo_manual_app.py',
     'tests/unit/test_pessoa_merge_safety.py',
     'tests/unit/test_notas_entrada_vinculo_elegibilidade.py',

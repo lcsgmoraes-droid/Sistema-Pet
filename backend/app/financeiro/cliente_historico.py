@@ -5,6 +5,11 @@ from datetime import datetime, time
 from sqlalchemy import String, case, cast, func, literal, select, union_all
 from sqlalchemy.orm import noload, selectinload
 
+from app.clientes.historico_compras import status_pagamento_sql
+from app.financeiro.recebimentos_historico import (
+    carregar_lotes_recebimentos,
+    serializar_recebimento,
+)
 from app.financeiro_models import ContaReceber, Recebimento
 from app.models import CreditoLog
 from app.services.venda_descontos import resumo_descontos_venda
@@ -40,12 +45,32 @@ def consultar_movimentos_cliente(
     status_recebimento = case(
         (Recebimento.valor_recebido < 0, "estornado"), else_="efetivado"
     )
+    pagamentos, contas, situacao_venda = status_pagamento_sql(tenant_id)
+    situacao_venda = case(
+        (Venda.status.in_(("cancelada", "cancelado")), "cancelado"),
+        else_=situacao_venda,
+    )
+    status_conta = func.lower(func.trim(func.coalesce(ContaReceber.status, "pendente")))
+    situacao_conta = case(
+        (status_conta.in_(("cancelada", "cancelado")), "cancelado"),
+        (
+            ContaReceber.valor_final - func.coalesce(ContaReceber.valor_recebido, 0)
+            <= 0,
+            "recebido",
+        ),
+        (status_conta.in_(("pago", "paga", "recebido", "quitado")), "recebido"),
+        (status_conta.in_(("vencido", "vencida")), "vencido"),
+        (func.coalesce(ContaReceber.valor_recebido, 0) > 0, "parcial"),
+        (status_conta.in_(("baixa_parcial", "parcial")), "parcial"),
+        (status_conta.in_(("pendente", "aberto", "aberta", "em_aberto")), "em_aberto"),
+        else_=status_conta,
+    )
     fontes = [
         (
             Venda,
             Venda.data_venda,
             tipo_venda,
-            Venda.status,
+            situacao_venda,
             Venda.cliente_id == cliente_id,
         ),
         (
@@ -59,7 +84,7 @@ def consultar_movimentos_cliente(
             ContaReceber,
             ContaReceber.data_emissao,
             literal("conta_receber"),
-            ContaReceber.status,
+            situacao_conta,
             ContaReceber.cliente_id == cliente_id,
         ),
         (
@@ -75,7 +100,12 @@ def consultar_movimentos_cliente(
             modelo.id.label("id"),
             tipo_expr.label("tipo"),
             cast(data, String).label("data"),
+            status_expr.label("situacao"),
         ).where(modelo.tenant_id == tenant_id, filtro_cliente)
+        if modelo is Venda:
+            consulta = consulta.outerjoin(
+                pagamentos, pagamentos.c.venda_id == Venda.id
+            ).outerjoin(contas, contas.c.venda_id == Venda.id)
         if modelo is Recebimento:
             consulta = consulta.join(
                 ContaReceber, ContaReceber.id == Recebimento.conta_receber_id
@@ -83,7 +113,23 @@ def consultar_movimentos_cliente(
         if tipo:
             consulta = consulta.where(tipo_expr == tipo)
         if status:
-            consulta = consulta.where(status_expr == status)
+            filtro_status = status
+            if modelo is Venda and status in {"cancelada", "recebido"}:
+                filtro_status = "cancelado" if status == "cancelada" else "pago"
+            elif modelo is Recebimento and status == "recebido":
+                filtro_status = "efetivado"
+            elif modelo is ContaReceber:
+                filtro_status = {
+                    "pendente": "em_aberto",
+                    "aberto": "em_aberto",
+                    "aberta": "em_aberto",
+                    "baixa_parcial": "parcial",
+                    "vencida": "vencido",
+                    "pago": "recebido",
+                    "paga": "recebido",
+                    "cancelada": "cancelado",
+                }.get(status, status)
+            consulta = consulta.where(status_expr == filtro_status)
         if data_inicio:
             consulta = consulta.where(data >= data_inicio)
         if data_fim:
@@ -135,6 +181,9 @@ def consultar_movimentos_cliente(
             )
         registros[tipo_atual] = {item.id: item for item in consulta.all()}
 
+    lotes_recebimentos = carregar_lotes_recebimentos(
+        db, tenant_id, registros.get("recebimento", {}).values()
+    )
     historico = []
     for ref in referencias:
         tipo_atual = ref["tipo"]
@@ -154,6 +203,8 @@ def consultar_movimentos_cliente(
                 if item.pagamentos
                 else "Não informado",
                 "observacoes": item.observacoes,
+                "status_pagamento": ref["situacao"],
+                "status_operacional": item.status,
             }
             historico.append(
                 {
@@ -162,10 +213,16 @@ def consultar_movimentos_cliente(
                     "descricao": f"{'Devolução - ' if devolucao else ''}Venda #{item.numero_venda}",
                     "valor": float(item.total or 0) * (-1 if devolucao else 1),
                     "status": item.status,
+                    "status_pagamento": ref["situacao"],
+                    "status_operacional": item.status,
                     "detalhes": detalhes,
                 }
             )
         elif tipo_atual == "recebimento":
+            detalhes = serializar_recebimento(
+                item, tenant_id, lotes_recebimentos.get(item.id)
+            )
+            detalhes["status_recebimento"] = detalhes["status"]
             historico.append(
                 {
                     "tipo": tipo_atual,
@@ -173,19 +230,7 @@ def consultar_movimentos_cliente(
                     "descricao": f"Recebimento - {item.conta.descricao}",
                     "valor": float(item.valor_recebido),
                     "status": "estornado" if item.valor_recebido < 0 else "efetivado",
-                    "detalhes": {
-                        "recebimento_id": item.id,
-                        "conta_receber_id": item.conta_receber_id,
-                        "venda_id": item.conta.venda_id,
-                        "data_baixa": item.data_recebimento.isoformat(),
-                        "registrado_em": item.created_at.isoformat()
-                        if item.created_at
-                        else None,
-                        "forma_pagamento": item.forma_pagamento.nome
-                        if item.forma_pagamento
-                        else "Não informado",
-                        "observacoes": item.observacoes,
-                    },
+                    "detalhes": detalhes,
                 }
             )
         elif tipo_atual == "conta_receber":
@@ -195,7 +240,7 @@ def consultar_movimentos_cliente(
                     "data": _data_evento(item.data_emissao),
                     "descricao": item.descricao,
                     "valor": float(item.valor_final or 0),
-                    "status": item.status,
+                    "status": ref["situacao"],
                     "detalhes": {
                         "conta_receber_id": item.id,
                         "venda_id": item.venda_id,
