@@ -571,6 +571,14 @@ mkdir -p "$NEXT_RUNTIME_DIST"
 printf '%s\n' "$HEAD_AFTER" >"$NEXT_RUNTIME_RELEASE_MARKER"
 printf '%s\n' "$HEAD_AFTER" >"$NEXT_RUNTIME_DIST/release-commit.txt"
 
+mark_step "preservar_assets_frontend"
+audit_step "Preservando assets para abas abertas antes da atualizacao"
+log "Preservando assets das versoes anteriores para abas abertas"
+python3 "$APP_DIR/scripts/preserve_frontend_assets.py" \
+  --current-dist "$RUNTIME_DIST" \
+  --next-dist "$NEXT_RUNTIME_DIST" \
+  --keep-days "${FRONTEND_ASSET_RETENTION_DAYS:-7}"
+
 mark_step "validar_compose"
 audit_step "Validando docker compose de producao"
 log "Validando docker compose"
