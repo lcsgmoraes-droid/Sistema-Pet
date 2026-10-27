@@ -39,11 +39,12 @@ testes que gravam dados devem acontecer em DEV.
 - [x] **07 — Parcelamento na baixa de vendas em aberto.** Permitir receber
       parcelado usando a mesma célula, com consistência entre venda, recebíveis,
       parcelas e caixa.
-- [ ] **08 — Histórico rápido e paginado.** Corrigir demora/falha na abertura,
+- [x] **08 — Histórico rápido e paginado.** Corrigir demora/falha na abertura,
       paginar dados e evitar carregar todo o histórico de uma vez. Caso de consulta:
       Fernanda Pedraza, tenant `james_dionizio`. Aceite reaberto em 27/10/2026 para
-      corrigir fechamento duplicado e conteúdo do histórico no PDV; preservar a
-      paginação, os filtros e a tentativa de atualização já entregues.
+      corrigir fechamento duplicado e conteúdo do histórico no PDV; correção
+      validada em DEV e publicada pelo PR #1575, preservando paginação, filtros e
+      tentativa de atualização. Limites da conferência produtiva ao final.
 - [x] **09 — Conferir alcance da importação Simplesvet.** Vendas importadas até
       **18/09/2026**, total de 111.266 vendas, primeira em 19/11/2019. Consulta de
       produção somente de leitura confirmada. A data/hora da execução não foi
@@ -59,11 +60,12 @@ testes que gravam dados devem acontecer em DEV.
       permanecem vencidos no contas a receber. Caso de consulta: Osvaldo Cano,
       referência informada 47644 (ID interno confirmado; código público **1848**),
       tenant `james_dionizio`.
-- [ ] **13 — Histórico financeiro completo.** Exibir movimentos de todo o fluxo
+- [x] **13 — Histórico financeiro completo.** Exibir movimentos de todo o fluxo
       de baixa, incluindo data e observação, especialmente nas baixas em lote.
       Preservar rastreabilidade de recebimentos e estornos sem duplicar valores.
-      Aceite reaberto em 27/10/2026: data/observação ausentes no PDV e detalhes
-      financeiros com IDs tratados como moeda, datas cruas e status pouco claros.
+      Aceite reaberto em 27/10/2026 e encerrado pelo PR #1575: data/observação no
+      PDV, referências sem moeda, datas locais e status claros. Financeiro real
+      de Osvaldo conferido somente por leitura após a publicação.
 - [x] **14 — Grupos de produtos para comissão.** Em vendas por vendedor,
       melhorar filtros, selecionar múltiplos produtos, salvar grupos reutilizáveis
       para comissão e gerar contas a pagar sem duplicidade.
@@ -404,15 +406,16 @@ Detalhes e limites na [ficha de telefone único](entregas/2026-10-27-telefone-un
 Novos prints enviados pelo Lucas apontam dois ícones de fechar no histórico do
 PDV, ausência de data/observação da baixa nesse histórico e detalhes financeiros
 que exibem IDs como valores em reais, datas ISO sem apresentação local,
-"registrado em" redundante e status confusos. Os itens **08 e 13 estão novamente
-abertos**. Os registros anteriores de publicação e seus aceites permanecem como
-evidência histórica; não comprovam o novo aceite completo dessas duas telas.
+"registrado em" redundante e status confusos. Os itens **08 e 13 foram reabertos**;
+o fechamento posterior está registrado ao final desta seção. Os registros
+anteriores de publicação e seus aceites permanecem como evidência histórica e
+não substituíram o aceite corretivo dessas telas.
 
 O item 12 mantém a quitação e o saldo já conferidos. A clareza dos status, dos
 filtros e de seus respectivos movimentos será revalidada nesta correção; não há
 nova comprovação de saldo incorreto nem autorização para refazer baixas reais.
 
-Critérios pendentes:
+Critérios da correção:
 
 - [x] Histórico do PDV com um único ícone na ação de fechar, sem perder a venda
       em andamento ao abrir ou fechar a janela.
@@ -423,11 +426,13 @@ Critérios pendentes:
       dinheiro; somente valores monetários usam reais com formato brasileiro.
 - [x] Datas sem ISO cru ou mudança indevida de dia; a data de negócio fica clara
       e o horário técnico de registro não aparece como informação redundante.
-- [ ] Status legíveis e coerentes com o tipo de movimento, saldo e filtros;
+- [x] Status legíveis e coerentes com o tipo de movimento, saldo e filtros;
       distinguir finalização da venda de recebimento efetivo quando necessário.
 - [x] Aceites HTTP e de interface em DEV nas três entradas, com evidências do
       mesmo recebimento, preservação dos valores e nenhuma nova movimentação.
-- [ ] Regressões, gate completo, PR e publicação pelo fluxo oficial.
+- [x] Regressões, build e gate completo final aprovados.
+- [x] PR #1575 integrado e checks do PR/main aprovados.
+- [x] Publicação pelo fluxo oficial concluída e conferência técnica em produção.
 
 A revisão de código confirmou o armazenamento da observação em lote/recebimento
 e sua ausência no resumo de pagamentos do PDV. Confirmou também o uso de
@@ -453,10 +458,51 @@ Provas e capturas inspecionadas em
 `runtime/correcao-historicos-baixas-20261027/aceite-http.json`, `aceite-ui.json` e
 `aceite-ui-clone.json`. O caso visual usa lote confirmado; recebimentos parciais,
 estornos e navegação com várias páginas ficam nas regressões automatizadas, sem
-criar baixas extras apenas para gerar tela. A consolidação final dos filtros de
-contas, regressões integradas, gate, CI e publicação permanece pendente.
+criar baixas extras apenas para gerar tela. A consolidação dos filtros de contas
+foi concluída antes da paginação, para que o estado exibido seja encontrado pelo
+filtro correspondente; Vencido com saldo continua identificado como Vencido.
 
-**Estado atual: aceites DEV aprovados; itens 08 e 13 continuam abertos até o
-fechamento das validações e da publicação.**
+As regressões focadas registraram **80 testes operacionais de frontend**, **38
+de histórico** e **um de cancelamento no backend**. O build e o gate local final
+completo passaram na head **`28e35c44b3fae52461083670cd0cce3136ba0251`**, com
+evidência em `runtime/correcao-historicos-baixas-20261027/release-check-final.log`.
+O apontamento anterior do Sonar S9383 foi corrigido explicitando a chamada
+assíncrona com `void`; a revisão final ficou aprovada, sem mudar a regra de negócio.
+
+O PR **#1575** foi integrado na `main`
+**`446e592847538e25a8cd255f32c2e7c9ec0a81ab`**. No PR, **8/8 checks oficiais** e
+os **12 resultados publicados**, incluindo Sonar, foram aprovados; na main,
+**8/8 oficiais** e os **nove resultados publicados** ficaram verdes. Evidências em
+`runtime/correcao-historicos-baixas-20261027/release-gate-pr1575-28e35c44.json` e
+`runtime/correcao-historicos-baixas-20261027/release-gate-main-446e5928.json`.
+
+O deploy oficial foi concluído em **27/10/2026 às 01:48:59 BRT**, com saída zero,
+servindo a revisão pública **`446e592847538e25a8cd255f32c2e7c9ec0a81ab`**. O status
+oficial posterior confirmou **cinco containers healthy**, head Alembic
+**`zzzzzc20261027a1`**, health público correto e watchdog healthy. Backups:
+
+- Banco: `/opt/petshop/backups/db/petshop_prod_20261027_014758.dump`.
+- Operacional: `/opt/petshop/backups/deploy_20261027_014659`.
+
+Logs em `runtime/correcao-historicos-baixas-20261027/deploy-producao.log` e
+`runtime/correcao-historicos-baixas-20261027/status-producao.log`.
+
+A conferência produtiva, somente de leitura no Chrome do James e na loja
+Atacadão Loja 1 Presidente Prudente, recarregou apenas a aba financeira de
+Osvaldo, código público **1848**. O recibo **#12595**, vinculado à conta
+**#11119**, exibiu **26-10-2026**, forma **Pix**, situação **Recebido** e a
+observação original integral, conferida na evidência local ignorada pelo Git.
+
+As referências apareceram sem moeda, as datas sem ISO cru e "Registrado em" foi
+omitido. A venda **IMP-20260915-112020** apareceu como **Pago**. A captura em tema
+escuro foi inspecionada; prova em
+`runtime/correcao-historicos-baixas-20261027/consulta-producao.json`. Nenhum
+lançamento financeiro foi realizado nessa consulta.
+
+A aba PDV do usuário foi preservada, sem recarregamento ou nova navegação nesta
+conferência. O aceite do PDV e das duas apresentações financeiras ocorreu em
+DEV; a nova verificação visual produtiva limitou-se à aba financeira descrita.
+
+**Estado atual: correção publicada e conferida; itens 08 e 13 concluídos.**
 A conferência humana no aparelho físico da Michele continua separada e pendente.
 Detalhes na [ficha da correção dos históricos](entregas/2026-10-27-correcao-historicos-baixas.md).
