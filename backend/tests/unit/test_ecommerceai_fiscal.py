@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from lxml import etree
 from pydantic import ValidationError
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
@@ -20,7 +20,7 @@ from sqlalchemy.pool import StaticPool
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 import app.db.base  # noqa: F401 - registro canônico de FKs e relacionamentos
-from app.ecommerceai_fiscal import payload, routes, service
+from app.ecommerceai_fiscal import payload, routes, service, configuration
 from app.ecommerceai_fiscal.models import (
     FiscalAccount,
     FiscalSkuMapping,
@@ -28,6 +28,7 @@ from app.ecommerceai_fiscal.models import (
 )
 from app.ecommerceai_fiscal.schemas import OrderInput
 from app.intnfe.client import IntNFeError
+from app.intnfe.models import IntNFeConnection
 from app.models import AuditLog
 from app.models import Tenant
 from app.ecommerceai_integration_models import (
@@ -184,6 +185,7 @@ def ctx(monkeypatch):
         Tenant,
         EcommerceAIConnectionRequest,
         EcommerceAIConnection,
+        IntNFeConnection,
         Produto,
         FiscalAccount,
         FiscalSkuMapping,
@@ -239,6 +241,7 @@ def ctx(monkeypatch):
     monkeypatch.setattr(routes, "check_permission", permission)
     monkeypatch.setattr(routes, "get_tenant", lambda *_a: tenant)
     monkeypatch.setattr(service, "get_tenant", lambda *_a: tenant)
+    monkeypatch.setattr(configuration, "get_tenant", lambda *_a: tenant)
     monkeypatch.setattr(service, "_connection", lambda *_a, **_kw: fiscal_connection)
     monkeypatch.setattr(routes, "_connection", lambda *_a, **_kw: fiscal_connection)
     monkeypatch.setattr(service, "_access_token", lambda *_a: "token-ficticio")
@@ -669,6 +672,7 @@ def test_management_records_cutoff_and_rejects_client_backdate(ctx):
     body = {
         "seller_id": "NEW_SELLER",
         "emitter_cnpj": CNPJ,
+        "active": True,
         "auto_issue_enabled": True,
         "discount_policy": "buyer_payment_total",
     }
@@ -862,3 +866,228 @@ def test_legacy_request_defaults_never_implicitly_request_new_fiscal_scopes():
         state="s" * 32,
     )
     assert set(request.requested_scopes) == {"catalog:read", "events:write"}
+
+
+def config(ctx):
+    response = ctx.client.get(PREFIX + "/configuration/accounts")
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def account_body(ctx, **changes):
+    current = {
+        "channel": "amazon",
+        "seller_id": ctx.account.seller_id,
+        "marketplace_id": ctx.account.marketplace_id,
+        "emitter_cnpj": ctx.account.emitter_cnpj,
+        "active": ctx.account.active,
+        "auto_issue_enabled": ctx.account.auto_issue_enabled,
+        "upload_enabled": ctx.account.upload_enabled,
+        "discount_policy": ctx.account.discount_policy,
+    }
+    current.update(changes)
+    return current
+
+
+def test_machine_configuration_is_safe_scoped_and_stable(ctx):
+    first = config(ctx)
+    assert first["schema_version"] == "1.1"
+    assert first["corepet_settings_url"].endswith("/configuracoes/integracoes")
+    assert len(first["configuration_revision"]) == 64 and len(first["accounts"]) == 1
+    account = first["accounts"][0]
+    allowed = {
+        "id",
+        "channel",
+        "seller_id",
+        "marketplace_id",
+        "emitter_cnpj",
+        "active",
+        "auto_issue_enabled",
+        "upload_enabled",
+        "discount_policy",
+        "activated_at",
+        "configuration_revision",
+    }
+    assert set(account) == allowed and account["upload_enabled"] is False
+    assert config(ctx) == first
+    assert "snapshot" not in str(first) and "12345678909" not in str(first)
+    ctx.connection.scopes = ["fiscal:prepare"]
+    assert ctx.client.get(PREFIX + "/configuration/accounts").status_code == 403
+
+
+def test_configuration_excludes_other_tenants_and_handles_empty_authority(ctx):
+    with tenant_context(OTHER):
+        ctx.db.add(
+            FiscalAccount(
+                tenant_id=OTHER,
+                channel="amazon",
+                seller_id="PRIVATE_OTHER",
+                marketplace_id="A2Q3Y263D00KWC",
+                emitter_cnpj=CNPJ,
+                approved_by_user_id=88,
+            )
+        )
+        ctx.db.commit()
+    assert [row["seller_id"] for row in config(ctx)["accounts"]] == ["SELLER_TESTE"]
+    ctx.db.query(FiscalSkuMapping).filter(FiscalSkuMapping.tenant_id == TENANT).delete()
+    ctx.db.query(FiscalAccount).filter(FiscalAccount.tenant_id == TENANT).delete()
+    ctx.db.commit()
+    result = config(ctx)
+    assert result["accounts"] == [] and len(result["configuration_revision"]) == 64
+
+
+def test_active_and_upload_default_off_and_upload_does_not_move_cutoff(ctx):
+    created = ctx.client.post(
+        PREFIX + "/manage/accounts",
+        json={"seller_id": "OFF_DEFAULT", "emitter_cnpj": CNPJ},
+    )
+    assert created.status_code == 200
+    body = created.json()
+    assert (
+        body["active"] is False
+        and body["auto_issue_enabled"] is False
+        and body["upload_enabled"] is False
+    )
+    assert body["activated_at"] is None
+    before = ctx.account.activated_at
+    response = ctx.client.put(
+        PREFIX + f"/manage/accounts/{ctx.account.id}",
+        json=account_body(ctx, upload_enabled=True),
+    )
+    assert response.status_code == 200 and response.json()["upload_enabled"] is True
+    assert service.aware(ctx.account.activated_at) == service.aware(before)
+
+
+@pytest.mark.parametrize("flag", ["auto_issue_enabled", "upload_enabled"])
+def test_inactive_master_cannot_authorize_new_automatic_posts(ctx, flag):
+    body = account_body(
+        ctx, active=False, auto_issue_enabled=False, upload_enabled=False
+    )
+    body[flag] = True
+    response = ctx.client.put(PREFIX + f"/manage/accounts/{ctx.account.id}", json=body)
+    assert (
+        response.status_code == 422
+        and response.json()["detail"]["code"] == "account_invalid"
+    )
+
+
+def test_master_activation_and_automatic_issue_restart_server_cutoff(ctx, monkeypatch):
+    response = ctx.client.put(
+        PREFIX + f"/manage/accounts/{ctx.account.id}",
+        json=account_body(
+            ctx, active=False, auto_issue_enabled=False, upload_enabled=False
+        ),
+    )
+    assert response.status_code == 200
+    activated = ctx.client.put(
+        PREFIX + f"/manage/accounts/{ctx.account.id}",
+        json=account_body(ctx, active=True, auto_issue_enabled=False),
+    )
+    assert (
+        activated.status_code == 200 and service.aware(ctx.account.activated_at) == NOW
+    )
+    later = NOW + timedelta(hours=1)
+    monkeypatch.setattr(service, "now", lambda: later)
+    auto = ctx.client.put(
+        PREFIX + f"/manage/accounts/{ctx.account.id}",
+        json=account_body(ctx, auto_issue_enabled=True),
+    )
+    assert auto.status_code == 200 and service.aware(ctx.account.activated_at) == later
+
+
+def test_configuration_revision_tracks_mapping_and_effective_fiscal_fixes(ctx):
+    original = config(ctx)
+    mapping = ctx.db.query(FiscalSkuMapping).one()
+    changed = ctx.client.put(
+        PREFIX + f"/manage/mappings/{mapping.id}",
+        json={
+            "account_id": ctx.account.id,
+            "seller_sku": "SKU_REVIEWED",
+            "product_id": ctx.product.id,
+            "active": True,
+        },
+    )
+    assert changed.status_code == 200
+    mapped = config(ctx)
+    assert mapped["configuration_revision"] != original["configuration_revision"]
+    assert (
+        mapped["accounts"][0]["configuration_revision"]
+        != original["accounts"][0]["configuration_revision"]
+    )
+    ctx.fiscal["ncm"] = "23091000"
+    fixed = config(ctx)
+    assert fixed["configuration_revision"] != mapped["configuration_revision"]
+    assert (
+        fixed["accounts"][0]["configuration_revision"]
+        != mapped["accounts"][0]["configuration_revision"]
+    )
+
+
+def test_configuration_changes_without_hashing_stock_or_catalog_price(ctx):
+    before = config(ctx)
+    ctx.product.estoque_atual = 42
+    ctx.product.preco_venda = 999
+    ctx.db.commit()
+    assert config(ctx)["configuration_revision"] == before["configuration_revision"]
+
+
+def test_inactive_master_blocks_new_emission_but_preserves_authorized_documents(ctx):
+    state = prepare(ctx)
+    ctx.provider.status = 3
+    emit(ctx, state)
+    content = service.xml_document(ctx.db, TENANT, state["id"])[1]
+    disabled = ctx.client.put(
+        PREFIX + f"/manage/accounts/{ctx.account.id}",
+        json=account_body(
+            ctx, active=False, auto_issue_enabled=False, upload_enabled=False
+        ),
+    )
+    assert disabled.status_code == 200
+    assert service.xml_document(ctx.db, TENANT, state["id"])[1] == content
+    fresh = facts()
+    fresh["external_order_id"] = "701-0000000-0000001"
+    blocked = prepare(ctx, fresh)
+    assert blocked["status"] == "blocked"
+    ctx.api.issue_document.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "javascript:alert(1)",
+        "https://user:private@corepet.com.br",
+        "https://corepet.com.br/api",
+        "https://[::1",
+    ],
+)
+def test_authority_settings_url_never_exposes_credentials_or_unsafe_scheme(
+    ctx, monkeypatch, url
+):
+    monkeypatch.setattr(configuration.settings, "COREPET_FRONTEND_URL", url)
+    result = config(ctx)
+    assert result["corepet_settings_url"] is None
+    assert "private" not in str(result)
+
+
+def test_database_defaults_do_not_activate_master_or_upload(ctx):
+    ctx.db.execute(
+        text(
+            "INSERT INTO ecommerceai_fiscal_accounts "
+            "(tenant_id,channel,seller_id,marketplace_id,emitter_cnpj,auto_issue_enabled,discount_policy,approved_by_user_id) "
+            "VALUES (:tenant,'amazon','RAW_DEFAULT','A2Q3Y263D00KWC',:cnpj,0,'source_discounts',77)"
+        ),
+        {"tenant": TENANT.hex, "cnpj": CNPJ},
+    )
+    ctx.db.commit()
+    row = (
+        ctx.db.query(FiscalAccount)
+        .filter(
+            FiscalAccount.tenant_id == TENANT, FiscalAccount.seller_id == "RAW_DEFAULT"
+        )
+        .one()
+    )
+    assert (
+        row.active is False
+        and row.upload_enabled is False
+        and row.configuration_version == 1
+    )

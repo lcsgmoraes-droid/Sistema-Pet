@@ -8,6 +8,7 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.audit_log import log_action
 from app.db import get_session
 from app.ecommerceai_fiscal import service
+from app.ecommerceai_fiscal import configuration
 from app.ecommerceai_fiscal.models import (
     FiscalAccount,
     FiscalSkuMapping,
@@ -110,21 +111,11 @@ def run(db, operation):
         )
 
 
-def account_view(row):
-    return {
-        key: getattr(row, key)
-        for key in (
-            "id",
-            "channel",
-            "seller_id",
-            "marketplace_id",
-            "emitter_cnpj",
-            "active",
-            "auto_issue_enabled",
-            "activated_at",
-            "discount_policy",
-        )
-    }
+def account_view(row, db=None):
+    result = configuration.public_account(row)
+    if db is not None:
+        result["configuration_revision"] = configuration.account_revision(db, row)
+    return result
 
 
 def get_account(db, tenant_id, account_id, *, lock=False):
@@ -151,9 +142,11 @@ def save_account(db, tenant_id, user_id, body, account_id=None):
         service.fail(
             "seller_invalid", "Informe o Seller ID exato da conta Amazon.", 422
         )
-    if body.auto_issue_enabled and not body.active:
+    if (body.auto_issue_enabled or body.upload_enabled) and not body.active:
         service.fail(
-            "account_invalid", "Uma conta inativa não pode ter emissão automática.", 422
+            "account_invalid",
+            "Ative o fluxo antes de autorizar emissão ou upload automático.",
+            422,
         )
     row = (
         get_account(db, tenant_id, account_id, lock=True)
@@ -167,8 +160,11 @@ def save_account(db, tenant_id, user_id, body, account_id=None):
             409,
         )
     previous = account_view(row) if account_id else {}
-    if body.auto_issue_enabled and not row.auto_issue_enabled:
+    if (body.active and not row.active) or (
+        body.auto_issue_enabled and not row.auto_issue_enabled
+    ):
         row.activated_at = service.now()
+    row.configuration_version = int(row.configuration_version or 0) + 1
     for key, value in body.model_dump().items():
         setattr(row, key, value)
     row.approved_by_user_id = user_id
@@ -192,7 +188,7 @@ def save_account(db, tenant_id, user_id, body, account_id=None):
         commit=False,
     )
     db.commit()
-    return account_view(row)
+    return account_view(row, db)
 
 
 def mapping_view(db, row):
@@ -216,7 +212,7 @@ def mapping_view(db, row):
 def accounts(db: Session = Depends(get_session), pair=Depends(reader)):
     return {
         "items": [
-            account_view(row)
+            account_view(row, db)
             for row in db.query(FiscalAccount)
             .filter(FiscalAccount.tenant_id == pair[1])
             .order_by(FiscalAccount.id)
@@ -287,7 +283,7 @@ def mappings(
 
 def save_mapping(db, pair, body, mapping_id=None):
     tenant_id = pair[1]
-    get_account(db, tenant_id, body.account_id, lock=True)
+    account = get_account(db, tenant_id, body.account_id, lock=True)
     if body.seller_sku != body.seller_sku.strip() or not body.seller_sku.strip():
         service.fail("sku_invalid", "Informe o SKU exato, sem espaços adicionais.", 422)
     product = (
@@ -316,6 +312,7 @@ def save_mapping(db, pair, body, mapping_id=None):
     for key, value in body.model_dump().items():
         setattr(row, key, value)
     row.approved_by_user_id = pair[0].id
+    account.configuration_version = int(account.configuration_version or 0) + 1
     db.add(row)
     try:
         db.flush()
@@ -477,6 +474,15 @@ def human_danfe(
     api=Depends(api_client),
 ):
     return run(db, lambda: danfe_response(db, pair[1], order_id, api))
+
+
+@router.get("/configuration/accounts")
+def machine_configuration(
+    db: Session = Depends(get_session), connection=Depends(reader_connection)
+):
+    return run(
+        db, lambda: configuration.configuration_accounts(db, connection.tenant_id)
+    )
 
 
 @router.post("/orders")

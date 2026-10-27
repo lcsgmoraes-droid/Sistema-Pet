@@ -12,7 +12,10 @@ const hash = "a".repeat(64);
 test.use({ channel: "chrome" });
 test.skip(!local || !process.env.E2E_BASE_URL, "requer frontend local e APIs simuladas");
 
-async function setup(page, { pending = false, historical = false, central = false } = {}) {
+async function setup(
+  page,
+  { pending = false, historical = false, central = false, configured = false } = {},
+) {
   const tenant = { id: "qa-amazon-fiscal", name: "Empresa Sintética QA", login_name: "qa" };
   const user = { id: 42001, name: "Operador QA", is_admin: true, role: { name: "admin" }, tenant };
   const state = {
@@ -78,6 +81,18 @@ async function setup(page, { pending = false, historical = false, central = fals
       },
     },
   };
+  if (configured)
+    state.accounts = [
+      {
+        id: 7,
+        seller_id: "SELLER-SINTETICO-QA",
+        emitter_cnpj: "11222333000181",
+        auto_issue_enabled: true,
+        upload_enabled: true,
+        active: true,
+        discount_policy: "source_discounts",
+      },
+    ];
   await page.addInitScript(
     ({ user, tenant }) => {
       globalThis.localStorage.setItem("access_token", "token-sintetico-sem-validade");
@@ -125,7 +140,7 @@ async function setup(page, { pending = false, historical = false, central = fals
           const account = {
             id: 7,
             ...request.postDataJSON(),
-            activated_at: request.postDataJSON().auto_issue_enabled ? "2026-10-27T12:00:00Z" : null,
+            activated_at: request.postDataJSON().active ? "2026-10-27T12:00:00Z" : null,
           };
           state.accounts = [account];
           return route.fulfill({ json: account });
@@ -261,8 +276,12 @@ test("aprovação fiscal, ativação e desconto dependem de escolhas explícitas
   await page.getByRole("button", { name: "Cadastrar conta fiscal Amazon", exact: true }).click();
   let dialog = page.getByRole("dialog", { name: "Cadastrar conta fiscal Amazon" });
   await expect(
-    dialog.getByLabel("Autorizo emissão automática de novos pedidos desta loja"),
+    dialog.getByLabel("Ativar fluxo de pedidos Amazon com EcommerceAI nesta empresa"),
   ).not.toBeChecked();
+  await expect(
+    dialog.getByLabel("Emitir NF-e automaticamente após as validações"),
+  ).not.toBeChecked();
+  await expect(dialog.getByLabel("Emitir NF-e automaticamente após as validações")).toBeDisabled();
   await expect(dialog.getByRole("combobox", { name: "Política de descontos" })).toHaveValue(
     "Somente descontos explícitos do pedido",
   );
@@ -271,6 +290,9 @@ test("aprovação fiscal, ativação e desconto dependem de escolhas explícitas
   await dialog.getByRole("button", { name: "Salvar configuração", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   expect(state.accounts[0].auto_issue_enabled).toBe(false);
+  expect(state.accounts[0].upload_enabled).toBe(false);
+  expect(state.accounts[0].active).toBe(false);
+  await expect(page.getByText(/Configure também a fila fiscal/)).toHaveCount(0);
   expect(state.accounts[0].discount_policy).toBe("source_discounts");
   expect(state.mutations[1].body).not.toHaveProperty("activated_at");
   await page.getByRole("button", { name: "Configurar", exact: true }).click();
@@ -286,11 +308,32 @@ test("aprovação fiscal, ativação e desconto dependem de escolhas explícitas
     .getByText("Autorizo ajustar o desconto ao pagamento documentado", { exact: true })
     .click();
   await dialog
-    .getByText("Autorizo emissão automática de novos pedidos desta loja", { exact: true })
+    .getByText("Ativar fluxo de pedidos Amazon com EcommerceAI nesta empresa", {
+      exact: true,
+    })
     .click();
   await dialog.getByRole("button", { name: "Salvar configuração", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   expect(state.accounts[0].activated_at).toBe("2026-10-27T12:00:00Z");
+  expect(state.accounts[0].upload_enabled).toBe(false);
+  expect(state.accounts[0].active).toBe(true);
+  expect(state.accounts[0].auto_issue_enabled).toBe(false);
+  await page.getByRole("button", { name: "Configurar", exact: true }).click();
+  dialog = page.getByRole("dialog", { name: "Configurar conta Amazon" });
+  await dialog.getByText("Emitir NF-e automaticamente após as validações", { exact: true }).click();
+  await dialog.getByRole("button", { name: "Salvar configuração", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(state.accounts[0].auto_issue_enabled).toBe(true);
+  expect(state.accounts[0].upload_enabled).toBe(false);
+  await page.getByRole("button", { name: "Configurar", exact: true }).click();
+  dialog = page.getByRole("dialog", { name: "Configurar conta Amazon" });
+  await dialog
+    .getByText("Autorizar envio automático do XML à Amazon quando permitido", { exact: true })
+    .click();
+  await dialog.getByRole("button", { name: "Salvar configuração", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(state.accounts[0].upload_enabled).toBe(true);
+  expect(state.accounts[0].auto_issue_enabled).toBe(true);
   await page.getByRole("button", { name: "Mapear SKUs", exact: true }).click();
   dialog = page.getByRole("dialog", { name: /Mapear SKUs Amazon/ });
   await dialog.getByLabel("SKU exato na Amazon").fill("AMZ-Kit-QA");
@@ -307,6 +350,49 @@ test("aprovação fiscal, ativação e desconto dependem de escolhas explícitas
     seller_sku: "AMZ-Kit-QA",
     product_id: 42005,
   });
+});
+
+test("conexão antiga aguarda escopos fiscais e permite desativar sem conceder novos acessos", async ({
+  page,
+}) => {
+  const state = await setup(page, { configured: true });
+  await expect(
+    page.getByText("Fluxo: Aguardando permissões fiscais", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Envio XML: Aguardando permissões fiscais", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Configurar", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Configurar conta Amazon" });
+  await dialog
+    .getByText("Ativar fluxo de pedidos Amazon com EcommerceAI nesta empresa", {
+      exact: true,
+    })
+    .click();
+  await expect(
+    dialog.getByLabel("Ativar fluxo de pedidos Amazon com EcommerceAI nesta empresa"),
+  ).toBeDisabled();
+  await expect(
+    dialog.getByLabel("Autorizar envio automático do XML à Amazon quando permitido"),
+  ).toBeDisabled();
+  await dialog.getByRole("button", { name: "Salvar configuração", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(state.mutations).toEqual([
+    {
+      path: `${base}/accounts/7`,
+      body: {
+        channel: "amazon",
+        seller_id: "SELLER-SINTETICO-QA",
+        marketplace_id: "A2Q3Y263D00KWC",
+        emitter_cnpj: "11222333000181",
+        auto_issue_enabled: false,
+        upload_enabled: false,
+        discount_policy: "source_discounts",
+        active: false,
+      },
+    },
+  ]);
+  expect(state.scopes).toEqual(["catalog:read"]);
 });
 
 test("revisão confirma versão antes de emitir e autorização não afirma aceite Amazon", async ({

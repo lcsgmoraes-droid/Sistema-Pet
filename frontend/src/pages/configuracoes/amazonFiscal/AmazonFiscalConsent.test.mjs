@@ -35,7 +35,7 @@ test("conta nova inicia sem automação e exige confirmação específica ao mud
     },
   );
   assert.equal(
-    control(harness, "Autorizo emissão automática de novos pedidos desta loja").props.checked,
+    control(harness, "Ativar fluxo de pedidos Amazon com EcommerceAI nesta empresa").props.checked,
     false,
   );
   assert.equal(control(harness, "Política de descontos").props.value, "source_discounts");
@@ -47,12 +47,62 @@ test("conta nova inicia sem automação e exige confirmação específica ao mud
     false,
   );
   assert.match(
-    control(harness, "Autorizo emissão automática de novos pedidos desta loja").props.help,
+    control(harness, "Ativar fluxo de pedidos Amazon com EcommerceAI nesta empresa").props.help,
     /Pedidos anteriores exigem/,
   );
-  const save = elements(harness.tree.props.rodape).find((item) => item.type === "BotaoSalva");
-  await harness.act(() => save.props.onClick());
+  const save = () => elements(harness.tree.props.rodape).find((item) => item.type === "BotaoSalva");
+  await harness.act(() => save().props.onClick());
   assert.equal(saved[0].discount_consent, false);
+  assert.equal(saved[0].upload_enabled, false);
+  assert.equal(saved[0].active, false);
+  assert.equal(
+    control(harness, "Emitir NF-e automaticamente após as validações").props.disabled,
+    true,
+  );
+  await harness.act(() =>
+    control(harness, "Ativar fluxo de pedidos Amazon com EcommerceAI nesta empresa").props.onChange(
+      true,
+    ),
+  );
+  await harness.act(() => save().props.onClick());
+  assert.equal(saved.at(-1).active, true);
+  assert.equal(saved.at(-1).auto_issue_enabled, false);
+  await harness.act(() =>
+    control(harness, "Emitir NF-e automaticamente após as validações").props.onChange(true),
+  );
+  await harness.act(() => save().props.onClick());
+  assert.equal(saved.at(-1).auto_issue_enabled, true);
+  assert.equal(saved.at(-1).upload_enabled, false);
+  await harness.act(() =>
+    control(harness, "Autorizar envio automático do XML à Amazon quando permitido").props.onChange(
+      true,
+    ),
+  );
+  await harness.act(() => save().props.onClick());
+  assert.equal(saved.at(-1).upload_enabled, true);
+  await harness.update({ hasFiscalScopes: false });
+  assert.match(elementText(harness.tree), /ainda precisa das permissões fiscais aprovadas/);
+  await harness.act(() =>
+    control(harness, "Ativar fluxo de pedidos Amazon com EcommerceAI nesta empresa").props.onChange(
+      false,
+    ),
+  );
+  assert.equal(
+    control(harness, "Ativar fluxo de pedidos Amazon com EcommerceAI nesta empresa").props.disabled,
+    true,
+  );
+  assert.equal(
+    control(harness, "Emitir NF-e automaticamente após as validações").props.checked,
+    false,
+  );
+  assert.equal(
+    control(harness, "Autorizar envio automático do XML à Amazon quando permitido").props.checked,
+    false,
+  );
+  assert.equal(
+    control(harness, "Autorizar envio automático do XML à Amazon quando permitido").props.disabled,
+    true,
+  );
 });
 
 for (const fiscal of [true, false])

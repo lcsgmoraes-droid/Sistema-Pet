@@ -1,4 +1,4 @@
-# Pedidos Amazon e NF-e CorePet — contrato v1
+# Pedidos Amazon e NF-e CorePet — contrato v1.1
 
 O EcommerceAI importa os fatos do pedido e coordena a fila. O CorePet resolve
 produto e tributacao, emite NF-e 55 e guarda o XML autorizado. O EcommerceAI
@@ -12,9 +12,17 @@ fiscal nao cria outra Venda, recebimento, conta ou movimento de estoque.
   Conexoes antigas nao recebem esses poderes automaticamente.
 - Um operador configura `(tenant, channel=amazon, seller_id)`, confere o CNPJ do
   emitente e vincula cada SKU ao produto/kit CorePet. Nunca resolver por titulo.
-- Emissao automatica comeca desativada; ativacao humana registra data e politica
-  de descontos. Pedido anterior a ativacao exige vinculo com nota existente ou
-  revisao explicita, nunca uma nova emissao automatica.
+- Toda configuracao fiscal fica no CorePet, por empresa e seller. `active`,
+  `auto_issue_enabled` e `upload_enabled` comecam falsos. O primeiro permite
+  importar/preparar; os outros permitem emissao sem confirmacao individual e
+  envio do XML. Os dois ultimos exigem `active=true`.
+- Ativacao humana registra o corte temporal e a politica de descontos. Pedido
+  anterior ao corte exige vinculo com nota existente ou revisao explicita,
+  nunca uma nova emissao automatica. Desativar interrompe novos disparos,
+  preservando consulta, documentos e reconciliacao de tentativas existentes.
+- O EcommerceAI recebe um espelho somente leitura dessa configuracao. Nao ha
+  segunda ativacao, CNPJ ou politica editavel nele. Contas sem consentimento
+  permanecem fora da fila, inclusive tenants que seguem emitindo pelo Bling.
 - Identidade permanente do pedido: `(tenant_id, channel, seller_id,
   external_order_id)`, inclusive depois de reconectar a integracao.
 
@@ -22,6 +30,10 @@ fiscal nao cria outra Venda, recebimento, conta ou movimento de estoque.
 
 Prefixo: `/integracoes/ecommerceai/fiscal`.
 
+- `GET /configuration/accounts`: configuracao autorizada por tenant, exige
+  `fiscal:read`. Retorna contas, corte, revisao da configuracao e URL segura da
+  tela CorePet `/configuracoes/integracoes`. A revisao cobre mapeamentos e dados
+  fiscais efetivos, permitindo reavaliar bloqueios depois de uma correcao.
 - `POST /orders`: preparar/upsert; exige `fiscal:prepare`.
 - `GET /orders/{id}`: consultar estado local; exige `fiscal:read`.
 - `POST /orders/{id}/emitir`: emitir a revisao esperada; exige `fiscal:issue` e
@@ -137,6 +149,12 @@ O EcommerceAI persiste o trabalho fiscal por usuario/conta/pedido antes da rede,
 com revisao, hash e lease. Importacao de pedido Unshipped/PartiallyShipped
 alimenta a fila; backstop agendado recupera trabalhos. Nao esperar etiqueta,
 package ou `ORDER_CHANGE.processed`, pois o agendamento DBA depende da NF.
+O worker atualiza o espelho por conexao autorizada e importa novos pedidos so
+das contas ativas, com cursor fiscal proprio e respeitando o corte. Esse job
+nao depende da chave global de sincronizacao Amazon nem ativa fluxos Bling.
+`active=true` com emissao automatica desligada prepara rascunhos para revisao
+e confirmacao no CorePet. Antes de cada novo envio do XML, o EcommerceAI confere
+novamente consentimento, seller, emitente e conexao na fonte CorePet.
 
 O CorePet persiste chave idempotente, payload e estado antes do POST IntNFe.
 Resposta incerta consulta o mesmo documento; nunca cria outra nota. Nao renovar
@@ -187,5 +205,7 @@ Modelo oficial: [Delivery Shipment Invoicing](https://github.com/amzn/selling-pa
 Fixtures ficticias, emissor e Amazon simulados em DEV. Cobrir isolamento,
 reconexao, duas execucoes concorrentes, timeout, snapshot alterado, dados
 ausentes, pagamentos, kits, XML adulterado e aceite parcial. Nenhuma nota real
-sera emitida por testes. Publicacao e ativacao em producao dependem de
-autorizacao explicita, apos a demonstracao e os testes.
+sera emitida por testes. Lucas autorizou a publicacao nos dois sistemas em
+2026-10-26. A publicacao preserva os controles desligados; a ativacao da conta
+ocorre exclusivamente na tela CorePet, apos configurar produtos e validar a
+conexao. A aprovacao de publicacao nao expande escopos de conexoes antigas.

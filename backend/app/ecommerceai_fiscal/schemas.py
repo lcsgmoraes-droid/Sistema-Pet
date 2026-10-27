@@ -89,8 +89,9 @@ class AccountInput(StrictModel):
     seller_id: str = Field(min_length=1, max_length=80)
     marketplace_id: Literal["A2Q3Y263D00KWC"] = "A2Q3Y263D00KWC"
     emitter_cnpj: str = Field(pattern=r"^[0-9]{14}$")
-    active: bool = True
+    active: bool = False
     auto_issue_enabled: bool = False
+    upload_enabled: bool = False
     discount_policy: Literal["source_discounts", "buyer_payment_total"] = (
         "source_discounts"
     )

@@ -19,7 +19,8 @@ export default function AmazonFiscalPanel({ scopes = [] }) {
         <div>
           <h2 className="text-lg font-semibold">NF-e de pedidos Amazon</h2>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            Configure a loja e os produtos para preparar e emitir NF-e pelo CorePet.
+            Configure e ative o fluxo por conta Amazon (Seller ID) desta empresa. CNPJ, SKUs,
+            descontos, emissão e autorização de envio do XML são definidos aqui no CorePet.
           </p>
         </div>
         <BotaoInteracao
@@ -105,8 +106,28 @@ export default function AmazonFiscalPanel({ scopes = [] }) {
                       </td>
                       <td className="p-2">
                         <p>
-                          {account.auto_issue_enabled ? "Ativada" : "Desativada"}
-                          {account.active === false ? " · conta inativa" : ""}
+                          Fluxo:{" "}
+                          {!account.active
+                            ? "Desativado"
+                            : !hasFiscalScopes
+                              ? "Aguardando permissões fiscais"
+                              : "Ativado"}
+                        </p>
+                        <p>
+                          Emissão:{" "}
+                          {account.active && account.auto_issue_enabled
+                            ? hasFiscalScopes
+                              ? "Automática após validação"
+                              : "Aguardando permissões fiscais"
+                            : "Com confirmação por pedido"}
+                        </p>
+                        <p>
+                          Envio XML:{" "}
+                          {!account.upload_enabled
+                            ? "Desativado"
+                            : !hasFiscalScopes
+                              ? "Aguardando permissões fiscais"
+                              : "Habilitado"}
                         </p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">
                           Corte: {formatFiscalDate(account.activated_at)}
@@ -134,6 +155,7 @@ export default function AmazonFiscalPanel({ scopes = [] }) {
       {editingAccount && (
         <AmazonFiscalAccountForm
           account={editingAccount}
+          hasFiscalScopes={hasFiscalScopes}
           busy={fiscal.busy}
           error={fiscal.error}
           onClose={() => setEditingAccount(null)}

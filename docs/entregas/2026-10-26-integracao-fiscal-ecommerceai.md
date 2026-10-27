@@ -22,7 +22,8 @@ Cancelamentos antigos e automação de recebimentos/estoque ficam fora do escopo
 
 ## 2. Regras de negócio e dados
 
-CorePet é autoridade de produtos, tributação, numeração, emissor e XML.
+CorePet é autoridade da ativação por empresa, produtos, tributação, numeração,
+emitente, política de descontos e consentimento de upload do XML.
 EcommerceAI é autoridade dos fatos comerciais Amazon e da coordenação da fila.
 A identidade tenant/canal/seller/pedido sobrevive à reconexão. Descontos seguem
 política explícita; valores de origem e ajuste ficam auditados. Novas tabelas
@@ -97,13 +98,19 @@ exigir reconciliação humana. Falha que afete emissão é incidente fiscal P1.
 ## 9. Mudança, comunicação e treinamento
 
 Operação: no CorePet, Integrações → EcommerceAI → NF-e de pedidos Amazon;
-autorizar escopos, cadastrar conta e mapear SKUs. No EcommerceAI, Integrações →
-Amazon · Notas fiscais pelo CorePet; configurar a mesma empresa/política e ativar.
+autorizar escopos, cadastrar conta e mapear SKUs. Ativar o fluxo nessa empresa;
+escolher separadamente emissão automática e envio do XML. Todos começam
+desligados. Com o fluxo ativo e emissão automática desligada, a fila prepara
+rascunhos para confirmação no CorePet. No EcommerceAI, Integrações → Amazon ·
+Notas fiscais pelo CorePet mostra a configuração recebida e o andamento;
+não exige outra ativação. Tenants que usam Bling mantêm seu fluxo atual.
 Revisar pendências pela fila. “NF autorizada” e “Aceito pela Amazon” são etapas
 distintas. Treinamento necessário: configuração inicial e tratamento das exceções.
 
 ## 10. Fechamento
 
-Código e testes locais preparados para revisão técnica. Publicação, homologação
-com a conta real e ativação dependem da autorização explícita de Lucas. A ficha
-e o contrato não autorizam comandos em produção nem concedem acesso novo.
+Lucas autorizou abrir o PR e publicar nos dois sistemas em 2026-10-26.
+Homologação com a conta real depende das permissões Amazon e da configuração
+por empresa no CorePet. A publicação mantém a automação desligada e não
+concede escopos fiscais a conexões antigas. Registrar os SHAs publicados e os
+resultados do smoke na entrega após concluir o fluxo oficial de cada sistema.

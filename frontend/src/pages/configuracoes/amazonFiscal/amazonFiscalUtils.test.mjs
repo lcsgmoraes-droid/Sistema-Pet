@@ -26,6 +26,9 @@ test("configuração não envia datas ou permissões inventadas e rejeita polít
   assert.equal(account.seller_id, "QA");
   assert.equal(account.discount_policy, "source_discounts");
   assert.equal(account.auto_issue_enabled, false);
+  assert.equal(account.upload_enabled, false);
+  assert.equal(account.active, false);
+  assert.equal(accountPayload({ ...account, upload_enabled: true }).upload_enabled, true);
   assert.equal("scopes" in account, false);
   assert.equal("activated_at" in account, false);
   assert.throws(() => accountPayload({ ...account, discount_policy: "inventada" }), /política/);

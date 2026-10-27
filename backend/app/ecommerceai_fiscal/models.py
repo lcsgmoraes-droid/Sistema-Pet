@@ -7,6 +7,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Index,
     CheckConstraint,
+    false,
 )
 from app.base_models import BaseTenantModel
 
@@ -28,8 +29,14 @@ class FiscalAccount(BaseTenantModel):
     seller_id = Column(String(80), nullable=False)
     marketplace_id = Column(String(80), nullable=False)
     emitter_cnpj = Column(String(14), nullable=False)
-    active = Column(Boolean, nullable=False, default=True)
+    active = Column(Boolean, nullable=False, default=False, server_default=false())
     auto_issue_enabled = Column(Boolean, nullable=False, default=False)
+    upload_enabled = Column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    configuration_version = Column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
     activated_at = Column(DateTime(timezone=True))
     discount_policy = Column(String(40), nullable=False, default="source_discounts")
     approved_by_user_id = Column(Integer, nullable=False)

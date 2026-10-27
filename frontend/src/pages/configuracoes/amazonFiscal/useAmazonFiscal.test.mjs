@@ -90,6 +90,7 @@ test("política padrão e automação desativada; política por pagamento exige 
   await harness.act(() => harness.tree.saveAccount(form));
   assert.equal(calls.length, 1);
   assert.equal(calls[0].body.auto_issue_enabled, false);
+  assert.equal(calls[0].body.upload_enabled, false);
   assert.equal(calls[0].body.emitter_cnpj, "11222333000181");
   assert.equal("activated_at" in calls[0].body, false);
   calls[0].resolve({ data: {} });

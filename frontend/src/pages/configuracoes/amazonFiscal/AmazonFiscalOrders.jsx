@@ -115,8 +115,8 @@ export default function AmazonFiscalOrders({ fiscal }) {
         </table>
         {!fiscal.orders.length && (
           <p className="p-4 text-sm text-slate-500 dark:text-slate-400">
-            Nenhum pedido encontrado. Ative a fila fiscal da conta no EcommerceAI para receber os
-            pedidos.
+            Nenhum pedido encontrado. Cadastre a conta Amazon, mapeie os SKUs e ative o fluxo
+            automático nesta tela para receber os novos pedidos pelo EcommerceAI.
           </p>
         )}
       </div>

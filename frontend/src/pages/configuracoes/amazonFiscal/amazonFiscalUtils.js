@@ -49,7 +49,8 @@ export function accountPayload(form) {
     emitter_cnpj: cnpj,
     discount_policy: form.discount_policy || "source_discounts",
     auto_issue_enabled: Boolean(form.auto_issue_enabled),
-    active: form.active !== false,
+    upload_enabled: Boolean(form.upload_enabled),
+    active: form.active === true,
   };
 }
 
