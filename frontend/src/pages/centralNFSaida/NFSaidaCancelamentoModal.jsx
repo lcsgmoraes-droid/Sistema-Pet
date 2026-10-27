@@ -54,16 +54,7 @@ export default function NFSaidaCancelamentoModal({
             </p>
             <p className="text-sm text-gray-600">
               <strong>Cliente:</strong>{" "}
-              <CustomerIdentity
-                code={
-                  modalCancelar.cliente?.codigo ||
-                  modalCancelar.cliente_id ||
-                  modalCancelar.cliente?.id
-                }
-                customer={modalCancelar.cliente}
-                fallback="N/A"
-                layout="inline"
-              />
+              <CustomerIdentity customer={modalCancelar.cliente} fallback="N/A" layout="inline" />
             </p>
           </div>
           <InputTextoLongo

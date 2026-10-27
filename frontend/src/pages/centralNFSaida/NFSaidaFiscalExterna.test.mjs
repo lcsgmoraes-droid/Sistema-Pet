@@ -75,3 +75,71 @@ test("documentos externos usam ID fiscal estável e endpoint management", () => 
   assert.equal(harness.tree, "/integracoes/ecommerceai/fiscal/manage/orders/9/xml");
   assert.doesNotMatch(harness.tree, /vendas|undefined/);
 });
+
+for (const modal of ["NFSaidaDetalhesModal", "NFSaidaCancelamentoModal"]) {
+  for (const codigo of ["1848", undefined]) {
+    test(`${modal} usa código público e nunca promove ID técnico quando código é ${codigo || "ausente"}`, () => {
+      const nota = {
+        id: 99,
+        numero: 1,
+        modelo: 55,
+        tipo: "nfe",
+        status: "autorizada",
+        valor: 10,
+        cliente_id: 47644,
+        cliente: { id: 47644, nome: "Pessoa fictícia", ...(codigo ? { codigo } : {}) },
+      };
+      const harness = createControllerHarness(
+        fileURLToPath(new URL(`./${modal}.jsx`, import.meta.url)),
+        {
+          props: {
+            notaSelecionada: nota,
+            modalCancelar: nota,
+            justificativa: "",
+            detalheNota: null,
+          },
+          mocks: new Map([
+            ["lucide-react", new Proxy({}, { get: (_target, key) => String(key) })],
+            ["../../components/ui/CustomerIdentity", "CustomerIdentity"],
+            ["../../components/v2/BotaoCancelar/BotaoCancelar", "BotaoCancelar"],
+            ["../../components/v2/BotaoInteracao/BotaoInteracao", "BotaoInteracao"],
+            ["../../components/v2/InputTextoLongo/InputTextoLongo", "InputTextoLongo"],
+            ["../../utils/formatters", { formatMoneyBRL: String }],
+            [
+              "../../utils/fiscalRejectionGuidance.mjs",
+              { rejeicaoResponsavelTecnico: () => false },
+            ],
+            ["../../utils/pdvFiscalStatus", { obterPendenciaCancelamentoFiscal: () => null }],
+            [
+              "./centralNFSaidaUtils",
+              {
+                formatarDataBR: () => "",
+                formatarValorDetalhe: String,
+                getSituacaoCor: () => "",
+                getSituacaoIcone: () => null,
+                valorBooleanoLabel: String,
+              },
+            ],
+          ]),
+        },
+      );
+      const identidade = elements(harness.tree).find((node) => node.type === "CustomerIdentity");
+      assert.ok(identidade);
+      const renderIdentidade = createControllerHarness(
+        fileURLToPath(new URL("../../components/ui/CustomerIdentity.jsx", import.meta.url)),
+        {
+          props: identidade.props,
+          mocks: new Map([
+            ["./CopyableCode", "CopyableCode"],
+            ["./CopyableValue", "CopyableValue"],
+          ]),
+        },
+      );
+      const exibido = elements(renderIdentidade.tree).find((node) => node.type === "CopyableCode");
+      assert.equal(exibido?.props.value, codigo);
+      assert.notEqual(exibido?.props.value, "47644");
+      renderIdentidade.unmount();
+      harness.unmount();
+    });
+  }
+}

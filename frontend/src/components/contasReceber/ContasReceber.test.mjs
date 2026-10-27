@@ -349,3 +349,69 @@ test("emissão pelo histórico abre o comprovante existente sem lançar outro pa
   await harness.act(() => comprovantes(harness).onClose());
   assert.equal(posts(chamadas).length, 0);
 });
+
+for (const [codigo, esperado] of [
+  ["1848", "1848"],
+  [null, "—"],
+  [undefined, "—"],
+]) {
+  test(`detalhe da conta exibe ${esperado} como código público, sem promover o ID técnico`, () => {
+    const painel = createControllerHarness(
+      fileURLToPath(new URL("./ContasReceberPanels.jsx", import.meta.url)),
+      {
+        exportName: "ContasReceberDetalhesModal",
+        props: {
+          mostrarDetalhes: true,
+          contaSelecionada: { id: 11119 },
+          detalhesCompletos: {
+            cliente_id: 47644,
+            cliente: { id: 47644, codigo, nome: "Pessoa QA" },
+            status: "recebido",
+            datas: {},
+            valores: {},
+          },
+          formatarData: String,
+          formatarMoeda: String,
+        },
+        mocks: new Map([
+          ["lucide-react", {}],
+          ["../../api/clientes", { buscarClientes: async () => [] }],
+          ...[
+            "BuscaPessoa",
+            "InputTexto",
+            "InputData",
+            "InputCombobox",
+            "BotaoInteracao",
+            "RecebimentoCampos",
+            "InputCheck",
+            "InputMoeda",
+            "BotaoCancelar",
+            "BotaoSalva",
+          ].map((nome) => [`../v2/${nome}/${nome}`, padrao(nome)]),
+          ...[
+            "ActionButton",
+            "CustomerIdentity",
+            "DataTable",
+            "FilterBar",
+            "MoneyCell",
+            "StatusBadge",
+          ].map((nome) => [`../ui/${nome}`, padrao(nome)]),
+        ]),
+      },
+    );
+    const identidade = componente(painel, "CustomerIdentity");
+    const renderizado = createControllerHarness(
+      fileURLToPath(new URL("../ui/CustomerIdentity.jsx", import.meta.url)),
+      {
+        props: identidade.props,
+        mocks: new Map([
+          ["./CopyableCode", padrao("CopyableCode")],
+          ["./CopyableValue", padrao("CopyableValue")],
+        ]),
+      },
+    );
+    const codigoExibido = componente(renderizado, "CopyableCode").props.value;
+    assert.equal(codigoExibido, esperado);
+    assert.notEqual(codigoExibido, "47644");
+  });
+}

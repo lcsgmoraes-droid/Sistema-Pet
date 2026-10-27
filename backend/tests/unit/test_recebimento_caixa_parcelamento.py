@@ -13,13 +13,17 @@ from app.caixa.escopo import buscar_caixa_para_recebimento
 from app.caixa_models import Caixa, MovimentacaoCaixa
 from app.clientes import financeiro_baixa_lote_routes as lote_routes
 from app.contas_receber_recebimentos_routes import registrar_recebimento
+from app.contas_receber_consulta_routes import buscar_conta_receber
 from app.contas_receber_schemas import RecebimentoCreate
+from app.financeiro.contas_pagar_manutencao_routes import buscar_conta_pagar
 from app.financeiro.status_contas_receber import status_conta_receber
 from app.financeiro_models import (
     ContaReceber,
     MovimentacaoFinanceira,
     Recebimento,
     ContaBancaria,
+    ContaPagar,
+    Pagamento,
 )
 from app.financeiro_models import FormaPagamento, LancamentoManual
 from app.ia.aba5_models import FluxoCaixa
@@ -72,6 +76,57 @@ def _receber(c, **extras):
     dados = RecebimentoCreate(**campos)
     return asyncio.run(
         registrar_recebimento(c.conta.id, dados, None, c.db, (c.usuario, c.tenant))
+    )
+
+
+@pytest.mark.parametrize("tipo", ["receber", "pagar"])
+@pytest.mark.parametrize("codigo", ["1848", None])
+def test_detalhe_conta_retorna_codigo_publico_sem_usar_id(
+    recebimento, monkeypatch, tipo, codigo
+):
+    c = recebimento
+    pessoa = Cliente(
+        tenant_id=c.tenant,
+        nome="Pessoa QA código público",
+        codigo=codigo,
+        user_id=1,
+    )
+    c.db.add(pessoa)
+    c.db.flush()
+    if tipo == "receber":
+        c.conta.cliente_id = pessoa.id
+        conta = c.conta
+        buscar = buscar_conta_receber
+        chave = "cliente"
+        monkeypatch.setattr(
+            "app.contas_receber_consulta_routes.carregar_config_encargos",
+            lambda *_: None,
+        )
+    else:
+        Pagamento.__table__.create(c.db.bind)
+        conta = ContaPagar(
+            tenant_id=c.tenant,
+            fornecedor_id=pessoa.id,
+            user_id=1,
+            descricao="Fornecedor QA código público",
+            valor_original=100,
+            valor_final=100,
+            valor_pago=0,
+            data_emissao=date(2026, 10, 26),
+            data_vencimento=date(2026, 10, 26),
+        )
+        c.db.add(conta)
+        buscar = buscar_conta_pagar
+        chave = "fornecedor"
+    c.db.commit()
+
+    resultado = buscar(conta.id, c.db, (c.usuario, c.tenant))
+
+    assert resultado[chave]["id"] == pessoa.id
+    assert resultado[chave]["codigo"] == codigo
+    assert resultado[chave]["codigo"] != str(resultado[chave]["id"])
+    assert resultado[chave]["codigo"] is None or isinstance(
+        resultado[chave]["codigo"], str
     )
 
 

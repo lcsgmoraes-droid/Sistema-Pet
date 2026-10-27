@@ -8,6 +8,7 @@ import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
 import { Printer, X } from "lucide-react";
 import { safeArray } from "../../utils/safeArray";
 import { calcularSaldoFinanceiro } from "../../utils/financeiroStatus";
+import { obterCodigoPessoaPublico } from "../../utils/codigosPublicos";
 import RecebimentoCampos from "../v2/RecebimentoCampos/RecebimentoCampos";
 import InputCheck from "../v2/InputCheck/InputCheck";
 import InputMoeda from "../v2/InputMoeda/InputMoeda";
@@ -374,11 +375,7 @@ export function ContasReceberDetalhesModal({
                   <label className="block text-sm font-medium text-gray-700">Cliente</label>
                   <p className="mt-1 text-lg">
                     <CustomerIdentity
-                      code={
-                        detalhesCompletos.cliente?.codigo ||
-                        detalhesCompletos.cliente_id ||
-                        detalhesCompletos.cliente?.id
-                      }
+                      code={obterCodigoPessoaPublico(detalhesCompletos) || "—"}
                       customer={detalhesCompletos.cliente}
                       fallback="N/A"
                     />

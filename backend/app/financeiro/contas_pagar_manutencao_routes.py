@@ -665,6 +665,7 @@ def buscar_conta_pagar(
         "descricao": conta.descricao,
         "fornecedor": {
             "id": fornecedor.id if fornecedor else None,
+            "codigo": fornecedor.codigo if fornecedor else None,
             "nome": fornecedor.nome if fornecedor else None,
             "cnpj": fornecedor.cnpj if fornecedor else None,
         }

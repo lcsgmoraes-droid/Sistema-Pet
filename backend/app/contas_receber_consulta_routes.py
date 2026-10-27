@@ -353,6 +353,7 @@ def buscar_conta_receber(
         "cliente": (
             {
                 "id": cliente.id if cliente else None,
+                "codigo": cliente.codigo if cliente else None,
                 "nome": cliente.nome if cliente else None,
                 "cpf": cliente.cpf if cliente else None,
             }
