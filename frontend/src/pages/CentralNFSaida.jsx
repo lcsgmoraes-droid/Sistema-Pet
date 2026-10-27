@@ -18,10 +18,7 @@ import {
   temPendenciasFiscais,
 } from "../utils/nfeFiscalAssistida";
 import { solicitarCorrecaoFiscal } from "../services/fiscalCorrectionDialog";
-import {
-  mensagemDocumento,
-  metadadosDownloadDanfe,
-} from "../utils/documentoFiscalDownload.mjs";
+import { mensagemDocumento, metadadosDownloadDanfe } from "../utils/documentoFiscalDownload.mjs";
 import {
   MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO,
   rejeicaoResponsavelTecnico,
