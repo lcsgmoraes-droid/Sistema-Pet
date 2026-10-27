@@ -41,6 +41,20 @@ Backup e restore smoke do banco: `docs/PRODUCAO_BACKUP_RESTORE_TESTE.md`.
 
 O script `scripts/deploy_producao_seguro.sh` e o caminho oficial. Ele faz pull de `origin/main`, gera frontend, reconstrui a imagem `petshop-backend:prod`, sobe `postgres`, `backend`, `worker-bling` e `nginx`, aplica Alembic e valida health.
 
+Antes de publicar o frontend, `scripts/preserve_frontend_assets.py` acrescenta ao
+novo build os arquivos publicos de `assets/` usados pelas versoes anteriores.
+Por padrao eles continuam disponiveis por sete dias depois que deixam de fazer
+parte da versao ativa (`FRONTEND_ASSET_RETENTION_DAYS`, de 1 a 90 dias). Assim,
+abas abertas continuam carregando suas telas sem uma recarga forcada. Os arquivos
+herdados conservam o prazo original entre deploys; o build atual e o diretorio de
+rollback nao sao alterados pela retencao. HTML e marcadores de release sao sempre
+os novos. Assets ausentes retornam 404, sem receber HTML no lugar de JavaScript.
+
+Como recuperacao adicional de uma falha ao abrir uma tela, o frontend tenta uma
+navegacao atualizada uma vez por versao carregada, preservando rota e parametros
+e evitando repeticoes. Essa recuperacao nao e acionada por preloads em segundo
+plano, e nao limpa login, carrinho ou armazenamento de dados do sistema.
+
 Em todo deploy, o script reinstala e valida os wrappers restritos de deploy,
 status e restore smoke, junto das respectivas regras `sudo` sem senha. Assim, o
 acesso operacional se autocorrige caso um wrapper ou sua permissao seja perdido.
