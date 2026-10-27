@@ -85,7 +85,7 @@ defusedxml==0.7.1
     #   fpdf2
 distro==1.9.0
     # via openai
-dnspython==2.8.0
+dnspython==2.9.0
     # via email-validator
 email-validator==2.3.0
     # via -r requirements.txt
