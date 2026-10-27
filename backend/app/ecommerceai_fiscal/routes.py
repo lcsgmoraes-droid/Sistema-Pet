@@ -2,6 +2,8 @@
 
 from fastapi import APIRouter, Depends, Header, Response, Query
 from fastapi.encoders import jsonable_encoder
+from fastapi.concurrency import run_in_threadpool
+from uuid import UUID
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user_and_tenant
@@ -31,6 +33,7 @@ from app.routes.ecommerceai_integration_routes import (
     _require_scope,
 )
 from app.security.permissions_service import check_permission
+from app.tenancy.context import set_current_tenant
 
 router = APIRouter(
     prefix="/integracoes/ecommerceai/fiscal", tags=["EcommerceAI fiscal"]
@@ -52,11 +55,14 @@ def api_client():
         api.close()
 
 
-def machine_connection(
+async def machine_connection(
     authorization: str | None = Header(default=None), db: Session = Depends(get_session)
 ):
-    connection = _connection_for_token(db, authorization)
-    tenant = get_tenant(db, connection.tenant_id)
+    connection = await run_in_threadpool(_connection_for_token, db, authorization)
+    # Bind the validated tenant in ASGI; worker context changes do not return here.
+    tenant_id = UUID(str(connection.tenant_id))
+    set_current_tenant(tenant_id)
+    tenant = await run_in_threadpool(get_tenant, db, tenant_id)
     if str(tenant.status).lower() not in {"active", "ativo"}:
         service.fail(
             "tenant_inactive", "Empresa indisponível para esta integração.", 403
