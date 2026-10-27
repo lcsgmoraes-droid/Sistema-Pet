@@ -333,3 +333,17 @@ def test_categoria_de_modelo_invalida_e_recusada(db):
         asyncio.run(
             sender_module.send_whatsapp_template(db, TENANT, "s", "x", "promocao")
         )
+
+
+def test_fracao_de_centavo_e_arredondada_uma_vez_so_no_fechamento(db):
+    _tarifa(db, valor="0.3625")
+    db.commit()
+    _envio_cobravel(db, "wamid.r1")
+    _envio_cobravel(db, "wamid.r2")
+
+    consumo.fechar_mes(db, mes=MES, margem_percentual=20, admin=ADMIN)
+    db.commit()
+
+    fechamento = db.query(WhatsAppFechamento).one()
+    assert float(fechamento.custo_estimado) == 0.73  # 0,725 arredonda para cima
+    assert float(fechamento.valor_repasse) == 0.88  # 0,73 + 20%

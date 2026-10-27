@@ -9,6 +9,7 @@ import {
   FiHome,
   FiLayout,
   FiLogOut,
+  FiMessageSquare,
   FiServer,
   FiShield,
   FiUsers,
@@ -42,6 +43,12 @@ const navItems = [
     label: "Lojas e módulos",
     description: "Agrupamento e módulos ativos",
     icon: FiGrid,
+  },
+  {
+    to: "/ops/consumo-whatsapp",
+    label: "Consumo de WhatsApp",
+    description: "Mensagens, custo e repasse",
+    icon: FiMessageSquare,
   },
   {
     to: "/ops/observabilidade",

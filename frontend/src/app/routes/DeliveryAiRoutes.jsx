@@ -4,6 +4,7 @@ import {
   AlertasRacao,
   ChatIA,
   ConectarWhatsApp,
+  ConsumoWhatsApp,
   CrmPage,
   DashEntregasFinanceiro,
   EntregasAbertas,
@@ -52,6 +53,16 @@ export function createDeliveryAiRoutes() {
           <ProtectedRoute permission="crm.visualizar">
             <ModuleGate modulo="crm">
               <CrmPage />
+            </ModuleGate>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="crm/whatsapp/consumo"
+        element={
+          <ProtectedRoute permission="crm.configurar">
+            <ModuleGate modulo="crm">
+              <ConsumoWhatsApp />
             </ModuleGate>
           </ProtectedRoute>
         }

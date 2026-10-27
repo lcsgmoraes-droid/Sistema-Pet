@@ -285,9 +285,14 @@ export default function ConectarWhatsAppPage() {
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4 p-4 sm:p-6">
       <header>
-        <LinkPadrao to="/crm" tamanho="text-sm">
-          ← Voltar ao CRM
-        </LinkPadrao>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <LinkPadrao to="/crm" tamanho="text-sm">
+            ← Voltar ao CRM
+          </LinkPadrao>
+          <LinkPadrao to="/crm/whatsapp/consumo" tamanho="text-sm">
+            Ver consumo de mensagens
+          </LinkPadrao>
+        </div>
         <p className="m-0 mt-3 text-xs font-bold uppercase tracking-[0.18em] text-teal-700 dark:text-teal-300">
           Canal de WhatsApp
         </p>

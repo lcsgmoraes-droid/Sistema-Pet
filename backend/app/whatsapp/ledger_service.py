@@ -476,7 +476,8 @@ def resumo_do_periodo(
         "cobraveis_por_categoria": por_categoria,
         "enviadas_por_origem": por_origem,
         "por_estado": por_estado,
-        "custo_estimado": float(round(custo_estimado, 2)),
+        # Sem arredondar aqui: o fechamento arredonda uma unica vez (centavo, para cima).
+        "custo_estimado": float(custo_estimado),
     }
 
 
