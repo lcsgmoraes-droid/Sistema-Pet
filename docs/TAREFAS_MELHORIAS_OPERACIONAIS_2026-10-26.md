@@ -28,12 +28,11 @@ testes que gravam dados devem acontecer em DEV.
       migrações para conferir a cobertura tela por tela.
 - [x] **04 — Busca no gestor de campanhas.** Aplicar a busca compartilhada,
       priorizando o cliente com código ou nome mais próximo do termo digitado.
-- [ ] **05 — Códigos visíveis ao usuário.** Exibir o código público de clientes
+- [x] **05 — Códigos visíveis ao usuário.** Exibir o código público de clientes
       e produtos em todas as telas; IDs internos continuam apenas nas referências
-      técnicas. Conferir também seleção e pesquisa por código. Reaberto após a
-      conferência produtiva: o modal de detalhes da conta 11119 ainda mostra o ID
-      interno 47644 em vez do código público 1848. Correção pontual em andamento,
-      ainda sem validação/publicação confirmadas.
+      técnicas. Seleção e pesquisa por código validadas. Após a correção publicada
+      pelo PR #1570, o modal da conta 11119 foi conferido novamente em produção e
+      mostra o código público 1848 de Osvaldo, em vez do ID interno 47644.
 - [x] **06 — Célula compartilhada de recebimento.** Reutilizar o recebimento do
       PDV em pagamentos de contas a receber, preservando formas de pagamento,
       valores, parcelas e regras financeiras existentes.
@@ -77,7 +76,7 @@ testes que gravam dados devem acontecer em DEV.
 - [x] Testes automatizados focados aprovados por frente.
 - [x] Fluxos revisados no ambiente DEV, incluindo isolamento entre empresas.
 - [x] Build do frontend e `FLUXO_UNICO.bat release-check` aprovados.
-- [x] Mudanças revisadas, commitadas e integradas pelo PR #1567.
+- [x] Mudanças revisadas, commitadas e integradas pelos PRs #1567 e #1570.
 - [x] Publicação pelo fluxo oficial e verificação técnica após publicação.
 
 ## Evidências e andamento
@@ -230,14 +229,14 @@ Os códigos públicos foram auditados também nas APIs de NF, entregas e relató
   `zzzzza20261027a1`, sem mudar dados. DEV e três bancos efêmeros chegaram à única
   head; RLS **3/3** e **18** aprovações PostgreSQL. Bancos temporários removidos.
 
-### Fechamento confirmado em produção — 26/10/2026
+### Publicação principal confirmada em produção — 26/10/2026
 
 - PR **#1567** integrado por squash na `main`, commit
   **`3f2e78f34ecfae558431008832452fa9ad22dfb6`**. O gate completo passou sobre a
   árvore `6dbed4d3`; os **oito checks oficiais** passaram no commit integrado.
   Evidência: `runtime/tarefas-melhorias-20261026/release-gate-main-3f2e78f3.json`.
-- Deploy oficial concluído às **22:35:49 BRT**. A revisão servida é `3f2e78f3`, a
-  head do banco é `zzzzzb20261027a1`, os **cinco containers estão healthy**, o
+- Deploy oficial concluído às **22:35:49 BRT**. A revisão servida nessa publicação
+  foi `3f2e78f3`, a head do banco era `zzzzzb20261027a1`, os **cinco containers estavam healthy**, o
   health público respondeu corretamente e o watchdog está healthy.
 - Backups registrados pelo deploy: banco
   `/opt/petshop/backups/db/petshop_prod_20261026_223444.dump` e operacional
@@ -268,18 +267,21 @@ Os códigos públicos foram auditados também nas APIs de NF, entregas e relató
 - [x] Osvaldo Cano: título **11119**, **recebido integralmente**, com saldo
       **zero**. Histórico mostra **26/10/2026** e **“Baixa em lote - pix”**.
       Nenhuma baixa ou outra escrita financeira foi realizada nessa conferência.
-- [ ] Corrigir, validar e publicar a exibição do código público **1848** no modal
-      de detalhes dessa conta, que ainda apresenta o ID interno **47644**. Essa
-      pendência mantém o item 05 aberto, sem alterar o saldo confirmado.
+- [x] Exibição do código público **1848** corrigida, validada e publicada no modal
+      de detalhes dessa conta. A conferência inicial encontrou o ID interno
+      **47644**, reabrindo o item 05; após o segundo deploy, nova consulta em
+      produção confirmou o código correto, com status e histórico preservados.
 - [ ] Conferir o cartão e a atualização dos benefícios no aparelho físico da
       Michele. A correção técnica do vínculo e o saldo em produção já foram validados;
       a conferência humana no aparelho não bloqueia a entrega técnica desse vínculo.
 
 Evidências das consultas em
 `runtime/tarefas-melhorias-20261026/fernanda-historico-producao.json` e
-`runtime/tarefas-melhorias-20261026/osvaldo-conta-producao.json`. A entrega
-principal está publicada; o ajuste pontual do código no modal permanece em
-fechamento, sem declarar o checklist integralmente encerrado.
+`runtime/tarefas-melhorias-20261026/osvaldo-conta-producao.json`. A conferência
+final do código está em
+`runtime/tarefas-melhorias-20261026/osvaldo-codigo-publico-producao-final.json`
+e na captura `.png` de mesmo nome. Os **15 itens técnicos estão concluídos e
+publicados**; permanece apenas o acompanhamento humano no aparelho físico.
 
 ### Correção dos detalhes de código público — validação local
 
@@ -289,11 +291,41 @@ usar IDs internos como alternativa. O detalhe fiscal Bling também conserva o
 código do cadastro local vinculado; sem código, a interface mostra “—”.
 Regressões com código público diferente do ID, nulo e ausente passaram:
 **33 testes financeiros backend, 10 frontend financeiros, 96 backend fiscais e
-6 frontend fiscais**. Ruff, ESLint e Prettier focados passaram. A publicação
-desse ajuste permanece condicionada ao gate completo e aos checks do PR/main.
+6 frontend fiscais**. Ruff, ESLint e Prettier focados passaram. Essa etapa foi
+complementada pelo gate completo e pelos checks do PR/main registrados abaixo.
 
 O aceite HTTP em DEV também revelou que detalhes de contas a pagar de comissão
 falhavam quando desconto, juros ou multa estavam nulos. A leitura agora devolve
 zero nesses três campos opcionais, sem gravar alterações nem recalcular os
 valores original, pago, final ou saldo. **36 testes financeiros backend** passaram,
 incluindo nulo, zero e valor positivo com conferência dos dados persistidos.
+
+### Publicação corretiva e fechamento técnico — 26/10/2026
+
+- PR **#1570** integrado na `main`, commit
+  **`cafeef28f30fc66f812def8def4bce6ae117bdcb`**. O `release-check` completo passou
+  com saída zero na head **`c56d227288a09ab1a051ad836ed11014b2792d14`**;
+  **12/12 checks do PR**, incluindo Sonar, e **8/8 checks da main** aprovados.
+  Evidências: `runtime/tarefas-melhorias-20261026/release-check-codigo-publico-final.log`
+  e `runtime/tarefas-melhorias-20261026/release-gate-main-cafeef28.json`.
+- Aceites HTTP reais em DEV confirmaram os detalhes de contas a receber e pagar
+  com códigos públicos diferentes dos IDs. A conta a pagar de comissão que antes
+  respondia HTTP 500 passou a responder **200** com desconto, juros e multa nulos
+  apresentados como zero, sem alterar valores financeiros persistidos.
+- Segundo deploy oficial concluído às **23:17:21 BRT**, com saída zero. O domínio
+  público confirmou a revisão completa **`cafeef28f30fc66f812def8def4bce6ae117bdcb`**;
+  **cinco containers healthy**, head **`zzzzzb20261027a1`**, health público correto
+  e watchdog healthy.
+- Backups dessa publicação: banco
+  `/opt/petshop/backups/db/petshop_prod_20261026_231620.dump` e operacional
+  `/opt/petshop/backups/deploy_20261026_231327`. Logs em
+  `runtime/tarefas-melhorias-20261026/deploy-producao-corretivo.log` e
+  `runtime/tarefas-melhorias-20261026/status-producao-final.log`.
+- A interface de produção, após recarregamento da sessão James, mostrou
+  **Cód. cliente 1848** no modal da conta **11119** de Osvaldo. Permaneceram o
+  status **Recebido** e o histórico de **26/10/2026**, **“Baixa em lote - pix”**.
+  Evidências JSON e PNG em `runtime/tarefas-melhorias-20261026/osvaldo-codigo-publico-producao-final.*`.
+
+**Decisão: entrega técnica concluída**, com os 15 itens atendidos, validados e
+publicados. Os registros anteriores de deploy, OTA e fusão permanecem preservados;
+a conferência no aparelho físico da Michele segue como acompanhamento separado.

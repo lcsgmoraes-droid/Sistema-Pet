@@ -2,15 +2,15 @@
 
 ## Identificação
 
-| Campo                  | Valor                                                                                 |
-| ---------------------- | ------------------------------------------------------------------------------------- |
-| Data                   | 26/10/2026                                                                            |
-| Responsável de negócio | Lucas Guerra                                                                          |
-| Executor técnico       | Codex, com revisão entre as frentes                                                   |
-| Issue/PR               | PR #1567 integrado por squash na `main`: `3f2e78f34ecfae558431008832452fa9ad22dfb6`   |
-| Prioridade             | P1: integridade financeira e continuidade da operação                                 |
-| Risco                  | Alto: recebimentos, comissões, migrations e correção administrativa de vínculo de app |
-| Domínios               | Pessoas, produtos, PDV, campanhas, histórico, financeiro, caixas e app mobile         |
+| Campo                  | Valor                                                                                                                                         |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Data                   | 26/10/2026                                                                                                                                    |
+| Responsável de negócio | Lucas Guerra                                                                                                                                  |
+| Executor técnico       | Codex, com revisão entre as frentes                                                                                                           |
+| Issue/PR               | PR #1567: `3f2e78f34ecfae558431008832452fa9ad22dfb6`; corretivo #1570: `cafeef28f30fc66f812def8def4bce6ae117bdcb`, ambos integrados na `main` |
+| Prioridade             | P1: integridade financeira e continuidade da operação                                                                                         |
+| Risco                  | Alto: recebimentos, comissões, migrations e correção administrativa de vínculo de app                                                         |
+| Domínios               | Pessoas, produtos, PDV, campanhas, histórico, financeiro, caixas e app mobile                                                                 |
 
 O estado de cada item e as evidências estão no
 [checklist operacional](../TAREFAS_MELHORIAS_OPERACIONAIS_2026-10-26.md).
@@ -67,9 +67,9 @@ comissões antigas ficam fora do escopo.
   pelo usuário; snapshots de comissão anteriores permanecem intactos.
 - A consulta confirmou dados importados do Simplesvet até 18/09/2026: 111.266
   vendas, desde 19/11/2019. Isso não comprova a data de execução da importação.
-- A correção do caso real exige unificação administrativa revisada. Histórico,
-  perfis, cargo, referências de vendas, créditos e grants devem ser preservados,
-  conforme o procedimento específico; não lançar carimbo compensatório.
+- A correção do caso real usou a unificação administrativa revisada. Histórico,
+  perfis, cargo, referências de vendas, créditos e grants foram preservados,
+  conforme o procedimento específico, sem lançar carimbo compensatório.
 
 ## 3. Arquitetura e integrações
 
@@ -149,6 +149,22 @@ integrada pelo PR #1567. Os oito checks oficiais passaram no commit da `main`
 `runtime/tarefas-melhorias-20261026/release-gate-main-3f2e78f3.json`. As contagens
 anteriores registram suas etapas de validação e não devem ser somadas.
 
+A correção dos detalhes financeiros e fiscais foi integrada pelo PR **#1570**.
+Os testes focados passaram: **36 backend financeiros**, **10 frontend
+financeiros**, **96 backend fiscais** e **6 frontend fiscais**, com códigos
+públicos diferentes dos IDs, nulos e ausentes. Os 36 testes financeiros incluem
+a regressão dos ajustes opcionais nulos. Aceites HTTP reais em DEV confirmaram
+os códigos de contas a receber/pagar e a resposta **200** no detalhe de comissão
+que antes falhava com **500**. Desconto, juros e multa nulos são apresentados
+como zero na leitura, sem alterar valores financeiros persistidos.
+
+O `release-check` completo passou com saída zero na head
+**`c56d227288a09ab1a051ad836ed11014b2792d14`**, com os **12/12 checks do PR**,
+incluindo Sonar, aprovados. Os **8/8 checks da main** passaram em
+**`cafeef28f30fc66f812def8def4bce6ae117bdcb`**. Evidências em
+`runtime/tarefas-melhorias-20261026/release-check-codigo-publico-final.log` e
+`runtime/tarefas-melhorias-20261026/release-gate-main-cafeef28.json`.
+
 ## 6. Ambientes e homologação
 
 Testes automatizados com escrita usaram DEV local e massa fictícia, com autenticação própria.
@@ -178,8 +194,8 @@ históricos: implementação `ac143f11a` e integração da main `297059ce8`. O P
 **#1567** foi integrado por squash no commit
 **`3f2e78f34ecfae558431008832452fa9ad22dfb6`** da `main`.
 
-O deploy oficial foi concluído em **26/10/2026 às 22:35:49 BRT**, com a head
-`zzzzzb20261027a1` e revisão servida `3f2e78f3`. Os **cinco containers estão
+O primeiro deploy oficial foi concluído em **26/10/2026 às 22:35:49 BRT**, com a head
+`zzzzzb20261027a1` e revisão servida `3f2e78f3`. Os **cinco containers estavam
 healthy**; health público e watchdog também foram conferidos. O upgrade seguiu o
 grafo oficial até a união de A4 com a linha fiscal da `main`.
 
@@ -215,6 +231,22 @@ ator **83**. A conferência posterior somente de leitura aprovou essa derivaçã
 específica, sem aceitar perfis adicionais arbitrários. O procedimento detalhado
 e os limites de preservação estão no documento de vínculo.
 
+O deploy corretivo do PR **#1570** foi concluído em **26/10/2026 às 23:17:21 BRT**,
+com saída zero. O domínio público confirmou a revisão completa
+**`cafeef28f30fc66f812def8def4bce6ae117bdcb`**. A verificação oficial posterior
+confirmou **cinco containers healthy**, head **`zzzzzb20261027a1`**, health público
+correto e watchdog healthy.
+
+Backups da publicação corretiva:
+
+- Banco: `/opt/petshop/backups/db/petshop_prod_20261026_231620.dump`.
+- Operacional: `/opt/petshop/backups/deploy_20261026_231327`.
+
+Logs em `runtime/tarefas-melhorias-20261026/deploy-producao-corretivo.log` e
+`runtime/tarefas-melhorias-20261026/status-producao-final.log`. Os registros
+anteriores de OTA e fusão correspondem às operações concluídas após o primeiro
+deploy e permanecem preservados.
+
 Abortar diante de falha no gate, migration, health, isolamento, saldo ou conferência
 da prévia. Rollback de aplicação/OTA usa a revisão/grupo anterior pelo fluxo
 oficial. Preservar pagamentos, comissões e histórico já gravados; não executar
@@ -243,12 +275,17 @@ com saldo **zero**, data **26/10/2026** e observação
 **“Baixa em lote - pix”** no histórico. As consultas não registraram baixa nem
 outra alteração financeira.
 
-Essa conferência também encontrou uma pendência de exibição: o modal de detalhes
-da conta ainda mostra o ID interno **47644** como código do cliente, em vez do
-código público **1848**. O item 05 do checklist foi reaberto; a correção pontual
-está em andamento e ainda requer validação e publicação. Evidências em
+Essa conferência encontrou o ID interno **47644** exibido como código do cliente,
+em vez do código público **1848**, reabrindo o item 05. O PR **#1570** corrigiu os
+contratos de detalhes financeiros e os dois modais fiscais, além do detalhe
+Bling vinculado ao cadastro local. Após o deploy corretivo e recarregamento da
+sessão James, a interface de produção confirmou **Cód. cliente 1848** no modal da
+conta **11119**, com status **Recebido** e histórico de **26/10/2026**,
+**“Baixa em lote - pix”**. O item 05 foi concluído. Evidências iniciais em
 `runtime/tarefas-melhorias-20261026/fernanda-historico-producao.json` e
-`runtime/tarefas-melhorias-20261026/osvaldo-conta-producao.json`.
+`runtime/tarefas-melhorias-20261026/osvaldo-conta-producao.json`; conferência final
+em `runtime/tarefas-melhorias-20261026/osvaldo-codigo-publico-producao-final.json`
+e na captura `.png` de mesmo nome.
 
 ## 9. Mudança, comunicação e treinamento
 
@@ -273,10 +310,9 @@ não declarar esse teste como realizado sem sua confirmação.
 - [x] Gate completo final e PR integrado registrados.
 - [x] Publicação principal, migrations, OTA e smoke técnico registrados.
 - [x] Correção real do vínculo e saldo do benefício conferidos em produção.
-- [ ] Correção pontual do código público no modal de detalhes validada e publicada.
+- [x] Correção pontual do código público no modal de detalhes validada e publicada.
 - [ ] Conferência humana no aparelho físico da cliente, como acompanhamento separado.
 
-Decisão: **entrega principal publicada, com ajuste pontual de exibição em
-fechamento**. O item 05 permanece aberto até a correção do modal ser validada e
-publicada. A conferência no aparelho físico não bloqueia a entrega técnica do
-vínculo; seu estado permanece explícito no checklist.
+Decisão: **entrega técnica concluída**, com os 15 itens atendidos, validados e
+publicados. A conferência humana no aparelho físico da Michele permanece como
+acompanhamento separado; seu estado continua explícito no checklist.
