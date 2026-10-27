@@ -115,8 +115,11 @@ def test_prod_nginx_applies_one_consistent_security_header_policy():
     assert "SAMEORIGIN" not in app_locations
     assert "no-referrer-when-downgrade" not in app_locations
     assert (
-        app_locations.count("include /etc/nginx/includes/security-headers.conf;") == 10
+        app_locations.count("include /etc/nginx/includes/security-headers.conf;") == 12
     )
+    for location in ("location ^~ /assets/ {", "location = /release-commit.txt {"):
+        block = app_locations.split(location, 1)[1].split("}", 1)[0]
+        assert block.count("include /etc/nginx/includes/security-headers.conf;") == 1
     assert (
         image_locations.count("include /etc/nginx/includes/security-headers.conf;") == 2
     )
