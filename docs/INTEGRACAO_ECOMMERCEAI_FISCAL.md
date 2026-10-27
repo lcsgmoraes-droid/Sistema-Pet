@@ -25,6 +25,11 @@ fiscal nao cria outra Venda, recebimento, conta ou movimento de estoque.
   permanecem fora da fila, inclusive tenants que seguem emitindo pelo Bling.
 - Identidade permanente do pedido: `(tenant_id, channel, seller_id,
   external_order_id)`, inclusive depois de reconectar a integracao.
+- A autenticacao por token opaco resolve o tenant em uma dependencia assincrona
+  no contexto ASGI, antes de o handler sincrono executar consultas. Definir o
+  `ContextVar` somente em uma dependencia sincrona isolada no pool de threads
+  nao o propaga ao handler. O filtro ORM continua bloqueando consultas sem
+  tenant; a regressao de HTTP usa token persistido e contexto inicial vazio.
 
 ## API de maquina CorePet
 

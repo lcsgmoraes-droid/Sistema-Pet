@@ -52,9 +52,10 @@ def api_client():
         api.close()
 
 
-def machine_connection(
+async def machine_connection(
     authorization: str | None = Header(default=None), db: Session = Depends(get_session)
 ):
+    # Define the tenant in the request context before sync handlers copy it.
     connection = _connection_for_token(db, authorization)
     tenant = get_tenant(db, connection.tenant_id)
     if str(tenant.status).lower() not in {"active", "ativo"}:
