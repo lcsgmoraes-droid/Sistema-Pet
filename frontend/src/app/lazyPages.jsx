@@ -90,6 +90,7 @@ export const VendasCanaisPreview = import.meta.env.DEV
   ? lazy(() => import("../components/financeiro/VendasCanaisPreview"))
   : null;
 export const CrmPage = lazy(() => import("../pages/crm/CrmPage"));
+export const ConectarWhatsApp = lazy(() => import("../pages/crm/ConectarWhatsAppPage"));
 export const AlertasRacao = lazy(() => import("../components/AlertasRacao"));
 export const OpcoesRacao = lazy(() => import("../components/OpcoesRacao"));
 export const DRE = lazy(() => import("../components/DRE"));

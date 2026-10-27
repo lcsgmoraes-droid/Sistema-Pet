@@ -42,6 +42,7 @@ Centralização de código · zero redundância · boas práticas (DDD, SOLID) p
 | 21/10 | Ordem: **Kanban primeiro**; WhatsApp como link manual no começo. | Lucas |
 | 21/10 | Os 9 problemas que travam a conversa com o tutor viram **etapas do roadmap** (Etapa 0), atacadas uma a uma. | Lucas |
 | 21/10 | **Como conectar o número de cada loja (parceiro de tecnologia da Meta ou intermediário): decidir quando chegar a Etapa 4.** | Lucas |
+| 26/10 | **Decidido: o canal de WhatsApp usa a API oficial da Meta (Cloud API).** Cada loja com o seu número e a sua conta do WhatsApp Business. Começamos pelo caminho **assistido** (a loja cria conta e app na Meta e cola os dados no sistema, guiada por uma página de apoio); a conexão com poucos cliques (cadastro incorporado) e o uso do número junto com o app WhatsApp Business (coexistência) dependem de o CorePet virar **provedor de tecnologia da Meta**. 360dialog e WAHA ficam como provedores antigos/piloto. | Lucas |
 | 21/10 | **Consentimento:** fazer os ajustes necessários e decidir a melhor forma de solicitar o aceite (Etapa 0.7). | Lucas |
 | 21/10 | **O CRM é por loja.** Usuário com permissão para mais de uma loja vê as lojas dele no CRM: cada card indica claramente a loja e há filtro fácil para ver tudo ou lojas específicas. | Lucas |
 | 21/10 | **Custo da IA e das mensagens fica com o CorePet.** Venda por **pacotes de créditos** consumidos pelo cliente, na mesma lógica de tokens dos modelos de IA. Detalhes da cobrança ficam para mais adiante. | Lucas |
@@ -233,10 +234,20 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 - [ ] 3.9 Dados do grupo comercial: cliente e pet são compartilhados entre lojas do grupo, vendas e histórico são por loja. Garantir que a ficha mostre a origem de cada dado e respeite o filtro de lojas.
 - [ ] 3.10 Testes e documentação.
 
+### O que a decisão da API oficial da Meta muda (26/10/2026)
+
+1. **Quem paga as mensagens.** Enquanto o CorePet não for parceiro de cobrança da Meta, a Meta cobra cada loja direto no cartão da conta dela. Isso conflita com a decisão de 21/10 (custo das mensagens com o CorePet, vendido em créditos). `[?] DECIDIR` (T.1): créditos cobrem só a IA e a plataforma, ou o CorePet passa a ser parceiro e repassa o custo.
+2. **Esforço da loja.** Cada loja verifica a empresa, cria o app e gera o token. `[?] DECIDIR` se o CorePet oferece o cadastro assistido como serviço (pelo OPS) e se isso entra no preço.
+3. **Número.** O número não pode estar ativo em um WhatsApp comum. Usar o mesmo número no app WhatsApp Business junto da API (coexistência) só existe pelo cadastro incorporado, que depende de o CorePet ser provedor de tecnologia.
+4. **Modelos de mensagem** passam a ser da conta de cada loja: o CorePet precisa criá-los e enviá-los para aprovação por loja (Etapas 4.6 e 7). A decisão de 19/10 (modelos aprovados com variáveis) continua valendo.
+5. **Webhook.** Hoje cada loja usa o próprio app e a própria chave secreta, com um endereço por loja. Com o app único do CorePet será preciso mapear número → loja.
+6. **Provedores antigos.** 360dialog e WAHA continuam funcionando para quem já usa; nenhuma loja troca sem ativar o oficial.
+7. **Versão da API da Meta.** Fica em configuração (`META_GRAPH_API_VERSION`, padrão v26.0) porque a Meta aposenta versões antigas; conferir a cada trimestre.
+
 ### Etapa 4 — Canal WhatsApp por loja
 
-- [ ] 4.1 **Como cada loja conecta o seu número oficial** (parceiro de tecnologia da Meta, intermediário oficial, ou outro caminho): `[?] DECIDIR NESTA ETAPA` — levantar custos, prazo e esforço de cadastro; o código deve manter o provedor trocável.
-- [ ] 4.2 Modelo de dados do canal por loja (número, provedor, estado de saúde, credenciais criptografadas).
+- [~] 4.1 **Como cada loja conecta o seu número oficial: decidido em 26/10 — API oficial da Meta.** Caminho assistido pronto (4.2/4.10); caminho com poucos cliques exige o CorePet ser provedor de tecnologia da Meta (verificação da empresa, revisão do app e permissões avançadas) `[?] DECIDIR` quando iniciar essa aprovação. O código mantém o provedor trocável.
+- [~] 4.2 Dados do canal por loja **feitos** (migração `zzzzo20261026a1`: ID da conta e do número, token e segredo do app criptografados em colunas próprias, estado do vínculo, qualidade, último webhook). Token e segredo ficam separados das chaves do provedor atual para que testar o vínculo nunca derrube quem está em produção.
 - [ ] 4.3 Camada única de envio com interface de provedor (substitui os envios espalhados), com registro persistente de cada envio: estado, tentativas e motivo da falha.
 - [ ] 4.4 Retorno de status do provedor (enviado, entregue, lido, falhou) e tratamento de mensagens recebidas de qualquer tipo.
 - [ ] 4.5 Modelos de mensagem aprovados: catálogo padrão do CorePet por loja, variáveis, categorias e acompanhamento da aprovação.
@@ -244,7 +255,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 - [ ] 4.7 Consentimento no ponto de envio, SAIR, e fluxo de confirmação definido na Etapa 0.7.
 - [ ] 4.8 Fila: evoluir a fila existente (canal WhatsApp, espera crescente entre tentativas, estado em processamento, trava para mais de uma instância) e processo dedicado como o do Bling.
 - [ ] 4.9 **Consumo de créditos** por mensagem (ver T.1).
-- [ ] 4.10 Telas de configuração do canal na loja e no OPS (estado de saúde, qualidade do número, modelos, limites).
+- [~] 4.10 Telas de configuração do canal na loja e no OPS (estado de saúde, qualidade do número, modelos, limites). **Feito: página de apoio `/crm/whatsapp` (passo a passo na Meta, formulário, webhook, teste e ativação). Falta a tela do OPS e o acompanhamento da qualidade/limites.**
 - [ ] 4.11 E-mail como segundo canal pelo mesmo caminho único (Gmail no MVP): corrigir os pontos falhos do diagnóstico (simulações marcadas como enviadas, falta de registro, erro engolido).
 - [ ] 4.12 Substituir os pontos de contato manuais (links) pelo canal oficial, onde fizer sentido.
 - [ ] 4.13 Testes de envio, falha, janela e consentimento; ensaio ponta a ponta com número de teste.
@@ -357,6 +368,7 @@ Origem: os 9 problemas que travam a conversa com o tutor. Cada sub-etapa tem tes
 | 22/10/2026 | Etapa 2 (API do quadro): leitura do quadro por loja(s), criar card, mover, registrar ação, agendar próximo passo, configurar colunas e ficha do card, com permissões por loja. Telas ainda não feitas. |
 | 22/10/2026 | Etapa 2 (regras do funil no servidor): colunas configuráveis, movimentação, ciclos e oportunidades com testes. Telas ainda não feitas. |
 | 22/10/2026 | Etapa 1.6: número novo no WhatsApp vira card sem cadastro (ou usa o cadastro do tutor); funil padrão provisório criado sob demanda. |
+| 26/10/2026 | Canal oficial da Meta (início da Etapa 4): decisão registrada; cliente da API oficial (envio de texto, imagem e modelo), webhook da Meta com assinatura do segredo do app, rotas de salvar/testar/inscrever/ativar e página de apoio com 9 passos. Nada muda no atendimento atual até a loja ativar. |
 | 22/10/2026 | Etapa 1.5: visão de várias lojas no CRM com travas de permissão, módulo e vínculo; lista de lojas permitidas pronta para o filtro da tela. |
 | 22/10/2026 | Etapa 1.4: modelo de dados do CRM criado (8 tabelas por loja com isolamento) e migração encadeada. |
 | 22/10/2026 | Etapa 1.1 e 1.3: módulo CRM registrado (fora da oferta pública), menu/rota/página provisória e permissões próprias com liberação automática para quem já usa o WhatsApp. |

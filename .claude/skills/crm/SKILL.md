@@ -27,6 +27,7 @@ Relacionamento com o tutor por loja: funil de leads em quadro, ficha 360 (compra
   - `acoes_service.py` — criar card, registrar ação, agendar passo, ficha, buscar pessoa e vincular a cadastro.
   - `quadro_service.py` — leitura do quadro de uma loja (50 cards por coluna; card sem telefone).
   - `routes.py` — `/crm/lojas`, `/crm/quadro`, `/crm/tutores`, `/crm/leads` (+ `/mover`, `/acoes`, `/proximo-passo`, `/vincular`), `PUT /crm/funil/colunas`. Router montado em `main_routers.py` com o módulo `crm` exigido; cada rota age em UMA loja e confere a permissão nela.
+- Canal oficial da Meta (decidido em 26/10): `app/whatsapp/meta_cloud.py` (cliente e tradução de erros), `app/routers/whatsapp_meta.py` (`/whatsapp/config/meta`: estado, credenciais, testar, inscrever-app, ativar; exige módulo `crm` e `crm.configurar`), colunas `meta_*` em `tenant_whatsapp_config`. O token tem coluna própria e salvar credenciais NUNCA troca o provedor em uso; só `/ativar` (após teste ok). O POST do webhook da Meta é autenticado só pela assinatura com a chave secreta do app (o token de verificação serve só ao GET). Página de apoio: `frontend/src/pages/crm/ConectarWhatsAppPage.jsx` (textos em `guiaMeta.js`).
 - Conversas de WhatsApp: `backend/app/whatsapp/` (webhook, processor, handoff, websocket). A criação de uma sessão nova registra o card do tutor quando o CRM está ativo na loja.
 
 ## Regras que não são óbvias

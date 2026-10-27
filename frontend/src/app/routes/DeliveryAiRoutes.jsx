@@ -3,6 +3,7 @@ import ProtectedRoute from "../../components/ProtectedRoute";
 import {
   AlertasRacao,
   ChatIA,
+  ConectarWhatsApp,
   CrmPage,
   DashEntregasFinanceiro,
   EntregasAbertas,
@@ -51,6 +52,16 @@ export function createDeliveryAiRoutes() {
           <ProtectedRoute permission="crm.visualizar">
             <ModuleGate modulo="crm">
               <CrmPage />
+            </ModuleGate>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="crm/whatsapp"
+        element={
+          <ProtectedRoute permission="crm.configurar">
+            <ModuleGate modulo="crm">
+              <ConectarWhatsApp />
             </ModuleGate>
           </ProtectedRoute>
         }

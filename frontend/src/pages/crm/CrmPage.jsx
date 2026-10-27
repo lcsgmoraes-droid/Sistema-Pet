@@ -1,5 +1,6 @@
-import { Plus, SearchX, Settings2 } from "lucide-react";
+import { MessageCircle, Plus, SearchX, Settings2 } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
 import EstadoVazio from "../../components/v2/EstadoVazio/EstadoVazio";
@@ -28,6 +29,7 @@ function Esqueleto() {
 export default function CrmPage() {
   const crm = useCrmQuadro();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const permissoes = user?.permissions || [];
   const podeCriar = permissoes.includes("crm.leads");
   const podeConfigurar = permissoes.includes("crm.configurar");
@@ -51,6 +53,11 @@ export default function CrmPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {podeConfigurar ? (
+            <BotaoInteracao icon={MessageCircle} onClick={() => navigate("/crm/whatsapp")}>
+              Conectar WhatsApp
+            </BotaoInteracao>
+          ) : null}
           {podeConfigurar && crm.lojasDoQuadro[0] ? (
             <BotaoInteracao icon={Settings2} onClick={() => setConfigurando(true)}>
               Colunas
