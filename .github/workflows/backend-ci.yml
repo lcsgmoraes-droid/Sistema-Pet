@@ -623,6 +623,11 @@ jobs:
           mypy app/ --ignore-missing-imports || echo "Type warnings found"
         continue-on-error: true
 
+      - name: Banho e tosa packages and delivery regression
+        run: >-
+          python -m pytest tests/unit/test_banho_tosa*.py
+          tests/integration/test_banho_tosa_pacotes_http.py -q
+
       - name: iFood catalog and operation safety contracts
         run: >-
           python -m pytest tests/unit/test_ifood_management.py

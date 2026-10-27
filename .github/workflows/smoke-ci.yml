@@ -92,3 +92,7 @@ jobs:
       - name: Operational regression tests
         working-directory: frontend
         run: npm run test:operacional
+
+      - name: Banho e tosa packages and delivery regression
+        working-directory: frontend
+        run: npm run test:banho-tosa-fluxo
