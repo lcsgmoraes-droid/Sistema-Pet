@@ -30,6 +30,7 @@ export default function TutorAutocomplete({
       setLoading(false);
       return undefined;
     }
+    setSugestoes([]);
     setLoading(true);
     const timer = setTimeout(async () => {
       try {

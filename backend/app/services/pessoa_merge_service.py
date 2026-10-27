@@ -386,15 +386,22 @@ def _snapshot_perfis_app(
             AppAccessProfile.tenant_id == tenant_id,
             AppAccessProfile.cliente_id.in_(pessoa_ids),
         )
+        .order_by(AppAccessProfile.id)
+        .with_for_update()
         .all()
     )
     for grant in grants:
         resultado.setdefault(str(grant.cliente_id), []).append(
             {
+                "id": grant.id,
+                "cliente_id": grant.cliente_id,
                 "profile_type": grant.profile_type,
                 "user_id": grant.user_id,
                 "is_active": grant.is_active,
                 "granted_by_user_id": grant.granted_by_user_id,
+                "notes": grant.notes,
+                "created_at": _valor_serializavel(grant.created_at),
+                "updated_at": _valor_serializavel(grant.updated_at),
             }
         )
     return resultado
@@ -450,27 +457,54 @@ def _mesclar_perfis_app(
     duplicado: Cliente,
     tenant_id: Any,
     user_id: int,
-) -> list[str]:
+) -> tuple[list[str], list[dict[str, Any]]]:
     grants = (
         db.query(AppAccessProfile)
         .filter(
             AppAccessProfile.tenant_id == tenant_id,
             AppAccessProfile.cliente_id.in_([principal.id, duplicado.id]),
-            AppAccessProfile.is_active.is_(True),
         )
+        .order_by(AppAccessProfile.id)
+        .with_for_update()
         .all()
     )
     perfis = _perfis_inerentes(principal) | _perfis_inerentes(duplicado)
-    perfis.update(grant.profile_type for grant in grants)
+    perfis.update(grant.profile_type for grant in grants if grant.is_active)
 
-    # Remove os grants do duplicado antes de sincronizar para evitar colisao da
-    # chave unica (tenant, pessoa, perfil).
+    por_tipo = {
+        grant.profile_type: grant
+        for grant in grants
+        if int(grant.cliente_id) == int(principal.id)
+    }
+    preservados = []
     for grant in grants:
-        if int(grant.cliente_id) == int(duplicado.id):
-            db.delete(grant)
+        if int(grant.cliente_id) != int(duplicado.id):
+            continue
+        existente = por_tipo.get(grant.profile_type)
+        if existente:
+            # A chave unica impede dois grants do mesmo perfil no principal.
+            # Conserva o registro conflitante no cadastro inativado, incluindo
+            # suas notas/datas, e o estado anterior completo na auditoria.
+            grant.is_active = False
+            resolucao = "historico_no_duplicado"
+        else:
+            # Mover a FK preserva id, criacao, notas e concedente do grant.
+            grant.cliente_id = principal.id
+            por_tipo[grant.profile_type] = grant
+            resolucao = "transferido"
+        preservados.append(
+            {
+                "id": grant.id,
+                "profile_type": grant.profile_type,
+                "cliente_origem_id": duplicado.id,
+                "cliente_destino_id": grant.cliente_id,
+                "resolucao": resolucao,
+                "perfil_principal_id": existente.id if existente else grant.id,
+            }
+        )
     db.flush()
 
-    return sync_cliente_app_access_profiles(
+    perfis_ativos = sync_cliente_app_access_profiles(
         db,
         tenant_id=tenant_id,
         cliente=principal,
@@ -478,6 +512,7 @@ def _mesclar_perfis_app(
         granted_by_user_id=user_id,
         linked_user_id=getattr(principal, "auth_user_id", None),
     )
+    return perfis_ativos, preservados
 
 
 def _mesclar_produto_fornecedores(
@@ -672,7 +707,7 @@ def executar_fusao_pessoas(
                 {"campo": campo, "label": label, "origem": "duplicado"}
             )
 
-    perfis_app = _mesclar_perfis_app(
+    perfis_app, preservacao_perfis_app = _mesclar_perfis_app(
         db,
         principal=principal,
         duplicado=duplicado,
@@ -711,6 +746,7 @@ def executar_fusao_pessoas(
         "campos_aplicados": campos_aplicados,
         "credito_somado": float(principal.credito or 0),
         "perfis_app": perfis_app,
+        "preservacao_perfis_app": preservacao_perfis_app,
         "transferidos_especiais": transferencias["transferidos_especiais"],
         "transferidos_genericos": transferencias["transferidos_genericos"],
     }
@@ -741,6 +777,7 @@ def executar_fusao_pessoas(
         "campos_aplicados": campos_aplicados,
         "credito_somado": float(principal.credito or 0),
         "perfis_app": perfis_app,
+        "preservacao_perfis_app": preservacao_perfis_app,
         "transferidos_especiais": transferencias["transferidos_especiais"],
         "transferidos_genericos": transferencias["transferidos_genericos"],
     }

@@ -510,6 +510,7 @@ async def baixar_vendas_lote(
                         pagamentos=[pagamento],
                         user_id=current_user.id,
                         db=db,
+                        manter_repasses_pendentes=True,
                     )
                     repasse_ids = criacao_repasse["contas_criadas"]
                     for repasse in (

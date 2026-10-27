@@ -683,6 +683,19 @@ jobs:
           tests/unit/test_vendas_fechamento_edicao.py
           tests/unit/test_vendas_comissao_reprocessamento_contract.py -q
 
+      - name: Operational search history receipts and commissions regression
+        run: >-
+          python -m pytest
+          tests/unit/test_clientes_busca_relevancia.py
+          tests/unit/test_cliente_historico_paginacao.py
+          tests/unit/test_beneficio_carimbo_manual_app.py
+          tests/unit/test_pessoa_merge_safety.py
+          tests/unit/test_notas_entrada_vinculo_elegibilidade.py
+          tests/unit/test_recebimento_caixa_parcelamento.py
+          tests/unit/test_recebimento_repasse_comissao.py
+          tests/unit/test_comissoes_grupos_valor_fixo.py
+          tests/unit/test_comissoes_pagamentos_lote.py -q
+
       - name: Sale cancellation original stock regression
         run: >-
           python -m pytest

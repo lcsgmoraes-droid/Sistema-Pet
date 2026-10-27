@@ -16,7 +16,7 @@ from app.campaigns.models import (
     CampaignTypeEnum,
     LoyaltyStamp,
 )
-from app.models import AppAccessProfile, Cliente, Role, User, UserTenant
+from app.models import AppAccessProfile, Cliente, PessoaMergeLog, Role, User, UserTenant
 from app.routes.ecommerce_auth_beneficios import meus_beneficios
 from app.routes.ecommerce_auth_cliente import _get_or_create_cliente_for_user
 from app.services.pessoa_merge_service import (
@@ -27,7 +27,8 @@ from app.tenancy.context import clear_current_tenant, set_current_tenant
 from app.vendas_models import Venda
 
 
-def test_preview_e_correcao_do_vinculo_preservam_carimbo_sem_commit():
+@pytest.mark.parametrize("com_conflito", [False, True])
+def test_preview_e_correcao_do_vinculo_preservam_carimbo_sem_commit(com_conflito):
     database_url = os.getenv("COREPET_TEST_POSTGRES_URL")
     if not database_url:
         pytest.skip("Informe COREPET_TEST_POSTGRES_URL de um banco DEV local")
@@ -98,6 +99,20 @@ def test_preview_e_correcao_do_vinculo_preservam_carimbo_sem_commit():
                     is_active=True,
                 )
                 db.add(vinculo_equipe)
+                data_concessao = datetime(2020, 5, 4, 10, 30, tzinfo=timezone.utc)
+                if com_conflito:
+                    db.add(
+                        AppAccessProfile(
+                            tenant_id=tenant,
+                            user_id=usuario_app.id,
+                            cliente_id=principal.id,
+                            profile_type="cliente",
+                            is_active=False,
+                            granted_by_user_id=criador.id,
+                            notes="Registro antigo do principal",
+                            created_at=data_concessao,
+                        )
+                    )
                 perfis_esperados = {
                     "cliente",
                     "funcionario",
@@ -115,6 +130,8 @@ def test_preview_e_correcao_do_vinculo_preservam_carimbo_sem_commit():
                             profile_type=perfil,
                             is_active=True,
                             granted_by_user_id=criador.id,
+                            notes=f"Concessao historica {perfil}",
+                            created_at=data_concessao,
                         )
                         for perfil in perfis_esperados
                     ]
@@ -146,6 +163,20 @@ def test_preview_e_correcao_do_vinculo_preservam_carimbo_sem_commit():
                     )
                 )
                 db.flush()
+                grants_antes = {
+                    grant.id: (
+                        grant.created_at,
+                        grant.notes,
+                        grant.granted_by_user_id,
+                        grant.user_id,
+                    )
+                    for grant in db.query(AppAccessProfile)
+                    .filter(
+                        AppAccessProfile.tenant_id == tenant,
+                        AppAccessProfile.cliente_id.in_([principal.id, duplicado.id]),
+                    )
+                    .all()
+                }
 
                 assert (
                     _get_or_create_cliente_for_user(db, usuario_app).id == duplicado.id
@@ -211,6 +242,54 @@ def test_preview_e_correcao_do_vinculo_preservam_carimbo_sem_commit():
                 )
                 assert {grant.profile_type for grant in grants} == perfis_esperados
                 assert {grant.user_id for grant in grants} == {usuario_app.id}
+                grants_preservados = (
+                    db.query(AppAccessProfile)
+                    .filter(
+                        AppAccessProfile.tenant_id == tenant,
+                        AppAccessProfile.id.in_(grants_antes),
+                    )
+                    .all()
+                )
+                assert {grant.id for grant in grants_preservados} == set(grants_antes)
+                assert all(
+                    (
+                        grant.created_at,
+                        grant.notes,
+                        grant.granted_by_user_id,
+                        grant.user_id,
+                    )
+                    == grants_antes[grant.id]
+                    for grant in grants_preservados
+                )
+                historicos_duplicado = [
+                    grant
+                    for grant in grants_preservados
+                    if grant.cliente_id == duplicado.id
+                ]
+                assert len(historicos_duplicado) == int(com_conflito)
+                assert all(not grant.is_active for grant in historicos_duplicado)
+                auditoria = (
+                    db.query(PessoaMergeLog)
+                    .filter(
+                        PessoaMergeLog.id == resultado["merge_log_id"],
+                        PessoaMergeLog.tenant_id == tenant,
+                    )
+                    .one()
+                )
+                assert (
+                    len(auditoria.snapshot_antes["perfis_app"][str(duplicado.id)]) == 6
+                )
+                assert all(
+                    grant["id"] in grants_antes
+                    and grant["notes"]
+                    and grant["created_at"] == data_concessao.isoformat()
+                    for grant in auditoria.snapshot_antes["perfis_app"][
+                        str(duplicado.id)
+                    ]
+                )
+                assert (
+                    len(auditoria.resumo_transferencias["preservacao_perfis_app"]) == 6
+                )
                 db.refresh(vinculo_equipe)
                 db.refresh(usuario_app)
                 assert vinculo_equipe.role_id == cargo.id and vinculo_equipe.is_active

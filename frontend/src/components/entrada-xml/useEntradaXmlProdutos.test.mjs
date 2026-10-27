@@ -3,7 +3,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { createControllerHarness } from "../../../scripts/helpers/reactControllerHarness.mjs";
 
-test("XML usa termo completo numa consulta e descarta resposta da busca cancelada", async () => {
+test("XML preserva simples/variações e descarta respostas canceladas", async () => {
   const timers = new Map();
   const chamadas = [];
   let sequencia = 0;
@@ -39,15 +39,41 @@ test("XML usa termo completo numa consulta e descarta resposta da busca cancelad
   };
   await harness.act(() => harness.tree.atualizarFiltroProduto(7, "ração adulto"));
   await executarTimer();
-  assert.equal(chamadas.length, 1);
+  assert.equal(chamadas.length, 2);
   assert.equal(chamadas[0].config.params.busca, "ração adulto");
-  assert.equal(chamadas[0].config.params.include_variations, true);
+  assert.deepEqual(
+    chamadas.map((chamada) => chamada.config.params.tipo_produto),
+    ["SIMPLES", "VARIACAO"],
+  );
   await harness.act(() => harness.tree.atualizarFiltroProduto(7, "ração filhote"));
   assert.equal(chamadas[0].config.signal.aborted, true);
+  assert.equal(chamadas[1].config.signal.aborted, true);
   await executarTimer();
-  chamadas[1].resolve({ data: { items: [{ id: 2, codigo: "FILHOTE" }] } });
+  chamadas[2].resolve({
+    data: {
+      items: [
+        { id: 2, codigo: "FILHOTE", tipo_produto: "SIMPLES" },
+        { id: 3, tipo_produto: "PAI" },
+      ],
+    },
+  });
+  chamadas[3].resolve({
+    data: {
+      items: [
+        { id: 4, codigo: "FILHOTE-V", tipo_produto: "VARIACAO" },
+        { id: 5, tipo_produto: "KIT" },
+      ],
+    },
+  });
   await harness.settle();
   chamadas[0].resolve({ data: { items: [{ id: 1, codigo: "ADULTO" }] } });
+  chamadas[1].resolve({ data: { items: [{ id: 6, codigo: "ADULTO-V" }] } });
   await harness.settle();
-  assert.equal(harness.tree.resultadosBuscaProduto[7][0].codigo, "FILHOTE");
+  assert.deepEqual(
+    harness.tree.resultadosBuscaProduto[7].map((produto) => produto.id),
+    [2, 4],
+  );
+  await harness.act(() => harness.tree.atualizarFiltroProduto(7, "outra busca"));
+  assert.deepEqual(harness.tree.resultadosBuscaProduto[7], []);
+  harness.unmount();
 });

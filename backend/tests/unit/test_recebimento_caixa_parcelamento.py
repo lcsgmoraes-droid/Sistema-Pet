@@ -110,6 +110,25 @@ def test_caixa_fechado_ou_de_outro_tenant_nao_recebe(recebimento):
     assert c.db.query(Recebimento).count() == 0
 
 
+@pytest.mark.parametrize("forma_id", [1, 2])
+def test_pix_dinheiro_descartam_metadados_cartao_nao_validados(recebimento, forma_id):
+    c = recebimento
+    _receber(
+        c,
+        forma_pagamento_id=forma_id,
+        operadora_id=999999,
+        bandeira="visa",
+        nsu_cartao="METADADO-DE-OUTRA-OPERACAO",
+    )
+    recibo = c.db.query(Recebimento).one()
+    assert (recibo.operadora_id, recibo.bandeira, recibo.nsu_cartao) == (
+        None,
+        None,
+        None,
+    )
+    assert c.conta.status == "recebido" and c.conta.valor_recebido == Decimal("100")
+
+
 def test_dois_caixas_abertos_exigem_escolha_e_aceitam_qualquer_caixa_acessivel(
     recebimento,
 ):
@@ -351,3 +370,117 @@ def test_baixa_lote_preserva_observacao_e_status_canonico(recebimento, monkeypat
     recibo = c.db.query(Recebimento).filter_by(conta_receber_id=conta.id).one()
     assert "Observação real da baixa" in recibo.observacoes
     assert recibo.caixa_id == 2
+
+
+@pytest.mark.parametrize("em_lote", [False, True])
+@pytest.mark.parametrize(
+    "parcelas,prazo,modalidade",
+    [(1, 0, "credito"), (1, 0, "debito"), (1, 0, "link"), (3, 30, "credito")],
+)
+def test_repasse_cartao_so_realiza_fluxo_ao_liquidar_inclusive_prazo_zero(
+    recebimento, monkeypatch, em_lote, parcelas, prazo, modalidade
+):
+    c = recebimento
+    _cartao(c)
+    forma = c.db.query(FormaPagamento).filter_by(id=3).one()
+    forma.tipo = "link_pagamento" if modalidade == "link" else f"cartao_{modalidade}"
+    forma.nome = forma.tipo
+    if parcelas == 1:
+        c.db.add(
+            OperadoraCartaoTaxa(
+                tenant_id=c.tenant,
+                operadora_id=1,
+                bandeira="visa",
+                modalidade=modalidade,
+                parcelas=1,
+                user_id=1,
+                taxa_percentual=2,
+                taxa_fixa=1,
+                prazo_recebimento_dias=prazo,
+                ativo=True,
+            )
+        )
+        c.db.commit()
+    if em_lote:
+        cliente = Cliente(tenant_id=c.tenant, user_id=1, nome="Cliente repasse prazo")
+        c.db.add(cliente)
+        c.db.flush()
+        c.venda.cliente_id = cliente.id
+        c.venda.total = c.venda.subtotal = Decimal("100")
+        c.venda.nao_gerar_beneficios = True
+        c.db.commit()
+        monkeypatch.setattr(
+            lote_routes,
+            "get_or_build_venda_rentabilidade_snapshot",
+            lambda *a, **kw: {},
+        )
+        resultado = asyncio.run(
+            lote_routes.baixar_vendas_lote(
+                cliente.id,
+                {
+                    "vendas_ids": [c.venda.id],
+                    "valor_total": 100,
+                    "forma_pagamento": "cartao_credito",
+                    "forma_pagamento_id": 3,
+                    "operadora_id": 1,
+                    "bandeira": "visa",
+                    "numero_parcelas": parcelas,
+                    "caixa_id": 2,
+                    "request_id": str(uuid4()),
+                    "nsu_cartao": "REPASSE-PRAZO",
+                },
+                c.db,
+                (c.usuario, c.tenant),
+            )
+        )
+        item = (
+            c.db.query(VendaBaixaLoteItem).filter_by(lote_id=resultado["lote_id"]).one()
+        )
+        repasses = (
+            c.db.query(ContaReceber)
+            .filter(ContaReceber.id.in_(item.efeitos["repasse_ids"]))
+            .all()
+        )
+    else:
+        _receber(
+            c,
+            forma_pagamento_id=3,
+            numero_parcelas=parcelas,
+            operadora_id=1,
+            bandeira="visa",
+            nsu_cartao="REPASSE-PRAZO",
+        )
+        repasses = (
+            c.db.query(ContaReceber).filter_by(conta_principal_id=c.conta.id).all()
+        )
+    assert len(repasses) == parcelas
+    assert all(
+        repasse.status == "pendente" and repasse.valor_recebido == 0
+        for repasse in repasses
+    )
+    assert c.db.query(Recebimento).count() == 1
+    assert c.db.query(FluxoCaixa).filter_by(status="realizado").count() == 0
+    previstos = c.db.query(FluxoCaixa).filter_by(status="previsto").all()
+    assert sum(Decimal(str(fluxo.valor)) for fluxo in previstos) == Decimal("100")
+
+    for repasse in repasses:
+        asyncio.run(
+            registrar_recebimento(
+                repasse.id,
+                RecebimentoCreate(
+                    valor_recebido=repasse.valor_final,
+                    data_recebimento=date.today(),
+                    forma_pagamento_id=1,
+                    caixa_id=2,
+                ),
+                None,
+                c.db,
+                (c.usuario, c.tenant),
+            )
+        )
+    assert c.db.query(Recebimento).count() == 1 + parcelas
+    assert all(repasse.status == "recebido" for repasse in repasses)
+    assert c.db.query(FluxoCaixa).filter_by(status="previsto").count() == 0
+    realizados = c.db.query(FluxoCaixa).filter_by(status="realizado").all()
+    assert len(realizados) == parcelas
+    assert sum(Decimal(str(fluxo.valor)) for fluxo in realizados) == Decimal("100")

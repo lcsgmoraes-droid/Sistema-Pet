@@ -16,7 +16,8 @@ from sqlalchemy.schema import CreateTable
 
 from app import contas_receber_recebimentos_routes as rotas
 from app.contas_receber_schemas import RecebimentoCreate, RecebimentoLoteCreate
-from app.financeiro_models import ContaReceber, Recebimento
+from app.financeiro_models import ContaReceber, FormaPagamento, Recebimento
+from app.ia.aba5_models import FluxoCaixa
 from app.vendas.edicao_pagamentos import fotografar_pagamentos_edicao
 from app.vendas_models import Venda, VendaBaixaLoteItem, VendaPagamento
 from tests.unit import test_finalizacao_recebiveis_atomicidade as recebiveis
@@ -27,6 +28,12 @@ DIA = date(2026, 10, 22)
 
 @pytest.fixture
 def caso(cenario, monkeypatch):
+    # O recebimento persiste o fluxo na mesma transação da conta e do recibo.
+    # A fixture-base de finalização cria somente as tabelas necessárias ao PDV.
+    with cenario.db.get_bind().begin() as conn:
+        conn.execute(
+            CreateTable(FluxoCaixa.__table__, include_foreign_key_constraints=[])
+        )
     cenario.venda.total = 100
     cenario.venda.subtotal = 100
     cenario.db.commit()
@@ -151,6 +158,18 @@ def test_lote_duas_contas_da_mesma_venda_aceita_total_correto(caso):
             "observacoes": "Pagamento no balcão",
         }
         assert salvo.tenant_id == caso.tenant
+    fluxos = caso.db.query(FluxoCaixa).all()
+    assert len(fluxos) == 2
+    assert {fluxo.origem_id for fluxo in fluxos} == {
+        recibo.id for recibo in recebimentos.values()
+    }
+    assert all(
+        fluxo.tenant_id == caso.tenant
+        and fluxo.origem_tipo == "recebimento"
+        and fluxo.status == "realizado"
+        for fluxo in fluxos
+    )
+    assert sum(Decimal(str(fluxo.valor)) for fluxo in fluxos) == Decimal("100")
 
 
 def test_lote_falha_no_segundo_recibo_reverte_todas_as_baixas(caso):
@@ -172,6 +191,7 @@ def test_lote_falha_no_segundo_recibo_reverte_todas_as_baixas(caso):
     assert primeira.valor_recebido == segunda.valor_recebido == 0
     assert primeira.status == segunda.status == "pendente"
     assert caso.db.query(Recebimento).count() == 0
+    assert caso.db.query(FluxoCaixa).count() == 0
 
 
 def test_lote_com_conta_invalida_nao_altera_a_primeira(caso):
@@ -186,6 +206,11 @@ def test_lote_com_conta_invalida_nao_altera_a_primeira(caso):
 def test_conta_sem_venda_preserva_fluxo_financeiro_independente(caso):
     registro = conta(caso, 200, venda_id=None)
     assert pagar(caso, registro, 200)["valor_recebido_total"] == 200
+    fluxo = caso.db.query(FluxoCaixa).one()
+    assert fluxo.status == "realizado" and fluxo.origem_tipo == "recebimento"
+    assert fluxo.tenant_id == caso.tenant
+    assert fluxo.origem_id == caso.db.query(Recebimento).one().id
+    assert Decimal(str(fluxo.valor)) == Decimal("200")
 
 
 def test_venda_cancelada_nao_ressuscita_recebimento(caso):
@@ -235,7 +260,14 @@ def test_desconto_financeiro_10_permite_90_e_nao_libera_mais_10(caso):
 
 def test_encargos_automaticos_preservam_calculo_incremental(caso, monkeypatch):
     registro = conta(caso, data_vencimento=date(2026, 9, 22))
-    registro.forma_pagamento.tipo = "crediario"
+    # A dívida é de crediário; sua baixa representa dinheiro novo recebido por Pix.
+    registro.forma_pagamento = FormaPagamento(
+        tenant_id=caso.tenant,
+        nome="Crediário",
+        tipo="crediario",
+        ativo=True,
+        user_id=1,
+    )
     caso.db.commit()
     config = SimpleNamespace(
         crediario_encargos_automaticos=True,

@@ -18,19 +18,15 @@ export default function ProdutoEstoqueAutocomplete({
 
   useEffect(() => {
     let ativo = true;
-    if (disabled) {
-      setSugestoes([]);
-      return;
-    }
-    if (selectedProduct?.id) return;
     const termo = busca.trim();
-    if (termo.length < 1) {
-      setSugestoes([]);
+    setSugestoes([]);
+    if (disabled || selectedProduct?.id || !termo) {
+      setCarregando(false);
       return;
     }
 
+    setCarregando(true);
     const timer = setTimeout(async () => {
-      setCarregando(true);
       try {
         const res = searchProducts
           ? await searchProducts(termo)

@@ -51,25 +51,26 @@ testes que gravam dados devem acontecer em DEV.
   permissões e identificação do operador.
 - [x] **12 — Status depois de baixa em lote.** Corrigir títulos pagos que
   permanecem vencidos no contas a receber. Caso de consulta: Osvaldo Cano,
-  código público 47644, tenant `james_dionizio`.
+  referência informada 47644 (ID interno confirmado; código público **1848**),
+  tenant `james_dionizio`.
 - [x] **13 — Histórico financeiro completo.** Exibir movimentos de todo o fluxo
   de baixa, incluindo data e observação, especialmente nas baixas em lote.
   Preservar rastreabilidade de recebimentos e estornos sem duplicar valores.
 - [x] **14 — Grupos de produtos para comissão.** Em vendas por vendedor,
   melhorar filtros, selecionar múltiplos produtos, salvar grupos reutilizáveis
   para comissão e gerar contas a pagar sem duplicidade.
-- [x] **15 — Comissão por valor fixo.** Conferir o suporte existente e completar
-  cadastro, cálculo e apresentação quando necessário, documentando a unidade
-  de aplicação do valor fixo.
+- [x] **15 — Comissão por valor fixo.** Novo tipo em reais por unidade vendida:
+  R$ 5,00 por unidade gera R$ 10,00 ao vender duas. Cadastro, cálculo e exibição
+  completos; vale somente para novas vendas, sem recalcular as anteriores.
 
 ## Validação e publicação
 
 - [x] Regras do repositório e estado inicial do Git conferidos.
 - [x] `FLUXO_UNICO.bat check` aprovado na abertura da tarefa.
 - [x] Sessão Chrome do James identificada pelo perfil, URL e usuário exibido.
-- [ ] Casos relatados investigados por consulta, sem alterações em produção.
-- [ ] Testes automatizados focados aprovados por frente.
-- [ ] Fluxos revisados no ambiente DEV, incluindo isolamento entre empresas.
+- [x] Casos relatados investigados por consulta, sem alterações em produção.
+- [x] Testes automatizados focados aprovados por frente.
+- [x] Fluxos revisados no ambiente DEV, incluindo isolamento entre empresas.
 - [ ] Build do frontend e `FLUXO_UNICO.bat release-check` aprovados.
 - [ ] Mudanças revisadas, commitadas e enviadas pela branch/PR.
 - [ ] Publicação pelo fluxo oficial e verificação após publicação.
@@ -109,9 +110,8 @@ Os códigos públicos foram auditados também nas APIs de NF, entregas e relató
 - Histórico de Fernanda: consulta em produção reproduziu timeout de 20 segundos
   para o cadastro técnico 43087, código público 2292. Implementação DEV pagina
   em SQL e mantém mensagem de erro com opção de tentar novamente.
-- Osvaldo: código público visto na listagem é **1848**. A referência **47644**
-  relatada precisa ser conferida como possível ID interno; não substituí-la
-  silenciosamente pelo código público no registro original.
+- Osvaldo: código público visto na listagem é **1848**. Consulta somente de
+  leitura confirmou que **47644**, referência do relato original, é o ID interno.
 - Michele: código público **2061**, cadastro técnico 47188; gestor mostra um
   carimbo manual disponível (13739), lançado em 26/10/2026 às 12:29:33 conforme
   a tela. API/cartão mobile sintéticos e atualização ao retornar à tela foram
@@ -144,3 +144,35 @@ Os códigos públicos foram auditados também nas APIs de NF, entregas e relató
   Massa e identidade fictícias, sem salvar alteração de kit.
 - Ruff aprovado nos 67 arquivos Python alterados e ESLint aprovado nas 152
   fontes JS/JSX alteradas, antes do gate completo.
+
+### Gate final em andamento — 26/10/2026
+
+- `origin/main` incorporada sem conflitos no commit `297059ce8`, após o
+  checkpoint de implementação `ac143f11a`.
+- Build frontend de produção aprovado. ESLint e Prettier completos aprovados.
+- Regressão iFood/frontend: **324/324**. Regressão operacional/frontend:
+  **48/48**. Aceite PDV/gestor repetido: **2/2**, mantendo produto e valor após
+  editar a pessoa.
+- Gate financeiro: **274 aprovados, 6 pulados**. Atualizados o teste que exigia
+  impedir dois caixas reabertos e a fixture que não criava a tabela de fluxo de
+  caixa. Mantidas verificações de saldo, auditoria, encargos e rollback do lote.
+- Novas regressões de busca, histórico, carimbo, fusão, recebimento e comissão
+  incluídas no gate oficial e no CI; teste mobile do carimbo incluído no gate.
+- Publicação e correção real da Michele ainda pendentes nesta etapa. Não
+  confundir os aceites com dados fictícios com a aplicação em produção.
+- Ensaio da fusão repetido em PostgreSQL: **2/2** com e sem colisão de perfil.
+  Preservados também IDs, datas de criação, notas e concedentes dos grants;
+  conflitos mantêm o registro histórico inativo e o estado anterior na auditoria.
+- Regressão frontend de faturamento aprovada: **233/233**.
+- Após a revisão final, regressão operacional frontend **51/51** e financeiro
+  combinado **301 aprovados, 6 pulados**. Foram corrigidos comissão repetida na
+  liquidação de repasse, cartão com prazo zero e metadados de cartão em
+  recebimento Pix/dinheiro; **29 testes financeiros focados** aprovados.
+- Backend DEV reiniciado com essas fontes. Os três aceites HTTP finais passaram:
+  caixas/recebimento, vendas parceladas e comissão por baixas parciais.
+- Revisão das fontes especializadas corrigiu elegibilidade SIMPLES/VARIACAO na
+  entrada de XML, loading ao limpar busca veterinária e respostas fora de ordem
+  em granel/fracionamento. Novas regressões incluídas no gate/CI.
+- Migration smoke oficial aprovado no PostgreSQL local: banco limpo, revisão
+  histórica e simulação local de tenant UUID chegaram a `zzzzz20261026a3`, com
+  RLS validado nos três cenários. Bancos temporários removidos e DEV preservado.

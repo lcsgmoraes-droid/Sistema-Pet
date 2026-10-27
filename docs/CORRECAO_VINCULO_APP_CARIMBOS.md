@@ -78,6 +78,18 @@ de campos textuais, e une os perfis ativos no cadastro principal. O vínculo
 Antes da aplicação autorizada, revisar os seis perfis reais e guardar a prévia
 e os valores anteriores para a conferência posterior.
 
+Os registros de permissão são preservados: quando não há o mesmo perfil no
+principal, a fusão muda somente o vínculo de pessoa e sincroniza o acesso,
+mantendo ID, data de criação, notas e concedente. Perfis revogados continuam
+revogados, salvo quando a união das flags cadastrais já concede aquele perfil.
+Se os dois cadastros têm o mesmo perfil, o registro do principal permanece e
+recebe a união do acesso; o registro conflitante é conservado no duplicado,
+inativo, com suas notas/datas. Nenhum grant é apagado. O estado anterior
+completo, incluindo IDs, notas, datas e estado ativo, fica no histórico da
+fusão; o resultado identifica cada grant transferido ou conservado no
+duplicado. Assim, um conflito não descarta metadados históricos nem cria
+permissão adicional para a pessoa inativada.
+
 Conferir depois no gestor e no app autenticado: pessoa 2061, mesmo saldo de
 carimbos, cartão atualizado ao voltar à tela e ausência de nova duplicata.
 
@@ -98,6 +110,14 @@ prévia não emitiu `FOR UPDATE`; a execução manteve o bloqueio de linhas. A
 fusão preservou perfis, cargo e conta ativa, transferiu as 306 referências e
 mudou o saldo do app de zero para um. Ao final, rollback confirmado e nenhum
 usuário fictício persistido. Nenhuma alteração foi executada em produção.
+
+O ensaio foi repetido com o algoritmo que conserva os registros: **dois
+cenários PostgreSQL aprovados**, com e sem perfil já existente no principal.
+Em ambos, IDs, criação, notas e concedente de todos os grants foram
+preservados, inclusive na colisão entre um perfil revogado do principal e
+um ativo do duplicado. A auditoria foi conferida, assim como seis perfis
+ativos finais, cargo, conta ativa, 306 vendas e carimbo. O teste unitário
+também cobre grant revogado sem colisão e sua permanência como revogado.
 
 A prévia antiga chamava a leitura com bloqueio de linhas e foi recusada numa
 transação de produção marcada `READ ONLY`, sem escrever dados. O código DEV

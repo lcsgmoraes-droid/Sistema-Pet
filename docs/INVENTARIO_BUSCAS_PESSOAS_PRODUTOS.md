@@ -107,9 +107,9 @@ Os caminhos abaixo são os componentes responsáveis pelo campo nas respectivas 
 
 | Fluxo | Fonte e regra preservada |
 | --- | --- |
-| XML | Catálogo ERP com ativos/inativos e variações; uma chamada por termo, cancelamento da busca anterior por item. Situação inativa, código/EAN e estoque permanecem nas sugestões. |
+| XML | Catálogo ERP com ativos/inativos; duas consultas tipadas por termo, somente SIMPLES e VARIACAO, com filtro antes da paginação e cancelamento por item. PAI/KIT não entram nas sugestões e o endpoint de vínculo também os rejeita. Situação inativa, código/EAN e estoque permanecem nas sugestões. |
 | Composição de kits | Catálogo de componentes elegíveis; exclui o próprio kit e itens proibidos pela regra existente. |
-| Granel e fracionamento clínico | Rotas de estoque próprias, unidades e vínculos existentes. Bipagem e conversão de estoque continuam nos fluxos originais. |
+| Granel e fracionamento clínico | Rotas de estoque próprias, unidades e vínculos existentes. Busca anterior é cancelada ao trocar termo ou fechar; resposta tardia não substitui a lista/seleção atual. Bipagem e conversão de estoque continuam nos fluxos originais. |
 | Grupos comerciais | Empresa e grupo enviados às rotas autorizadas existentes; a célula não abre acesso a outra empresa. |
 | Calculadora de ração | Catálogo específico e aptidão nutricional preservados; produto incompleto continua sem poder ser selecionado. |
 | Catálogo público | Mantém as consultas públicas e seus filtros; trocar a célula não usa API privada do ERP. |
@@ -147,10 +147,11 @@ Os caminhos abaixo são os componentes responsáveis pelo campo nas respectivas 
 ## Verificações e limites
 
 - Testes de seleção local, tutor, histórico paginado, recibos, PDFs, transferência e carimbo manual executados separadamente.
+- Revisão adicional confirmou e corrigiu ampliação indevida do catálogo XML para PAI/KIT, loading veterinário preso ao limpar busca e consultas concorrentes em granel/fracionamento. Cinco regressões frontend e cinco backend passaram; vínculo de produto de outra empresa é rejeitado sem alterar o item.
 - O build geral e o aceite visual final devem rodar após a integração de todas as frentes da tarefa.
 - A ordenação na célula prioriza os candidatos recebidos. As rotas especializadas de estoque/grupo/ração conservam a elegibilidade existente; validar buscas longas e códigos exatos nesses fluxos durante o aceite.
 - O histórico de Fernanda Pedraza, código público 2292, foi reproduzido em produção somente para leitura: a rota antiga `/clientes/43087/historico-compras` excede o timeout de 20 segundos. A nova consulta pagina no banco; o teste usa 45 vendas fictícias, valida totais globais e limita consultas à página. A UI mantém erro visível e permite tentar novamente.
 - A causa do carimbo de Michele foi confirmada por leitura autorizada dos dados de produção: o carimbo pertence à pessoa 2061, enquanto o usuário de app 84 está ligado à duplicata 10851. A conta tem `login_phone`, mas telefone/e-mail/CPF do perfil vazios; o resolvedor não considerava `login_phone`. O fallback foi corrigido para prevenir novos casos e preservar vínculos explícitos. A correção da duplicata existente exige revisão administrativa; ver `docs/CORRECAO_VINCULO_APP_CARIMBOS.md`.
 - O ensaio PostgreSQL DEV validou prévia, fusão, saldo 0→1, seis perfis ativos, flags operacionais, cargo e 306 referências fictícias de vendas. Todos os dados foram desfeitos por rollback. O cartão do app renderiza 1/10 mesmo sem compras e atualiza ao voltar à tela; o aparelho físico da cliente real ainda não foi testado.
 - A leitura autorizada do tenant confirmou 111266 vendas `IMP-`, entre 19/11/2019 e **18/09/2026**. Esta última é a data final dos dados importados encontrada. A data/hora de execução da importação continua não comprovada: `created_at` conserva as datas originais e não é recibo de importação.
-- Os 26 testes unitários focados de histórico, benefício, código fiscal e segurança da fusão passaram, além do ensaio PostgreSQL. A suíte de contexto mobile tem uma falha preexistente na política de push: `test_registrar_push_token_keeps_same_device_active_for_other_accounts` exige ausência de `_disable_same_push_token_for_other_users`, mas a implementação no próprio `HEAD` já o chama. `app_mobile_routes.py` permanece sem alterações nesta tarefa; não foi removida proteção nem declarada essa suíte inteira verde.
+- Os 27 testes unitários focados de histórico, benefício, código fiscal e segurança da fusão passaram, além dos dois cenários PostgreSQL de preservação dos grants. A suíte de contexto mobile tem uma falha preexistente na política de push: `test_registrar_push_token_keeps_same_device_active_for_other_accounts` exige ausência de `_disable_same_push_token_for_other_users`, mas a implementação no próprio `HEAD` já o chama. `app_mobile_routes.py` permanece sem alterações nesta tarefa; não foi removida proteção nem declarada essa suíte inteira verde.

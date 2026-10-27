@@ -87,9 +87,10 @@ def registrar_efeitos_recebimento(
     recebimento.caixa_id = caixa.id
     recebimento.conta_bancaria_id = banco.id if banco else None
     recebimento.numero_parcelas = dados.numero_parcelas
-    recebimento.operadora_id = dados.operadora_id
-    recebimento.bandeira = dados.bandeira
-    recebimento.nsu_cartao = dados.nsu_cartao
+    eh_cartao = tipo in TIPOS_CARTAO
+    recebimento.operadora_id = dados.operadora_id if eh_cartao else None
+    recebimento.bandeira = dados.bandeira if eh_cartao else None
+    recebimento.nsu_cartao = dados.nsu_cartao if eh_cartao else None
     db.flush()
     referencia = f"RECEBIMENTO-{recebimento.id}"
     nome_usuario = usuario.nome or getattr(usuario, "email", None) or "Usuário"

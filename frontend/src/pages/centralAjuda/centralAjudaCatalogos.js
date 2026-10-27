@@ -1,0 +1,448 @@
+import {
+  FiBarChart2,
+  FiBookOpen,
+  FiCalendar,
+  FiCpu,
+  FiPackage,
+  FiSettings,
+  FiTruck,
+  FiUsers,
+} from "react-icons/fi";
+
+// Categorias estáticas da Central de Ajuda; a ordem é definida pelo catálogo principal.
+export const AJUDA_DASHBOARD = {
+  modulo: "dashboard",
+  label: "Dashboard",
+  icone: FiBarChart2,
+  cor: "indigo",
+  artigos: [
+    {
+      titulo: "Como ler o Dashboard",
+      tags: ["dashboard", "financeiro", "saldo", "resumo"],
+      conteudo: [
+        "O Dashboard reúne os principais sinais do negócio em uma única tela, sem misturar posição atual com desempenho do período.",
+        "**Desempenho** — mostra faturamento, resultado de caixa, vendas finalizadas e ticket médio no período escolhido.",
+        "**Resultado de caixa** — diferença entre entradas e saídas registradas. Ele não substitui o lucro contábil apresentado no DRE.",
+        "**Posição atual** — mostra o saldo das contas bancárias e os totais a receber e a pagar, independentemente do período.",
+        "**Atenção agora** — destaca valores vencidos, clientes VIP em risco e clientes sem comprar há mais de 90 dias.",
+        "**Entradas e saídas** — mostra o movimento diário e ajuda a identificar dias de maior pressão no caixa.",
+        "**Produtos que puxam as vendas** — ranking dos produtos com maior quantidade vendida no período.",
+      ],
+    },
+    {
+      titulo: "Como mudar o período do Dashboard",
+      tags: ["dashboard", "período", "dias", "filtro"],
+      conteudo: [
+        "No canto superior direito do Dashboard, você vê os botões: 7 dias, 15 dias, 30 dias, 60 dias, 90 dias.",
+        "Clique em qualquer um deles para atualizar desempenho, gráfico e ranking de produtos.",
+        "A posição atual, as contas vencidas e os indicadores de clientes não mudam com esse filtro.",
+      ],
+    },
+    {
+      titulo: "Diferença entre resultado de caixa e DRE",
+      tags: ["dre", "classificar", "lançamentos", "resultado"],
+      conteudo: [
+        "O resultado de caixa do Dashboard mostra entradas menos saídas registradas no período.",
+        "O DRE considera receitas, custos e despesas por competência e é o local correto para analisar lucro.",
+        "Para uma análise contábil detalhada, acesse **Financeiro → DRE**.",
+      ],
+    },
+  ],
+};
+
+export const AJUDA_PESSOAS = {
+  modulo: "pessoas",
+  label: "Pessoas (Clientes, Fornecedores, Veterinários)",
+  icone: FiUsers,
+  cor: "blue",
+  artigos: [
+    {
+      titulo: "Como cadastrar um novo cliente",
+      tags: ["cliente", "cadastro", "novo", "pessoas", "fornecedor"],
+      conteudo: [
+        "Acesse o menu **Pessoas** na barra lateral.",
+        "Clique no botão **+ Novo Cadastro** (canto superior direito).",
+        "Preencha os dados: nome, CPF/CNPJ, telefone, e-mail e endereço.",
+        "No campo **Tipo**, escolha: Cliente, Fornecedor, Veterinário ou Funcionário.",
+        "Clique em **Salvar**. O cadastro aparece na lista imediatamente.",
+        "💡 Dica: O CPF/CNPJ não é obrigatório, mas facilita emissão de notas fiscais.",
+      ],
+    },
+    {
+      titulo: "Como pesquisar e filtrar pessoas",
+      tags: ["pesquisar", "filtrar", "buscar", "cliente", "pessoas"],
+      conteudo: [
+        "Na página **Pessoas**, use a barra de pesquisa no topo da tabela.",
+        "Você pode buscar por: nome, código, CPF/CNPJ, e-mail ou telefone.",
+        "Use as abas para filtrar por tipo: Todos, Clientes, Fornecedores, Veterinários, Funcionários.",
+        "Para alterar quantos resultados aparecem por página, use o seletor '20 por página' no canto.",
+      ],
+    },
+    {
+      titulo: "Como importar clientes em massa (planilha Excel)",
+      tags: ["importar", "excel", "planilha", "clientes", "massa"],
+      conteudo: [
+        "**Atenção:** Prepare uma planilha Excel (.xlsx) com as colunas corretas antes de importar.",
+        "**Colunas esperadas:** nome, cpf_cnpj, telefone, e-mail, tipo (Cliente/Fornecedor/etc).",
+        "Clique no botão **Importar Excel** na página de Pessoas.",
+        "Selecione o arquivo. O sistema valida os dados e mostra um prévia antes de confirmar.",
+        "Erros são apontados linha a linha para você corrigir.",
+        "Após confirmar, todos os registros válidos são importados de uma vez.",
+      ],
+    },
+    {
+      titulo: "Como ver o histórico completo de um cliente",
+      tags: ["histórico", "timeline", "cliente", "compras", "pets"],
+      conteudo: [
+        "Clique no ícone de **editar** (lápis) ao lado do cliente na lista.",
+        "Na ficha do cliente, você encontra:",
+        "• **Dados pessoais** — nome, contato, endereço",
+        "• **Pets** — lista de pets cadastrados vinculados a ele",
+        "• **Histórico de compras** — todas as vendas feitas para este cliente",
+        "• **Segmento** — tag de classificação (ex: Parceiro, VIP)",
+        "💡 Clique em 'Ver Timeline Completa' para ver tudo em ordem cronológica.",
+      ],
+    },
+  ],
+};
+
+export const AJUDA_PETS = {
+  modulo: "pets",
+  label: "Pets",
+  icone: FiBookOpen,
+  cor: "green",
+  artigos: [
+    {
+      titulo: "Como cadastrar um pet",
+      tags: ["pet", "animal", "cadastro", "espécie", "raça"],
+      conteudo: [
+        "Acesse **Pets** no menu lateral ou acesse a ficha do tutor e clique em '+ Adicionar Pet'.",
+        "Preencha: nome do pet, espécie, raça, data de nascimento e sexo.",
+        "Vincule o pet a um tutor (cliente já cadastrado).",
+        "Você pode adicionar uma foto e informações de saúde (peso, vacinas, observações).",
+        "Clique em **Salvar**.",
+      ],
+    },
+    {
+      titulo: "Espécies e Raças — como gerenciar",
+      tags: ["espécie", "raça", "cadastro", "configurar"],
+      conteudo: [
+        "O sistema vem com espécies e raças pré-cadastradas (cão, gato, etc).",
+        "Para adicionar novas: acesse **Configurações → Espécies e Raças**.",
+        "Você pode criar novas espécies e associar raças a cada uma.",
+        "Esses dados são usados na ficha do pet e nos relatórios.",
+      ],
+    },
+  ],
+};
+
+export const AJUDA_PRODUTOS = {
+  modulo: "produtos",
+  label: "Produtos e Estoque",
+  icone: FiPackage,
+  cor: "orange",
+  artigos: [
+    {
+      slug: "lancar-granel-bipagem",
+      titulo: "Como lançar granel com conferência por bipagem",
+      tags: ["granel", "bipagem", "produto fechado", "estoque", "app funcionario"],
+      conteudo: [
+        "Para conferir ou criar o vínculo no ERP, acesse **Produtos / Estoque → Listar Produtos**, abra o produto fechado de origem, clique em **Ver movimentações de estoque → Lançar granel** e selecione o produto a granel. Um mesmo produto a granel pode receber vínculos de embalagens diferentes, como 10 kg, 15 kg e 20 kg.",
+        "No ERP, abra **Configurações → Estoque** para decidir se a bipagem será obrigatória.",
+        "No app do funcionário, abra **Lançar granel**, bipe primeiro o produto fechado e depois o produto a granel.",
+        "O sistema mostra **Tudo certo** somente quando a combinação estiver vinculada. Uma combinação diferente é recusada.",
+        "Informe quantas embalagens foram abertas e confirme. O estoque do produto fechado diminui e o estoque do produto a granel recebe o peso correspondente em kg.",
+        "Quando a trava estiver desligada, a busca manual continua disponível no ERP e no app.",
+      ],
+    },
+    {
+      titulo: "Como cadastrar um produto",
+      tags: ["produto", "cadastro", "estoque", "novo"],
+      conteudo: [
+        "Acesse **Produtos** no menu lateral.",
+        "Clique em **+ Novo Produto**.",
+        "Preencha: nome, categoria, preço de venda, custo, código de barras (opcional).",
+        "Defina o **estoque inicial** — quantidade que você já tem em mãos.",
+        "Configure o **estoque mínimo** para receber alertas quando acabar.",
+        "Clique em **Salvar**.",
+        "💡 O produto já aparece disponível no PDV após salvar.",
+      ],
+    },
+    {
+      titulo: "Como pesquisar e filtrar produtos",
+      tags: ["buscar", "pesquisar", "filtrar", "produto", "categoria"],
+      conteudo: [
+        "Na página **Produtos**, use a barra de busca para pesquisar por nome ou código.",
+        "Use os filtros de categoria para ver apenas rações, brinquedos, medicamentos, etc.",
+        "O botão de filtro avançado permite filtrar por: faixa de preço, estoque baixo, fornecedor.",
+        "A lista mostra: nome, código, preço, estoque atual e status.",
+      ],
+    },
+    {
+      titulo: "Alertas de estoque baixo",
+      tags: ["estoque", "alerta", "mínimo", "reposição"],
+      conteudo: [
+        "Quando um produto atinge ou passa abaixo do **estoque mínimo**, ele aparece nos Alertas.",
+        "Acesse **Produtos → Alertas de Estoque** para ver a lista completa.",
+        "O Dashboard também exibe um resumo de produtos com estoque crítico.",
+        "Para configurar o estoque mínimo de um produto: edite o produto e defina o campo 'Estoque Mínimo'.",
+      ],
+    },
+    {
+      titulo: "Como importar produtos em massa",
+      tags: ["importar", "excel", "planilha", "produto", "massa"],
+      conteudo: [
+        "Clique em **Importar Excel** na página de Produtos.",
+        "Use a planilha modelo disponível para download no mesmo botão.",
+        "Colunas obrigatórias: nome, preco_venda, categoria.",
+        "Colunas opcionais: custo, codigo_barras, estoque_inicial, estoque_minimo.",
+        "Após importar, revise os produtos criados na lista.",
+      ],
+    },
+    {
+      titulo: "Como usar o relatório de produtos",
+      tags: ["relatório", "produto", "vendas", "vendedor", "análise", "fornecedor", "pdf", "csv"],
+      conteudo: [
+        "Acesse **Produtos / Estoque → Análise de Produtos** em `/produtos/analise` para acompanhar produtos vendidos, rankings, Curva ABC e grupos.",
+        "Escolha o **período** e, se desejar, o **Fornecedor**. Clique em **Aplicar filtros** e aguarde o resultado antes de exportar.",
+        "Clique em **Exportar produtos do filtro** para baixar um CSV que abre no Excel, ou em **Gerar PDF por fornecedor** para baixar o relatório com produtos, SKU, quantidades, faturamento e totais. As exportações usam o período e os filtros aplicados.",
+        "Em **Resultado por produto**, clique em **Ver vendedores** para expandir a quantidade, o faturamento e a participação de cada vendedor naquele produto. Vendas sem identificação aparecem como **Sem vendedor informado**.",
+        "Marque **Incluir vendedores no PDF** antes de gerar o arquivo para detalhar todos os vendedores dos produtos filtrados, mesmo com as linhas recolhidas na tela. Desmarque para gerar apenas o resumo dos produtos.",
+        "Para comparar fornecedores, deixe **Todos os fornecedores** e abra **Grupos → Fornecedor**. Sem filtro, o agrupamento usa o fornecedor principal atual de cada produto.",
+        "O filtro aceita o **fornecedor principal** ou um **vínculo alternativo ativo** no cadastro do produto. Esse vínculo atual não identifica de qual fornecedor veio o lote vendido.",
+        "Se houver venda sem filtrar fornecedor, mas ela não aparecer ao selecionar um fornecedor, confira os vínculos no cadastro do produto. Produtos sem vínculo com o fornecedor escolhido ficam fora desse filtro; a venda e o histórico são preservados.",
+        "Lucro e margem são estimativas calculadas pelo custo atual do cadastro, não pelo custo histórico de cada venda.",
+      ],
+    },
+  ],
+};
+
+export const AJUDA_LEMBRETES = {
+  modulo: "lembretes",
+  label: "Lembretes e Agendamentos",
+  icone: FiCalendar,
+  cor: "purple",
+  artigos: [
+    {
+      titulo: "Como criar um lembrete",
+      tags: ["lembrete", "agendamento", "criar", "notificação"],
+      conteudo: [
+        "Acesse **Lembretes** no menu lateral.",
+        "Clique em **+ Novo Lembrete**.",
+        "Preencha: título, data, hora, cliente (opcional) e observações.",
+        "Escolha o tipo: Consulta, Banho e Tosa, Vacina, Retorno, Outro.",
+        "Salve. O lembrete aparece no calendário e na lista.",
+        "💡 Lembretes com data chegando ficam destacados na lista.",
+      ],
+    },
+    {
+      titulo: "Como ver os lembretes do dia",
+      tags: ["lembrete", "hoje", "dia", "agenda"],
+      conteudo: [
+        "Na página de Lembretes, o filtro padrão mostra os lembretes de hoje.",
+        "Use os botões de filtro para ver: Hoje, Esta Semana, Este Mês ou Todos.",
+        "Lembretes vencidos (data passada, não concluídos) aparecem marcados em vermelho.",
+        "Clique em um lembrete para editar, marcar como concluído ou excluir.",
+      ],
+    },
+  ],
+};
+
+export const AJUDA_CALCULADORA = {
+  modulo: "calculadora",
+  label: "Calculadora de Ração",
+  icone: FiCpu,
+  cor: "teal",
+  artigos: [
+    {
+      titulo: "Como usar a Calculadora de Ração",
+      tags: ["ração", "calculadora", "nutrição", "pet", "quantidade"],
+      conteudo: [
+        "Acesse **Calculadora de Ração** no menu lateral.",
+        "Informe os dados do pet: espécie, raça, peso atual, idade e nível de atividade.",
+        "Selecione a ração disponível no estoque ou informe os dados manualmente.",
+        "O sistema calcula: quantidade diária recomendada, custo por dia e quanto um pacote vai durar.",
+        "Use os resultados para orientar os tutores na compra da quantidade correta.",
+        "💡 Você pode salvar perfis de pets para calcular rapidamente no futuro.",
+      ],
+    },
+  ],
+};
+
+export const AJUDA_NFE = {
+  modulo: "nfe",
+  label: "Notas Fiscais",
+  icone: FiBookOpen,
+  cor: "gray",
+  artigos: [
+    {
+      titulo: "Qual é a diferença entre NF-e modelo 55 e NFC-e modelo 65?",
+      tags: ["modelo 55", "modelo 65", "nfe", "nfce", "série", "numeração"],
+      conteudo: [
+        "A **NF-e, modelo 55**, é usada nas vendas de mercadorias que exigem NF-e, como operações com entrega, e-commerce e muitas vendas entre empresas. Confirme a regra da operação com a contabilidade.",
+        "A **NFC-e, modelo 65**, é usada no varejo para consumidor final, normalmente no atendimento presencial. Para emiti-la, a empresa também precisa do CSC do ambiente correspondente.",
+        "Os modelos não compartilham numeração. NF-e modelo 55, série 1, e NFC-e modelo 65, série 1, possuem sequências independentes.",
+        "Homologação e produção também mantêm sequências separadas. Configure sempre o ambiente correto antes de informar a série e o próximo número.",
+        "Em **Configurações → Integrações → IntNFe**, use a ajuda **Qual modelo escolher?** e marque **Continuar com esta série no CorePet** quando quiser manter a série do sistema anterior.",
+      ],
+    },
+    {
+      titulo: "Como obter e cadastrar o CSC da NFC-e?",
+      tags: ["csc", "nfce", "modelo 65", "sefaz", "código de segurança", "token"],
+      conteudo: [
+        "O **CSC (Código de Segurança do Contribuinte)** é usado para gerar o QR Code da NFC-e, modelo 65. Ele não é necessário para a NF-e modelo 55.",
+        "O CSC é fornecido pela Secretaria da Fazenda do estado da empresa. Primeiro, confirme que o estabelecimento está credenciado para emitir NFC-e.",
+        "Acesse o portal da NFC-e da sua SEFAZ com o certificado digital da empresa, selecione o estabelecimento e procure **Gerenciar Cód Segurança** ou opção equivalente.",
+        "A SEFAZ fornece o **ID do CSC**, que é curto, e o **código CSC**, que é secreto. Copie os dois para **Configurações → Integrações → IntNFe → CSC da NFC-e**.",
+        "Homologação e produção usam CSCs diferentes. Antes de copiar, confira em qual ambiente o código foi gerado.",
+        "Para empresas de São Paulo, consulte as [orientações oficiais da SEFAZ-SP](https://portal.fazenda.sp.gov.br/servicos/nfce/).",
+        "O botão **Verificar cadastro na IntNFe** confirma se existe um CSC e mostra seu ID. Por segurança, ele nunca recupera nem exibe o código secreto.",
+      ],
+    },
+    {
+      titulo: "Como emitir uma nota fiscal",
+      tags: ["nota fiscal", "nfe", "nfce", "emitir", "imposto"],
+      conteudo: [
+        "Acesse **Notas Fiscais** no menu lateral.",
+        "Clique em **+ Nova Nota**.",
+        "Selecione o cliente (com CPF/CNPJ cadastrado para emissão com destinatário).",
+        "Adicione os produtos/serviços, quantidades e valores.",
+        "Selecione a natureza de operação e o CFOP correto.",
+        "Clique em **Emitir**. A nota é enviada para a SEFAZ e o XML/PDF ficam disponíveis.",
+        "**Atenção:** configure os dados da empresa e o certificado digital em Configurações antes de emitir a primeira nota.",
+      ],
+    },
+  ],
+};
+
+export const AJUDA_CONFIGURACOES = {
+  modulo: "configuracoes",
+  label: "Configurações",
+  icone: FiSettings,
+  cor: "gray",
+  artigos: [
+    {
+      titulo: "Como configurar os dados da empresa",
+      tags: ["empresa", "cnpj", "dados", "razão social", "logo", "configuração"],
+      conteudo: [
+        "Acesse **Configurações** no menu lateral.",
+        "Na aba **Empresa**, preencha: razão social, CNPJ, endereço, telefone, e-mail.",
+        "Faça upload do logotipo da empresa (aparece nos recibos e documentos).",
+        "Salve as alterações. Os dados aparecem automaticamente nos documentos gerados.",
+      ],
+    },
+    {
+      titulo: "Como criar e gerenciar usuários",
+      tags: ["usuário", "acesso", "permissão", "criar", "colaborador"],
+      conteudo: [
+        "Acesse **Configurações → Usuários**.",
+        "Clique em **+ Novo Usuário**.",
+        "Preencha: nome, e-mail, senha e perfil de acesso (Admin, Vendedor, Financeiro, etc).",
+        "Cada perfil tem permissões diferentes:",
+        "• **Admin** — acesso total ao sistema.",
+        "• **Vendedor** — acesso ao PDV e Produtos.",
+        "• **Financeiro** — acesso ao módulo financeiro.",
+        "Após salvar, o usuário recebe os dados de acesso por e-mail.",
+      ],
+    },
+    {
+      titulo: "Como definir permissões por perfil",
+      tags: ["permissão", "perfil", "cargo", "acesso", "roles"],
+      conteudo: [
+        "Acesse **Configurações → Perfis de Acesso**.",
+        "Veja os perfis existentes ou crie um novo.",
+        "Para cada perfil, marque ou desmarque as permissões por módulo.",
+        "Exemplos de permissões: 'ver financeiro', 'emitir nota fiscal', 'cancelar venda'.",
+        "Ao salvar, todos os usuários com aquele perfil são atualizados automaticamente.",
+      ],
+    },
+    {
+      titulo: "Como habilitar o app mobile para uma loja",
+      tags: ["app", "mobile", "loja", "tenant", "entregador", "veterinario"],
+      conteudo: [
+        "Para o app encontrar uma loja, o tenant precisa estar ativo e com codigo publico configurado.",
+        "**Passo a passo:**",
+        "1. Acesse as configuracoes da empresa/loja.",
+        "2. Preencha nome da empresa, cidade, UF e CEP.",
+        "3. Configure um codigo publico da loja, tambem chamado de slug. Exemplo: clinica-veterinaria-sao-jose.",
+        "4. Ative a loja/app/e-commerce para que ela apareca na busca do aplicativo.",
+        "5. Cadastre os usuarios e vincule cada perfil correto: cliente, entregador, veterinario ou admin.",
+        "6. No app, a pessoa digita ou escaneia o codigo da loja e depois faz login com o e-mail dela.",
+        "Se o mesmo e-mail existir em mais de uma loja, a loja selecionada no app define qual tenant sera usado.",
+      ],
+    },
+    {
+      titulo: "Operadoras de Cartão — como cadastrar",
+      tags: ["operadora", "cartão", "cielo", "stone", "rede", "taxa"],
+      conteudo: [
+        "Acesse **Financeiro → Operadoras de Cartão**.",
+        "Cadastre cada operadora e marque uma ativa como padrão para ela vir selecionada no PDV.",
+        "Na tabela de taxas, selecione uma ou mais bandeiras e informe a taxa de cada modalidade e quantidade de parcelas.",
+        "As taxas aplicadas ficam gravadas na venda e são usadas na margem, no valor líquido, nos recebíveis e na conciliação.",
+        "Você pode ter múltiplas operadoras cadastradas (Cielo, Stone, Rede, Getnet etc.).",
+      ],
+    },
+  ],
+};
+
+export const AJUDA_COMPRAS = {
+  modulo: "compras",
+  label: "Compras e Pedidos",
+  icone: FiTruck,
+  cor: "blue",
+  artigos: [
+    {
+      titulo: "Como registrar uma compra de estoque",
+      tags: ["compra", "estoque", "fornecedor", "repor", "entrada"],
+      conteudo: [
+        "Acesse **Compras** no menu lateral.",
+        "Clique em **+ Nova Compra**.",
+        "Selecione o fornecedor e adicione os produtos comprados com as quantidades e custos.",
+        "Salve. O estoque é atualizado automaticamente com as quantidades informadas.",
+        "O custo registrado é usado para cálculo de margem e CMV no DRE.",
+      ],
+    },
+    {
+      titulo: "Integração com Bling (Pedidos)",
+      tags: ["bling", "pedido", "integração", "erp"],
+      conteudo: [
+        "Acesse **Pedidos Bling** no menu lateral.",
+        "Esta tela mostra os pedidos sincronizados com o sistema Bling.",
+        "Use para acompanhar pedidos de fornecedores e integrações de marketplace.",
+        "Configure a chave de API do Bling em **Configurações → Integrações**.",
+      ],
+    },
+  ],
+};
+
+export const AJUDA_IA = {
+  modulo: "ia",
+  label: "Inteligência Artificial",
+  icone: FiCpu,
+  cor: "purple",
+  artigos: [
+    {
+      titulo: "Como usar o Chat com IA",
+      tags: ["ia", "inteligência artificial", "chat", "assistente", "dúvida"],
+      conteudo: [
+        "Acesse **IA → Chat** no menu lateral.",
+        "Digite sua pergunta ou descreva o que precisa de ajuda.",
+        "A IA conhece os dados do seu sistema e pode responder perguntas como:",
+        "• 'Quais produtos estão com estoque baixo?'",
+        "• 'Qual foi minha venda total no último mês?'",
+        "• 'Quais clientes têm contas vencidas?'",
+        "As respostas são baseadas nos dados reais do seu sistema.",
+      ],
+    },
+    {
+      titulo: "IA de Fluxo de Caixa — previsões inteligentes",
+      tags: ["ia", "fluxo de caixa", "previsão", "projeção", "inteligente"],
+      conteudo: [
+        "Acesse **IA → Fluxo de Caixa** no menu lateral.",
+        "A IA analisa seu histórico financeiro e projeta tendências futuras.",
+        "Mostra alertas inteligentes como: 'Com base no histórico, seu caixa pode ficar negativo em X dias'.",
+        "Use para tomar decisões antecipadas sobre compras e investimentos.",
+      ],
+    },
+  ],
+};

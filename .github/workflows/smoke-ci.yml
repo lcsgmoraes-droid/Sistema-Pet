@@ -88,3 +88,7 @@ jobs:
       - name: iFood and product regression tests
         working-directory: frontend
         run: npm run test:ifood
+
+      - name: Operational regression tests
+        working-directory: frontend
+        run: npm run test:operacional

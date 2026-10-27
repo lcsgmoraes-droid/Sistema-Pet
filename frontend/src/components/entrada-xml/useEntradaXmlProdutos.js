@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { confirmarCorePet } from "../../services/corepetDialog";
+import { ordenarSugestoesEntidade } from "../../utils/buscaEntidades";
 import { aplicarMultiplicadorPackAoItem, obterCustoAquisicaoItem } from "./entradaXmlUtils";
 import {
   calcularMargemLucroProduto,
@@ -57,22 +58,38 @@ export default function useEntradaXmlProdutos({
     buscaProdutoControllersRef.current[itemId] = controller;
     setBuscandoProduto((prev) => ({ ...prev, [itemId]: true }));
     try {
-      const { data } = await api.get("/produtos/", {
-        params: {
-          busca: textoBusca,
-          ativo: null,
-          include_variations: true,
-          page: 1,
-          page_size: 60,
-          busca_completa: false,
-          incluir_imagens: false,
-          incluir_lotes: false,
-          incluir_detalhes_composto: false,
-        },
-        signal: controller.signal,
-      });
+      const respostas = await Promise.all(
+        ["SIMPLES", "VARIACAO"].map((tipoProduto) =>
+          api.get("/produtos/", {
+            params: {
+              busca: textoBusca,
+              ativo: null,
+              tipo_produto: tipoProduto,
+              page: 1,
+              page_size: 60,
+              busca_completa: false,
+              incluir_imagens: false,
+              incluir_lotes: false,
+              incluir_detalhes_composto: false,
+            },
+            signal: controller.signal,
+          }),
+        ),
+      );
       if (!controller.signal.aborted) {
-        setResultadosBuscaProduto((prev) => ({ ...prev, [itemId]: data?.items || [] }));
+        const porId = new Map(
+          respostas
+            .flatMap((resposta) => resposta.data?.items || [])
+            .filter((produto) =>
+              ["SIMPLES", "VARIACAO"].includes(produto.tipo_produto || "SIMPLES"),
+            )
+            .map((produto) => [produto.id, produto]),
+        );
+        const produtos = ordenarSugestoesEntidade([...porId.values()], textoBusca, "produto").slice(
+          0,
+          60,
+        );
+        setResultadosBuscaProduto((prev) => ({ ...prev, [itemId]: produtos }));
       }
     } catch (error) {
       if (!controller.signal.aborted) {
@@ -87,6 +104,7 @@ export default function useEntradaXmlProdutos({
   const atualizarFiltroProduto = (itemId, valor) => {
     buscaProdutoControllersRef.current[itemId]?.abort();
     setFiltroProduto((prev) => ({ ...prev, [itemId]: valor }));
+    setResultadosBuscaProduto((prev) => ({ ...prev, [itemId]: [] }));
 
     if (buscaProdutoTimersRef.current[itemId]) {
       clearTimeout(buscaProdutoTimersRef.current[itemId]);
@@ -98,6 +116,7 @@ export default function useEntradaXmlProdutos({
       return;
     }
 
+    setBuscandoProduto((prev) => ({ ...prev, [itemId]: true }));
     buscaProdutoTimersRef.current[itemId] = setTimeout(() => {
       buscarProdutosParaVinculo(itemId, valor);
     }, 250);

@@ -183,6 +183,19 @@ Invoke-GateStep 'Faturamento and cash audit reconciliation regression' $python @
     'tests/unit/test_vendas_comissao_reprocessamento_contract.py', '-q'
 ) $backend
 
+Invoke-GateStep 'Operational search history receipts and commissions regression' $python @(
+    '-m', 'pytest',
+    'tests/unit/test_clientes_busca_relevancia.py',
+    'tests/unit/test_cliente_historico_paginacao.py',
+    'tests/unit/test_beneficio_carimbo_manual_app.py',
+    'tests/unit/test_pessoa_merge_safety.py',
+    'tests/unit/test_notas_entrada_vinculo_elegibilidade.py',
+    'tests/unit/test_recebimento_caixa_parcelamento.py',
+    'tests/unit/test_recebimento_repasse_comissao.py',
+    'tests/unit/test_comissoes_grupos_valor_fixo.py',
+    'tests/unit/test_comissoes_pagamentos_lote.py', '-q'
+) $backend
+
 Invoke-GateStep 'Sale cancellation original stock regression' $python @(
     '-m', 'pytest',
     'tests/unit/test_venda_cancelamento_lotes.py',
@@ -228,6 +241,7 @@ Invoke-GateStep 'Frontend lint' $npm @('run', 'lint:core') $frontend
 Invoke-GateStep 'Frontend format' $npm @('run', 'format:core:check') $frontend
 Invoke-GateStep 'Frontend production build' $npm @('run', 'build') $frontend
 Invoke-GateStep 'Frontend iFood and product regression tests' $npm @('run', 'test:ifood') $frontend
+Invoke-GateStep 'Frontend operational regression tests' $npm @('run', 'test:operacional') $frontend
 Invoke-GateStep 'Backend iFood safety contracts' $python @(
     '-m', 'pytest', 'tests/unit/test_ifood_management.py',
     'tests/unit/test_ifood_catalog_contract.py', 'tests/unit/test_ifood_routes_contract.py',
@@ -289,6 +303,9 @@ if ($mobileTests.Count -eq 0) {
     Fail 'Nenhum teste mobile *.test.mjs foi encontrado.'
 }
 Invoke-GateStep 'Mobile tests' $node (@('--test') + $mobileTests) $mobile
+Invoke-GateStep 'Mobile manual loyalty stamp regression' $node @(
+    'scripts/test-beneficios-carimbo-manual.cjs'
+) $mobile
 
 Write-Host "`nOK: gate completo de release passou." -ForegroundColor Green
 exit 0
