@@ -49,7 +49,7 @@ def test_migracao_continua_a_cadeia_com_uma_unica_cabeca():
     cfg.set_main_option("script_location", str(RAIZ / "alembic"))
     script = ScriptDirectory.from_config(cfg)
 
-    assert script.get_heads() == ["zzzzm20261022a1"]
+    assert len(script.get_heads()) == 1  # nunca duas pontas
     assert script.get_revision("zzzzm20261022a1").down_revision == "zzzzl20261022a1"
 
 

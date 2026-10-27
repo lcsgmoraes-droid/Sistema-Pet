@@ -14,6 +14,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.utils.correlation import current_correlation_id
+from app.whatsapp.meta_cloud import MetaCloudClient
 from app.whatsapp.models import TenantWhatsAppConfig, WhatsAppSession, WhatsAppMessage
 from app.whatsapp.tenant_context import whatsapp_tenant_context
 
@@ -41,6 +42,19 @@ def _build_whatsapp_client(db: Session, tenant_id: str) -> Optional[Any]:
     )
 
     provider = _resolve_provider(config, tenant_id)
+    if provider == "meta_cloud":
+        token = config.meta_access_token if config else ""
+        numero_id = (config.meta_phone_number_id if config else "") or ""
+        if not token or not numero_id:
+            logger.error(
+                "Tenant %s com API oficial da Meta sem token ou ID do numero", tenant_id
+            )
+            return None
+        return MetaCloudClient(
+            access_token=token,
+            phone_number_id=numero_id,
+            waba_id=config.meta_waba_id,
+        )
     if provider == "waha":
         waha_url = os.getenv("WAHA_BASE_URL", "http://waha:3000")
         waha_key = os.getenv("WAHA_API_KEY", "")

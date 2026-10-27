@@ -173,7 +173,11 @@ async def receive_webhook(
     signature = request.headers.get("X-Hub-Signature-256", "")
     static_token = request.headers.get(WHATSAPP_WEBHOOK_TOKEN_HEADER, "")
 
-    if not config.webhook_secret:
+    meta_oficial = (getattr(config, "provider", None) or "").lower() == "meta_cloud"
+    # API oficial da Meta assina com o segredo do app (X-Hub-Signature-256); o token
+    # de verificacao so serve para o GET inicial e nunca autentica o POST.
+    segredo = config.meta_app_secret if meta_oficial else config.webhook_secret
+    if not segredo:
         logger.error("Webhook WhatsApp sem segredo configurado para o tenant")
         raise HTTPException(
             status_code=503,
@@ -183,11 +187,14 @@ async def receive_webhook(
     if not validate_webhook_authentication(
         body,
         signature=signature,
-        static_token=static_token,
-        secret=config.webhook_secret,
+        static_token="" if meta_oficial else static_token,
+        secret=segredo,
     ):
         logger.warning("Autenticacao ausente ou invalida no webhook WhatsApp")
         raise HTTPException(status_code=403, detail="Autenticação inválida")
+
+    if meta_oficial:
+        _registrar_webhook_recebido(db, tenant_id, config)
 
     # 3. Parsear payload JSON
     try:
@@ -214,6 +221,17 @@ async def receive_webhook(
         logger.error(f"Erro ao processar webhook: {e}")
         # Retornar 200 mesmo com erro interno (para não reenviar)
         return {"status": "error", "message": str(e)}
+
+
+def _registrar_webhook_recebido(db: Session, tenant_id: str, config: Any) -> None:
+    """Guarda quando a Meta falou com a gente pela ultima vez (prova que o webhook funciona)."""
+    try:
+        with whatsapp_tenant_context(tenant_id):
+            config.meta_ultimo_webhook_em = datetime.utcnow()
+            db.commit()
+    except Exception as erro:
+        db.rollback()
+        logger.warning("Falha ao registrar webhook recebido: %s", type(erro).__name__)
 
 
 # ============================================================================

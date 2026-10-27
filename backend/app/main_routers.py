@@ -162,6 +162,7 @@ from app.whatsapp.webhook import router as whatsapp_webhook_router
 from app.routers.whatsapp_config import router as whatsapp_config_router
 from app.routers.whatsapp_handoff import router as whatsapp_handoff_router  # Sprint 4
 from app.crm.routes import router as crm_router
+from app.routers.whatsapp_meta import router as whatsapp_meta_router
 from app.routers.whatsapp_websocket import (
     router as whatsapp_websocket_router,
 )  # Sprint 5: WebSocket
@@ -634,6 +635,9 @@ def register_routers(app: FastAPI) -> None:
         whatsapp_handoff_router, dependencies=_module_dependencies("whatsapp")
     )  # Sprint 4: Human Handoff (com auth)
     app.include_router(crm_router, dependencies=_module_dependencies("crm"))
+    app.include_router(
+        whatsapp_meta_router, dependencies=_module_dependencies("crm")
+    )  # Vínculo com a API oficial da Meta
     app.include_router(whatsapp_websocket_router)  # Sprint 5: WebSocket Real-time
     app.include_router(
         whatsapp_api_router, dependencies=_module_dependencies("whatsapp")

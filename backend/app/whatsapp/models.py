@@ -49,13 +49,30 @@ class TenantWhatsAppConfig(TenantScoped, Base):
     tenant_id = Column(UUID(as_uuid=True), ForeignKey(TENANTS_ID_FK), nullable=False)
 
     # Provider Config
-    provider = Column(String(50), default="360dialog")  # 360dialog, z-api, twilio
+    provider = Column(
+        String(50), default="360dialog"
+    )  # 360dialog, meta_cloud (API oficial da Meta), waha (piloto)
     _api_key_legacy = Column("api_key", Text)
     _api_key_encrypted = Column("api_key_encrypted", Text)
     phone_number = Column(String(20))
     webhook_url = Column(Text)
     _webhook_secret_legacy = Column("webhook_secret", Text)
     _webhook_secret_encrypted = Column("webhook_secret_encrypted", Text)
+
+    # API oficial da Meta (provider = meta_cloud). O token tem coluna propria para nao
+    # sobrescrever a chave do provedor em uso enquanto o vinculo ainda e testado.
+    _meta_access_token_encrypted = Column("meta_access_token_encrypted", Text)
+    meta_waba_id = Column(String(40))
+    meta_phone_number_id = Column(String(40))
+    _meta_app_secret_encrypted = Column("meta_app_secret_encrypted", Text)
+    # Estado do vinculo: aguardando_teste | conectado | erro (vazio = nunca configurado)
+    meta_status = Column(String(20))
+    meta_status_detalhe = Column(String(300))
+    meta_verificado_em = Column(DateTime)
+    meta_numero_exibicao = Column(String(40))
+    meta_nome_verificado = Column(String(200))
+    meta_qualidade = Column(String(20))
+    meta_ultimo_webhook_em = Column(DateTime)
 
     # IA Config
     _openai_api_key_legacy = Column("openai_api_key", Text)
@@ -106,6 +123,22 @@ class TenantWhatsAppConfig(TenantScoped, Base):
     def webhook_secret(self, value: str | None) -> None:
         self._webhook_secret_encrypted = encrypt_secret(value)
         self._webhook_secret_legacy = None
+
+    @property
+    def meta_access_token(self) -> str:
+        return self._read_secret(self._meta_access_token_encrypted, None)
+
+    @meta_access_token.setter
+    def meta_access_token(self, value: str | None) -> None:
+        self._meta_access_token_encrypted = encrypt_secret(value)
+
+    @property
+    def meta_app_secret(self) -> str:
+        return self._read_secret(self._meta_app_secret_encrypted, None)
+
+    @meta_app_secret.setter
+    def meta_app_secret(self, value: str | None) -> None:
+        self._meta_app_secret_encrypted = encrypt_secret(value)
 
     @property
     def openai_api_key(self) -> str:
