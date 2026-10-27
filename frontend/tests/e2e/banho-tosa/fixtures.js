@@ -92,16 +92,14 @@ export async function criarContextoBanhoTosa(request, ambiente) {
     celular: "11955550001",
     ativo: true,
   });
-  const pets = [];
-  for (const nome of ["Amora", "Pipoca"])
-    pets.push(
-      await api("post", "/pets", {
-        nome: `${prefixo} ${nome}`,
-        especie: "Canina",
-        porte: "pequeno",
-        cliente_id: tutor.id,
-      }),
-    );
+  const criarPet = (nome) =>
+    api("post", "/pets", {
+      nome: `${prefixo} ${nome}`,
+      especie: "Canina",
+      porte: "pequeno",
+      cliente_id: tutor.id,
+    });
+  const pets = [await criarPet("Amora"), await criarPet("Pipoca")];
   const banho = await api("post", "/banho-tosa/servicos", {
     nome: `${prefixo} Banho`,
     preco_base: "50",

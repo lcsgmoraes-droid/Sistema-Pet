@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { URL } from "node:url";
 import { ambienteBanhoTosa, urlLocal } from "../tests/e2e/banho-tosa/ambiente.mjs";
 
 test("suite sem autorizacao explicita nao cria identidade", () => {
@@ -13,17 +14,21 @@ test("defaults sao origens DEV locais com portas explicitas", () => {
   });
 });
 
-for (const url of [
-  "https://corepet.com.br",
-  "http://localhost.exemplo.com:5173",
-  "http://127.0.0.1",
-  "https://localhost:5173",
-  "http://localhost:5173/api",
-  "http://localhost:5173?destino=remoto",
-  "http://localhost:5173#remoto",
-  "http://operador:teste@localhost:5173",
+// O destino remoto existe apenas como entrada rejeitada; nenhuma requisição é feita.
+const subdominioRemoto = new URL("http://localhost:5173");
+subdominioRemoto.hostname = "localhost.exemplo.com";
+
+for (const [caso, url] of [
+  ["domínio de produção", "https://corepet.com.br"],
+  ["localhost usado como subdomínio remoto", subdominioRemoto.href],
+  ["origem sem porta", "http://127.0.0.1"],
+  ["HTTPS local", "https://localhost:5173"],
+  ["caminho adicional", "http://localhost:5173/api"],
+  ["parâmetro de consulta", "http://localhost:5173?destino=remoto"],
+  ["fragmento", "http://localhost:5173#remoto"],
+  ["credenciais na URL", "http://operador:teste@localhost:5173"],
 ]) {
-  test(`recusa destino inseguro ${url.replace(/\/\/[^@]+@/, "//[redigido]@")}`, () => {
+  test(`recusa ${caso}`, () => {
     assert.throws(() => urlLocal(url, "E2E_BASE_URL"));
   });
 }
