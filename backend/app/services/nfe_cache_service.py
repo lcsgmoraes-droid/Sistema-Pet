@@ -176,7 +176,7 @@ def serializar_nota_cache(registro: BlingNotaFiscalCache) -> dict:
                 "situacao": registro.status,
                 "fiscal_order_id": int(
                     str(registro.bling_id).removeprefix("fiscal-externa-")
-                )
+                ),
             }
             if registro.source == "ecommerceai_fiscal"
             and str(registro.bling_id).removeprefix("fiscal-externa-").isdigit()
