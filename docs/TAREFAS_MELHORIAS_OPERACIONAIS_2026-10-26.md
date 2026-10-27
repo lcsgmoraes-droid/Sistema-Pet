@@ -66,11 +66,12 @@ testes que gravam dados devem acontecer em DEV.
 - [x] **15 — Comissão por valor fixo.** Novo tipo em reais por unidade vendida:
       R$ 5,00 por unidade gera R$ 10,00 ao vender duas. Cadastro, cálculo e exibição
       completos; vale somente para novas vendas, sem recalcular as anteriores.
-- [ ] **16 — Impedir telefone compartilhado por pessoas diferentes.** Solicitação
+- [x] **16 — Impedir telefone compartilhado por pessoas diferentes.** Solicitação
       complementar: aplicar a mesma regra entre todas as lojas do grupo, conforme
       confirmação do Lucas. Comparar telefone, celular e contatos adicionais com
       máscara/DDI normalizados; proteger API, importações e gravações concorrentes
       no banco. Preservar legados e aliases fundidos, sem fusão automática.
+      Publicado pelo PR #1573 e conferido tecnicamente em produção em 27/10/2026.
 
 ## Validação e publicação
 
@@ -81,7 +82,7 @@ testes que gravam dados devem acontecer em DEV.
 - [x] Testes automatizados focados aprovados por frente.
 - [x] Fluxos revisados no ambiente DEV, incluindo isolamento entre empresas.
 - [x] Build do frontend e `FLUXO_UNICO.bat release-check` aprovados.
-- [x] Mudanças revisadas, commitadas e integradas pelos PRs #1567 e #1570.
+- [x] Mudanças revisadas, commitadas e integradas pelos PRs #1567, #1570 e #1573.
 - [x] Publicação pelo fluxo oficial e verificação técnica após publicação.
 
 ## Evidências e andamento
@@ -348,7 +349,48 @@ Os testes focados de API/interface passaram. **18 testes PostgreSQL** passaram e
 banco descartável local, incluindo concorrência, rollback, RLS com role sem
 BYPASSRLS, múltiplos grupos e preservação de legado/fusão. O smoke de migrations
 passou nos três cenários, com RLS 3/3 e 24 testes PostgreSQL por cenário (18 de
-telefone e 6 de vigência financeira). O gate completo e a publicação do item 16
-ainda estão em andamento.
+telefone e 6 de vigência financeira).
+
+O aceite HTTP e os **2/2 fluxos de interface headless em DEV** foram aprovados na
+revisão `af83f49ff`; o CRUD de telefone dessa revisão é idêntico ao da fonte final.
+Uma pessoa fictícia foi criada, levando a contagem de **40 para 41**. Tentativas
+com o mesmo número em telefone/celular e máscara `+55` retornaram **409**, sem
+nova linha; editar o próprio número retornou **200**. A interface manteve
+**41 → 41**, destacou o campo na aba Contatos e preservou o rascunho, o produto e
+o subtotal do PDV, sem salvar venda ou movimentação financeira. Evidências em
+`runtime/tarefas-telefone-unico-20261027/aceite-http.json` e `aceite-ui.json`, com
+capturas no mesmo diretório.
+
+A revisão final do cadastro público ambíguo passou por **33 testes unitários**:
+retorna **409**, sem criar usuário ou executar fusão. O perfil do app também não
+funde pessoas automaticamente; variações de DDI podem reutilizar a mesma pessoa.
+O gate completo passou na head **`e2ed899d213da5d95d833e248c6ae93e3915484f`**.
+O PR **#1573** teve **13/13 checks aprovados**, incluindo Sonar, e foi integrado
+por squash na `main` **`833a962d21701b6b2f2766aa84653f3b52fe50b9`**. Na main,
+**8/8 checks obrigatórios** e os **nove resultados publicados** ficaram em
+`SUCCESS`. Evidências em
+`runtime/tarefas-telefone-unico-20261027/release-gate-pr1573-e2ed899d.json` e
+`runtime/tarefas-telefone-unico-20261027/release-gate-main-833a962d.json`.
+
+O deploy oficial foi concluído em **27/10/2026 às 00:48:45 BRT**, com saída zero.
+A revisão pública confirmou **`833a962d21701b6b2f2766aa84653f3b52fe50b9`**,
+**cinco containers healthy**, head **`zzzzzc20261027a1`**, health público correto
+e watchdog healthy. Backups: banco
+`/opt/petshop/backups/db/petshop_prod_20261027_004747.dump` e operacional
+`/opt/petshop/backups/deploy_20261027_004645`. Logs em
+`runtime/tarefas-telefone-unico-20261027/deploy-producao.log` e `status-producao.log`.
+
+A conferência de metadados em produção, somente de leitura, confirmou **oito
+triggers ativos**, **três índices válidos**, **nove funções privadas sem EXECUTE
+público** e **dois wrappers SECURITY DEFINER**, com owner BYPASSRLS e search_path
+fixo. A normalização de `+55`, `0055` e DDD `55` foi aprovada com valores
+fictícios enviados apenas à função. Nenhuma pessoa fictícia foi cadastrada e
+nenhuma fusão foi executada em produção nesta extensão. Evidência em
+`runtime/tarefas-telefone-unico-20261027/guard-producao.json`.
+
+**Fechamento da extensão: item 16 concluído e publicado em produção.** Os 16
+itens técnicos estão atendidos. Os registros das 15 entregas anteriores, das
+OTAs e da fusão autorizada permanecem preservados; a conferência humana no
+aparelho físico da Michele continua como acompanhamento separado, ainda pendente.
 
 Detalhes e limites na [ficha de telefone único](entregas/2026-10-27-telefone-unico-pessoas.md).
