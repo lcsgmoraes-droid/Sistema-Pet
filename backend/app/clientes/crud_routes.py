@@ -13,6 +13,11 @@ from sqlalchemy.orm import Session, selectinload
 from app.audit_log import log_action, log_create, log_delete, log_update
 from app.auth.dependencies import get_current_user_and_tenant
 from app.services.cliente_historico_service import registrar_alteracoes_cliente
+from app.services.pessoa_telefone import (
+    PessoaTelefoneDuplicado,
+    erro_telefone_duplicado,
+    normalizar_telefone_pessoa,
+)
 from app.clientes.common import (
     _anexar_metadados_criacao_cliente,
     _obter_cliente_ou_404,
@@ -219,6 +224,8 @@ def create_cliente(
         db.commit()
     except IntegrityError as exc:
         db.rollback()
+        if erro_telefone_duplicado(exc):
+            raise PessoaTelefoneDuplicado() from exc
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Código de cliente já em uso. Tente cadastrar novamente.",
@@ -489,6 +496,7 @@ def update_cliente(
             else cliente.contatos_adicionais,
             dados_payload.get("celular", cliente.celular),
             dados_payload.get("telefone", cliente.telefone),
+            pessoa_atual=cliente,
         )
     auth_user_informado = "auth_user_id" in dados_payload
     perfis_informados = "app_access_profiles" in dados_payload
@@ -896,11 +904,14 @@ def _preparar_dados_cliente(
 
 def _normalizar_campos_identidade(dados_cliente: dict) -> None:
     """Grava identificadores em formato estavel para prevenir novas duplicidades."""
-    for campo in ("cpf", "cnpj", "telefone", "celular", "cep"):
+    for campo in ("cpf", "cnpj", "cep"):
         if campo in dados_cliente and dados_cliente[campo] is not None:
             dados_cliente[campo] = (
                 "".join(ch for ch in str(dados_cliente[campo]) if ch.isdigit()) or None
             )
+    for campo in ("telefone", "celular"):
+        if campo in dados_cliente:
+            dados_cliente[campo] = normalizar_telefone_pessoa(dados_cliente[campo])
     if "email" in dados_cliente and dados_cliente["email"] is not None:
         dados_cliente["email"] = str(dados_cliente["email"]).strip().casefold() or None
     if "crmv" in dados_cliente and dados_cliente["crmv"] is not None:

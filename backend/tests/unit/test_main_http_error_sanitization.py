@@ -40,6 +40,57 @@ def _test_app() -> FastAPI:
     return app
 
 
+def test_phone_conflict_keeps_text_detail_and_marks_field_without_identity():
+    from app.services.pessoa_telefone import PessoaTelefoneDuplicado
+
+    app = _test_app()
+
+    @app.get("/phone-conflict")
+    async def phone_conflict():
+        raise PessoaTelefoneDuplicado("celular")
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.get("/phone-conflict")
+
+    assert response.status_code == 409
+    payload = response.json()
+    assert isinstance(payload["detail"], str)
+    assert payload["error"] == "pessoa_telefone_duplicado"
+    assert payload["details"] == [
+        {"loc": ["body", "celular"], "msg": payload["detail"], "type": "value_error"}
+    ]
+    assert set(payload) == {"detail", "error", "details"}
+
+
+def test_database_phone_constraint_is_a_safe_business_conflict(caplog):
+    from types import SimpleNamespace
+
+    from sqlalchemy.exc import IntegrityError
+
+    original = Exception("private database contents")
+    original.pgcode = "23505"
+    original.diag = SimpleNamespace(
+        constraint_name="uq_pessoa_telefone_escopo", column_name="contatos_adicionais"
+    )
+    app = _test_app()
+
+    @app.get("/phone-database-conflict")
+    async def phone_database_conflict():
+        raise IntegrityError("private SQL", {"phone": SENSITIVE_VALUE}, original)
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.get("/phone-database-conflict")
+
+    assert response.status_code == 409
+    payload = response.json()
+    assert payload["details"][0]["loc"] == ["body", "contatos_adicionais"]
+    assert payload["error"] == "pessoa_telefone_duplicado"
+    assert SENSITIVE_VALUE not in response.text
+    assert "private SQL" not in response.text
+    assert "private database contents" not in response.text
+    assert SENSITIVE_VALUE not in caplog.text
+
+
 def test_validation_error_does_not_echo_submitted_secret(caplog):
     caplog.set_level(logging.WARNING, logger="app.main_http")
     with TestClient(_test_app(), raise_server_exceptions=False) as client:

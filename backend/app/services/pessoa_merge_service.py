@@ -628,8 +628,12 @@ def executar_fusao_pessoas(
     motivo: str | None = None,
     commit: bool = True,
 ) -> dict[str, Any]:
-    # Tenant → pessoas → configurações evita ciclo com as FKs da nova venda.
+    # Telefone → comissão → pessoas: também respeita o fluxo que cria pessoa
+    # antes de inserir a venda. Nenhum lock de telefone pode vir após as tuplas.
     from app.comissoes_vigencia import bloquear_alteracao_comissao_por_tenant
+    from app.services.pessoa_telefone import bloquear_escopo_telefone_pessoa
+
+    bloquear_escopo_telefone_pessoa(db, tenant_id)
 
     bloquear_alteracao_comissao_por_tenant(db, tenant_id)
     principal, duplicado = _obter_pessoas(db, tenant_id, principal_id, duplicado_id)
@@ -656,6 +660,13 @@ def executar_fusao_pessoas(
             "A fusao foi bloqueada porque os cadastros estao ligados a contas "
             "de aplicativo diferentes. Revise os acessos antes de continuar."
         )
+
+    # O alias deixa de reservar os números antes de copiá-los ao principal.
+    # A operação inteira continua na mesma transação; qualquer falha reverte
+    # esta marcação junto com os vínculos, grants e auditoria.
+    duplicado.merged_into_id = principal.id
+    duplicado.ativo = False
+    db.flush([duplicado])
 
     # Libera primeiro o vinculo do duplicado para respeitar o indice unico de
     # conta ativa mesmo quando a conta precisa migrar para o principal.

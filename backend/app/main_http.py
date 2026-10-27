@@ -133,11 +133,39 @@ def register_exception_handlers(app: FastAPI) -> None:
                 request.url.path,
             )
 
+        payload = {"detail": exc.detail}
+        if getattr(exc, "error_code", None) == "pessoa_telefone_duplicado":
+            payload.update(
+                error="pessoa_telefone_duplicado",
+                details=[
+                    {
+                        "loc": getattr(exc, "loc", ["body", "telefone"]),
+                        "msg": exc.detail,
+                        "type": "value_error",
+                    }
+                ],
+            )
         return JSONResponse(
             status_code=exc.status_code,
-            content={"detail": exc.detail},
+            content=payload,
             headers=exc.headers,
         )
+
+    from sqlalchemy.exc import IntegrityError
+
+    @app.exception_handler(IntegrityError)
+    async def integrity_exception_handler(request: Request, exc: IntegrityError):
+        from app.services.pessoa_telefone import (
+            PessoaTelefoneDuplicado,
+            erro_telefone_duplicado,
+        )
+
+        if erro_telefone_duplicado(exc):
+            campo = getattr(getattr(exc.orig, "diag", None), "column_name", None)
+            if campo not in {"telefone", "celular", "contatos_adicionais"}:
+                campo = "telefone"
+            return await http_exception_handler(request, PessoaTelefoneDuplicado(campo))
+        return await general_exception_handler(request, exc)
 
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception):

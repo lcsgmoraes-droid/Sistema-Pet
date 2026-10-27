@@ -720,12 +720,12 @@ def test_ecommerce_profile_merge_transfers_customer_relations_before_detaching_d
     assert "getattr(previous_cliente, relationship_name" not in source
 
 
-def test_atualizar_perfil_detaches_duplicate_customer_instead_of_deleting_history():
+def test_atualizar_perfil_bloqueia_telefone_duplicado_sem_fundir_ou_apagar_historico():
     source = inspect.getsource(atualizar_perfil)
 
-    assert "executar_fusao_pessoas" in source
-    assert 'modo="ecommerce_perfil"' in source
-    assert "commit=False" in source
+    assert "validar_telefones_pessoa" in source
+    assert "executar_fusao_pessoas" not in source
+    assert "_copy_missing_cliente_fields" not in source
     assert "db.delete(previous_cliente)" not in source
 
 

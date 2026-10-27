@@ -9,6 +9,11 @@ from app.models import Cliente, User
 from app.routes.ecommerce_auth_common import _activate_user_tenant_context
 from app.services.pessoa_merge_service import transferir_referencias_pessoa
 from app.services.cliente_origem import normalizar_origem_cliente
+from app.services.pessoa_telefone import (
+    bloquear_escopo_telefone_pessoa,
+    normalizar_telefone_pessoa,
+    telefone_em_uso,
+)
 
 
 def _digits_only(value: str | None) -> str:
@@ -16,8 +21,7 @@ def _digits_only(value: str | None) -> str:
 
 
 def _phone_digits(value: str | None) -> str:
-    digits = _digits_only(value)
-    return digits[2:] if len(digits) == 13 and digits.startswith("55") else digits
+    return normalizar_telefone_pessoa(value) or ""
 
 
 def _user_phone(user: User) -> str | None:
@@ -450,7 +454,15 @@ def _get_or_create_cliente_for_user(
         if not cliente.email:
             cliente.email = user.email
         if not cliente.telefone and telefone_usuario:
-            cliente.telefone = telefone_usuario
+            # Completar o cadastro durante login/consulta é opcional. Um vínculo
+            # explícito legítimo não deve falhar por um telefone legado de User.
+            with db.no_autoflush:
+                bloquear_escopo_telefone_pessoa(db, cliente.tenant_id)
+                chave = normalizar_telefone_pessoa(telefone_usuario)
+                if chave and not telefone_em_uso(
+                    db, cliente.tenant_id, chave, cliente.id
+                ):
+                    cliente.telefone = telefone_usuario
         if not cliente.cpf and user.cpf_cnpj:
             cliente.cpf = user.cpf_cnpj
 

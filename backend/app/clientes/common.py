@@ -276,7 +276,9 @@ def gerar_codigo_cliente(db: Session, tipo_pessoa: str, tenant_id: int) -> str:
     from sqlalchemy.dialects.postgresql import BIGINT
 
     from app.services.grupo_codigos import ids_uuid_do_grupo, trava_codigos_do_grupo
+    from app.services.pessoa_telefone import bloquear_escopo_telefone_pessoa
 
+    bloquear_escopo_telefone_pessoa(db, tenant_id)
     trava_codigos_do_grupo(db, tenant_id, "codigo_pessoa")
     resultado = (
         db.query(sqlfunc.max(sqcast(Cliente.codigo, BIGINT)))

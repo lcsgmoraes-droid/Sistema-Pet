@@ -12,7 +12,9 @@ export default function ClientePessoaContatosTab({
   setFormData,
 }) {
   const contatosAdicionais = formData.contatos_adicionais || [];
-  const errosContatos = erros.contatos_adicionais || {};
+  const erroContatos =
+    typeof erros.contatos_adicionais === "string" ? erros.contatos_adicionais : "";
+  const errosContatos = erroContatos ? {} : erros.contatos_adicionais || {};
 
   const atualizarContato = (index, campo, valor) => {
     setFormData((prev) => {
@@ -64,7 +66,9 @@ export default function ClientePessoaContatosTab({
           label="Telefone fixo"
           tipo="fixo"
           value={formData.telefone}
+          error={erros.telefone}
           onChange={(telefone) => setFormData((prev) => ({ ...prev, telefone }))}
+          onBlur={() => onBlurCampo?.("telefone")}
         />
 
         <InputTexto
@@ -96,6 +100,11 @@ export default function ClientePessoaContatosTab({
             Cadastre o celular da mãe, irmã ou de outra pessoa. No PDV, esse número encontra o
             cadastro principal e seus benefícios.
           </p>
+          {erroContatos ? (
+            <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-400">
+              {erroContatos}
+            </p>
+          ) : null}
 
           <div className="mt-3 flex flex-col gap-3">
             {contatosAdicionais.map((contato, index) => (

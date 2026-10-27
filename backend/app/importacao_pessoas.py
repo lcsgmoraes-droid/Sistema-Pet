@@ -3,6 +3,7 @@ Sistema de importação de Pessoas (Clientes, Fornecedores, Veterinários)
 """
 
 from fastapi import APIRouter, UploadFile, File, Depends
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -12,6 +13,11 @@ from .clientes.common import CAMPO_FLAG_POR_TIPO_CADASTRO, gerar_codigo_cliente
 from .models import Cliente
 from .db import get_session as get_db
 from .auth import get_current_user, get_current_user_and_tenant
+from .services.pessoa_telefone import (
+    PessoaTelefoneDuplicado,
+    erro_telefone_duplicado,
+    validar_telefones_pessoa,
+)
 
 router = APIRouter(prefix="/pessoas", tags=["pessoas"])
 
@@ -272,168 +278,191 @@ async def importar_pessoas(
         # Processar linhas (começar da linha 3, pois linha 1 é instrução e 2 é header)
         for row_num in range(3, ws.max_row + 1):
             try:
-                # Ler dados da linha
-                tipo_cadastro = ws[f"A{row_num}"].value
-                tipo_pessoa = ws[f"B{row_num}"].value
-                codigo = ws[f"C{row_num}"].value
-                nome = ws[f"D{row_num}"].value
-                cpf = ws[f"E{row_num}"].value
-                cnpj = ws[f"F{row_num}"].value
-                razao_social = ws[f"G{row_num}"].value
-                responsavel = ws[f"H{row_num}"].value
-                crmv = ws[f"I{row_num}"].value
-                inscricao_estadual = ws[f"J{row_num}"].value
-                telefone = ws[f"K{row_num}"].value
-                celular = ws[f"L{row_num}"].value
-                email = ws[f"M{row_num}"].value
-                cep = ws[f"N{row_num}"].value
-                endereco = ws[f"O{row_num}"].value
-                numero = ws[f"P{row_num}"].value
-                complemento = ws[f"Q{row_num}"].value
-                bairro = ws[f"R{row_num}"].value
+                with db.begin_nested():
+                    # Ler dados da linha
+                    tipo_cadastro = ws[f"A{row_num}"].value
+                    tipo_pessoa = ws[f"B{row_num}"].value
+                    codigo = ws[f"C{row_num}"].value
+                    nome = ws[f"D{row_num}"].value
+                    cpf = ws[f"E{row_num}"].value
+                    cnpj = ws[f"F{row_num}"].value
+                    razao_social = ws[f"G{row_num}"].value
+                    responsavel = ws[f"H{row_num}"].value
+                    crmv = ws[f"I{row_num}"].value
+                    inscricao_estadual = ws[f"J{row_num}"].value
+                    telefone = ws[f"K{row_num}"].value
+                    celular = ws[f"L{row_num}"].value
+                    email = ws[f"M{row_num}"].value
+                    cep = ws[f"N{row_num}"].value
+                    endereco = ws[f"O{row_num}"].value
+                    numero = ws[f"P{row_num}"].value
+                    complemento = ws[f"Q{row_num}"].value
+                    bairro = ws[f"R{row_num}"].value
 
-                # Pular linhas vazias
-                if not nome or not tipo_cadastro:
-                    continue
+                    # Pular linhas vazias
+                    if not nome or not tipo_cadastro:
+                        continue
 
-                # Validações
-                tipo_cadastro = str(tipo_cadastro).strip().lower()
-                if tipo_cadastro not in CAMPO_FLAG_POR_TIPO_CADASTRO:
-                    raise ValueError(f"Tipo cadastro inválido: {tipo_cadastro}")
-                campo_flag = CAMPO_FLAG_POR_TIPO_CADASTRO[tipo_cadastro]
+                    # Validações
+                    tipo_cadastro = str(tipo_cadastro).strip().lower()
+                    if tipo_cadastro not in CAMPO_FLAG_POR_TIPO_CADASTRO:
+                        raise ValueError(f"Tipo cadastro inválido: {tipo_cadastro}")
+                    campo_flag = CAMPO_FLAG_POR_TIPO_CADASTRO[tipo_cadastro]
 
-                tipo_pessoa = str(tipo_pessoa).strip().upper()
-                if tipo_pessoa not in ["PF", "PJ"]:
-                    raise ValueError(f"Tipo pessoa inválido: {tipo_pessoa}")
+                    tipo_pessoa = str(tipo_pessoa).strip().upper()
+                    if tipo_pessoa not in ["PF", "PJ"]:
+                        raise ValueError(f"Tipo pessoa inválido: {tipo_pessoa}")
 
-                # Validar dados obrigatórios por tipo
-                if tipo_pessoa == "PF" and not cpf:
-                    raise ValueError("CPF obrigatório para Pessoa Física")
+                    # Validar dados obrigatórios por tipo
+                    if tipo_pessoa == "PF" and not cpf:
+                        raise ValueError("CPF obrigatório para Pessoa Física")
 
-                if tipo_pessoa == "PJ" and not cnpj:
-                    raise ValueError("CNPJ obrigatório para Pessoa Jurídica")
+                    if tipo_pessoa == "PJ" and not cnpj:
+                        raise ValueError("CNPJ obrigatório para Pessoa Jurídica")
 
-                # Procurar pessoa existente por CPF/CNPJ ou código
-                pessoa_existente = None
-
-                if cpf:
-                    pessoa_existente = (
-                        db.query(Cliente)
-                        .filter(
-                            Cliente.cpf == cpf.strip(), Cliente.tenant_id == tenant_id
-                        )
-                        .first()
-                    )
-                elif cnpj:
-                    pessoa_existente = (
-                        db.query(Cliente)
-                        .filter(
-                            Cliente.cnpj == cnpj.strip(), Cliente.tenant_id == tenant_id
-                        )
-                        .first()
-                    )
-                elif codigo:
-                    pessoa_existente = (
-                        db.query(Cliente)
-                        .filter(
-                            Cliente.codigo == str(codigo).strip(),
-                            Cliente.tenant_id == tenant_id,
-                        )
-                        .first()
-                    )
-
-                # Criar ou atualizar
-                if pessoa_existente:
-                    # Atualizar: liga a flag de forma aditiva, sem desligar papeis
-                    # que a pessoa ja tinha antes desta importacao.
-                    setattr(pessoa_existente, campo_flag, True)
-                    pessoa_existente.tipo_pessoa = tipo_pessoa
-                    pessoa_existente.nome = str(nome).strip()
+                    # Procurar pessoa existente por CPF/CNPJ ou código
+                    pessoa_existente = None
 
                     if cpf:
-                        pessoa_existente.cpf = cpf
-                    if cnpj:
-                        pessoa_existente.cnpj = cnpj
-                    if razao_social:
-                        pessoa_existente.razao_social = razao_social
-                    if responsavel:
-                        pessoa_existente.responsavel = responsavel
-                    if crmv:
-                        pessoa_existente.crmv = crmv
-                    if inscricao_estadual:
-                        pessoa_existente.inscricao_estadual = inscricao_estadual
-                    if telefone:
-                        pessoa_existente.telefone = telefone
-                    if celular:
-                        pessoa_existente.celular = celular
-                    if email:
-                        pessoa_existente.email = email
-                    if cep:
-                        pessoa_existente.cep = cep
-                    if endereco:
-                        pessoa_existente.endereco = endereco
-                    if numero:
-                        pessoa_existente.numero = numero
-                    if complemento:
-                        pessoa_existente.complemento = complemento
-                    if bairro:
-                        pessoa_existente.bairro = bairro
+                        pessoa_existente = (
+                            db.query(Cliente)
+                            .filter(
+                                Cliente.cpf == cpf.strip(),
+                                Cliente.tenant_id == tenant_id,
+                            )
+                            .first()
+                        )
+                    elif cnpj:
+                        pessoa_existente = (
+                            db.query(Cliente)
+                            .filter(
+                                Cliente.cnpj == cnpj.strip(),
+                                Cliente.tenant_id == tenant_id,
+                            )
+                            .first()
+                        )
+                    elif codigo:
+                        pessoa_existente = (
+                            db.query(Cliente)
+                            .filter(
+                                Cliente.codigo == str(codigo).strip(),
+                                Cliente.tenant_id == tenant_id,
+                            )
+                            .first()
+                        )
 
-                    db.add(pessoa_existente)
-                    atualizados.append(
-                        {
-                            "linha": row_num,
-                            "nome": str(nome).strip(),
-                            "tipo": tipo_cadastro,
-                        }
-                    )
-                else:
-                    # Criar novo
-                    codigo_pessoa = str(codigo or "").strip() or gerar_codigo_cliente(
+                    validar_telefones_pessoa(
                         db,
-                        tipo_pessoa,
                         tenant_id,
-                    )
-                    nova_pessoa = Cliente(
-                        tenant_id=tenant_id,
-                        codigo=codigo_pessoa,
-                        **{campo_flag: True},
-                        tipo_pessoa=tipo_pessoa,
-                        nome=str(nome).strip(),
-                        cpf=cpf.strip() if cpf else None,
-                        cnpj=cnpj.strip() if cnpj else None,
-                        razao_social=razao_social,
-                        responsavel=responsavel,
-                        crmv=crmv,
-                        inscricao_estadual=inscricao_estadual,
                         telefone=telefone,
                         celular=celular,
-                        email=email,
-                        cep=cep,
-                        endereco=endereco,
-                        numero=numero,
-                        complemento=complemento,
-                        bairro=bairro,
-                        ativo=True,
+                        pessoa_atual=pessoa_existente,
                     )
-                    db.add(nova_pessoa)
-                    criados.append(
-                        {
+
+                    # Criar ou atualizar
+                    if pessoa_existente:
+                        # Atualizar: liga a flag de forma aditiva, sem desligar papeis
+                        # que a pessoa ja tinha antes desta importacao.
+                        setattr(pessoa_existente, campo_flag, True)
+                        pessoa_existente.tipo_pessoa = tipo_pessoa
+                        pessoa_existente.nome = str(nome).strip()
+
+                        if cpf:
+                            pessoa_existente.cpf = cpf
+                        if cnpj:
+                            pessoa_existente.cnpj = cnpj
+                        if razao_social:
+                            pessoa_existente.razao_social = razao_social
+                        if responsavel:
+                            pessoa_existente.responsavel = responsavel
+                        if crmv:
+                            pessoa_existente.crmv = crmv
+                        if inscricao_estadual:
+                            pessoa_existente.inscricao_estadual = inscricao_estadual
+                        if telefone:
+                            pessoa_existente.telefone = telefone
+                        if celular:
+                            pessoa_existente.celular = celular
+                        if email:
+                            pessoa_existente.email = email
+                        if cep:
+                            pessoa_existente.cep = cep
+                        if endereco:
+                            pessoa_existente.endereco = endereco
+                        if numero:
+                            pessoa_existente.numero = numero
+                        if complemento:
+                            pessoa_existente.complemento = complemento
+                        if bairro:
+                            pessoa_existente.bairro = bairro
+
+                        db.add(pessoa_existente)
+                        resultado_linha = {
                             "linha": row_num,
                             "nome": str(nome).strip(),
                             "tipo": tipo_cadastro,
                         }
-                    )
+                    else:
+                        # Criar novo
+                        codigo_pessoa = str(
+                            codigo or ""
+                        ).strip() or gerar_codigo_cliente(
+                            db,
+                            tipo_pessoa,
+                            tenant_id,
+                        )
+                        nova_pessoa = Cliente(
+                            tenant_id=tenant_id,
+                            user_id=current_user.id,
+                            codigo=codigo_pessoa,
+                            **{campo_flag: True},
+                            tipo_pessoa=tipo_pessoa,
+                            nome=str(nome).strip(),
+                            cpf=cpf.strip() if cpf else None,
+                            cnpj=cnpj.strip() if cnpj else None,
+                            razao_social=razao_social,
+                            responsavel=responsavel,
+                            crmv=crmv,
+                            inscricao_estadual=inscricao_estadual,
+                            telefone=telefone,
+                            celular=celular,
+                            email=email,
+                            cep=cep,
+                            endereco=endereco,
+                            numero=numero,
+                            complemento=complemento,
+                            bairro=bairro,
+                            ativo=True,
+                        )
+                        db.add(nova_pessoa)
+                        resultado_linha = {
+                            "linha": row_num,
+                            "nome": str(nome).strip(),
+                            "tipo": tipo_cadastro,
+                        }
 
-            except Exception as e:
-                erros.append(
-                    {
-                        "linha": row_num,
-                        "nome": str(ws[f"D{row_num}"].value or "?"),
-                        "tipo": str(ws[f"A{row_num}"].value or "?"),
-                        "erro": str(e),
-                    }
+                    db.flush()
+                destino = atualizados if pessoa_existente else criados
+                destino.append(resultado_linha)
+            except Exception as exc:
+                duplicado = isinstance(exc, PessoaTelefoneDuplicado) or (
+                    isinstance(exc, IntegrityError) and erro_telefone_duplicado(exc)
                 )
+                if duplicado:
+                    mensagem = str(PessoaTelefoneDuplicado().detail)
+                elif isinstance(exc, ValueError):
+                    mensagem = str(exc)
+                else:
+                    mensagem = "Não foi possível salvar esta linha. Revise os dados informados."
+                erro = {
+                    "linha": row_num,
+                    "nome": str(ws[f"D{row_num}"].value or "?"),
+                    "tipo": str(ws[f"A{row_num}"].value or "?"),
+                    "erro": mensagem,
+                }
+                if duplicado:
+                    erro["error_code"] = "pessoa_telefone_duplicado"
+                erros.append(erro)
 
         # Salvar todas as mudanças
         db.commit()
@@ -448,5 +477,17 @@ async def importar_pessoas(
             "total_processados": len(criados) + len(atualizados) + len(erros),
         }
 
-    except Exception as e:
-        return {"sucesso": False, "erro": str(e)}
+    except Exception as exc:
+        db.rollback()
+        if isinstance(exc, PessoaTelefoneDuplicado) or (
+            isinstance(exc, IntegrityError) and erro_telefone_duplicado(exc)
+        ):
+            return {
+                "sucesso": False,
+                "erro": str(PessoaTelefoneDuplicado().detail),
+                "error_code": "pessoa_telefone_duplicado",
+            }
+        return {
+            "sucesso": False,
+            "erro": "Não foi possível concluir a importação. Verifique o arquivo e tente novamente.",
+        }
