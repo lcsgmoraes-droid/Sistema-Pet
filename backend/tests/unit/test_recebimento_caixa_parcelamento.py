@@ -130,6 +130,44 @@ def test_detalhe_conta_retorna_codigo_publico_sem_usar_id(
     )
 
 
+@pytest.mark.parametrize("ajuste", [None, Decimal("0.00"), Decimal("1.25")])
+def test_detalhe_conta_pagar_aceita_ajustes_nulos_sem_alterar_valores(
+    recebimento, ajuste
+):
+    c = recebimento
+    Pagamento.__table__.create(c.db.bind)
+    conta = ContaPagar(
+        tenant_id=c.tenant,
+        user_id=1,
+        descricao="Comissão QA com ajustes opcionais",
+        valor_original=Decimal("130.25"),
+        valor_final=Decimal("130.25"),
+        valor_pago=Decimal("30.10"),
+        data_emissao=date(2026, 10, 26),
+        data_vencimento=date(2026, 10, 26),
+    )
+    c.db.add(conta)
+    c.db.commit()
+    # Persiste NULL após os defaults de INSERT, como nos títulos de comissão
+    # criados por SQL direto. A consulta não deve escrever esses ajustes.
+    conta.valor_desconto = conta.valor_juros = conta.valor_multa = ajuste
+    c.db.commit()
+
+    resultado = buscar_conta_pagar(conta.id, c.db, (c.usuario, c.tenant))
+
+    assert resultado["valores"] == {
+        "original": 130.25,
+        "pago": 30.10,
+        "desconto": float(ajuste or 0),
+        "juros": float(ajuste or 0),
+        "multa": float(ajuste or 0),
+        "final": 130.25,
+        "saldo": 100.15,
+    }
+    c.db.refresh(conta)
+    assert conta.valor_desconto == conta.valor_juros == conta.valor_multa == ajuste
+
+
 def test_recebimento_grava_caixa_observacao_movimento_e_fluxo_na_mesma_transacao(
     recebimento,
 ):

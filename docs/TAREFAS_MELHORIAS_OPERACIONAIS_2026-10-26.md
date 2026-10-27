@@ -291,3 +291,9 @@ Regressões com código público diferente do ID, nulo e ausente passaram:
 **33 testes financeiros backend, 10 frontend financeiros, 96 backend fiscais e
 6 frontend fiscais**. Ruff, ESLint e Prettier focados passaram. A publicação
 desse ajuste permanece condicionada ao gate completo e aos checks do PR/main.
+
+O aceite HTTP em DEV também revelou que detalhes de contas a pagar de comissão
+falhavam quando desconto, juros ou multa estavam nulos. A leitura agora devolve
+zero nesses três campos opcionais, sem gravar alterações nem recalcular os
+valores original, pago, final ou saldo. **36 testes financeiros backend** passaram,
+incluindo nulo, zero e valor positivo com conferência dos dados persistidos.

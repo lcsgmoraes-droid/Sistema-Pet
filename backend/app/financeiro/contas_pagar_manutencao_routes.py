@@ -686,9 +686,9 @@ def buscar_conta_pagar(
         "valores": {
             "original": float(conta.valor_original),
             "pago": float(conta.valor_pago),
-            "desconto": float(conta.valor_desconto),
-            "juros": float(conta.valor_juros),
-            "multa": float(conta.valor_multa),
+            "desconto": float(_decimal_monetario(conta.valor_desconto)),
+            "juros": float(_decimal_monetario(conta.valor_juros)),
+            "multa": float(_decimal_monetario(conta.valor_multa)),
             "final": float(conta.valor_final),
             "saldo": float(conta.valor_final - conta.valor_pago),
         },
