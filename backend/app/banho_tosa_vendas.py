@@ -11,6 +11,7 @@ from app.banho_tosa_models import (
     BanhoTosaAtendimento,
     BanhoTosaTaxiDog,
 )
+from app.banho_tosa_pacote_reservas import consumo_legado_ativo
 from app.vendas.service import VendaService
 from app.vendas_models import Venda
 
@@ -122,54 +123,70 @@ def venda_identifica_atendimento(venda, atendimento_id: int) -> bool:
 
 
 def _montar_itens_venda(db: Session, tenant_id, atendimento) -> list[dict]:
-    itens = []
+    if consumo_legado_ativo(db, tenant_id, atendimento):
+        # Antes da cobertura por item, o consumo já dispensava a venda inteira,
+        # inclusive táxi. Preserva a concessão registrada, sem cobrança retroativa.
+        return []
     agendamento = getattr(atendimento, "agendamento", None)
-    if agendamento:
-        for servico in agendamento.servicos or []:
-            quantidade = Decimal(str(servico.quantidade or 0))
-            coberta = min(
-                quantidade, Decimal(str(getattr(servico, "pacote_quantidade", 0) or 0))
-            )
-            quantidade_cobrar = quantidade - coberta
-            if quantidade_cobrar <= 0:
-                continue
-            # Distribui o desconto proporcionalmente quando parte da quantidade usa pacote.
-            desconto = (
-                Decimal(str(servico.desconto or 0)) * quantidade_cobrar / quantidade
-                if quantidade
-                else Decimal("0")
-            )
-            subtotal = _subtotal(quantidade_cobrar, servico.valor_unitario, desconto)
-            if subtotal <= 0:
-                continue
-            itens.append(
-                _item_servico(
-                    servico.nome_servico_snapshot,
-                    quantidade_cobrar,
-                    servico.valor_unitario,
-                    desconto,
-                    subtotal,
-                    atendimento.pet_id,
-                )
-            )
-        itens.extend(_itens_taxi_dog(db, tenant_id, agendamento, atendimento.pet_id))
-
-    if not itens and not (agendamento and agendamento.servicos):
-        valor = Decimal(
-            str(getattr(agendamento, "valor_previsto", 0) if agendamento else 0)
-        )
-        if valor > 0:
-            itens.append(
-                _item_servico(
-                    f"Banho & Tosa - Atendimento #{atendimento.id}",
-                    1,
-                    valor,
-                    0,
-                    valor,
-                    atendimento.pet_id,
-                )
-            )
+    if not agendamento:
+        return []
+    itens = _itens_servicos_agendamento(agendamento, atendimento.pet_id)
+    itens.extend(_itens_taxi_dog(db, tenant_id, agendamento, atendimento.pet_id))
+    if not itens and not agendamento.servicos:
+        return _itens_valor_previsto(agendamento, atendimento)
     return itens
+
+
+def _itens_servicos_agendamento(agendamento, pet_id: int) -> list[dict]:
+    itens = []
+    for servico in agendamento.servicos or []:
+        item = _item_servico_avulso(servico, pet_id)
+        if item:
+            itens.append(item)
+    return itens
+
+
+def _item_servico_avulso(servico, pet_id: int):
+    quantidade = Decimal(str(servico.quantidade or 0))
+    coberta = min(
+        quantidade, Decimal(str(getattr(servico, "pacote_quantidade", 0) or 0))
+    )
+    quantidade_cobrar = quantidade - coberta
+    if quantidade_cobrar <= 0:
+        return None
+    # Distribui o desconto proporcionalmente quando parte da quantidade usa pacote.
+    desconto = (
+        Decimal(str(servico.desconto or 0)) * quantidade_cobrar / quantidade
+        if quantidade
+        else Decimal("0")
+    )
+    subtotal = _subtotal(quantidade_cobrar, servico.valor_unitario, desconto)
+    if subtotal <= 0:
+        return None
+    return _item_servico(
+        servico.nome_servico_snapshot,
+        quantidade_cobrar,
+        servico.valor_unitario,
+        desconto,
+        subtotal,
+        pet_id,
+    )
+
+
+def _itens_valor_previsto(agendamento, atendimento) -> list[dict]:
+    valor = Decimal(str(getattr(agendamento, "valor_previsto", 0)))
+    if valor <= 0:
+        return []
+    return [
+        _item_servico(
+            f"Banho & Tosa - Atendimento #{atendimento.id}",
+            1,
+            valor,
+            0,
+            valor,
+            atendimento.pet_id,
+        )
+    ]
 
 
 def _itens_taxi_dog(db: Session, tenant_id, agendamento, pet_id: int) -> list[dict]:

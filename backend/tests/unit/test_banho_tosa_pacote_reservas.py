@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace as NS
 
@@ -7,6 +7,7 @@ import pytest
 from app import banho_tosa_pacote_reservas as regras
 from app.banho_tosa_pacotes import calcular_saldo_creditos, credito_disponivel
 from app.banho_tosa_pacotes_serializers import resumo_financeiro_credito
+from app.banho_tosa_pacotes_serializers import serializar_credito
 
 
 def _credito(**campos):
@@ -44,6 +45,40 @@ def test_disponivel_respeita_inicio_reserva_e_vencimento_sem_apagar_saldo():
     assert calcular_saldo_creditos(
         credito.creditos_total, credito.creditos_usados, credito.creditos_cancelados
     ) == Decimal("4")
+
+
+def test_validade_termina_meia_noite_brasilia_em_vez_de_21h(monkeypatch):
+    from app.utils import timezone as timezone_utils
+
+    relogio = {"utc": datetime(2026, 10, 28, 0, 30, tzinfo=timezone.utc)}
+
+    class DatetimeFixo:
+        @classmethod
+        def now(cls, tz=None):
+            return (
+                relogio["utc"].astimezone(tz)
+                if tz
+                else relogio["utc"].replace(tzinfo=None)
+            )
+
+    monkeypatch.setattr(timezone_utils, "datetime", DatetimeFixo)
+    credito = _credito(
+        data_inicio=date(2026, 10, 1),
+        data_validade=date(2026, 10, 27),
+        pacote_id=1,
+        pacote=None,
+        cliente=None,
+        pet=None,
+        venda_id=None,
+        observacoes=None,
+    )
+    assert credito_disponivel(credito) is True
+    assert serializar_credito(credito)["vencido"] is False
+    assert serializar_credito(credito)["disponivel"] is True
+    relogio["utc"] = datetime(2026, 10, 28, 3, 0, tzinfo=timezone.utc)
+    assert credito_disponivel(credito) is False
+    assert serializar_credito(credito)["vencido"] is True
+    assert serializar_credito(credito)["saldo_creditos"] == Decimal("4")
 
 
 def test_cotas_por_servico_e_estorno_nao_misturam_banho_com_tosa():

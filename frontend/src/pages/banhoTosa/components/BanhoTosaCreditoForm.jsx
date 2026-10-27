@@ -66,6 +66,7 @@ export default function BanhoTosaCreditoForm({ pacotes = [], onCancel, onChanged
     setForm((prev) => ({ ...prev, [field]: value }));
   }
   const pacote = pacotes.find((item) => String(item.id) === String(form.pacote_id));
+  const placeholderPet = obterPlaceholderPet(loadingPets, tutor?.id);
 
   async function liberarCredito(event) {
     event.preventDefault();
@@ -157,17 +158,8 @@ export default function BanhoTosaCreditoForm({ pacotes = [], onCancel, onChanged
           value={form.pet_id}
           disabled={!tutor?.id || loadingPets}
           error={erroPets}
-          placeholder={
-            loadingPets
-              ? "Carregando pets..."
-              : !tutor?.id
-                ? "Selecione o tutor primeiro"
-                : "Selecione o pet"
-          }
-          opcoes={pets.map((pet) => ({
-            value: String(pet.id),
-            label: `${pet.nome}${pet.especie ? ` (${pet.especie})` : ""}`,
-          }))}
+          placeholder={placeholderPet}
+          opcoes={pets.map(opcaoPet)}
           onChange={(value) => updateField("pet_id", value)}
         />
         <div className="grid gap-3 sm:grid-cols-2">
@@ -208,4 +200,16 @@ export default function BanhoTosaCreditoForm({ pacotes = [], onCancel, onChanged
       </form>
     </Panel>
   );
+}
+
+function obterPlaceholderPet(loadingPets, tutorId) {
+  if (loadingPets) return "Carregando pets...";
+  if (!tutorId) return "Selecione o tutor primeiro";
+  return "Selecione o pet";
+}
+
+function opcaoPet(pet) {
+  let label = pet.nome;
+  if (pet.especie) label += ` (${pet.especie})`;
+  return { value: String(pet.id), label };
 }

@@ -22,6 +22,7 @@ from app.banho_tosa_api import agenda_routes
 from app.banho_tosa_models import (
     BanhoTosaAtendimento,
     BanhoTosaPacoteMovimento,
+    BanhoTosaPacoteCredito,
     BanhoTosaServico,
 )
 from app.banho_tosa_routes import router
@@ -698,3 +699,174 @@ def test_fechamentos_encontra_pendencias_antigas_apos_lotes_sem_cobranca(fluxo):
     assert {
         item["atendimento_id"] for item in resposta.json()["itens"]
     } == ids_pendentes
+
+
+def _simular_consumo_anterior_a_reserva_por_item(f):
+    # Primeiro cria agenda/check-in sem contrato, como registros já existentes
+    # antes da implantação. O movimento antigo não tinha os três novos vínculos.
+    agendamento = agendar(f)
+    enviar(f, "taxi-dog", {"agendamento_id": agendamento["id"], "valor_cobrado": "15"})
+    atendimento = enviar(
+        f, f"agendamentos/{agendamento['id']}/check-in", {}, esperado=200
+    )
+    credito = contratar(f)
+    venda = enviar(f, f"pacotes/creditos/{credito['id']}/gerar-venda", {}, esperado=200)
+    set_current_tenant(f.tenant_id)
+    contrato = f.db.query(BanhoTosaPacoteCredito).filter_by(id=credito["id"]).one()
+    contrato.servicos = None
+    contrato.pet_id = None
+    contrato.creditos_usados = Decimal("1")
+    movimento = BanhoTosaPacoteMovimento(
+        tenant_id=f.tenant_id,
+        credito_id=credito["id"],
+        atendimento_id=atendimento["id"],
+        tipo="consumo",
+        quantidade=1,
+        saldo_apos=3,
+        observacoes="Consumo registrado no fluxo anterior",
+        created_by=f.identidade["user"].id,
+    )
+    f.db.add(movimento)
+    f.db.flush()
+    registro = f.db.query(BanhoTosaAtendimento).filter_by(id=atendimento["id"]).one()
+    registro.pacote_credito_id = credito["id"]
+    registro.pacote_movimento_id = movimento.id
+    f.db.commit()
+    return agendamento, atendimento, credito, venda
+
+
+def test_consumo_legado_preserva_cobertura_sem_nova_venda_ou_baixa(fluxo):
+    f = fluxo
+    agendamento, atendimento, credito, venda = (
+        _simular_consumo_anterior_a_reserva_por_item(f)
+    )
+    repetido = enviar(f, f"agendamentos/{agendamento['id']}/check-in", {}, esperado=200)
+    assert repetido["id"] == atendimento["id"]
+    contrato = saldo(f, credito["id"])
+    assert Decimal(contrato["creditos_usados"]) == 1
+    assert Decimal(contrato["servicos"][0]["creditos_usados"]) == 1
+    assert Decimal(contrato["servicos"][0]["saldo_creditos"]) == 3
+    detalhe = f.api.get(f"/banho-tosa/atendimentos/{atendimento['id']}").json()
+    assert Decimal(detalhe["valor_cobranca_pendente"]) == 0
+    entregue = enviar(
+        f,
+        f"atendimentos/{atendimento['id']}/mover-etapa",
+        {"tipo": "entregue", "iniciar_timer": False},
+        esperado=200,
+    )
+    assert entregue["status"] == "entregue"
+    assert entregue["venda_id"] is None
+    assert entregue["pacote_status_pagamento"] == "pendente"
+    assert Decimal(entregue["pacote_valor_restante"]) == 200
+    set_current_tenant(f.tenant_id)
+    assert [v.id for v in f.db.query(Venda).all()] == [venda["venda_id"]]
+
+
+def test_cancelamento_consumo_legado_restaura_saldo_por_servico(fluxo):
+    f = fluxo
+    _, atendimento, credito, venda = _simular_consumo_anterior_a_reserva_por_item(f)
+    enviar(
+        f,
+        f"atendimentos/{atendimento['id']}/cancelar-processo",
+        {"motivo": "Tutor remarcou o atendimento antigo"},
+        esperado=200,
+    )
+    enviar(
+        f,
+        f"atendimentos/{atendimento['id']}/cancelar-processo",
+        {"motivo": "Tutor remarcou o atendimento antigo"},
+        esperado=200,
+    )
+    contrato = saldo(f, credito["id"])
+    assert Decimal(contrato["creditos_usados"]) == 0
+    assert Decimal(contrato["servicos"][0]["creditos_usados"]) == 0
+    assert Decimal(contrato["servicos"][0]["saldo_creditos"]) == 4
+    assert contrato["venda_id"] == venda["venda_id"]
+    assert contrato["status_pagamento"] == "pendente"
+    historico = f.api.get(
+        f"/banho-tosa/pacotes/creditos/{credito['id']}/movimentos"
+    ).json()
+    assert sum(m["tipo"] == "estorno" for m in historico) == 1
+
+
+def test_fechamentos_continua_busca_apos_orcamento_fixo_sem_ocultar_pendencias(
+    fluxo, monkeypatch
+):
+    from app import banho_tosa_fechamento
+
+    monkeypatch.setattr(banho_tosa_fechamento, "MAX_PAGINAS_PENDENCIAS", 2)
+    monkeypatch.setattr(banho_tosa_fechamento, "TAMANHO_LOTE_PENDENCIAS", 2)
+    f = fluxo
+    set_current_tenant(f.tenant_id)
+    pendente = BanhoTosaAtendimento(
+        tenant_id=f.tenant_id, cliente_id=f.tutor.id, pet_id=f.pet.id, status="pronto"
+    )
+    f.db.add(pendente)
+    f.db.flush()
+    pendente_id = pendente.id
+    f.db.add_all(
+        [
+            BanhoTosaAtendimento(
+                tenant_id=f.tenant_id,
+                cliente_id=f.tutor.id,
+                pet_id=f.pet.id,
+                status="entregue",
+                ocorrencias=[
+                    {"tipo": "entrega_sem_cobranca", "system_generated": True}
+                ],
+            )
+            for _ in range(5)
+        ]
+    )
+    f.db.commit()
+    primeira = f.api.get(
+        "/banho-tosa/fechamentos/pendencias", params={"limit": 2}
+    ).json()
+    assert primeira["itens"] == []
+    assert primeira["busca_incompleta"] is True
+    assert primeira["proximo_cursor"] > 0
+    sincronizada = f.api.post(
+        "/banho-tosa/fechamentos/pendencias/sincronizar", params={"limit": 2}
+    ).json()
+    assert sincronizada["total_processados"] == 0
+    assert sincronizada["busca_incompleta"] is True
+    assert sincronizada["proximo_cursor"] == primeira["proximo_cursor"]
+    segunda = f.api.get(
+        "/banho-tosa/fechamentos/pendencias",
+        params={"limit": 2, "cursor": primeira["proximo_cursor"]},
+    ).json()
+    assert segunda["busca_incompleta"] is False
+    assert segunda["proximo_cursor"] is None
+    assert [item["atendimento_id"] for item in segunda["itens"]] == [pendente_id]
+
+
+def test_fechamentos_cursor_nao_pula_pendencias_no_meio_do_lote(fluxo, monkeypatch):
+    from app import banho_tosa_fechamento
+
+    monkeypatch.setattr(banho_tosa_fechamento, "TAMANHO_LOTE_PENDENCIAS", 2)
+    f = fluxo
+    set_current_tenant(f.tenant_id)
+    registros = [
+        BanhoTosaAtendimento(
+            tenant_id=f.tenant_id,
+            cliente_id=f.tutor.id,
+            pet_id=f.pet.id,
+            status="pronto",
+        )
+        for _ in range(3)
+    ]
+    f.db.add_all(registros)
+    f.db.commit()
+    ids_esperados = {item.id for item in registros}
+    cursor = None
+    encontrados = []
+    for _ in range(3):
+        params = {"limit": 1}
+        if cursor is not None:
+            params["cursor"] = cursor
+        pagina = f.api.get("/banho-tosa/fechamentos/pendencias", params=params).json()
+        encontrados.extend(item["atendimento_id"] for item in pagina["itens"])
+        cursor = pagina["proximo_cursor"]
+    assert cursor is None
+    assert len(encontrados) == len(set(encontrados)) == 3
+    assert set(encontrados) == ids_esperados

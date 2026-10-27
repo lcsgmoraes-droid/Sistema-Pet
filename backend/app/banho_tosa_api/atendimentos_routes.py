@@ -92,7 +92,13 @@ def obter_atendimento(
 
 
 @router.patch(
-    "/atendimentos/{atendimento_id}/status", response_model=BanhoTosaAtendimentoResponse
+    "/atendimentos/{atendimento_id}/status",
+    response_model=BanhoTosaAtendimentoResponse,
+    responses={
+        422: {
+            "description": "Transicao invalida ou encerramento sem confirmacao operacional."
+        }
+    },
 )
 def atualizar_status_atendimento(
     atendimento_id: int,
@@ -148,6 +154,11 @@ def cancelar_processo(
 @router.post(
     "/atendimentos/{atendimento_id}/mover-etapa",
     response_model=BanhoTosaAtendimentoResponse,
+    responses={
+        422: {
+            "description": "Etapa invalida, atendimento encerrado ou entrega sem cobranca nao permitida."
+        }
+    },
 )
 def mover_etapa_atendimento(
     atendimento_id: int,
@@ -234,12 +245,15 @@ def mover_etapa_atendimento(
     aplicar_status_atendimento(db, tenant_id, atendimento, status_por_etapa(tipo))
     if tipo == "entregue" and body.observacoes_saida is not None:
         atendimento.observacoes_saida = body.observacoes_saida.strip() or None
-    if tipo == "entregue":
-        if not body.entrega_sem_cobranca and (
+    if (
+        tipo == "entregue"
+        and not body.entrega_sem_cobranca
+        and (
             not atendimento.pacote_credito_id
             or _montar_itens_venda(db, tenant_id, atendimento)
-        ):
-            gerar_venda_atendimento(db, tenant_id, current_user.id, atendimento.id)
+        )
+    ):
+        gerar_venda_atendimento(db, tenant_id, current_user.id, atendimento.id)
     if tipo in {"pronto", "entregue"}:
         db.flush()
         recalcular_snapshot_atendimento(db, tenant_id, atendimento.id)

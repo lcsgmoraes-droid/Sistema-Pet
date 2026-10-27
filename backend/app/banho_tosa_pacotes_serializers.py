@@ -1,11 +1,11 @@
 """Serializadores do dominio de pacotes de Banho & Tosa."""
 
-from datetime import date
 from decimal import Decimal
 
 from app.banho_tosa_pacotes import calcular_saldo_creditos
 from app.banho_tosa_pacote_reservas import saldos_por_servico
 from app.vendas.status_pagamento import calcular_resumo_pagamento_venda
+from app.utils.timezone import now_brasilia
 
 
 def resumo_financeiro_credito(credito) -> dict:
@@ -19,16 +19,12 @@ def resumo_financeiro_credito(credito) -> dict:
     )
     pago = resumo["valor_pago"]
     status = "sem_venda"
-    if venda:
-        status = (
-            "cancelado"
-            if venda.status == "cancelada"
-            else (
-                "pendente"
-                if resumo["status_pagamento"] == "em_aberto"
-                else resumo["status_pagamento"]
-            )
-        )
+    if venda and venda.status == "cancelada":
+        status = "cancelado"
+    elif venda and resumo["status_pagamento"] == "em_aberto":
+        status = "pendente"
+    elif venda:
+        status = resumo["status_pagamento"]
     return {
         "status_pagamento": status,
         "valor_pacote": valor_pacote,
@@ -71,7 +67,8 @@ def serializar_credito(credito) -> dict:
     )
     reservados = getattr(credito, "creditos_reservados", 0) or 0
     saldo = max(saldo_total - reservados, Decimal("0"))
-    vencido = credito.data_validade < date.today()
+    hoje = now_brasilia().date()
+    vencido = credito.data_validade < hoje
     pacote = credito.pacote
     return {
         "id": credito.id,
@@ -97,7 +94,7 @@ def serializar_credito(credito) -> dict:
         "vencido": vencido,
         "disponivel": credito.status == "ativo"
         and not vencido
-        and credito.data_inicio <= date.today()
+        and credito.data_inicio <= hoje
         and saldo > 0,
         "observacoes": credito.observacoes,
         **resumo_financeiro_credito(credito),

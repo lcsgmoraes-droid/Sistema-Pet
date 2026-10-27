@@ -6,6 +6,7 @@ from fastapi import HTTPException
 
 from app import banho_tosa_entrega as entrega
 from app.banho_tosa_fechamento import _resumo_sem_venda
+from app.banho_tosa_fechamento import listar_pendencias_fechamento
 from app.banho_tosa_vendas import _montar_itens_venda, venda_identifica_atendimento
 
 
@@ -177,3 +178,17 @@ def test_token_atendimento_nao_identifica_venda_de_numero_maior():
     venda = SimpleNamespace(observacoes="Banho & Tosa | BT_ATENDIMENTO:10")
     assert not venda_identifica_atendimento(venda, 1)
     assert venda_identifica_atendimento(venda, 10)
+
+
+@pytest.mark.parametrize("limite", [0, -1, 501, "200"])
+def test_busca_pendencias_valida_limite_internamente(limite):
+    with pytest.raises(HTTPException) as erro:
+        listar_pendencias_fechamento(None, "tenant-a", limit=limite)
+    assert erro.value.status_code == 422
+
+
+@pytest.mark.parametrize("cursor", [0, -1, "10"])
+def test_busca_pendencias_valida_cursor_internamente(cursor):
+    with pytest.raises(HTTPException) as erro:
+        listar_pendencias_fechamento(None, "tenant-a", cursor=cursor)
+    assert erro.value.status_code == 422

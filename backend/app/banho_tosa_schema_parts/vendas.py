@@ -50,6 +50,8 @@ class BanhoTosaFechamentoPendenciaItem(BanhoTosaFechamentoSyncResponse):
 class BanhoTosaFechamentoPendenciasResponse(BaseModel):
     total: int
     itens: List[BanhoTosaFechamentoPendenciaItem] = Field(default_factory=list)
+    proximo_cursor: Optional[int] = None
+    busca_incompleta: bool = False
 
 
 class BanhoTosaFechamentoSincronizacaoLoteResponse(BaseModel):
@@ -57,6 +59,8 @@ class BanhoTosaFechamentoSincronizacaoLoteResponse(BaseModel):
     sincronizados: int
     sem_venda: int
     pendentes_restantes: int
+    proximo_cursor: Optional[int] = None
+    busca_incompleta: bool = False
 
 
 class BanhoTosaCancelamentoInput(BaseModel):

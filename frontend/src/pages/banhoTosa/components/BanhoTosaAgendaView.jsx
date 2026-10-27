@@ -224,11 +224,7 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
         (total, item) => total + Number(item.pacote_quantidade || 0),
         0,
       );
-      toast.success(
-        reservado > 0
-          ? `Agendamento criado: ${formatarCreditos(reservado)} crédito(s) reservado(s) automaticamente.${reservado < 1 ? " O valor não coberto continua a cobrar." : ""}`
-          : "Agendamento criado.",
-      );
+      toast.success(mensagemAgendamentoCriado(reservado));
       resetarFormularioAgendamento();
       setFormOpen(false);
       await carregarAgenda();
@@ -415,6 +411,13 @@ function CapacidadeAlertas({ capacidade }) {
       </div>
     </Panel>
   );
+}
+
+function mensagemAgendamentoCriado(reservado) {
+  if (reservado <= 0) return "Agendamento criado.";
+  let mensagem = `Agendamento criado: ${formatarCreditos(reservado)} crédito(s) reservado(s) automaticamente.`;
+  if (reservado < 1) mensagem += " O valor não coberto continua a cobrar.";
+  return mensagem;
 }
 
 function resumirAgenda(agendamentos, capacidade, recursos) {

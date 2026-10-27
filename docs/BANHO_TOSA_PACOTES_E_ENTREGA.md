@@ -28,6 +28,7 @@ histórico. É necessário resolver as reservas existentes antes desse encerrame
 
 O uso dos créditos e sua eventual prorrogação não renovam o pacote automaticamente.
 Para um novo período, a equipe registra uma nova contratação.
+A virada de validade segue a data de Brasília, mesmo quando o servidor usa UTC.
 
 ## Pagamento
 
@@ -47,9 +48,17 @@ com justificativa e confirmação da entrega. O sistema registra uma ocorrência
 auditoria e conserva o atendimento, seus custos e histórico, sem inventar venda ou
 pagamento. Se houver serviços ou táxi a cobrar, essa opção é rejeitada pelo backend.
 
+Atendimentos que já tinham consumido pacote no fluxo antigo conservam a cobertura
+integral anteriormente concedida. A atualização não gera cobrança retroativa nem
+consome outro crédito ao repetir o check-in; a dívida do pacote permanece separada.
+
 Para corrigir um atendimento criado indevidamente, a ficha também permite cancelar
 o processo com motivo. A cobrança avulsa e a devolução dos créditos são tratadas
 na mesma transação. O pacote contratado e sua cobrança continuam preservados.
+
+A central de fechamentos consulta o histórico em lotes limitados. Quando ainda
+houver registros anteriores para conferir, ela informa isso e oferece continuar
+a busca; uma busca parcial não é apresentada como ausência de pendências.
 
 ## Validação e aplicação
 

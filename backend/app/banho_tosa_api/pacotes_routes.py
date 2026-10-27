@@ -48,6 +48,7 @@ from app.vendas_models import Venda
 from app.vendas.service import VendaService
 from app.db import get_session
 from app.veterinario_core import _get_tenant
+from app.utils.timezone import now_brasilia
 
 
 router = APIRouter()
@@ -73,7 +74,16 @@ def listar_pacotes(
     ]
 
 
-@router.post("/pacotes", response_model=BanhoTosaPacoteResponse, status_code=201)
+@router.post(
+    "/pacotes",
+    response_model=BanhoTosaPacoteResponse,
+    status_code=201,
+    responses={
+        404: {"description": "Serviço informado não encontrado."},
+        409: {"description": "Nome do pacote já cadastrado."},
+        422: {"description": "Composição do pacote inválida."},
+    },
+)
 def criar_pacote(
     body: BanhoTosaPacoteCreate,
     db: Session = Depends(get_session),
@@ -112,7 +122,10 @@ def criar_pacote(
     return serializar_pacote(pacote)
 
 
-@router.delete("/pacotes/{pacote_id}")
+@router.delete(
+    "/pacotes/{pacote_id}",
+    responses={404: {"description": "Pacote a excluir não encontrado."}},
+)
 def excluir_pacote(
     pacote_id: int,
     db: Session = Depends(get_session),
@@ -138,7 +151,15 @@ def excluir_pacote(
     }
 
 
-@router.patch("/pacotes/{pacote_id}", response_model=BanhoTosaPacoteResponse)
+@router.patch(
+    "/pacotes/{pacote_id}",
+    response_model=BanhoTosaPacoteResponse,
+    responses={
+        404: {"description": "Pacote ou serviço a alterar não encontrado."},
+        409: {"description": "Nome já utilizado por outro pacote."},
+        422: {"description": "Alterações do pacote inválidas."},
+    },
+)
 def atualizar_pacote(
     pacote_id: int,
     body: BanhoTosaPacoteUpdate,
@@ -206,7 +227,7 @@ def listar_creditos(
     if status:
         query = query.filter(BanhoTosaPacoteCredito.status == status)
     if disponiveis_only:
-        referencia = data_referencia or date.today()
+        referencia = data_referencia or now_brasilia().date()
         query = query.filter(
             BanhoTosaPacoteCredito.status == "ativo",
             BanhoTosaPacoteCredito.data_validade >= referencia,
@@ -235,7 +256,13 @@ def _pacote_tem_creditos(db: Session, tenant_id, pacote_id: int) -> bool:
 
 
 @router.post(
-    "/pacotes/creditos", response_model=BanhoTosaPacoteCreditoResponse, status_code=201
+    "/pacotes/creditos",
+    response_model=BanhoTosaPacoteCreditoResponse,
+    status_code=201,
+    responses={
+        404: {"description": "Pacote, tutor, pet ou serviço não localizado."},
+        422: {"description": "Contrato, cobrança ou período de validade inválido."},
+    },
 )
 def criar_credito(
     body: BanhoTosaPacoteCreditoCreate,
@@ -255,7 +282,7 @@ def criar_credito(
             status_code=422,
             detail="Defina os serviços cobertos antes de contratar este pacote.",
         )
-    data_inicio = body.data_inicio or date.today()
+    data_inicio = body.data_inicio or now_brasilia().date()
     data_validade = body.data_validade or calcular_validade_pacote(
         data_inicio, pacote.validade_dias
     )
@@ -290,15 +317,12 @@ def criar_credito(
 
 
 def _normalizar_servicos(db, tenant_id, servicos, servico_id=None, quantidade=1):
-    itens = (
-        servicos
-        if servicos is not None
-        else (
-            [{"servico_id": servico_id, "quantidade_creditos": quantidade}]
-            if servico_id
-            else []
-        )
-    )
+    if servicos is not None:
+        itens = servicos
+    elif servico_id:
+        itens = [{"servico_id": servico_id, "quantidade_creditos": quantidade}]
+    else:
+        itens = []
     ids = set()
     saida = []
     for item in itens:
@@ -355,6 +379,7 @@ def _validar_venda(db, tenant_id, venda_id, cliente_id):
 @router.get(
     "/pacotes/creditos/{credito_id}/movimentos",
     response_model=List[BanhoTosaPacoteMovimentoResponse],
+    responses={404: {"description": "Contrato do histórico não encontrado."}},
 )
 def listar_movimentos_credito(
     credito_id: int,
@@ -371,6 +396,10 @@ def listar_movimentos_credito(
 @router.post(
     "/pacotes/creditos/{credito_id}/prorrogar",
     response_model=BanhoTosaPacoteCreditoResponse,
+    responses={
+        404: {"description": "Contrato a prorrogar não encontrado."},
+        422: {"description": "Motivo ou nova validade de prorrogação inválidos."},
+    },
 )
 def prorrogar_credito(
     credito_id: int,
@@ -386,7 +415,7 @@ def prorrogar_credito(
     if (
         credito.status == "encerrado"
         or body.data_validade <= credito.data_validade
-        or body.data_validade < date.today()
+        or body.data_validade < now_brasilia().date()
     ):
         raise HTTPException(
             status_code=422,
@@ -422,6 +451,11 @@ def prorrogar_credito(
 @router.post(
     "/pacotes/creditos/{credito_id}/encerrar",
     response_model=BanhoTosaPacoteCreditoResponse,
+    responses={
+        404: {"description": "Contrato a encerrar não encontrado."},
+        409: {"description": "Contrato ainda possui reservas em agendamentos."},
+        422: {"description": "Motivo de encerramento inválido."},
+    },
 )
 def encerrar_credito(
     credito_id: int,
@@ -466,7 +500,13 @@ def encerrar_credito(
     )
 
 
-@router.post("/pacotes/creditos/{credito_id}/gerar-venda")
+@router.post(
+    "/pacotes/creditos/{credito_id}/gerar-venda",
+    responses={
+        404: {"description": "Contrato para cobrança não encontrado."},
+        422: {"description": "Cobrança cancelada ou pacote sem valor de venda."},
+    },
+)
 def gerar_venda_credito(
     credito_id: int,
     db: Session = Depends(get_session),
@@ -548,6 +588,11 @@ def gerar_venda_credito(
 @router.post(
     "/pacotes/creditos/{credito_id}/consumir",
     response_model=BanhoTosaPacoteConsumoResponse,
+    responses={
+        404: {"description": "Crédito ou atendimento a consumir não encontrado."},
+        409: {"description": "Atendimento já vinculado a outro contrato."},
+        422: {"description": "Crédito indisponível ou incompatível com o atendimento."},
+    },
 )
 def consumir_credito(
     credito_id: int,
@@ -580,6 +625,10 @@ def consumir_credito(
 @router.post(
     "/pacotes/creditos/{credito_id}/estornar",
     response_model=BanhoTosaPacoteConsumoResponse,
+    responses={
+        404: {"description": "Consumo ou contrato a estornar não encontrado."},
+        422: {"description": "Informe o movimento ou atendimento para estorno."},
+    },
 )
 def estornar_credito(
     credito_id: int,

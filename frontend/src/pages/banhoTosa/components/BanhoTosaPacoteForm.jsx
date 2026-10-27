@@ -13,7 +13,7 @@ import Panel from "../../../components/ui/Panel";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
 
-const novoServico = () => ({ servico_id: "", quantidade_creditos: 4 });
+const novoServico = () => ({ chave: crypto.randomUUID(), servico_id: "", quantidade_creditos: 4 });
 const initialForm = () => ({
   nome: "",
   descricao: "",
@@ -36,6 +36,7 @@ function formFromPacote(pacote) {
     nome: pacote.nome || "",
     descricao: pacote.descricao || "",
     servicos: servicos.map((item) => ({
+      chave: crypto.randomUUID(),
       servico_id: item.servico_id ? String(item.servico_id) : "",
       quantidade_creditos: Number(item.quantidade_creditos || 1),
     })),
@@ -62,10 +63,12 @@ export default function BanhoTosaPacoteForm({
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
-  function atualizarServico(index, field, value) {
+  function atualizarServico(chave, field, value) {
     setForm((prev) => ({
       ...prev,
-      servicos: prev.servicos.map((item, i) => (i === index ? { ...item, [field]: value } : item)),
+      servicos: prev.servicos.map((item) =>
+        item.chave === chave ? { ...item, [field]: value } : item,
+      ),
     }));
   }
 
@@ -141,26 +144,26 @@ export default function BanhoTosaPacoteForm({
           onChange={(value) => updateField("descricao", value)}
         />
         <div className="space-y-3">
-          {form.servicos.map((item, index) => (
+          {form.servicos.map((item) => (
             <div
-              key={index}
+              key={item.chave}
               className="grid items-end gap-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700 sm:grid-cols-[1fr_7rem_auto]"
             >
               <InputCombobox
-                id={`bt-pacote-servico-${index}`}
+                id={`bt-pacote-servico-${item.chave}`}
                 label="Serviço incluído"
                 required
                 opcoes={opcoes}
                 value={item.servico_id}
-                onChange={(value) => atualizarServico(index, "servico_id", value)}
+                onChange={(value) => atualizarServico(item.chave, "servico_id", value)}
               />
               <InputQuantidade
-                id={`bt-pacote-quantidade-${index}`}
+                id={`bt-pacote-quantidade-${item.chave}`}
                 label="Quantidade"
                 min={1}
                 required
                 value={item.quantidade_creditos}
-                onChange={(value) => atualizarServico(index, "quantidade_creditos", value)}
+                onChange={(value) => atualizarServico(item.chave, "quantidade_creditos", value)}
               />
               <BotaoInteracao
                 icon={Trash2}
@@ -169,7 +172,7 @@ export default function BanhoTosaPacoteForm({
                 onClick={() =>
                   updateField(
                     "servicos",
-                    form.servicos.filter((_, i) => i !== index),
+                    form.servicos.filter((selecionado) => selecionado.chave !== item.chave),
                   )
                 }
               >

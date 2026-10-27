@@ -17,6 +17,8 @@ from sqlalchemy.orm import relationship
 
 from app.base_models import BaseTenantModel
 
+SERVICO_FOREIGN_KEY = "banho_tosa_servicos.id"
+
 
 class BanhoTosaPacote(BaseTenantModel):
     __tablename__ = "banho_tosa_pacotes"
@@ -28,7 +30,7 @@ class BanhoTosaPacote(BaseTenantModel):
     nome = Column(String(160), nullable=False, index=True)
     descricao = Column(Text, nullable=True)
     servico_id = Column(
-        Integer, ForeignKey("banho_tosa_servicos.id"), nullable=True, index=True
+        Integer, ForeignKey(SERVICO_FOREIGN_KEY), nullable=True, index=True
     )
     quantidade_creditos = Column(Numeric(12, 3), nullable=False, default=1)
     validade_dias = Column(Integer, nullable=False, default=30)
@@ -107,7 +109,7 @@ class BanhoTosaPacoteMovimento(BaseTenantModel):
         nullable=True,
         index=True,
     )
-    servico_id = Column(Integer, ForeignKey("banho_tosa_servicos.id"), nullable=True)
+    servico_id = Column(Integer, ForeignKey(SERVICO_FOREIGN_KEY), nullable=True)
     tipo = Column(String(30), nullable=False, index=True)
     quantidade = Column(Numeric(12, 3), nullable=False, default=0)
     saldo_apos = Column(Numeric(12, 3), nullable=False, default=0)
@@ -126,7 +128,7 @@ class BanhoTosaRecorrencia(BaseTenantModel):
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False, index=True)
     pet_id = Column(Integer, ForeignKey("pets.id"), nullable=False, index=True)
     servico_id = Column(
-        Integer, ForeignKey("banho_tosa_servicos.id"), nullable=True, index=True
+        Integer, ForeignKey(SERVICO_FOREIGN_KEY), nullable=True, index=True
     )
     pacote_credito_id = Column(
         Integer, ForeignKey("banho_tosa_pacote_creditos.id"), nullable=True, index=True

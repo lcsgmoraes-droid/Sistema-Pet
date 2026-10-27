@@ -11,6 +11,7 @@ from app.banho_tosa_models import (
     BanhoTosaPacoteCredito,
     BanhoTosaPacoteMovimento,
 )
+from app.utils.timezone import now_brasilia
 
 
 def calcular_saldo_creditos(total, usados=0, cancelados=0, reservados=0) -> Decimal:
@@ -25,7 +26,7 @@ def calcular_validade_pacote(data_inicio: date, validade_dias: int) -> date:
 
 
 def credito_disponivel(credito, hoje: date | None = None) -> bool:
-    hoje = hoje or date.today()
+    hoje = hoje or now_brasilia().date()
     return (
         credito.status == "ativo"
         and (not getattr(credito, "data_inicio", None) or credito.data_inicio <= hoje)
@@ -85,32 +86,7 @@ def consumir_credito_atendimento(
             detail="Atendimento ja possui venda vinculada; ajuste o PDV antes de consumir pacote.",
         )
 
-    from app.banho_tosa_pacote_reservas import saldos_por_servico
-
-    composicao = saldos_por_servico(credito)
-    servico_coberto = None
-    for servico in (
-        getattr(getattr(atendimento, "agendamento", None), "servicos", []) or []
-    ):
-        saldo_servico = next(
-            (
-                item["saldo_creditos"]
-                for item in composicao
-                if item["servico_id"] == servico.servico_id
-            ),
-            Decimal("0"),
-        )
-        nao_coberto = _decimal(servico.quantidade) - _decimal(
-            getattr(servico, "pacote_quantidade", 0)
-        )
-        if saldo_servico >= quantidade and nao_coberto >= quantidade:
-            servico_coberto = servico
-            break
-    if composicao and not servico_coberto:
-        raise HTTPException(
-            status_code=422,
-            detail="Pacote sem saldo do serviço solicitado; o uso automático é calculado por serviço no agendamento.",
-        )
+    servico_coberto = _selecionar_servico_consumo(credito, atendimento, quantidade)
 
     credito.creditos_usados = _decimal(credito.creditos_usados) + quantidade
     saldo_apos = calcular_saldo_creditos(
@@ -151,6 +127,34 @@ def consumir_credito_atendimento(
     db.refresh(credito)
     db.refresh(movimento)
     return credito, movimento, False
+
+
+def _selecionar_servico_consumo(credito, atendimento, quantidade):
+    from app.banho_tosa_pacote_reservas import saldos_por_servico
+
+    composicao = saldos_por_servico(credito)
+    for servico in (
+        getattr(getattr(atendimento, "agendamento", None), "servicos", []) or []
+    ):
+        saldo_servico = next(
+            (
+                item["saldo_creditos"]
+                for item in composicao
+                if item["servico_id"] == servico.servico_id
+            ),
+            Decimal("0"),
+        )
+        nao_coberto = _decimal(servico.quantidade) - _decimal(
+            getattr(servico, "pacote_quantidade", 0)
+        )
+        if saldo_servico >= quantidade and nao_coberto >= quantidade:
+            return servico
+    if composicao:
+        raise HTTPException(
+            status_code=422,
+            detail="Pacote sem saldo do serviço solicitado; o uso automático é calculado por serviço no agendamento.",
+        )
+    return None
 
 
 def estornar_consumo_atendimento(

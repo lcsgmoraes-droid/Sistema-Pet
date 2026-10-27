@@ -36,7 +36,13 @@ def listar_ocorrencias_atendimento(
     return atendimento.ocorrencias or []
 
 
-@router.post("/atendimentos/{atendimento_id}/ocorrencias", status_code=201)
+@router.post(
+    "/atendimentos/{atendimento_id}/ocorrencias",
+    status_code=201,
+    responses={
+        422: {"description": "Tipo reservado a registro automatico de entrega."}
+    },
+)
 def registrar_ocorrencia_atendimento(
     atendimento_id: int,
     body: BanhoTosaOcorrenciaCreate,
@@ -66,7 +72,11 @@ def registrar_ocorrencia_atendimento(
 
 
 @router.delete(
-    "/atendimentos/{atendimento_id}/ocorrencias/{ocorrencia_id}", status_code=204
+    "/atendimentos/{atendimento_id}/ocorrencias/{ocorrencia_id}",
+    status_code=204,
+    responses={
+        422: {"description": "Registro automatico de entrega deve ser preservado."}
+    },
 )
 def remover_ocorrencia_atendimento(
     atendimento_id: int,
