@@ -181,6 +181,7 @@ from app.routes.health_routes import (
 from app.routes.error_events_routes import (
     router as error_events_router,
 )  # Observabilidade operacional
+from app.routes.ops_lojas_routes import router as ops_lojas_router
 from app.routes.ops_tenants_routes import (
     router as ops_tenants_router,
 )  # Gestao operacional de tenants
@@ -264,6 +265,7 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(platform_auth_router)
     app.include_router(error_events_router)
     app.include_router(ops_tenants_router)
+    app.include_router(ops_lojas_router)
     app.include_router(ops_grupo_comercial_router)
     app.include_router(evolucao_router)
     app.include_router(product_images_public_router)

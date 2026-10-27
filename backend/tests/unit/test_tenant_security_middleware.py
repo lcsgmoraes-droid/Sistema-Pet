@@ -92,6 +92,8 @@ async def test_tenant_security_allows_select_tenant_without_tenant():
         "/api/admin/observabilidade/ops-summary",
         "/api/admin/grupos-comerciais/onboarding",
         "/api/admin/grupos-comerciais/1/lojas",
+        "/api/admin/lojas",
+        "/api/admin/lojas/abc/modulos/crm/ativar",
     ],
 )
 async def test_tenant_security_allows_platform_admin_only_on_ops_paths(path):
@@ -109,6 +111,7 @@ async def test_tenant_security_allows_platform_admin_only_on_ops_paths(path):
     [
         ("/api/vendas", {"sub": "platform:1", "scope": "platform_admin"}),
         ("/api/admin/tenants", {"sub": "1", "scope": "platform_admin"}),
+        ("/api/admin/lojas", {"sub": "1"}),  # usuario comum sem loja nao entra no OPS
     ],
 )
 async def test_tenant_security_blocks_platform_scope_outside_ops_contract(
