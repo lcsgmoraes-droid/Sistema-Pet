@@ -217,6 +217,7 @@ export async function persistirVendaAbertaParaPagamento({
   vendaParaPersistir = {},
   payloadVenda = {},
   vendaIdPersistida = null,
+  buscarVenda,
   criarVenda,
   atualizarVenda,
   onVendaPersistida,
@@ -231,6 +232,17 @@ export async function persistirVendaAbertaParaPagamento({
     // O pedido importado e imutavel. O finalizador valida novamente o vinculo,
     // os itens, a entrega e o pagamento no servidor antes de qualquer baixa.
     return idExistente;
+  }
+
+  if (vendaParaPersistir.status === "baixa_parcial") {
+    if (!vendaId) {
+      throw new Error("Abra a venda com baixa parcial antes de registrar outro recebimento.");
+    }
+    // O complemento recebe sobre a venda já registrada. A edição comercial
+    // continua protegida; o snapshot permite revisar total e saldo atualizados.
+    const existente = await buscarVenda(vendaId);
+    onVendaPersistida?.(existente);
+    return vendaId;
   }
 
   if (vendaId) {

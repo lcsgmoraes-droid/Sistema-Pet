@@ -114,6 +114,23 @@ def test_crediario_fica_pago_quando_todas_as_parcelas_forem_baixadas():
     assert resumo["valor_restante"] == 0
 
 
+@pytest.mark.parametrize(
+    "recebido, status_esperado",
+    [(0, "em_aberto"), (50, "parcial"), (200, "pago")],
+)
+def test_boleto_depende_da_baixa_do_titulo_como_outros_planos_a_prazo(
+    recebido, status_esperado
+):
+    resumo = calcular_resumo_pagamento_venda(
+        total=200,
+        pagamentos=[_pagamento(valor=200, forma_pagamento="Boleto")],
+        contas_receber=[_conta(valor_final=200, valor_recebido=recebido)],
+    )
+    assert resumo["status_pagamento"] == status_esperado
+    assert resumo["valor_pago"] == Decimal(recebido)
+    assert resumo["valor_restante"] == Decimal(200 - recebido)
+
+
 def test_pagamento_misto_soma_parte_imediata_com_baixa_do_crediario():
     resumo = calcular_resumo_pagamento_venda(
         total=100,

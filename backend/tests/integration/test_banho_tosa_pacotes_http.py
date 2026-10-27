@@ -30,6 +30,7 @@ from app.db import get_session
 from app.models import Cliente, Pet
 from app.tenancy.context import clear_current_tenant, set_current_tenant
 from app.vendas_models import Venda, VendaPagamento
+from app.financeiro_models import ContaReceber, FormaPagamento
 from app import rotas_entrega_models  # noqa: F401
 from fastapi import HTTPException
 from app import banho_tosa_cancelamento
@@ -281,11 +282,24 @@ def test_cobranca_unica_em_aberto_nao_impede_reserva_ou_quita_pacote(fluxo):
     assert aberto["status_pagamento"] == "pendente"
     assert Decimal(aberto["valor_pago"]) == 0
     assert Decimal(aberto["valor_restante"]) == 200
-    agendar(f)
+    agendamento = agendar(f)
     reservado = saldo(f, credito["id"])
     assert Decimal(reservado["saldo_creditos"]) == 3
     assert reservado["status_pagamento"] == "pendente"
     assert Decimal(reservado["valor_restante"]) == 200
+    atendimento = enviar(
+        f, f"agendamentos/{agendamento['id']}/check-in", {}, esperado=200
+    )
+    entregue = enviar(
+        f,
+        f"atendimentos/{atendimento['id']}/mover-etapa",
+        {"tipo": "entregue", "iniciar_timer": False},
+        esperado=200,
+    )
+    assert entregue["venda_id"] is None
+    assert entregue["pacote_status_pagamento"] == "pendente"
+    assert Decimal(entregue["pacote_valor_restante"]) == 200
+    assert Decimal(saldo(f, credito["id"])["creditos_usados"]) == 1
 
 
 def test_encerramento_nao_apaga_historico_nem_cancela_cobranca(fluxo):
@@ -336,11 +350,19 @@ def test_credito_de_outro_tenant_nao_pode_ser_lido_ou_alterado(
         ),
         ("encerrar", {"motivo": "Tentativa outra loja"}),
         ("gerar-venda", {}),
+        ("consumir", {"atendimento_id": 1}),
+        ("estornar", {"movimento_id": 1}),
     ):
         resposta = f.api.post(
             f"/banho-tosa/pacotes/creditos/{credito['id']}/{sufixo}", json=dados
         )
         assert resposta.status_code == 404, resposta.text
+    assert (
+        f.api.get(
+            f"/banho-tosa/pacotes/creditos/{credito['id']}/movimentos"
+        ).status_code
+        == 404
+    )
 
 
 def test_pacote_parcial_cobra_so_unidade_avulsa_e_taxi_sem_cancelar_contrato(fluxo):
@@ -870,3 +892,251 @@ def test_fechamentos_cursor_nao_pula_pendencias_no_meio_do_lote(fluxo, monkeypat
     assert cursor is None
     assert len(encontrados) == len(set(encontrados)) == 3
     assert set(encontrados) == ids_esperados
+
+
+def test_entrega_na_agenda_nao_finaliza_reserva_sem_confirmacao_da_fila(fluxo):
+    f = fluxo
+    credito = contratar(f)
+    agendamento = agendar(f)
+    resposta = f.api.patch(
+        f"/banho-tosa/agendamentos/{agendamento['id']}/status",
+        json={"status": "entregue"},
+    )
+    assert resposta.status_code == 422, resposta.text
+    contrato = saldo(f, credito["id"])
+    assert Decimal(contrato["creditos_reservados"]) == 1
+    assert Decimal(contrato["creditos_usados"]) == 0
+    atendimento = enviar(
+        f, f"agendamentos/{agendamento['id']}/check-in", {}, esperado=200
+    )
+    assert atendimento["status"] == "chegou"
+    contrato = saldo(f, credito["id"])
+    assert Decimal(contrato["creditos_reservados"]) == 0
+    assert Decimal(contrato["creditos_usados"]) == 1
+
+
+def test_boleto_pacote_so_fica_pago_com_recebimento_do_titulo(fluxo):
+    f = fluxo
+    credito = contratar(f)
+    venda = enviar(f, f"pacotes/creditos/{credito['id']}/gerar-venda", {}, esperado=200)
+    set_current_tenant(f.tenant_id)
+    forma = FormaPagamento(
+        tenant_id=f.tenant_id,
+        user_id=f.identidade["user"].id,
+        nome="Boleto QA",
+        tipo="boleto",
+        gera_contas_receber=True,
+    )
+    f.db.add(forma)
+    f.db.flush()
+    f.db.add(
+        VendaPagamento(
+            tenant_id=f.tenant_id,
+            venda_id=venda["venda_id"],
+            forma_pagamento="boleto",
+            forma_pagamento_id=forma.id,
+            valor=200,
+            status="pendente",
+        )
+    )
+    conta = ContaReceber(
+        tenant_id=f.tenant_id,
+        user_id=f.identidade["user"].id,
+        cliente_id=f.tutor.id,
+        venda_id=venda["venda_id"],
+        descricao="Pacote mensal boleto QA",
+        forma_pagamento_id=forma.id,
+        dre_subcategoria_id=1,
+        canal="banho_tosa",
+        valor_original=200,
+        valor_final=200,
+        valor_recebido=0,
+        status="pendente",
+        data_emissao=date.today(),
+        data_vencimento=date.today() + timedelta(days=7),
+    )
+    f.db.add(conta)
+    f.db.commit()
+    pendente = saldo(f, credito["id"])
+    assert pendente["status_pagamento"] == "pendente"
+    assert Decimal(pendente["valor_pago"]) == 0
+    assert Decimal(pendente["valor_restante"]) == 200
+
+    for recebido, situacao_conta, situacao_pacote in (
+        (50, "parcial", "parcial"),
+        (200, "recebido", "pago"),
+        (0, "pendente", "pendente"),
+    ):
+        set_current_tenant(f.tenant_id)
+        conta.valor_recebido = recebido
+        conta.status = situacao_conta
+        f.db.commit()
+        atualizado = saldo(f, credito["id"])
+        assert atualizado["status_pagamento"] == situacao_pacote
+        assert Decimal(atualizado["valor_pago"]) == recebido
+        assert Decimal(atualizado["saldo_creditos"]) == 4
+
+
+def test_jornada_quatro_banhos_pagos_cancelamento_falta_reposicao_e_quinto_avulso(
+    fluxo,
+):
+    f = fluxo
+    credito = contratar(f)
+    venda_pacote = enviar(
+        f, f"pacotes/creditos/{credito['id']}/gerar-venda", {}, esperado=200
+    )
+    set_current_tenant(f.tenant_id)
+    f.db.add(
+        VendaPagamento(
+            tenant_id=f.tenant_id,
+            venda_id=venda_pacote["venda_id"],
+            forma_pagamento="dinheiro",
+            valor=200,
+            status="aprovado",
+        )
+    )
+    f.db.commit()
+    assert saldo(f, credito["id"])["status_pagamento"] == "pago"
+
+    agendas = [
+        agendar(f, dia=date.today() + timedelta(days=d)) for d in (0, 7, 14, 21, 28)
+    ]
+    assert all(
+        a["servicos"][0]["pacote_credito_id"] == credito["id"] for a in agendas[:4]
+    )
+    assert agendas[4]["servicos"][0]["pacote_credito_id"] is None
+    assert Decimal(saldo(f, credito["id"])["creditos_reservados"]) == 4
+
+    for indice, status in ((1, "cancelado"), (2, "no_show")):
+        caminho = f"/banho-tosa/agendamentos/{agendas[indice]['id']}/status"
+        for _ in range(2):
+            resposta = f.api.patch(caminho, json={"status": status})
+            assert resposta.status_code == 200, resposta.text
+        assert (
+            f.api.post(
+                f"/banho-tosa/agendamentos/{agendas[indice]['id']}/check-in"
+            ).status_code
+            == 422
+        )
+    livre = saldo(f, credito["id"])
+    assert Decimal(livre["saldo_creditos"]) == 2
+    assert Decimal(livre["creditos_reservados"]) == 2
+    assert Decimal(livre["creditos_usados"]) == 0
+    reposicoes = [agendar(f, dia=date.today() + timedelta(days=d)) for d in (8, 15)]
+
+    for numero, agenda in enumerate(
+        [agendas[0], reposicoes[0], reposicoes[1], agendas[3]], 1
+    ):
+        atendimento = enviar(
+            f, f"agendamentos/{agenda['id']}/check-in", {}, esperado=200
+        )
+        enviar(f, f"agendamentos/{agenda['id']}/check-in", {}, esperado=200)
+        entregue = enviar(
+            f,
+            f"atendimentos/{atendimento['id']}/mover-etapa",
+            {"tipo": "entregue", "iniciar_timer": False},
+            esperado=200,
+        )
+        assert entregue["venda_id"] is None
+        assert entregue["pacote_status_pagamento"] == "pago"
+        contrato = saldo(f, credito["id"])
+        assert Decimal(contrato["creditos_usados"]) == numero
+        assert Decimal(contrato["creditos_reservados"]) == 4 - numero
+        assert Decimal(contrato["saldo_creditos"]) == 0
+    assert contrato["status"] == "esgotado"
+
+    quinto = enviar(f, f"agendamentos/{agendas[4]['id']}/check-in", {}, esperado=200)
+    assert quinto["pacote_credito_id"] is None
+    entregue = enviar(
+        f,
+        f"atendimentos/{quinto['id']}/mover-etapa",
+        {"tipo": "entregue", "iniciar_timer": False},
+        esperado=200,
+    )
+    assert Decimal(entregue["venda_total"]) == 50
+    assert entregue["venda_id"] != venda_pacote["venda_id"]
+    contrato = saldo(f, credito["id"])
+    assert contrato["status_pagamento"] == "pago"
+    assert Decimal(contrato["creditos_usados"]) == 4
+    historico = f.api.get(
+        f"/banho-tosa/pacotes/creditos/{credito['id']}/movimentos"
+    ).json()
+    assert sum(m["tipo"] == "estorno_reserva" for m in historico) == 2
+    assert sum(m["tipo"] == "consumo" for m in historico) == 4
+    set_current_tenant(f.tenant_id)
+    assert f.db.query(Venda).count() == 2
+
+
+def test_credito_de_um_pet_nao_cobre_outro_pet_do_mesmo_tutor(fluxo):
+    f = fluxo
+    credito = contratar(f)
+    set_current_tenant(f.tenant_id)
+    outro_pet = Pet(
+        tenant_id=f.tenant_id,
+        user_id=f.identidade["user"].id,
+        cliente_id=f.tutor.id,
+        codigo="PET-BT-HTTP-OUTRO",
+        nome="Segundo pet QA",
+        especie="Cao",
+        ativo=True,
+    )
+    outro_tutor = Cliente(
+        tenant_id=f.tenant_id,
+        user_id=f.identidade["user"].id,
+        nome="Outro tutor QA",
+        codigo="TUTOR-BT-HTTP-OUTRO",
+        is_cliente=True,
+        ativo=True,
+    )
+    f.db.add_all([outro_pet, outro_tutor])
+    f.db.commit()
+    agendamento = enviar(
+        f,
+        "agendamentos",
+        {
+            "cliente_id": f.tutor.id,
+            "pet_id": outro_pet.id,
+            "data_hora_inicio": datetime.combine(date.today(), time(14)).isoformat(),
+            "servicos": [{"servico_id": f.banho.id, "valor_unitario": "50"}],
+        },
+    )
+    assert agendamento["servicos"][0]["pacote_credito_id"] is None
+    atendimento = enviar(
+        f, f"agendamentos/{agendamento['id']}/check-in", {}, esperado=200
+    )
+    assert atendimento["pacote_credito_id"] is None
+    resposta = f.api.post(
+        f"/banho-tosa/pacotes/creditos/{credito['id']}/consumir",
+        json={"atendimento_id": atendimento["id"]},
+    )
+    assert resposta.status_code == 422, resposta.text
+    resposta = f.api.post(
+        "/banho-tosa/pacotes/creditos",
+        json={
+            "pacote_id": credito["pacote_id"],
+            "cliente_id": outro_tutor.id,
+            "pet_id": f.pet.id,
+        },
+    )
+    assert resposta.status_code == 404, resposta.text
+    assert Decimal(saldo(f, credito["id"])["saldo_creditos"]) == 4
+
+
+@pytest.mark.parametrize(
+    "inicio_em_dias, validade_em_dias, agenda_em_dias, reserva_esperada",
+    [(0, 30, 31, 0), (7, 37, 0, 0), (7, 37, 7, 1)],
+)
+def test_reserva_automatica_respeita_periodo_contratado(
+    fluxo, inicio_em_dias, validade_em_dias, agenda_em_dias, reserva_esperada
+):
+    f = fluxo
+    credito = contratar(
+        f,
+        data_inicio=(date.today() + timedelta(days=inicio_em_dias)).isoformat(),
+        data_validade=(date.today() + timedelta(days=validade_em_dias)).isoformat(),
+    )
+    agendamento = agendar(f, dia=date.today() + timedelta(days=agenda_em_dias))
+    assert Decimal(agendamento["servicos"][0]["pacote_quantidade"]) == reserva_esperada
+    contrato = saldo(f, credito["id"])
+    assert Decimal(contrato["creditos_reservados"]) == reserva_esperada
+    assert Decimal(contrato["saldo_creditos"]) == 4 - reserva_esperada

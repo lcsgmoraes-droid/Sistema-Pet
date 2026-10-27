@@ -77,7 +77,7 @@ export default function Fechamento({
     const motivo = await perguntarCorePet({
       titulo: "Cancelar atendimento",
       mensagem:
-        "O pet sairá da fila, as vendas vinculadas serão canceladas e os créditos de pacote serão devolvidos. O histórico será preservado. Informe o motivo:",
+        "O pet sairá da fila, as vendas avulsas deste atendimento serão canceladas e os créditos de pacote serão devolvidos. A cobrança do pacote e o histórico serão preservados. Informe o motivo:",
       confirmarTexto: "Cancelar atendimento",
       cancelarTexto: "Voltar",
       variante: "danger",

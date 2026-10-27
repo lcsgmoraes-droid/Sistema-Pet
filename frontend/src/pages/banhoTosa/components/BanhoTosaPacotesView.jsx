@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Coins, PackageCheck, Plus, RefreshCw, WalletCards } from "lucide-react";
 import toast from "react-hot-toast";
 import BotaoInteracao from "../../../components/v2/BotaoInteracao/BotaoInteracao";
@@ -21,35 +21,50 @@ export default function BanhoTosaPacotesView({ servicos = [], onChanged }) {
   const [showPacoteForm, setShowPacoteForm] = useState(false);
   const [showCreditoForm, setShowCreditoForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [atualizando, setAtualizando] = useState(false);
   const [erroCarga, setErroCarga] = useState("");
   const ultimaCarga = useRef(0);
+  const cargaEmAndamento = useRef(null);
+  const montado = useRef(false);
 
-  async function carregar() {
+  const carregar = useCallback(() => {
+    if (!montado.current) return Promise.resolve();
+    if (cargaEmAndamento.current) return cargaEmAndamento.current;
     const carga = ++ultimaCarga.current;
-    setLoading(true);
+    setAtualizando(true);
     setErroCarga("");
-    try {
-      const [pacotesRes, creditosRes] = await Promise.all([
-        banhoTosaApi.listarPacotes(),
-        banhoTosaApi.listarCreditosPacote({ limit: 300 }),
-      ]);
+    const leitura = Promise.resolve().then(async () => {
       if (carga !== ultimaCarga.current) return;
-      setPacotes(Array.isArray(pacotesRes.data) ? pacotesRes.data : []);
-      setCreditos(Array.isArray(creditosRes.data) ? creditosRes.data : []);
-    } catch (error) {
-      if (carga !== ultimaCarga.current) return;
-      setErroCarga(
-        getApiErrorMessage(
-          error,
-          "Não foi possível carregar os pacotes. Atualize para tentar novamente.",
-        ),
-      );
-    } finally {
-      if (carga === ultimaCarga.current) setLoading(false);
-    }
-  }
+      try {
+        const [pacotesRes, creditosRes] = await Promise.all([
+          banhoTosaApi.listarPacotes(),
+          banhoTosaApi.listarCreditosPacote({ limit: 300 }),
+        ]);
+        if (carga !== ultimaCarga.current) return;
+        setPacotes(Array.isArray(pacotesRes.data) ? pacotesRes.data : []);
+        setCreditos(Array.isArray(creditosRes.data) ? creditosRes.data : []);
+      } catch (error) {
+        if (carga !== ultimaCarga.current) return;
+        setErroCarga(
+          getApiErrorMessage(
+            error,
+            "Não foi possível carregar os pacotes. Atualize para tentar novamente.",
+          ),
+        );
+      } finally {
+        if (carga === ultimaCarga.current) {
+          cargaEmAndamento.current = null;
+          setAtualizando(false);
+          setLoading(false);
+        }
+      }
+    });
+    cargaEmAndamento.current = leitura;
+    return leitura;
+  }, []);
 
   async function recarregarTudo() {
+    await cargaEmAndamento.current;
     await carregar();
     await onChanged?.(true);
   }
@@ -79,11 +94,21 @@ export default function BanhoTosaPacotesView({ servicos = [], onChanged }) {
   }
 
   useEffect(() => {
-    carregar();
-    return () => {
-      ultimaCarga.current += 1;
+    montado.current = true;
+    void carregar();
+    const atualizarAoVoltar = () => {
+      if (document.visibilityState !== "hidden") void carregar();
     };
-  }, []);
+    window.addEventListener("focus", atualizarAoVoltar);
+    document.addEventListener("visibilitychange", atualizarAoVoltar);
+    return () => {
+      montado.current = false;
+      ultimaCarga.current += 1;
+      cargaEmAndamento.current = null;
+      window.removeEventListener("focus", atualizarAoVoltar);
+      document.removeEventListener("visibilitychange", atualizarAoVoltar);
+    };
+  }, [carregar]);
 
   const resumo = montarResumo(pacotes, creditos);
 
@@ -107,7 +132,7 @@ export default function BanhoTosaPacotesView({ servicos = [], onChanged }) {
             >
               Vincular pacote ao pet
             </BotaoInteracao>
-            <BotaoInteracao icon={RefreshCw} loading={loading} onClick={carregar}>
+            <BotaoInteracao icon={RefreshCw} loading={atualizando} onClick={carregar}>
               Atualizar
             </BotaoInteracao>
           </div>

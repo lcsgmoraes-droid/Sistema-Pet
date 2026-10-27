@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import api from "../../api";
 import { verificarEstoqueNegativo } from "../../api/alertasEstoque";
-import { atualizarVenda, criarVenda, finalizarVenda } from "../../api/vendas";
+import { atualizarVenda, buscarVenda, criarVenda, finalizarVenda } from "../../api/vendas";
 import {
   emitirNotaFiscalAssistida,
   extrairAcaoCorrecaoFiscal,
@@ -254,6 +254,7 @@ export function useModalPagamentoActions({
       vendaParaPersistir,
       payloadVenda,
       vendaIdPersistida: vendaIdPersistidaRef.current,
+      buscarVenda,
       criarVenda,
       atualizarVenda,
       onVendaPersistida: (persistida) => {

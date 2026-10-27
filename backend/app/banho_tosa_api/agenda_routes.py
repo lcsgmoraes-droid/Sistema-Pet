@@ -213,7 +213,14 @@ def criar_agendamento(
 
 
 @router.patch(
-    "/agendamentos/{agendamento_id}/status", response_model=BanhoTosaAgendamentoResponse
+    "/agendamentos/{agendamento_id}/status",
+    response_model=BanhoTosaAgendamentoResponse,
+    responses={
+        404: {"description": "Agendamento não encontrado nesta empresa."},
+        422: {
+            "description": "Status inválido ou transição exige confirmação pela fila."
+        },
+    },
 )
 def atualizar_status_agendamento(
     agendamento_id: int,
@@ -247,6 +254,11 @@ def atualizar_status_agendamento(
     novo_status = body.status.strip().lower()
     if novo_status not in statuses:
         raise HTTPException(status_code=422, detail="Status de agendamento invalido")
+    if novo_status == "entregue" and agendamento.status != "entregue":
+        raise HTTPException(
+            status_code=422,
+            detail="Confirme a entrega pela fila para registrar o consumo do pacote e conferir a cobrança.",
+        )
     try:
         agendamento.status = validar_transicao_status(agendamento.status, novo_status)
     except ValueError as exc:

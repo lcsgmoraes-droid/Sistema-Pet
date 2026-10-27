@@ -38,7 +38,9 @@ def pagamento_valido_para_saldo(pagamento: Any) -> bool:
 
 def _eh_pagamento_crediario(pagamento: Any) -> bool:
     forma = _texto_normalizado(_campo(pagamento, "forma_pagamento"))
-    return forma == "crediario" or bool(_campo(pagamento, "intervalo_crediario"))
+    return forma in {"crediario", "boleto"} or bool(
+        _campo(pagamento, "intervalo_crediario")
+    )
 
 
 def _contas_do_crediario(
@@ -85,7 +87,7 @@ def calcular_resumo_pagamento_venda(
     """Resume quanto o cliente pagou, sem confundir com o repasse da operadora.
 
     Cartao, PIX e dinheiro quitam a obrigacao do cliente no caixa, mesmo quando
-    a operadora ainda vai repassar o valor. No crediario, o registro em
+    a operadora ainda vai repassar o valor. No crediário e boleto, o registro em
     ``VendaPagamento`` representa apenas o plano; somente as baixas das parcelas
     contam como pagamento do cliente.
     """

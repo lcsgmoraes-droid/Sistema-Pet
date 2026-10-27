@@ -240,6 +240,47 @@ def test_ultimo_centavo_baixa_recebivel_e_finaliza(cenario):
     assert cenario.db.query(LancamentoManual).filter_by(status="previsto").count() == 0
 
 
+def test_complemento_dinheiro_80_mais_120_quita_200_sem_reabrir_ou_duplicar_venda(
+    cenario,
+):
+    cenario.venda.total = Decimal("200")
+    cenario.venda.subtotal = Decimal("200")
+    cenario.db.commit()
+
+    def receber(valor):
+        return finalizacao.finalizar_venda(
+            venda_id=cenario.venda.id,
+            pagamentos=[
+                {"forma_pagamento": "Dinheiro", "forma_pagamento_id": 2, "valor": valor}
+            ],
+            user_id=1,
+            user_nome="Teste",
+            tenant_id=cenario.tenant,
+            db=cenario.db,
+            processar_baixa_estoque_item=lambda **kw: [],
+        )
+
+    parcial = receber(80)
+    assert parcial["venda"]["status"] == cenario.venda.status == "baixa_parcial"
+    assert cenario.db.query(VendaPagamento).count() == 1
+    assert cenario.db.query(func.sum(Recebimento.valor_recebido)).scalar() == Decimal(
+        "80"
+    )
+    assert cenario.db.query(LancamentoManual).filter_by(
+        status="previsto"
+    ).one().valor == Decimal("120")
+
+    completo = receber(120)
+    assert completo["venda"]["status"] == cenario.venda.status == "finalizada"
+    assert cenario.db.query(Venda).count() == 1
+    assert cenario.db.query(VendaPagamento).count() == 2
+    assert cenario.db.query(Recebimento).count() == 2
+    assert cenario.db.query(func.sum(Recebimento.valor_recebido)).scalar() == Decimal(
+        "200"
+    )
+    assert cenario.db.query(LancamentoManual).filter_by(status="previsto").count() == 0
+
+
 def test_reabertura_com_desconto_nao_repete_recebimento(cenario):
     cenario.finalizar(121)
     cenario.venda.status = "aberta"
