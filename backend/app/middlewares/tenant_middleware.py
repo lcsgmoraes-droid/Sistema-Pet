@@ -25,11 +25,13 @@ TENANT_EXEMPT_PATHS = {
     "/openapi.json",
 }
 
+# Tudo que fica sob /admin e do OPS (equipe da plataforma): quem entra no OPS acessa todas
+# as telas, entao uma tela nova nao precisa mais ser cadastrada aqui para funcionar. O token
+# continua precisando ser de administrador da plataforma (escopo e assunto conferidos
+# abaixo) e cada rota ainda valida a sessao e o JTI nas suas dependencias.
 PLATFORM_ADMIN_PATH_PREFIXES = (
     "/platform-auth",
-    "/admin/tenants",
-    "/admin/observabilidade",
-    "/admin/grupos-comerciais",
+    "/admin",
 )
 
 
