@@ -267,9 +267,7 @@ export default function ProdutosTabelaSection({
                         {componente.quantidade}x
                       </span>
                       <span className="flex-1 text-gray-700">
-                        {componente.produto_nome ||
-                          componente.nome ||
-                          `Produto #${componente.produto_id || componente.produto_componente_id}`}
+                        {componente.produto_nome || componente.nome || "Produto não informado"}
                       </span>
                       {estoqueDisponivel !== null && (
                         <span className="text-gray-500">

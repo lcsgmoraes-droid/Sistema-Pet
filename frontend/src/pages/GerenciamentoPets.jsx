@@ -455,7 +455,7 @@ const GerenciamentoPets = () => {
                 render: (pet) => (
                   <CustomerIdentity
                     codeLabel="Cod. tutor"
-                    fallback={`Tutor #${pet.cliente_id || "-"}`}
+                    fallback={"Cliente não informado"}
                     nameClassName="font-medium text-blue-600"
                     record={pet}
                   />

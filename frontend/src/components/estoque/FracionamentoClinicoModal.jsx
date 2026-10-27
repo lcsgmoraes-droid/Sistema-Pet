@@ -1,29 +1,5 @@
-import { ArrowRight, Loader2, Search, Syringe, X } from "lucide-react";
-
-function ProdutoDestinoOption({ item, onSelecionar, selecionado }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onSelecionar(item.id)}
-      className={`w-full rounded-lg border p-3 text-left transition ${
-        selecionado
-          ? "border-violet-400 bg-violet-50 ring-1 ring-violet-300"
-          : "border-slate-200 hover:border-violet-200 hover:bg-slate-50"
-      }`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-sm font-semibold text-slate-900">{item.nome}</div>
-          <div className="mt-1 text-xs text-slate-500">{item.codigo || "Sem codigo"}</div>
-        </div>
-        <div className="text-right text-xs text-slate-600">
-          <div className="font-semibold">{item.unidade || "UN"}</div>
-          <div>Saldo: {Number(item.estoque_atual || 0).toLocaleString("pt-BR")}</div>
-        </div>
-      </div>
-    </button>
-  );
-}
+import BuscaProduto from "../v2/BuscaProduto/BuscaProduto";
+import { ArrowRight, Loader2, Syringe, X } from "lucide-react";
 
 export default function FracionamentoClinicoModal({ fluxo }) {
   const {
@@ -111,35 +87,31 @@ export default function FracionamentoClinicoModal({ fluxo }) {
             <label className="mb-1 block text-sm font-semibold text-slate-700">
               Produto que recebe o saldo clinico *
             </label>
-            <div className="relative">
-              <Search
-                size={17}
-                className="absolute left-3 top-2.5 text-slate-400"
-                aria-hidden="true"
-              />
-              <input
-                value={busca}
-                onChange={(event) => setBusca(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-200"
-                placeholder="Buscar o SKU clinico, por exemplo Dipirona uso clinico"
-              />
-            </div>
-            <div className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1">
-              {produtosDisponiveis.map((item) => (
-                <ProdutoDestinoOption
-                  key={item.id}
-                  item={item}
-                  onSelecionar={onSelecionarProduto}
-                  selecionado={String(item.id) === String(produtoDestinoId)}
-                />
-              ))}
-              {!loading && produtosDisponiveis.length === 0 ? (
-                <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">
-                  Nenhum produto encontrado. Cadastre primeiro um produto simples em ML ou na
-                  unidade clinica desejada.
-                </p>
-              ) : null}
-            </div>
+            <BuscaProduto
+              value={busca}
+              onChange={setBusca}
+              minChars={0}
+              suggestions={produtosDisponiveis}
+              showSuggestions
+              loading={loading}
+              onSelect={(item) => {
+                onSelecionarProduto(item.id);
+                setBusca(item.nome || "");
+              }}
+              renderSuggestionContent={(item) => (
+                <>
+                  <span className="block font-medium">{item.nome}</span>
+                  <span className="text-xs text-slate-500">
+                    {item.codigo || "Sem código"} | {item.unidade || "UN"} | Saldo:{" "}
+                    {Number(item.estoque_atual || 0).toLocaleString("pt-BR")}
+                  </span>
+                </>
+              )}
+              placeholder="Código ou nome do produto clínico que recebe o saldo"
+            />
+            {produtoDestino && (
+              <p className="mt-2 text-xs text-violet-700">Selecionado: {produtoDestino.nome}</p>
+            )}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">

@@ -1,4 +1,15 @@
-import { AlertTriangle, Check, Copy, CreditCard, History, Plus, User, Wallet } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  Copy,
+  CreditCard,
+  History,
+  Pencil,
+  Plus,
+  User,
+  Wallet,
+} from "lucide-react";
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { formatBRL, formatMoneyBRL } from "../../utils/formatters";
 import { getClienteAlertasPdvAtivos } from "../../utils/clienteAlertasPdv";
@@ -13,6 +24,9 @@ import CustomerIdentity from "../ui/CustomerIdentity";
 import EntityCard from "../ui/EntityCard";
 import Panel from "../ui/Panel";
 import PetSelector from "../pets/PetSelector";
+import PessoaFormularioModal from "../clientes/PessoaFormularioModal";
+import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
+import { obterCodigoPessoaPublico } from "../../utils/codigosPublicos";
 
 function CopyButton({ active, onClick, title }) {
   return (
@@ -463,12 +477,14 @@ export default function PDVClienteCard({
   onRemoverCliente,
   onSelecionarCliente,
   onSelecionarPet,
+  onAtualizarCliente,
   saldoCampanhas,
   vendaAtual,
   vendaGuiaClasses,
   vendasEmAbertoInfo,
 }) {
   const navigate = useNavigate();
+  const [editandoCliente, setEditandoCliente] = useState(false);
   const cliente = vendaAtual.cliente;
   const saldoCarimbos = Number(saldoCampanhas?.total_carimbos || 0);
   const debitoFidelidade = Math.max(
@@ -479,7 +495,7 @@ export default function PDVClienteCard({
   const cuponsAtivos = filtrarCuponsValidosPdv(saldoCampanhas?.cupons_ativos);
   const resumoEmAberto = calcularResumoEmAbertoCliente(vendasEmAbertoInfo);
   const telefoneCliente = cliente?.telefone || cliente?.celular || cliente?.whatsapp || "";
-  const codigoCliente = cliente?.codigo || cliente?.id || "";
+  const codigoCliente = obterCodigoPessoaPublico(cliente);
   const nivelFidelidade = saldoCampanhas?.rank_level || "bronze";
   const cashback = Number(saldoCampanhas?.saldo_cashback || 0);
   const beneficiosMensagem = saldoCampanhas?.beneficios_erro_atualizacao
@@ -502,11 +518,33 @@ export default function PDVClienteCard({
           Cliente
         </h2>
         {cliente && !modoVisualizacao && (
-          <ActionButton onClick={onRemoverCliente} intent="delete" tone="ghost" size="xs">
-            Remover
-          </ActionButton>
+          <div className="flex items-center gap-2">
+            <BotaoInteracao
+              icon={Pencil}
+              tamanho="pequeno"
+              onClick={() => setEditandoCliente(true)}
+              aria-label="Editar cliente selecionado"
+            >
+              Editar
+            </BotaoInteracao>
+            <ActionButton onClick={onRemoverCliente} intent="delete" tone="ghost" size="xs">
+              Remover
+            </ActionButton>
+          </div>
         )}
       </div>
+
+      {editandoCliente && cliente && (
+        <PessoaFormularioModal
+          key={cliente.id}
+          pessoa={cliente}
+          onFechar={() => setEditandoCliente(false)}
+          onSalvo={(pessoa) => {
+            onAtualizarCliente?.(pessoa);
+            setEditandoCliente(false);
+          }}
+        />
+      )}
 
       {!cliente ? (
         <ClienteLookup

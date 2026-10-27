@@ -40,17 +40,18 @@ export function getFornecedorIdentityDocument(fornecedor) {
 }
 
 export function getFornecedorIdentityCode(fornecedor) {
+  const codigoProprio =
+    fornecedor &&
+    !["fornecedor_id", "id_fornecedor", "supplier_id"].some((chave) => chave in fornecedor)
+      ? fornecedor.codigo
+      : undefined;
   return firstText(
     fornecedor?.fornecedor_codigo,
     fornecedor?.codigo_fornecedor,
     fornecedor?.cod_fornecedor,
     fornecedor?.supplier_code,
     fornecedor?.fornecedor?.codigo,
-    fornecedor?.fornecedor?.id,
-    fornecedor?.codigo,
-    fornecedor?.fornecedor_id,
-    fornecedor?.id_fornecedor,
-    fornecedor?.supplier_id,
+    codigoProprio,
   );
 }
 
@@ -66,7 +67,7 @@ export default function FornecedorIdentity({
   empty = "-",
   fallback = "Fornecedor nao informado",
   fornecedor,
-  id,
+  id: _id,
   label = "Fornecedor",
   layout = "stacked",
   name,
@@ -91,7 +92,6 @@ export default function FornecedorIdentity({
     code,
     getFornecedorIdentityCode(fornecedor),
     getFornecedorIdentityCode(record),
-    id,
   );
 
   if (!fornecedorName && !fornecedorDocument && !fornecedorCode) {

@@ -420,6 +420,7 @@ def listar_vendas_pendentes_entrega(
     # Exclui: 'em_rota', 'entregue', 'cancelada'
     vendas = (
         db.query(Venda)
+        .options(joinedload(Venda.cliente), joinedload(Venda.entregador))
         .filter(*filtros_venda_entrega_operacional(tenant_id))
         .order_by(Venda.data_venda.desc(), Venda.id.desc())
         .all()
@@ -431,6 +432,7 @@ def listar_vendas_pendentes_entrega(
             "numero_venda": v.numero_venda,
             "cliente_id": v.cliente_id,
             "cliente_nome": v.cliente.nome if v.cliente else "Cliente não cadastrado",
+            "cliente_codigo": v.cliente.codigo if v.cliente else None,
             "endereco_entrega": v.endereco_entrega,
             "taxa_entrega": float(v.taxa_entrega) if v.taxa_entrega else 0,
             "distancia_km": float(v.distancia_km) if v.distancia_km else None,

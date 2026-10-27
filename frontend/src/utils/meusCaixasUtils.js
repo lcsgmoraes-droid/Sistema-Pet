@@ -20,8 +20,8 @@ export function separarPaginaCaixas(resposta) {
   };
 }
 
-export function podeReabrirCaixa(statusConsulta, caixaAberto) {
-  return statusConsulta === "pronto" && !caixaAberto;
+export function podeReabrirCaixa(statusConsulta) {
+  return statusConsulta === "pronto";
 }
 
 export function mensagemErroConsultaCaixas(erro, mensagemPadrao) {

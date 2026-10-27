@@ -52,6 +52,7 @@ async function setup(user, search = "") {
     "AbasNavegacao",
     "BotaoInteracao",
     "BotaoMenuAcoes",
+    "BuscaProduto",
     "CartaoIndicador",
     "InputCheckbox",
     "InputCombobox",

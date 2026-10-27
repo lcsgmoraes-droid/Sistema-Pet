@@ -1,3 +1,4 @@
+import { obterCodigoPessoaPublico } from "../../utils/codigosPublicos";
 import { AlertTriangle, Dice5, Gift, Mail, ShoppingBag } from "lucide-react";
 import CustomerIdentity from "../ui/CustomerIdentity";
 
@@ -142,7 +143,7 @@ export default function CampanhasDashboardAlertasSection({
               <div key={index} className="flex items-start justify-between gap-3 px-5 py-3">
                 <div className="min-w-0 flex-1">
                   <CustomerIdentity
-                    code={brinde.customer_id}
+                    code={obterCodigoPessoaPublico(brinde)}
                     fallback="Cliente nao informado"
                     name={brinde.nome_cliente}
                     nameClassName="font-medium text-gray-900"

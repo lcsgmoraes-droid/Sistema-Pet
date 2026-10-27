@@ -119,7 +119,7 @@ export default function useTransferenciaLancamentoController({ setAbaAtiva } = {
 
   useEffect(() => {
     const termo = buscaParceiro.trim();
-    if (parceiroSelecionado || termo.length < 2) {
+    if (parceiroSelecionado || termo.length < 1) {
       setSugestoesParceiros([]);
       setLoadingParceiros(false);
       return undefined;
@@ -143,7 +143,7 @@ export default function useTransferenciaLancamentoController({ setAbaAtiva } = {
 
   useEffect(() => {
     const termo = buscaProduto.trim();
-    if (termo.length < 2) {
+    if (termo.length < 1) {
       setSugestoesProdutos([]);
       setLoadingProdutos(false);
       return undefined;
@@ -261,7 +261,7 @@ export default function useTransferenciaLancamentoController({ setAbaAtiva } = {
 
   const adicionarProdutoPorBuscaAtual = async () => {
     const termo = buscaProduto.trim();
-    if (termo.length < 2) return;
+    if (termo.length < 1) return;
 
     const local = sugestoesProdutos.find((produto) => produtoConfereCodigo(produto, termo));
     if (local) {

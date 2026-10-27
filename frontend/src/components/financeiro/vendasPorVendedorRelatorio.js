@@ -1,3 +1,5 @@
+import { obterCodigoProdutoPublico } from "../../utils/codigosPublicos.js";
+
 export const SEM_VENDEDOR = "sem-vendedor";
 
 export function chaveVendedor(venda) {
@@ -23,9 +25,11 @@ export function opcoesProdutosVendas(vendas = []) {
       if (item.produto_id == null || item.produto_id === "") continue;
       const value = String(item.produto_id);
       if (!produtos.has(value)) {
+        const codigo = obterCodigoProdutoPublico(item);
         produtos.set(value, {
           value,
-          label: `${item.produto_nome || "Produto removido"} (#${value})`,
+          label: `${item.produto_nome || "Produto removido"}${codigo ? ` (${codigo})` : ""}`,
+          produto: { id: item.produto_id, nome: item.produto_nome || "Produto removido", codigo },
         });
       }
     }
@@ -34,12 +38,17 @@ export function opcoesProdutosVendas(vendas = []) {
 }
 
 export function agruparVendasPorVendedor(vendas = [], produtoId = "") {
-  const filtrarProduto = produtoId !== "" && produtoId != null;
+  const ids = new Set(
+    (Array.isArray(produtoId) ? produtoId : [produtoId])
+      .filter((id) => id !== "" && id != null)
+      .map(String),
+  );
+  const filtrarProduto = ids.size > 0;
   const grupos = new Map();
   for (const venda of vendas) {
     const itens = filtrarProduto
       ? (venda.itens || []).filter(
-          (item) => item.produto_id != null && String(item.produto_id) === String(produtoId),
+          (item) => item.produto_id != null && ids.has(String(item.produto_id)),
         )
       : [...(venda.itens || [])];
     if (filtrarProduto && !itens.length) continue;

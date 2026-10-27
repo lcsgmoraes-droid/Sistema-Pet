@@ -16,7 +16,12 @@ from app.audit_log import log_action
 from app.caixa.escopo import buscar_caixa_aberto
 from app.caixa.service import CaixaService
 from app.caixa_models import MovimentacaoCaixa
-from app.financeiro_models import ContaReceber, MovimentacaoFinanceira, Recebimento
+from app.financeiro_models import (
+    ContaReceber,
+    LancamentoManual,
+    MovimentacaoFinanceira,
+    Recebimento,
+)
 from app.ia.aba5_models import FluxoCaixa
 from app.services.venda_rentabilidade_snapshot_service import (
     invalidate_venda_rentabilidade_snapshot,
@@ -64,6 +69,27 @@ def normalizar_requisicao(dados):
         observacoes = str(dados.get("observacoes") or "").strip() or None
         if observacoes and len(observacoes) > 2000:
             raise ValueError()
+        caixa_id = dados.get("caixa_id")
+        if caixa_id is not None and (type(caixa_id) is not int or caixa_id <= 0):
+            raise ValueError()
+        parcelas = dados.get("numero_parcelas", 1)
+        if type(parcelas) is not int or not 1 <= parcelas <= 60:
+            raise ValueError()
+        extras = {}
+        for campo in ("forma_pagamento_id", "operadora_id", "conta_bancaria_id"):
+            valor_id = dados.get(campo)
+            if valor_id is not None:
+                if type(valor_id) is not int or valor_id <= 0:
+                    raise ValueError()
+                extras[campo] = valor_id
+        for campo, limite in (("bandeira", 30), ("nsu_cartao", 100)):
+            texto = str(dados.get(campo) or "").strip()
+            if len(texto) > limite:
+                raise ValueError()
+            if texto:
+                extras[campo] = texto
+        if parcelas > 1:
+            extras["numero_parcelas"] = parcelas
         request_id = (
             str(UUID(str(dados["request_id"])))
             if dados.get("request_id")
@@ -74,13 +100,18 @@ def normalizar_requisicao(dados):
             422,
             "Informe vendas válidas, valor positivo, forma de recebimento e uma identificação válida da operação.",
         )
-    return request_id, {
+    requisicao = {
         "vendas_ids": sorted(ids),
         "valor_total": str(valor),
         "forma_pagamento": forma,
         "numero_transacao": transacao,
         "observacoes": observacoes,
     }
+    # Omitir ausente preserva a comparação de idempotência dos clientes antigos.
+    if caixa_id is not None:
+        requisicao["caixa_id"] = caixa_id
+    requisicao.update(extras)
+    return request_id, requisicao
 
 
 def buscar_repeticao(db, *, tenant_id, cliente_id, request_id, requisicao):
@@ -132,6 +163,21 @@ def preparar_lote(
 
 def atualizar_previsao(db, *, tenant_id, conta, user_id, instante):
     """Uma previsão por saldo, sem acumular previsões de baixas parciais."""
+    documentos = [f"CONTA-RECEBER-{conta.id}"]
+    if conta.venda_id:
+        documentos.extend([f"VENDA-{conta.venda_id}", f"VENDA-{conta.venda_id}-SALDO"])
+    for espelho in (
+        db.query(LancamentoManual)
+        .filter(
+            LancamentoManual.tenant_id == tenant_id,
+            LancamentoManual.documento.in_(documentos),
+            LancamentoManual.tipo == "entrada",
+            LancamentoManual.status == "previsto",
+        )
+        .all()
+    ):
+        # Preserva o registro original; a conta passa a ter previsão do saldo exato.
+        espelho.status = "cancelado"
     anteriores = (
         db.query(FluxoCaixa)
         .filter_by(
@@ -187,6 +233,7 @@ def registrar_item(
     previsao,
     evento,
     status_anterior,
+    repasse_ids=None,
 ):
     pagamento.baixa_lote_id = lote.id
     db.flush()
@@ -212,7 +259,8 @@ def registrar_item(
                     moeda(conta.valor_recebido) - moeda(soma_recibos)
                 ),
                 "movimento_id": movimento.id if movimento else None,
-                "fluxo_id": fluxo.id,
+                "fluxo_id": fluxo.id if fluxo else None,
+                "repasse_ids": list(repasse_ids or []),
                 "previsao_id": previsao.id if previsao else None,
                 "evento_id": evento.id if evento else None,
             },
@@ -295,6 +343,7 @@ def _obter_efeitos(db, lote, item, venda):
         or pagamento.gateway_provider
         or pagamento.status_conciliacao == "conciliado"
         or moeda(pagamento.valor_taxa_prevista) > 0
+        or pagamento.operadora_id
     ):
         _bloquear(
             "o pagamento tem conciliação, taxa ou operadora vinculada; desfaça esse vínculo no financeiro primeiro"
@@ -363,6 +412,10 @@ def _obter_efeitos(db, lote, item, venda):
     if bancaria:
         _bloquear(
             "há movimento bancário posterior vinculado; estorne esse movimento no financeiro primeiro"
+        )
+    if lote.requisicao.get("conta_bancaria_id"):
+        _bloquear(
+            "há movimento bancário vinculado; estorne esse movimento no financeiro primeiro"
         )
     recebimento = (
         db.query(Recebimento)

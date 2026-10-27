@@ -174,7 +174,7 @@ function RetornoCard({ disabled, item, onAgendar, onAvancar }) {
             <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-slate-600">
               <CustomerIdentity
                 codeLabel="Cod. tutor"
-                fallback={`Tutor #${item.cliente_id || "-"}`}
+                fallback={"Tutor não informado"}
                 layout="inline"
                 nameClassName="font-medium text-slate-700"
                 record={item}

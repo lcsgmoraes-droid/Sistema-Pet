@@ -372,11 +372,11 @@ class ComissoesConfig:
                         db,
                         text("""
                             INSERT INTO comissoes_configuracao (
-                                funcionario_id, tipo, referencia_id, tipo_calculo, percentual,
+                                funcionario_id, tipo, referencia_id, tipo_calculo, percentual, valor_fixo,
                                 percentual_loja, desconta_taxa_cartao, desconta_impostos,
                                 desconta_taxa_entrega, permite_edicao_venda, observacoes,
                                 usuario_criacao, tenant_id
-                            ) VALUES (:funcionario_destino_id, :tipo, :referencia_id, :tipo_calculo, :percentual,
+                            ) VALUES (:funcionario_destino_id, :tipo, :referencia_id, :tipo_calculo, :percentual, :valor_fixo,
                                      :percentual_loja, :desconta_taxa_cartao, :desconta_impostos,
                                      :desconta_taxa_entrega, :permite_edicao_venda, :observacoes,
                                      :usuario_id, :tenant_id)
@@ -387,6 +387,7 @@ class ComissoesConfig:
                             "referencia_id": config["referencia_id"],
                             "tipo_calculo": config["tipo_calculo"],
                             "percentual": config["percentual"],
+                            "valor_fixo": config.get("valor_fixo", 0),
                             "percentual_loja": config["percentual_loja"],
                             "desconta_taxa_cartao": config["desconta_taxa_cartao"],
                             "desconta_impostos": config["desconta_impostos"],
@@ -665,6 +666,7 @@ class ComissaoConfiguracao(TenantScoped, Base):
     referencia_id = Column(Integer, nullable=False)  # ID da categoria/produto/serviço
 
     percentual = Column(Numeric, nullable=False)
+    valor_fixo = Column(Numeric(12, 2), nullable=False, default=0)
     ativo = Column(Boolean, nullable=True, default=True)
 
     # Configurações de cálculo
@@ -720,6 +722,7 @@ class ComissaoItem(TenantScoped, Base):
     tipo_calculo = Column(String(50), nullable=True)
     valor_base_calculo = Column(Numeric, nullable=True)
     percentual_comissao = Column(Numeric, nullable=True)
+    valor_fixo = Column(Numeric(12, 2), nullable=False, default=0)
     valor_comissao = Column(Numeric, nullable=True)
     valor_comissao_gerada = Column(Numeric, nullable=False)
 

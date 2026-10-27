@@ -49,11 +49,16 @@ def test_migration_smoke_runs_rls_no_debt_guard_after_upgrade(monkeypatch):
     monkeypatch.setattr(
         smoke, "_assert_rls_no_debt", lambda *args: calls.append(("rls", args))
     )
+    monkeypatch.setattr(
+        smoke,
+        "_assert_commission_effective_rules",
+        lambda *args: calls.append(("commissions", args)),
+    )
 
     assert smoke.main() == 0
 
     call_names = [name for name, _ in calls]
-    assert call_names == ["prepare", "alembic", "head", "rls", "drop"]
+    assert call_names == ["prepare", "alembic", "head", "rls", "commissions", "drop"]
 
 
 def test_prod_deploy_runs_rls_no_debt_guard_after_migrations_before_services():

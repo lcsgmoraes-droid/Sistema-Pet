@@ -1,5 +1,6 @@
 import CopyableCode from "./CopyableCode";
 import CopyableValue from "./CopyableValue";
+import { obterCodigoPessoaPublico } from "../../utils/codigosPublicos";
 
 function firstText(...values) {
   const value = values.find((item) => {
@@ -33,32 +34,7 @@ export function getCustomerIdentityName(customer) {
 }
 
 export function getCustomerIdentityCode(customer) {
-  return firstText(
-    customer?.cliente_codigo,
-    customer?.codigo_cliente,
-    customer?.cod_cliente,
-    customer?.tutor_codigo,
-    customer?.codigo_tutor,
-    customer?.pessoa_codigo,
-    customer?.codigo_pessoa,
-    customer?.customer_code,
-    customer?.cliente?.codigo,
-    customer?.cliente?.cod_cliente,
-    customer?.cliente?.id,
-    customer?.tutor?.codigo,
-    customer?.tutor?.id,
-    customer?.pessoa?.codigo,
-    customer?.pessoa?.id,
-    customer?.customer?.codigo,
-    customer?.customer?.id,
-    customer?.id_cliente,
-    customer?.cliente_id,
-    customer?.id_tutor,
-    customer?.tutor_id,
-    customer?.id_pessoa,
-    customer?.pessoa_id,
-    customer?.customer_id,
-  );
+  return obterCodigoPessoaPublico(customer);
 }
 
 export default function CustomerIdentity({
@@ -69,7 +45,6 @@ export default function CustomerIdentity({
   customer,
   empty = "-",
   fallback = "Cliente nao informado",
-  id,
   label = "Cliente",
   layout = "stacked",
   name,
@@ -80,7 +55,6 @@ export default function CustomerIdentity({
   showLabel = false,
   venda,
 }) {
-  const explicitCustomerCode = customer || venda || record ? "" : firstText(id);
   const customerName = firstText(
     name,
     getCustomerIdentityName(customer),
@@ -93,8 +67,6 @@ export default function CustomerIdentity({
     getCustomerIdentityCode(customer),
     getCustomerIdentityCode(venda),
     getCustomerIdentityCode(record),
-    id,
-    explicitCustomerCode,
   );
 
   if (!customerName && !customerCode) {

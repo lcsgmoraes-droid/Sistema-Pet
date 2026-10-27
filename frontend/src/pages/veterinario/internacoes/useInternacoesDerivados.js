@@ -20,7 +20,7 @@ export function useInternacoesDerivados({
       if (mapa.has(String(pet.cliente_id))) continue;
       mapa.set(String(pet.cliente_id), {
         id: String(pet.cliente_id),
-        nome: pet.cliente_nome ?? `Pessoa #${pet.cliente_id}`,
+        nome: pet.cliente_nome ?? "Pessoa não informada",
       });
     }
     return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));

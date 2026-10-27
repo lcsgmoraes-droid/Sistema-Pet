@@ -1,3 +1,4 @@
+import { obterCodigoPessoaPublico } from "../../utils/codigosPublicos.js";
 import { PREFERENCES } from "./lgpdConstants";
 
 export function formatDate(value) {
@@ -53,7 +54,7 @@ export function mergeUpdatedRequest(current, updated) {
 }
 
 export function exportDossieJson(dossie) {
-  const clienteId = dossie?.cliente?.codigo || dossie?.cliente?.id || "cliente";
+  const clienteId = obterCodigoPessoaPublico(dossie?.cliente) || "cliente";
   const blob = new Blob([JSON.stringify(dossie, null, 2)], {
     type: "application/json",
   });

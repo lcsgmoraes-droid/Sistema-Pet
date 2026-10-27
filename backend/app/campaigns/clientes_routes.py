@@ -29,6 +29,8 @@ from app.campaigns.models import (
 from app.campaigns.routes_common import get_db
 from app.campaigns.statement_service import build_campaign_customer_statement
 from app.models import Cliente
+from app.clientes.search import _aplicar_filtro_busca, _ordenar_query_listagem
+from app.utils.search_query import desativar_jit_busca
 
 
 router = APIRouter()
@@ -36,31 +38,20 @@ router = APIRouter()
 
 @router.get("/clientes/buscar")
 def buscar_clientes_campanhas(
-    search: str = Query(..., min_length=2),
+    search: str = Query(..., min_length=1),
     limit: int = Query(10, ge=1, le=50),
     db: Session = Depends(get_db),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Busca clientes por nome, CPF ou telefone. Usado pelo Gestor de Benefícios."""
     _, tenant_id = user_and_tenant
-    termo = f"%{search}%"
-    clientes = (
-        db.query(Cliente)
-        .filter(
-            Cliente.tenant_id == tenant_id,
-            Cliente.ativo.is_(True),
-            (
-                Cliente.nome.ilike(termo)
-                | Cliente.codigo.ilike(termo)
-                | Cliente.cpf.ilike(termo)
-                | Cliente.telefone.ilike(termo)
-                | Cliente.celular.ilike(termo)
-            ),
-        )
-        .order_by(Cliente.nome)
-        .limit(limit)
-        .all()
+    desativar_jit_busca(db, search)
+    query = db.query(Cliente).filter(
+        Cliente.tenant_id == tenant_id,
+        Cliente.ativo.is_(True),
     )
+    query = _aplicar_filtro_busca(query, search)
+    clientes = _ordenar_query_listagem(query, search).limit(limit).all()
     return {
         "clientes": [
             {

@@ -1,8 +1,8 @@
 """Schemas e helpers de payload para rotas de comissoes."""
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 
 # ==========================================
@@ -16,8 +16,9 @@ class ConfiguracaoComissaoCreate(BaseModel):
     funcionario_id: int
     tipo: str  # 'categoria', 'subcategoria', 'produto', 'geral'
     referencia_id: int
-    tipo_calculo: str  # 'percentual' ou 'lucro'
-    percentual: float
+    tipo_calculo: Literal["percentual", "lucro", "fixo"]
+    percentual: float = Field(default=0, ge=0, le=100, allow_inf_nan=False)
+    valor_fixo: float = Field(default=0, ge=0, le=9999999.99, allow_inf_nan=False)
     percentual_loja: Optional[float] = None
     desconta_taxa_cartao: bool = True
     desconta_impostos: bool = True
@@ -25,6 +26,18 @@ class ConfiguracaoComissaoCreate(BaseModel):
     comissao_venda_parcial: bool = True
     permite_edicao_venda: bool = False
     observacoes: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validar_calculo(self):
+        if self.tipo_calculo == "fixo":
+            if self.valor_fixo <= 0:
+                raise ValueError("Informe o valor fixo por unidade vendida")
+            self.percentual = 0
+            self.percentual_loja = None
+            self.permite_edicao_venda = False
+        else:
+            self.valor_fixo = 0
+        return self
 
 
 class ConfiguracoesBatchCreate(BaseModel):
@@ -43,6 +56,7 @@ class ConfiguracaoComissaoResponse(BaseModel):
     nome_item: Optional[str]
     tipo_calculo: str
     percentual: float
+    valor_fixo: float = 0
     percentual_loja: Optional[float]
     desconta_taxa_cartao: bool
     desconta_impostos: bool

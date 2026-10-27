@@ -1,3 +1,4 @@
+import BuscaProduto from "../../components/v2/BuscaProduto/BuscaProduto";
 import FornecedorSelector from "../../components/fornecedores/FornecedorSelector";
 import {
   CategoriaProdutoSelector,
@@ -17,12 +18,11 @@ export default function ProdutosValidadeFiltros({ controller }) {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         <div className="xl:col-span-2">
           <label className="mb-1 block text-sm font-medium text-gray-700">Busca</label>
-          <input
-            type="text"
+          <BuscaProduto
             value={filtros.busca}
-            onChange={(event) => controller.atualizarFiltro("busca", event.target.value)}
+            onChange={(valor) => controller.atualizarFiltro("busca", valor)}
             placeholder="Produto, codigo, SKU ou lote"
-            className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            showSuggestions={false}
           />
         </div>
 

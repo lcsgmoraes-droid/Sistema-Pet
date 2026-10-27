@@ -33,7 +33,7 @@ export function useInternacoesQueryEffects({
       (prev) =>
         prev || {
           id: String(tutorIdQuery),
-          nome: tutorNomeQuery || `Pessoa #${tutorIdQuery}`,
+          nome: tutorNomeQuery || "Pessoa não informada",
         },
     );
   }, [setFormNova, setTutorNovaSelecionado, tutorIdQuery, tutorNomeQuery]);

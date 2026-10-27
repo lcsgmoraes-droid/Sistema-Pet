@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
 import api from "../../api";
@@ -20,6 +20,7 @@ export function useMovimentacoesProdutoGranel({ carregarDados, id, produto }) {
   const [granelProdutos, setGranelProdutos] = useState([]);
   const [granelSelecionadoId, setGranelSelecionadoId] = useState("");
   const [buscaGranel, setBuscaGranel] = useState("");
+  const buscaController = useRef(null);
   const [quantidadeGranel, setQuantidadeGranel] = useState("");
   const [observacaoGranel, setObservacaoGranel] = useState("");
   const [loadingGranel, setLoadingGranel] = useState(false);
@@ -93,13 +94,21 @@ export function useMovimentacoesProdutoGranel({ carregarDados, id, produto }) {
   };
 
   const buscarProdutosGranel = async (termo = "") => {
-    const response = await api.get("/estoque/granel/produtos", {
-      params: {
-        busca: termo || undefined,
-        limite: 30,
-      },
-    });
-    setGranelProdutos(response.data || []);
+    buscaController.current?.abort();
+    const controller = new AbortController();
+    buscaController.current = controller;
+    try {
+      const response = await api.get("/estoque/granel/produtos", {
+        params: {
+          busca: termo || undefined,
+          limite: 30,
+        },
+        signal: controller.signal,
+      });
+      if (!controller.signal.aborted) setGranelProdutos(response.data || []);
+    } catch (error) {
+      if (!controller.signal.aborted) throw error;
+    }
   };
 
   const abrirModalGranel = async () => {
@@ -229,7 +238,11 @@ export function useMovimentacoesProdutoGranel({ carregarDados, id, produto }) {
   };
 
   useEffect(() => {
-    if (!showGranelModal) return undefined;
+    if (!showGranelModal) {
+      buscaController.current?.abort();
+      return undefined;
+    }
+    setGranelProdutos([]);
 
     const timer = setTimeout(
       async () => {
@@ -242,7 +255,10 @@ export function useMovimentacoesProdutoGranel({ carregarDados, id, produto }) {
       buscaGranel.trim() ? 250 : 0,
     );
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      buscaController.current?.abort();
+    };
   }, [showGranelModal, buscaGranel]);
 
   return {

@@ -1,5 +1,8 @@
+import BuscaProdutoCelula from "../../components/v2/BuscaProduto/BuscaProduto";
+import BotaoCancelar from "../../components/v2/BotaoCancelar/BotaoCancelar";
+import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
 import { useEffect, useState } from "react";
-import { Pencil, Search, X } from "lucide-react";
+import { Pencil, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { getProdutos } from "../../api/produtos";
 import ProductIdentity from "../../components/ui/ProductIdentity";
@@ -26,7 +29,7 @@ function BuscaProduto({ selecionado, onSelecionar, onLimpar }) {
   const [aberto, setAberto] = useState(false);
 
   useEffect(() => {
-    if (selecionado || termo.trim().length < 2) {
+    if (selecionado || termo.trim().length < 1) {
       setSugestoes([]);
       return undefined;
     }
@@ -60,68 +63,34 @@ function BuscaProduto({ selecionado, onSelecionar, onLimpar }) {
             codeClassName="text-xs text-slate-500"
           />
         </div>
-        <button
-          type="button"
+        <BotaoCancelar
           onClick={onLimpar}
           className="rounded-lg p-2 text-slate-500 hover:bg-white hover:text-rose-600"
           aria-label="Limpar produto"
         >
           <X className="h-4 w-4" />
-        </button>
+        </BotaoCancelar>
       </div>
     );
   }
 
   return (
-    <div className="relative">
-      <Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" aria-hidden="true" />
-      <input
-        value={termo}
-        onChange={(event) => {
-          setTermo(event.target.value);
-          setAberto(true);
-        }}
-        onFocus={() => setAberto(true)}
-        placeholder="Digite nome, código, SKU ou código de barras"
-        className="w-full rounded-xl border border-slate-300 py-3 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-      />
-      {aberto && termo.trim().length >= 2 && (
-        <div className="absolute z-20 mt-2 max-h-80 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl">
-          {carregando ? (
-            <p className="p-4 text-sm text-slate-500">Buscando produtos...</p>
-          ) : sugestoes.length ? (
-            sugestoes.map((produto) => (
-              <button
-                key={produto.id}
-                type="button"
-                onMouseDown={() => {
-                  onSelecionar(produto);
-                  setTermo("");
-                  setAberto(false);
-                }}
-                className="flex w-full items-center justify-between gap-4 border-b border-slate-100 px-4 py-3 text-left last:border-0 hover:bg-blue-50"
-              >
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-slate-900">
-                    {produto.nome}
-                  </span>
-                  <span className="block truncate text-xs text-slate-500">
-                    {[produto.codigo, produto.sku, produto.codigo_barras]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                </span>
-                <span className="shrink-0 text-xs text-slate-500">
-                  Estoque {formatarQuantidade(produto.estoque_atual)}
-                </span>
-              </button>
-            ))
-          ) : (
-            <p className="p-4 text-sm text-slate-500">Nenhum produto encontrado.</p>
-          )}
-        </div>
-      )}
-    </div>
+    <BuscaProdutoCelula
+      value={termo}
+      onChange={(valor) => {
+        setTermo(valor);
+        setAberto(true);
+      }}
+      suggestions={sugestoes}
+      showSuggestions={aberto}
+      loading={carregando}
+      onFocus={() => setAberto(true)}
+      onSelect={(produto) => {
+        onSelecionar(produto);
+        setTermo("");
+        setAberto(false);
+      }}
+    />
   );
 }
 
@@ -158,14 +127,14 @@ export default function AnaliseProdutoEspecifico({
             </p>
           </div>
           {produtoSelecionado && (
-            <button
+            <BotaoInteracao
               type="button"
               onClick={() => navigate(`/produtos/${produtoSelecionado.id}/editar`)}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               <Pencil className="h-4 w-4" />
               Editar produto
-            </button>
+            </BotaoInteracao>
           )}
         </div>
       </div>

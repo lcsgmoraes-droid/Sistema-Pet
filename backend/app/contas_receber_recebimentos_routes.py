@@ -20,6 +20,10 @@ from .contas_receber_schemas import RecebimentoCreate, RecebimentoLoteCreate
 from .contas_receber_saldo_venda import bloquear_contas_e_vendas, validar_saldo_vendas
 from .db import get_session
 from .financeiro_models import ContaReceber, FormaPagamento, Recebimento
+from .financeiro.recebimento_operacao import (
+    preparar_destino_recebimento,
+    registrar_efeitos_recebimento,
+)
 from .idempotency import idempotent
 from .utils.tenant_safe_sql import execute_tenant_safe
 
@@ -100,11 +104,14 @@ def _prever_baixa(conta, **opcoes):
 
 def _gerar_comissao_baixa_lote(db, conta, tenant_id, forma_pagamento_id, valor_baixa):
     """Preserva na baixa em lote o mesmo efeito financeiro da baixa individual."""
-    if not conta.venda_id:
+    if not conta.venda_id or str(conta.tenant_id) != str(tenant_id):
         return None
 
     try:
         from app.comissoes_service import gerar_comissoes_venda
+        from app.vendas.recebimentos_independentes import (
+            pagamentos_representados_pelas_contas,
+        )
         from app.vendas_models import Venda
 
         venda = (
@@ -113,6 +120,11 @@ def _gerar_comissao_baixa_lote(db, conta, tenant_id, forma_pagamento_id, valor_b
             .first()
         )
         if not venda or not venda.funcionario_id:
+            return None
+        # A venda já foi comissionada no pagamento original. O crédito da
+        # operadora é liquidação de repasse; o plano de crediário continua sendo
+        # recebimento do cliente e não é excluído por este vínculo.
+        if conta.id in pagamentos_representados_pelas_contas(venda, [conta]):
             return None
 
         proxima_parcela = int(
@@ -204,6 +216,9 @@ async def registrar_recebimentos_lote(
 ):
     """Quita, em uma única operação, todas as parcelas selecionadas."""
     current_user, tenant_id = user_and_tenant
+    destino = preparar_destino_recebimento(
+        db, dados=lote, tenant_id=tenant_id, usuario=current_user
+    )
     contas_por_id, vendas = bloquear_contas_e_vendas(
         db, tenant_id=tenant_id, conta_ids=lote.conta_ids
     )
@@ -224,6 +239,9 @@ async def registrar_recebimentos_lote(
             baixas.append((conta, previa, valor))
         validar_saldo_vendas(
             db, tenant_id=tenant_id, vendas=vendas, contas=contas_por_id, baixas=baixas
+        )
+        destino["valor_total_receber"] = sum(
+            (valor for _conta, _previa, valor in baixas), Decimal("0.00")
         )
         for conta_id in lote.conta_ids:
             conta = contas_por_id[conta_id]
@@ -255,6 +273,15 @@ async def registrar_recebimentos_lote(
             )
             db.add(novo_recebimento)
             db.flush()
+            registrar_efeitos_recebimento(
+                db,
+                conta=conta,
+                recebimento=novo_recebimento,
+                dados=lote,
+                destino=destino,
+                usuario=current_user,
+                tenant_id=tenant_id,
+            )
             resultados.append(
                 {
                     "conta_id": conta.id,
@@ -316,6 +343,9 @@ async def registrar_recebimento(
     Registra um recebimento (baixa) de conta a receber
     """
     current_user, tenant_id = user_and_tenant
+    destino = preparar_destino_recebimento(
+        db, dados=recebimento, tenant_id=tenant_id, usuario=current_user
+    )
     contas, vendas = bloquear_contas_e_vendas(
         db, tenant_id=tenant_id, conta_ids=[conta_id]
     )
@@ -366,97 +396,28 @@ async def registrar_recebimento(
         tenant_id=tenant_id,  # ✅ Garantir isolamento multi-tenant
     )
     db.add(novo_recebimento)
-
-    db.commit()
+    try:
+        db.flush()
+        registrar_efeitos_recebimento(
+            db,
+            conta=conta,
+            recebimento=novo_recebimento,
+            dados=recebimento,
+            destino=destino,
+            usuario=current_user,
+            tenant_id=tenant_id,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(novo_recebimento)
 
     logger.info(f"✅ Recebimento registrado: R$ {valor_baixa} - Conta {conta_id}")
 
-    # ============================================================================
-    # 💰 GERAR COMISSÃO SE CONTA VINCULADA A VENDA
-    # ============================================================================
-    comissao_gerada = False
-    comissao_info = None
-
-    if conta.venda_id:
-        try:
-            from app.comissoes_service import gerar_comissoes_venda
-            from app.vendas_models import Venda
-
-            # Buscar venda para verificar se tem funcionário
-            venda = (
-                db.query(Venda)
-                .filter(Venda.id == conta.venda_id, Venda.tenant_id == tenant_id)
-                .first()
-            )
-
-            if venda and venda.funcionario_id:
-                logger.info(
-                    f"💰 Gerando comissão para venda #{venda.numero_venda} (baixa de conta a receber)"
-                )
-
-                # Gerar comissão proporcional ao valor recebido NESTA baixa
-                proxima_parcela = int(
-                    execute_tenant_safe(
-                        db,
-                        """
-                        SELECT COALESCE(MAX(parcela_numero), 0) + 1
-                        FROM comissoes_itens
-                        WHERE venda_id = :venda_id
-                          AND funcionario_id = :funcionario_id
-                          AND {tenant_filter}
-                        """,
-                        {
-                            "venda_id": venda.id,
-                            "funcionario_id": venda.funcionario_id,
-                        },
-                        tenant_id=tenant_id,
-                    ).scalar()
-                    or 1
-                )
-                forma = (
-                    db.query(FormaPagamento)
-                    .filter(
-                        FormaPagamento.id == recebimento.forma_pagamento_id,
-                        FormaPagamento.tenant_id == tenant_id,
-                    )
-                    .first()
-                    if recebimento.forma_pagamento_id
-                    else None
-                )
-
-                resultado = gerar_comissoes_venda(
-                    venda_id=venda.id,
-                    funcionario_id=venda.funcionario_id,
-                    valor_pago=Decimal(str(valor_baixa)),  # Apenas o valor DESTA baixa
-                    forma_pagamento=forma.nome if forma else None,
-                    parcela_numero=proxima_parcela,
-                    db=db,
-                )
-
-                if resultado.get("success"):
-                    comissao_gerada = True
-                    comissao_info = {
-                        "venda_id": venda.id,
-                        "numero_venda": venda.numero_venda,
-                        "valor_comissao": resultado.get("total_comissao", 0),
-                    }
-                    logger.info(
-                        f"✅ Comissão gerada com sucesso: R$ {resultado.get('total_comissao', 0):.2f}"
-                    )
-                else:
-                    logger.warning(
-                        f"⚠️ Falha ao gerar comissão: {resultado.get('error', 'Erro desconhecido')}"
-                    )
-            else:
-                logger.info(
-                    f"ℹ️ Venda #{conta.venda_id} sem funcionário configurado, comissão não gerada"
-                )
-
-        except Exception as e:
-            logger.error(f"❌ Erro ao gerar comissão para venda #{conta.venda_id}: {e}")
-            # Não falha o recebimento por erro na comissão
-            pass
+    comissao_info = _gerar_comissao_baixa_lote(
+        db, conta, tenant_id, recebimento.forma_pagamento_id, valor_baixa
+    )
 
     response = {
         "message": "Recebimento registrado com sucesso",
@@ -479,7 +440,7 @@ async def registrar_recebimento(
         },
     }
 
-    if comissao_gerada and comissao_info:
+    if comissao_info:
         response["comissao"] = comissao_info
 
     return response

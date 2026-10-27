@@ -1,7 +1,18 @@
+import { useEffect, useState } from "react";
+import { buscarClientes } from "../../api/clientes";
+import BuscaPessoa from "../v2/BuscaPessoa/BuscaPessoa";
+import InputTexto from "../v2/InputTexto/InputTexto";
+import InputData from "../v2/InputData/InputData";
+import InputCombobox from "../v2/InputCombobox/InputCombobox";
+import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
 import { Printer, X } from "lucide-react";
 import { safeArray } from "../../utils/safeArray";
 import { calcularSaldoFinanceiro } from "../../utils/financeiroStatus";
-import CurrencyInput from "../CurrencyInput";
+import RecebimentoCampos from "../v2/RecebimentoCampos/RecebimentoCampos";
+import InputCheck from "../v2/InputCheck/InputCheck";
+import InputMoeda from "../v2/InputMoeda/InputMoeda";
+import BotaoCancelar from "../v2/BotaoCancelar/BotaoCancelar";
+import BotaoSalva from "../v2/BotaoSalva/BotaoSalva";
 import ActionButton from "../ui/ActionButton";
 import CustomerIdentity from "../ui/CustomerIdentity";
 import DataTable from "../ui/DataTable";
@@ -19,417 +30,236 @@ export function ContasReceberFilters({
   setBusca,
   setFiltros,
 }) {
+  const [termoPessoa, setTermoPessoa] = useState("");
+  const [sugestoes, setSugestoes] = useState([]);
+  const [buscandoPessoa, setBuscandoPessoa] = useState(false);
+  useEffect(() => {
+    if (!filtros.cliente_id) return;
+    const pessoa = safeArray(clientes).find((p) => String(p.id) === String(filtros.cliente_id));
+    if (pessoa) setTermoPessoa([pessoa.codigo, pessoa.nome].filter(Boolean).join(" · "));
+  }, [filtros.cliente_id, clientes]);
+  useEffect(() => {
+    let ativo = true;
+    const controller = new AbortController();
+    if (!termoPessoa.trim() || filtros.cliente_id) {
+      setSugestoes([]);
+      return;
+    }
+    setBuscandoPessoa(true);
+    const timer = setTimeout(
+      () =>
+        buscarClientes({ search: termoPessoa.trim(), limit: 20 }, { signal: controller.signal })
+          .then((pessoas) => {
+            if (ativo) setSugestoes(safeArray(pessoas));
+          })
+          .catch(() => {
+            if (ativo) setSugestoes([]);
+          })
+          .finally(() => {
+            if (ativo) setBuscandoPessoa(false);
+          }),
+      300,
+    );
+    return () => {
+      ativo = false;
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [termoPessoa, filtros.cliente_id]);
   return (
-    <>
-      {/* Filtros */}
-      <FilterBar className="mb-6" onSubmit={handleFiltrosSubmit}>
-        <h5 className="text-lg font-semibold mb-4">Filtros</h5>
-
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <span className="mr-1 text-sm font-medium text-gray-700">Periodo rapido:</span>
-          <ActionButton
-            intent="neutral"
-            tone="soft"
-            size="xs"
-            onClick={() => aplicarPeriodoRapido("todos")}
-          >
-            Todos os periodos
-          </ActionButton>
-          <ActionButton
-            intent="warning"
-            tone="soft"
-            size="xs"
-            onClick={() => aplicarPeriodoRapido("vencidas")}
-          >
-            Vencidas
-          </ActionButton>
-          <ActionButton
-            intent="neutral"
-            tone="soft"
-            size="xs"
-            onClick={() => aplicarPeriodoRapido("a_vencer")}
-          >
-            A vencer
-          </ActionButton>
-        </div>
-
-        {/* Busca geral das contas e da pessoa vinculada */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">Buscar conta ou pessoa</label>
-          <input
-            type="text"
-            placeholder="Nome, telefone, codigo da pessoa, venda ou documento"
-            className="w-full border border-gray-300 rounded px-3 py-2"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                aplicarFiltros();
-              }
-            }}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Status</label>
-            <select
-              className="w-full border border-gray-300 rounded px-3 py-2"
-              value={filtros.status}
-              onChange={(e) => setFiltros({ ...filtros, status: e.target.value })}
-            >
-              <option value="todos">Todos</option>
-              <option value="em_aberto">Em aberto</option>
-              <option value="pendente">Pendente</option>
-              <option value="parcial">Parcial</option>
-              <option value="recebido">Recebido</option>
-              <option value="vencido">Vencido</option>
-              <option value="cancelado">Cancelado</option>
-            </select>
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium mb-1">Cliente</label>
-            <select
-              className="w-full border border-gray-300 rounded px-3 py-2"
-              value={filtros.cliente_id || ""}
-              onChange={(e) => setFiltros({ ...filtros, cliente_id: e.target.value || null })}
-            >
-              <option value="">Todos</option>
-              {safeArray(clientes).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Data Inicio</label>
-            <input
-              type="date"
-              className="w-full border border-gray-300 rounded px-3 py-2"
-              value={filtros.data_inicio}
-              onChange={(e) => setFiltros({ ...filtros, data_inicio: e.target.value })}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Data Fim</label>
-            <input
-              type="date"
-              className="w-full border border-gray-300 rounded px-3 py-2"
-              value={filtros.data_fim}
-              onChange={(e) => setFiltros({ ...filtros, data_fim: e.target.value })}
-            />
-          </div>
-
-          <div className="flex items-end gap-4">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                className="w-4 h-4"
-                checked={filtros.apenas_vencidas}
-                onChange={(e) =>
-                  setFiltros({
-                    ...filtros,
-                    apenas_vencidas: e.target.checked,
-                    apenas_vencer: false,
-                  })
-                }
-              />
-              <span className="text-sm">So Vencidas</span>
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                className="w-4 h-4"
-                checked={filtros.apenas_vencer}
-                onChange={(e) =>
-                  setFiltros({
-                    ...filtros,
-                    apenas_vencer: e.target.checked,
-                    apenas_vencidas: false,
-                  })
-                }
-              />
-              <span className="text-sm">A Vencer</span>
-            </label>
-            <ActionButton intent="neutral" tone="solid" size="sm" onClick={aplicarFiltros}>
-              Filtrar
-            </ActionButton>
-          </div>
-        </div>
-      </FilterBar>
-    </>
+    <FilterBar className="mb-6" onSubmit={handleFiltrosSubmit}>
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        {[
+          ["todos", "Todos os períodos"],
+          ["vencidas", "Vencidas"],
+          ["a_vencer", "A vencer"],
+        ].map(([id, texto]) => (
+          <BotaoInteracao key={id} tamanho="pequeno" onClick={() => aplicarPeriodoRapido(id)}>
+            {texto}
+          </BotaoInteracao>
+        ))}
+      </div>
+      <InputTexto
+        label="Buscar conta ou documento"
+        value={busca}
+        onChange={setBusca}
+        placeholder="Descrição, venda ou documento"
+      />
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-4">
+        <InputCombobox
+          id="receber-filtro-status"
+          label="Status"
+          value={filtros.status}
+          permitirLimpar={false}
+          opcoes={[
+            ["todos", "Todos"],
+            ["em_aberto", "Em aberto"],
+            ["pendente", "Pendente"],
+            ["parcial", "Parcial"],
+            ["recebido", "Recebido"],
+            ["vencido", "Vencido"],
+            ["cancelado", "Cancelado"],
+          ].map(([value, label]) => ({ value, label }))}
+          onChange={(status) => setFiltros((atual) => ({ ...atual, status }))}
+        />
+        <BuscaPessoa
+          label="Cliente"
+          value={termoPessoa}
+          loading={buscandoPessoa}
+          suggestions={sugestoes}
+          showSuggestions
+          onChange={(termo) => {
+            setTermoPessoa(termo);
+            setFiltros((atual) => ({ ...atual, cliente_id: null }));
+          }}
+          onSelect={(pessoa) => {
+            setTermoPessoa([pessoa.codigo, pessoa.nome].filter(Boolean).join(" · "));
+            setSugestoes([]);
+            setFiltros((atual) => ({ ...atual, cliente_id: pessoa.id }));
+          }}
+        />
+        <InputData
+          label="Data inicial"
+          value={filtros.data_inicio}
+          onChange={(data_inicio) => setFiltros((atual) => ({ ...atual, data_inicio }))}
+        />
+        <InputData
+          label="Data final"
+          value={filtros.data_fim}
+          onChange={(data_fim) => setFiltros((atual) => ({ ...atual, data_fim }))}
+        />
+      </div>
+      <div className="mt-3 flex flex-wrap items-end gap-3">
+        <InputCheck
+          id="receber-so-vencidas"
+          label="Só vencidas"
+          checked={filtros.apenas_vencidas}
+          onChange={(checked) =>
+            setFiltros((atual) => ({ ...atual, apenas_vencidas: checked, apenas_vencer: false }))
+          }
+        />
+        <InputCheck
+          id="receber-a-vencer"
+          label="A vencer"
+          checked={filtros.apenas_vencer}
+          onChange={(checked) =>
+            setFiltros((atual) => ({ ...atual, apenas_vencer: checked, apenas_vencidas: false }))
+          }
+        />
+        <BotaoInteracao onClick={aplicarFiltros}>Filtrar</BotaoInteracao>
+      </div>
+    </FilterBar>
   );
 }
 
 export function ContasReceberRecebimentoModal({
   calculoEncargos,
   contaSelecionada,
-  contasBancarias,
   dadosRecebimento,
   formasPagamento,
   formatarMoeda,
   mostrarModalRecebimento,
-  onDataRecebimentoChange,
   registrarRecebimento,
   setDadosRecebimento,
   setMostrarModalRecebimento,
+  onDataRecebimentoChange,
+  processando = false,
 }) {
+  if (!mostrarModalRecebimento || !contaSelecionada) return null;
   return (
-    <>
-      {/* Modal de Recebimento */}
-      {mostrarModalRecebimento && contaSelecionada && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
-            <div className="flex justify-between items-center border-b p-4">
-              <h5 className="text-xl font-bold">Registrar Recebimento</h5>
-              <ActionButton
-                intent="neutral"
-                tone="ghost"
-                size="sm"
-                icon={X}
-                aria-label="Fechar recebimento"
-                onClick={() => setMostrarModalRecebimento(false)}
-              />
-            </div>
-
-            <div className="p-6">
-              <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-4 text-sm">
-                <strong>Conta:</strong> {contaSelecionada.descricao}
-                <br />
-                <strong>Valor Total:</strong> {formatarMoeda(contaSelecionada.valor_final)}
-                <br />
-                <strong>Ja Recebido:</strong> {formatarMoeda(contaSelecionada.valor_recebido)}
-                <br />
-                <strong>Saldo Restante:</strong>{" "}
-                {formatarMoeda(calcularSaldoFinanceiro(contaSelecionada, "valor_recebido"))}
-              </div>
-
-              {calculoEncargos?.eh_crediario && (
-                <div className="mb-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <strong>Encargos do crediario</strong>
-                      <div className="mt-1 text-xs text-amber-800">
-                        {calculoEncargos.dias_atraso || 0} dia(s) de atraso · Juros{" "}
-                        {formatarMoeda(calculoEncargos.valor_juros_calculado || 0)} · Multa{" "}
-                        {formatarMoeda(calculoEncargos.valor_multa_calculada || 0)}
-                      </div>
-                    </div>
-                    <label className="inline-flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(dadosRecebimento.aplicar_encargos_automaticos)}
-                        disabled={!calculoEncargos.encargos_automaticos_ativos}
-                        onChange={(e) =>
-                          setDadosRecebimento({
-                            ...dadosRecebimento,
-                            aplicar_encargos_automaticos: e.target.checked,
-                            valor_recebido: dadosRecebimento.quitar
-                              ? Number(
-                                  e.target.checked
-                                    ? calculoEncargos.saldo_atualizado
-                                    : calculoEncargos.saldo_atual,
-                                )
-                              : dadosRecebimento.valor_recebido,
-                          })
-                        }
-                      />
-                      <span className="font-medium">Aplicar automaticamente</span>
-                    </label>
-                  </div>
-                  {!calculoEncargos.encargos_automaticos_ativos && (
-                    <p className="mt-2 text-xs">
-                      A cobranca automatica esta desligada nas Configuracoes Gerais do Negocio.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Valor a Receber *</label>
-                  <CurrencyInput
-                    className="w-full border border-gray-300 rounded px-3 py-2"
-                    disabled={dadosRecebimento.quitar}
-                    value={dadosRecebimento.valor_recebido}
-                    onChange={(valor) =>
-                      setDadosRecebimento({
-                        ...dadosRecebimento,
-                        valor_recebido: valor,
-                      })
-                    }
-                  />
-                  <label className="mt-2 inline-flex items-center gap-2 text-xs text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(dadosRecebimento.quitar)}
-                      onChange={(e) =>
-                        setDadosRecebimento({
-                          ...dadosRecebimento,
-                          quitar: e.target.checked,
-                          valor_recebido: e.target.checked
-                            ? Number(
-                                dadosRecebimento.aplicar_encargos_automaticos
-                                  ? calculoEncargos?.saldo_atualizado
-                                  : calculoEncargos?.saldo_atual,
-                              )
-                            : dadosRecebimento.valor_recebido,
-                        })
-                      }
-                    />
-                    Quitar a parcela inteira
-                  </label>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Data do Recebimento *</label>
-                  <input
-                    type="date"
-                    className="w-full border border-gray-300 rounded px-3 py-2"
-                    value={dadosRecebimento.data_recebimento}
-                    onChange={(e) => onDataRecebimentoChange(e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Forma de Pagamento</label>
-                  <select
-                    className="w-full border border-gray-300 rounded px-3 py-2"
-                    value={dadosRecebimento.forma_pagamento_id || ""}
-                    onChange={(e) =>
-                      setDadosRecebimento({
-                        ...dadosRecebimento,
-                        forma_pagamento_id: parseInt(e.target.value) || null,
-                      })
-                    }
-                  >
-                    <option value="">Selecione...</option>
-                    {safeArray(formasPagamento).map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.nome}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Conta Bancaria *</label>
-                  <select
-                    className="w-full border border-gray-300 rounded px-3 py-2"
-                    value={dadosRecebimento.conta_bancaria_id || ""}
-                    onChange={(e) =>
-                      setDadosRecebimento({
-                        ...dadosRecebimento,
-                        conta_bancaria_id: parseInt(e.target.value) || null,
-                      })
-                    }
-                  >
-                    <option value="">Selecione a conta...</option>
-                    {safeArray(contasBancarias).map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nome} - {formatarMoeda(c.saldo_atual || 0)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Juros</label>
-                  <CurrencyInput
-                    className="w-full border border-gray-300 rounded px-3 py-2"
-                    value={
-                      dadosRecebimento.aplicar_encargos_automaticos
-                        ? Number(calculoEncargos?.valor_juros_calculado || 0)
-                        : dadosRecebimento.valor_juros
-                    }
-                    disabled={dadosRecebimento.aplicar_encargos_automaticos}
-                    onChange={(valor) =>
-                      setDadosRecebimento({
-                        ...dadosRecebimento,
-                        valor_juros: valor,
-                      })
-                    }
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Multa</label>
-                  <CurrencyInput
-                    className="w-full border border-gray-300 rounded px-3 py-2"
-                    value={
-                      dadosRecebimento.aplicar_encargos_automaticos
-                        ? Number(calculoEncargos?.valor_multa_calculada || 0)
-                        : dadosRecebimento.valor_multa
-                    }
-                    disabled={dadosRecebimento.aplicar_encargos_automaticos}
-                    onChange={(valor) =>
-                      setDadosRecebimento({
-                        ...dadosRecebimento,
-                        valor_multa: valor,
-                      })
-                    }
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Desconto</label>
-                  <CurrencyInput
-                    className="w-full border border-gray-300 rounded px-3 py-2"
-                    value={dadosRecebimento.valor_desconto}
-                    onChange={(valor) =>
-                      setDadosRecebimento({
-                        ...dadosRecebimento,
-                        valor_desconto: valor,
-                      })
-                    }
-                  />
-                </div>
-
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-1">Observacoes</label>
-                  <textarea
-                    className="w-full border border-gray-300 rounded px-3 py-2"
-                    rows="3"
-                    value={dadosRecebimento.observacoes}
-                    onChange={(e) =>
-                      setDadosRecebimento({ ...dadosRecebimento, observacoes: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="bg-green-50 border border-green-200 rounded p-3 mt-4">
-                <strong>Valor que sera recebido:</strong>{" "}
-                {formatarMoeda(dadosRecebimento.valor_recebido || 0)}
-                {dadosRecebimento.quitar && (
-                  <div className="mt-1 text-xs text-green-800">
-                    O servidor recalcula o saldo exato antes de quitar.
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 border-t p-4">
-              <ActionButton
-                intent="neutral"
-                tone="soft"
-                size="md"
-                onClick={() => setMostrarModalRecebimento(false)}
-              >
-                Cancelar
-              </ActionButton>
-              <ActionButton intent="create" size="md" onClick={registrarRecebimento}>
-                Confirmar Recebimento
-              </ActionButton>
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label="Registrar recebimento"
+        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl dark:bg-slate-900"
+      >
+        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+          Registrar recebimento
+        </h2>
+        <p className="my-3 text-sm text-slate-700 dark:text-slate-300">
+          {contaSelecionada.descricao} · Saldo:{" "}
+          {formatarMoeda(calcularSaldoFinanceiro(contaSelecionada, "valor_recebido"))}
+        </p>
+        {calculoEncargos?.eh_crediario && (
+          <div className="mb-4">
+            <InputCheck
+              id="recebimento-encargos"
+              label="Aplicar encargos automáticos"
+              checked={Boolean(dadosRecebimento.aplicar_encargos_automaticos)}
+              disabled={!calculoEncargos.encargos_automaticos_ativos || processando}
+              onChange={(checked) =>
+                setDadosRecebimento((atual) => ({
+                  ...atual,
+                  aplicar_encargos_automaticos: checked,
+                  valor_recebido: Number(
+                    checked ? calculoEncargos.saldo_atualizado : calculoEncargos.saldo_atual,
+                  ),
+                }))
+              }
+            />
           </div>
+        )}
+        <RecebimentoCampos
+          value={dadosRecebimento}
+          onChange={setDadosRecebimento}
+          onDataChange={onDataRecebimentoChange}
+          formas={formasPagamento}
+          disabled={processando}
+        />
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {[
+            ["valor_juros", "Juros"],
+            ["valor_multa", "Multa"],
+            ["valor_desconto", "Desconto"],
+          ].map(([campo, label]) => (
+            <InputMoeda
+              key={campo}
+              label={label}
+              value={dadosRecebimento[campo] || 0}
+              disabled={
+                processando ||
+                (campo !== "valor_desconto" && dadosRecebimento.aplicar_encargos_automaticos)
+              }
+              onChange={(valor) => setDadosRecebimento((atual) => ({ ...atual, [campo]: valor }))}
+            />
+          ))}
         </div>
-      )}
-    </>
+        <div className="my-4">
+          <InputCheck
+            id="recebimento-quitar"
+            label="Quitar o saldo inteiro"
+            checked={Boolean(dadosRecebimento.quitar)}
+            disabled={processando}
+            onChange={(checked) =>
+              setDadosRecebimento((atual) => ({
+                ...atual,
+                quitar: checked,
+                valor_recebido: checked
+                  ? Number(
+                      atual.aplicar_encargos_automaticos
+                        ? calculoEncargos?.saldo_atualizado
+                        : calculoEncargos?.saldo_atual,
+                    )
+                  : atual.valor_recebido,
+              }))
+            }
+          />
+        </div>
+        <div className="mt-5 flex justify-end gap-3">
+          <BotaoCancelar onClick={() => setMostrarModalRecebimento(false)} disabled={processando}>
+            Cancelar
+          </BotaoCancelar>
+          <BotaoSalva
+            onClick={registrarRecebimento}
+            loading={processando}
+            disabled={!dadosRecebimento.caixa_id || !dadosRecebimento.forma_pagamento_id}
+          >
+            Confirmar recebimento
+          </BotaoSalva>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -442,132 +272,64 @@ export function ContasReceberRecebimentoLoteModal({
   onConfirmar,
   onFechar,
   setDadosRecebimento,
+  processando = false,
 }) {
   if (!mostrar) return null;
-
-  const saldoSemEncargos = safeArray(contasSelecionadas).reduce(
-    (total, conta) => total + Number(conta.valor_final || 0) - Number(conta.valor_recebido || 0),
+  const saldo = safeArray(contasSelecionadas).reduce(
+    (total, conta) =>
+      total +
+      Number(
+        dadosRecebimento.aplicar_encargos_automaticos
+          ? conta.saldo_atualizado
+          : Number(conta.valor_final || 0) - Number(conta.valor_recebido || 0),
+      ),
     0,
   );
-  const juros = safeArray(contasSelecionadas).reduce(
-    (total, conta) => total + Number(conta.valor_juros_calculado || 0),
-    0,
-  );
-  const multa = safeArray(contasSelecionadas).reduce(
-    (total, conta) => total + Number(conta.valor_multa_calculada || 0),
-    0,
-  );
-  const totalAtualizado = dadosRecebimento.aplicar_encargos_automaticos
-    ? saldoSemEncargos + juros + multa
-    : saldoSemEncargos;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="mx-4 w-full max-w-2xl rounded-lg bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b p-4">
-          <div>
-            <h5 className="text-xl font-bold">Baixar parcelas selecionadas</h5>
-            <p className="text-sm text-gray-500">{contasSelecionadas.length} parcela(s)</p>
-          </div>
-          <ActionButton
-            intent="neutral"
-            tone="ghost"
-            size="sm"
-            icon={X}
-            onClick={onFechar}
-            aria-label="Fechar baixa em lote"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label="Receber contas selecionadas"
+        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl dark:bg-slate-900"
+      >
+        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+          Receber contas selecionadas
+        </h2>
+        <p className="my-3 text-sm text-slate-700 dark:text-slate-300">
+          {safeArray(contasSelecionadas).length} conta(s) · Total: {formatarMoeda(saldo)}
+        </p>
+        <RecebimentoCampos
+          value={{ ...dadosRecebimento, valor_recebido: saldo }}
+          onChange={setDadosRecebimento}
+          formas={formasPagamento}
+          mostrarValor={false}
+          disabled={processando}
+        />
+        <div className="mt-4">
+          <InputCheck
+            id="recebimento-lote-encargos"
+            label="Aplicar encargos automáticos do crediário"
+            checked={Boolean(dadosRecebimento.aplicar_encargos_automaticos)}
+            disabled={processando}
+            onChange={(checked) =>
+              setDadosRecebimento((atual) => ({ ...atual, aplicar_encargos_automaticos: checked }))
+            }
           />
         </div>
-
-        <div className="space-y-4 p-6">
-          <div className="grid grid-cols-1 gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm sm:grid-cols-3">
-            <div>
-              <span className="block text-blue-700">Saldo</span>
-              <strong>{formatarMoeda(saldoSemEncargos)}</strong>
-            </div>
-            <div>
-              <span className="block text-blue-700">Juros + multa</span>
-              <strong>{formatarMoeda(juros + multa)}</strong>
-            </div>
-            <div>
-              <span className="block text-blue-700">Total previsto</span>
-              <strong>{formatarMoeda(totalAtualizado)}</strong>
-            </div>
-          </div>
-
-          <label className="flex items-center gap-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-            <input
-              type="checkbox"
-              checked={dadosRecebimento.aplicar_encargos_automaticos}
-              onChange={(e) =>
-                setDadosRecebimento({
-                  ...dadosRecebimento,
-                  aplicar_encargos_automaticos: e.target.checked,
-                })
-              }
-            />
-            Aplicar juros e multa automaticos nas parcelas de crediario vencidas
-          </label>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium">Data do recebimento</label>
-              <input
-                type="date"
-                className="w-full rounded border border-gray-300 px-3 py-2"
-                value={dadosRecebimento.data_recebimento}
-                onChange={(e) =>
-                  setDadosRecebimento({ ...dadosRecebimento, data_recebimento: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Forma de pagamento</label>
-              <select
-                className="w-full rounded border border-gray-300 px-3 py-2"
-                value={dadosRecebimento.forma_pagamento_id || ""}
-                onChange={(e) =>
-                  setDadosRecebimento({
-                    ...dadosRecebimento,
-                    forma_pagamento_id: parseInt(e.target.value) || null,
-                  })
-                }
-              >
-                <option value="">Selecione...</option>
-                {safeArray(formasPagamento).map((forma) => (
-                  <option key={forma.id} value={forma.id}>
-                    {forma.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium">Observacoes</label>
-            <textarea
-              className="w-full rounded border border-gray-300 px-3 py-2"
-              rows="2"
-              value={dadosRecebimento.observacoes}
-              onChange={(e) =>
-                setDadosRecebimento({ ...dadosRecebimento, observacoes: e.target.value })
-              }
-            />
-          </div>
-          <p className="text-xs text-gray-500">
-            Os valores sao recalculados no servidor para a data escolhida antes da baixa.
-          </p>
-        </div>
-
-        <div className="flex justify-end gap-3 border-t p-4">
-          <ActionButton intent="neutral" tone="soft" size="md" onClick={onFechar}>
+        <div className="mt-5 flex justify-end gap-3">
+          <BotaoCancelar onClick={onFechar} disabled={processando}>
             Cancelar
-          </ActionButton>
-          <ActionButton intent="create" size="md" onClick={onConfirmar}>
-            Quitar {contasSelecionadas.length} parcela(s)
-          </ActionButton>
+          </BotaoCancelar>
+          <BotaoSalva
+            onClick={onConfirmar}
+            loading={processando}
+            disabled={!dadosRecebimento.caixa_id || !dadosRecebimento.forma_pagamento_id}
+          >
+            Confirmar recebimento
+          </BotaoSalva>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
@@ -756,6 +518,11 @@ export function ContasReceberDetalhesModal({
                             ) : (
                               <span className="text-xs text-gray-400">Nao informada</span>
                             ),
+                        },
+                        {
+                          key: "observacoes",
+                          header: "Observações",
+                          render: (recebimento) => recebimento.observacoes || "—",
                         },
                         {
                           key: "comprovante",

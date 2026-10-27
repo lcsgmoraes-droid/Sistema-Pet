@@ -1,3 +1,5 @@
+import BuscaProduto from "../../../components/v2/BuscaProduto/BuscaProduto";
+import InputTexto from "../../../components/v2/InputTexto/InputTexto";
 import { FiSearch } from "react-icons/fi";
 import ActionButton from "../../../components/ui/ActionButton";
 import Panel from "../../../components/ui/Panel";
@@ -14,15 +16,17 @@ export default function GrupoAnaliseFiltros({
   onEmpresaChange,
   onSubmit,
   placeholder,
+  entidadeBusca,
 }) {
+  const CampoBusca = entidadeBusca === "produto" ? BuscaProduto : InputTexto;
   return (
     <Panel padding="sm">
       <form className="flex flex-col gap-3 md:flex-row" onSubmit={onSubmit}>
         <label className="min-w-0 flex-1">
           <span className="sr-only">Pesquisar</span>
-          <input
+          <CampoBusca
             value={busca}
-            onChange={(event) => onBuscaChange(event.target.value)}
+            onChange={onBuscaChange}
             placeholder={placeholder}
             className={`w-full ${campoClasses}`}
           />

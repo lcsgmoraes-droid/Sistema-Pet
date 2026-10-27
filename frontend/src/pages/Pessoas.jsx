@@ -1,3 +1,4 @@
+import BuscaPessoa from "../components/v2/BuscaPessoa/BuscaPessoa";
 /**
  * Pagina de Gestao de Pessoas (clientes, fornecedores e veterinarios).
  */
@@ -18,7 +19,6 @@ import PageHeader from "../components/ui/PageHeader";
 import Panel from "../components/ui/Panel";
 import StatusBadge from "../components/ui/StatusBadge";
 import InputCheckbox from "../components/v2/InputCheckbox/InputCheckbox";
-import InputTexto from "../components/v2/InputTexto/InputTexto";
 import SeletorOpcoes from "../components/v2/SeletorOpcoes/SeletorOpcoes";
 import { useTour } from "../hooks/useTour";
 import useShiftRangeSelection from "../hooks/useShiftRangeSelection";
@@ -292,7 +292,7 @@ export default function Pessoas() {
         subtitle="Localize cadastros por nome, documento ou tipo."
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <InputTexto
+          <BuscaPessoa
             label="Buscar"
             placeholder="Nome, CPF, CNPJ..."
             value={buscaTexto}

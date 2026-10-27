@@ -109,6 +109,7 @@ class CriarVendaRequest(PagamentoExcedenteRequest):
 
 
 class FinalizarVendaRequest(PagamentoExcedenteRequest):
+    caixa_id: Optional[int] = Field(default=None, gt=0)
     caixa_revisao_id: Optional[int] = None
     data_ocorrencia: Optional[datetime] = None
     motivo_revisao: Optional[str] = None

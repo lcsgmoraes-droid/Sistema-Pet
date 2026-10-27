@@ -1,3 +1,4 @@
+import BuscaProduto from "../v2/BuscaProduto/BuscaProduto";
 const normalizarBuscaProduto = (valor) =>
   String(valor || "")
     .normalize("NFD")
@@ -175,67 +176,36 @@ export default function ProdutosNovoComposicaoTab({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Produto</label>
-            <div className="relative">
-              <input
-                type="text"
-                value={buscaComponente}
-                onChange={(e) => {
-                  setBuscaComponente(e.target.value);
-                  setProdutoKitSelecionado("");
-                  setDropdownComponenteVisivel(true);
-                }}
-                onFocus={() => setDropdownComponenteVisivel(true)}
-                onBlur={() => setTimeout(() => setDropdownComponenteVisivel(false), 180)}
-                placeholder="Buscar por SKU ou nome..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                autoComplete="off"
-              />
-              {dropdownComponenteVisivel &&
-                buscaComponente.length > 0 &&
-                (() => {
-                  const termo = buscaComponente;
-                  const filtrados = produtosDisponiveis
-                    .filter((produto) => produtoCorrespondeAoTermo(produto, termo))
-                    .slice(0, 30);
-                  if (loadingComponentes) {
-                    return (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
-                        <div className="px-3 py-2 text-sm text-gray-500">Buscando produtos...</div>
-                      </div>
-                    );
-                  }
-
-                  return filtrados.length > 0 ? (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                      {filtrados.map((produto) => (
-                        <div
-                          key={produto.id}
-                          className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm flex justify-between items-center"
-                          onMouseDown={() => {
-                            setProdutoKitSelecionado(String(produto.id));
-                            setBuscaComponente(`[${produto.codigo}] ${produto.nome}`);
-                            setDropdownComponenteVisivel(false);
-                          }}
-                        >
-                          <span>
-                            <span className="font-semibold text-blue-700">{produto.codigo}</span> –{" "}
-                            {produto.nome}
-                          </span>
-                          <span className="text-xs text-gray-400 ml-2 shrink-0">
-                            Estoque: {produto.estoque_atual || 0}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
-                      <div className="px-3 py-2 text-sm text-gray-500">
-                        Nenhum produto encontrado
-                      </div>
-                    </div>
-                  );
-                })()}
-            </div>
+            <BuscaProduto
+              value={buscaComponente}
+              onChange={(valor) => {
+                setBuscaComponente(valor);
+                setProdutoKitSelecionado("");
+                setDropdownComponenteVisivel(true);
+              }}
+              onFocus={() => setDropdownComponenteVisivel(true)}
+              suggestions={produtosDisponiveis
+                .filter((produto) => produtoCorrespondeAoTermo(produto, buscaComponente))
+                .slice(0, 30)}
+              showSuggestions={dropdownComponenteVisivel}
+              loading={loadingComponentes}
+              onSelect={(produto) => {
+                setProdutoKitSelecionado(String(produto.id));
+                setBuscaComponente(`[${produto.codigo || "Sem código"}] ${produto.nome}`);
+                setDropdownComponenteVisivel(false);
+              }}
+              renderSuggestionContent={(produto) => (
+                <>
+                  <span className="block font-medium">
+                    {produto.codigo || "Sem código"} - {produto.nome}
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    Estoque: {produto.estoque_atual || 0}
+                  </span>
+                </>
+              )}
+              placeholder="Código, nome, SKU ou código de barras do componente"
+            />
           </div>
 
           <div>

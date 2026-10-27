@@ -137,7 +137,7 @@ export default function BanhoTosaFechamentosView({ onChanged }) {
                     {item.pet_nome || `Pet #${item.pet_id}`}
                   </h3>
                   <p className="text-sm text-slate-500">
-                    Tutor: {item.cliente_nome || `#${item.cliente_id}`}
+                    Tutor: {item.cliente_nome || "Tutor não informado"}
                   </p>
                 </div>
                 <span className="w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">

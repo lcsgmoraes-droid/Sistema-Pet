@@ -98,6 +98,7 @@ async def criar_configuracao(
                     """
                     UPDATE comissoes_configuracao
                     SET percentual = :perc, 
+                        valor_fixo = :valor_fixo,
                         percentual_loja = :perc_loja,
                         tipo_calculo = :tipo_calc,
                         desconta_taxa_cartao = :desc_cartao,
@@ -112,6 +113,7 @@ async def criar_configuracao(
                 """,
                     {
                         "perc": config.percentual,
+                        "valor_fixo": config.valor_fixo,
                         "perc_loja": config.percentual_loja,
                         "tipo_calc": config.tipo_calculo,
                         "desc_cartao": config.desconta_taxa_cartao,
@@ -130,10 +132,10 @@ async def criar_configuracao(
                     db,
                     """
                     INSERT INTO comissoes_configuracao 
-                    (funcionario_id, tipo, referencia_id, percentual, percentual_loja, tipo_calculo,
+                    (funcionario_id, tipo, referencia_id, percentual, valor_fixo, percentual_loja, tipo_calculo,
                      desconta_taxa_cartao, desconta_impostos, desconta_custo_entrega, comissao_venda_parcial,
                      permite_edicao_venda, observacoes, ativo, tenant_id)
-                    VALUES (:func_id, :tipo, :ref_id, :perc, :perc_loja, :tipo_calc,
+                    VALUES (:func_id, :tipo, :ref_id, :perc, :valor_fixo, :perc_loja, :tipo_calc,
                             :desc_cartao, :desc_impostos, :desc_entrega, :venda_parcial,
                             :permite_edicao, :obs, true, :tenant_id)
                     RETURNING id
@@ -143,6 +145,7 @@ async def criar_configuracao(
                         "tipo": config.tipo,
                         "ref_id": config.referencia_id,
                         "perc": config.percentual,
+                        "valor_fixo": config.valor_fixo,
                         "perc_loja": config.percentual_loja,
                         "tipo_calc": config.tipo_calculo,
                         "desc_cartao": config.desconta_taxa_cartao,
@@ -264,6 +267,7 @@ async def criar_configuracoes_batch(
                         """
                         UPDATE comissoes_configuracao SET
                             percentual = :p,
+                            valor_fixo = :valor_fixo,
                             percentual_loja = :pl,
                             tipo_calculo = :tc,
                             desconta_taxa_cartao = :dtc,
@@ -277,6 +281,7 @@ async def criar_configuracoes_batch(
                     """,
                         {
                             "p": config.percentual,
+                            "valor_fixo": config.valor_fixo,
                             "pl": config.percentual_loja,
                             "tc": config.tipo_calculo,
                             "dtc": config.desconta_taxa_cartao,
@@ -296,11 +301,11 @@ async def criar_configuracoes_batch(
                         db,
                         """
                         INSERT INTO comissoes_configuracao (
-                            funcionario_id, tipo, referencia_id, percentual, percentual_loja, tipo_calculo,
+                            funcionario_id, tipo, referencia_id, percentual, valor_fixo, percentual_loja, tipo_calculo,
                             desconta_taxa_cartao, desconta_impostos, desconta_custo_entrega,
                             comissao_venda_parcial, permite_edicao_venda, observacoes, ativo, tenant_id
                         ) VALUES (
-                            :f, :t, :r, :p, :pl, :tc, :dtc, :di, :dce, :cvp, :pev, :obs, true, :tenant_id
+                            :f, :t, :r, :p, :valor_fixo, :pl, :tc, :dtc, :di, :dce, :cvp, :pev, :obs, true, :tenant_id
                         ) RETURNING id
                     """,
                         {
@@ -308,6 +313,7 @@ async def criar_configuracoes_batch(
                             "t": config.tipo,
                             "r": config.referencia_id,
                             "p": config.percentual,
+                            "valor_fixo": config.valor_fixo,
                             "pl": config.percentual_loja,
                             "tc": config.tipo_calculo,
                             "dtc": config.desconta_taxa_cartao,

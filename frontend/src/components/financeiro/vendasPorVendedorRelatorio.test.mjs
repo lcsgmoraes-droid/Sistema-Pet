@@ -29,10 +29,10 @@ test("opções distinguem produtos com nome igual e ignoram itens sem identifica
   const opcoes = opcoesProdutosVendas([
     {
       itens: [
-        { produto_id: 2, produto_nome: "Ração" },
-        { produto_id: "2", produto_nome: "Ração" },
-        { produto_id: 3, produto_nome: "Ração" },
-        { produto_id: 1, produto_nome: "Areia" },
+        { produto_id: 2, produto_nome: "Ração", produto_codigo: "RAC-02" },
+        { produto_id: "2", produto_nome: "Ração", produto_codigo: "RAC-02" },
+        { produto_id: 3, produto_nome: "Ração", produto_codigo: "RAC-03" },
+        { produto_id: 1, produto_nome: "Areia", produto_codigo: "ARE-01" },
         { produto_nome: "Sem identificação" },
         { produto_id: null, produto_nome: "Sem identificação" },
         { produto_id: "", produto_nome: "Sem identificação" },
@@ -41,11 +41,14 @@ test("opções distinguem produtos com nome igual e ignoram itens sem identifica
     {},
   ]);
 
-  assert.deepEqual(opcoes, [
-    { value: "1", label: "Areia (#1)" },
-    { value: "2", label: "Ração (#2)" },
-    { value: "3", label: "Ração (#3)" },
-  ]);
+  assert.deepEqual(
+    opcoes.map(({ value, label }) => ({ value, label })),
+    [
+      { value: "1", label: "Areia (ARE-01)" },
+      { value: "2", label: "Ração (RAC-02)" },
+      { value: "3", label: "Ração (RAC-03)" },
+    ],
+  );
 });
 
 function vendasMistas() {
@@ -108,6 +111,33 @@ function vendasMistas() {
     { id: 4, total_venda: 100 },
   ];
 }
+
+test("grupo de produtos soma apenas os itens selecionados sem duplicar a venda", () => {
+  const grupos = agruparVendasPorVendedor(vendasMistas(), ["2", "3", "2"]);
+  assert.deepEqual(
+    grupos.map(({ chave, quantidade, quantidadeProdutos, total }) => ({
+      chave,
+      quantidade,
+      quantidadeProdutos,
+      total,
+    })),
+    [
+      { chave: "10", quantidade: 2, quantidadeProdutos: 3.5, total: 260 },
+      { chave: "11", quantidade: 1, quantidadeProdutos: 0.001, total: 0.02 },
+    ],
+  );
+  assert.equal(grupos[0].vendas[0].total_relatorio, 210);
+  assert.equal(grupos[0].vendas[0].total_venda, 190);
+});
+
+test("produto sem código público não mostra o ID interno como código", () => {
+  assert.deepEqual(
+    opcoesProdutosVendas([{ itens: [{ produto_id: 99999, produto_nome: "Serviço" }] }]).map(
+      ({ value, label }) => ({ value, label }),
+    ),
+    [{ value: "99999", label: "Serviço" }],
+  );
+});
 
 test("produto em venda mista soma só seus itens e conta a venda uma vez, preservando três decimais", () => {
   const grupos = agruparVendasPorVendedor(vendasMistas(), "2");

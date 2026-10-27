@@ -71,7 +71,7 @@ export default function TimelineConsultaPanel({
                           key={`${evento.kind}_${evento.item_id}_insumo_${idx}`}
                           className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700"
                         >
-                          {insumo.nome || `Produto #${insumo.produto_id}`} • {insumo.quantidade}{" "}
+                          {insumo.nome || "Produto não informado"} • {insumo.quantidade}{" "}
                           {insumo.unidade || "un"}
                         </span>
                       ))}

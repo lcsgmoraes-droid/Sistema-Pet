@@ -392,6 +392,14 @@ class Recebimento(BaseTenantModel):
         index=True,
     )
     forma_pagamento_id = Column(Integer, ForeignKey("formas_pagamento.id"))
+    caixa_id = Column(Integer, ForeignKey("caixas.id"), nullable=True, index=True)
+    conta_bancaria_id = Column(
+        Integer, ForeignKey("contas_bancarias.id"), nullable=True
+    )
+    numero_parcelas = Column(Integer, nullable=False, default=1, server_default="1")
+    operadora_id = Column(Integer, nullable=True)
+    bandeira = Column(String(30), nullable=True)
+    nsu_cartao = Column(String(100), nullable=True)
 
     valor_recebido = Column(Numeric(10, 2), nullable=False)
     data_recebimento = Column(Date, nullable=False, index=True)
