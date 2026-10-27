@@ -1,32 +1,13 @@
 ---
-name: design-humano-e-psicologia-etica
-description: Use ao desenhar ou revisar qualquer coisa que influencie comportamento — notificações e mensagens automáticas (WhatsApp, e-mail, push), lembretes, indicadores de progresso, contadores e urgência, padrões e pré-seleções, telas de carregamento e processamento, cobrança, créditos, cancelamento e rotas de saída, personalização. Une os princípios de Humane by Design, Calm Technology e os casos do Growth.Design, com limites éticos claros.
+name: psicologia-etica-de-produto
+description: Use ao desenhar ou revisar qualquer coisa que influencie comportamento — notificações e mensagens automáticas (WhatsApp, e-mail, push), lembretes, indicadores de progresso, contadores e urgência, padrões e pré-seleções, telas de carregamento e processamento, cobrança, créditos, cancelamento e rotas de saída, personalização. Une os princípios de Calm Technology e os casos do Growth.Design, com limites éticos claros.
 ---
 
-# Design humano e psicologia ética
+# Psicologia ética de produto
 
 Psicologia de produto é ferramenta poderosa: aqui ela serve para **ajudar a pessoa a concluir o que
-ela quer**, nunca para prender, apressar ou enganar. As regras abaixo reforçam a seção "Humane
-Design" do CLAUDE.md global. Conflito entre conversão e honestidade: vence a honestidade.
-
-## Humane by Design (humanebydesign.com)
-
-Três princípios, cada um com práticas concretas:
-
-- **Empoderador**: o valor entregue à pessoa vem antes da receita. Práticas: deixar a pessoa
-  controlar os algoritmos que a afetam; privacidade e anonimato sob controle dela; tecnologia
-  "invisível até ser necessária"; mostrar padrões de uso para ela criar hábitos saudáveis; em IA,
-  manter um humano no circuito e explicar as decisões.
-- **Finito**: tempo bem gasto, não tempo maximizado. Práticas: indicador de "você viu tudo" no fim
-  de listas; botão "carregar mais" no lugar de rolagem infinita; nada de reprodução automática do
-  próximo item sem ação da pessoa.
-- **Inclusivo**: equipes e produtos para toda a diversidade humana. Práticas: projetar primeiro
-  para quem tem deficiência (costuma beneficiar todos); nunca bloquear zoom, contraste ou tamanho
-  de fonte; permitir desligar animações, paralaxe e rolagem infinita.
-
-Padrões ("seeds"): **Adaptar ao contexto**, **Abraçar o atrito** (atrito de propósito em ações
-sensíveis: confirmar exclusão, envio em massa, mudança de permissão) e **Invisível até ser
-necessário** (calma: não disputar atenção).
+ela quer**, nunca para prender, apressar ou enganar. As regras abaixo reforçam a seção de limites éticos
+("Ethical Boundaries") do CLAUDE.md global. Conflito entre conversão e honestidade: vence a honestidade.
 
 ## Tecnologia calma (Amber Case, via principles.design)
 
