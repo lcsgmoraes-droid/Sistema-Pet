@@ -1,8 +1,8 @@
 """Integridade do XML NF-e; nunca assina ou altera dados fiscais.
 
-O provedor pode reconstruir textos com acentos depois de assinar sua forma
-sem diacriticos. Essa unica representacao alternativa so e aceita quando a
-assinatura original inteira a comprova. Nao valida cadeia ICP-Brasil, CRL ou
+O provedor pode reconstruir acentos e ordinais depois de assinar sua forma
+normalizada. Uma representacao alternativa so e aceita quando a assinatura
+original inteira a comprova. Nao valida cadeia ICP-Brasil, CRL ou
 o estado fiscal atual, que continuam dependendo do emissor/SEFAZ.
 Uso restrito ao emissor autenticado e ao cache interno; o certificado embutido
 nao torna este helper uma autorizacao para uploads ou operacoes financeiras.
@@ -317,28 +317,35 @@ def ensure_signed_xml(
         info, valid = _verified(root, **arguments)
         if valid:
             return content
-        changed = False
-        for node in info.iter():
-            if not isinstance(node.tag, str):
+        # Prefer NFD so legitimately signed compatibility characters are kept.
+        # If its digest fails, NFKD also restores ordinals such as º -> o.
+        for normalization in ("NFD", "NFKD"):
+            changed = False
+            for node in info.iter():
+                if not isinstance(node.tag, str):
+                    continue
+                for field in ("text", "tail") if node is not info else ("text",):
+                    value = getattr(node, field)
+                    if value is not None:
+                        candidate = "".join(
+                            char
+                            for char in unicodedata.normalize(normalization, value)
+                            if not unicodedata.combining(char)
+                        )
+                        if candidate != value:
+                            setattr(node, field, candidate)
+                            changed = True
+            if not changed:
                 continue
-            for field in ("text", "tail") if node is not info else ("text",):
-                value = getattr(node, field)
-                if value is not None:
-                    candidate = "".join(
-                        char
-                        for char in unicodedata.normalize("NFD", value)
-                        if not unicodedata.combining(char)
-                    )
-                    if candidate != value:
-                        setattr(node, field, candidate)
-                        changed = True
-        _require(changed)
-        candidate_bytes = etree.tostring(root, encoding="utf-8", xml_declaration=True)
-        # Verify the exact bytes being returned, including namespace context after
-        # serialization. SignedInfo, signature, attributes and protocol are untouched.
-        _, valid = _verified(_parse(candidate_bytes), **arguments)
-        _require(valid)
-        return candidate_bytes
+            candidate_bytes = etree.tostring(
+                root, encoding="utf-8", xml_declaration=True
+            )
+            # Verify the exact bytes being returned, including namespace context after
+            # serialization. SignedInfo, signature, attributes and protocol are untouched.
+            _, valid = _verified(_parse(candidate_bytes), **arguments)
+            if valid:
+                return candidate_bytes
+        raise _InvalidXml
     except (
         ValueError,
         TypeError,

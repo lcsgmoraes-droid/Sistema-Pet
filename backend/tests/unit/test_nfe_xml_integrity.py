@@ -118,6 +118,75 @@ def test_only_original_signature_can_prove_restored_text(sha256):
     assert "Condomínio".encode() in damaged
 
 
+@pytest.mark.parametrize("sha256", [False, True])
+@pytest.mark.parametrize("letter,ordinal", [("o", "º"), ("a", "ª")])
+def test_original_signature_proves_restored_accents_and_ordinals(
+    sha256, letter, ordinal
+):
+    raw = raw_nfe().replace(
+        b"Pedido ficticio", f"Referencia 1{letter} ficticia".encode()
+    )
+    original = sign_nfe(raw, sha256=sha256)
+    damaged = original.replace(b"Condominio Ficticio", "Condomínio Fictício".encode())
+    damaged = damaged.replace(
+        f"Referencia 1{letter}".encode(), f"Referencia 1{ordinal}".encode()
+    )
+
+    repaired = ensure_signed_xml(
+        damaged, expected_cnpj=CNPJ, expected_key=KEY, document_type="nfe"
+    )
+
+    for path in ("n:NFe/n:infNFe", "n:NFe/ds:Signature", "n:protNFe"):
+        assert canonical_part(repaired, path) == canonical_part(original, path)
+    assert ensure_signed_xml(repaired) is repaired
+
+
+def test_ordinal_recovery_works_without_any_accent_change():
+    original = sign_nfe(raw_nfe().replace(b"Pedido ficticio", b"Pedido No ficticio"))
+    damaged = original.replace(b"Pedido No ficticio", "Pedido Nº ficticio".encode())
+
+    repaired = ensure_signed_xml(damaged)
+
+    assert canonical_part(repaired, "n:NFe/n:infNFe") == canonical_part(
+        original, "n:NFe/n:infNFe"
+    )
+
+
+def test_legitimately_signed_ordinal_is_preserved_before_and_after_accent_recovery():
+    original = sign_nfe(
+        raw_nfe().replace(b"Pedido ficticio", "Pedido Nº ficticio".encode())
+    )
+    assert ensure_signed_xml(original) is original
+    damaged = original.replace(b"Condominio Ficticio", "Condomínio Fictício".encode())
+
+    repaired = ensure_signed_xml(damaged)
+
+    assert "Pedido Nº ficticio".encode() in repaired
+    assert canonical_part(repaired, "n:NFe/n:infNFe") == canonical_part(
+        original, "n:NFe/n:infNFe"
+    )
+
+
+@pytest.mark.parametrize(
+    "path,value",
+    [
+        ("n:NFe/n:infNFe/n:total/n:ICMSTot/n:vNF", "146.90"),
+        ("n:NFe/n:infNFe/n:dest/n:xNome", "Outro Cliente Ficticio"),
+        ("n:NFe/ds:Signature/ds:SignatureValue", "AAAAAAAAAAAAAAAAAAAAAA=="),
+    ],
+)
+def test_ordinal_recovery_never_accepts_value_customer_or_signature_tampering(
+    path, value
+):
+    original = sign_nfe(raw_nfe().replace(b"Pedido ficticio", b"Pedido No ficticio"))
+    damaged = original.replace(b"Pedido No ficticio", "Pedido Nº ficticio".encode())
+    damaged = damaged.replace(b"Condominio Ficticio", "Condomínio Fictício".encode())
+
+    assert_invalid(
+        changed_xml(damaged, lambda root: setattr(find(root, path), "text", value))
+    )
+
+
 def test_text_outside_reference_is_not_normalized(signed_xml):
     damaged = signed_xml.replace(b"Condominio Ficticio", "Condomínio Fictício".encode())
     damaged = damaged.replace(

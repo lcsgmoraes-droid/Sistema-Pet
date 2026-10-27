@@ -18,7 +18,7 @@ import {
   temPendenciasFiscais,
 } from "../utils/nfeFiscalAssistida";
 import { solicitarCorrecaoFiscal } from "../services/fiscalCorrectionDialog";
-import { metadadosDownloadDanfe } from "../utils/documentoFiscalDownload.mjs";
+import { mensagemDocumento, metadadosDownloadDanfe } from "../utils/documentoFiscalDownload.mjs";
 import {
   MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO,
   rejeicaoResponsavelTecnico,
@@ -39,18 +39,6 @@ function salvarArquivo(blob, nome) {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-async function mensagemDocumento(error, padrao) {
-  let dados = error.response?.data;
-  if (dados instanceof Blob) {
-    try {
-      dados = JSON.parse(await dados.text());
-    } catch {
-      dados = null;
-    }
-  }
-  return typeof dados?.detail === "string" ? dados.detail : padrao;
 }
 
 export default function CentralNFSaida() {
