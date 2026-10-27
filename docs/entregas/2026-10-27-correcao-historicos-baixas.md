@@ -3,11 +3,11 @@
 ## 1. Identificação e estado
 
 Correção solicitada por Lucas em 27/10/2026, após novos prints dos históricos do
-PDV e do financeiro. Reabre o aceite dos itens **08 e 13** do
+PDV e do financeiro. Reabriu o aceite dos itens **08 e 13** do
 [checklist operacional](../TAREFAS_MELHORIAS_OPERACIONAIS_2026-10-26.md).
 
-**Implementação e aceites HTTP/UI em DEV aprovados; gate, CI e publicação ainda
-pendentes.** Os registros das entregas anteriores permanecem como histórico.
+**Correção concluída e publicada pelo PR #1575, com aceites DEV, gate, CI e
+conferência financeira em produção aprovados.** Os registros das entregas anteriores permanecem como histórico.
 Esta correção não refaz baixas, não funde pessoas e não altera o acompanhamento
 separado do celular da Michele.
 
@@ -125,9 +125,23 @@ de runtime indicado acima. `inventario-dev.json` registra a seleção da massa.
 O aceite visual usa um lote confirmado. Pagamentos parciais, estornos,
 paginação com várias páginas, isolamento e falhas/retry têm regressões
 automatizadas nas frentes; não foram criadas baixas extras para gerar novos
-casos visuais. Os testes focados informados pelas frentes foram aprovados; a
-execução integrada final e os filtros normalizados de contas ainda precisam
-fechamento no gate.
+casos visuais. Os filtros de contas foram normalizados antes da paginação, para
+que a situação exibida seja encontrada no filtro correspondente. Vencido com
+saldo continua identificado como Vencido nas duas apresentações.
+
+As regressões focadas registraram **80 testes operacionais de frontend**, **38
+de histórico** e **um de cancelamento no backend**. O build e o gate local final
+completo passaram na head **`28e35c44b3fae52461083670cd0cce3136ba0251`**. O log é
+`runtime/correcao-historicos-baixas-20261027/release-check-final.log`; não somar
+essas contagens às suítes integradas que já as incluem.
+
+Um apontamento anterior do Sonar S9383 foi corrigido explicitando a chamada
+assíncrona com `void`, sem mudança da regra de negócio. Na revisão final do PR
+**#1575**, **8/8 checks oficiais** e os **12 resultados publicados**, incluindo
+Sonar, foram aprovados. Na `main` integrada, passaram **8/8 checks oficiais** e
+os **nove resultados publicados**. Evidências em
+`runtime/correcao-historicos-baixas-20261027/release-gate-pr1575-28e35c44.json` e
+`runtime/correcao-historicos-baixas-20261027/release-gate-main-446e5928.json`.
 
 Os scripts antigos de baixa são referência de contrato, não devem ser executados
 sem revisão: criam vendas/recebimentos e podem conter telefones fixos agora
@@ -135,9 +149,11 @@ bloqueados pela proteção de duplicidade.
 
 ## 7. Segurança e limites
 
-Não usar produção, SSH, dados reais ou a sessão autenticada do James neste
-aceite. Não imprimir tokens, senhas ou cabeçalhos de autenticação. Consultas de
-teste não autorizam corrigir saldos, lançar pagamentos ou carimbos.
+Os aceites transacionais e a navegação QA usaram somente DEV e massa fictícia.
+A conferência posterior em produção foi autorizada e limitada à leitura da aba
+financeira descrita abaixo. Não imprimir tokens, senhas ou cabeçalhos de
+autenticação. Consultas de teste não autorizam corrigir saldos, lançar pagamentos
+ou carimbos.
 
 Os aceites anteriores de performance, recebimento e publicação continuam
 registrados. O novo aceite visual é obrigatório para os defeitos relatados;
@@ -145,9 +161,38 @@ aprovar só a presença de um campo no JSON não conclui a correção.
 
 ## 8. Publicação e reversão
 
-Implementação e aceites DEV concluídos. Publicação pendente do gate completo e
-checks do PR/commit integrado. Seguir o fluxo oficial e a autorização de produção do
-projeto. Registrar SHA, data, health e evidências somente após confirmação real.
+O PR **#1575** foi integrado na `main`
+**`446e592847538e25a8cd255f32c2e7c9ec0a81ab`**, após os aceites e checks descritos
+acima. O deploy oficial terminou em **27/10/2026 às 01:48:59 BRT**, com saída zero.
+A revisão pública confirmou esse commit completo. O status oficial posterior,
+também com saída zero, confirmou **cinco containers healthy**, head Alembic
+**`zzzzzc20261027a1`**, health público correto e watchdog healthy.
+
+Backups da publicação:
+
+- Banco: `/opt/petshop/backups/db/petshop_prod_20261027_014758.dump`.
+- Operacional: `/opt/petshop/backups/deploy_20261027_014659`.
+
+Logs em `runtime/correcao-historicos-baixas-20261027/deploy-producao.log` e
+`runtime/correcao-historicos-baixas-20261027/status-producao.log`.
+
+A sessão Chrome autorizada do James, na loja Atacadão Loja 1 Presidente
+Prudente, foi usada somente para recarregar a aba financeira de Osvaldo, código
+público **1848**, e expandir o recibo **#12595**. A referência da conta apareceu
+como **#11119**, sem moeda; data da baixa **26-10-2026**, forma **Pix**, situação
+**Recebido** e observação original exibida integralmente. O texto completo está
+preservado na evidência local ignorada pelo Git.
+
+Não apareceram "Registrado em", ISO cru ou IDs monetários. A venda
+**IMP-20260915-112020** apareceu como **Pago**. A captura foi inspecionada em tema
+escuro e a evidência está em
+`runtime/correcao-historicos-baixas-20261027/consulta-producao.json`. A conferência
+não criou lançamento financeiro.
+
+A aba PDV do usuário foi preservada como estava, sem recarregamento ou nova
+navegação em produção. O PDV e ambas as apresentações financeiras tiveram aceite
+em DEV; a conferência visual produtiva desta correção foi a leitura financeira
+descrita acima.
 
 Uma reversão deve preservar todos os recebimentos, vínculos e histórico já
 gravados. Não repetir baixas nem executar correções financeiras para contornar
@@ -162,12 +207,12 @@ um problema de exibição.
 - [x] Aceites HTTP e das três entradas de interface com massa existente em DEV.
 - [x] Consolidação final dos filtros de contas e regressões focadas: 80 testes
       operacionais de frontend, 38 de histórico e um de cancelamento no backend.
-- [ ] Regressões e gate completo aprovados.
-- [ ] PR integrado e publicação técnica confirmada.
+- [x] Regressões, build e gate completo final aprovados.
+- [x] PR #1575 integrado e checks oficiais/publicados do PR/main aprovados.
+- [x] Publicação técnica e conferência em produção confirmadas, com os limites acima.
 
 ## 10. Decisão
 
-**Aceites DEV aprovados; correção ainda não publicada.** Os itens 08 e 13
-permanecem abertos até o fechamento das validações e da publicação. A conferência
+**Correção concluída, publicada e conferida; itens 08 e 13 encerrados.** A conferência
 humana do cartão da Michele no aparelho físico permanece como acompanhamento
 anterior, separado desta correção.
