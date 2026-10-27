@@ -1192,6 +1192,31 @@ test("persistencia entrega total do servidor para revisar pagamentos antes da fi
   assert.deepEqual(retornos, [criada, atualizada]);
 });
 
+test("complemento de recebimento parcial relê venda existente sem PUT ou nova venda", async () => {
+  const snapshot = { id: 42, total: 200, status: "baixa_parcial" };
+  const chamadas = [];
+  const id = await persistirVendaAbertaParaPagamento({
+    vendaParaPersistir: snapshot,
+    payloadVenda: { itens: [] },
+    buscarVenda: async (vendaId) => {
+      chamadas.push(["buscar", vendaId]);
+      return snapshot;
+    },
+    atualizarVenda: async () => {
+      throw new Error("A venda parcial não pode ser editada.");
+    },
+    criarVenda: async () => {
+      throw new Error("O complemento não pode duplicar a venda.");
+    },
+    onVendaPersistida: (venda) => chamadas.push(["snapshot", venda]),
+  });
+  assert.equal(id, 42);
+  assert.deepEqual(chamadas, [
+    ["buscar", 42],
+    ["snapshot", snapshot],
+  ]);
+});
+
 test("pagamento da venda iFood existente preserva DELIVERY sem PUT previo ou entregador inventado", async () => {
   const venda = { id: 42, canal: "ifood", tem_entrega: true, entregador_id: null, total: 65 };
   const chamadas = [];

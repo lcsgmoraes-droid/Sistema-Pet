@@ -39,7 +39,7 @@ const fotografia = {
   total_novos_pagamentos: 119.9,
   crediario_pendente: 0,
 };
-function preparar({ props = {}, persistir, finalizar, recebido = 0 } = {}) {
+function preparar({ props = {}, persistir, finalizar, buscar, recebido = 0 } = {}) {
   const alteracoes = {},
     chamadas = { persistir: [], finalizar: [], leituras: [] };
   const emissoes = [];
@@ -113,6 +113,10 @@ function preparar({ props = {}, persistir, finalizar, recebido = 0 } = {}) {
         [
           "../../api/vendas",
           {
+            buscarVenda: async (id) => {
+              chamadas.leituras.push(`/vendas/${id}`);
+              return buscar ? buscar(id) : { ...defaults.venda, id };
+            },
             atualizarVenda: async (id, payload) => {
               chamadas.persistir.push({ id, payload });
               return persistir ? persistir(id, payload) : { id, total: defaults.venda.total };
@@ -417,6 +421,62 @@ test("recebimento parcial e registrado sem exigir quitar todo saldo nem justific
   assert.equal(c.chamadas.finalizar.length, 1);
   assert.equal(c.chamadas.finalizar[0].pagamentos[0].valor, 50);
   assert.equal(c.chamadas.finalizar[0].options.contexto_pagamento_excedente, undefined);
+});
+
+test("complementa80mais120 numa venda parcial200 sem tentar editar a venda", async () => {
+  const venda = {
+    ...baseVenda,
+    status: "baixa_parcial",
+    total: 200,
+    itens: [
+      {
+        tipo: "servico",
+        servico_descricao: "Pacote4banhos",
+        quantidade: 1,
+        preco_unitario: 200,
+        subtotal: 200,
+      },
+    ],
+  };
+  const c = preparar({
+    props: { venda, totalPagoExistente: 80, pagamentos: [montar(dinheiro, 120, 120)] },
+    recebido: 80,
+    persistir: async () => {
+      throw {
+        response: {
+          data: {
+            detail:
+              'Não é possível atualizar venda com status "baixa_parcial". Apenas vendas abertas podem ser atualizadas.',
+          },
+        },
+      };
+    },
+    finalizar: async (id, pagamentos) => ({ id, status: "finalizada", total: 200, pagamentos }),
+  });
+  await c.h.act(() => c.h.tree.handleFinalizar());
+  assert.equal(c.chamadas.persistir.length, 0);
+  assert.equal(c.chamadas.finalizar.length, 1);
+  assert.deepEqual(c.chamadas.leituras, ["/vendas/12", "/vendas/12/pagamentos"]);
+  assert.equal(c.chamadas.finalizar[0].pagamentos.length, 1);
+  assert.equal(c.chamadas.finalizar[0].pagamentos[0].valor, 120);
+  assert.equal(c.alteracoes.VendaFinalizadaParaCupom.status, "finalizada");
+});
+
+test("recebimento parcial relê total do servidor antes de aceitar complemento", async () => {
+  const c = preparar({
+    props: {
+      venda: { ...baseVenda, status: "baixa_parcial", total: 200 },
+      totalPagoExistente: 80,
+      pagamentos: [montar(dinheiro, 120, 120)],
+    },
+    recebido: 80,
+    buscar: async () => ({ ...baseVenda, status: "baixa_parcial", total: 210 }),
+  });
+  await c.h.act(() => c.h.tree.handleFinalizar());
+  assert.equal(c.chamadas.persistir.length, 0);
+  assert.equal(c.chamadas.finalizar.length, 0);
+  assert.equal(c.alteracoes.VendaPersistida.total, 210);
+  assert.match(c.alteracoes.Erro, /Nenhum novo pagamento foi registrado/);
 });
 
 test("409 de pagamento legado exibe orientacao sem autorizar excedente ou repetir a gravacao", async () => {
