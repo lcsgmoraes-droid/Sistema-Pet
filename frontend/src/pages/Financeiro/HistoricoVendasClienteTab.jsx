@@ -84,7 +84,7 @@ export const HistoricoInline = ({ clienteId, clienteInfo }) => {
         if (ativo) setLoading(false);
       }
     };
-    carregarDados();
+    void carregarDados();
     return () => {
       ativo = false;
       cicloConsulta.current += 1;
