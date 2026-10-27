@@ -356,6 +356,9 @@ def _normalizar_detalhe_nota_bling(
     )
 
     cliente = {
+        "codigo": getattr(venda.cliente, "codigo", None)
+        if venda and venda.cliente
+        else None,
         "nome": _texto(
             _primeiro_preenchido(
                 contato.get("nome"),
