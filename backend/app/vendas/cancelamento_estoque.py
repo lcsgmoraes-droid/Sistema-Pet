@@ -25,6 +25,7 @@ from app.produtos.tipos import tipo_controla_estoque
 from app.produtos_models import EstoqueMovimentacao, Produto, ProdutoLote
 from app.services.sales_channel import is_online_sales_channel
 from app.vendas.fiscal_status import nota_fiscal_cancelada
+from app.vendas.kit_estoque import tipo_kit_estoque
 
 MOTIVO = "cancelamento_venda"
 EPSILON = Decimal("0.000001")
@@ -199,9 +200,8 @@ def _preparar_grupo(db, venda, itens, tenant_venda, tenant_estoque, produto_id):
     if produto is None or not produto.controlar_estoque:
         _inconsistente()
     _validar_saldo_fisico(getattr(produto, "estoque_atual", None))
-    if produto.tipo_produto == "PAI" or (
-        produto.tipo_produto == "KIT" and produto.tipo_kit != "FISICO"
-    ):
+    tipo_kit = tipo_kit_estoque(produto)
+    if produto.tipo_produto == "PAI" or (tipo_kit and tipo_kit != "FISICO"):
         # A composicao atual de um kit virtual nao e prova do consumo passado.
         _inconsistente()
     movimentos = (

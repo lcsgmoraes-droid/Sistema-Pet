@@ -35,6 +35,7 @@ def sincronizar_bling_background(
     """
     try:
         from app.services.bling_sync_service import BlingSyncService
+        from app.services.bling_sync_stock import agendar_kits_dependentes
 
         if db is not None:
             # Nunca abrir outra sessão esperando locks que o próprio chamador
@@ -44,6 +45,13 @@ def sincronizar_bling_background(
                     db,
                     produto_id=produto_id,
                     estoque_novo=estoque_novo,
+                    motivo=motivo,
+                    origem="evento",
+                )
+                agendar_kits_dependentes(
+                    db,
+                    produto_id,
+                    enfileirar=BlingSyncService.queue_product_sync,
                     motivo=motivo,
                     origem="evento",
                 )

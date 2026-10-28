@@ -6,6 +6,7 @@ from typing import Any, Dict, List, TYPE_CHECKING
 from sqlalchemy.orm import Session
 
 from app.estoque.service import EstoqueService
+from app.vendas.kit_estoque import tipo_kit_estoque
 
 if TYPE_CHECKING:
     from app.produtos_models import Produto
@@ -31,7 +32,7 @@ def processar_baixa_estoque_item(
     Processa a baixa de estoque de um item de venda.
 
     Comportamento por tipo de produto:
-    - SIMPLES/VARIACAO: Baixa estoque do próprio produto (ou da variação se product_variation_id fornecido)
+    - SIMPLES/VARIACAO sem composicao: Baixa estoque do proprio produto
     - KIT FÍSICO: Baixa estoque do KIT (tratado como produto simples)
     - KIT VIRTUAL: Baixa estoque de cada componente em cascata
 
@@ -67,21 +68,24 @@ def processar_baixa_estoque_item(
             .filter(
                 Produto.id == product_variation_id,
                 Produto.tipo_produto == "VARIACAO",
+                Produto.tenant_id == tenant_id,
             )
             .first()
         )
 
-        if variacao:
-            produto = (
-                variacao  # A variação é o próprio produto a ser baixado do estoque
+        if not variacao:
+            raise ValueError(
+                f"Variação ID {product_variation_id} não encontrada no tenant do estoque"
             )
-            if not getattr(produto, "controlar_estoque", True):
-                return resultados
+        produto = variacao
+        if not getattr(produto, "controlar_estoque", True):
+            return resultados
 
     # ============================================================
     # CASO 1: PRODUTO SIMPLES OU VARIAÇÃO
     # ============================================================
-    if produto.tipo_produto in ("SIMPLES", "VARIACAO"):
+    tipo_kit = tipo_kit_estoque(produto)
+    if produto.tipo_produto in ("SIMPLES", "VARIACAO") and tipo_kit is None:
         resultado_estoque = EstoqueService.baixar_estoque(
             produto_id=produto.id,
             quantidade=quantidade_vendida,
@@ -132,9 +136,7 @@ def processar_baixa_estoque_item(
     # ============================================================
     # CASO 2: PRODUTO KIT
     # ============================================================
-    if produto.tipo_produto == "KIT":
-        tipo_kit = produto.tipo_kit or "VIRTUAL"  # Default VIRTUAL se não definido
-
+    if tipo_kit is not None:
         # --------------------------------------------------------
         # CASO 2.1: KIT FÍSICO (tratado como produto simples)
         # LÓGICA: Venda de kit físico só baixa o estoque do KIT
@@ -170,7 +172,7 @@ def processar_baixa_estoque_item(
                 {
                     "produto": resultado_estoque["produto_nome"],
                     "produto_id": produto.id,
-                    "tipo_produto": "KIT",
+                    "tipo_produto": produto.tipo_produto,
                     "tipo_kit": "FISICO",
                     "quantidade": quantidade_vendida,
                     "estoque_anterior": resultado_estoque["estoque_anterior"],
@@ -197,7 +199,10 @@ def processar_baixa_estoque_item(
             # Buscar componentes do KIT
             componentes = (
                 db.query(ProdutoKitComponente)
-                .filter(ProdutoKitComponente.kit_id == produto.id)
+                .filter(
+                    ProdutoKitComponente.kit_id == produto.id,
+                    ProdutoKitComponente.tenant_id == tenant_id,
+                )
                 .all()
             )
 

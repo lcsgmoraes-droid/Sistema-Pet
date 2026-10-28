@@ -18,6 +18,12 @@ from app.services.produto_bling_identity_service import (
     produto_arquivado,
     vinculo_retirado,
 )
+from app.services.bling_sync_stock import (
+    carregar_produto_sync,
+    enfileirar_sync_background,
+    estoque_produto_bling,
+    produto_kit_virtual,
+)
 from app.tenancy.context import tenant_context
 from app.utils.tenant_safe_sql import execute_tenant_safe_one
 
@@ -133,27 +139,7 @@ class BlingSyncQueueMixin:
     def _load_produto_sync(
         cls, db: Session, produto_id: int
     ) -> tuple[Optional[Produto], Optional[ProdutoBlingSync]]:
-        # Mesma ordem da fusao: produto antes de vinculo, ate o commit da operacao.
-        produto = (
-            db.query(Produto)
-            .filter(Produto.id == produto_id)
-            .populate_existing()
-            .with_for_update(of=Produto)
-            .first()
-        )
-        if not produto:
-            return None, None
-
-        sync = (
-            db.query(ProdutoBlingSync)
-            .filter(ProdutoBlingSync.produto_id == produto_id)
-            .populate_existing()
-            .with_for_update(of=ProdutoBlingSync)
-            .first()
-        )
-        if produto_arquivado(produto) or vinculo_retirado(sync):
-            return produto, None
-        return produto, sync
+        return carregar_produto_sync(db, produto_id)
 
     @classmethod
     def queue_product_sync(
@@ -183,12 +169,13 @@ class BlingSyncQueueMixin:
                 "produto_id": produto_id,
             }
 
+        estoque_atual = estoque_produto_bling(db, produto)
         estoque_destino = (
-            float(produto.estoque_atual or 0)
-            if estoque_novo is None
+            estoque_atual
+            if estoque_novo is None or produto_kit_virtual(produto)
             else float(estoque_novo)
         )
-        if float(produto.estoque_atual or 0) < 0 or estoque_destino < 0:
+        if estoque_atual < 0 or estoque_destino < 0:
             return {
                 "ok": False,
                 "detail": "Saldo negativo no CorePet; confira o estoque antes de enviar ao Bling",
@@ -446,7 +433,7 @@ class BlingSyncQueueMixin:
                 "erro": fila.ultimo_erro,
             }
 
-        estoque_atual = float(produto.estoque_atual or 0)
+        estoque_atual = estoque_produto_bling(db, produto)
         if estoque_atual < 0:
             fila.status = "falha_final"
             fila.ultimo_erro = (
@@ -515,27 +502,15 @@ class BlingSyncQueueMixin:
         origem: str = "evento",
         force: bool = False,
     ) -> None:
-        db = SessionLocal()
-        try:
-            resultado = cls.queue_product_sync(
-                db,
-                produto_id=produto_id,
-                estoque_novo=estoque_novo,
-                motivo=motivo,
-                origem=origem,
-                force=force,
-            )
-            if not resultado.get("ok"):
-                db.rollback()
-                return
-
-            # A execução acontece no scheduler (fila persistente), sem thread local.
-            db.commit()
-        except Exception as error:
-            db.rollback()
-            logger.warning("[BLING SYNC] Falha ao enfileirar sync: %s", error)
-        finally:
-            db.close()
+        enfileirar_sync_background(
+            cls,
+            SessionLocal,
+            produto_id,
+            estoque_novo=estoque_novo,
+            motivo=motivo,
+            origem=origem,
+            force=force,
+        )
 
     @classmethod
     def normalize_sync_states_from_latest_queue(
