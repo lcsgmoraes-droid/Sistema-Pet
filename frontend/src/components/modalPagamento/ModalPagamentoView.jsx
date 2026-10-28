@@ -114,7 +114,7 @@ export default function ModalPagamentoView({
                 disabled={loading}
               />
             </div>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <ModalPagamentoFormaPanel
                 venda={venda}
                 formaPagamentoSelecionada={formaPagamentoSelecionada}
@@ -147,7 +147,7 @@ export default function ModalPagamentoView({
               />
 
               {/* Coluna Direita - Resumo */}
-              <div className="space-y-6">
+              <div className="min-w-0 space-y-6">
                 <ExcecaoPagamentoPanel
                   composicao={composicaoExcedente}
                   autorizacao={autorizacaoExcedente}
