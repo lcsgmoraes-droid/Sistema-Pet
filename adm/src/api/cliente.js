@@ -122,3 +122,5 @@ export const obter = (caminho) => api("GET", caminho);
 export const enviar = (caminho, corpo) => api("POST", caminho, { corpo });
 export const entrarNoPainel = (email, senha) =>
   pedir("POST", "/adm/auth/login", { corpo: { email, password: senha }, autenticado: false });
+export const alterar = (caminho, corpo) => api("PATCH", caminho, { corpo });
+export const substituir = (caminho, corpo) => api("PUT", caminho, { corpo });

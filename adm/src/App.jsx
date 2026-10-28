@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import { Carregando } from "./components/ui";
 import Layout from "./layout/Layout";
+import Consumo from "./pages/Consumo";
+import Creditos from "./pages/Creditos";
 import Dashboard from "./pages/Dashboard";
 import LojaDetalhe from "./pages/LojaDetalhe";
 import Lojas from "./pages/Lojas";
@@ -52,6 +54,8 @@ export default function App() {
         <Route index element={<Dashboard />} />
         <Route path="lojas" element={<Lojas />} />
         <Route path="lojas/:id" element={<LojaDetalhe />} />
+        <Route path="consumo-whatsapp" element={<Consumo />} />
+        <Route path="creditos-whatsapp" element={<Creditos />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

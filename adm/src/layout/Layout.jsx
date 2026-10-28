@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { KeyRound, LayoutDashboard, LogOut, Menu, Store, X } from "lucide-react";
+import { Coins, KeyRound, LayoutDashboard, LogOut, Menu, MessageSquare, Store, X } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 
 const ITENS = [
   { para: "/", rotulo: "Dashboard", icone: LayoutDashboard, fim: true },
   { para: "/lojas", rotulo: "Lojas", icone: Store },
+  { para: "/consumo-whatsapp", rotulo: "Consumo de WhatsApp", icone: MessageSquare },
+  { para: "/creditos-whatsapp", rotulo: "Créditos de WhatsApp", icone: Coins },
 ];
 
 const classeDoLink = ({ isActive }) =>
