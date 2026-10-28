@@ -837,7 +837,8 @@ jobs:
           python -m pytest tests/integration/test_ifood_pdv_pilot_postgres.py
           tests/integration/test_ifood_stock_sync_postgres.py
           tests/integration/test_ifood_stock_sync_live_postgres.py
-          tests/integration/test_venda_cancelamento_lotes_postgres.py -q
+          tests/integration/test_venda_cancelamento_lotes_postgres.py
+          tests/integration/test_bling_sync_virtual_stock_postgres.py -q
 
   quality-gate:
     name: Quality Gate

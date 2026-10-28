@@ -112,7 +112,6 @@ def enfileirar_kits_dependentes(
             Produto.id != produto_id,
         )
         .order_by(Produto.id.asc())
-        .distinct()
         .all()
     )
     resultados = []
