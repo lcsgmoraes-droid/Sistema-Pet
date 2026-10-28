@@ -183,11 +183,11 @@ export default function ModalPagamentoResumoLateral({
               {pagamentosExistentes.map((pag, idx) => (
                 <div
                   key={pag.id}
-                  className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
+                  className="flex flex-wrap items-start justify-between gap-3 p-3 bg-green-50 border border-green-200 rounded-lg"
                 >
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                      <div className="font-medium text-gray-900">
+                  <div className="min-w-0 flex-1 basis-40 break-words">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="min-w-0 max-w-full font-medium text-gray-900">
                         {pag.forma_pagamento === "dinheiro"
                           ? "💵 Dinheiro"
                           : pag.forma_pagamento === "pix"
@@ -200,7 +200,7 @@ export default function ModalPagamentoResumoLateral({
                                   ? "📄 Boleto"
                                   : pag.forma_pagamento}
                       </div>
-                      <span className="px-2 py-0.5 bg-green-200 text-green-800 text-xs rounded-full font-medium">
+                      <span className="max-w-full px-2 py-0.5 bg-green-200 text-green-800 text-xs rounded-full font-medium">
                         Pagamento {idx + 1}
                       </span>
                     </div>
@@ -229,8 +229,8 @@ export default function ModalPagamentoResumoLateral({
                       </p>
                     ) : null}
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="text-right">
+                  <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-3">
+                    <div className="min-w-0 max-w-full break-words text-right tabular-nums">
                       <div className="font-semibold text-green-700 text-lg">
                         {formatMoneyBRL(pag.valor)}
                       </div>
@@ -272,18 +272,18 @@ export default function ModalPagamentoResumoLateral({
               {pagamentos.map((pag, index) => (
                 <div
                   key={index}
-                  className={`flex items-center justify-between p-4 rounded-lg border ${
+                  className={`flex flex-wrap items-start justify-between gap-3 p-4 rounded-lg border ${
                     pag.is_cashback ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"
                   }`}
                 >
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                      <div className="font-medium text-gray-900">
+                  <div className="min-w-0 flex-1 basis-40 break-words">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="min-w-0 max-w-full font-medium text-gray-900">
                         {pag.is_cashback ? "💰 " : ""}
                         {pag.nome}
                       </div>
                       <span
-                        className={`px-2 py-0.5 text-xs rounded-full font-medium ${
+                        className={`max-w-full px-2 py-0.5 text-xs rounded-full font-medium ${
                           pag.is_cashback
                             ? "bg-green-200 text-green-800"
                             : "bg-blue-200 text-blue-800"
@@ -312,19 +312,19 @@ export default function ModalPagamentoResumoLateral({
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center space-x-3">
+                  <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-3">
                     <span
-                      className={`font-semibold text-lg ${pag.is_cashback ? "text-green-700" : "text-blue-700"}`}
+                      className={`min-w-0 max-w-full break-words text-right font-semibold text-lg tabular-nums ${pag.is_cashback ? "text-green-700" : "text-blue-700"}`}
                     >
                       {formatMoneyBRL(pag.valor)}
                     </span>
-                    <button
+                    <BotaoInteracao
+                      icon={X}
                       onClick={() => removerPagamento(index)}
-                      className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                      tamanho="pequeno"
+                      aria-label="Remover pagamento"
                       title="Remover"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
+                    />
                   </div>
                 </div>
               ))}

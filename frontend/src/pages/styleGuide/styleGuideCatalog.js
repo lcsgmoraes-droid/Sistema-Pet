@@ -180,6 +180,13 @@ export const styleGuideCatalog = [
           'Ação genérica com ícone livre — usado também para ações primárias fora do padrão salvar/cancelar/excluir (ex.: "Entrar" no login)',
       },
       {
+        nome: "BotaoSaldo",
+        status: "pronto",
+        arquivo: "components/v2/BotaoSaldo/BotaoSaldo.jsx",
+        descricao:
+          "Seleção de crédito ou cashback com saldo e limites em linhas próprias, altura automática, seleção controlada, help/error e modo escuro.",
+      },
+      {
         nome: "BotaoLink",
         status: "pronto",
         arquivo: "components/v2/BotaoLink/BotaoLink.jsx",

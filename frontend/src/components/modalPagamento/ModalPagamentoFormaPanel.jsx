@@ -2,6 +2,7 @@ import { Wallet, AlertCircle } from "lucide-react";
 
 import InputMoeda from "../v2/InputMoeda/InputMoeda";
 import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
+import BotaoSaldo from "../v2/BotaoSaldo/BotaoSaldo";
 import SeletorFormaRecebimento from "../v2/SeletorFormaRecebimento/SeletorFormaRecebimento";
 import CamposCartaoRecebimento from "../v2/CamposCartaoRecebimento/CamposCartaoRecebimento";
 import InputTexto from "../v2/InputTexto/InputTexto";
@@ -56,14 +57,21 @@ export default function ModalPagamentoFormaPanel({
   return (
     <>
       {/* Coluna Esquerda - Seleção de Pagamentos */}
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         <div>
           <h3 className="font-semibold text-gray-900 mb-4">Selecione a forma de pagamento</h3>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {/* Crédito Cliente (exibir primeiro se disponível) */}
             {venda.cliente && saldoCreditoDisponivel > 0 && (
-              <BotaoInteracao
+              <BotaoSaldo
+                label="Crédito Cliente"
+                saldo={saldoCreditoDisponivel}
+                icone="🎁"
+                selecionado={formaPagamentoSelecionada?.id === "credito_cliente"}
+                detalhes={[
+                  `Até ${formatMoneyBRL(Math.min(saldoCreditoDisponivel, valorRestante))} nesta venda`,
+                ]}
                 onClick={() => {
                   setFormaPagamentoSelecionada({
                     id: "credito_cliente",
@@ -78,31 +86,22 @@ export default function ModalPagamentoFormaPanel({
                   // Pre-preencher com o menor valor entre crédito e valor restante
                   setValorRecebido(Math.min(saldoCreditoDisponivel, valorRestante));
                 }}
-                className={`p-4 rounded-lg border-2 transition-all ${
-                  formaPagamentoSelecionada?.id === "credito_cliente"
-                    ? "border-purple-500 bg-purple-50"
-                    : "border-purple-200 bg-purple-50/50 hover:border-purple-300"
-                }`}
-              >
-                <div className="text-2xl mb-1">🎁</div>
-                <div
-                  className={`text-sm font-medium ${
-                    formaPagamentoSelecionada?.id === "credito_cliente"
-                      ? "text-purple-900"
-                      : "text-purple-700"
-                  }`}
-                >
-                  Crédito Cliente
-                </div>
-                <div className="text-xs text-purple-600 mt-1 font-semibold">
-                  {formatMoneyBRL(saldoCreditoDisponivel)}
-                </div>
-              </BotaoInteracao>
+              />
             )}
 
             {/* Cashback de campanhas (exibir se disponível) */}
             {venda.cliente && saldoCashbackTotal > 0 && (
-              <BotaoInteracao
+              <BotaoSaldo
+                label="Cashback"
+                saldo={saldoCashbackTotal}
+                icone="💰"
+                selecionado={formaPagamentoSelecionada?.id === "cashback"}
+                detalhes={[
+                  `Até ${formatMoneyBRL(Math.min(saldoCashback, valorRestante))} nesta venda`,
+                  ...(cashbackLimitPercent !== null
+                    ? [`Limite: ${formatPercent(cashbackLimitPercent)} da compra`]
+                    : []),
+                ]}
                 disabled={saldoCashback <= 0}
                 onClick={() => {
                   setFormaPagamentoSelecionada({
@@ -116,37 +115,10 @@ export default function ModalPagamentoFormaPanel({
                   setNsuCartao("");
                   setValorRecebido(Math.min(saldoCashback, valorRestante));
                 }}
-                className={`p-4 rounded-lg border-2 transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
-                  formaPagamentoSelecionada?.id === "cashback"
-                    ? "border-green-500 bg-green-50"
-                    : "border-green-200 bg-green-50/50 hover:border-green-300"
-                }`}
-              >
-                <div className="text-2xl mb-1">💰</div>
-                <div
-                  className={`text-sm font-medium ${
-                    formaPagamentoSelecionada?.id === "cashback"
-                      ? "text-green-900"
-                      : "text-green-700"
-                  }`}
-                >
-                  Cashback
-                </div>
-                <div className="text-xs text-green-700 mt-1">
-                  Saldo: {formatMoneyBRL(saldoCashbackTotal)}
-                </div>
-                <div className="text-xs text-green-600 mt-1 font-semibold">
-                  Até {formatMoneyBRL(Math.min(saldoCashback, valorRestante))}
-                </div>
-                {cashbackLimitPercent !== null && (
-                  <div className="text-xs text-green-700 mt-1">
-                    Limite: {formatPercent(cashbackLimitPercent)} da compra
-                  </div>
-                )}
-              </BotaoInteracao>
+              />
             )}
 
-            <div className="col-span-2 min-w-0">
+            <div className="min-w-0 sm:col-span-2">
               <SeletorFormaRecebimento
                 formas={formasPagamento}
                 value={formaPagamentoSelecionada?.id}
