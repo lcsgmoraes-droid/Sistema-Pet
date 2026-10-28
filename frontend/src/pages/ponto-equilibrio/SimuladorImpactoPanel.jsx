@@ -1,6 +1,10 @@
 import { formatMoneyBRL } from "../../utils/formatters";
 import { CENARIOS_RAPIDOS, DEFAULT_IMPACTO_FORM } from "./pontoEquilibrioConstants";
 import { formatarImpactoMoeda, formatarImpactoVendas } from "./pontoEquilibrioUtils";
+import {
+  descreverRentabilidadePendente,
+  temRentabilidadePendente,
+} from "../../components/financeiro/vendasFinanceiro/rentabilidadePendente";
 
 export default function SimuladorImpactoPanel({
   dados,
@@ -152,7 +156,9 @@ export default function SimuladorImpactoPanel({
         </div>
       ) : (
         <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          A simulacao depende de margem de contribuicao positiva no periodo selecionado.
+          {temRentabilidadePendente(dados)
+            ? descreverRentabilidadePendente(dados)
+            : "A simulacao depende de margem de contribuicao positiva no periodo selecionado."}
         </div>
       )}
     </div>

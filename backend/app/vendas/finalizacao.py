@@ -24,6 +24,14 @@ from app.vendas.finalizacao_pagamentos import (
     _calcular_pagamentos_finalizacao,
     consumir_cupom_finalizacao,
     processar_pagamentos_finalizacao,
+    preparar_formas_pagamentos_finalizacao,
+    _natureza_pagamento,
+)
+from app.vendas.pagamento_excedente import (
+    registrar_excesso_pagamento,
+    snapshot_pagamentos_excedente,
+    validar_excesso_pagamento,
+    buscar_justificativa_excesso,
 )
 from app.vendas.finalizacao_pos_commit import processar_pos_commit_finalizacao
 from app.vendas.finalizacao_recebiveis import (
@@ -59,6 +67,8 @@ def finalizar_venda(
     motivo_liberacao_crediario: Optional[str] = None,
     nao_gerar_beneficios: bool = False,
     justificativa_nao_gerar_beneficios: Optional[str] = None,
+    justificativa_pagamento_excedente: Optional[str] = None,
+    contexto_pagamento_excedente=None,
     *,
     processar_baixa_estoque_item: Callable[..., List[Dict[str, Any]]],
 ) -> Dict[str, Any]:
@@ -154,6 +164,7 @@ def finalizar_venda(
             caixa_id=caixa_id,
             permitir_caixa_tenant=permitir_caixa_tenant,
             permitir_fechado=data_ocorrencia is not None,
+            exigir_selecao=True,
         )
         caixa_aberto_id = caixa_info["caixa_id"]
         logger.debug(f"✅ Caixa validado: ID={caixa_aberto_id}")
@@ -201,6 +212,12 @@ def finalizar_venda(
                 detail=f"Apenas vendas abertas ou com baixa parcial podem receber pagamentos (status atual: {venda.status})",
             )
 
+        from app.integrations.ifood.pdv_pilot import prepare_pilot_finalization
+
+        pilot_bridge = prepare_pilot_finalization(
+            db, venda, pagamentos, cupom_code=cupom_code
+        )
+
         exigir_vendedor_pdv(
             db,
             tenant_id,
@@ -221,6 +238,7 @@ def finalizar_venda(
         pagamentos_existentes = (
             db.query(VendaPagamento)
             .filter_by(venda_id=venda.id, tenant_id=tenant_id)
+            .populate_existing()
             .all()
         )
         if nao_gerar_beneficios and not venda.nao_gerar_beneficios:
@@ -250,14 +268,81 @@ def finalizar_venda(
                 commit=False,
             )
         total_venda = float(moeda(venda.total))
+        from app.financeiro_models import ContaReceber
+        from sqlalchemy.orm.attributes import set_committed_value
+
+        contas = (
+            db.query(ContaReceber)
+            .filter(
+                ContaReceber.tenant_id == tenant_id, ContaReceber.venda_id == venda.id
+            )
+            .populate_existing()
+            .with_for_update()
+            .all()
+        )
+        set_committed_value(venda, "pagamentos", pagamentos_existentes)
+        set_committed_value(venda, "contas_receber", contas)
+        fotografia_pagamentos = snapshot_pagamentos_excedente(db, venda, tenant_id)
+        preparar_formas_pagamentos_finalizacao(db, tenant_id, pagamentos)
+        if moeda(fotografia_pagamentos["creditos_utilizados"]) > moeda(total_venda):
+            raise HTTPException(
+                400,
+                "Revise os créditos e benefícios: o valor utilizado excede o total da venda.",
+            )
+        if moeda(fotografia_pagamentos["crediario_pendente"]) > 0 and moeda(
+            fotografia_pagamentos["total_ja_pago"]
+        ) + moeda(fotografia_pagamentos["crediario_pendente"]) > moeda(total_venda):
+            raise HTTPException(
+                400, "Revise as parcelas do crediário antes de finalizar a venda."
+            )
+        excesso_refinalizacao = None
+        if not pagamentos and moeda(fotografia_pagamentos["total_ja_pago"]) > moeda(
+            total_venda
+        ):
+            contexto_atual = {
+                "total_venda": total_venda,
+                "total_ja_pago": fotografia_pagamentos["total_ja_pago"],
+                "total_novos_pagamentos": 0,
+                "crediario_pendente": fotografia_pagamentos["crediario_pendente"],
+            }
+            autorizada = buscar_justificativa_excesso(
+                db, venda=venda, tenant_id=tenant_id, contexto=contexto_atual
+            )
+            if (
+                not autorizada
+                or justificativa_pagamento_excedente
+                or contexto_pagamento_excedente is not None
+            ):
+                excesso_refinalizacao = validar_excesso_pagamento(
+                    **contexto_atual,
+                    justificativa=justificativa_pagamento_excedente,
+                    contexto=contexto_pagamento_excedente,
+                )
         totais_pagamento = _calcular_pagamentos_finalizacao(
             total_venda=total_venda,
             pagamentos_existentes=pagamentos_existentes,
             pagamentos_novos=pagamentos,
+            total_ja_pago_canonico=fotografia_pagamentos["total_ja_pago"],
+            crediario_pendente=fotografia_pagamentos["crediario_pendente"],
+            creditos_ja_utilizados=fotografia_pagamentos["creditos_utilizados"],
+            justificativa_pagamento_excedente=justificativa_pagamento_excedente,
+            contexto_pagamento_excedente=contexto_pagamento_excedente,
         )
         total_ja_pago = totais_pagamento["total_ja_pago"]
         total_novos_pagamentos = totais_pagamento["total_novos_pagamentos"]
         total_pagamentos = totais_pagamento["total_pagamentos"]
+        registrar_excesso_pagamento(
+            db,
+            venda=venda,
+            tenant_id=tenant_id,
+            usuario_id=user_id,
+            usuario_nome=user_nome,
+            validacao=totais_pagamento.get("excesso_pagamento")
+            or excesso_refinalizacao,
+            origem="finalizacao",
+            pagamentos_antes=fotografia_pagamentos["pagamentos"],
+            pagamentos_novos=pagamentos,
+        )
 
         logger.info(
             f"💰 Totais: Venda=R$ {total_venda:.2f}, "
@@ -370,7 +455,10 @@ def finalizar_venda(
         # Receber outra parcela ou concluir o pagamento não gera nova saída.
 
         estoque_baixado = []
-        deve_baixar_estoque = status_anterior not in {"aberta", "baixa_parcial"}
+        deve_baixar_estoque = pilot_bridge is not None or status_anterior not in {
+            "aberta",
+            "baixa_parcial",
+        }
 
         if deve_baixar_estoque:
             logger.info("📦 Baixando estoque de venda sem saída anterior")
@@ -470,9 +558,9 @@ def finalizar_venda(
                     user_id=user_id,
                     tenant_id=tenant_id,
                     pagamentos_anteriores=pagamentos_existentes,
-                    data_recebimento=data_ocorrencia.date()
-                    if data_ocorrencia
-                    else None,
+                    data_recebimento=(
+                        data_ocorrencia.date() if data_ocorrencia else None
+                    ),
                 )
             )
             valor_ja_baixado = sum(
@@ -577,6 +665,9 @@ def finalizar_venda(
                 commit=False,
             )
 
+        from app.integrations.ifood.pdv_pilot import complete_pilot_finalization
+
+        complete_pilot_finalization(db, pilot_bridge)
         db.commit()
         logger.info(
             f"✅ ✅ ✅ COMMIT REALIZADO - Venda #{venda.numero_venda} finalizada com sucesso! ✅ ✅ ✅"
@@ -647,6 +738,10 @@ def finalizar_venda(
             contas_criadas_ids=contas_criadas_ids,
         )
 
+        # SessionLocal preserva o cache no commit. A resposta precisa recarregar
+        # os pagamentos e recebiveis gravados, em vez da fotografia anterior.
+        db.expire(venda, ["pagamentos", "contas_receber"])
+
         # Preparar retorno
         return {
             "venda": {
@@ -654,10 +749,38 @@ def finalizar_venda(
                 "numero_venda": venda.numero_venda,
                 "status": venda.status,
                 "total": float(venda.total),
-                "total_pago": total_pagamentos,
-                "data_finalizacao": venda.data_finalizacao.isoformat()
-                if venda.data_finalizacao
-                else None,
+                "total_pago": min(total_pagamentos, total_venda),
+                "total_recebido": float(
+                    moeda(fotografia_pagamentos["recebido_monetario"])
+                    + sum(
+                        (
+                            moeda(p["valor"])
+                            for p in pagamentos
+                            if _natureza_pagamento(p) in {"dinheiro", "monetario"}
+                        ),
+                        Decimal("0"),
+                    )
+                ),
+                "excedente_recebido": float(
+                    max(
+                        moeda(fotografia_pagamentos["total_ja_pago"])
+                        + sum(
+                            (
+                                moeda(p["valor"])
+                                for p in pagamentos
+                                if _natureza_pagamento(p) != "plano"
+                            ),
+                            Decimal("0"),
+                        )
+                        - moeda(total_venda),
+                        Decimal("0"),
+                    )
+                ),
+                "data_finalizacao": (
+                    venda.data_finalizacao.isoformat()
+                    if venda.data_finalizacao
+                    else None
+                ),
             },
             "operacoes": {
                 "estoque_baixado": estoque_baixado,

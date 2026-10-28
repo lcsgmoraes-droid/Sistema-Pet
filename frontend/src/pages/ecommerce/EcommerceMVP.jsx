@@ -22,6 +22,7 @@ import useEcommercePaymentReturn from "./useEcommercePaymentReturn";
 import useEcommerceProductModal from "./useEcommerceProductModal";
 import useEcommerceStorefrontRuntime from "./useEcommerceStorefrontRuntime";
 import useEcommerceSeo from "./useEcommerceSeo";
+import { buildProductUrl } from "./ecommerceProductLinks";
 import {
   setEcommerceAnalyticsContext,
   trackPageView,
@@ -62,7 +63,6 @@ export default function EcommerceMVP() {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [loading, setLoading] = useState(false);
   const {
-    products,
     setProducts,
     catalogMeta,
     setCatalogMeta,
@@ -87,15 +87,9 @@ export default function EcommerceMVP() {
     categorias,
     filteredProducts,
     productMap,
+    cacheProduct,
     clearCatalogFilters,
   } = useEcommerceCatalog();
-  const {
-    selectedProduct,
-    activeProductImage,
-    setActiveProductImage,
-    openProductDetails,
-    closeProductModal,
-  } = useEcommerceProductModal({ products, location, navigate });
   const [customerToken, setCustomerToken] = useState(localStorage.getItem(STORAGE_TOKEN_KEY) || "");
 
   const [error, setError] = useState("");
@@ -136,6 +130,29 @@ export default function EcommerceMVP() {
   }, [customerToken]);
 
   const storefrontRef = tenantContext?.ecommerce_slug || tenantRef || "";
+  const {
+    selectedProduct,
+    activeProductImage,
+    productLoading,
+    productError,
+    setActiveProductImage,
+    openProductDetails,
+    closeProductModal,
+  } = useEcommerceProductModal({
+    location,
+    navigate,
+    tenantRef: tenantRef || tenantContext?.id,
+  });
+
+  useEffect(() => {
+    if (selectedProduct) cacheProduct(selectedProduct);
+  }, [cacheProduct, selectedProduct]);
+
+  const productUrl = buildProductUrl(
+    { origin: window.location.origin, pathname: location.pathname, search: location.search },
+    selectedProduct?.id,
+    tenantRef || tenantContext?.id,
+  );
 
   useEffect(() => {
     if (!storefrontRef) {
@@ -180,6 +197,7 @@ export default function EcommerceMVP() {
     tenantContext,
     storeDisplayName,
     selectedProduct,
+    canonicalUrl: productUrl,
   });
 
   const catalogPagination = useMemo(() => {
@@ -442,7 +460,7 @@ export default function EcommerceMVP() {
   useEffect(() => {
     if (!tenantRef && tenantContext?.id) {
       if (tenantContext.ecommerce_slug) {
-        navigate(`/${tenantContext.ecommerce_slug}`, { replace: true });
+        navigate(`/${tenantContext.ecommerce_slug}${location.search}`, { replace: true });
       }
     }
   }, [tenantContext?.ecommerce_slug, tenantContext?.id, tenantRef]);
@@ -671,10 +689,15 @@ export default function EcommerceMVP() {
       )}
 
       {/* ALERTAS */}
-      {(error || success) && (
+      {(error || productError || success) && (
         <div style={{ padding: "0 20px" }}>
           <div style={{ maxWidth: 1280, margin: "0 auto" }}>
             {error && <div style={S.alertError}>⚠️ {error}</div>}
+            {productError && (
+              <div role="alert" style={S.alertError}>
+                {productError}
+              </div>
+            )}
             {success && <div style={S.alertSuccess}>✓ {success}</div>}
           </div>
         </div>
@@ -726,23 +749,35 @@ export default function EcommerceMVP() {
         />
       )}
 
+      {productLoading && (
+        <div
+          role="status"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 60,
+            display: "grid",
+            placeItems: "center",
+            background: "rgba(15,23,42,0.65)",
+            color: "#fff",
+            fontWeight: 700,
+          }}
+        >
+          Carregando produto…
+        </div>
+      )}
+
       {selectedProduct && (
         <EcommerceProductDetailModal
           activeImage={activeProductImage}
           isMobile={isMobile}
           product={selectedProduct}
+          productUrl={productUrl}
           variations={selectedProductVariations}
           styles={S}
           wishlist={wishlist}
           onAddToCart={addToCart}
           onClose={closeProductModal}
-          onCopyLink={(product) => {
-            const url = `${window.location.origin}${location.pathname}?produto=${product.id}`;
-            navigator.clipboard
-              ?.writeText(url)
-              .then(() => setSuccess("Link copiado!"))
-              .catch(() => setSuccess(`Link: ${url}`));
-          }}
           onImageChange={setActiveProductImage}
           onNotifyMe={registerNotifyMe}
           onSelectVariation={openProductDetails}

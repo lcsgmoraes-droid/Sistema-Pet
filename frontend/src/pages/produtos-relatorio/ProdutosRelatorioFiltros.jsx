@@ -1,7 +1,34 @@
-import { X } from "lucide-react";
+import BuscaProduto from "../../components/v2/BuscaProduto/BuscaProduto";
+import { RefreshCw } from "lucide-react";
 import ProductIdentity from "../../components/ui/ProductIdentity";
+import BotaoCancelar from "../../components/v2/BotaoCancelar/BotaoCancelar";
+import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
+import BotaoLink from "../../components/v2/BotaoLink/BotaoLink";
+import InputCombobox from "../../components/v2/InputCombobox/InputCombobox";
+import InputData from "../../components/v2/InputData/InputData";
+import InputTexto from "../../components/v2/InputTexto/InputTexto";
+import SeletorOpcoes from "../../components/v2/SeletorOpcoes/SeletorOpcoes";
 import { PERIODOS } from "./produtosRelatorioConstants";
-import { formatarQuantidade } from "./produtosRelatorioFormatters";
+
+const OPCOES_QUANTIDADE = [
+  { value: "", label: "Todas as quantidades" },
+  { value: "acima_de", label: "Acima de" },
+  { value: "abaixo_de", label: "Abaixo de" },
+  { value: "igual_a", label: "Igual a" },
+];
+
+const OPCOES_MOVIMENTACAO = [
+  { value: "", label: "Todos os tipos" },
+  { value: "entrada", label: "Entrada" },
+  { value: "saida", label: "Saída" },
+  { value: "transferencia", label: "Transferência" },
+];
+
+const OPCOES_PAGINA = [20, 50, 100].map((value) => ({ value, label: String(value) }));
+const OPCOES_PERIODO = PERIODOS.map((periodo) => ({
+  valor: periodo.value,
+  rotulo: periodo.label,
+}));
 
 export default function ProdutosRelatorioFiltros({
   periodoSelecionado,
@@ -12,6 +39,7 @@ export default function ProdutosRelatorioFiltros({
   dropdownAberto,
   loadingBuscaProduto,
   buscaRef,
+  erroQuantidade = "",
   onSubmit,
   onPeriodoChange,
   onDataInicioChange,
@@ -19,176 +47,134 @@ export default function ProdutosRelatorioFiltros({
   onFiltroChange,
   onBuscaProdutoChange,
   onBuscaProdutoFocus,
-  onLimparBuscaProduto,
+  onLimparBuscaProduto: _onLimparBuscaProduto,
   onSelecionarProduto,
   onLimparProduto,
   onLimparFiltros,
 }) {
+  const unidade = produtoSelecionado?.unidade || produtoSelecionado?.unidade_medida;
+  const unidadeLabel = unidade ? String(unidade).toLowerCase() : "unidade do produto";
+
   return (
-    <form onSubmit={onSubmit} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-wrap gap-2">
-        {PERIODOS.map((periodo) => (
-          <button
-            key={periodo.value}
-            type="button"
-            onClick={() => onPeriodoChange(periodo)}
-            className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
-              periodoSelecionado === periodo.value
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            {periodo.label}
-          </button>
-        ))}
-      </div>
+    <form
+      onSubmit={onSubmit}
+      className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+    >
+      <SeletorOpcoes
+        rotulo="Período"
+        opcoes={OPCOES_PERIODO}
+        valorSelecionado={periodoSelecionado}
+        aoSelecionar={(valor) =>
+          onPeriodoChange(PERIODOS.find((periodo) => periodo.value === valor))
+        }
+      />
 
       <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Data inicio</label>
-          <input
-            type="date"
-            value={filtrosForm.data_inicio}
-            onChange={(event) => onDataInicioChange(event.target.value)}
-            className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-          />
-        </div>
+        <InputData
+          id="relatorio-data-inicio"
+          label="Data início"
+          value={filtrosForm.data_inicio}
+          onChange={onDataInicioChange}
+        />
 
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Data fim</label>
-          <input
-            type="date"
-            value={filtrosForm.data_fim}
-            onChange={(event) => onDataFimChange(event.target.value)}
-            className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-          />
-        </div>
+        <InputData
+          id="relatorio-data-fim"
+          label="Data fim"
+          value={filtrosForm.data_fim}
+          onChange={onDataFimChange}
+        />
 
         <div className="relative md:col-span-2" ref={buscaRef}>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Produto</label>
           {produtoSelecionado ? (
-            <div className="flex min-h-[46px] items-center gap-3 rounded-xl border border-blue-300 bg-blue-50 px-3 py-2">
-              <div className="min-w-0 flex-1">
-                <ProductIdentity
-                  product={produtoSelecionado}
-                  className="max-w-full"
-                  nameClassName="text-sm font-semibold text-gray-900"
-                  codeClassName="text-xs text-gray-600"
-                />
+            <div>
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                Produto
+              </span>
+              <div className="mt-1 flex min-h-9 items-center gap-3 rounded-lg border border-blue-300 bg-blue-50 px-3 py-1 dark:border-blue-700 dark:bg-blue-950">
+                <div className="min-w-0 flex-1">
+                  <ProductIdentity
+                    product={produtoSelecionado}
+                    className="max-w-full"
+                    nameClassName="text-sm font-semibold text-gray-900 dark:text-slate-100"
+                    codeClassName="text-xs text-gray-600 dark:text-slate-400"
+                  />
+                </div>
+                <BotaoLink onClick={onLimparProduto}>Limpar</BotaoLink>
               </div>
-              <button
-                type="button"
-                onClick={onLimparProduto}
-                className="rounded-lg px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
-              >
-                Limpar
-              </button>
             </div>
           ) : (
-            <div className="relative">
-              <input
-                type="text"
-                value={buscaProduto}
-                onChange={(event) => onBuscaProdutoChange(event.target.value)}
-                onFocus={onBuscaProdutoFocus}
-                placeholder="Buscar por nome, codigo, SKU ou codigo de barras"
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 pr-10 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-              />
-              {buscaProduto && (
-                <button
-                  type="button"
-                  onClick={onLimparBuscaProduto}
-                  aria-label="Limpar busca de produto"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-red-500"
-                >
-                  <X className="h-4 w-4" aria-hidden="true" />
-                </button>
-              )}
-              {dropdownAberto && (buscaProduto.trim().length >= 2 || loadingBuscaProduto) && (
-                <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
-                  {loadingBuscaProduto ? (
-                    <div className="px-4 py-3 text-sm text-gray-500">Buscando produtos...</div>
-                  ) : sugestoesProdutos.length === 0 ? (
-                    <div className="px-4 py-3 text-sm text-gray-500">
-                      Nenhum produto encontrado para esse termo.
-                    </div>
-                  ) : (
-                    sugestoesProdutos.map((produto) => (
-                      <button
-                        key={produto.id}
-                        type="button"
-                        onMouseDown={() => onSelecionarProduto(produto)}
-                        className="flex w-full items-start justify-between gap-3 border-b border-gray-100 px-4 py-3 text-left transition-colors hover:bg-blue-50 last:border-b-0"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-gray-900">
-                            {produto.nome}
-                          </p>
-                          <p className="truncate text-xs text-gray-500">
-                            {[produto.codigo, produto.sku, produto.codigo_barras]
-                              .filter(Boolean)
-                              .join(" | ")}
-                          </p>
-                        </div>
-                        <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-700">
-                          Estoque {formatarQuantidade(produto.estoque_atual)}
-                        </span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
+            <BuscaProduto
+              id="relatorio-busca-produto"
+              label="Produto"
+              value={buscaProduto}
+              onChange={onBuscaProdutoChange}
+              onFocus={onBuscaProdutoFocus}
+              suggestions={sugestoesProdutos}
+              showSuggestions={dropdownAberto}
+              loading={loadingBuscaProduto}
+              onSelect={onSelecionarProduto}
+              placeholder="Buscar por nome, código, SKU ou código de barras"
+            />
           )}
         </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Tipo da movimentacao
-          </label>
-          <select
-            value={filtrosForm.tipo_movimentacao}
-            onChange={(event) => onFiltroChange("tipo_movimentacao", event.target.value)}
-            className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="">Todos os tipos</option>
-            <option value="entrada">Entrada</option>
-            <option value="saida">Saida</option>
-            <option value="transferencia">Transferencia</option>
-          </select>
-        </div>
+        <InputCombobox
+          id="relatorio-tipo-movimentacao"
+          label="Tipo da movimentação"
+          value={filtrosForm.tipo_movimentacao}
+          opcoes={OPCOES_MOVIMENTACAO}
+          permitirLimpar={false}
+          onChange={(value) => onFiltroChange("tipo_movimentacao", value)}
+        />
       </div>
 
-      <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium text-gray-700">Itens por pagina</label>
-          <select
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <InputCombobox
+          id="relatorio-quantidade-operador"
+          label="Quantidade por item / movimentação"
+          value={filtrosForm.quantidade_operador || ""}
+          opcoes={OPCOES_QUANTIDADE}
+          permitirLimpar={false}
+          onChange={(value) => onFiltroChange("quantidade_operador", value)}
+        />
+        <InputTexto
+          id="relatorio-quantidade-valor"
+          label={`Quantidade (${unidadeLabel})`}
+          inputMode="decimal"
+          value={filtrosForm.quantidade_valor ?? ""}
+          onChange={(value) => onFiltroChange("quantidade_valor", value)}
+          disabled={!filtrosForm.quantidade_operador}
+          placeholder="Ex.: 1 ou 0,5"
+          error={erroQuantidade}
+          help={
+            unidadeLabel === "kg"
+              ? "1 kg = 1. Para 500 g, informe 0,5."
+              : "Informe na unidade de cadastro do produto."
+          }
+        />
+        <p className="self-center text-xs text-slate-500 dark:text-slate-400 md:col-span-2 xl:col-span-3">
+          Acima e abaixo não incluem o valor informado. Use Igual a para a quantidade exata. Para
+          consultar o fracionamento vendido, veja o histórico de vendas e as movimentações de saída.
+        </p>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div className="w-full md:w-40">
+          <InputCombobox
+            id="relatorio-itens-pagina"
+            label="Itens por página"
             value={filtrosForm.page_size}
-            onChange={(event) => onFiltroChange("page_size", Number(event.target.value))}
-            className="rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-          >
-            {[20, 50, 100].map((opcao) => (
-              <option key={opcao} value={opcao}>
-                {opcao}
-              </option>
-            ))}
-          </select>
+            opcoes={OPCOES_PAGINA}
+            permitirLimpar={false}
+            onChange={(value) => onFiltroChange("page_size", Number(value))}
+          />
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={onLimparFiltros}
-            className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
-          >
-            Limpar filtros
-          </button>
-          <button
-            type="submit"
-            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-          >
+          <BotaoCancelar onClick={onLimparFiltros}>Limpar filtros</BotaoCancelar>
+          <BotaoInteracao type="submit" icon={RefreshCw}>
             Atualizar painel
-          </button>
+          </BotaoInteracao>
         </div>
       </div>
     </form>

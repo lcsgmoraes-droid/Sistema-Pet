@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import BuscaPessoa from "../v2/BuscaPessoa/BuscaPessoa";
 import { Calendar, DollarSign, FileText, Plus, Repeat, Tag, User, X } from "lucide-react";
 
 export default function ModalNovaContaReceberContent({
@@ -27,6 +29,11 @@ export default function ModalNovaContaReceberContent({
   showModalCategoria,
   subcategoriasDRE,
 }) {
+  const [buscaPessoa, setBuscaPessoa] = useState("");
+  useEffect(() => {
+    const pessoa = clientes.find((item) => Number(item.id) === Number(dados.cliente_id));
+    if (pessoa) setBuscaPessoa([pessoa.codigo, pessoa.nome].filter(Boolean).join(" · "));
+  }, [dados.cliente_id, clientes]);
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
       <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full m-4 max-h-[90vh] overflow-y-auto">
@@ -65,23 +72,20 @@ export default function ModalNovaContaReceberContent({
                   <User size={16} className="inline mr-1" />
                   Cliente
                 </label>
-                <select
-                  value={dados.cliente_id || ""}
-                  onChange={(e) =>
-                    setDados({
-                      ...dados,
-                      cliente_id: e.target.value ? parseInt(e.target.value) : null,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Selecione...</option>
-                  {clientes.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nome}
-                    </option>
-                  ))}
-                </select>
+                <BuscaPessoa
+                  label="Cliente"
+                  value={buscaPessoa}
+                  showSuggestions
+                  autoSearch={!dados.cliente_id}
+                  onChange={(texto) => {
+                    setBuscaPessoa(texto);
+                    setDados((atual) => ({ ...atual, cliente_id: null }));
+                  }}
+                  onSelect={(pessoa) => {
+                    setBuscaPessoa([pessoa.codigo, pessoa.nome].filter(Boolean).join(" · "));
+                    setDados((atual) => ({ ...atual, cliente_id: pessoa.id }));
+                  }}
+                />
               </div>
 
               <div>

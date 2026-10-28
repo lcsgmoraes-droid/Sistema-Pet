@@ -22,28 +22,33 @@ router = APIRouter()
 
 
 @router.get(
-    "/fechamentos/pendencias", response_model=BanhoTosaFechamentoPendenciasResponse
+    "/fechamentos/pendencias",
+    response_model=BanhoTosaFechamentoPendenciasResponse,
+    responses={422: {"description": "Limite de pendencias ou cursor invalido."}},
 )
 def listar_pendencias_de_fechamento(
     limit: int = Query(200, ge=1, le=500),
+    cursor: int | None = Query(None, ge=1),
     db: Session = Depends(get_session),
     current=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = _get_tenant(current)
-    return listar_pendencias_fechamento(db, tenant_id, limit=limit)
+    return listar_pendencias_fechamento(db, tenant_id, limit=limit, cursor=cursor)
 
 
 @router.post(
     "/fechamentos/pendencias/sincronizar",
     response_model=BanhoTosaFechamentoSincronizacaoLoteResponse,
+    responses={422: {"description": "Limite de pendencias ou cursor invalido."}},
 )
 def sincronizar_pendencias_de_fechamento(
     limit: int = Query(200, ge=1, le=500),
+    cursor: int | None = Query(None, ge=1),
     db: Session = Depends(get_session),
     current=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = _get_tenant(current)
-    return sincronizar_pendencias_fechamento(db, tenant_id, limit=limit)
+    return sincronizar_pendencias_fechamento(db, tenant_id, limit=limit, cursor=cursor)
 
 
 @router.post(

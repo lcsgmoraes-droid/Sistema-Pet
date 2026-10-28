@@ -1,10 +1,19 @@
 import { useState } from "react";
-import { Calculator, Printer, Receipt, X } from "lucide-react";
-import CustomerIdentity from "../ui/CustomerIdentity";
-import SaleReference from "../ui/SaleReference";
+import { Calculator, Printer, Receipt, RefreshCw, X } from "lucide-react";
 import { formatBRL, formatMoneyBRL } from "../../utils/formatters";
 import CurrencyInput from "../CurrencyInput";
 import ImpressaoResumoCaixa from "./ImpressaoResumoCaixa";
+import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
+import ResumoFaturamento from "../v2/ResumoFaturamento/ResumoFaturamento";
+import { periodoFaturamento } from "../v2/ResumoFaturamento/faturamentoPresentation";
+import RecebimentosCaixaPanel from "./RecebimentosCaixaPanel";
+import ConferenciaCaixaItem from "./ConferenciaCaixaItem";
+import IdentificacaoPixItem from "./IdentificacaoPixItem";
+import {
+  classeConferenciaCaixa,
+  localizarLancamentoConferencia,
+  localizarVendaConferencia,
+} from "../../utils/conferenciaFechamentoUtils";
 
 export function CashCountPanel({
   aplicarContagem,
@@ -54,7 +63,7 @@ export function CashCountPanel({
                   <span className="text-xs text-gray-500">×</span>
                 </div>
                 <span className="text-lg font-bold text-gray-600">
-                  R$ {((parseInt(notas.n2) || 0) * 2).toFixed(2)}
+                  R$ {formatBRL((parseInt(notas.n2) || 0) * 2)}
                 </span>
               </div>
             </div>
@@ -78,7 +87,7 @@ export function CashCountPanel({
                   <span className="text-xs text-gray-500">×</span>
                 </div>
                 <span className="text-lg font-bold text-purple-600">
-                  R$ {((parseInt(notas.n5) || 0) * 5).toFixed(2)}
+                  R$ {formatBRL((parseInt(notas.n5) || 0) * 5)}
                 </span>
               </div>
             </div>
@@ -102,7 +111,7 @@ export function CashCountPanel({
                   <span className="text-xs text-gray-500">×</span>
                 </div>
                 <span className="text-lg font-bold text-red-600">
-                  R$ {((parseInt(notas.n10) || 0) * 10).toFixed(2)}
+                  R$ {formatBRL((parseInt(notas.n10) || 0) * 10)}
                 </span>
               </div>
             </div>
@@ -126,7 +135,7 @@ export function CashCountPanel({
                   <span className="text-xs text-gray-500">×</span>
                 </div>
                 <span className="text-lg font-bold text-yellow-600">
-                  R$ {((parseInt(notas.n20) || 0) * 20).toFixed(2)}
+                  R$ {formatBRL((parseInt(notas.n20) || 0) * 20)}
                 </span>
               </div>
             </div>
@@ -150,7 +159,7 @@ export function CashCountPanel({
                   <span className="text-xs text-gray-500">×</span>
                 </div>
                 <span className="text-lg font-bold text-blue-600">
-                  R$ {((parseInt(notas.n50) || 0) * 50).toFixed(2)}
+                  R$ {formatBRL((parseInt(notas.n50) || 0) * 50)}
                 </span>
               </div>
             </div>
@@ -174,7 +183,7 @@ export function CashCountPanel({
                   <span className="text-xs text-gray-500">×</span>
                 </div>
                 <span className="text-lg font-bold text-green-600">
-                  R$ {((parseInt(notas.n100) || 0) * 100).toFixed(2)}
+                  R$ {formatBRL((parseInt(notas.n100) || 0) * 100)}
                 </span>
               </div>
             </div>
@@ -235,213 +244,154 @@ export function CashCountPanel({
   );
 }
 
-export function PaymentBreakdownPanel({
-  carregarVendasForma,
-  formaExpandida,
-  loadingVendas,
-  resumo,
-  setFormaExpandida,
-  vendasDetalhe,
-}) {
+export function PaymentBreakdownPanel({ resumo, conferencia }) {
   const [imprimindo, setImprimindo] = useState(false);
-  const formas = Object.entries(resumo.vendas_por_forma_pagamento || {});
   const itensResumo = [
-    ["Total vendido", resumo.total_vendido],
-    ["Total recebido", resumo.total_recebido],
     ["Valor de abertura", resumo.caixa.valor_abertura],
     ["Suprimentos", resumo.totais.suprimentos],
     ["Sangria", resumo.totais.sangrias],
-    ["Devoluções", resumo.totais.devolucoes],
+    ["Devoluções em dinheiro", resumo.totais.devolucoes],
     ["Despesas", resumo.totais.despesas],
   ];
-  const recebimentosPorData = Object.entries(resumo.recebimentos_por_data_venda || {}).sort(
-    ([dataA], [dataB]) => dataB.localeCompare(dataA),
+  const periodo = periodoFaturamento(resumo.vendas_periodo);
+  const conferenciaOcupada = Boolean(
+    conferencia?.ocupado || conferencia?.salvando || conferencia?.atualizando,
   );
-  const rotuloData = (data) =>
-    data === "sem_venda" ? "Sem venda vinculada" : data.split("-").reverse().join("/");
-  const totalPorData = (formasDoDia) =>
-    Object.values(formasDoDia).reduce((total, dados) => total + dados.total, 0);
+  const conferenciaBloqueada = Boolean(
+    conferencia?.bloqueado || conferenciaOcupada || !conferencia?.auditoria,
+  );
+  const localizarVenda = (venda) => localizarVendaConferencia(conferencia?.auditoria, venda);
+  const localizarLancamento = (lancamento) =>
+    localizarLancamentoConferencia(conferencia?.auditoria, lancamento);
+  const renderizarConferencia = (referencia, registro, tipoPadrao) => {
+    const tipo = referencia?.tipo || tipoPadrao;
+    const item = referencia?.item;
+    return (
+      <div className="space-y-2" key={`${tipo}:${item?.id ?? registro.id ?? registro.venda_id}`}>
+        <ConferenciaCaixaItem
+          key={`${tipo}:${item?.id}:${item?.assinatura || "sem-assinatura"}`}
+          item={item}
+          tipo={tipo}
+          vendaId={registro.venda_id ?? (tipo === "venda" ? registro.id : null)}
+          salvando={Boolean(conferencia?.salvando)}
+          bloqueado={conferenciaBloqueada}
+          onSalvar={conferencia?.salvar}
+          onAbrirVenda={conferencia?.abrirVenda}
+        />
+        {tipo === "pagamento" && (
+          <IdentificacaoPixItem
+            item={item}
+            salvando={Boolean(conferencia?.salvando)}
+            bloqueado={conferenciaBloqueada}
+            onSalvar={conferencia?.salvarPix}
+          />
+        )}
+      </div>
+    );
+  };
 
   return (
-    <>
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <h4 className="text-sm font-bold text-gray-700 flex items-center">
-            <Receipt className="w-4 h-4 mr-1.5 text-blue-600" />
-            Resumo do Caixa
-          </h4>
-          <button
-            type="button"
-            onClick={() => setImprimindo(true)}
-            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-blue-700 bg-white border border-blue-300 rounded hover:bg-blue-50"
-            title="Imprimir resumo do caixa e formas de pagamento"
-          >
-            <Printer className="w-4 h-4" />
-            Imprimir
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          {itensResumo.map(([titulo, valor]) => (
-            <div key={titulo} className="bg-white rounded-lg p-3 border border-gray-200">
-              <div className="text-xs font-semibold text-gray-700">{titulo}</div>
-              <div className="mt-1 text-sm font-bold text-gray-900">{formatMoneyBRL(valor)}</div>
-            </div>
-          ))}
-        </div>
-
-        <h5 className="mt-4 mb-2 text-sm font-bold text-gray-700">Formas de Pagamento</h5>
-        <div className="grid grid-cols-2 gap-2">
-          {formas.map(([forma, dados]) => {
-            const ehDinheiro = forma === "Dinheiro";
-            return (
-              <div
-                key={forma}
-                className={`bg-white rounded-lg p-3 border ${
-                  formaExpandida === forma
-                    ? "border-blue-400 bg-blue-50 shadow-md"
-                    : ehDinheiro
-                      ? "border-green-300 bg-green-50"
-                      : "border-gray-200"
-                } hover:shadow-sm transition-shadow cursor-pointer select-none`}
-                title="Clique para ver detalhes dos recebimentos"
-                onClick={() => carregarVendasForma(forma)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                      <div
-                        className={`w-2 h-2 rounded-full ${
-                          forma === "Dinheiro"
-                            ? "bg-green-500"
-                            : forma === "PIX"
-                              ? "bg-purple-500"
-                              : forma.includes("Débito")
-                                ? "bg-blue-500"
-                                : forma.includes("Crédito")
-                                  ? "bg-orange-500"
-                                  : "bg-gray-400"
-                        }`}
-                      ></div>
-                      <span className="text-xs font-semibold text-gray-700">{forma}</span>
-                      {ehDinheiro && (
-                        <span className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded">
-                          CAIXA
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      {dados.quantidade} {dados.tipo_contagem || "pagamento"}
-                      {dados.quantidade !== 1 ? "s" : ""}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-gray-900">
-                      {formatMoneyBRL(dados.total)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          {formas.length === 0 && (
-            <p className="col-span-2 text-xs text-gray-600">Nenhum pagamento registrado.</p>
+    <section className="space-y-4" aria-label="Vendas e recebimentos do fechamento">
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+          <Receipt className="h-4 w-4" /> Resumo do caixa
+        </h4>
+        <BotaoInteracao tamanho="pequeno" icon={Printer} onClick={() => setImprimindo(true)}>
+          Imprimir
+        </BotaoInteracao>
+      </div>
+      {conferencia && (
+        <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              Confira cada venda e recebimento nos detalhes. Pendências e divergências ficam
+              registradas e não impedem o fechamento.
+            </p>
+            <BotaoInteracao
+              tamanho="pequeno"
+              icon={RefreshCw}
+              loading={Boolean(conferencia.atualizando)}
+              disabled={conferenciaOcupada || typeof conferencia.atualizar !== "function"}
+              onClick={() => conferencia.atualizar()}
+            >
+              Atualizar conferência
+            </BotaoInteracao>
+          </div>
+          <p role="status" className="text-xs text-slate-600 dark:text-slate-300">
+            {conferencia.salvando
+              ? "Salvando a conferência. Aguarde antes de fechar o caixa."
+              : conferencia.atualizando
+                ? "Atualizando vendas e recebimentos. Aguarde antes de conferir ou fechar o caixa."
+                : conferencia.auditoria && !conferencia.bloqueado
+                  ? conferencia.erro
+                    ? "Confira os dados atualizados antes de tentar novamente."
+                    : "Conferência atualizada. As marcações registram responsável, data e observação."
+                  : "Atualize os dados antes de continuar a conferência."}
+          </p>
+          {conferencia.erro && (
+            <p role="alert" className="text-xs font-semibold text-red-700 dark:text-red-300">
+              {conferencia.erro}
+            </p>
+          )}
+          {conferencia.auditoria?.pagamentos?.some(
+            (item) => item.identificacao_pix?.estado === "nao_identificado",
+          ) && (
+            <p
+              role="status"
+              className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
+            >
+              Há Pix não identificado neste caixa. A pendência fica nos Alertas do gestor e não
+              impede o fechamento.
+            </p>
           )}
         </div>
-
-        {recebimentosPorData.length > 0 && (
-          <details className="mt-3 rounded border border-blue-200 bg-white px-3 py-2 text-xs">
-            <summary className="cursor-pointer font-semibold text-blue-800">
-              Conferir por data da venda
-            </summary>
-            <p className="mt-2 text-gray-600">
-              O total do caixa pode incluir pagamentos de vendas feitas em outras datas.
-            </p>
-            <div className="mt-2 space-y-2">
-              {recebimentosPorData.map(([data, formasDoDia]) => (
-                <div key={data} className="rounded border border-gray-200 p-2">
-                  <div className="flex justify-between font-bold text-gray-800">
-                    <span>{rotuloData(data)}</span>
-                    <span>{formatMoneyBRL(totalPorData(formasDoDia))}</span>
-                  </div>
-                  {Object.entries(formasDoDia).map(([forma, dados]) => (
-                    <div key={forma} className="flex justify-between text-gray-600">
-                      <span>
-                        {forma} · {dados.quantidade}
-                      </span>
-                      <span>{formatMoneyBRL(dados.total)}</span>
-                    </div>
-                  ))}
-                </div>
-              ))}
+      )}
+      <ResumoFaturamento
+        key={periodo}
+        composicao={resumo.vendas_periodo}
+        titulo={`Vendas de ${periodo}`}
+        mostrarDetalhes={true}
+        classeVenda={
+          conferencia ? (venda) => classeConferenciaCaixa(localizarVenda(venda)?.item) : undefined
+        }
+        renderAcoesVenda={
+          conferencia
+            ? (venda) => renderizarConferencia(localizarVenda(venda), venda, "venda")
+            : undefined
+        }
+      />
+      <RecebimentosCaixaPanel
+        composicao={resumo.composicao_recebimentos}
+        mostrarDetalhes={true}
+        classeLancamento={
+          conferencia
+            ? (lancamento) => classeConferenciaCaixa(localizarLancamento(lancamento)?.item)
+            : undefined
+        }
+        renderAcoesLancamento={
+          conferencia
+            ? (lancamento) =>
+                renderizarConferencia(localizarLancamento(lancamento), lancamento, "pagamento")
+            : undefined
+        }
+      />
+      <div className="grid grid-cols-2 gap-2">
+        {itensResumo.map(([titulo, valor]) => (
+          <div
+            key={titulo}
+            className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
+          >
+            <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">{titulo}</div>
+            <div className="mt-1 text-sm font-bold text-slate-950 dark:text-white">
+              {formatMoneyBRL(valor)}
             </div>
-          </details>
-        )}
-
-        {/* Painel de detalhes dos recebimentos por forma */}
-        {formaExpandida && (
-          <div className="mt-3 border-t border-blue-200 pt-3">
-            <div className="flex items-center justify-between mb-2">
-              <h5 className="text-xs font-bold text-gray-700">Recebimentos — {formaExpandida}</h5>
-              <button
-                onClick={() => setFormaExpandida(null)}
-                className="text-xs text-gray-400 hover:text-gray-600"
-              >
-                ✕ fechar
-              </button>
-            </div>
-            {loadingVendas === formaExpandida ? (
-              <div className="text-xs text-gray-500 py-2">Carregando...</div>
-            ) : (
-              <div className="space-y-1 max-h-44 overflow-y-auto">
-                {(vendasDetalhe[formaExpandida] || []).length === 0 ? (
-                  <div className="text-xs text-gray-400">Nenhuma venda encontrada.</div>
-                ) : (
-                  (vendasDetalhe[formaExpandida] || []).map((v) => (
-                    <div
-                      key={v.id}
-                      className="flex justify-between items-center text-xs py-1.5 px-2 rounded bg-white border border-gray-100"
-                    >
-                      <div>
-                        <SaleReference
-                          sale={v}
-                          showPrefix={false}
-                          valueClassName="font-semibold text-gray-700"
-                        />
-                        <CustomerIdentity
-                          className="ml-1.5"
-                          fallback="Consumidor"
-                          layout="inline"
-                          nameClassName="text-gray-500"
-                          venda={v}
-                        />
-                      </div>
-                      <div className="text-right">
-                        <span className="text-gray-400 mr-2">
-                          {v.data_venda ? `${rotuloData(v.data_venda)} ` : ""}
-                          {v.hora_venda}
-                        </span>
-                        <span className="font-bold text-gray-800">
-                          {formatMoneyBRL(v.valor_nesta_forma ?? v.total)}
-                        </span>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
           </div>
-        )}
-
-        <div className="mt-3 pt-3 border-t border-blue-200 text-xs text-gray-600">
-          💡 <strong>Dica:</strong> Apenas <strong>Dinheiro</strong> afeta o saldo físico do caixa.
-          As demais formas são informativas.
-        </div>
+        ))}
       </div>
       {imprimindo && (
         <ImpressaoResumoCaixa resumo={resumo} onAfterPrint={() => setImprimindo(false)} />
       )}
-    </>
+    </section>
   );
 }
 
@@ -467,7 +417,7 @@ export function DifferenceTipsModal({
                     {diferenca > 0 ? "💰 Sobrou dinheiro no caixa" : "⚠️ Faltou dinheiro no caixa"}
                   </h3>
                   <p className="text-sm opacity-90 mt-0.5">
-                    Diferença de R$ {Math.abs(diferenca).toFixed(2)} — possíveis causas
+                    Diferença de R$ {formatBRL(Math.abs(diferenca))} — possíveis causas
                   </p>
                 </div>
                 <button
@@ -485,8 +435,8 @@ export function DifferenceTipsModal({
                 <>
                   <p className="text-sm text-gray-600">
                     O caixa deveria ter{" "}
-                    <strong>R$ {(resumo?.totais?.saldo_atual ?? 0).toFixed(2)}</strong>, mas você
-                    contou <strong>R$ {valorContado.toFixed(2)}</strong>. Alguém saiu com dinheiro
+                    <strong>R$ {formatBRL(resumo?.totais?.saldo_atual ?? 0)}</strong>, mas você
+                    contou <strong>R$ {formatBRL(valorContado)}</strong>. Alguém saiu com dinheiro
                     que não foi registrado, ou houve um erro de registro. Veja as causas mais
                     comuns:
                   </p>
@@ -554,8 +504,8 @@ export function DifferenceTipsModal({
                 <>
                   <p className="text-sm text-gray-600">
                     O caixa deveria ter{" "}
-                    <strong>R$ {(resumo?.totais?.saldo_atual ?? 0).toFixed(2)}</strong>, mas você
-                    contou <strong>R$ {valorContado.toFixed(2)}</strong>. Entrou mais dinheiro do
+                    <strong>R$ {formatBRL(resumo?.totais?.saldo_atual ?? 0)}</strong>, mas você
+                    contou <strong>R$ {formatBRL(valorContado)}</strong>. Entrou mais dinheiro do
                     que foi registrado. Veja as causas mais comuns:
                   </p>
 

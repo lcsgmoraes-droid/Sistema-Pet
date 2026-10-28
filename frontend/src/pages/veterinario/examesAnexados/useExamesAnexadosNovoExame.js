@@ -39,7 +39,7 @@ export function useExamesAnexadosNovoExame({
     const tutor = petEncontrado?.cliente_id
       ? {
           id: String(petEncontrado.cliente_id),
-          nome: petEncontrado.cliente_nome ?? `Tutor #${petEncontrado.cliente_id}`,
+          nome: petEncontrado.cliente_nome ?? "Tutor não informado",
           telefone: petEncontrado.cliente_telefone ?? "",
           celular: petEncontrado.cliente_celular ?? "",
         }
@@ -60,7 +60,7 @@ export function useExamesAnexadosNovoExame({
     if (!tutorIdQuery || tutorFormSelecionado?.id) return;
     setTutorFormSelecionado({
       id: String(tutorIdQuery),
-      nome: tutorNomeQuery || `Tutor #${tutorIdQuery}`,
+      nome: tutorNomeQuery || "Tutor não informado",
     });
   }, [tutorIdQuery, tutorNomeQuery, tutorFormSelecionado]);
 

@@ -6,11 +6,13 @@ import NumberCell from "../../../components/ui/NumberCell";
 import SaleReference from "../../../components/ui/SaleReference";
 import StatusBadge from "../../../components/ui/StatusBadge";
 import { formatarDataHoraComissao } from "../../../utils/comissoesDate";
+import InputCheckbox from "../../../components/v2/InputCheckbox/InputCheckbox";
 
 function ComissaoTipoCalculoBadge({ tipo }) {
   const labels = {
     percentual: "Percentual",
     lucro: "Lucro",
+    fixo: "Valor fixo por unidade",
   };
 
   return (
@@ -85,8 +87,8 @@ export default function ComissoesListagemTabela({ controller }) {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left">
-                  <input
-                    type="checkbox"
+                  <InputCheckbox
+                    rotulo="Selecionar todas as comissões pendentes"
                     checked={
                       comissoesSelecionadas.length > 0 &&
                       comissoesSelecionadas.length ===
@@ -105,7 +107,7 @@ export default function ComissoesListagemTabela({ controller }) {
                   Número da Venda
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Produto ID
+                  Código do produto
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Parcela
@@ -117,7 +119,7 @@ export default function ComissoesListagemTabela({ controller }) {
                   Base de Cálculo
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  % Comissão
+                  Regra de comissão
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Valor Comissão
@@ -131,8 +133,8 @@ export default function ComissoesListagemTabela({ controller }) {
               {comissoes.map((comissao) => (
                 <tr key={comissao.id} className="hover:bg-blue-50 transition">
                   <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
+                    <InputCheckbox
+                      rotulo="Selecionar comissão para fechamento"
                       checked={comissoesSelecionadas.includes(comissao.id)}
                       onChange={(event) =>
                         toggleSelecaoComissao(comissao.id, comissao.status, event)
@@ -166,7 +168,7 @@ export default function ComissoesListagemTabela({ controller }) {
                     className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 cursor-pointer"
                     onClick={() => abrirDetalhe(comissao.id)}
                   >
-                    <CopyableCode label="Produto" value={comissao.produto_id} />
+                    <CopyableCode label="Produto" value={comissao.produto_codigo || "—"} />
                   </td>
                   <td
                     className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 cursor-pointer"
@@ -184,13 +186,21 @@ export default function ComissoesListagemTabela({ controller }) {
                     className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium cursor-pointer"
                     onClick={() => abrirDetalhe(comissao.id)}
                   >
-                    <MoneyCell value={comissao.valor_base_calculo} />
+                    {comissao.tipo_calculo === "fixo" ? (
+                      <NumberCell value={comissao.valor_base_calculo} decimals={3} suffix=" un." />
+                    ) : (
+                      <MoneyCell value={comissao.valor_base_calculo} />
+                    )}
                   </td>
                   <td
                     className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right cursor-pointer"
                     onClick={() => abrirDetalhe(comissao.id)}
                   >
-                    <NumberCell value={comissao.percentual_comissao} decimals={1} suffix="%" />
+                    {comissao.tipo_calculo === "fixo" ? (
+                      <MoneyCell value={comissao.valor_fixo} />
+                    ) : (
+                      <NumberCell value={comissao.percentual_comissao} decimals={1} suffix="%" />
+                    )}
                   </td>
                   <td
                     className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-bold cursor-pointer"

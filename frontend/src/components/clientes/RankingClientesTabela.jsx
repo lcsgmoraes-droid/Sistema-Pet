@@ -90,7 +90,7 @@ export default function RankingClientesTabela({ clientes, metrica, onMudarPagina
                 <td className="px-4 py-3">
                   <p className="font-semibold text-slate-900 dark:text-slate-100">{cliente.nome}</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {cliente.codigo ? `Código ${cliente.codigo}` : `ID ${cliente.cliente_id}`}
+                    {cliente.codigo ? `Código ${cliente.codigo}` : "Código não informado"}
                     {cliente.telefone ? ` · ${cliente.telefone}` : ""}
                   </p>
                 </td>

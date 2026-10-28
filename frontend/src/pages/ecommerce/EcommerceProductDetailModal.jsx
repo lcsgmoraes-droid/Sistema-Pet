@@ -1,4 +1,6 @@
-import { Bell, Heart, Link, Package, ShoppingCart, X } from "lucide-react";
+import { Bell, Heart, Package, ShoppingCart, X } from "lucide-react";
+import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
+import EcommerceProductSharing from "./EcommerceProductSharing";
 import {
   formatCurrency,
   getProductImages,
@@ -19,7 +21,7 @@ export default function EcommerceProductDetailModal({
   wishlist,
   onAddToCart,
   onClose,
-  onCopyLink,
+  productUrl,
   onImageChange,
   onNotifyMe,
   onSelectVariation,
@@ -97,8 +99,10 @@ export default function EcommerceProductDetailModal({
           {images.length > 1 && (
             <div style={{ display: "flex", gap: 8, overflowX: "auto" }}>
               {images.map((image) => (
-                <button
+                <BotaoInteracao
                   key={image}
+                  aria-label={`Ver imagem ${images.indexOf(image) + 1} do produto`}
+                  aria-pressed={activeImage === image}
                   onClick={() => onImageChange(image)}
                   style={{
                     border: activeImage === image ? "2.5px solid #f97316" : "1.5px solid #e7e5e4",
@@ -117,7 +121,7 @@ export default function EcommerceProductDetailModal({
                     alt="Miniatura"
                     style={{ width: "100%", height: "100%", objectFit: "contain" }}
                   />
-                </button>
+                </BotaoInteracao>
               ))}
             </div>
           )}
@@ -143,7 +147,8 @@ export default function EcommerceProductDetailModal({
             >
               {product.nome}
             </h3>
-            <button
+            <BotaoInteracao
+              icon={X}
               onClick={onClose}
               style={{
                 background: "#f1f5f9",
@@ -151,6 +156,7 @@ export default function EcommerceProductDetailModal({
                 borderRadius: 8,
                 width: 34,
                 height: 34,
+                padding: 0,
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
@@ -159,9 +165,7 @@ export default function EcommerceProductDetailModal({
                 color: "#6b7280",
               }}
               aria-label="Fechar detalhes do produto"
-            >
-              <X size={16} />
-            </button>
+            />
           </div>
 
           <div style={{ fontSize: 30, fontWeight: 800, color: "#1a1a2e", letterSpacing: -1 }}>
@@ -212,8 +216,9 @@ export default function EcommerceProductDetailModal({
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                 {variations.map((variation) => (
-                  <button
+                  <BotaoInteracao
                     key={variation.id}
+                    aria-pressed={variation.id === product.id}
                     type="button"
                     onClick={() => onSelectVariation(variation)}
                     style={{
@@ -230,7 +235,7 @@ export default function EcommerceProductDetailModal({
                   >
                     {Object.values(variation.variation_attributes || {}).join(" · ") ||
                       variation.nome}
-                  </button>
+                  </BotaoInteracao>
                 ))}
               </div>
             </div>
@@ -286,7 +291,8 @@ export default function EcommerceProductDetailModal({
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
             {!outOfStock ? (
-              <button
+              <BotaoInteracao
+                icon={ShoppingCart}
                 onClick={() => onAddToCart(product)}
                 style={{
                   ...S.addBtn(false),
@@ -298,11 +304,11 @@ export default function EcommerceProductDetailModal({
                   gap: 7,
                 }}
               >
-                <ShoppingCart size={15} />
                 Adicionar ao carrinho
-              </button>
+              </BotaoInteracao>
             ) : (
-              <button
+              <BotaoInteracao
+                icon={Bell}
                 onClick={() => onNotifyMe(product)}
                 style={{
                   ...S.notifyBtn,
@@ -314,11 +320,10 @@ export default function EcommerceProductDetailModal({
                   gap: 7,
                 }}
               >
-                <Bell size={14} />
                 Avise-me quando chegar
-              </button>
+              </BotaoInteracao>
             )}
-            <button
+            <BotaoInteracao
               onClick={() => onToggleWishlist(product.id)}
               style={{
                 background: "#fff",
@@ -336,8 +341,8 @@ export default function EcommerceProductDetailModal({
             >
               <Heart size={14} fill={wished ? "currentColor" : "none"} />
               {wished ? "Remover" : "Salvar"}
-            </button>
-            <button
+            </BotaoInteracao>
+            <BotaoInteracao
               onClick={onViewCart}
               style={{
                 background: "#fff",
@@ -351,28 +356,10 @@ export default function EcommerceProductDetailModal({
               }}
             >
               Ver carrinho
-            </button>
+            </BotaoInteracao>
           </div>
 
-          <button
-            onClick={() => onCopyLink(product)}
-            style={{
-              background: "transparent",
-              border: "1px solid #e5e7eb",
-              color: "#9ca3af",
-              borderRadius: 8,
-              padding: "8px 12px",
-              cursor: "pointer",
-              fontSize: 12,
-              justifySelf: "start",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            <Link size={13} />
-            Copiar link do produto
-          </button>
+          <EcommerceProductSharing key={product.id} product={product} url={productUrl} />
         </div>
       </div>
     </div>

@@ -1,16 +1,16 @@
+import { FiBookOpen, FiDollarSign, FiGlobe, FiShoppingCart } from "react-icons/fi";
 import {
-  FiBarChart2,
-  FiBookOpen,
-  FiCalendar,
-  FiCpu,
-  FiDollarSign,
-  FiGlobe,
-  FiPackage,
-  FiSettings,
-  FiShoppingCart,
-  FiTruck,
-  FiUsers,
-} from "react-icons/fi";
+  AJUDA_DASHBOARD,
+  AJUDA_PESSOAS,
+  AJUDA_PETS,
+  AJUDA_PRODUTOS,
+  AJUDA_LEMBRETES,
+  AJUDA_CALCULADORA,
+  AJUDA_NFE,
+  AJUDA_CONFIGURACOES,
+  AJUDA_COMPRAS,
+  AJUDA_IA,
+} from "./centralAjudaCatalogos";
 
 export const BASE_CONHECIMENTO = [
   {
@@ -24,7 +24,7 @@ export const BASE_CONHECIMENTO = [
         titulo: "Como enviar os XMLs das notas de saída ao contador",
         tags: ["xml", "contador", "contabilidade", "nota fiscal", "zip", "mensal", "eventos"],
         conteudo: [
-          "Acesse **Configurações → XML para contabilidade**. A função exige acesso às configurações e ao módulo fiscal da empresa selecionada.",
+          "Acesse **Configurações → XML para contabilidade**. A rotina reúne as notas emitidas no CorePet e seus eventos. A função exige acesso às configurações e ao módulo fiscal da empresa selecionada.",
           "Para começar, confira o CNPJ cadastrado da empresa e informe o **E-mail do contador**. Clique em **Salvar configuração**. O serviço de e-mail do sistema precisa estar configurado para enviar; o download funciona sem ele.",
           "Para enviar cada documento separadamente, ative **Enviar XML por XML: cada nota e seus eventos** e salve. O sistema envia o XML da nota após a autorização e os XMLs dos novos eventos após o registro, incluindo cancelamentos e cartas de correção. Essa opção funciona sem o envio mensal.",
           "Para a rotina mensal, ative **Enviar automaticamente o mês anterior completo**, escolha o dia e a hora e salve. Todo mês, o sistema reúne o primeiro ao último dia do mês anterior, mesmo com a tela fechada. As duas opções automáticas são independentes e podem ficar ativadas juntas. Não há agendamento avulso de período.",
@@ -32,9 +32,11 @@ export const BASE_CONHECIMENTO = [
           "O envio mensal inclui as notas emitidas e os eventos registrados no mês anterior. Por exemplo, um cancelamento registrado em setembro entra no lote de setembro mesmo se a nota foi emitida em agosto. O sistema consulta os eventos disponíveis no provedor fiscal.",
           "Em **Download e envio manual por período**, escolha as datas inicial e final e use **Baixar ZIP**. As notas são selecionadas pela data de emissão e os eventos pela data de registro, inclusive eventos de notas antigas. As duas datas estão incluídas, no horário de Brasília. Outros períodos são sempre manuais e não alteram a rotina mensal.",
           "No envio mensal e no **Enviar agora**, os anexos são separados por tipo: um ZIP de notas, outro de cancelamentos, outro de cartas de correção e outros para os demais eventos encontrados. O download entrega um arquivo principal contendo esses ZIPs. O destinatário precisa estar salvo e o serviço de e-mail configurado para enviar.",
-          "Acompanhe o **Histórico de envios**: Na fila, Agendado, Processando, Enviado, Falhou ou Sem notas. Enviado significa aceito pelo servidor de e-mail; confirme o recebimento com o contador e confira a caixa de spam.",
+          "O envio entra em uma fila e é preparado em segundo plano. Você pode continuar usando o sistema ou fechar a tela. Acompanhe o **Histórico de envios** e abra **Relatório** para conferir os documentos e o resultado de cada tentativa. Enviado significa aceito pelo servidor de e-mail; confirme o recebimento com o contador e confira a caixa de spam.",
+          "**Enviado com pendências** significa que as notas autorizadas completas foram enviadas e outras emissões ainda aguardavam confirmação. O relatório informa quais não foram enviadas, o motivo e um atalho para consultar a situação na Central de NF de Saída. A consulta usa a mesma emissão CorePet e não emite nem cancela outra nota. Após regularizar, solicite um novo lote da competência; ele pode repetir documentos já enviados.",
+          "O relatório separa notas preparadas, enviadas, não enviadas, canceladas e eventos por tipo. Quando disponíveis, os valores vêm dos XMLs oficiais já carregados, sem novas consultas. Cancelamentos formam um subconjunto das notas; correções e demais eventos não multiplicam seu valor. Valores desconhecidos aparecem como indisponíveis. Tentativas antigas sem relatório detalhado não são reconstruídas com dados atuais.",
           "Envios ainda aguardando podem ser cancelados. Falhas permitem **Tentar novamente**, usando o e-mail atual salvo. Se houver aviso de processamento interrompido, confirme o recebimento antes de reenviar para evitar duplicidade.",
-          "Os arquivos contêm os XMLs originais das NF-e/NFC-e de saída, inclusive as canceladas, seus eventos fiscais e um manifesto com a situação dos documentos. XML obrigatório ausente ou inválido bloqueia o lote inteiro; o sistema informa a falha em vez de enviar uma contabilidade incompleta.",
+          "Os arquivos contêm os XMLs originais das NF-e/NFC-e de saída, inclusive as canceladas, seus eventos fiscais e um manifesto com a situação dos documentos. Emissões pendentes ficam fora do pacote e são informadas no relatório. XML obrigatório ausente ou inválido de uma nota já autorizada ainda bloqueia o lote por integridade; o sistema informa a falha. Falta de confirmação não garante que a nota não foi emitida: consulte a situação antes de pensar em uma nova emissão.",
           "Cada lote aceita até 366 dias e 10.000 notas, 30 MB de XMLs e 15 MB de ZIPs. Divida períodos grandes. Notas de entrada, homologação e emitidas por outro CNPJ ficam fora do lote.",
           "Para testar, baixe um período conhecido e confira o manifesto e os XMLs com a central de notas. Antes de ativar qualquer envio automático, confirme o destinatário. Desativar uma opção interrompe sua rotina e cancela os respectivos envios pendentes; a outra opção continua independente. O histórico mantém os registros.",
         ],
@@ -197,210 +199,16 @@ export const BASE_CONHECIMENTO = [
   },
 
   // ────────────── DASHBOARD ──────────────
-  {
-    modulo: "dashboard",
-    label: "Dashboard",
-    icone: FiBarChart2,
-    cor: "indigo",
-    artigos: [
-      {
-        titulo: "Como ler o Dashboard",
-        tags: ["dashboard", "financeiro", "saldo", "resumo"],
-        conteudo: [
-          "O Dashboard reúne os principais sinais do negócio em uma única tela, sem misturar posição atual com desempenho do período.",
-          "**Desempenho** — mostra faturamento, resultado de caixa, vendas finalizadas e ticket médio no período escolhido.",
-          "**Resultado de caixa** — diferença entre entradas e saídas registradas. Ele não substitui o lucro contábil apresentado no DRE.",
-          "**Posição atual** — mostra o saldo das contas bancárias e os totais a receber e a pagar, independentemente do período.",
-          "**Atenção agora** — destaca valores vencidos, clientes VIP em risco e clientes sem comprar há mais de 90 dias.",
-          "**Entradas e saídas** — mostra o movimento diário e ajuda a identificar dias de maior pressão no caixa.",
-          "**Produtos que puxam as vendas** — ranking dos produtos com maior quantidade vendida no período.",
-        ],
-      },
-      {
-        titulo: "Como mudar o período do Dashboard",
-        tags: ["dashboard", "período", "dias", "filtro"],
-        conteudo: [
-          "No canto superior direito do Dashboard, você vê os botões: 7 dias, 15 dias, 30 dias, 60 dias, 90 dias.",
-          "Clique em qualquer um deles para atualizar desempenho, gráfico e ranking de produtos.",
-          "A posição atual, as contas vencidas e os indicadores de clientes não mudam com esse filtro.",
-        ],
-      },
-      {
-        titulo: "Diferença entre resultado de caixa e DRE",
-        tags: ["dre", "classificar", "lançamentos", "resultado"],
-        conteudo: [
-          "O resultado de caixa do Dashboard mostra entradas menos saídas registradas no período.",
-          "O DRE considera receitas, custos e despesas por competência e é o local correto para analisar lucro.",
-          "Para uma análise contábil detalhada, acesse **Financeiro → DRE**.",
-        ],
-      },
-    ],
-  },
+  AJUDA_DASHBOARD,
 
   // ────────────── CADASTROS / PESSOAS ──────────────
-  {
-    modulo: "pessoas",
-    label: "Pessoas (Clientes, Fornecedores, Veterinários)",
-    icone: FiUsers,
-    cor: "blue",
-    artigos: [
-      {
-        titulo: "Como cadastrar um novo cliente",
-        tags: ["cliente", "cadastro", "novo", "pessoas", "fornecedor"],
-        conteudo: [
-          "Acesse o menu **Pessoas** na barra lateral.",
-          "Clique no botão **+ Novo Cadastro** (canto superior direito).",
-          "Preencha os dados: nome, CPF/CNPJ, telefone, e-mail e endereço.",
-          "No campo **Tipo**, escolha: Cliente, Fornecedor, Veterinário ou Funcionário.",
-          "Clique em **Salvar**. O cadastro aparece na lista imediatamente.",
-          "💡 Dica: O CPF/CNPJ não é obrigatório, mas facilita emissão de notas fiscais.",
-        ],
-      },
-      {
-        titulo: "Como pesquisar e filtrar pessoas",
-        tags: ["pesquisar", "filtrar", "buscar", "cliente", "pessoas"],
-        conteudo: [
-          "Na página **Pessoas**, use a barra de pesquisa no topo da tabela.",
-          "Você pode buscar por: nome, código, CPF/CNPJ, e-mail ou telefone.",
-          "Use as abas para filtrar por tipo: Todos, Clientes, Fornecedores, Veterinários, Funcionários.",
-          "Para alterar quantos resultados aparecem por página, use o seletor '20 por página' no canto.",
-        ],
-      },
-      {
-        titulo: "Como importar clientes em massa (planilha Excel)",
-        tags: ["importar", "excel", "planilha", "clientes", "massa"],
-        conteudo: [
-          "**Atenção:** Prepare uma planilha Excel (.xlsx) com as colunas corretas antes de importar.",
-          "**Colunas esperadas:** nome, cpf_cnpj, telefone, e-mail, tipo (Cliente/Fornecedor/etc).",
-          "Clique no botão **Importar Excel** na página de Pessoas.",
-          "Selecione o arquivo. O sistema valida os dados e mostra um prévia antes de confirmar.",
-          "Erros são apontados linha a linha para você corrigir.",
-          "Após confirmar, todos os registros válidos são importados de uma vez.",
-        ],
-      },
-      {
-        titulo: "Como ver o histórico completo de um cliente",
-        tags: ["histórico", "timeline", "cliente", "compras", "pets"],
-        conteudo: [
-          "Clique no ícone de **editar** (lápis) ao lado do cliente na lista.",
-          "Na ficha do cliente, você encontra:",
-          "• **Dados pessoais** — nome, contato, endereço",
-          "• **Pets** — lista de pets cadastrados vinculados a ele",
-          "• **Histórico de compras** — todas as vendas feitas para este cliente",
-          "• **Segmento** — tag de classificação (ex: Parceiro, VIP)",
-          "💡 Clique em 'Ver Timeline Completa' para ver tudo em ordem cronológica.",
-        ],
-      },
-    ],
-  },
+  AJUDA_PESSOAS,
 
   // ────────────── PETS ──────────────
-  {
-    modulo: "pets",
-    label: "Pets",
-    icone: FiBookOpen,
-    cor: "green",
-    artigos: [
-      {
-        titulo: "Como cadastrar um pet",
-        tags: ["pet", "animal", "cadastro", "espécie", "raça"],
-        conteudo: [
-          "Acesse **Pets** no menu lateral ou acesse a ficha do tutor e clique em '+ Adicionar Pet'.",
-          "Preencha: nome do pet, espécie, raça, data de nascimento e sexo.",
-          "Vincule o pet a um tutor (cliente já cadastrado).",
-          "Você pode adicionar uma foto e informações de saúde (peso, vacinas, observações).",
-          "Clique em **Salvar**.",
-        ],
-      },
-      {
-        titulo: "Espécies e Raças — como gerenciar",
-        tags: ["espécie", "raça", "cadastro", "configurar"],
-        conteudo: [
-          "O sistema vem com espécies e raças pré-cadastradas (cão, gato, etc).",
-          "Para adicionar novas: acesse **Configurações → Espécies e Raças**.",
-          "Você pode criar novas espécies e associar raças a cada uma.",
-          "Esses dados são usados na ficha do pet e nos relatórios.",
-        ],
-      },
-    ],
-  },
+  AJUDA_PETS,
 
   // ────────────── PRODUTOS ──────────────
-  {
-    modulo: "produtos",
-    label: "Produtos e Estoque",
-    icone: FiPackage,
-    cor: "orange",
-    artigos: [
-      {
-        slug: "lancar-granel-bipagem",
-        titulo: "Como lançar granel com conferência por bipagem",
-        tags: ["granel", "bipagem", "produto fechado", "estoque", "app funcionario"],
-        conteudo: [
-          "Para conferir ou criar o vínculo no ERP, acesse **Produtos / Estoque → Listar Produtos**, abra o produto fechado de origem, clique em **Ver movimentações de estoque → Lançar granel** e selecione o produto a granel. Um mesmo produto a granel pode receber vínculos de embalagens diferentes, como 10 kg, 15 kg e 20 kg.",
-          "No ERP, abra **Configurações → Estoque** para decidir se a bipagem será obrigatória.",
-          "No app do funcionário, abra **Lançar granel**, bipe primeiro o produto fechado e depois o produto a granel.",
-          "O sistema mostra **Tudo certo** somente quando a combinação estiver vinculada. Uma combinação diferente é recusada.",
-          "Informe quantas embalagens foram abertas e confirme. O estoque do produto fechado diminui e o estoque do produto a granel recebe o peso correspondente em kg.",
-          "Quando a trava estiver desligada, a busca manual continua disponível no ERP e no app.",
-        ],
-      },
-      {
-        titulo: "Como cadastrar um produto",
-        tags: ["produto", "cadastro", "estoque", "novo"],
-        conteudo: [
-          "Acesse **Produtos** no menu lateral.",
-          "Clique em **+ Novo Produto**.",
-          "Preencha: nome, categoria, preço de venda, custo, código de barras (opcional).",
-          "Defina o **estoque inicial** — quantidade que você já tem em mãos.",
-          "Configure o **estoque mínimo** para receber alertas quando acabar.",
-          "Clique em **Salvar**.",
-          "💡 O produto já aparece disponível no PDV após salvar.",
-        ],
-      },
-      {
-        titulo: "Como pesquisar e filtrar produtos",
-        tags: ["buscar", "pesquisar", "filtrar", "produto", "categoria"],
-        conteudo: [
-          "Na página **Produtos**, use a barra de busca para pesquisar por nome ou código.",
-          "Use os filtros de categoria para ver apenas rações, brinquedos, medicamentos, etc.",
-          "O botão de filtro avançado permite filtrar por: faixa de preço, estoque baixo, fornecedor.",
-          "A lista mostra: nome, código, preço, estoque atual e status.",
-        ],
-      },
-      {
-        titulo: "Alertas de estoque baixo",
-        tags: ["estoque", "alerta", "mínimo", "reposição"],
-        conteudo: [
-          "Quando um produto atinge ou passa abaixo do **estoque mínimo**, ele aparece nos Alertas.",
-          "Acesse **Produtos → Alertas de Estoque** para ver a lista completa.",
-          "O Dashboard também exibe um resumo de produtos com estoque crítico.",
-          "Para configurar o estoque mínimo de um produto: edite o produto e defina o campo 'Estoque Mínimo'.",
-        ],
-      },
-      {
-        titulo: "Como importar produtos em massa",
-        tags: ["importar", "excel", "planilha", "produto", "massa"],
-        conteudo: [
-          "Clique em **Importar Excel** na página de Produtos.",
-          "Use a planilha modelo disponível para download no mesmo botão.",
-          "Colunas obrigatórias: nome, preco_venda, categoria.",
-          "Colunas opcionais: custo, codigo_barras, estoque_inicial, estoque_minimo.",
-          "Após importar, revise os produtos criados na lista.",
-        ],
-      },
-      {
-        titulo: "Como usar o relatório de produtos",
-        tags: ["relatório", "produto", "vendas", "análise"],
-        conteudo: [
-          "Acesse **Produtos → Relatório** para ver análises detalhadas.",
-          "Mostra: produtos mais vendidos, margem de lucro por produto, giro de estoque.",
-          "Filtre por período para comparar desempenho.",
-          "Exporte os dados para Excel clicando em 'Exportar'.",
-        ],
-      },
-    ],
-  },
+  AJUDA_PRODUTOS,
 
   // ────────────── PDV / VENDAS ──────────────
   {
@@ -525,13 +333,26 @@ export const BASE_CONHECIMENTO = [
         tags: ["venda", "pdv", "caixa", "vender", "produto"],
         conteudo: [
           "Acesse **PDV (Vendas)** no menu lateral.",
-          "**1. Selecione o cliente** — comece digitando o nome ou CPF do cliente. Se for venda sem cliente, deixe em branco.",
-          "**2. Adicione produtos** — use a barra de busca para procurar pelo nome ou código de barras.",
+          "**1. Selecione o cliente** — pesquise por nome, código do cadastro, CPF ou telefone. Se for venda sem cliente, deixe em branco.",
+          "Se precisar corrigir os dados da pessoa, use o **lápis ao lado do cliente selecionado**, salve a alteração e continue a mesma venda.",
+          "**2. Adicione produtos** — procure pelo nome, SKU/código ou código de barras. As sugestões priorizam os termos mais próximos do que foi digitado.",
           "Clique no produto ou pressione Enter para adicionar ao carrinho.",
           "**3. Ajuste quantidades** — clique nos botões + e - no carrinho ou digite direto.",
           "**4. Aplique desconto** — no resumo, clique em 'Desconto' e informe o valor ou percentual.",
-          "**5. Escolha o pagamento** — dinheiro, cartão débito/crédito, Pix ou misto.",
-          "**6. Finalize** — clique em 'Finalizar Venda'. O sistema gera o recibo e atualiza o estoque automaticamente.",
+          "**5. Abra Registrar Recebimento** — confira o **Caixa do recebimento** e escolha dinheiro, cartão, Pix ou pagamento misto. No cartão, confira operadora, bandeira e parcelas.",
+          "**6. Confira e confirme** — adicione os pagamentos e revise os valores antes de confirmar a finalização.",
+        ],
+      },
+      {
+        slug: "editar-cliente-no-pdv",
+        titulo: "Como editar o cliente sem sair do PDV",
+        tags: ["editar cliente", "editar pessoa", "pdv", "lapis", "cadastro", "venda"],
+        conteudo: [
+          "Na área **Cliente** do **PDV (Vendas)**, pesquise e selecione a pessoa pelo nome, código, CPF ou telefone.",
+          "Clique no **lápis ao lado do cliente selecionado**. O formulário de edição da pessoa abre sobre a venda atual, conforme sua permissão de acesso.",
+          "Corrija os dados necessários e clique em **Salvar**. O cliente exibido no PDV é atualizado; produtos e valores da venda em andamento são mantidos.",
+          "Para sair sem gravar as alterações, use **Cancelar** ou feche o formulário. Depois, continue a venda normalmente.",
+          "**Conferência:** confirme o nome e os dados atualizados, os produtos e o total antes de registrar o recebimento.",
         ],
       },
       {
@@ -546,6 +367,8 @@ export const BASE_CONHECIMENTO = [
           "**Suprimento:** adiciona dinheiro ao caixa. Registre o motivo.",
           "**Fechar caixa:** conta o dinheiro físico, o sistema compara com o esperado e mostra a diferença.",
           "O relatório de fechamento fica salvo no histórico de caixas.",
+          "**Reabrir caixa:** quem tem permissão pode reabrir um caixa fechado mesmo com outro já aberto. Confira qual caixa será usado em cada novo recebimento.",
+          "Em **Caixa do recebimento**, selecione o destino do movimento. Quando houver mais de um caixa aberto, a escolha é obrigatória; reabrir um caixa não transfere os movimentos antigos para outro.",
         ],
       },
       {
@@ -555,7 +378,7 @@ export const BASE_CONHECIMENTO = [
           "O PDV aceita as seguintes formas de pagamento:",
           "• **Dinheiro** — informe o valor recebido, o sistema calcula o troco.",
           "• **Cartão de Débito** — registre a operadora do cartão.",
-          "• **Cartão de Crédito** — pode parcelar em até 12x.",
+          "• **Cartão de Crédito** — escolha operadora, bandeira e as parcelas disponíveis na configuração da operadora.",
           "• **Pix** — registre o valor recebido via Pix.",
           "• **Pagamento Misto** — combine duas ou mais formas (ex: metade no cartão, metade em Pix).",
           "💡 O sistema registra cada forma separadamente para a conciliação financeira.",
@@ -603,7 +426,53 @@ export const BASE_CONHECIMENTO = [
           "Preencha: cliente, valor, data de vencimento, descrição.",
           "Escolha a categoria (ex: Venda, Serviço, Outros).",
           "Salve. A conta aparece na lista com status 'Pendente'.",
-          "**Registrar pagamento:** clique na conta e depois em 'Marcar como Pago'. Informe a data e forma de pagamento.",
+          "**Registrar pagamento:** use a ação de recebimento da conta, confira data, valor, forma de pagamento e **Caixa do recebimento** antes de confirmar.",
+        ],
+      },
+      {
+        slug: "recebimento-parcelado-e-caixa",
+        titulo: "Como receber no cartão parcelado e escolher o caixa",
+        tags: [
+          "recebimento",
+          "parcelamento",
+          "cartao",
+          "caixa",
+          "baixa em lote",
+          "vendas em aberto",
+          "contas a receber",
+        ],
+        conteudo: [
+          "Use **Registrar Recebimento** no PDV, a ação de recebimento em **Financeiro → Contas a Receber** ou a baixa de **vendas em aberto** na área financeira da pessoa.",
+          "Confira o saldo e o **Caixa do recebimento**. Se houver vários caixas abertos ou reabertos, escolha onde o movimento deve entrar. Sem caixa disponível, abra ou reabra um antes de receber.",
+          "Escolha a forma de pagamento. Para cartão, confira **Operadora**, **Bandeira**, **Valor do pagamento** e **Número de parcelas**. Registre o **NSU / número da transação** quando disponível, para identificar e conciliar o pagamento.",
+          "As parcelas disponíveis seguem a configuração da operadora e da bandeira. Confira a quantidade e o valor de cada parcela antes de confirmar.",
+          "Nas baixas de contas e de vendas em aberto, confira também a data e a observação do recebimento. Em lote, revise todos os títulos ou vendas selecionados e o total a baixar.",
+          "O pagamento do cliente no cartão baixa sua dívida; o repasse da operadora fica previsto até a liquidação. Não registre outro pagamento do cliente para representar a entrada desse repasse.",
+          "**Conferência:** consulte o status atualizado e o histórico financeiro, com data, observação e caixa. Se o sistema informar NSU já registrado, confira a transação existente antes de tentar outro lançamento.",
+        ],
+      },
+      {
+        slug: "grupos-produtos-comissao-fixa",
+        titulo: "Como usar grupos de produtos e comissão fixa por unidade",
+        tags: [
+          "comissao",
+          "valor fixo",
+          "por unidade",
+          "grupo de produtos",
+          "vendedor",
+          "contas a pagar",
+          "novas vendas",
+        ],
+        conteudo: [
+          "Acesse **Financeiro → Vendas → Por vendedor**, escolha o período e, se necessário, o vendedor. Em **Produtos**, pesquise por nome ou código e selecione vários itens. Use o X de um produto para removê-lo da seleção.",
+          "Preencha **Nome do grupo** e clique em **Salvar como novo grupo**. Depois, use **Grupo de produtos salvo** para recuperar a mesma seleção em outro período. Se alterar os produtos ou o nome, use **Atualizar grupo** antes de configurar sua comissão.",
+          "Com o grupo salvo, clique em **Configurar comissão do grupo**. Escolha o **Parceiro comissionado** e o tipo de comissão. Essa configuração requer permissão para configurar comissões.",
+          "Para pagar em reais por produto vendido, selecione **Valor fixo por unidade**, preencha **Valor por unidade vendida (R$)** e clique em **Salvar agora**. Confira o grupo e o parceiro na confirmação.",
+          "Exemplo: R$ 5,00 por unidade gera R$ 10,00 ao vender duas unidades. Quantidades fracionadas e pagamentos parciais são proporcionais; taxas não reduzem esse valor fixo.",
+          "A nova regra vale **somente para novas vendas**. Salvar ou configurar um grupo não recalcula comissões de vendas anteriores.",
+          "Uma venda que já estava aberta mantém a regra de quando foi incluída, mesmo se o primeiro pagamento ou as próximas parcelas ocorrerem depois da mudança. Alterar a data comercial da venda não muda essa regra.",
+          "Use **Gerar contas a pagar** para provisionar as comissões já calculadas, ainda sem conta a pagar, respeitando o período e o vendedor do relatório. Comissões já provisionadas não são duplicadas. Essa ação exige permissão para os fechamentos de comissão.",
+          "**Conferência:** revise os produtos do grupo, o parceiro, o valor por unidade e as contas geradas. Gerar uma conta a pagar não registra seu pagamento.",
         ],
       },
       {
@@ -706,240 +575,22 @@ export const BASE_CONHECIMENTO = [
   },
 
   // ────────────── LEMBRETES ──────────────
-  {
-    modulo: "lembretes",
-    label: "Lembretes e Agendamentos",
-    icone: FiCalendar,
-    cor: "purple",
-    artigos: [
-      {
-        titulo: "Como criar um lembrete",
-        tags: ["lembrete", "agendamento", "criar", "notificação"],
-        conteudo: [
-          "Acesse **Lembretes** no menu lateral.",
-          "Clique em **+ Novo Lembrete**.",
-          "Preencha: título, data, hora, cliente (opcional) e observações.",
-          "Escolha o tipo: Consulta, Banho e Tosa, Vacina, Retorno, Outro.",
-          "Salve. O lembrete aparece no calendário e na lista.",
-          "💡 Lembretes com data chegando ficam destacados na lista.",
-        ],
-      },
-      {
-        titulo: "Como ver os lembretes do dia",
-        tags: ["lembrete", "hoje", "dia", "agenda"],
-        conteudo: [
-          "Na página de Lembretes, o filtro padrão mostra os lembretes de hoje.",
-          "Use os botões de filtro para ver: Hoje, Esta Semana, Este Mês ou Todos.",
-          "Lembretes vencidos (data passada, não concluídos) aparecem marcados em vermelho.",
-          "Clique em um lembrete para editar, marcar como concluído ou excluir.",
-        ],
-      },
-    ],
-  },
+  AJUDA_LEMBRETES,
 
   // ────────────── CALCULADORA DE RAÇÃO ──────────────
-  {
-    modulo: "calculadora",
-    label: "Calculadora de Ração",
-    icone: FiCpu,
-    cor: "teal",
-    artigos: [
-      {
-        titulo: "Como usar a Calculadora de Ração",
-        tags: ["ração", "calculadora", "nutrição", "pet", "quantidade"],
-        conteudo: [
-          "Acesse **Calculadora de Ração** no menu lateral.",
-          "Informe os dados do pet: espécie, raça, peso atual, idade e nível de atividade.",
-          "Selecione a ração disponível no estoque ou informe os dados manualmente.",
-          "O sistema calcula: quantidade diária recomendada, custo por dia e quanto um pacote vai durar.",
-          "Use os resultados para orientar os tutores na compra da quantidade correta.",
-          "💡 Você pode salvar perfis de pets para calcular rapidamente no futuro.",
-        ],
-      },
-    ],
-  },
+  AJUDA_CALCULADORA,
 
   // ────────────── NOTAS FISCAIS ──────────────
-  {
-    modulo: "nfe",
-    label: "Notas Fiscais",
-    icone: FiBookOpen,
-    cor: "gray",
-    artigos: [
-      {
-        titulo: "Qual é a diferença entre NF-e modelo 55 e NFC-e modelo 65?",
-        tags: ["modelo 55", "modelo 65", "nfe", "nfce", "série", "numeração"],
-        conteudo: [
-          "A **NF-e, modelo 55**, é usada nas vendas de mercadorias que exigem NF-e, como operações com entrega, e-commerce e muitas vendas entre empresas. Confirme a regra da operação com a contabilidade.",
-          "A **NFC-e, modelo 65**, é usada no varejo para consumidor final, normalmente no atendimento presencial. Para emiti-la, a empresa também precisa do CSC do ambiente correspondente.",
-          "Os modelos não compartilham numeração. NF-e modelo 55, série 1, e NFC-e modelo 65, série 1, possuem sequências independentes.",
-          "Homologação e produção também mantêm sequências separadas. Configure sempre o ambiente correto antes de informar a série e o próximo número.",
-          "Em **Configurações → Integrações → IntNFe**, use a ajuda **Qual modelo escolher?** e marque **Continuar com esta série no CorePet** quando quiser manter a série do sistema anterior.",
-        ],
-      },
-      {
-        titulo: "Como obter e cadastrar o CSC da NFC-e?",
-        tags: ["csc", "nfce", "modelo 65", "sefaz", "código de segurança", "token"],
-        conteudo: [
-          "O **CSC (Código de Segurança do Contribuinte)** é usado para gerar o QR Code da NFC-e, modelo 65. Ele não é necessário para a NF-e modelo 55.",
-          "O CSC é fornecido pela Secretaria da Fazenda do estado da empresa. Primeiro, confirme que o estabelecimento está credenciado para emitir NFC-e.",
-          "Acesse o portal da NFC-e da sua SEFAZ com o certificado digital da empresa, selecione o estabelecimento e procure **Gerenciar Cód Segurança** ou opção equivalente.",
-          "A SEFAZ fornece o **ID do CSC**, que é curto, e o **código CSC**, que é secreto. Copie os dois para **Configurações → Integrações → IntNFe → CSC da NFC-e**.",
-          "Homologação e produção usam CSCs diferentes. Antes de copiar, confira em qual ambiente o código foi gerado.",
-          "Para empresas de São Paulo, consulte as [orientações oficiais da SEFAZ-SP](https://portal.fazenda.sp.gov.br/servicos/nfce/).",
-          "O botão **Verificar cadastro na IntNFe** confirma se existe um CSC e mostra seu ID. Por segurança, ele nunca recupera nem exibe o código secreto.",
-        ],
-      },
-      {
-        titulo: "Como emitir uma nota fiscal",
-        tags: ["nota fiscal", "nfe", "nfce", "emitir", "imposto"],
-        conteudo: [
-          "Acesse **Notas Fiscais** no menu lateral.",
-          "Clique em **+ Nova Nota**.",
-          "Selecione o cliente (com CPF/CNPJ cadastrado para emissão com destinatário).",
-          "Adicione os produtos/serviços, quantidades e valores.",
-          "Selecione a natureza de operação e o CFOP correto.",
-          "Clique em **Emitir**. A nota é enviada para a SEFAZ e o XML/PDF ficam disponíveis.",
-          "**Atenção:** configure os dados da empresa e o certificado digital em Configurações antes de emitir a primeira nota.",
-        ],
-      },
-    ],
-  },
+  AJUDA_NFE,
 
   // ────────────── CONFIGURAÇÕES ──────────────
-  {
-    modulo: "configuracoes",
-    label: "Configurações",
-    icone: FiSettings,
-    cor: "gray",
-    artigos: [
-      {
-        titulo: "Como configurar os dados da empresa",
-        tags: ["empresa", "cnpj", "dados", "razão social", "logo", "configuração"],
-        conteudo: [
-          "Acesse **Configurações** no menu lateral.",
-          "Na aba **Empresa**, preencha: razão social, CNPJ, endereço, telefone, e-mail.",
-          "Faça upload do logotipo da empresa (aparece nos recibos e documentos).",
-          "Salve as alterações. Os dados aparecem automaticamente nos documentos gerados.",
-        ],
-      },
-      {
-        titulo: "Como criar e gerenciar usuários",
-        tags: ["usuário", "acesso", "permissão", "criar", "colaborador"],
-        conteudo: [
-          "Acesse **Configurações → Usuários**.",
-          "Clique em **+ Novo Usuário**.",
-          "Preencha: nome, e-mail, senha e perfil de acesso (Admin, Vendedor, Financeiro, etc).",
-          "Cada perfil tem permissões diferentes:",
-          "• **Admin** — acesso total ao sistema.",
-          "• **Vendedor** — acesso ao PDV e Produtos.",
-          "• **Financeiro** — acesso ao módulo financeiro.",
-          "Após salvar, o usuário recebe os dados de acesso por e-mail.",
-        ],
-      },
-      {
-        titulo: "Como definir permissões por perfil",
-        tags: ["permissão", "perfil", "cargo", "acesso", "roles"],
-        conteudo: [
-          "Acesse **Configurações → Perfis de Acesso**.",
-          "Veja os perfis existentes ou crie um novo.",
-          "Para cada perfil, marque ou desmarque as permissões por módulo.",
-          "Exemplos de permissões: 'ver financeiro', 'emitir nota fiscal', 'cancelar venda'.",
-          "Ao salvar, todos os usuários com aquele perfil são atualizados automaticamente.",
-        ],
-      },
-      {
-        titulo: "Como habilitar o app mobile para uma loja",
-        tags: ["app", "mobile", "loja", "tenant", "entregador", "veterinario"],
-        conteudo: [
-          "Para o app encontrar uma loja, o tenant precisa estar ativo e com codigo publico configurado.",
-          "**Passo a passo:**",
-          "1. Acesse as configuracoes da empresa/loja.",
-          "2. Preencha nome da empresa, cidade, UF e CEP.",
-          "3. Configure um codigo publico da loja, tambem chamado de slug. Exemplo: clinica-veterinaria-sao-jose.",
-          "4. Ative a loja/app/e-commerce para que ela apareca na busca do aplicativo.",
-          "5. Cadastre os usuarios e vincule cada perfil correto: cliente, entregador, veterinario ou admin.",
-          "6. No app, a pessoa digita ou escaneia o codigo da loja e depois faz login com o e-mail dela.",
-          "Se o mesmo e-mail existir em mais de uma loja, a loja selecionada no app define qual tenant sera usado.",
-        ],
-      },
-      {
-        titulo: "Operadoras de Cartão — como cadastrar",
-        tags: ["operadora", "cartão", "cielo", "stone", "rede", "taxa"],
-        conteudo: [
-          "Acesse **Financeiro → Operadoras de Cartão**.",
-          "Cadastre cada operadora e marque uma ativa como padrão para ela vir selecionada no PDV.",
-          "Na tabela de taxas, selecione uma ou mais bandeiras e informe a taxa de cada modalidade e quantidade de parcelas.",
-          "As taxas aplicadas ficam gravadas na venda e são usadas na margem, no valor líquido, nos recebíveis e na conciliação.",
-          "Você pode ter múltiplas operadoras cadastradas (Cielo, Stone, Rede, Getnet etc.).",
-        ],
-      },
-    ],
-  },
+  AJUDA_CONFIGURACOES,
 
   // ────────────── COMPRAS / PEDIDOS BLING ──────────────
-  {
-    modulo: "compras",
-    label: "Compras e Pedidos",
-    icone: FiTruck,
-    cor: "blue",
-    artigos: [
-      {
-        titulo: "Como registrar uma compra de estoque",
-        tags: ["compra", "estoque", "fornecedor", "repor", "entrada"],
-        conteudo: [
-          "Acesse **Compras** no menu lateral.",
-          "Clique em **+ Nova Compra**.",
-          "Selecione o fornecedor e adicione os produtos comprados com as quantidades e custos.",
-          "Salve. O estoque é atualizado automaticamente com as quantidades informadas.",
-          "O custo registrado é usado para cálculo de margem e CMV no DRE.",
-        ],
-      },
-      {
-        titulo: "Integração com Bling (Pedidos)",
-        tags: ["bling", "pedido", "integração", "erp"],
-        conteudo: [
-          "Acesse **Pedidos Bling** no menu lateral.",
-          "Esta tela mostra os pedidos sincronizados com o sistema Bling.",
-          "Use para acompanhar pedidos de fornecedores e integrações de marketplace.",
-          "Configure a chave de API do Bling em **Configurações → Integrações**.",
-        ],
-      },
-    ],
-  },
+  AJUDA_COMPRAS,
 
   // ────────────── IA / ASSISTENTE ──────────────
-  {
-    modulo: "ia",
-    label: "Inteligência Artificial",
-    icone: FiCpu,
-    cor: "purple",
-    artigos: [
-      {
-        titulo: "Como usar o Chat com IA",
-        tags: ["ia", "inteligência artificial", "chat", "assistente", "dúvida"],
-        conteudo: [
-          "Acesse **IA → Chat** no menu lateral.",
-          "Digite sua pergunta ou descreva o que precisa de ajuda.",
-          "A IA conhece os dados do seu sistema e pode responder perguntas como:",
-          "• 'Quais produtos estão com estoque baixo?'",
-          "• 'Qual foi minha venda total no último mês?'",
-          "• 'Quais clientes têm contas vencidas?'",
-          "As respostas são baseadas nos dados reais do seu sistema.",
-        ],
-      },
-      {
-        titulo: "IA de Fluxo de Caixa — previsões inteligentes",
-        tags: ["ia", "fluxo de caixa", "previsão", "projeção", "inteligente"],
-        conteudo: [
-          "Acesse **IA → Fluxo de Caixa** no menu lateral.",
-          "A IA analisa seu histórico financeiro e projeta tendências futuras.",
-          "Mostra alertas inteligentes como: 'Com base no histórico, seu caixa pode ficar negativo em X dias'.",
-          "Use para tomar decisões antecipadas sobre compras e investimentos.",
-        ],
-      },
-    ],
-  },
+  AJUDA_IA,
 
   // ────────────── MÓDULOS PREMIUM ──────────────
   {

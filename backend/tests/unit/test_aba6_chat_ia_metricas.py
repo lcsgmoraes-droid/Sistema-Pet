@@ -62,8 +62,10 @@ class _Metricas(ChatIAMetricasMixin):
         self.db = db
 
 
-def test_dre_simplificada_ignora_compra_de_estoque_das_notas():
+@pytest.mark.parametrize("canal", ["loja_fisica", "ifood"])
+def test_dre_simplificada_ignora_compra_de_estoque_das_notas(canal):
     venda = SimpleNamespace(
+        canal=canal,
         subtotal=1000,
         taxa_entrega=0,
         desconto_valor=0,
@@ -96,7 +98,43 @@ def test_dre_simplificada_ignora_compra_de_estoque_das_notas():
     assert dre["receita_liquida"] == 1000
     assert dre["cmv_estimado"] == 400
     assert dre["despesas_operacionais"] == 100
-    assert dre["lucro_liquido_estimado"] == 500
+    assert dre["lucro_liquido_estimado"] == (None if canal == "ifood" else 500)
+    assert dre["taxas_ifood_pendentes"] is (canal == "ifood")
+    if canal == "ifood":
+        assert dre["margem_liquida_estimada"] is None
+
+
+def test_ia_preserva_top_vendidos_mas_nao_classifica_margem_ifood_desconhecida():
+    produto = SimpleNamespace(id=1, nome="SKU piloto", preco_custo=40, categoria=None)
+    vendas = [
+        SimpleNamespace(
+            canal=canal,
+            total=65,
+            itens=[
+                SimpleNamespace(
+                    produto_id=1,
+                    produto=produto,
+                    quantidade=1,
+                    subtotal=65,
+                )
+            ],
+        )
+        for canal in ("ifood", "loja_fisica")
+    ]
+    service = _Metricas(_FakeDb(vendas, []))
+    produtos = service._obter_produtos_periodo(
+        "tenant-dev", datetime(2026, 10, 1), datetime(2026, 10, 31)
+    )
+    assert produtos["top_margem"] == []
+    assert produtos["top_vendidos"][0]["quantidade"] == 2
+    assert produtos["top_vendidos"][0]["receita"] == 130
+    assert produtos["top_vendidos"][0]["lucro"] is None
+    rankings = service._obter_rankings_periodo(
+        "tenant-dev", datetime(2026, 10, 1), datetime(2026, 10, 31)
+    )
+    assert rankings["top_categorias_margem"] == []
+    assert len(rankings["top_canais"]) == 2
+    assert rankings["vendas_rentabilidade_pendente"] == 1
 
 
 def test_ranking_clientes_soma_compras_e_ordena_por_valor():

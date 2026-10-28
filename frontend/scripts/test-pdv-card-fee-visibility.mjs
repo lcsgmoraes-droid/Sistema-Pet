@@ -24,7 +24,10 @@ assert.ok(
   "O aviso deve aparecer apenas quando faltar uma regra para a combinacao selecionada.",
 );
 assert.ok(
-  panelSource.includes("Esta combinacao nao esta disponivel"),
+  panelSource
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .includes("Esta combinacao nao esta disponivel"),
   "O PDV deve continuar bloqueando combinacoes sem regra cadastrada.",
 );
 

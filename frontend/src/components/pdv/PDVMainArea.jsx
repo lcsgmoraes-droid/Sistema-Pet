@@ -11,6 +11,8 @@ import PDVProdutosCard from "./PDVProdutosCard";
 import PDVResumoFinanceiroCard from "./PDVResumoFinanceiroCard";
 import api from "../../api";
 import { buildValidadePdvQuery, extractProdutoIdsCarrinho } from "./pdvValidadeAlertUtils";
+import { isIfoodManualPaymentBlocked } from "../../utils/ifoodPdvPilot";
+import IfoodPdvOnlineVendaCard from "../ifood/IfoodPdvOnlineVendaCard";
 
 export default function PDVMainArea(props) {
   const {
@@ -67,6 +69,7 @@ export default function PDVMainArea(props) {
     onCopiarCampoCliente,
     onRemoverCliente,
     onSelecionarCliente,
+    onAtualizarCliente,
     onSelecionarPet,
     saldoCampanhas,
     vendasEmAbertoInfo,
@@ -82,6 +85,7 @@ export default function PDVMainArea(props) {
     onAtualizarPetItem,
     onAtualizarProtocoloItem,
     onAtualizarQuantidadeItem,
+    onAtualizarSubtotalItem,
     onAtualizarPrevisaoFimRacao,
     onBuscarProdutoChange,
     onBuscarProdutoFocus,
@@ -215,6 +219,8 @@ export default function PDVMainArea(props) {
         modoVisualizacao={modoVisualizacao}
         vendaAtual={vendaAtual}
         validadeAlertas={validadeAlertas}
+        onRecarregarVenda={onRecarregarVenda}
+        loading={loading}
       />
 
       <PDVModoVisualizacaoBanner
@@ -225,6 +231,8 @@ export default function PDVMainArea(props) {
         mudarStatusParaAberta={mudarStatusParaAberta}
         habilitarEdicao={habilitarEdicao}
         onRecarregarVenda={onRecarregarVenda}
+        onCancelarVenda={onExcluirVenda}
+        loading={loading}
         temCaixaAberto={temCaixaAberto}
         statusConsultaCaixa={statusConsultaCaixa}
         onAbrirDevolucao={onAbrirDevolucaoVendaAtual}
@@ -248,6 +256,7 @@ export default function PDVMainArea(props) {
             onCopiarCampoCliente={onCopiarCampoCliente}
             onRemoverCliente={onRemoverCliente}
             onSelecionarCliente={selecionarClienteEFocarProduto}
+            onAtualizarCliente={onAtualizarCliente}
             onSelecionarPet={onSelecionarPet}
             onTrocarCliente={onRemoverCliente}
             saldoCampanhas={saldoCampanhas}
@@ -270,6 +279,7 @@ export default function PDVMainArea(props) {
             onAtualizarPetItem={onAtualizarPetItem}
             onAtualizarProtocoloItem={onAtualizarProtocoloItem}
             onAtualizarQuantidadeItem={onAtualizarQuantidadeItem}
+            onAtualizarSubtotalItem={onAtualizarSubtotalItem}
             onAtualizarPrevisaoFimRacao={onAtualizarPrevisaoFimRacao}
             onBuscarProdutoChange={onBuscarProdutoChange}
             onBuscarProdutoFocus={onBuscarProdutoFocus}
@@ -307,22 +317,26 @@ export default function PDVMainArea(props) {
             vendaAtual={vendaAtual}
           />
 
-          <PDVResumoFinanceiroCard
-            alertasCarrinho={alertasCarrinho}
-            codigoCupom={codigoCupom}
-            cupomAplicado={cupomAplicado}
-            erroCupom={erroCupom}
-            loadingCupom={loadingCupom}
-            modoVisualizacao={modoVisualizacao}
-            onAbrirModalDescontoTotal={onAbrirModalDescontoTotal}
-            onAplicarCupom={onAplicarCupom}
-            onCodigoCupomChange={onCodigoCupomChange}
-            onCodigoCupomKeyDown={onCodigoCupomKeyDown}
-            onRemoverCupom={onRemoverCupom}
-            onRemoverDescontoTotal={onRemoverDescontoTotal}
-            totalImpostos={totalImpostos}
-            vendaAtual={vendaAtual}
-          />
+          {isIfoodManualPaymentBlocked(vendaAtual) ? (
+            <IfoodPdvOnlineVendaCard venda={vendaAtual} onUpdated={onRecarregarVenda} autoRefresh />
+          ) : (
+            <PDVResumoFinanceiroCard
+              alertasCarrinho={alertasCarrinho}
+              codigoCupom={codigoCupom}
+              cupomAplicado={cupomAplicado}
+              erroCupom={erroCupom}
+              loadingCupom={loadingCupom}
+              modoVisualizacao={modoVisualizacao}
+              onAbrirModalDescontoTotal={onAbrirModalDescontoTotal}
+              onAplicarCupom={onAplicarCupom}
+              onCodigoCupomChange={onCodigoCupomChange}
+              onCodigoCupomKeyDown={onCodigoCupomKeyDown}
+              onRemoverCupom={onRemoverCupom}
+              onRemoverDescontoTotal={onRemoverDescontoTotal}
+              totalImpostos={totalImpostos}
+              vendaAtual={vendaAtual}
+            />
+          )}
 
           <PDVComissaoCard
             buscaFuncionario={buscaFuncionario}
@@ -341,18 +355,20 @@ export default function PDVMainArea(props) {
           />
         </div>
 
-        <PDVAcoesFooterCard
-          itensCount={vendaAtual.itens.length}
-          loading={loading}
-          modoVisualizacao={modoVisualizacao}
-          onAbrirModalPagamento={onAbrirModalPagamento}
-          onNovaVenda={onNovaVenda}
-          onSalvarVenda={onSalvarVenda}
-          statusVenda={vendaAtual.status}
-          temCaixaAberto={temCaixaAberto}
-          statusConsultaCaixa={statusConsultaCaixa}
-          vendaId={vendaAtual.id}
-        />
+        {!isIfoodManualPaymentBlocked(vendaAtual) && (
+          <PDVAcoesFooterCard
+            itensCount={vendaAtual.itens.length}
+            loading={loading}
+            modoVisualizacao={modoVisualizacao}
+            onAbrirModalPagamento={onAbrirModalPagamento}
+            onNovaVenda={onNovaVenda}
+            onSalvarVenda={onSalvarVenda}
+            statusVenda={vendaAtual.status}
+            temCaixaAberto={temCaixaAberto}
+            statusConsultaCaixa={statusConsultaCaixa}
+            vendaId={vendaAtual.id}
+          />
+        )}
       </div>
     </div>
   );

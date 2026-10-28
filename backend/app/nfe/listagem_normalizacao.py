@@ -27,6 +27,7 @@ from app.nfe.listagem_base import (
     _venda_usa_nfce,
 )
 from app.vendas_models import Venda
+from app.intnfe.cancellation import campos_cancelamento_com_aliases
 
 
 def _normalizar_resumo_canal(item: dict, venda: Venda | None = None) -> dict:
@@ -355,6 +356,9 @@ def _normalizar_detalhe_nota_bling(
     )
 
     cliente = {
+        "codigo": getattr(venda.cliente, "codigo", None)
+        if venda and venda.cliente
+        else None,
         "nome": _texto(
             _primeiro_preenchido(
                 contato.get("nome"),
@@ -670,6 +674,8 @@ def _normalizar_nota_venda_local(venda: Venda) -> dict:
     return {
         "id": str(venda.nfe_correlation_id or venda.nfe_bling_id),
         "venda_id": venda.id,
+        "venda_status": getattr(venda, "status", None),
+        **campos_cancelamento_com_aliases(venda),
         "numero": venda.nfe_numero,
         "serie": venda.nfe_serie,
         "tipo": "nfce" if _venda_usa_nfce(venda) else "nfe",
@@ -688,6 +694,7 @@ def _normalizar_nota_venda_local(venda: Venda) -> dict:
         "valor": float(venda.total or 0),
         "cliente": {
             "id": venda.cliente.id if venda.cliente else None,
+            "codigo": getattr(venda.cliente, "codigo", None) if venda.cliente else None,
             "nome": venda.cliente.nome if venda.cliente else None,
             "cpf_cnpj": (
                 (venda.cliente.cpf or venda.cliente.cnpj) if venda.cliente else None

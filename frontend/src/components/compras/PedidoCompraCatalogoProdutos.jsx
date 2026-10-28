@@ -1,13 +1,6 @@
+import BuscaProduto from "../v2/BuscaProduto/BuscaProduto";
 import { useEffect, useState } from "react";
-import {
-  AlertTriangle,
-  Check,
-  HelpCircle,
-  Loader2,
-  PackageSearch,
-  Plus,
-  Search,
-} from "lucide-react";
+import { AlertTriangle, Check, HelpCircle, Loader2, PackageSearch, Plus } from "lucide-react";
 import ProductIdentity from "../ui/ProductIdentity";
 import CurrencyInput from "../CurrencyInput";
 import Pagination from "../Pagination/Pagination";
@@ -161,13 +154,11 @@ export default function PedidoCompraCatalogoProdutos({
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <label className="relative block min-w-[300px]">
               <span className="sr-only">Pesquisar produtos</span>
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="search"
+              <BuscaProduto
                 value={termo}
-                onChange={(event) => onChangeTermo(event.target.value)}
+                onChange={(valor) => onChangeTermo(valor)}
                 placeholder="Nome, SKU ou código de barras"
-                className="h-11 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                showSuggestions={false}
               />
             </label>
             <div className="flex rounded-lg border border-slate-200 bg-white p-1">

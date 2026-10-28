@@ -714,23 +714,31 @@ def run(args: argparse.Namespace) -> int:
     family_defaults = build_family_defaults(bling_rows)
     dbx = load_db_dependencies()
 
+    from app.tenancy.context import tenant_context
+    from app.tenancy.rls import sync_rls_tenant
+
     db = dbx.SessionLocal()
     try:
-        ctx, produtos = build_context(db, dbx, args, family_defaults, kit_costs)
-        preview_rows, update_rows, counters = process_rows(ctx, bling_rows)
-        if args.apply:
-            update_rows = apply_sample_limit(
-                ctx,
-                produtos,
-                bling_rows,
-                update_rows,
-                args.sample_limit,
-            )
-            db.commit()
+        tenant_id = (
+            UUID(args.tenant_id) if args.tenant_id else dbx.detect_single_tenant_id(db)
+        )
+        with tenant_context(tenant_id):
+            sync_rls_tenant(db, tenant_id)
+            ctx, produtos = build_context(db, dbx, args, family_defaults, kit_costs)
+            preview_rows, update_rows, counters = process_rows(ctx, bling_rows)
+            if args.apply:
+                update_rows = apply_sample_limit(
+                    ctx,
+                    produtos,
+                    bling_rows,
+                    update_rows,
+                    args.sample_limit,
+                )
+                db.commit()
 
-        summary = build_summary(paths, ctx, bling_rows, counters, args.sample_limit)
-        write_reports(paths, preview_rows, update_rows, summary)
-        print_summary(paths, summary)
+            summary = build_summary(paths, ctx, bling_rows, counters, args.sample_limit)
+            write_reports(paths, preview_rows, update_rows, summary)
+            print_summary(paths, summary)
     finally:
         db.close()
 

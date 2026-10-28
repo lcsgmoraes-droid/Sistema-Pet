@@ -53,7 +53,7 @@ export default function PetDetalhesHeader({ onBack, onEdit, onToggleStatus, pet 
                   <span className="font-medium">Tutor:</span>
                   <CustomerIdentity
                     codeLabel="Cod. tutor"
-                    fallback={`Tutor #${pet.cliente_id || "-"}`}
+                    fallback={"Cliente não informado"}
                     layout="inline"
                     nameClassName="font-medium text-blue-600"
                     record={pet}

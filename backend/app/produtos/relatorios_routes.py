@@ -8,6 +8,7 @@ parte de relatorios para reduzir o tamanho do roteador principal.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -32,6 +33,7 @@ from app.produtos.relatorios import (
     _calcular_janelas_vendas_produto,
     _calcular_totais_validade_proxima,
     _detectar_promocao_venda_item,
+    _filtros_quantidade_relatorio,
     _mapear_promocoes_movimentacoes,
     _parse_relatorio_datetime,
     _serializar_movimentacao_relatorio,
@@ -92,6 +94,8 @@ def relatorio_movimentacoes(
     page: int = 1,
     page_size: int = 20,
     export_all: bool = False,
+    quantidade_operador: Optional[str] = None,
+    quantidade_valor: Optional[Decimal] = None,
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
@@ -116,6 +120,9 @@ def relatorio_movimentacoes(
         .filter(
             EstoqueMovimentacao.tenant_id == tenant_id,
             Produto.tenant_id.in_(access_ids),
+            *_filtros_quantidade_relatorio(
+                EstoqueMovimentacao.quantidade, quantidade_operador, quantidade_valor
+            ),
         )
     )
 
@@ -267,6 +274,8 @@ def relatorio_vendas_produto(
     data_fim: Optional[str] = None,
     page: int = 1,
     page_size: int = 10,
+    quantidade_operador: Optional[str] = None,
+    quantidade_valor: Optional[Decimal] = None,
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
@@ -276,6 +285,9 @@ def relatorio_vendas_produto(
 
     _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
+    filtros_quantidade = _filtros_quantidade_relatorio(
+        VendaItem.quantidade, quantidade_operador, quantidade_valor
+    )
     page, page_size, offset = _normalizar_paginacao_produtos(
         page,
         page_size,
@@ -326,6 +338,7 @@ def relatorio_vendas_produto(
             Venda.status.notin_(["cancelada", "devolvida"]),
             Venda.data_venda >= data_inicio_dt,
             Venda.data_venda <= data_fim_dt,
+            *filtros_quantidade,
         )
     )
 
@@ -390,6 +403,7 @@ def relatorio_vendas_produto(
             Venda.status.notin_(["cancelada", "devolvida"]),
             Venda.data_venda >= janela_90_inicio,
             Venda.data_venda <= data_fim_dt,
+            *filtros_quantidade,
         )
         .all()
     )
@@ -419,6 +433,7 @@ def relatorio_vendas_produto(
             VendaItem.produto_id == produto.id,
             VendaItem.tipo == "produto",
             Venda.status.notin_(["cancelada", "devolvida"]),
+            *filtros_quantidade,
         )
         .order_by(
             Venda.data_venda.desc(),
@@ -462,6 +477,7 @@ def relatorio_vendas_produto(
             "codigo": produto.codigo,
             "sku": _produto_sku_value(produto),
             "codigo_barras": produto.codigo_barras,
+            "unidade": produto.unidade,
             "estoque_atual": estoque_atual,
             "estoque_minimo": float(produto.estoque_minimo or 0),
             "preco_custo": float(produto.preco_custo or 0),

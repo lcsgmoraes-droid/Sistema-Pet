@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Literal
+from types import SimpleNamespace
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.config import settings
 from app.db import get_session
-from app.ifood_integration_models import IfoodMerchantConfig
+from app.ifood_integration_models import IfoodMarginRulesRevision, IfoodMerchantConfig
 from app.integrations.ifood import (
     IfoodClient,
     IfoodClientError,
@@ -22,16 +23,69 @@ from app.integrations.ifood import (
 )
 from app.models import User
 from app.produtos_catalogo_models import Produto
+from app.produtos.schemas import ProdutoUpdate
+from app.security import permissions_service
+from app.integrations.ifood.management import (
+    MARGIN_CONFIG_FIELDS,
+    build_management_item,
+    product_identifier,
+)
+from app.integrations.ifood.pricing import MAX_IFOOD_MONEY, aware, utc_timestamp
+from app.security.permissions_decorator import (
+    require_permission,
+    require_any_permission,
+)
 
 router = APIRouter(prefix="/integracoes/ifood", tags=["iFood"])
 
 
-class IfoodConfigPayload(BaseModel):
+class IfoodCatalogSettings(BaseModel):
+    rates_reference: str | None = Field(default=None, max_length=240)
+    rates_valid_from: date | None = None
+
+    @field_validator("rates_reference")
+    @classmethod
+    def normalize_rates_reference(cls, value):
+        return value.strip() or None if value is not None else None
+
+    @field_validator("rates_valid_from")
+    @classmethod
+    def current_contract_only(cls, value):
+        if value and value > date.today():
+            raise ValueError(
+                "Informe a vigencia das taxas atuais; agendamento de contrato ainda nao disponivel."
+            )
+        return value
+
+    default_markup_percent: float = Field(default=0, ge=-50, le=300)
+    stock_safety: float = Field(default=0, ge=0, le=1000000)
+    commission_merchant_percent: float | None = Field(
+        default=None, ge=0, le=100, allow_inf_nan=False
+    )
+    commission_ifood_percent: float | None = Field(
+        default=None, ge=0, le=100, allow_inf_nan=False
+    )
+    payment_fee_percent: float | None = Field(
+        default=None, ge=0, le=100, allow_inf_nan=False
+    )
+    tax_percent: float | None = Field(default=None, ge=0, le=100, allow_inf_nan=False)
+    additional_unit_cost: float | None = Field(
+        default=None, ge=0, le=1000000, allow_inf_nan=False
+    )
+    target_margin_percent: float | None = Field(
+        default=None, ge=0, le=99.99, allow_inf_nan=False
+    )
+
+
+class IfoodCatalogConfigPayload(IfoodCatalogSettings):
+    # Esta superficie local nao permite ativar/vincular nem operar o provedor.
+    model_config = ConfigDict(extra="forbid")
+
+
+class IfoodConfigPayload(IfoodCatalogSettings):
     merchant_id: str | None = Field(default=None, max_length=36)
     active: bool = False
     catalog_source: Literal["ecommerce", "erp"] = "ecommerce"
-    default_markup_percent: float = Field(default=0, ge=-50, le=300)
-    stock_safety: float = Field(default=0, ge=0, le=1000000)
 
     @field_validator("merchant_id")
     @classmethod
@@ -54,6 +108,25 @@ class IfoodSyncPayload(BaseModel):
     confirm_reset: bool = False
 
 
+class IfoodPreviewProduto(ProdutoUpdate):
+    id: int | None = Field(default=None, gt=0)
+    imagem_principal: str | None = Field(default=None, max_length=2048)
+    ativo: bool | None = None
+    situacao: bool | None = None
+
+
+class IfoodProductPreviewPayload(BaseModel):
+    produto: IfoodPreviewProduto
+    modalidade: Literal["MERCHANT", "IFOOD"] = "MERCHANT"
+
+
+class IfoodPriceSimulationPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    product_id: int = Field(gt=0)
+    preco_ifood: float | None = Field(ge=0, le=MAX_IFOOD_MONEY, allow_inf_nan=False)
+
+
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -74,6 +147,18 @@ def _credentials_configured() -> bool:
         str(settings.IFOOD_CLIENT_ID or "").strip()
         and str(settings.IFOOD_CLIENT_SECRET or "").strip()
     )
+
+
+def _can_configure_catalog(db: Session, user: User, tenant_id: UUID) -> bool:
+    try:
+        permissions_service.check_permission(
+            db, user.id, "configuracoes.editar", tenant_id, current_user=user
+        )
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_403_FORBIDDEN:
+            return False
+        raise
+    return True
 
 
 def _provider_http_status(exc: IfoodClientError) -> int:
@@ -121,14 +206,48 @@ def _config_view(config: IfoodMerchantConfig | None) -> dict[str, Any]:
         "last_orders_poll_at": config.last_orders_poll_at if config else None,
         "last_orders_error": config.last_orders_error if config else None,
         "last_error": config.last_error if config else None,
+        "rates_reference": getattr(config, "rates_reference", None),
+        "rates_valid_from": getattr(config, "rates_valid_from", None),
+        **{field: getattr(config, field, None) for field in MARGIN_CONFIG_FIELDS},
     }
 
 
-def _products(db: Session, product_ids: list[int] | None = None) -> list[Produto]:
-    query = db.query(Produto).options(
-        joinedload(Produto.categoria),
-        joinedload(Produto.marca),
-        joinedload(Produto.departamento),
+def _record_margin_rules(
+    db: Session, config: IfoodMerchantConfig, actor_id: int
+) -> None:
+    values = {
+        field: str(getattr(config, field))
+        if getattr(config, field, None) is not None
+        else None
+        for field in MARGIN_CONFIG_FIELDS
+    }
+    values.update(
+        rates_reference=config.rates_reference,
+        rates_valid_from=config.rates_valid_from.isoformat()
+        if config.rates_valid_from
+        else None,
+    )
+    db.add(
+        IfoodMarginRulesRevision(
+            tenant_id=config.tenant_id,
+            merchant_id=config.merchant_id,
+            actor_id=actor_id,
+            values=values,
+        )
+    )
+
+
+def _products(
+    db: Session, tenant_id: UUID, product_ids: list[int] | None = None
+) -> list[Produto]:
+    query = (
+        db.query(Produto)
+        .options(
+            joinedload(Produto.categoria),
+            joinedload(Produto.marca),
+            joinedload(Produto.departamento),
+        )
+        .filter(Produto.tenant_id == tenant_id, Produto.deleted_at.is_(None))
     )
     if product_ids is not None:
         if not product_ids:
@@ -139,16 +258,120 @@ def _products(db: Session, product_ids: list[int] | None = None) -> list[Produto
 
 def _catalog(
     db: Session,
+    tenant_id: UUID,
     config: IfoodMerchantConfig | None,
     product_ids: list[int] | None = None,
 ):
+    products = _products(db, tenant_id, product_ids)
+    stocks = _available_stocks(db, tenant_id, products)
+    identifiers = Counter(
+        product_identifier(p).casefold() for p in _products(db, tenant_id)
+    )
+    for product in products:
+        product.ifood_available_stock = stocks.get(product.id)
     return build_catalog_preview(
-        _products(db, product_ids),
-        source=config.catalog_source if config else "ecommerce",
+        products,
+        source="ifood",
         markup_percent=float(config.default_markup_percent or 0) if config else 0,
         stock_safety=float(config.stock_safety or 0) if config else 0,
         public_base_url=settings.COREPET_FRONTEND_URL,
+        duplicate_identifiers={key for key, count in identifiers.items() if count > 1},
     )
+
+
+def _available_stocks(
+    db: Session, tenant_id: UUID, products: list[Produto]
+) -> dict[int, float | None]:
+    from app.estoque_reserva_service import EstoqueReservaService
+    from app.services.kit_estoque_service import KitEstoqueService
+
+    reserves = EstoqueReservaService.mapa_reservas_ativas_por_produto(db, tenant_id)
+    virtual_stocks = KitEstoqueService.calcular_estoques_virtuais_em_lote(
+        db, products, tenant_id=tenant_id, reservas_por_produto=reserves
+    )
+    result = {}
+    for product in products:
+        if (
+            product.tipo_produto in ("KIT", "VARIACAO")
+            and product.tipo_kit == "VIRTUAL"
+        ):
+            result[product.id] = float(virtual_stocks.get(product.id, 0))
+        else:
+            result[product.id] = max(
+                0.0,
+                float(product.estoque_atual or 0) - float(reserves.get(product.id, 0)),
+            )
+    return result
+
+
+def _management_items(
+    db: Session,
+    tenant_id: UUID,
+    config: IfoodMerchantConfig | None,
+    *,
+    product_ids: list[int] | None = None,
+    price_overrides: dict[int, float | None] | None = None,
+    now: datetime | None = None,
+) -> list[dict]:
+    from app.services.kit_custo_service import KitCustoService
+
+    products = _products(db, tenant_id, product_ids)
+    stocks = _available_stocks(db, tenant_id, products)
+    kit_costs = KitCustoService.calcular_custos_kits_em_lote(db, products)
+    identifiers = Counter(
+        product_identifier(product).casefold()
+        for product in (products if product_ids is None else _products(db, tenant_id))
+    )
+    safety = float(config.stock_safety or 0) if config else 0
+    evaluated_at = now or datetime.now(timezone.utc)
+    items = []
+    for product in products:
+        snapshot = SimpleNamespace(
+            **{
+                column.key: getattr(product, column.key)
+                for column in Produto.__table__.columns
+            }
+        )
+        snapshot.ifood_saved_specific_price = product.preco_ifood
+        if price_overrides is not None and product.id in price_overrides:
+            snapshot.preco_ifood = price_overrides[product.id]
+        if product.id in kit_costs:
+            snapshot.preco_custo = float(kit_costs[product.id])
+        stock = stocks.get(product.id)
+        items.append(
+            build_management_item(
+                snapshot,
+                config,
+                available_stock=max(0, stock - safety) if stock is not None else None,
+                duplicate_identifier=identifiers[product_identifier(product).casefold()]
+                > 1,
+                now=evaluated_at,
+            )
+        )
+    from app.integrations.ifood.catalog_pilot import summaries
+
+    publication = summaries(
+        db, tenant_id, config.merchant_id if config else None, [p.id for p in products]
+    )
+    for item in items:
+        evidence = publication.get(
+            item["product_id"],
+            {"link": None, "last_submission": None, "last_confirmation": None},
+        )
+        if evidence["link"]:
+            evidence["link"]["stale"] = (
+                evidence["link"]["barcode"] != item["identifier"]
+            )
+        item["publication"] = evidence
+        last = evidence["last_submission"]
+        item["sync_status"] = last["status"] if last else "nao_enviado"
+        confirmed = evidence["last_confirmation"]
+        item["last_confirmed_price"] = (
+            confirmed["price"]
+            if confirmed and confirmed["barcode"] == item["identifier"]
+            else None
+        )
+    return items
 
 
 def _catalog_response(
@@ -156,7 +379,7 @@ def _catalog_response(
 ) -> dict[str, Any]:
     eligible = [item for item in items if item.eligible]
     rejected = [item for item in items if not item.eligible]
-    selected = rejected if only_issues else items
+    selected = rejected if only_issues else eligible + rejected
     error_counts = Counter(error for item in rejected for error in item.errors)
     warning_counts = Counter(warning for item in items for warning in item.warnings)
     return {
@@ -204,7 +427,7 @@ def get_ifood_status(
 ):
     _user, tenant_id = auth
     config = _get_config(db, tenant_id)
-    items = _catalog(db, config)
+    items = _catalog(db, tenant_id, config)
     eligible = sum(1 for item in items if item.eligible)
     return {
         "configured": bool(config and config.merchant_id),
@@ -229,20 +452,30 @@ def save_ifood_config(
 ):
     current_user, tenant_id = auth
     _require_admin(current_user)
-    if body.active and not body.merchant_id:
+    config = _get_config(db, tenant_id, create=True)
+    assert config is not None
+    active = body.active if "active" in body.model_fields_set else config.active
+    merchant_id = (
+        body.merchant_id
+        if "merchant_id" in body.model_fields_set
+        else config.merchant_id
+    )
+    if active and not merchant_id:
         raise HTTPException(
             status_code=422,
             detail="Informe o Merchant ID antes de ativar a integracao.",
         )
-    config = _get_config(db, tenant_id, create=True)
-    assert config is not None
-    config.merchant_id = body.merchant_id
-    config.active = body.active
-    config.catalog_source = body.catalog_source
-    config.default_markup_percent = body.default_markup_percent
-    config.stock_safety = body.stock_safety
-    config.status = "ready" if body.merchant_id else "draft"
-    config.last_error = None
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(config, field, value)
+    if set(body.model_fields_set) & {
+        *MARGIN_CONFIG_FIELDS,
+        "rates_reference",
+        "rates_valid_from",
+    }:
+        _record_margin_rules(db, config, current_user.id)
+    if "merchant_id" in body.model_fields_set or "active" in body.model_fields_set:
+        config.status = "ready" if config.merchant_id else "draft"
+        config.last_error = None
     db.commit()
     db.refresh(config)
     return {"config": _config_view(config)}
@@ -257,7 +490,237 @@ def preview_ifood_catalog(
 ):
     _user, tenant_id = auth
     config = _get_config(db, tenant_id)
-    return _catalog_response(_catalog(db, config), limit=limit, only_issues=only_issues)
+    return _catalog_response(
+        _catalog(db, tenant_id, config), limit=limit, only_issues=only_issues
+    )
+
+
+@router.put("/catalogo/configuracao")
+@require_permission("configuracoes.editar")
+def save_ifood_catalog_config(
+    body: IfoodCatalogConfigPayload,
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    """Premissas locais da loja; nao altera vinculo, ativacao ou flags externas."""
+    current_user, tenant_id = user_and_tenant
+    config = _get_config(db, tenant_id, create=True)
+    assert config is not None
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(config, field, value)
+    _record_margin_rules(db, config, current_user.id)
+    db.commit()
+    db.refresh(config)
+    return {"config": _config_view(config)}
+
+
+@router.get("/catalogo/gestao")
+@require_permission("produtos.visualizar")
+def get_ifood_management_catalog(
+    q: str = Query(default="", max_length=200),
+    filtro: Literal[
+        "todos",
+        "selecionados",
+        "pendencias",
+        "sem_estoque",
+        "preco_especifico",
+        "nao_selecionados",
+    ] = "todos",
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    product_id: int | None = Query(default=None, ge=1),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    current_user, tenant_id = user_and_tenant
+    config = _get_config(db, tenant_id)
+    evaluated_at = datetime.now(timezone.utc)
+    items = _management_items(db, tenant_id, config, now=evaluated_at)
+    # Calcular antes de busca, filtro e paginacao: uma promocao pode fazer um
+    # produto entrar/sair da lista e alterar os indicadores da loja.
+    next_changes = [
+        item["next_price_change_at"]
+        for item in items
+        if item["next_price_change_at"] is not None
+    ]
+
+    def has_issues(item):
+        return item["selected"] and any(
+            p["kind"] != "recomendacao" for p in item["pending"]
+        )
+
+    summary = {
+        "total": len(items),
+        "selected": sum(item["selected"] for item in items),
+        "issues": sum(has_issues(item) for item in items),
+        "out_of_stock": sum(
+            item["available_stock"] is not None and item["available_stock"] <= 0
+            for item in items
+        ),
+        "specific_price": sum(item["price_source"] == "especifico" for item in items),
+    }
+    filters = {
+        "todos": lambda item: True,
+        "selecionados": lambda item: item["selected"],
+        "pendencias": has_issues,
+        "sem_estoque": lambda item: (
+            item["available_stock"] is not None and item["available_stock"] <= 0
+        ),
+        "preco_especifico": lambda item: item["price_source"] == "especifico",
+        "nao_selecionados": lambda item: not item["selected"],
+    }
+    terms = q.casefold().split()
+    filtered = [
+        item
+        for item in items
+        if (product_id is None or item["product_id"] == product_id)
+        and filters[filtro](item)
+        and all(
+            term in f"{item['name']} {item['sku']} {item['identifier']}".casefold()
+            for term in terms
+        )
+    ]
+    return {
+        "evaluated_at": utc_timestamp(evaluated_at),
+        "next_price_change_at": min(next_changes, key=aware) if next_changes else None,
+        "items": filtered[offset : offset + limit],
+        "total": len(filtered),
+        "summary": summary,
+        "config": _config_view(config),
+        "has_more": offset + limit < len(filtered),
+        "can_configure": _can_configure_catalog(db, current_user, tenant_id),
+    }
+
+
+@router.post("/catalogo/produto/simular-preco")
+@require_permission("produtos.visualizar")
+def simulate_ifood_product_price(
+    body: IfoodPriceSimulationPayload,
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    """Simula somente o preco: custo, estoque, oferta e promocao vem do ERP."""
+    _, tenant_id = user_and_tenant
+    config = _get_config(db, tenant_id)
+    items = _management_items(
+        db,
+        tenant_id,
+        config,
+        product_ids=[body.product_id],
+        price_overrides={body.product_id: body.preco_ifood},
+    )
+    if not items:
+        raise HTTPException(
+            status_code=404, detail="Produto não encontrado nesta loja."
+        )
+    return items[0]
+
+
+@router.post("/catalogo/produto/preview")
+@require_any_permission(("produtos.criar", "produtos.editar"))
+def preview_ifood_product(
+    body: IfoodProductPreviewPayload,
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    _, tenant_id = user_and_tenant
+    config = _get_config(db, tenant_id)
+    product = None
+    if body.produto.id:
+        product = (
+            db.query(Produto)
+            .filter(
+                Produto.tenant_id == tenant_id,
+                Produto.id == body.produto.id,
+                Produto.deleted_at.is_(None),
+            )
+            .first()
+        )
+        if product is None:
+            raise HTTPException(
+                status_code=404, detail="Produto nao encontrado nesta loja."
+            )
+    snapshot = SimpleNamespace(
+        **(
+            {
+                column.key: getattr(product, column.key)
+                for column in Produto.__table__.columns
+            }
+            if product
+            else {
+                "ativo": True,
+                "situacao": True,
+                "is_sellable": True,
+                "is_parent": False,
+                "tipo_produto": "SIMPLES",
+                "tipo": "produto",
+                "unidade": "UN",
+            }
+        )
+    )
+    changes = body.produto.model_dump(exclude_unset=True)
+    snapshot.ifood_saved_specific_price = product.preco_ifood if product else None
+    for field, value in changes.items():
+        setattr(snapshot, field, value)
+    stock = (
+        _available_stocks(db, tenant_id, [product]).get(product.id) if product else None
+    )
+    composition_changed = False
+    if product:
+        composition_changed = (
+            snapshot.tipo_produto != product.tipo_produto
+            or snapshot.tipo_kit != product.tipo_kit
+        )
+        if "composicao_kit" in changes:
+            from app.produtos_models import ProdutoKitComponente
+
+            persisted = (
+                db.query(ProdutoKitComponente)
+                .filter(
+                    ProdutoKitComponente.tenant_id == tenant_id,
+                    ProdutoKitComponente.kit_id == product.id,
+                )
+                .all()
+            )
+            before = sorted(
+                (row.produto_componente_id, float(row.quantidade), bool(row.opcional))
+                for row in persisted
+            )
+            after = sorted(
+                (
+                    row["produto_componente_id"],
+                    float(row["quantidade"]),
+                    bool(row.get("opcional", False)),
+                )
+                for row in changes["composicao_kit"] or []
+            )
+            composition_changed = composition_changed or before != after
+        if composition_changed:
+            stock = None
+    if getattr(snapshot, "tipo_produto", None) in ("KIT", "VARIACAO") and getattr(
+        snapshot, "tipo_kit", None
+    ):
+        if not product or composition_changed:
+            snapshot.preco_custo = None
+        else:
+            from app.services.kit_custo_service import KitCustoService
+
+            snapshot.preco_custo = float(
+                KitCustoService.calcular_custo_kit(product.id, db)
+            )
+    identifier = product_identifier(snapshot)
+    duplicate = any(
+        p.id != getattr(snapshot, "id", None)
+        and product_identifier(p).casefold() == identifier.casefold()
+        for p in _products(db, tenant_id)
+    )
+    safety = float(config.stock_safety or 0) if config else 0
+    return build_management_item(
+        snapshot,
+        config,
+        available_stock=max(0, stock - safety) if stock is not None else None,
+        duplicate_identifier=duplicate,
+    )
 
 
 @router.post("/testar-conexao")
@@ -303,7 +766,14 @@ def test_ifood_connection(
         ) from exc
 
 
-@router.post("/catalogo/sincronizar")
+@router.post(
+    "/catalogo/sincronizar",
+    responses={
+        409: {
+            "description": "Envio legado/reset bloqueado; use o piloto individual na Central"
+        }
+    },
+)
 def sync_ifood_catalog(
     body: IfoodSyncPayload,
     auth=Depends(get_current_user_and_tenant),
@@ -311,9 +781,17 @@ def sync_ifood_catalog(
 ):
     current_user, tenant_id = auth
     _require_admin(current_user)
+    if body.reset_catalog and str(settings.ENVIRONMENT).lower() in {
+        "production",
+        "prod",
+        "staging",
+    }:
+        raise HTTPException(
+            409,
+            "Reset de catalogo esta bloqueado em producao. Use a Central iFood para o piloto de um produto.",
+        )
     config = _get_config(db, tenant_id)
-    items = _catalog(db, config, body.product_ids)
-    eligible = [item for item in items if item.eligible and item.payload]
+    items = _catalog(db, tenant_id, config, body.product_ids)
     preview = _catalog_response(items, limit=200)
     if body.dry_run:
         return {
@@ -323,88 +801,7 @@ def sync_ifood_catalog(
             **preview,
         }
 
-    if body.reset_catalog and body.operation != "create":
-        raise HTTPException(
-            status_code=422,
-            detail="Reset de catalogo so pode ser usado na criacao via POST.",
-        )
-    if body.reset_catalog and not body.confirm_reset:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "Confirme o reset do catalogo de teste. Produtos omitidos serao "
-                "desativados no iFood."
-            ),
-        )
-
-    if not settings.IFOOD_CATALOG_WRITE_ENABLED:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Envios reais estao bloqueados ate concluir a homologacao do iFood.",
-        )
-    if not body.confirm_send:
-        raise HTTPException(
-            status_code=422,
-            detail="Confirme explicitamente o envio real do catalogo.",
-        )
-    if not config or not config.active or not config.merchant_id:
-        raise HTTPException(
-            status_code=409,
-            detail="Ative a integracao e informe o Merchant ID antes de enviar.",
-        )
-    if not _credentials_configured():
-        raise HTTPException(
-            status_code=503,
-            detail="Credenciais do aplicativo iFood nao configuradas no servidor.",
-        )
-    if len(eligible) > 200:
-        raise HTTPException(
-            status_code=422,
-            detail="Selecione no maximo 200 produtos por envio para respeitar a volumetria do iFood.",
-        )
-    payloads = [item.payload for item in eligible if item.payload]
-    if not payloads:
-        raise HTTPException(
-            status_code=422,
-            detail="Nenhum produto elegivel foi selecionado para o envio.",
-        )
-    if body.operation == "update":
-        payloads = [
-            {
-                "barcode": payload["barcode"],
-                "name": payload["name"],
-                "inventory": payload["inventory"],
-                "details": payload["details"],
-                "prices": payload["prices"],
-                "channels": payload["channels"],
-            }
-            for payload in payloads
-        ]
-    try:
-        with _client() as client:
-            result = client.ingest_items(
-                config.merchant_id,
-                payloads,
-                method="POST" if body.operation == "create" else "PATCH",
-                reset_catalog=body.reset_catalog,
-            )
-        config.status = "connected"
-        config.last_catalog_sync_at = _utcnow()
-        config.last_error = None
-        db.commit()
-        return {
-            "dry_run": False,
-            "operation": body.operation,
-            "reset_catalog": body.reset_catalog,
-            "sent": len(payloads),
-            "rejected": len(items) - len(eligible),
-            **result,
-        }
-    except IfoodClientError as exc:
-        config.status = "error"
-        config.last_error = str(exc)
-        db.commit()
-        raise HTTPException(
-            status_code=_provider_http_status(exc),
-            detail=str(exc),
-        ) from exc
+    raise HTTPException(
+        status_code=409,
+        detail="Envios reais pelo fluxo legado estao bloqueados. Use a Central iFood e a conferencia individual do produto; reset de catalogo nao e permitido.",
+    )

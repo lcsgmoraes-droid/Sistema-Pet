@@ -7,6 +7,8 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from tests.helpers.signed_nfe import make_key, sign_nfe
+
 from app.db import base as _registry  # noqa: F401
 from app.nfe_cache_models import BlingNotaFiscalCache
 from app.services import xml_contabilidade_documentos as documentos
@@ -20,16 +22,19 @@ from app.xml_contabilidade_models import (
     XmlContabilidadeEnvio,
     XmlContabilidadeEvento,
     XmlContabilidadeMonitor,
+    XmlContabilidadeTentativa,
 )
 
-CHAVE = "35261033590794000140650030000000441241595909"
+CHAVE = make_key("35261033590794000140650030000000441241595909")
 CNPJ = "33590794000140"
 NOW = datetime(2026, 10, 19, 15, 0, tzinfo=timezone.utc)
 OBTER_EVENTOS_REAL = documentos._obter_eventos
 
 
-def xml_nota(data="2026-09-03T12:00:00-03:00"):
-    return f"""<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe{CHAVE}"><ide><mod>65</mod><dhEmi>{data}</dhEmi><tpAmb>1</tpAmb><tpNF>1</tpNF></ide><emit><CNPJ>{CNPJ}</CNPJ><xNome>Loja teste</xNome></emit></infNFe></NFe><protNFe><infProt><chNFe>{CHAVE}</chNFe><cStat>100</cStat></infProt></protNFe></nfeProc>""".encode()
+def xml_nota(data="2026-10-03T12:00:00-03:00"):
+    return sign_nfe(
+        f"""<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe{CHAVE}"><ide><mod>65</mod><dhEmi>{data}</dhEmi><tpAmb>1</tpAmb><tpNF>1</tpNF></ide><emit><CNPJ>{CNPJ}</CNPJ><xNome>Loja teste</xNome></emit></infNFe></NFe><protNFe><infProt><chNFe>{CHAVE}</chNFe><cStat>100</cStat></infProt></protNFe></nfeProc>"""
+    )
 
 
 def xml_evento(tipo="110110", seq=1, data="2026-10-19T12:01:00-03:00"):
@@ -50,6 +55,7 @@ def contexto(monkeypatch):
     for model in (
         XmlContabilidadeConfig,
         XmlContabilidadeEnvio,
+        XmlContabilidadeTentativa,
         XmlContabilidadeEvento,
         XmlContabilidadeMonitor,
         Venda,
@@ -68,7 +74,7 @@ def contexto(monkeypatch):
 
 
 def venda(db, tenant, *, recente=False):
-    data = datetime(2026, 10, 19, 12, 1) if recente else datetime(2026, 9, 3, 12)
+    data = datetime(2026, 10, 19, 12, 1) if recente else datetime(2026, 10, 3, 12)
     obj = Venda(
         tenant_id=tenant,
         numero_venda="V1",
@@ -214,16 +220,16 @@ def test_periodo_inclui_eventos_de_nota_antiga_com_individual_desativado(context
     venda(db, tenant)
     eventos.extend(
         [
-            xml_evento(data="2026-09-30T23:59:59-03:00"),
-            xml_evento(seq=2, data="2026-10-01T00:00:00-03:00"),
+            xml_evento(data="2026-10-09T23:59:59-03:00"),
+            xml_evento(seq=2, data="2026-10-10T00:00:00-03:00"),
         ]
     )
     arquivos, notas = individual.coletar_eventos_periodo(
-        db, tenant, date(2026, 10, 1), date(2026, 10, 31)
+        db, tenant, date(2026, 10, 10), date(2026, 10, 31)
     )
     assert len(arquivos) == len(notas) == 1
     assert arquivos[0][1] == eventos[1]["xmlEvento"].encode()
-    assert notas[0]["data_emissao"] == "2026-09-03"
+    assert notas[0]["data_emissao"] == "2026-10-03"
     assert notas[0]["somente_eventos_periodo"] is True
     assert notas[0]["eventos"][0]["sequencia"] == 2
     assert db.query(XmlContabilidadeEnvio).count() == 0
@@ -266,8 +272,77 @@ def test_evento_de_outra_empresa_nao_pode_ser_enviado(contexto):
     db.commit()
     envio = db.query(XmlContabilidadeEnvio).one()
     with tenant_context(uuid4()):
-        with pytest.raises(service.XmlContabilidadeError, match="não está disponível"):
+        with pytest.raises(
+            service.XmlContabilidadeError, match="CorePet|não está disponível"
+        ):
             individual.preparar_anexos_individual(db, uuid4(), envio)
+
+
+@pytest.mark.parametrize(
+    "origem_invalida",
+    ["evento_bling", "evento_orfao", "chave_divergente", "venda_bling", "envio_bling"],
+)
+def test_evento_individual_exige_origem_e_vinculo_com_emissao_corepet(
+    contexto, origem_invalida
+):
+    db, tenant, _ = contexto
+    obj = venda(db, tenant)
+    dado = xml_evento()
+    identidade = f"ID110110{CHAVE}01"
+    if origem_invalida == "venda_bling":
+        obj.nfe_provider = "bling"
+    evento = XmlContabilidadeEvento(
+        tenant_id=tenant,
+        provider="bling" if origem_invalida == "evento_bling" else "intnfe",
+        documento_id="999999" if origem_invalida == "evento_orfao" else str(obj.id),
+        chave="9" * 44 if origem_invalida == "chave_divergente" else CHAVE,
+        identidade=identidade,
+        tipo="110110",
+        sequencia=1,
+        protocolo=dado["protocolo"],
+        registrado_em=NOW,
+        nome_arquivo=f"{identidade}.xml",
+        xml=dado["xmlEvento"].encode(),
+    )
+    db.add(evento)
+    db.commit()
+    envio = SimpleNamespace(
+        provider="bling" if origem_invalida == "envio_bling" else "intnfe",
+        documento_id=str(obj.id),
+        idempotency_key=f"evento:{identidade}:{dado['protocolo']}",
+    )
+    with pytest.raises(service.XmlContabilidadeError):
+        individual.preparar_anexos_individual(db, tenant, envio)
+
+
+def test_evento_importado_com_mesma_chave_corepet_nao_entra_no_lote(
+    contexto, monkeypatch
+):
+    db, tenant, _ = contexto
+    obj = venda(db, tenant)
+    dado = xml_evento()
+    identidade = f"ID110110{CHAVE}01"
+    db.add(
+        XmlContabilidadeEvento(
+            tenant_id=tenant,
+            provider="bling",
+            documento_id=str(obj.id),
+            chave=CHAVE,
+            identidade=identidade,
+            tipo="110110",
+            sequencia=1,
+            protocolo=dado["protocolo"],
+            registrado_em=NOW,
+            nome_arquivo=f"{identidade}.xml",
+            xml=dado["xmlEvento"].encode(),
+        )
+    )
+    db.commit()
+    monkeypatch.setattr(documentos, "_obter_eventos", OBTER_EVENTOS_REAL)
+    monkeypatch.setattr(eventos_service, "obter_eventos_intnfe", lambda *_: [])
+    assert individual.coletar_eventos_periodo(
+        db, tenant, date(2026, 10, 1), date(2026, 10, 31)
+    ) == ([], [])
 
 
 def test_evento_ja_recebido_permanece_no_lote_se_lista_remota_agora_omite(
@@ -312,7 +387,7 @@ def test_persistido_nao_oculta_falha_de_consulta_remota(contexto, monkeypatch):
         )
 
 
-def test_evento_embutido_persistido_revalida_fonte_original_sem_reserializar(
+def test_evento_acrescentado_ao_nfeproc_nao_persiste_fonte_nao_suportada(
     contexto, monkeypatch
 ):
     db, tenant, _ = contexto
@@ -325,15 +400,10 @@ def test_evento_embutido_persistido_revalida_fonte_original_sem_reserializar(
     original = xml_nota().replace(b"</nfeProc>", evento + b"</nfeProc>")
     obj.nfe_xml = original.decode()
     db.commit()
-    individual.consultar_documento(db, tenant, "intnfe", obj.id, NOW)
-    db.commit()
-    obj.nfe_xml = xml_nota().decode()
-    db.commit()
-    arquivos, notas = individual.coletar_eventos_periodo(
-        db, tenant, date(2026, 10, 1), date(2026, 10, 31)
-    )
-    assert len(arquivos) == 1 and arquivos[0][1] == original
-    assert notas[0]["status"] == "cancelada"
+    with pytest.raises(service.XmlContabilidadeError, match="integridade.*parcial"):
+        individual.consultar_documento(db, tenant, "intnfe", obj.id, NOW)
+    assert db.query(XmlContabilidadeEvento).count() == 0
+    assert obj.nfe_xml == original.decode()
 
 
 def test_individual_anexa_xml_sem_zip_e_sem_simular_smtp(monkeypatch):
@@ -353,6 +423,7 @@ def test_individual_anexa_xml_sem_zip_e_sem_simular_smtp(monkeypatch):
     )
     envio = SimpleNamespace(
         origem="automatico",
+        provider="intnfe",
         idempotency_key="evento:ID:135260000000001",
         email_destino="contador@example.com",
     )

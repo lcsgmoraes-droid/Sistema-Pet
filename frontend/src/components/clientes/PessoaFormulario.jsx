@@ -456,7 +456,7 @@ export default function PessoaFormulario({
         label: "Contatos",
         icon: Phone,
         descricao: "Telefone, e-mail, observações e contatos adicionais",
-        invalida: Boolean(erros.celular || erros.contatos_adicionais),
+        invalida: Boolean(erros.celular || erros.telefone || erros.contatos_adicionais),
       },
       {
         id: "endereco",
@@ -580,17 +580,30 @@ export default function PessoaFormulario({
       setEnderecosAdicionais(pessoaSalva.enderecos_adicionais || []);
       onSalvo?.(pessoaSalva);
     } catch (error) {
-      const details = error.response?.data?.details;
-      if (Array.isArray(details) && details.length > 0) {
-        const { errosPorCampo, primeiraAba } = mapearErrosServidor(details);
+      const resposta = error.response?.data;
+      const conflitoTelefone =
+        error.response?.status === 409 && resposta?.error === "pessoa_telefone_duplicado";
+      const details = error.response?.status !== 409 || conflitoTelefone ? resposta?.details : null;
+      const detalhesCampos = Array.isArray(details)
+        ? details.filter(
+            (detalhe) => Array.isArray(detalhe?.loc) && typeof detalhe.msg === "string",
+          )
+        : [];
+      if (conflitoTelefone) setAbaAtiva("contatos");
+      if (detalhesCampos.length > 0) {
+        const { errosPorCampo, primeiraAba } = mapearErrosServidor(detalhesCampos);
         setErrosServidor(errosPorCampo);
         if (primeiraAba) setAbaAtiva(primeiraAba);
-        const mensagens = details.map((detalhe) => detalhe.msg).filter(Boolean);
+        const mensagens = detalhesCampos.map((detalhe) => detalhe.msg).filter(Boolean);
         toast.error(
           mensagens.join(" · ") || "Não foi possível salvar — corrija os campos destacados.",
         );
       } else {
-        toast.error(error.response?.data?.detail || "Não foi possível salvar as alterações.");
+        toast.error(
+          typeof resposta?.detail === "string" && resposta.detail.trim()
+            ? resposta.detail
+            : "Não foi possível salvar as alterações.",
+        );
       }
     } finally {
       setSalvando(false);

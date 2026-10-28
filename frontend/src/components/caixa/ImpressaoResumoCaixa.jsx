@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { formatMoneyBRL } from "../../utils/formatters";
+import { criarResumoImpressaoCaixa } from "./caixaImpressaoResumo";
 
 export default function ImpressaoResumoCaixa({ resumo, onAfterPrint }) {
   const onAfterPrintRef = useRef(onAfterPrint);
@@ -23,20 +24,18 @@ export default function ImpressaoResumoCaixa({ resumo, onAfterPrint }) {
 
   if (!resumo) return null;
 
+  const impressao = criarResumoImpressaoCaixa(resumo);
   const itensResumo = [
-    ["Total vendido", resumo.total_vendido],
-    ["Vendas no crediário", resumo.total_vendas_crediario ?? 0],
-    ["Total recebido", resumo.total_recebido],
     ["Valor de abertura", resumo.caixa.valor_abertura],
     ["Suprimentos", resumo.totais.suprimentos],
     ["Sangria", resumo.totais.sangrias],
     ["Devoluções", resumo.totais.devolucoes],
     ["Despesas", resumo.totais.despesas],
   ];
-  const formas = Object.entries(resumo.vendas_por_forma_pagamento || {});
-  const recebimentosPorData = Object.entries(resumo.recebimentos_por_data_venda || {}).sort(
-    ([dataA], [dataB]) => dataB.localeCompare(dataA),
-  );
+  const formas = impressao.formas;
+  const recebimentosPorData = Object.entries(
+    impressao.novoContrato ? {} : resumo.recebimentos_por_data_venda || {},
+  ).sort(([dataA], [dataB]) => dataB.localeCompare(dataA));
   const rotuloData = (data) =>
     data === "sem_venda" ? "Sem venda vinculada" : data.split("-").reverse().join("/");
   const totalPorData = (formasDoDia) =>
@@ -78,13 +77,30 @@ export default function ImpressaoResumoCaixa({ resumo, onAfterPrint }) {
         Caixa #{resumo.caixa.numero_caixa} — {resumo.caixa.usuario_nome}
       </div>
       <div>Abertura: {new Date(resumo.caixa.data_abertura).toLocaleString("pt-BR")}</div>
+      <h2>{impressao.tituloVendas}</h2>
+      {impressao.descricaoVendas && <p>{impressao.descricaoVendas}</p>}
+      {impressao.linhasVendas.map(([titulo, valor]) => (
+        <div className="linha" key={titulo}>
+          <span>{titulo}</span>
+          <strong>{formatMoneyBRL(valor)}</strong>
+        </div>
+      ))}
+      <h2>{impressao.tituloRecebimentos}</h2>
+      {impressao.periodoRecebimentos && <p>Período: {impressao.periodoRecebimentos}</p>}
+      {impressao.linhasRecebimentos.map(([titulo, valor]) => (
+        <div className="linha" key={titulo}>
+          <span>{titulo}</span>
+          <strong>{formatMoneyBRL(valor)}</strong>
+        </div>
+      ))}
+      <h2>Saldo físico do caixa</h2>
       {itensResumo.map(([titulo, valor]) => (
         <div className="linha" key={titulo}>
           <span>{titulo}</span>
           <strong>{formatMoneyBRL(valor)}</strong>
         </div>
       ))}
-      <h2>Formas de pagamento</h2>
+      <h2>{impressao.tituloFormas}</h2>
       {formas.map(([forma, dados]) => (
         <div className="linha" key={forma}>
           <span>
@@ -115,10 +131,7 @@ export default function ImpressaoResumoCaixa({ resumo, onAfterPrint }) {
           ))}
         </>
       )}
-      <p>
-        Dinheiro corresponde às entradas registradas no extrato deste caixa. As demais formas não
-        afetam o saldo físico.
-      </p>
+      <p>{impressao.notaRecebimentos}</p>
     </div>,
     document.body,
   );

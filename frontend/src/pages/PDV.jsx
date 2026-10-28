@@ -327,6 +327,7 @@ export default function PDV() {
     reabrirVenda,
   } = usePDVVendaAtual({
     vendaAtual,
+    modoVisualizacao,
     setVendaAtual,
     searchVendaQuery,
     setSearchVendaQuery,
@@ -403,6 +404,7 @@ export default function PDV() {
     atualizarPetDoItem,
     atualizarProtocoloDoItem,
     atualizarQuantidadeItem,
+    atualizarSubtotalItem,
     copiarCodigoProdutoCarrinho,
     handleBuscarProdutoChange,
     handleBuscarProdutoFocus,
@@ -557,6 +559,7 @@ export default function PDV() {
     atualizarPetDoItem,
     atualizarProtocoloDoItem,
     atualizarQuantidadeItem,
+    atualizarSubtotalItem,
     handleBuscarProdutoChange,
     handleBuscarProdutoFocus,
     handleBuscarProdutoKeyDown,

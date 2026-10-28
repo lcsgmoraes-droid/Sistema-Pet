@@ -165,12 +165,120 @@ Invoke-GateStep 'Backend format' $ruff @(
     'format', '--check', '.', '--exclude', 'alembic/versions'
 ) $backend
 
+Invoke-GateStep 'Faturamento and cash audit reconciliation regression' $python @(
+    '-m', 'pytest',
+    'tests/unit/test_faturamento_composicao.py',
+    'tests/unit/test_faturamento_superficies.py',
+    'tests/unit/test_pdf_caixa_resumo.py',
+    'tests/unit/test_caixa_recebimentos_auditoria.py',
+    'tests/unit/test_caixa_conferencia_estados.py',
+    'tests/unit/test_caixa_auditoria_performance.py',
+    'tests/unit/test_pagamento_excedente_finalizacao.py',
+    'tests/unit/test_venda_edicao_pagamentos.py',
+    'tests/unit/test_contas_receber_saldo_venda.py',
+    'tests/unit/test_venda_finalizacao_pagamentos.py',
+    'tests/unit/test_venda_status_pagamento.py',
+    'tests/unit/test_finalizacao_recebiveis_atomicidade.py',
+    'tests/unit/test_vendas_fechamento_edicao.py',
+    'tests/unit/test_vendas_comissao_reprocessamento_contract.py', '-q'
+) $backend
+
+Invoke-GateStep 'Operational search history receipts and commissions regression' $python @(
+    '-m', 'pytest',
+    'tests/unit/test_clientes_busca_relevancia.py',
+    'tests/unit/test_cliente_historico_paginacao.py',
+    'tests/unit/test_clientes_historico_compras_cancelamento.py',
+    'tests/unit/test_beneficio_carimbo_manual_app.py',
+    'tests/unit/test_pessoa_merge_safety.py',
+    'tests/unit/test_notas_entrada_vinculo_elegibilidade.py',
+    'tests/unit/test_recebimento_caixa_parcelamento.py',
+    'tests/unit/test_recebimento_repasse_comissao.py',
+    'tests/unit/test_comissoes_grupos_valor_fixo.py',
+    'tests/unit/test_comissoes_pagamentos_lote.py',
+    'tests/unit/test_pessoa_telefone_unico.py',
+    'tests/unit/test_pessoa_telefone_import_mobile.py',
+    'tests/unit/test_pessoa_telefone_usuarios.py',
+    'tests/unit/test_main_http_error_sanitization.py', '-q'
+) $backend
+
+Invoke-GateStep 'Sale cancellation original stock regression' $python @(
+    '-m', 'pytest',
+    'tests/unit/test_venda_cancelamento_lotes.py',
+    'tests/unit/test_cancelamento_pagamentos_caixa.py',
+    'tests/unit/test_venda_cancelamento_fiscal.py',
+    'tests/unit/test_venda_cancelamento_comercial_fiscal.py',
+    'tests/unit/test_vendas_cancelamento_com_devolucao.py',
+    'tests/unit/test_vendas_devolucao_lotes.py',
+    'tests/unit/test_vendas_devolucao_atomicidade.py',
+    'tests/unit/test_finalizacao_pagamento_estoque.py',
+    'tests/unit/test_estoque_service_quantidade_decimal.py',
+    'tests/unit/test_grupo_comercial_estoque_compartilhado_service.py',
+    'tests/unit/test_venda_custo_original_proveniencia.py',
+    'tests/unit/test_venda_edicao_preserva_custo_original.py',
+    'tests/unit/test_pedido_cancelamento_fiscal_estoque_service.py',
+    'tests/unit/test_bling_estoque_sync_transaction.py', '-q'
+) $backend
+
+Invoke-GateStep 'Billing operational continuity regression' $python @(
+    '-m', 'pytest',
+    'tests/unit/test_plan_catalog_and_limits.py',
+    'tests/unit/test_modulos_liberacao_temporaria_contract.py',
+    'tests/unit/test_module_access_dependency.py',
+    'tests/unit/test_custom_billing_offers.py',
+    'tests/unit/test_asaas_billing.py',
+    'tests/unit/test_ops_tenants_routes_contract.py',
+    'tests/unit/test_manual_full_access.py', '-q'
+) $backend
+Invoke-GateStep 'Billing notices regression' $node @(
+    'src/utils/billingNotice.test.mjs'
+) $frontend
+Invoke-GateStep 'Module access refresh regression' $node @(
+    '--test', 'src/contexts/ModulosContext.test.mjs'
+) $frontend
+Invoke-GateStep 'Tenant suspension authorization regression' $node @(
+    'src/pages/opsTenantsUtils.test.mjs'
+) $frontend
+
 Invoke-GateStep 'Frontend dependency audit' $npm @(
     'run', 'audit:dependencies'
 ) $frontend
 Invoke-GateStep 'Frontend lint' $npm @('run', 'lint:core') $frontend
 Invoke-GateStep 'Frontend format' $npm @('run', 'format:core:check') $frontend
 Invoke-GateStep 'Frontend production build' $npm @('run', 'build') $frontend
+Invoke-GateStep 'Frontend iFood and product regression tests' $npm @('run', 'test:ifood') $frontend
+Invoke-GateStep 'Frontend operational regression tests' $npm @('run', 'test:operacional') $frontend
+Invoke-GateStep 'Backend iFood safety contracts' $python @(
+    '-m', 'pytest', 'tests/unit/test_ifood_management.py',
+    'tests/unit/test_ifood_catalog_contract.py', 'tests/unit/test_ifood_routes_contract.py',
+    'tests/unit/test_ifood_orders_contract.py', 'tests/unit/test_ifood_client_contract.py',
+    'tests/unit/test_ifood_pdv_pilot.py',
+    'tests/unit/test_ifood_pdv_cancellation.py',
+    'tests/unit/test_ifood_stock_sync.py',
+    'tests/unit/test_ifood_stock_sync_live.py',
+    'tests/unit/test_ifood_pdv_pilot_bypasses.py',
+    'tests/unit/test_ifood_pdv_pilot_permissions.py',
+    'tests/unit/test_ifood_financial.py', 'tests/unit/test_ifood_financial_client.py',
+    'tests/unit/test_ifood_financial_routes.py', 'tests/unit/test_ifood_contract_reference.py',
+    'tests/unit/test_ifood_financial_costs.py', 'tests/unit/test_ifood_payouts.py',
+    'tests/unit/test_ifood_financial_statement.py', 'tests/unit/test_ifood_portal_statement.py',
+    'tests/unit/test_ifood_catalog_pilot.py', 'tests/unit/test_ifood_stock_pause_cycle.py',
+    'tests/unit/test_produto_origem_historico.py', '-q'
+) $backend
+
+Invoke-GateStep 'iFood pending fees reporting regression' $python @(
+    '-m', 'pytest', 'tests/unit/test_ifood_rentabilidade_pendente.py',
+    'tests/unit/test_ifood_sale_financials.py',
+    'tests/unit/test_ifood_financial_report_consumers.py',
+    'tests/unit/test_ifood_financial_poller.py',
+    'tests/unit/test_ifood_rentabilidade_dre_pe_pendente.py',
+    'tests/unit/test_venda_rentabilidade_snapshot.py',
+    'tests/unit/test_venda_rentabilidade_reprocessamento_service.py',
+    'tests/unit/test_dashboard_resumo_numeric_types.py',
+    'tests/unit/test_aba6_chat_ia_metricas.py',
+    'tests/unit/test_aba6_chat_ia_periodos.py',
+    'tests/unit/test_aba6_chat_ia_respostas.py',
+    'tests/unit/test_app_mobile_gestor_contract.py', '-q'
+) $backend
 
 if ($Nivel -eq 'rapido') {
     Write-Host "`nOK: gate rapido passou." -ForegroundColor Green
@@ -200,6 +308,9 @@ if ($mobileTests.Count -eq 0) {
     Fail 'Nenhum teste mobile *.test.mjs foi encontrado.'
 }
 Invoke-GateStep 'Mobile tests' $node (@('--test') + $mobileTests) $mobile
+Invoke-GateStep 'Mobile manual loyalty stamp regression' $node @(
+    'scripts/test-beneficios-carimbo-manual.cjs'
+) $mobile
 
 Write-Host "`nOK: gate completo de release passou." -ForegroundColor Green
 exit 0

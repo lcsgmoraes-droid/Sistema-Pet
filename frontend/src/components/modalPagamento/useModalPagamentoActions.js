@@ -14,6 +14,8 @@ import { ehVendaCrediario } from "../../utils/pdvReceipt";
 import { montarPayloadVenda } from "../../utils/pdvVendaPayload";
 import { arredondarDinheiro } from "../../utils/pdvCarrinhoItensUtils";
 import { formatMoneyBRL } from "../../utils/formatters";
+import { CANAL_IFOOD, normalizeSalesChannel } from "../../utils/salesChannel";
+import { isIfoodManualPaymentBlocked } from "../../utils/ifoodPdvPilot";
 import {
   devePerguntarNotaFiscal,
   montarItensParaVerificarEstoqueNegativo,
@@ -27,9 +29,23 @@ import {
   validarPagamentoParaAdicionar,
 } from "../modalPagamentoUtils";
 import { confirmarCorePet, perguntarCorePet } from "../../services/corepetDialog";
+import {
+  comporExcedentePagamento,
+  excecaoPagamentoAutorizada,
+  extrairExcecaoPagamento,
+  mensagemExcedentePagamento,
+  validarTiposPagamentoExcedente,
+} from "./modalPagamentoExcedente";
 
 export function useModalPagamentoActions({
+  bloqueado = false,
+  autorizacaoExcedente,
+  setAutorizacaoExcedente,
+  composicaoFinalizacao,
+  setContextoExcedenteServidor,
+  setErroPagamentosExistentes,
   bandeira,
+  caixaRecebimentoId,
   corParcelamentoAtual,
   cupomParaFinalizar,
   descricaoCupomMargem,
@@ -77,9 +93,32 @@ export function useModalPagamentoActions({
 }) {
   const navigate = useNavigate();
   const vendaIdPersistidaRef = useRef(venda?.id || null);
+  const finalizacaoEmAndamentoRef = useRef(false);
 
   const adicionarPagamento = () => {
+    if (isIfoodManualPaymentBlocked(venda)) return;
+    if (bloqueado || finalizacaoEmAndamentoRef.current) return;
     const valor = valorRecebido || 0;
+    const candidato = formaPagamentoSelecionada
+      ? montarPagamentoRecebido({
+          formaPagamento: formaPagamentoSelecionada,
+          valor,
+          valorRestante,
+          bandeira,
+          nsuCartao,
+          operadora: operadoraSelecionada,
+          numeroParcelas,
+        })
+      : null;
+    const composicao = comporExcedentePagamento({
+      valorTotal: venda.total,
+      totalPagoExistente,
+      pagamentos: candidato ? [...pagamentos, candidato] : pagamentos,
+    });
+    const excedenteAutorizado =
+      !["dinheiro", "cashback", "credito_cliente", "crediario", "boleto"].includes(
+        formaPagamentoSelecionada?.tipo,
+      ) && excecaoPagamentoAutorizada(composicao, autorizacaoExcedente);
     const erroValidacao = validarPagamentoParaAdicionar({
       formaPagamento: formaPagamentoSelecionada,
       valor,
@@ -91,6 +130,7 @@ export function useModalPagamentoActions({
       numeroParcelas,
       parcelasDisponiveis,
       cliente: venda.cliente,
+      excedenteAutorizado,
     });
 
     if (erroValidacao) {
@@ -100,15 +140,7 @@ export function useModalPagamentoActions({
 
     console.log("DEBUG formaPagamentoSelecionada:", formaPagamentoSelecionada);
 
-    const novoPagamento = montarPagamentoRecebido({
-      formaPagamento: formaPagamentoSelecionada,
-      valor,
-      valorRestante,
-      bandeira,
-      nsuCartao,
-      operadora: operadoraSelecionada,
-      numeroParcelas,
-    });
+    const novoPagamento = candidato;
     console.log("DEBUG novoPagamento:", novoPagamento);
     console.log(
       `Reutilizando simulacao do backend: ${numeroParcelas}x = cor ${corParcelamentoAtual}`,
@@ -143,10 +175,12 @@ export function useModalPagamentoActions({
   };
 
   const removerPagamento = (index) => {
+    if (isIfoodManualPaymentBlocked(venda)) return;
     setPagamentos(pagamentos.filter((_, i) => i !== index));
   };
 
   const excluirPagamentoExistente = async (pagamentoId) => {
+    if (isIfoodManualPaymentBlocked(venda)) return;
     if (!(await confirmarCorePet("Deseja realmente excluir este pagamento?"))) {
       return;
     }
@@ -208,6 +242,13 @@ export function useModalPagamentoActions({
       cupomParaFinalizar,
     });
     const payloadVenda = montarPayloadVenda(vendaParaPersistir);
+    if (
+      autorizacaoExcedente?.contexto &&
+      excecaoPagamentoAutorizada(composicaoFinalizacao || {}, autorizacaoExcedente)
+    ) {
+      payloadVenda.justificativa_pagamento_excedente = autorizacaoExcedente.justificativa;
+      payloadVenda.contexto_pagamento_excedente = autorizacaoExcedente.contexto;
+    }
     let vendaPersistida;
     const vendaId = await persistirVendaAbertaParaPagamento({
       vendaParaPersistir,
@@ -224,11 +265,33 @@ export function useModalPagamentoActions({
   };
 
   const handleFinalizar = async () => {
+    if (isIfoodManualPaymentBlocked(venda)) {
+      setErro("Cobrança manual iFood bloqueada. Confira o resumo do piloto no pedido.");
+      return;
+    }
+    if (bloqueado || finalizacaoEmAndamentoRef.current) return;
+    const erroTipos = validarTiposPagamentoExcedente({
+      valorTotal: venda.total,
+      totalPagoExistente,
+      pagamentos,
+    });
+    if (erroTipos) {
+      setErro(erroTipos);
+      return;
+    }
+    const composicao =
+      composicaoFinalizacao ||
+      comporExcedentePagamento({ valorTotal: venda.total, totalPagoExistente, pagamentos });
+    if (composicao.excedente > 0 && !excecaoPagamentoAutorizada(composicao, autorizacaoExcedente)) {
+      setErro(mensagemExcedentePagamento(composicao));
+      return;
+    }
     if (!podeConfirmarFinalizacao) {
       setErro("Adicione pelo menos uma forma de pagamento");
       return;
     }
 
+    finalizacaoEmAndamentoRef.current = true;
     setLoading(true);
     setErro("");
 
@@ -240,30 +303,51 @@ export function useModalPagamentoActions({
       }
 
       const { vendaId, vendaPersistida } = await salvarVendaAbertaParaPagamento();
+      let leituraPagamentos;
+      try {
+        leituraPagamentos = (await api.get(`/vendas/${vendaId}/pagamentos`)).data;
+      } catch (error) {
+        setErroPagamentosExistentes?.(true);
+        throw error;
+      }
+      const recebidoAtual = obterTotalRecebidoExistente(leituraPagamentos);
+      setPagamentosExistentes(leituraPagamentos.pagamentos || []);
+      setTotalPagoExistente(recebidoAtual);
       if (
-        vendaPersistida?.total != null &&
-        arredondarDinheiro(vendaPersistida.total) !== arredondarDinheiro(venda.total)
+        (vendaPersistida?.total != null &&
+          arredondarDinheiro(vendaPersistida.total) !== arredondarDinheiro(venda.total)) ||
+        arredondarDinheiro(recebidoAtual) !== arredondarDinheiro(totalPagoExistente)
       ) {
-        setVendaPersistida(vendaPersistida);
+        const totalAtual = vendaPersistida?.total ?? venda.total;
+        if (vendaPersistida) setVendaPersistida(vendaPersistida);
+        setAutorizacaoExcedente?.(null);
         setPagamentos(
           revisarPagamentosParaTotalPersistido({
             pagamentos,
-            valorTotal: vendaPersistida.total,
-            totalPagoExistente,
+            valorTotal: totalAtual,
+            totalPagoExistente: recebidoAtual,
           }),
         );
         setErro(
-          `O total da venda foi atualizado para ${formatMoneyBRL(vendaPersistida.total)}. Confira os pagamentos e confirme novamente. O cashback e o crédito utilizam somente o valor devido.`,
+          `Os valores foram atualizados: total líquido ${formatMoneyBRL(totalAtual)} e pagamentos já registrados ${formatMoneyBRL(recebidoAtual)}. Confira os pagamentos e confirme novamente. Nenhum novo pagamento foi registrado.`,
         );
         return;
       }
       const opcoesFinalizacao = {
+        caixa_id: caixaRecebimentoId || null,
         cupom_code: cupomParaFinalizar?.code || null,
         cupom_discount_applied: cupomParaFinalizar?.discount_applied ?? null,
         nao_gerar_beneficios: naoGerarBeneficios,
         justificativa_nao_gerar_beneficios: naoGerarBeneficios
           ? justificativaBeneficios.trim()
           : null,
+        ...(autorizacaoExcedente?.contexto &&
+        excecaoPagamentoAutorizada(composicao, autorizacaoExcedente)
+          ? {
+              justificativa_pagamento_excedente: autorizacaoExcedente.justificativa,
+              contexto_pagamento_excedente: autorizacaoExcedente.contexto,
+            }
+          : {}),
       };
       let resultado;
       try {
@@ -316,7 +400,10 @@ export function useModalPagamentoActions({
 
       if (!moduloFiscalAtivo || devePerguntarNotaFiscal(resultado)) {
         setAutoEmitirTipo(
-          moduloFiscalAtivo && emissaoAutomatica?.ativa && devePerguntarNotaFiscal(resultado)
+          normalizeSalesChannel(venda.canal) !== CANAL_IFOOD &&
+            moduloFiscalAtivo &&
+            emissaoAutomatica?.ativa &&
+            devePerguntarNotaFiscal(resultado)
             ? emissaoAutomatica.tipo
             : null,
         );
@@ -326,8 +413,33 @@ export function useModalPagamentoActions({
       }
     } catch (error) {
       console.error("Erro ao finalizar venda:", error);
-      setErro(error.response?.data?.detail || "Erro ao finalizar venda");
+      const excecao = extrairExcecaoPagamento(error);
+      if (excecao) {
+        setAutorizacaoExcedente?.(null);
+        setContextoExcedenteServidor?.({
+          base: comporExcedentePagamento({
+            valorTotal: venda.total,
+            totalPagoExistente,
+            pagamentos,
+          }).chave,
+          detalhe: excecao,
+        });
+        setErro(
+          excecao.mensagem ||
+            "Confira os pagamentos atualizados e confirme novamente a exceção com justificativa.",
+        );
+      } else {
+        const detalhe = error.response?.data?.detail;
+        setErro(
+          typeof detalhe === "string"
+            ? detalhe
+            : typeof detalhe?.mensagem === "string"
+              ? detalhe.mensagem
+              : "Erro ao finalizar venda",
+        );
+      }
     } finally {
+      finalizacaoEmAndamentoRef.current = false;
       setLoading(false);
     }
   };

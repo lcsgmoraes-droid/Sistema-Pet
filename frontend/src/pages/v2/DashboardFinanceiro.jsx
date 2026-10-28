@@ -31,12 +31,21 @@ import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
 import BotaoLink from "../../components/v2/BotaoLink/BotaoLink";
 import CartaoIndicador from "../../components/v2/CartaoIndicador/CartaoIndicador";
 import EstadoVazio from "../../components/v2/EstadoVazio/EstadoVazio";
+import InputPeriodo from "../../components/v2/InputPeriodo/InputPeriodo";
 import SeletorOpcoes from "../../components/v2/SeletorOpcoes/SeletorOpcoes";
+import ResumoFaturamento, {
+  DetalhesFaturamento,
+} from "../../components/v2/ResumoFaturamento/ResumoFaturamento";
 import { TONS_BADGE } from "../../components/v2/utils/tons";
 import { useTour } from "../../hooks/useTour";
 import { useTheme } from "../../theme/ThemeContext";
 import { tourDashboard } from "../../tours/tourDefinitions";
 import { formatMoneyBRL } from "../../utils/formatters";
+import {
+  descreverRentabilidadePendente,
+  PENDENCIA_IFOOD_LABEL,
+  temRentabilidadePendente,
+} from "../../components/financeiro/vendasFinanceiro/rentabilidadePendente.js";
 import { formatarDataLocal } from "../../components/financeiro/vendasFinanceiro/vendasFinanceiroDatas";
 import {
   calculateDashboardIndicators,
@@ -44,8 +53,14 @@ import {
   createEmptyManagementMetrics,
   getDashboardDetailPath,
   getExecutiveStatus,
-  getPeriodLabel,
 } from "../dashboard/dashboardOverview";
+import { iniciarAtualizacaoDashboard } from "../dashboard/dashboardRefresh";
+import {
+  chavePeriodoDashboard,
+  parametrosPeriodoDashboard,
+  rotuloPeriodoDashboard,
+  validarPeriodoDashboard,
+} from "../dashboard/dashboardPeriod";
 
 const PERIOD_OPTIONS = [
   { valor: 1, rotulo: "Hoje" },
@@ -54,6 +69,7 @@ const PERIOD_OPTIONS = [
   { valor: 30, rotulo: "30 dias" },
   { valor: 60, rotulo: "60 dias" },
   { valor: 90, rotulo: "90 dias" },
+  { valor: "personalizado", rotulo: "Período" },
 ];
 
 function formatDate(dateValue) {
@@ -86,8 +102,17 @@ export default function DashboardFinanceiro() {
   const { isDark } = useTheme();
   const { iniciarTour } = useTour("dashboard", tourDashboard, { delay: 2000 });
   const requestIdRef = useRef(0);
-  const hasLoadedRef = useRef(false);
-  const [periodDays, setPeriodDays] = useState(30);
+  const loadedPeriodRef = useRef(null);
+  const summaryPeriodRef = useRef(null);
+  const cashFlowPeriodRef = useRef(null);
+  const productsPeriodRef = useRef(null);
+  const requestPendingRef = useRef(false);
+  const abortControllerRef = useRef(null);
+  const [periodo, setPeriodo] = useState({ dias: 30 });
+  const [editarPeriodo, setEditarPeriodo] = useState(false);
+  const [rascunhoPeriodo, setRascunhoPeriodo] = useState({ inicio: "", fim: "" });
+  const [erroPeriodo, setErroPeriodo] = useState("");
+  const periodKey = chavePeriodoDashboard(periodo);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
@@ -98,77 +123,135 @@ export default function DashboardFinanceiro() {
   const [overdueAccounts, setOverdueAccounts] = useState({ contas_receber: [], contas_pagar: [] });
   const [topProducts, setTopProducts] = useState([]);
   const [bankBalance, setBankBalance] = useState(null);
+  const [detalhesAbertos, setDetalhesAbertos] = useState(false);
 
-  const loadDashboard = useCallback(async () => {
-    const requestId = ++requestIdRef.current;
-    if (hasLoadedRef.current) setRefreshing(true);
-    else setLoading(true);
+  const loadDashboard = useCallback(
+    async ({ automatico = false } = {}) => {
+      if (automatico && requestPendingRef.current) return;
+      const requestId = ++requestIdRef.current;
+      abortControllerRef.current?.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      requestPendingRef.current = true;
+      const mudouPeriodo = loadedPeriodRef.current !== periodKey;
+      if (mudouPeriodo) {
+        setLoading(true);
+        summaryPeriodRef.current = null;
+        cashFlowPeriodRef.current = null;
+        productsPeriodRef.current = null;
+        setSummary(createEmptyDashboardSummary());
+        setCashFlow([]);
+        setTopProducts([]);
+        setLastUpdate(null);
+      } else if (!automatico) setRefreshing(true);
+      const options = { signal: controller.signal };
+      const periodParams = parametrosPeriodoDashboard(periodo);
 
-    const requests = [
-      {
-        key: "resumo financeiro",
-        promise: api.get("/dashboard/resumo", { params: { periodo_dias: periodDays } }),
-      },
-      {
-        key: "fluxo diário",
-        promise: api.get("/dashboard/entradas-saidas", { params: { periodo_dias: periodDays } }),
-      },
-      {
-        key: "contas vencidas",
-        promise: api.get("/dashboard/contas-vencidas", { params: { limite: 5 } }),
-      },
-      { key: "clientes", promise: api.get("/dashboard/gerencial") },
-      {
-        key: "produtos",
-        promise: api.get("/dashboard/top-produtos", {
-          params: { periodo_dias: periodDays, limite: 5 },
-        }),
-      },
-      { key: "saldo bancário", promise: api.get("/contas-bancarias/resumo/saldos") },
-    ];
+      const requests = [
+        {
+          key: "resumo financeiro",
+          automatico: true,
+          consultar: () => api.get("/dashboard/resumo", { ...options, params: periodParams }),
+          aplicar: (data) => {
+            summaryPeriodRef.current = periodKey;
+            setSummary(data);
+            setLastUpdate(new Date());
+          },
+        },
+        {
+          key: "fluxo diário",
+          automatico: true,
+          consultar: () =>
+            api.get("/dashboard/entradas-saidas", {
+              ...options,
+              params: periodParams,
+            }),
+          aplicar: (data) => {
+            cashFlowPeriodRef.current = periodKey;
+            setCashFlow(data || []);
+          },
+        },
+        {
+          key: "contas vencidas",
+          consultar: () =>
+            api.get("/dashboard/contas-vencidas", { ...options, params: { limite: 5 } }),
+          aplicar: setOverdueAccounts,
+        },
+        {
+          key: "clientes",
+          consultar: () => api.get("/dashboard/gerencial", options),
+          aplicar: setManagement,
+        },
+        {
+          key: "produtos",
+          automatico: true,
+          consultar: () =>
+            api.get("/dashboard/top-produtos", {
+              ...options,
+              params: { ...periodParams, limite: 5 },
+            }),
+          aplicar: (data) => {
+            productsPeriodRef.current = periodKey;
+            setTopProducts(data || []);
+          },
+        },
+        {
+          key: "saldo bancário",
+          consultar: () => api.get("/contas-bancarias/resumo/saldos", options),
+          aplicar: (data) => setBankBalance(Number(data?.total_geral || 0)),
+          falhou: () => setBankBalance(null),
+        },
+      ].filter((request) => !automatico || request.automatico);
 
-    const results = await Promise.allSettled(requests.map((request) => request.promise));
-    if (requestId !== requestIdRef.current) return;
+      const results = await Promise.allSettled(requests.map((request) => request.consultar()));
+      if (requestId !== requestIdRef.current) return;
+      requestPendingRef.current = false;
 
-    const failed = [];
-    results.forEach((result, index) => {
-      if (result.status === "rejected") failed.push(requests[index].key);
-    });
+      const failed = [];
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") requests[index].aplicar(result.value.data);
+        else {
+          failed.push(requests[index].key);
+          requests[index].falhou?.();
+        }
+      });
 
-    if (results[0].status === "fulfilled") setSummary(results[0].value.data);
-    if (results[1].status === "fulfilled") setCashFlow(results[1].value.data || []);
-    if (results[2].status === "fulfilled") setOverdueAccounts(results[2].value.data);
-    if (results[3].status === "fulfilled") setManagement(results[3].value.data);
-    if (results[4].status === "fulfilled") setTopProducts(results[4].value.data || []);
-    if (results[5].status === "fulfilled") {
-      setBankBalance(Number(results[5].value.data?.total_geral || 0));
-    } else {
-      setBankBalance(null);
-    }
-
-    hasLoadedRef.current = true;
-    setFailedBlocks(failed);
-    setLastUpdate(new Date());
-    setLoading(false);
-    setRefreshing(false);
-  }, [periodDays]);
+      loadedPeriodRef.current = periodKey;
+      setFailedBlocks((anteriores) => [
+        ...anteriores.filter((key) => !requests.some((request) => request.key === key)),
+        ...failed,
+      ]);
+      setLoading(false);
+      setRefreshing(false);
+    },
+    [periodo, periodKey],
+  );
 
   useEffect(() => {
-    loadDashboard();
+    void loadDashboard();
+    const pararAtualizacao = iniciarAtualizacaoDashboard({
+      atualizar: () => loadDashboard({ automatico: true }),
+    });
+    return () => {
+      pararAtualizacao();
+      requestIdRef.current += 1;
+      abortControllerRef.current?.abort();
+      requestPendingRef.current = false;
+    };
   }, [loadDashboard]);
 
   const indicators = useMemo(() => calculateDashboardIndicators(summary), [summary]);
   const executiveStatus = useMemo(() => getExecutiveStatus(summary), [summary]);
   const statusIcon = executiveStatus.tone === "sucesso" ? CheckCircle2 : AlertCircle;
   const StatusIcon = statusIcon;
-  const periodLabel = getPeriodLabel(periodDays);
-  const grossSales = Number(summary?.vendas_periodo?.faturamento_bruto || 0);
+  const periodLabel = rotuloPeriodoDashboard(periodo);
   const porRecebimento = summary?.visao_comercial === "recebimento";
-  const commercialValue = summary?.indicador_comercial ?? grossSales;
+  const composicaoVendas = summary?.composicao_vendas;
   const cashResult = Number(summary?.fluxo_periodo?.lucro || 0);
   const salesCount = Number(summary?.vendas_periodo?.quantidade || 0);
   const unitsSold = Number(summary?.vendas_periodo?.unidades || 0);
-  const salesProfit = Number(summary?.vendas_periodo?.lucro || 0);
+  const salesProfitPending = temRentabilidadePendente(summary?.vendas_periodo);
+  const salesProfit = salesProfitPending ? null : Number(summary?.vendas_periodo?.lucro || 0);
   const displayedBalance = bankBalance ?? Number(summary?.saldo_atual || 0);
   const hasChartMovement = cashFlow.some(
     (item) => Number(item?.entradas || 0) !== 0 || Number(item?.saidas || 0) !== 0,
@@ -179,12 +262,84 @@ export default function DashboardFinanceiro() {
   const openManagementAssistant = () => {
     navigate("/ia/chat", {
       state: {
-        perguntaInicial: `Analise meu negócio nos últimos ${periodDays} dias: vendas, resultado de caixa, contas vencidas e riscos de clientes.`,
+        perguntaInicial: `Analise meu negócio no período ${periodLabel.toLowerCase()}: vendas, resultado de caixa, contas vencidas e riscos de clientes.`,
       },
     });
   };
 
-  if (loading) return <DashboardLoading />;
+  const selecionarPeriodo = (valor) => {
+    setErroPeriodo("");
+    if (valor === "personalizado") {
+      if (!editarPeriodo) {
+        setRascunhoPeriodo({
+          inicio: periodo.inicio || composicaoVendas?.data_inicio || "",
+          fim: periodo.fim || composicaoVendas?.data_fim || "",
+        });
+      }
+      setEditarPeriodo(true);
+      return;
+    }
+    setEditarPeriodo(false);
+    if (periodo.inicio || periodo.dias !== valor) setPeriodo({ dias: valor });
+  };
+
+  const aplicarPeriodo = () => {
+    const { erro } = validarPeriodoDashboard(rascunhoPeriodo);
+    setErroPeriodo(erro);
+    if (erro) return;
+    if (chavePeriodoDashboard(rascunhoPeriodo) !== periodKey) {
+      setPeriodo({ ...rascunhoPeriodo });
+    }
+  };
+
+  const seletorPeriodo = (
+    <SeletorOpcoes
+      rotulo="Período"
+      opcoes={PERIOD_OPTIONS}
+      valorSelecionado={editarPeriodo || periodo.inicio ? "personalizado" : periodo.dias}
+      aoSelecionar={selecionarPeriodo}
+    />
+  );
+  const filtroPeriodo = editarPeriodo ? (
+    <div className="mt-3 flex flex-col items-start gap-3 border-t border-slate-100 pt-3 dark:border-slate-800 sm:flex-row sm:items-center">
+      <div className="w-full sm:max-w-sm">
+        <InputPeriodo
+          id="dashboard-periodo-personalizado"
+          label="De / até"
+          value={rascunhoPeriodo}
+          onChange={(valor) => {
+            setRascunhoPeriodo(valor);
+            setErroPeriodo("");
+          }}
+          error={erroPeriodo}
+          help="Escolha até 90 dias, contando a data inicial e a final."
+        />
+      </div>
+      <BotaoInteracao onClick={aplicarPeriodo}>Aplicar período</BotaoInteracao>
+    </div>
+  ) : null;
+
+  if (loading || loadedPeriodRef.current !== periodKey) return <DashboardLoading />;
+
+  if (summaryPeriodRef.current !== periodKey) {
+    return (
+      <div className="min-h-full space-y-4 bg-slate-50 p-4 dark:bg-slate-950 sm:p-6">
+        <h1 className="v2-titulo-pagina">Dashboard</h1>
+        {seletorPeriodo}
+        {filtroPeriodo}
+        <div role="alert">
+          <EstadoVazio
+            icone={AlertCircle}
+            titulo="Não foi possível carregar o resultado do período"
+            descricao="Os valores estão indisponíveis. Uma nova consulta será feita automaticamente."
+          />
+        </div>
+        <BotaoInteracao icon={RefreshCw} onClick={loadDashboard} loading={refreshing}>
+          Tentar novamente
+        </BotaoInteracao>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-full space-y-5 bg-slate-50 p-4 dark:bg-slate-950 sm:p-6">
@@ -205,15 +360,13 @@ export default function DashboardFinanceiro() {
                 {lastUpdate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
               </span>
             )}
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Vendas: atualização automática a cada 30 s
+            </span>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <SeletorOpcoes
-              rotulo="Período"
-              opcoes={PERIOD_OPTIONS}
-              valorSelecionado={periodDays}
-              aoSelecionar={setPeriodDays}
-            />
+            {seletorPeriodo}
             <BotaoInteracao
               icon={HelpCircle}
               tamanho="pequeno"
@@ -236,6 +389,7 @@ export default function DashboardFinanceiro() {
             </BotaoInteracao>
           </div>
         </div>
+        {filtroPeriodo}
       </section>
 
       {failedBlocks.length > 0 && (
@@ -256,17 +410,14 @@ export default function DashboardFinanceiro() {
           </div>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <CartaoIndicador
-            icone={TrendingUp}
-            tom="informativo"
-            titulo={porRecebimento ? "Recebimentos de vendas" : "Faturamento"}
-            detalhe={periodLabel}
-            aoClicar={() => navigate(getDashboardDetailPath("sales", periodDays))}
-          >
-            <p className="text-2xl font-bold leading-tight text-slate-950 dark:text-white">
-              {formatMoneyBRL(commercialValue)}
-            </p>
-          </CartaoIndicador>
+          <ResumoFaturamento
+            composicao={composicaoVendas}
+            periodo={periodLabel}
+            expandido={detalhesAbertos}
+            aoAlternarDetalhes={() => setDetalhesAbertos((atual) => !atual)}
+            detalhesFora
+            detalhesId="dashboard-detalhes-faturamento"
+          />
           <CartaoIndicador
             icone={ShoppingBag}
             tom="neutro"
@@ -274,7 +425,7 @@ export default function DashboardFinanceiro() {
             detalhe={
               porRecebimento ? "Vendas e itens pela data da venda" : "Vendas e itens movimentados"
             }
-            aoClicar={() => navigate(getDashboardDetailPath("sales", periodDays))}
+            aoClicar={() => navigate(getDashboardDetailPath("sales", periodo))}
           >
             <p className="text-2xl font-bold leading-tight text-slate-950 dark:text-white">
               {formatQuantity(salesCount)} / {formatQuantity(unitsSold)}
@@ -282,16 +433,30 @@ export default function DashboardFinanceiro() {
           </CartaoIndicador>
           <CartaoIndicador
             icone={BarChart3}
-            tom={salesProfit >= 0 ? "sucesso" : "perigo"}
+            tom={salesProfitPending ? "atencao" : salesProfit >= 0 ? "sucesso" : "perigo"}
             titulo="Lucro das vendas"
-            detalhe="Após custos e deduções de cada venda"
+            detalhe={
+              salesProfitPending
+                ? descreverRentabilidadePendente(summary?.vendas_periodo)
+                : "Após custos e deduções de cada venda"
+            }
             aoClicar={() => navigate("/financeiro/dre")}
           >
             <p className="text-2xl font-bold leading-tight text-slate-950 dark:text-white">
-              {formatMoneyBRL(salesProfit)}
+              {salesProfitPending ? PENDENCIA_IFOOD_LABEL : formatMoneyBRL(salesProfit)}
             </p>
           </CartaoIndicador>
         </div>
+        {detalhesAbertos && (
+          <div className="mt-4">
+            <DetalhesFaturamento
+              composicao={composicaoVendas}
+              mostrarTotaisPorForma
+              id="dashboard-detalhes-faturamento"
+              aoAbrirRelatorio={() => navigate(getDashboardDetailPath("sales", periodo))}
+            />
+          </div>
+        )}
       </section>
 
       <section id="tour-financeiro" className="space-y-4">
@@ -319,7 +484,7 @@ export default function DashboardFinanceiro() {
               tom={cashResult >= 0 ? "sucesso" : "perigo"}
               titulo="Resultado de caixa"
               detalhe={`${formatMoneyBRL(indicators.inflows)} entrou · ${formatMoneyBRL(indicators.outflows)} saiu`}
-              aoClicar={() => navigate(getDashboardDetailPath("cashFlow", periodDays))}
+              aoClicar={() => navigate(getDashboardDetailPath("cashFlow", periodo))}
             >
               <p className="text-lg font-bold leading-tight text-slate-950 dark:text-white">
                 {formatMoneyBRL(cashResult)}
@@ -330,10 +495,14 @@ export default function DashboardFinanceiro() {
               tom="neutro"
               titulo="Ticket médio"
               detalhe={periodLabel}
-              aoClicar={() => navigate(getDashboardDetailPath("sales", periodDays))}
+              aoClicar={() => navigate(getDashboardDetailPath("sales", periodo))}
             >
               <p className="text-lg font-bold leading-tight text-slate-950 dark:text-white">
-                {formatMoneyBRL(summary?.vendas_periodo?.ticket_medio || 0)}
+                {formatMoneyBRL(
+                  composicaoVendas?.quantidade
+                    ? composicaoVendas.faturamento_liquido / composicaoVendas.quantidade
+                    : summary?.vendas_periodo?.ticket_medio || 0,
+                )}
               </p>
             </CartaoIndicador>
             <CartaoIndicador
@@ -341,7 +510,7 @@ export default function DashboardFinanceiro() {
               tom="sucesso"
               titulo="Total a receber"
               detalhe="Valores ainda em aberto"
-              aoClicar={() => navigate(getDashboardDetailPath("receivableOpen", periodDays))}
+              aoClicar={() => navigate(getDashboardDetailPath("receivableOpen", periodo))}
             >
               <p className="text-lg font-bold leading-tight text-slate-950 dark:text-white">
                 {formatMoneyBRL(summary?.contas_receber?.total || 0)}
@@ -352,7 +521,7 @@ export default function DashboardFinanceiro() {
               tom="perigo"
               titulo="Total a pagar"
               detalhe="Compromissos ainda em aberto"
-              aoClicar={() => navigate(getDashboardDetailPath("payableOpen", periodDays))}
+              aoClicar={() => navigate(getDashboardDetailPath("payableOpen", periodo))}
             >
               <p className="text-lg font-bold leading-tight text-slate-950 dark:text-white">
                 {formatMoneyBRL(summary?.contas_pagar?.total || 0)}
@@ -376,7 +545,7 @@ export default function DashboardFinanceiro() {
                   ? "Priorize as cobranças mais antigas"
                   : "Nenhum valor vencido"
               }
-              aoClicar={() => navigate(getDashboardDetailPath("receivableOverdue", periodDays))}
+              aoClicar={() => navigate(getDashboardDetailPath("receivableOverdue", periodo))}
             >
               <p className="text-xl font-bold text-slate-900 dark:text-white">
                 {formatMoneyBRL(indicators.overdueReceivable)}
@@ -391,7 +560,7 @@ export default function DashboardFinanceiro() {
                   ? "Revise juros e fornecedores prioritários"
                   : "Nenhum valor vencido"
               }
-              aoClicar={() => navigate(getDashboardDetailPath("payableOverdue", periodDays))}
+              aoClicar={() => navigate(getDashboardDetailPath("payableOverdue", periodo))}
             >
               <p className="text-xl font-bold text-slate-900 dark:text-white">
                 {formatMoneyBRL(indicators.overduePayable)}
@@ -406,7 +575,7 @@ export default function DashboardFinanceiro() {
                   ? `${formatMoneyBRL(indicators.dueTodayReceivable)} a receber hoje`
                   : "Compromissos do dia, sem marcar como atraso"
               }
-              aoClicar={() => navigate(getDashboardDetailPath("payableDueToday", periodDays))}
+              aoClicar={() => navigate(getDashboardDetailPath("payableDueToday", periodo))}
             >
               <p className="text-xl font-bold text-slate-900 dark:text-white">
                 {formatMoneyBRL(indicators.dueTodayPayable)}
@@ -421,7 +590,7 @@ export default function DashboardFinanceiro() {
                   ? `${management.vips_inativos.impacto} em impacto estimado`
                   : "Nenhum VIP inativo há mais de 20 dias"
               }
-              aoClicar={() => navigate(getDashboardDetailPath("vipAtRisk", periodDays))}
+              aoClicar={() => navigate(getDashboardDetailPath("vipAtRisk", periodo))}
             >
               <p className="text-xl font-bold text-slate-900 dark:text-white">
                 {String(management?.vips_inativos?.quantidade || 0)}
@@ -438,7 +607,7 @@ export default function DashboardFinanceiro() {
                   ? "Sem compra há mais de 90 dias"
                   : "Nenhum cliente nessa condição"
               }
-              aoClicar={() => navigate(getDashboardDetailPath("inactiveCustomers", periodDays))}
+              aoClicar={() => navigate(getDashboardDetailPath("inactiveCustomers", periodo))}
             >
               <p className="text-xl font-bold text-slate-900 dark:text-white">
                 {String(management?.clientes_inativos?.quantidade || 0)}
@@ -456,7 +625,13 @@ export default function DashboardFinanceiro() {
               <p className="v2-subtitulo">Movimento diário · {periodLabel.toLowerCase()}</p>
             </div>
           </div>
-          {hasChartMovement ? (
+          {cashFlowPeriodRef.current !== periodKey ? (
+            <EstadoVazio
+              icone={AlertCircle}
+              titulo="Fluxo diário indisponível neste período"
+              descricao="Aguarde a próxima atualização ou tente novamente."
+            />
+          ) : hasChartMovement ? (
             <ResponsiveContainer width="100%" height={260}>
               <AreaChart data={cashFlow} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <defs>
@@ -521,7 +696,13 @@ export default function DashboardFinanceiro() {
             </div>
             <BotaoLink onClick={() => navigate("/produtos")}>Ver produtos</BotaoLink>
           </div>
-          {topProducts.length > 0 ? (
+          {productsPeriodRef.current !== periodKey ? (
+            <EstadoVazio
+              icone={AlertCircle}
+              titulo="Produtos indisponíveis neste período"
+              descricao="Aguarde a próxima atualização ou tente novamente."
+            />
+          ) : topProducts.length > 0 ? (
             <ol className="space-y-2">
               {topProducts.map((product, index) => (
                 <li
@@ -562,17 +743,17 @@ export default function DashboardFinanceiro() {
               {
                 label: "Clientes ativos",
                 value: management?.total_clientes || 0,
-                path: getDashboardDetailPath("activeCustomers", periodDays),
+                path: getDashboardDetailPath("activeCustomers", periodo),
               },
               {
                 label: "Novos promissores",
                 value: management?.oportunidades_novos?.quantidade || 0,
-                path: getDashboardDetailPath("promisingCustomers", periodDays),
+                path: getDashboardDetailPath("promisingCustomers", periodo),
               },
               {
                 label: "Sem WhatsApp",
                 value: management?.whatsapp_inativo?.quantidade || 0,
-                path: getDashboardDetailPath("customersWithoutWhatsapp", periodDays),
+                path: getDashboardDetailPath("customersWithoutWhatsapp", periodo),
               },
             ].map(({ label, value, path }) => (
               <button
@@ -604,14 +785,14 @@ export default function DashboardFinanceiro() {
                   key: "contas_receber",
                   label: "A receber",
                   personKey: "cliente",
-                  path: getDashboardDetailPath("receivableOverdue", periodDays),
+                  path: getDashboardDetailPath("receivableOverdue", periodo),
                   tone: "text-emerald-700 dark:text-emerald-300",
                 },
                 {
                   key: "contas_pagar",
                   label: "A pagar",
                   personKey: "fornecedor",
-                  path: getDashboardDetailPath("payableOverdue", periodDays),
+                  path: getDashboardDetailPath("payableOverdue", periodo),
                   tone: "text-rose-700 dark:text-rose-300",
                 },
               ].map((group) => (

@@ -19,6 +19,7 @@ from app.campaigns.cashback_wallet import get_cashback_wallet, lock_cashback_cus
 from app.services.venda_descontos import moeda
 from app.utils.timezone import now_brasilia
 from app.vendas.status_pagamento import pagamento_valido_para_saldo
+from app.vendas.pagamento_excedente import validar_excesso_pagamento
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,91 @@ __all__ = [
     "_calcular_pagamentos_finalizacao",
     "consumir_cupom_finalizacao",
     "processar_pagamentos_finalizacao",
+    "preparar_formas_pagamentos_finalizacao",
 ]
+
+
+def _natureza_pagamento(pagamento):
+    from app.caixa.service import CaixaService
+    from app.services.faturamento_composicao import eh_beneficio, normalizar
+
+    tipo = normalizar(pagamento.get("_tipo_forma_pagamento"))
+    forma = pagamento.get("forma_pagamento")
+    if tipo == "dinheiro" or (
+        not tipo
+        and (normalizar(forma) == "dinheiro" or CaixaService.eh_forma_dinheiro(forma))
+    ):
+        return "dinheiro"
+    if eh_beneficio(forma) or tipo in {"credito cliente", "cashback"}:
+        return "beneficio"
+    if (
+        tipo in {"crediario", "boleto"}
+        or normalizar(forma) in {"crediario", "boleto"}
+        or pagamento.get("intervalo_crediario")
+    ):
+        return "plano"
+    return "monetario"
+
+
+def preparar_formas_pagamentos_finalizacao(db, tenant_id, pagamentos):
+    from app.caixa.service import CaixaService
+    from app.financeiro_models import FormaPagamento
+    from app.services.faturamento_composicao import eh_beneficio, normalizar
+
+    ids = {p.get("forma_pagamento_id") or p.get("forma_id") for p in pagamentos}
+    ids.discard(None)
+    formas = (
+        {
+            f.id: f
+            for f in db.query(FormaPagamento)
+            .filter(
+                FormaPagamento.tenant_id == tenant_id,
+                FormaPagamento.id.in_(ids),
+                FormaPagamento.ativo.is_(True),
+            )
+            .all()
+        }
+        if ids
+        else {}
+    )
+    for pagamento in pagamentos:
+        pagamento.pop("_tipo_forma_pagamento", None)
+        if isinstance(pagamento.get("forma_pagamento"), str):
+            pagamento["forma_pagamento"] = pagamento["forma_pagamento"].strip()
+        forma_id = pagamento.get("forma_pagamento_id") or pagamento.get("forma_id")
+        if not forma_id:
+            nome = normalizar(pagamento.get("forma_pagamento"))
+            if nome == "dinheiro":
+                pagamento["forma_pagamento"] = "Dinheiro"
+            elif eh_beneficio(nome):
+                pagamento["forma_pagamento"] = (
+                    "Cashback" if "cashback" in nome else "Crédito Cliente"
+                )
+            continue
+        forma = formas.get(forma_id)
+        if forma is None:
+            raise HTTPException(400, "Forma de pagamento inexistente ou inativa.")
+        tipo = normalizar(forma.tipo)
+        if tipo != "dinheiro" and CaixaService.eh_forma_dinheiro(
+            pagamento.get("forma_pagamento")
+        ):
+            raise HTTPException(
+                400,
+                "O nome da forma de pagamento não corresponde ao cadastro selecionado.",
+            )
+        pagamento["_tipo_forma_pagamento"] = tipo
+        nomes_canonicos = {
+            "dinheiro": "Dinheiro",
+            "pix": "Pix",
+            "cartao credito": "Cartão de crédito",
+            "cartao debito": "Cartão de débito",
+            "credito cliente": "Crédito Cliente",
+            "cashback": "Cashback",
+            "crediario": "Crediário",
+            "boleto": "Boleto",
+        }
+        if tipo in nomes_canonicos:
+            pagamento["forma_pagamento"] = nomes_canonicos[tipo]
 
 
 def _montar_campos_venda_pagamento(
@@ -67,7 +152,12 @@ def _calcular_pagamentos_finalizacao(
     total_venda: Any,
     pagamentos_existentes: List[Any],
     pagamentos_novos: List[Dict[str, Any]],
-) -> Dict[str, float]:
+    total_ja_pago_canonico=None,
+    crediario_pendente=0,
+    creditos_ja_utilizados=0,
+    justificativa_pagamento_excedente=None,
+    contexto_pagamento_excedente=None,
+) -> Dict[str, Any]:
     total_venda_decimal = moeda(total_venda)
     total_ja_pago = sum(
         (
@@ -77,6 +167,13 @@ def _calcular_pagamentos_finalizacao(
         ),
         Decimal("0.00"),
     )
+    financeiro_ja_pago = (
+        moeda(total_ja_pago_canonico)
+        if total_ja_pago_canonico is not None
+        else total_ja_pago
+    )
+    if total_ja_pago_canonico is not None:
+        total_ja_pago = financeiro_ja_pago + moeda(crediario_pendente)
     for pagamento in pagamentos_novos:
         try:
             valor = moeda(pagamento.get("valor"))
@@ -103,30 +200,70 @@ def _calcular_pagamentos_finalizacao(
 
     # A edição pode reduzir o total abaixo do valor recebido anteriormente.
     # Sem pagamento novo, a refinalização preserva esse histórico financeiro.
+    validacao_excesso = None
     if total_novos_pagamentos > max(Decimal("0.00"), valor_restante_bruto):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Valor dos pagamentos excede o saldo da venda. "
-                f"Saldo: R$ {max(0, valor_restante_bruto):.2f}, "
-                f"informado: R$ {total_novos_pagamentos:.2f}."
+        fixos = sum(
+            (
+                moeda(p["valor"])
+                for p in pagamentos_novos
+                if _natureza_pagamento(p) != "monetario"
             ),
+            Decimal("0.00"),
+        )
+        beneficios = sum(
+            (
+                moeda(p["valor"])
+                for p in pagamentos_novos
+                if _natureza_pagamento(p) == "beneficio"
+            ),
+            Decimal("0.00"),
+        )
+        novos_planos = sum(
+            (
+                moeda(p["valor"])
+                for p in pagamentos_novos
+                if _natureza_pagamento(p) == "plano"
+            ),
+            Decimal("0.00"),
+        )
+        novos_reais = total_novos_pagamentos - novos_planos
+        if (
+            fixos > max(Decimal("0.00"), valor_restante_bruto)
+            or moeda(creditos_ja_utilizados) + beneficios > total_venda_decimal
+        ):
+            raise HTTPException(
+                400,
+                "Valor dos pagamentos em dinheiro, benefícios ou crediário excede o saldo da venda. Revise essas formas.",
+            )
+        if moeda(crediario_pendente) + novos_planos > 0:
+            raise HTTPException(
+                400,
+                "Revise as parcelas do crediário antes de registrar um recebimento excedente.",
+            )
+        validacao_excesso = validar_excesso_pagamento(
+            total_venda=total_venda_decimal,
+            total_ja_pago=financeiro_ja_pago,
+            total_novos_pagamentos=novos_reais,
+            crediario_pendente=crediario_pendente,
+            justificativa=justificativa_pagamento_excedente,
+            contexto=contexto_pagamento_excedente,
         )
 
     for pagamento in pagamentos_novos:
         _normalizar_recebido_e_troco(pagamento)
 
-    return {
+    resultado = {
         "total_ja_pago": float(total_ja_pago),
         "total_novos_pagamentos": float(total_novos_pagamentos),
         "total_pagamentos": float(total_ja_pago + total_novos_pagamentos),
         "valor_restante": float(max(Decimal("0.00"), valor_restante_bruto)),
     }
+    if validacao_excesso:
+        resultado["excesso_pagamento"] = validacao_excesso
+    return resultado
 
 
 def _normalizar_recebido_e_troco(pagamento: Dict[str, Any]) -> None:
-    from app.caixa.service import CaixaService
-
     aplicado = moeda(pagamento["valor"])
     for campo in ("valor_recebido", "troco"):
         if pagamento.get(campo) is not None:
@@ -138,9 +275,8 @@ def _normalizar_recebido_e_troco(pagamento: Dict[str, Any]) -> None:
                 raise HTTPException(400, "Confira o valor recebido e o troco.")
             pagamento[campo] = float(valor)
 
-    forma = str(pagamento.get("forma_pagamento") or "").strip().lower()
-    beneficio = forma in {"cashback", "credito_cliente", "crédito cliente"}
-    if beneficio:
+    natureza = _natureza_pagamento(pagamento)
+    if natureza != "dinheiro":
         recebido = moeda(
             aplicado
             if pagamento.get("valor_recebido") is None
@@ -149,11 +285,11 @@ def _normalizar_recebido_e_troco(pagamento: Dict[str, Any]) -> None:
         if recebido != aplicado or moeda(pagamento.get("troco")) != 0:
             raise HTTPException(
                 400,
-                "Cashback e crédito cliente só podem utilizar o valor aplicado à venda.",
+                "Somente dinheiro pode ter valor entregue maior e troco. Nas demais formas, valor recebido deve ser igual ao pagamento registrado, sem troco.",
             )
         pagamento["valor_recebido"] = float(aplicado)
         pagamento["troco"] = 0.0
-    elif CaixaService.eh_forma_dinheiro(pagamento.get("forma_pagamento")):
+    else:
         recebido = moeda(
             aplicado
             if pagamento.get("valor_recebido") is None
@@ -275,6 +411,7 @@ def processar_pagamentos_finalizacao(
     db: Session,
     caixa_aberto_id: int,
     data_ocorrencia=None,
+    baixa_lote_id=None,
 ) -> List[int]:
     from app.caixa.service import CaixaService
     from app.campaigns.models import (
@@ -300,7 +437,7 @@ def processar_pagamentos_finalizacao(
         normalize_card_brand,
         resolve_card_fee,
     )
-    from app.vendas_models import Venda, VendaPagamento
+    from app.vendas_models import VendaPagamento
 
     movimentacoes_caixa_ids: List[int] = []
     tem_cashback = any(
@@ -510,31 +647,19 @@ def processar_pagamentos_finalizacao(
                     f"{operadora.max_parcelas}x. Você tentou {numero_parcelas}x.",
                 )
 
-        nsu_informado = pag_data.get("nsu_cartao")
-        if nsu_informado and operadora_id:
-            nsu_duplicado = (
-                db.query(VendaPagamento)
-                .filter(
-                    VendaPagamento.tenant_id == tenant_id,
-                    VendaPagamento.nsu_cartao == nsu_informado,
-                    VendaPagamento.operadora_id == operadora_id,
-                )
-                .first()
-            )
+        from app.financeiro.recebimento_nsu import validar_nsu_recebimento
 
-            if nsu_duplicado:
-                venda_duplicada = (
-                    db.query(Venda).filter_by(id=nsu_duplicado.venda_id).first()
-                )
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"❌ NSU DUPLICADO: O NSU '{nsu_informado}' já está vinculado à "
-                    f"Venda {venda_duplicada.numero_venda if venda_duplicada else nsu_duplicado.venda_id}. "
-                    f"Cada NSU deve ser usado apenas uma vez por operadora.",
-                )
+        validar_nsu_recebimento(
+            db,
+            tenant_id=tenant_id,
+            operadora_id=operadora_id,
+            nsu=pag_data.get("nsu_cartao"),
+            baixa_lote_id=baixa_lote_id,
+        )
 
         pagamento = VendaPagamento(
             caixa_id=caixa_aberto_id,
+            baixa_lote_id=baixa_lote_id,
             **_montar_campos_venda_pagamento(
                 venda_id=venda.id,
                 tenant_id=tenant_id,

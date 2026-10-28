@@ -3,6 +3,14 @@ import { rotuloFormaPagamento } from "./pdvPaymentDisplay.js";
 export const FILTRO_SEM_PAGAMENTOS = "__sem_pagamentos__";
 export const TAMANHO_PAGINA_AUDITORIA = 25;
 
+export function selecionarVendasAuditoria(vendas = [], composicao, recorte = "periodo") {
+  if (!Array.isArray(composicao?.detalhes) || recorte === "todos") return vendas;
+  const idsPeriodo = new Set(composicao.detalhes.map((venda) => String(venda.venda_id)));
+  return vendas.filter((venda) =>
+    recorte === "outros" ? !idsPeriodo.has(String(venda.id)) : idsPeriodo.has(String(venda.id)),
+  );
+}
+
 export function paginarAuditoria(itens = [], pagina = 1) {
   const totalPaginas = Math.max(1, Math.ceil(itens.length / TAMANHO_PAGINA_AUDITORIA));
   const paginaAtual = Math.min(Math.max(Math.trunc(Number(pagina)) || 1, 1), totalPaginas);
@@ -24,6 +32,20 @@ export function chaveFormaAuditoria(pagamento = {}) {
 
 export function pagamentosVendaAuditoria(venda = {}) {
   return Array.isArray(venda.pagamentos) ? venda.pagamentos : venda.recebimentos || [];
+}
+
+export function naturezaQuitacaoAuditoria(item = {}) {
+  const forma = chaveFormaAuditoria({
+    ...item,
+    forma_pagamento: item.forma_pagamento_tipo || item.forma_pagamento,
+  });
+  if (forma.includes("cashback") || (forma.includes("credito") && forma.includes("cliente"))) {
+    return "Crédito ou benefício — sem entrada de dinheiro";
+  }
+  if (item.intervalo_crediario || forma === "crediario" || forma === "boleto") {
+    return "Plano a prazo — não é recebimento";
+  }
+  return "";
 }
 
 export function filtrarVendasAuditoria(vendas = [], forma = "") {

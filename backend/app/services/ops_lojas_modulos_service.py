@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -41,6 +41,76 @@ from app.tenancy.rls import sync_rls_tenant
 logger = logging.getLogger(__name__)
 
 LIMITE_DE_LOJAS = 200
+
+# Nome e descricao de cada modulo para as telas administrativas (todo modulo de
+# MODULOS_PREMIUM precisa estar aqui; ha um teste que confere).
+CATALOGO_DE_MODULOS: dict[str, tuple[str, str]] = {
+    "app_mobile": (
+        "App para clientes",
+        "App mobile próprio para os clientes da loja comprarem e acompanharem pedidos.",
+    ),
+    "banho_tosa": (
+        "Banho e tosa",
+        "Agenda, fila do dia, serviços, pacotes, retornos e taxi dog.",
+    ),
+    "bling": (
+        "Integração Bling",
+        "Sincronização de pedidos, produtos, estoque e notas via Bling.",
+    ),
+    "campanhas": (
+        "Campanhas",
+        "Campanhas de marketing, promoções, cashback e fidelidade.",
+    ),
+    "crm": (
+        "CRM",
+        "Funil de leads, ficha do tutor e conversas de WhatsApp com a loja.",
+    ),
+    "comissoes": (
+        "Comissões",
+        "Regras, demonstrativos, provisões e fechamento de comissões.",
+    ),
+    "compras": (
+        "Compras e entrada XML",
+        "Pedidos de compra, entrada por XML e conferências de estoque.",
+    ),
+    "ecommerce": ("E-commerce", "Loja virtual integrada ao sistema."),
+    "entregas": ("Entregas", "Rotas, rastreamento e app do entregador."),
+    "financeiro_erp": (
+        "Financeiro ERP",
+        "Contas a pagar e receber, fluxo de caixa, DRE e conciliações.",
+    ),
+    "fiscal": ("Fiscal / NF", "Emissão e acompanhamento de notas fiscais."),
+    "ia_avancada": (
+        "IA avançada",
+        "Previsões financeiras e assistentes especializados.",
+    ),
+    "integracoes": (
+        "Integrações",
+        "Conectores externos para automações, canais e plataformas.",
+    ),
+    "marketplaces": (
+        "Marketplaces",
+        "Venda em Mercado Livre, Shopee, Amazon e outros.",
+    ),
+    "rh": ("Recursos humanos", "Funcionários, cargos e departamentos."),
+    "veterinario": (
+        "Veterinário",
+        "Agenda, consultas, prontuário, vacinas, exames e internações.",
+    ),
+    "whatsapp": ("WhatsApp", "Atendimento por WhatsApp com inteligência artificial."),
+}
+
+
+def catalogo_de_modulos() -> list[dict[str, str]]:
+    return [
+        {
+            "codigo": codigo,
+            "nome": CATALOGO_DE_MODULOS.get(codigo, (codigo, ""))[0],
+            "descricao": CATALOGO_DE_MODULOS.get(codigo, (codigo, ""))[1],
+        }
+        for codigo in sorted(MODULOS_PREMIUM)
+    ]
+
 
 ORIGEM_MANUAL = "manual"
 ORIGEM_ASSINATURA = "assinatura"
@@ -138,20 +208,37 @@ def listar_lojas(db: Session, search: str | None = None) -> dict[str, Any]:
         )
     lojas = consulta.order_by(Tenant.name).limit(LIMITE_DE_LOJAS + 1).all()
     cortou = len(lojas) > LIMITE_DE_LOJAS
+    from app.services.ops_lojas_detalhe_service import resumo_de_usuarios_por_loja
+
+    usuarios = resumo_de_usuarios_por_loja(db)
     itens = []
     for tenant in lojas[:LIMITE_DE_LOJAS]:
         tenant_id = str(tenant.id)
+        estado = _modulos_da_loja(db, tenant)
         itens.append(
             {
                 "id": tenant_id,
                 "nome": tenant.name,
                 "status": tenant.status,
+                "plano": getattr(tenant, "plan", None),
+                "situacao_da_cobranca": getattr(tenant, "billing_status", None),
                 "grupo": _grupo_comercial_info(db, tenant_id),
                 "principal": _principal_user(db, tenant_id),
-                **_modulos_da_loja(db, tenant),
+                "usuarios": usuarios.get(
+                    tenant_id, {"total": 0, "ativos": 0, "ultimo_acesso": None}
+                ),
+                "total_de_modulos_ativos": sum(
+                    1 for m in estado["modulos"] if m["ativo"]
+                ),
+                **estado,
             }
         )
-    return {"items": itens, "limite": LIMITE_DE_LOJAS, "cortou": cortou}
+    return {
+        "items": itens,
+        "limite": LIMITE_DE_LOJAS,
+        "cortou": cortou,
+        "catalogo_de_modulos": catalogo_de_modulos(),
+    }
 
 
 def _tenant(db: Session, tenant_id: str) -> Tenant:

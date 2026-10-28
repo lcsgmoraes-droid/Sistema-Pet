@@ -24,6 +24,7 @@ import api from "../api";
 import ProdutoHistoricoPanel from "../components/produto/ProdutoHistoricoPanel";
 import { formatarMoeda, formatarData } from "../api/produtos";
 import { calcularMargemSobreVenda, calcularPrecoVendaPorMargem } from "../utils/produtoMargem";
+import BotaoInteracao from "../components/v2/BotaoInteracao/BotaoInteracao";
 
 // Função auxiliar para converter valores sem retornar NaN
 const parseNumber = (valor) => {
@@ -82,6 +83,12 @@ export default function ProdutosNovo() {
     preco_app_promo_fim: "",
     anunciar_ecommerce: true,
     anunciar_app: true,
+    anunciar_ifood: false,
+    ifood_pausado: false,
+    preco_ifood: null,
+    preco_ifood_promo: null,
+    preco_ifood_promo_inicio: "",
+    preco_ifood_promo_fim: "",
     ativo: true,
     situacao: true,
     margem: "",
@@ -181,23 +188,7 @@ export default function ProdutosNovo() {
   const [produtosOrigemGranel, setProdutosOrigemGranel] = useState([]);
   const [granelVinculos, setGranelVinculos] = useState([]);
 
-  useEffect(() => {
-    if (!isEdicao) return;
-    let ativo = true;
-    api
-      .get(`/estoque/granel/vinculos/granel/${id}`)
-      .then(({ data }) => {
-        if (ativo) setGranelVinculos(Array.isArray(data) ? data : []);
-      })
-      .catch((error) => {
-        console.error("Erro ao carregar vínculos de granel:", error);
-      });
-    return () => {
-      ativo = false;
-    };
-  }, [id, isEdicao]);
-
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [erroCarregamento, setErroCarregamento] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [preenchendoComIA, setPreenchendoComIA] = useState(false);
@@ -381,6 +372,7 @@ export default function ProdutosNovo() {
     setImagens,
     setLotes,
     setFornecedores,
+    setGranelVinculos,
   });
 
   const { handleChangeTributacao, handlePersonalizarFiscal } = useProdutosNovoTributacao({
@@ -801,16 +793,11 @@ export default function ProdutosNovo() {
           <h2 className="text-lg font-semibold text-gray-900">Não foi possível abrir o produto</h2>
           <p className="mt-2 text-sm text-gray-600">{erroCarregamento}</p>
           <div className="mt-5 flex justify-center gap-3">
-            <button
-              type="button"
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              onClick={() => navigate("/produtos")}
-            >
+            <BotaoInteracao type="button" onClick={() => navigate("/produtos")}>
               Voltar para produtos
-            </button>
-            <button
+            </BotaoInteracao>
+            <BotaoInteracao
               type="button"
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
               onClick={() =>
                 isClone
                   ? carregarProdutoParaClone()
@@ -820,7 +807,7 @@ export default function ProdutosNovo() {
               }
             >
               Tentar novamente
-            </button>
+            </BotaoInteracao>
           </div>
         </div>
       </div>

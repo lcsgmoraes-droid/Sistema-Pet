@@ -187,7 +187,18 @@ def reprocessar_rentabilidade_vendas(
                 "numero_venda": venda.numero_venda,
                 "custo_anterior": custo_anterior,
                 "custo_novo": _round_money(snapshot.get("custo_produtos", 0)),
-                "lucro_novo": _round_money(snapshot.get("lucro", 0)),
+                "lucro_novo": (
+                    _round_money(snapshot.get("lucro", 0))
+                    if snapshot.get("lucro") is not None
+                    else None
+                ),
+                "rentabilidade_status": snapshot.get(
+                    "rentabilidade_status", "complete"
+                ),
+                "taxas_ifood_pendentes": bool(snapshot.get("taxas_ifood_pendentes")),
+                "pendencias_rentabilidade": snapshot.get(
+                    "pendencias_rentabilidade", []
+                ),
             }
         )
 

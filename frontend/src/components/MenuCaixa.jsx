@@ -289,7 +289,7 @@ export default function MenuCaixa({
                       </div>
                     </div>
                     <div>
-                      <div className="text-gray-600">Entradas</div>
+                      <div className="text-gray-600">Recebimentos em dinheiro</div>
                       <div
                         className={`font-semibold ${mostrarValores ? "text-green-600" : "text-green-300"}`}
                       >

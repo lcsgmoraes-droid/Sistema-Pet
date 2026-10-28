@@ -1,5 +1,10 @@
+import BuscaProduto from "../v2/BuscaProduto/BuscaProduto";
+import { useEffect, useRef } from "react";
+import { Check } from "lucide-react";
 import CardFiscal from "../CardFiscal";
 import ActionButton from "../ui/ActionButton";
+import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
+import InputTexto from "../v2/InputTexto/InputTexto";
 
 function EntradaXmlDetalhesItemCard({
   acaoConferenciaOpcoes,
@@ -10,19 +15,23 @@ function EntradaXmlDetalhesItemCard({
   buscandoProduto,
   calcularConferenciaItem,
   conferenciaItens,
+  confirmarPackItem,
   desvincularProduto,
   detectarDivergencias,
   filtroProduto,
-  formatarOpcaoProduto,
+  formatarOpcaoProduto: _formatarOpcaoProduto,
   formatarValorFiscal,
   getConfiancaBadge,
   item,
+  invalidarConfirmacaoPackItem,
   mostrarCamposConferencia,
   multiplicadoresPack,
   notaSelecionada,
   obterConfiguracaoPackItem,
+  obterConfirmacaoPackItem,
   obterCustoAquisicaoItem,
   quantidadesOnline,
+  pendenciaConfirmacaoPack,
   resultadosBuscaProduto,
   salvarQuantidadeOnlineItem,
   setFiltroProduto,
@@ -36,6 +45,30 @@ function EntradaXmlDetalhesItemCard({
   const temDivergencia = divergencias.length > 0;
   const itemAjustado = aplicarMultiplicadorPackAoItem(item, multiplicadoresPack);
   const packConfig = obterConfiguracaoPackItem(item, multiplicadoresPack);
+  const confirmacaoPack = obterConfirmacaoPackItem(notaSelecionada, item);
+  const packRef = useRef(null);
+  const botaoOkRef = useRef(null);
+  const destacarPack =
+    confirmacaoPack.necessaria &&
+    !confirmacaoPack.confirmada &&
+    pendenciaConfirmacaoPack?.notaId === notaSelecionada.id &&
+    pendenciaConfirmacaoPack?.itemId === item.id;
+
+  useEffect(() => {
+    if (!destacarPack || !packRef.current) return;
+    const reduzirMovimento = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    packRef.current.scrollIntoView({
+      behavior: reduzirMovimento ? "auto" : "smooth",
+      block: "center",
+    });
+    botaoOkRef.current?.focus({ preventScroll: true });
+    if (reduzirMovimento) return;
+    const animacao = packRef.current.animate([{ opacity: 1 }, { opacity: 0.45 }, { opacity: 1 }], {
+      duration: 650,
+      iterations: 3,
+    });
+    return () => animacao.cancel();
+  }, [destacarPack, pendenciaConfirmacaoPack]);
   const conferenciaItem = calcularConferenciaItem(item, conferenciaItens[item.id]);
   const mostrarTratativaItem =
     mostrarCamposConferencia &&
@@ -114,7 +147,12 @@ function EntradaXmlDetalhesItemCard({
 
           {/* Pack / Caixa: multiplicador manual ou auto-detectado */}
           {notaSelecionada.status === "pendente" && (
-            <div className="mt-2 border-t border-slate-200 pt-2">
+            <div
+              ref={packRef}
+              className={`mt-2 scroll-m-4 border-t border-slate-200 pt-2 ${
+                destacarPack ? "rounded-lg p-2 ring-2 ring-red-500 dark:ring-red-400" : ""
+              }`}
+            >
               <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
                 <span className="text-gray-600 text-xs font-semibold">Pack (unid./caixa):</span>
                 <div className="flex items-center gap-1.5 flex-wrap justify-end">
@@ -136,25 +174,52 @@ function EntradaXmlDetalhesItemCard({
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="1"
-                  max="200"
-                  value={packConfig.multiplicador}
-                  onChange={(e) => {
-                    const v = Math.max(1, Math.min(200, Number.parseInt(e.target.value) || 1));
-                    setMultiplicadoresPack((prev) => ({ ...prev, [item.id]: v }));
-                  }}
-                  className={`w-20 px-2 py-1 border-2 rounded text-sm text-right font-semibold focus:ring-2 ${
-                    packConfig.overrideManual
-                      ? "border-blue-400 bg-blue-50 text-blue-900 focus:ring-blue-500"
-                      : packConfig.sugestaoAutomaticaDiferenteDoPadrao
-                        ? "border-amber-400 bg-amber-50 text-amber-900 focus:ring-amber-500"
-                        : "border-blue-300 focus:ring-blue-500"
-                  }`}
-                />
+                <div className="w-24">
+                  <InputTexto
+                    id={`pack-${item.id}`}
+                    placeholder="Unid./caixa"
+                    inputMode="numeric"
+                    alinhamentoTexto="direita"
+                    value={packConfig.multiplicador}
+                    onChange={(valor) => {
+                      const v = Math.max(1, Math.min(200, Number.parseInt(valor, 10) || 1));
+                      invalidarConfirmacaoPackItem(notaSelecionada.id, item.id);
+                      setMultiplicadoresPack((prev) => ({ ...prev, [item.id]: v }));
+                    }}
+                  />
+                </div>
                 <span className="text-xs text-gray-500">unid. por caixa</span>
+                {confirmacaoPack.necessaria && (
+                  <BotaoInteracao
+                    ref={botaoOkRef}
+                    tamanho="pequeno"
+                    icon={Check}
+                    aria-label={`Dar OK no rateio de ${item.descricao}`}
+                    aria-pressed={confirmacaoPack.confirmada}
+                    aria-describedby={`confirmacao-pack-${item.id}`}
+                    onClick={() => confirmarPackItem(notaSelecionada, item)}
+                  >
+                    OK
+                  </BotaoInteracao>
+                )}
               </div>
+              {confirmacaoPack.necessaria && (
+                <p
+                  id={`confirmacao-pack-${item.id}`}
+                  role={destacarPack ? "alert" : undefined}
+                  className={`mt-1 text-xs font-semibold ${
+                    confirmacaoPack.confirmada
+                      ? "text-emerald-700 dark:text-emerald-400"
+                      : destacarPack
+                        ? "text-red-700 dark:text-red-400"
+                        : "text-amber-800 dark:text-amber-300"
+                  }`}
+                >
+                  {confirmacaoPack.confirmada
+                    ? "Rateio conferido."
+                    : "Confira as unidades por caixa e dê OK no rateio para avançar."}
+                </p>
+              )}
               {(packConfig.sugestaoAutomaticaDiferenteDoPadrao || packConfig.overrideManual) && (
                 <div
                   className={`mt-1.5 rounded p-2 text-xs space-y-0.5 border ${
@@ -174,7 +239,9 @@ function EntradaXmlDetalhesItemCard({
                   </div>
                   <div>
                     💰 Custo unit.:{" "}
-                    <strong>R$ {obterCustoAquisicaoItem(itemAjustado).toFixed(4)}</strong>
+                    <strong>
+                      R$ {formatarValorFiscal(obterCustoAquisicaoItem(itemAjustado), 4)}
+                    </strong>
                   </div>
                 </div>
               )}
@@ -300,37 +367,29 @@ function EntradaXmlDetalhesItemCard({
                     Para alterar o vinculo, selecione outro produto ou clique no V para desvincular
                   </div>
 
-                  <div className="grid gap-2 xl:grid-cols-[minmax(180px,0.8fr)_minmax(260px,1.2fr)]">
-                    <input
-                      type="text"
-                      placeholder="Pesquisar outro produto..."
-                      value={filtroProduto[item.id] || ""}
-                      onChange={(e) => atualizarFiltroProduto(item.id, e.target.value)}
-                      className="w-full rounded border border-slate-300 px-3 py-1.5 text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500"
-                    />
-
-                    {/* Select para trocar produto */}
-                    <select
-                      value={item.produto_id}
-                      onChange={(e) => {
-                        if (e.target.value && e.target.value != item.produto_id) {
-                          vincularProduto(notaSelecionada.id, item.id, e.target.value);
-                        }
-                      }}
-                      className="w-full rounded border border-slate-300 px-3 py-1.5 text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500"
-                    >
-                      <option value={item.produto_id}>
-                        {`${item.produto_codigo || "Sem SKU"} | EAN: ${item.produto_ean || "Sem EAN"} | ${item.produto_nome}`}
-                      </option>
-                      {(resultadosBuscaProduto[item.id] || [])
-                        .filter((p) => p.id !== item.produto_id)
-                        .map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {formatarOpcaoProduto(p)}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
+                  <BuscaProduto
+                    value={filtroProduto[item.id] || ""}
+                    onChange={(valor) => atualizarFiltroProduto(item.id, valor)}
+                    suggestions={(resultadosBuscaProduto[item.id] || []).filter(
+                      (produto) => produto.id !== item.produto_id,
+                    )}
+                    showSuggestions
+                    loading={buscandoProduto[item.id]}
+                    onSelect={(produto) => vincularProduto(notaSelecionada.id, item.id, produto.id)}
+                    renderSuggestionContent={(produto) => (
+                      <>
+                        <span className="block font-medium">
+                          {produto.ativo === false ? "[INATIVO] " : ""}
+                          {produto.codigo || "Sem código"} - {produto.nome}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          EAN: {produto.codigo_barras || produto.gtin_ean || "Sem EAN"} | Estoque:{" "}
+                          {produto.estoque_atual || 0}
+                        </span>
+                      </>
+                    )}
+                    placeholder="Pesquisar outro produto por código, nome ou EAN"
+                  />
                 </>
               ) : (
                 <>
@@ -341,67 +400,32 @@ function EntradaXmlDetalhesItemCard({
                   </div>
 
                   <div className="space-y-3">
-                    {/* Campo de pesquisa */}
-                    <div>
-                      <div className="block text-xs font-semibold text-gray-700 mb-1">
-                        Pesquisar produto existente:
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Digite nome ou SKU..."
-                        value={filtroProduto[item.id] || ""}
-                        onChange={(e) => atualizarFiltroProduto(item.id, e.target.value)}
-                        className="w-full px-3 py-2 border-2 border-gray-400 rounded focus:ring-2 focus:ring-blue-500 text-sm"
-                      />
-                    </div>
-
-                    {/* Lista de produtos filtrados */}
-                    {filtroProduto[item.id] && filtroProduto[item.id].length >= 2 && (
-                      <div className="border-2 border-gray-300 rounded max-h-48 overflow-y-auto bg-white">
-                        {(() => {
-                          const filtrados = resultadosBuscaProduto[item.id] || [];
-                          if (buscandoProduto[item.id]) {
-                            return (
-                              <div className="px-3 py-4 text-center text-gray-500 text-xs">
-                                Buscando produtos...
-                              </div>
-                            );
-                          }
-                          if (filtrados.length === 0) {
-                            return (
-                              <div className="px-3 py-4 text-center text-gray-500 text-xs">
-                                ❌ Nenhum produto encontrado
-                              </div>
-                            );
-                          }
-                          return filtrados.map((p) => (
-                            <button
-                              key={`produto-${item.id}-${p.id}`}
-                              type="button"
-                              onClick={() => {
-                                vincularProduto(notaSelecionada.id, item.id, p.id);
-                                setFiltroProduto((prev) => ({ ...prev, [item.id]: "" }));
-                                setResultadosBuscaProduto((prev) => ({ ...prev, [item.id]: [] }));
-                              }}
-                              className={`w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-200 last:border-b-0 text-xs ${!p.ativo ? "text-red-600 font-bold" : ""}`}
-                            >
-                              {!p.ativo && "[INATIVO] "}
-                              {p.codigo || "Sem SKU"} - {p.nome}
-                              <span className="text-gray-500 ml-1">
-                                | EAN:{" "}
-                                {p.codigo_barras ||
-                                  p.gtin_ean ||
-                                  p.gtin_ean_tributario ||
-                                  "Sem EAN"}
-                              </span>
-                              <span className="text-gray-500 ml-1">
-                                (Est: {p.estoque_atual || 0})
-                              </span>
-                            </button>
-                          ));
-                        })()}
-                      </div>
-                    )}
+                    <BuscaProduto
+                      label="Pesquisar produto existente"
+                      value={filtroProduto[item.id] || ""}
+                      onChange={(valor) => atualizarFiltroProduto(item.id, valor)}
+                      suggestions={resultadosBuscaProduto[item.id] || []}
+                      showSuggestions
+                      loading={buscandoProduto[item.id]}
+                      onSelect={(produto) => {
+                        vincularProduto(notaSelecionada.id, item.id, produto.id);
+                        setFiltroProduto((prev) => ({ ...prev, [item.id]: "" }));
+                        setResultadosBuscaProduto((prev) => ({ ...prev, [item.id]: [] }));
+                      }}
+                      renderSuggestionContent={(produto) => (
+                        <>
+                          <span className="block font-medium">
+                            {produto.ativo === false ? "[INATIVO] " : ""}
+                            {produto.codigo || "Sem código"} - {produto.nome}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            EAN: {produto.codigo_barras || produto.gtin_ean || "Sem EAN"} | Estoque:{" "}
+                            {produto.estoque_atual || 0}
+                          </span>
+                        </>
+                      )}
+                      placeholder="Código, nome, SKU ou EAN do produto"
+                    />
 
                     <div className="flex items-center gap-2">
                       <div className="flex-1 border-t border-gray-300"></div>

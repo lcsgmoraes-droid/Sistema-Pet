@@ -4,6 +4,7 @@
 
 import api from "../api";
 import { obterContextoRevisaoCaixa } from "../utils/caixaRevisao";
+import { atualizarSituacaoFiscalVenda } from "../utils/pdvFiscalRefresh";
 
 /**
  * Listar vendas com filtros
@@ -20,6 +21,13 @@ export const buscarVenda = async (vendaId) => {
   const response = await api.get(`/vendas/${vendaId}`);
   return response.data;
 };
+
+export const buscarVendaComSituacaoFiscal = async (vendaId) =>
+  atualizarSituacaoFiscalVenda(await buscarVenda(vendaId), {
+    consultarIntNFe: (id) => api.get(`/nfe/vendas/${id}/status`),
+    sincronizarBling: (id) => api.post(`/nfe/${id}/sincronizar-status`),
+    buscarVenda,
+  });
 
 /**
  * Criar nova venda
@@ -45,12 +53,15 @@ export const atualizarVenda = async (vendaId, dados) => {
  */
 export const finalizarVenda = async (vendaId, pagamentos, options = {}) => {
   const response = await api.post(`/vendas/${vendaId}/finalizar`, {
+    caixa_id: options.caixa_id || null,
     pagamentos,
     cupom_code: options.cupom_code || null,
     cupom_discount_applied: options.cupom_discount_applied ?? null,
     motivo_liberacao_crediario: options.motivo_liberacao_crediario || null,
     nao_gerar_beneficios: Boolean(options.nao_gerar_beneficios),
     justificativa_nao_gerar_beneficios: options.justificativa_nao_gerar_beneficios || null,
+    justificativa_pagamento_excedente: options.justificativa_pagamento_excedente || null,
+    contexto_pagamento_excedente: options.contexto_pagamento_excedente || null,
     ...obterContextoRevisaoCaixa(),
   });
   return response.data;

@@ -11,6 +11,18 @@ from app.config import settings
 BASE_URL = "https://api.intnfe.com.br"
 
 
+def _provider_unavailable_message(value):
+    """Páginas do proxy não são respostas fiscais, mesmo dentro de JSON."""
+    return isinstance(value, str) and bool(
+        re.search(r"<\s*(?:!doctype|/?[a-z][\w:-]*(?:\s|>))", value, re.IGNORECASE)
+        or re.search(
+            r"\b(?:502\s+bad\s+gateway|503\s+service\s+unavailable|504\s+gateway\s+timeout)\b",
+            value,
+            re.IGNORECASE,
+        )
+    )
+
+
 class IntNFeError(Exception):
     def __init__(
         self,
@@ -20,6 +32,7 @@ class IntNFeError(Exception):
         correlation=None,
         uncertain=False,
         validation_errors=None,
+        provider_message=None,
     ):
         super().__init__(code)
         self.code = code
@@ -31,6 +44,8 @@ class IntNFeError(Exception):
         )
         self.uncertain = uncertain
         self.validation_errors = list(validation_errors or [])
+        mensagens = _safe_validation_errors({"erros": [provider_message]})
+        self.provider_message = mensagens[0] if mensagens else None
 
 
 def _safe_validation_errors(payload):
@@ -40,7 +55,7 @@ def _safe_validation_errors(payload):
 
     safe = []
     for raw in payload["erros"][:12]:
-        if not isinstance(raw, str):
+        if not isinstance(raw, str) or _provider_unavailable_message(raw):
             continue
         message = re.sub(r"[\x00-\x1f\x7f]+", " ", raw).strip()
         if not message:
@@ -152,6 +167,14 @@ class IntNFeClient:
                     r"[A-Za-z][A-Za-z0-9_-]{1,79}", remote_code
                 ):
                     code = remote_code
+                if path.endswith("/cancelar") and isinstance(error, dict):
+                    cancellation_code = str(error.get("codigoRetorno") or "")
+                    if re.fullmatch(r"\d{1,5}", cancellation_code):
+                        code = cancellation_code
+                    if _provider_unavailable_message(
+                        error.get("motivoRetorno") or error.get("mensagem")
+                    ):
+                        code = "EmissorIndisponivel"
             raise IntNFeError(
                 code,
                 status=response.status_code,
@@ -161,10 +184,22 @@ class IntNFeClient:
                     response.status_code >= 500
                     or response.status_code == 408
                     or 300 <= response.status_code < 400
+                    or (
+                        path.endswith("/cancelar")
+                        and isinstance(error, dict)
+                        and _provider_unavailable_message(
+                            error.get("motivoRetorno") or error.get("mensagem")
+                        )
+                    )
                 ),
                 validation_errors=(
                     _safe_validation_errors(error)
                     if path.startswith(("/nfe", "/nfce"))
+                    else None
+                ),
+                provider_message=(
+                    error.get("motivoRetorno") or error.get("mensagem")
+                    if isinstance(error, dict) and path.endswith("/cancelar")
                     else None
                 ),
             )
@@ -463,17 +498,29 @@ class IntNFeClient:
         result = self._request(
             "GET", self._document_path(document_type, correlation_id), token=token
         )
-        if not isinstance(result, dict):
+        if not isinstance(result, dict) or str(result.get("status")) not in {
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+        }:
             raise IntNFeError("RespostaInvalida")
         return result
 
     def document_xml(self, token, document_type, correlation_id):
-        return self._binary_request(
+        from app.intnfe.xml_integrity import ensure_signed_xml
+
+        content = self._binary_request(
             "GET",
             self._document_path(document_type, correlation_id, "xml"),
             token=token,
             accept="application/xml, text/xml",
         )
+        return ensure_signed_xml(content, document_type=document_type)
 
     def document_events(self, token, document_type, correlation_id):
         # Contrato oficial: https://intnfe.com.br/api/doc#ep-eventos
@@ -513,4 +560,10 @@ class IntNFeClient:
         )
         if not isinstance(result, dict):
             raise IntNFeError("RespostaInvalida", uncertain=True)
+        if not (result.get("autorizado") is True and result.get("protocolo")) and (
+            _provider_unavailable_message(
+                result.get("motivoRetorno") or result.get("mensagem")
+            )
+        ):
+            raise IntNFeError("EmissorIndisponivel", uncertain=True)
         return result

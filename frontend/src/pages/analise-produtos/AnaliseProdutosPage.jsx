@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { BarChart3, Download } from "lucide-react";
+import { BarChart3, Download, FileText } from "lucide-react";
 import ModuleTabs from "../../components/ui/ModuleTabs";
+import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
+import InputCheckTexto from "../../components/v2/InputCheckTexto/InputCheckTexto";
 import AnaliseProdutoEspecifico from "./AnaliseProdutoEspecifico";
 import AnaliseProdutosFiltros from "./AnaliseProdutosFiltros";
 import { CurvaAbcProdutos, GruposProdutos, VisaoGeralProdutos } from "./AnaliseProdutosViews";
@@ -34,15 +36,33 @@ export default function AnaliseProdutosPage() {
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={analise.exportarCsv}
-          disabled={analise.carregando}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
-        >
-          <Download className="h-4 w-4" aria-hidden="true" />
-          Exportar produtos do filtro
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <BotaoInteracao
+            icon={Download}
+            onClick={analise.exportarCsv}
+            disabled={!analise.podeExportar}
+          >
+            Exportar produtos do filtro
+          </BotaoInteracao>
+          <div className="flex flex-col gap-2">
+            <BotaoInteracao
+              icon={FileText}
+              onClick={analise.exportarPdf}
+              disabled={!analise.podeExportar}
+              loading={analise.exportandoPdf}
+            >
+              Gerar PDF por fornecedor
+            </BotaoInteracao>
+            <InputCheckTexto
+              id="analise-incluir-vendedores-pdf"
+              checked={analise.incluirVendedoresPdf}
+              onChange={analise.setIncluirVendedoresPdf}
+              disabled={analise.exportandoPdf}
+            >
+              Incluir vendedores no PDF
+            </InputCheckTexto>
+          </div>
+        </div>
       </header>
 
       <AnaliseProdutosFiltros

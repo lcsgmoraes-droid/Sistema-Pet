@@ -23,6 +23,7 @@ import { useTenantStore } from "../../store/tenant.store";
 import { CORES } from "../../theme";
 import { formatarMoeda } from "../../utils/format";
 import { gestorStyles as styles } from "./GestorDashboardStyles";
+import GestorFaturamentoCard from "./GestorFaturamentoCard";
 import {
   formatIsoDateBR,
   formatQuantity,
@@ -30,8 +31,9 @@ import {
   GestorPeriod,
   maskBRDate,
   parseBRDate,
+  refreshGestorPeriod,
   resolveGestorPeriod,
-  toLocalIsoDate,
+  toBrasiliaIsoDate,
 } from "./GestorDashboardUtils";
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -54,6 +56,7 @@ export default function GestorDashboardScreen() {
     async (target: GestorPeriod, showAlert = false) => {
       const currentRequest = ++requestId.current;
       try {
+        setRefreshing(true);
         setError(null);
         const data = await obterResumoGestor(target.start, target.end);
         if (currentRequest === requestId.current) setSummary(data);
@@ -74,10 +77,28 @@ export default function GestorDashboardScreen() {
     [],
   );
 
+  const refreshSummary = useCallback(
+    (showAlert = false) => {
+      const currentPeriod = refreshGestorPeriod(period);
+      if (
+        currentPeriod.start !== period.start ||
+        currentPeriod.end !== period.end
+      ) {
+        setPeriod(currentPeriod);
+        return;
+      }
+      void loadSummary(currentPeriod, showAlert);
+    },
+    [loadSummary, period],
+  );
+
   useFocusEffect(
     useCallback(() => {
-      void loadSummary(period);
-    }, [loadSummary, period]),
+      refreshSummary();
+      return () => {
+        requestId.current += 1;
+      };
+    }, [refreshSummary]),
   );
 
   const selectQuickPeriod = (
@@ -110,7 +131,7 @@ export default function GestorDashboardScreen() {
       );
       return;
     }
-    if (end > toLocalIsoDate(new Date())) {
+    if (end > toBrasiliaIsoDate(new Date())) {
       Alert.alert("Periodo invalido", "A data final nao pode estar no futuro.");
       return;
     }
@@ -155,7 +176,7 @@ export default function GestorDashboardScreen() {
             tintColor={CORES.primario}
             onRefresh={() => {
               setRefreshing(true);
-              void loadSummary(period, true);
+              refreshSummary(true);
             }}
           />
         }
@@ -234,7 +255,7 @@ export default function GestorDashboardScreen() {
             <Text style={styles.errorText}>{error}</Text>
             <TouchableOpacity
               style={styles.retryButton}
-              onPress={() => void loadSummary(period, true)}
+              onPress={() => refreshSummary(true)}
             >
               <Text style={styles.retryText}>Tentar novamente</Text>
             </TouchableOpacity>
@@ -274,48 +295,10 @@ function DashboardCards({ summary }: { summary: GestorResumo }) {
   } = summary;
   return (
     <>
-      <Card
-        icon="trending-up-outline"
-        title="Faturamento"
-        subtitle="Vendas do periodo selecionado"
-      >
-        <Text style={styles.mainMetricLabel}>Faturamento liquido</Text>
-        <Text style={styles.mainMetricValue}>
-          {formatarMoeda(vendas.faturamento_liquido)}
-        </Text>
-        <View style={styles.moneyGrid}>
-          <MoneyCell label="Bruto" value={vendas.faturamento_bruto} />
-          <MoneyCell label="Liquido" value={vendas.faturamento_liquido} />
-          <MoneyCell label="Recebido" value={vendas.recebido} />
-        </View>
-        <View style={styles.metricGrid}>
-          <MetricBox
-            icon="receipt-outline"
-            label="Vendas"
-            value={String(vendas.quantidade_vendas)}
-          />
-          <MetricBox
-            icon="cube-outline"
-            label="Unidades"
-            value={formatQuantity(vendas.unidades_vendidas)}
-          />
-          <MetricBox
-            icon="layers-outline"
-            label="Produtos diferentes"
-            value={String(vendas.produtos_distintos)}
-          />
-          <MetricBox
-            icon="calculator-outline"
-            label="Ticket medio"
-            value={formatarMoeda(vendas.ticket_medio)}
-          />
-        </View>
-        {vendas.descontos > 0 ? (
-          <Text style={styles.footnote}>
-            Descontos concedidos: {formatarMoeda(vendas.descontos)}
-          </Text>
-        ) : null}
-      </Card>
+      <GestorFaturamentoCard
+        key={`${summary.data_inicio}:${summary.data_fim}`}
+        vendas={vendas}
+      />
 
       <Card
         icon="pulse-outline"
@@ -513,41 +496,6 @@ function Card({
         </View>
       </View>
       {children}
-    </View>
-  );
-}
-
-function MoneyCell({ label, value }: { label: string; value: number }) {
-  return (
-    <View style={styles.moneyCell}>
-      <Text style={styles.moneyCellLabel}>{label}</Text>
-      <Text
-        style={styles.moneyCellValue}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-      >
-        {formatarMoeda(value)}
-      </Text>
-    </View>
-  );
-}
-
-function MetricBox({
-  icon,
-  label,
-  value,
-}: {
-  icon: IconName;
-  label: string;
-  value: string;
-}) {
-  return (
-    <View style={styles.metricBox}>
-      <View style={styles.metricBoxTop}>
-        <Ionicons name={icon} size={16} color={CORES.primario} />
-        <Text style={styles.metricBoxLabel}>{label}</Text>
-      </View>
-      <Text style={styles.metricBoxValue}>{value}</Text>
     </View>
   );
 }

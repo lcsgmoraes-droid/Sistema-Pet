@@ -1,4 +1,8 @@
 import {
+  PENDENCIA_IFOOD_LABEL,
+  temRentabilidadePendente,
+} from "./vendasFinanceiro/rentabilidadePendente.js";
+import {
   Bar,
   BarChart,
   CartesianGrid,
@@ -90,9 +94,15 @@ export default function VendasAnaliseInteligentePanel({
               className="border-emerald-100 text-emerald-700"
               hint="Periodo atual"
               label="Ticket medio estimado"
-              value={formatarMoeda(
-                resumo.quantidade_vendas > 0 ? resumo.venda_liquida / resumo.quantidade_vendas : 0,
-              )}
+              value={
+                temRentabilidadePendente(resumo)
+                  ? PENDENCIA_IFOOD_LABEL
+                  : formatarMoeda(
+                      resumo.quantidade_vendas > 0
+                        ? resumo.venda_liquida / resumo.quantidade_vendas
+                        : 0,
+                    )
+              }
             />
           </div>
 
@@ -101,8 +111,9 @@ export default function VendasAnaliseInteligentePanel({
 
             {alertasInteligentesVendas.length === 0 ? (
               <div className="p-4 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
-                Nenhum alerta critico no momento. O desempenho esta estavel para o periodo
-                analisado.
+                {temRentabilidadePendente(resumo)
+                  ? "A análise de rentabilidade ainda aguarda as cobranças do iFood. Nenhum alerta foi identificado nos dados conhecidos."
+                  : "Nenhum alerta critico no momento. O desempenho esta estavel para o periodo analisado."}
               </div>
             ) : (
               <div className="space-y-3">
@@ -145,6 +156,12 @@ export default function VendasAnaliseInteligentePanel({
               </svg>
               <h3 className="text-lg font-semibold">Top Produtos por Lucro</h3>
             </div>
+            {temRentabilidadePendente(resumo) && (
+              <p className="mb-3 text-sm text-amber-800 dark:text-amber-300">
+                Produtos com cobranças pendentes do iFood ficam fora do ranking e dos alertas de
+                margem.
+              </p>
+            )}
             <TopProdutosLucroTable produtos={produtosMaisLucrativos} />
           </div>
 
@@ -179,7 +196,9 @@ export default function VendasAnaliseInteligentePanel({
                               : "text-red-600"
                         }`}
                       >
-                        {sanitizarNumero(dados.margem_media).toFixed(1)}%
+                        {temRentabilidadePendente(dados)
+                          ? PENDENCIA_IFOOD_LABEL
+                          : `${sanitizarNumero(dados.margem_media).toFixed(1)}%`}
                       </span>
                     </div>
                   </div>

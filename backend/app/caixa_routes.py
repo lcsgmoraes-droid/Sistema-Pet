@@ -20,6 +20,10 @@ from app.caixa.recebimentos import (
     filtro_recebimentos_dinheiro_caixa,
     resumir_pagamentos_vendas_caixa,
 )
+from app.caixa.formas_pagamento import (
+    carregar_nomes_formas_pagamento,
+    nome_forma_pagamento,
+)
 from app.caixa.auditoria import registrar_evento_caixa, snapshot_caixa
 from app.caixa.auditoria_routes import router as auditoria_router
 from app.utils.timezone import now_brasilia
@@ -41,6 +45,7 @@ from app.caixa.escopo import (
 from app.financeiro_models import ContaPagar, TipoDespesa
 from app.domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
 from app.pdf_caixa import gerar_pdf_fechamento_caixa
+from app.services.faturamento_service import montar_composicoes_caixa
 
 router = APIRouter(prefix="/caixas", tags=["caixas"])
 router.include_router(auditoria_router)
@@ -537,24 +542,7 @@ def reabrir_caixa(
             400, "Descreva o motivo da reabertura com pelo menos 10 caracteres."
         )
 
-    caixa_aberto, compartilhado = buscar_caixa_aberto(
-        db,
-        tenant_id=tenant_id,
-        usuario_id=current_user.id,
-        bloquear_config=True,
-    )
-
-    if caixa_aberto:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "A empresa já possui um caixa compartilhado aberto. Feche-o antes de reabrir outro."
-                if compartilhado
-                else "Você já possui um caixa aberto. Feche-o antes de reabrir outro."
-            ),
-        )
-
-    caixa, _ = buscar_caixa_acessivel(
+    caixa, compartilhado = buscar_caixa_acessivel(
         db,
         caixa_id=caixa_id,
         tenant_id=tenant_id,
@@ -644,6 +632,7 @@ def obter_resumo_caixa(
         db.query(
             data_da_venda.label("data_venda"),
             VendaPagamento.forma_pagamento,
+            VendaPagamento.forma_pagamento_id,
             func.count(VendaPagamento.id).label("quantidade"),
             func.sum(VendaPagamento.valor).label("total"),
         )
@@ -657,8 +646,13 @@ def obter_resumo_caixa(
         )
     )
     pagamentos_por_data = pagamentos_query.group_by(
-        data_da_venda, VendaPagamento.forma_pagamento
+        data_da_venda, VendaPagamento.forma_pagamento, VendaPagamento.forma_pagamento_id
     ).all()
+    nomes_formas = carregar_nomes_formas_pagamento(
+        db,
+        tenant_id=tenant_id,
+        forma_ids=[pagamento.forma_pagamento_id for pagamento in pagamentos_por_data],
+    )
 
     vendas_por_forma = {}
     recebimentos_por_data_venda = {}
@@ -692,8 +686,22 @@ def obter_resumo_caixa(
             valor_recebimento_dinheiro(mov),
             "lançamento",
         )
-    for data_venda, forma, quantidade, total in pagamentos_por_data:
+    for pagamento in pagamentos_por_data:
+        data_venda, _forma, _forma_id, quantidade, total = pagamento
+        forma = nome_forma_pagamento(pagamento, nomes_formas)
         somar_recebimento(data_venda, forma, quantidade, total, "pagamento")
+    for movimento in movimentacoes:
+        if (
+            movimento.tipo == "recebimento"
+            and movimento.categoria == "recebimento_conta"
+        ):
+            somar_recebimento(
+                None,
+                movimento.forma_pagamento or "Recebimento de conta",
+                1,
+                movimento.valor,
+                "recebimento",
+            )
 
     total_vendido = (
         db.query(func.sum(Venda.total))
@@ -704,7 +712,13 @@ def obter_resumo_caixa(
         )
         .scalar()
     )
-    indicadores = indicadores_vendas_recebimentos(total_vendido, vendas_por_forma)
+    # A consulta já excluiu os planos pelo tipo; os nomes abaixo são do cadastro.
+    indicadores = indicadores_vendas_recebimentos(
+        total_vendido, vendas_por_forma, excluir_planos=False
+    )
+    composicoes = montar_composicoes_caixa(
+        db, caixa=caixa, tenant_id=tenant_id, movimentacoes=movimentacoes
+    )
 
     return {
         "caixa": _serializar_caixa(caixa, compartilhado=compartilhado, compact=compact),
@@ -713,6 +727,7 @@ def obter_resumo_caixa(
         "recebimentos_por_data_venda": recebimentos_por_data_venda,
         **resumir_pagamentos_vendas_caixa(db, caixa_id=caixa_id, tenant_id=tenant_id),
         **indicadores,
+        **composicoes,
     }
 
 
@@ -860,6 +875,11 @@ def listar_vendas_caixa(
             )
             .all()
         )
+        nomes_formas = carregar_nomes_formas_pagamento(
+            db,
+            tenant_id=tenant_id,
+            forma_ids=[pagamento.forma_pagamento_id for pagamento in pagamentos_caixa],
+        )
         dinheiro_caixa = (
             db.query(MovimentacaoCaixa)
             .filter(
@@ -873,7 +893,13 @@ def listar_vendas_caixa(
                 {
                     "id": pagamento.id,
                     "tipo": "pagamento",
-                    "forma_pagamento": pagamento.forma_pagamento,
+                    "forma_pagamento": nome_forma_pagamento(pagamento, nomes_formas),
+                    **(
+                        {"forma_pagamento_tipo": pagamento.forma_pagamento}
+                        if nome_forma_pagamento(pagamento, nomes_formas)
+                        != pagamento.forma_pagamento
+                        else {}
+                    ),
                     "valor": float(moeda(pagamento.valor)),
                     "data_recebimento": pagamento.data_pagamento.isoformat()
                     if pagamento.data_pagamento
@@ -962,10 +988,15 @@ def listar_vendas_caixa(
             Venda.tenant_id == tenant_id,
             VendaPagamento.tenant_id == tenant_id,
             VendaPagamento.valor != 0,
-            VendaPagamento.forma_pagamento == forma_pagamento,
+            func.lower(func.trim(VendaPagamento.forma_pagamento)) != "dinheiro",
         )
         .order_by(VendaPagamento.data_pagamento.desc())
         .all()
+    )
+    nomes_formas = carregar_nomes_formas_pagamento(
+        db,
+        tenant_id=tenant_id,
+        forma_ids=[pagamento.forma_pagamento_id for pagamento in pagamentos],
     )
     return [
         {
@@ -989,6 +1020,7 @@ def listar_vendas_caixa(
             else None,
         }
         for pagamento in pagamentos
+        if nome_forma_pagamento(pagamento, nomes_formas) == forma_pagamento
     ]
 
 
@@ -1033,6 +1065,8 @@ def gerar_pdf_caixa(
         "vendas_por_forma_pagamento": resumo["vendas_por_forma_pagamento"],
         "recebimentos_por_forma_pagamento": resumo["recebimentos_por_forma_pagamento"],
         "totais": resumo["totais"],
+        "vendas_periodo": resumo["vendas_periodo"],
+        "composicao_recebimentos": resumo["composicao_recebimentos"],
         "saldo_fechamento": float(caixa.valor_informado)
         if caixa.valor_informado is not None
         else None,

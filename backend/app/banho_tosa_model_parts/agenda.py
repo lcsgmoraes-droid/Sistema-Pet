@@ -91,6 +91,10 @@ class BanhoTosaAgendamentoServico(BaseTenantModel):
     valor_unitario = Column(Numeric(12, 2), nullable=False, default=0)
     desconto = Column(Numeric(12, 2), nullable=False, default=0)
     tempo_previsto_minutos = Column(Integer, nullable=False, default=0)
+    pacote_credito_id = Column(
+        Integer, ForeignKey("banho_tosa_pacote_creditos.id"), nullable=True
+    )
+    pacote_quantidade = Column(Numeric(12, 3), nullable=False, default=0)
 
     agendamento = relationship("BanhoTosaAgendamento", back_populates="servicos")
     servico = relationship("BanhoTosaServico")

@@ -149,6 +149,7 @@ def update_ops_tenant_commercial_state(
     *,
     tenant_id: str,
     changes: dict[str, Any],
+    actor_platform_admin_id: int | None = None,
 ) -> dict[str, Any]:
     target_tenant_id = str(tenant_id).strip()
     _ensure_target_tenant(db, target_tenant_id)
@@ -161,8 +162,67 @@ def update_ops_tenant_commercial_state(
     if not normalized:
         raise OpsTenantActionError("Nenhuma alteracao comercial informada.")
 
+    blocking_note = None
+    blocking_admin = None
+    next_status = normalized.get("status")
+    if next_status and next_status not in {"active", "ativo"}:
+        lock_clause = (
+            " FOR UPDATE" if db.get_bind().dialect.name == "postgresql" else ""
+        )
+        previous_status = db.execute(
+            text(
+                "SELECT status FROM tenants WHERE CAST(id AS TEXT) = :tenant_id"
+                + lock_clause
+            ),
+            {"tenant_id": target_tenant_id},
+        ).scalar_one()
+        if str(previous_status or "").strip().lower() != next_status:
+            reason = str(changes.get("blocking_authorization_reason") or "").strip()
+            if (
+                changes.get("blocking_authorized_by_lucas") is not True
+                or len(reason) < 10
+            ):
+                raise OpsTenantActionError(
+                    "Suspender acesso exige autorizacao explicita do Lucas e motivo com pelo menos 10 caracteres."
+                )
+            if len(reason) > 880:
+                raise OpsTenantActionError(
+                    "Motivo de autorizacao deve ter no maximo 880 caracteres."
+                )
+            if actor_platform_admin_id is None:
+                raise OpsTenantActionError(
+                    "Administrador responsavel nao identificado."
+                )
+            blocking_admin = (
+                db.execute(
+                    text(
+                        "SELECT id, name, email FROM platform_admins WHERE id = :id AND is_active = true"
+                    ),
+                    {"id": actor_platform_admin_id},
+                )
+                .mappings()
+                .first()
+            )
+            if blocking_admin is None:
+                raise OpsTenantActionError(
+                    "Administrador responsavel invalido ou inativo."
+                )
+            blocking_note = (
+                f"Suspensao comercial autorizada por Lucas: {reason} "
+                f"({previous_status}->{next_status})"
+            )
+            if len(blocking_note) > 1000:
+                raise OpsTenantActionError(
+                    "Motivo de autorizacao muito longo para o registro de auditoria."
+                )
+
     assignments = ", ".join(f"{field} = :{field}" for field in normalized)
     params: dict[str, Any] = {"tenant_id": target_tenant_id, **normalized}
+    if normalized.get("billing_status") in {"active", "paid", "ok", "em_dia"}:
+        # A ativacao manual e uma decisao de usar o plano contratado. Um
+        # webhook financeiro posterior nao pode reabrir o trial completo.
+        assignments += ", subscription_activated_at = COALESCE(subscription_activated_at, :activated_at)"
+        params["activated_at"] = datetime.now(timezone.utc)
     db.execute(
         text(f"""
             UPDATE tenants
@@ -171,6 +231,14 @@ def update_ops_tenant_commercial_state(
             """),
         params,
     )
+    if blocking_note is not None:
+        create_ops_tenant_onboarding_note(
+            db,
+            tenant_id=target_tenant_id,
+            note=blocking_note,
+            platform_admin_id=int(blocking_admin["id"]),
+            platform_admin_label=blocking_admin["name"] or blocking_admin["email"],
+        )
     return _fetch_tenant_item(db, target_tenant_id)
 
 

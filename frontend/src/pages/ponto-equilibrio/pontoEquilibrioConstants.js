@@ -4,6 +4,7 @@ export const CANAIS = [
   { value: "mercado_livre", label: "Mercado Livre" },
   { value: "shopee", label: "Shopee" },
   { value: "amazon", label: "Amazon" },
+  { value: "ifood", label: "iFood" },
   { value: "site", label: "Site" },
 ];
 

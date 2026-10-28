@@ -1,3 +1,4 @@
+import { obterCodigoPessoaPublico } from "../utils/codigosPublicos";
 import { useState, useEffect } from "react";
 import {
   FileText,
@@ -16,6 +17,7 @@ import api from "../api";
 import CustomerIdentity from "../components/ui/CustomerIdentity";
 import { confirmarCorePet } from "../services/corepetDialog";
 import { metadadosDownloadDanfe } from "../utils/documentoFiscalDownload.mjs";
+import { resumirCancelamentoNota } from "../utils/nfeCancelamentoFeedback";
 
 export default function NotasFiscais() {
   const [notas, setNotas] = useState([]);
@@ -121,17 +123,16 @@ export default function NotasFiscais() {
         justificativa,
       });
 
-      alert(
-        response.data?.cancelamento_solicitado
-          ? "Cancelamento enviado. Atualize a lista para acompanhar a confirmação."
-          : "Nota fiscal cancelada com sucesso!",
-      );
-      setModalCancelar(null);
-      setJustificativa("");
+      const feedback = resumirCancelamentoNota(response.data);
+      alert(feedback.mensagem);
+      if (feedback.confirmado || feedback.solicitado) {
+        setModalCancelar(null);
+        setJustificativa("");
+      }
       carregarNotas();
     } catch (error) {
       console.error("Erro ao cancelar nota:", error);
-      alert(error.response?.data?.detail || "Erro ao cancelar nota fiscal");
+      alert(resumirCancelamentoNota(error.response?.data || { mensagem: error.message }).mensagem);
     } finally {
       setCancelando(false);
     }
@@ -326,7 +327,7 @@ export default function NotasFiscais() {
                   </td>
                   <td className="px-6 py-4">
                     <CustomerIdentity
-                      code={nota.cliente?.codigo || nota.cliente_id || nota.cliente?.id}
+                      code={obterCodigoPessoaPublico(nota)}
                       customer={nota.cliente}
                       nameClassName="font-medium text-gray-900"
                     />
@@ -450,11 +451,7 @@ export default function NotasFiscais() {
                   <label className="text-sm font-medium text-gray-600">Cliente</label>
                   <p className="text-gray-900">
                     <CustomerIdentity
-                      code={
-                        notaSelecionada.cliente?.codigo ||
-                        notaSelecionada.cliente_id ||
-                        notaSelecionada.cliente?.id
-                      }
+                      code={obterCodigoPessoaPublico(notaSelecionada)}
                       customer={notaSelecionada.cliente}
                       fallback="N/A"
                     />
@@ -526,11 +523,7 @@ export default function NotasFiscais() {
                 <p className="text-sm text-gray-600">
                   <strong>Cliente:</strong>{" "}
                   <CustomerIdentity
-                    code={
-                      modalCancelar.cliente?.codigo ||
-                      modalCancelar.cliente_id ||
-                      modalCancelar.cliente?.id
-                    }
+                    code={obterCodigoPessoaPublico(modalCancelar)}
                     customer={modalCancelar.cliente}
                     fallback="N/A"
                     layout="inline"

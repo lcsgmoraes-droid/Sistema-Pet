@@ -1,16 +1,20 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowDownUp, CheckSquare, Plus, Receipt } from "lucide-react";
+import { ArrowDownUp, CheckSquare, Plus, Receipt, DollarSign, Eye } from "lucide-react";
 import api from "../api";
 import { getAccessToken } from "../auth/tokenStorage";
 import { toast } from "react-hot-toast";
 import {
   calcularSaldoAtualizadoFinanceiro,
+  obterStatusContaReceber,
   ehContaDeRepasseCartao,
   ehLancamentoFinanceiroCancelado,
 } from "../utils/financeiroStatus";
 import { safeArray } from "../utils/safeArray";
 import ActionButton from "./ui/ActionButton";
+import InputCheckbox from "./v2/InputCheckbox/InputCheckbox";
+import BotaoInteracao from "./v2/BotaoInteracao/BotaoInteracao";
+import BotaoMenuAcoes from "./v2/BotaoMenuAcoes/BotaoMenuAcoes";
 import CustomerIdentity from "./ui/CustomerIdentity";
 import DataTable from "./ui/DataTable";
 import LoadingState from "./ui/LoadingState";
@@ -76,6 +80,8 @@ const ContasReceber = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [contas, setContas] = useState([]);
+  const envioRecebimento = useRef(false);
+  const [processandoRecebimento, setProcessandoRecebimento] = useState(false);
   const [loading, setLoading] = useState(true);
   const [abaAtivaContasReceber, setAbaAtivaContasReceber] = useState("lancamentos");
   const [filtros, setFiltros] = useState(() => criarFiltrosContasReceberDaUrl(searchParams));
@@ -92,13 +98,14 @@ const ContasReceber = () => {
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
   const [contasSelecionadas, setContasSelecionadas] = useState(() => new Set());
   const [calculoEncargos, setCalculoEncargos] = useState(null);
-  const [comprovanteRecebimento, setComprovanteRecebimento] = useState(null);
+  const [comprovantesRecebimento, setComprovantesRecebimento] = useState([]);
+  const [perguntarImpressao, setPerguntarImpressao] = useState(false);
   const [formasPagamento, setFormasPagamento] = useState([]);
   const [contasBancarias, setContasBancarias] = useState([]);
 
   const [dadosRecebimento, setDadosRecebimento] = useState({
     valor_recebido: 0,
-    data_recebimento: new Date().toISOString().split("T")[0],
+    data_recebimento: formatarDataISO(new Date()),
     forma_pagamento_id: null,
     conta_bancaria_id: null,
     valor_juros: 0,
@@ -109,7 +116,7 @@ const ContasReceber = () => {
     quitar: true,
   });
   const [dadosRecebimentoLote, setDadosRecebimentoLote] = useState({
-    data_recebimento: new Date().toISOString().split("T")[0],
+    data_recebimento: formatarDataISO(new Date()),
     forma_pagamento_id: null,
     observacoes: "",
     aplicar_encargos_automaticos: true,
@@ -173,9 +180,9 @@ const ContasReceber = () => {
     }
   }, [busca]);
 
-  const carregarDados = async () => {
+  const carregarDados = async ({ mostrarLoading = true } = {}) => {
     try {
-      setLoading(true);
+      if (mostrarLoading) setLoading(true);
       const token = getAccessToken();
       const headers = { Authorization: `Bearer ${token}` };
       const contasRes = await api.get(
@@ -191,7 +198,7 @@ const ContasReceber = () => {
       console.error("Erro ao carregar dados:", error);
       toast.error("Erro ao carregar contas a receber");
     } finally {
-      setLoading(false);
+      if (mostrarLoading) setLoading(false);
     }
   };
 
@@ -252,14 +259,6 @@ const ContasReceber = () => {
     void carregarContasComFiltros(novosFiltros, busca);
   };
 
-  const abrirVendaNoPDV = (vendaId) => {
-    // Armazena ID da venda para abrir automaticamente no PDV
-    sessionStorage.setItem("abrirVenda", vendaId);
-    sessionStorage.setItem("abrirModalPagamento", "true");
-    toast.success("Redirecionando para o PDV...");
-    navigate("/pdv");
-  };
-
   const abrirFluxoDeCaixa = (conta) => {
     // Redireciona para o fluxo de caixa com filtros da conta
     const params = new URLSearchParams();
@@ -317,7 +316,7 @@ const ContasReceber = () => {
   };
 
   const abrirModalRecebimento = (conta) => {
-    const dataHoje = new Date().toISOString().split("T")[0];
+    const dataHoje = formatarDataISO(new Date());
     const aplicarAutomaticos = Boolean(conta.encargos_automaticos_ativos && conta.eh_crediario);
     setContaSelecionada(conta);
     setDadosRecebimento({
@@ -372,13 +371,16 @@ const ContasReceber = () => {
   };
 
   const registrarRecebimento = async () => {
+    if (envioRecebimento.current) return;
+    envioRecebimento.current = true;
+    setProcessandoRecebimento(true);
     try {
       const response = await api.post(
         `/contas-receber/${contaSelecionada.id}/receber`,
         dadosRecebimento,
       );
 
-      setComprovanteRecebimento(
+      setComprovantesRecebimento([
         montarDadosComprovanteRecebimento({
           conta: contaSelecionada,
           formasPagamento,
@@ -395,21 +397,26 @@ const ContasReceber = () => {
           },
           saldoRestante: response.data?.saldo_restante,
         }),
-      );
+      ]);
+      setPerguntarImpressao(true);
 
       toast.success("Recebimento registrado com sucesso!");
       setMostrarModalRecebimento(false);
-      carregarDados();
+      void carregarDados({ mostrarLoading: false });
     } catch (error) {
       console.error("Erro ao registrar recebimento:", error);
       toast.error(error.response?.data?.detail || "Erro ao registrar recebimento");
+    } finally {
+      envioRecebimento.current = false;
+      setProcessandoRecebimento(false);
     }
   };
 
   const contasReceberExibidas = safeArray(contas);
 
   const contasAbertasExibidas = contasReceberExibidas.filter(
-    (conta) => conta.status !== "recebido" && !ehLancamentoFinanceiroCancelado(conta),
+    (conta) =>
+      obterStatusContaReceber(conta) !== "recebido" && !ehLancamentoFinanceiroCancelado(conta),
   );
 
   const contasSelecionadasDetalhes = contasAbertasExibidas.filter((conta) =>
@@ -437,30 +444,50 @@ const ContasReceber = () => {
   };
 
   const registrarRecebimentosLote = async () => {
+    if (envioRecebimento.current) return;
+    envioRecebimento.current = true;
+    setProcessandoRecebimento(true);
     try {
       const response = await api.post("/contas-receber/receber-lote", {
         ...dadosRecebimentoLote,
         conta_ids: contasSelecionadasDetalhes.map((conta) => conta.id),
       });
+      setComprovantesRecebimento(
+        safeArray(response.data?.itens).map((item) =>
+          montarDadosComprovanteRecebimento({
+            conta: contasSelecionadasDetalhes.find(
+              (conta) => Number(conta.id) === Number(item.conta_id),
+            ),
+            formasPagamento,
+            recebimento: item.recebimento,
+            saldoRestante: 0,
+          }),
+        ),
+      );
+      setPerguntarImpressao(true);
       toast.success(response.data?.message || "Parcelas recebidas com sucesso!");
       setMostrarModalRecebimentoLote(false);
       setContasSelecionadas(new Set());
-      await carregarDados();
+      void carregarDados({ mostrarLoading: false });
     } catch (error) {
       console.error("Erro ao receber parcelas em lote:", error);
       toast.error(error.response?.data?.detail || "Erro ao receber parcelas selecionadas");
+    } finally {
+      envioRecebimento.current = false;
+      setProcessandoRecebimento(false);
     }
   };
 
   const emitirComprovanteHistorico = (recebimento) => {
-    setComprovanteRecebimento(
+    setComprovantesRecebimento([
       montarDadosComprovanteRecebimento({
         conta: contaSelecionada,
         detalhes: detalhesCompletos,
         formasPagamento,
         recebimento,
       }),
-    );
+    ]);
+    setPerguntarImpressao(false);
   };
 
   const formatarData = (data) => {
@@ -479,9 +506,9 @@ const ContasReceber = () => {
     const hoje = new Date();
     const vencimento = new Date(conta.data_vencimento);
     if (ehLancamentoFinanceiroCancelado(conta)) return <StatusBadge status="cancelado" />;
-    if (conta.status === "recebido") return <StatusBadge status="recebido" />;
+    if (obterStatusContaReceber(conta) === "recebido") return <StatusBadge status="recebido" />;
     if (ehContaDeRepasseCartao(conta)) {
-      if (conta.status === "parcial") {
+      if (obterStatusContaReceber(conta) === "parcial") {
         return (
           <StatusBadge intent="info" title="Cliente pagou; a operadora repassou parte do valor">
             Pago · repasse parcial
@@ -502,7 +529,7 @@ const ContasReceber = () => {
       );
     }
     if (vencimento < hoje) return <StatusBadge status="vencida" />;
-    if (conta.status === "parcial") return <StatusBadge status="parcial" />;
+    if (obterStatusContaReceber(conta) === "parcial") return <StatusBadge status="parcial" />;
     return <StatusBadge status="pendente" />;
   };
 
@@ -510,9 +537,8 @@ const ContasReceber = () => {
     {
       key: "selecao",
       header: (
-        <input
-          type="checkbox"
-          aria-label="Selecionar todas as contas em aberto"
+        <InputCheckbox
+          rotulo="Selecionar todas as contas em aberto"
           checked={
             contasAbertasExibidas.length > 0 &&
             contasAbertasExibidas.every((conta) => contasSelecionadas.has(conta.id))
@@ -521,10 +547,9 @@ const ContasReceber = () => {
         />
       ),
       render: (conta) =>
-        conta.status !== "recebido" && !ehLancamentoFinanceiroCancelado(conta) ? (
-          <input
-            type="checkbox"
-            aria-label={`Selecionar conta ${conta.id}`}
+        obterStatusContaReceber(conta) !== "recebido" && !ehLancamentoFinanceiroCancelado(conta) ? (
+          <InputCheckbox
+            rotulo={`Selecionar conta ${conta.id}`}
             checked={contasSelecionadas.has(conta.id)}
             onChange={() => alternarContaSelecionada(conta.id)}
           />
@@ -591,87 +616,52 @@ const ContasReceber = () => {
     },
     {
       key: "acoes",
-      header: "Acoes",
-      className: "min-w-[230px]",
-      render: (conta) => (
-        <div className="flex flex-wrap items-center gap-2">
-          {conta.status !== "recebido" && !ehLancamentoFinanceiroCancelado(conta) && (
-            <>
-              {conta.nsu && !conta.conciliado ? (
-                <>
-                  <ActionButton
-                    intent="warning"
-                    size="xs"
-                    onClick={() => navigate(`/conciliacao-cartao?nsu=${conta.nsu}`)}
-                    title={`Conciliar NSU ${conta.nsu} com extrato da operadora`}
-                  >
-                    Conciliar
-                  </ActionButton>
-                  <ActionButton
-                    intent="create"
-                    size="xs"
-                    onClick={() => abrirModalRecebimento(conta)}
-                    title="Receber manual (caso nao consiga conciliar)"
-                  >
-                    Manual
-                  </ActionButton>
-                </>
-              ) : conta.venda_id && !conta.nsu ? (
-                <>
-                  <ActionButton
-                    intent="neutral"
-                    size="xs"
-                    onClick={() => {
-                      if (conta.venda_id) {
-                        abrirVendaNoPDV(conta.venda_id);
-                      } else {
-                        abrirModalRecebimento(conta);
-                      }
-                    }}
-                    title="Receber no PDV (movimenta caixa)"
-                  >
-                    PDV
-                  </ActionButton>
-                  <ActionButton
-                    intent="create"
-                    size="xs"
-                    onClick={() => abrirModalRecebimento(conta)}
-                    title="Receber manual (sem PDV)"
-                  >
-                    Manual
-                  </ActionButton>
-                </>
-              ) : (
-                <ActionButton
-                  intent="create"
-                  size="xs"
-                  onClick={() => abrirModalRecebimento(conta)}
-                  title="Registrar recebimento manual"
-                >
-                  Receber Manual
-                </ActionButton>
-              )}
-            </>
-          )}
-          {conta.conciliado && (
-            <span
-              className="text-xs text-green-600 font-semibold"
-              title={`Conciliado em ${conta.data_conciliacao}`}
-            >
-              Conciliado
-            </span>
-          )}
-          <ActionButton
-            intent="neutral"
-            tone="soft"
-            size="xs"
-            title="Ver Detalhes"
-            onClick={() => abrirDetalhes(conta)}
-          >
-            Ver
-          </ActionButton>
-        </div>
-      ),
+      header: "Ações",
+      className: "min-w-[140px]",
+      render: (conta) => {
+        const aberta =
+          obterStatusContaReceber(conta) !== "recebido" && !ehLancamentoFinanceiroCancelado(conta);
+        // Receber = DollarSign; conciliar = ArrowDownUp; ver detalhes = Eye.
+        const acoes = [
+          aberta && {
+            icon: DollarSign,
+            label: "Receber",
+            title: "Registrar recebimento manual",
+            onClick: () => abrirModalRecebimento(conta),
+          },
+          aberta &&
+            conta.nsu &&
+            !conta.conciliado && {
+              icon: ArrowDownUp,
+              label: "Conciliar cartão",
+              title: "Conciliar cartão",
+              onClick: () => navigate(`/conciliacao-cartao?nsu=${encodeURIComponent(conta.nsu)}`),
+            },
+          {
+            icon: Eye,
+            label: "Ver detalhes",
+            title: "Ver Detalhes",
+            onClick: () => abrirDetalhes(conta),
+          },
+        ].filter(Boolean);
+        return acoes.length >= 3 ? (
+          <BotaoMenuAcoes acoes={acoes} />
+        ) : (
+          <div className="flex gap-2">
+            {acoes.map((acao) => (
+              <BotaoInteracao
+                key={acao.label}
+                icon={acao.icon}
+                title={acao.title}
+                tamanho="pequeno"
+                onClick={acao.onClick}
+              >
+                {acao.label}
+              </BotaoInteracao>
+            ))}
+          </div>
+        );
+      },
     },
   ];
 
@@ -735,7 +725,7 @@ const ContasReceber = () => {
         ].map((aba) => {
           const ativa = abaAtivaContasReceber === aba.id;
           return (
-            <button
+            <BotaoInteracao
               key={aba.id}
               type="button"
               onClick={() => setAbaAtivaContasReceber(aba.id)}
@@ -747,7 +737,7 @@ const ContasReceber = () => {
               ].join(" ")}
             >
               {aba.label}
-            </button>
+            </BotaoInteracao>
           );
         })}
       </div>
@@ -807,6 +797,7 @@ const ContasReceber = () => {
       />
 
       <ContasReceberRecebimentoModal
+        processando={processandoRecebimento}
         calculoEncargos={calculoEncargos}
         contaSelecionada={contaSelecionada}
         contasBancarias={contasBancarias}
@@ -821,6 +812,7 @@ const ContasReceber = () => {
       />
 
       <ContasReceberRecebimentoLoteModal
+        processando={processandoRecebimento}
         contasSelecionadas={contasSelecionadasDetalhes}
         dadosRecebimento={dadosRecebimentoLote}
         formasPagamento={formasPagamento}
@@ -842,8 +834,9 @@ const ContasReceber = () => {
         setMostrarDetalhes={setMostrarDetalhes}
       />
       <ComprovanteRecebimentoModal
-        comprovante={comprovanteRecebimento}
-        onClose={() => setComprovanteRecebimento(null)}
+        comprovantes={comprovantesRecebimento}
+        perguntarImpressao={perguntarImpressao}
+        onClose={() => setComprovantesRecebimento([])}
       />
     </div>
   );

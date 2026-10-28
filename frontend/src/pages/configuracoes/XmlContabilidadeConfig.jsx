@@ -69,9 +69,9 @@ export default function XmlContabilidadeConfig({ config, onChange, onSalvar, sal
           </span>
         </InputCheckTexto>
         <p className="text-sm text-slate-600 dark:text-slate-300">
-          O envio mensal reúne as notas emitidas e os eventos registrados no mês anterior, inclusive
-          cancelamentos e correções de notas mais antigas. As duas opções são independentes e podem
-          ficar ativadas juntas.
+          O envio mensal reúne as notas emitidas no CorePet e os eventos registrados no mês
+          anterior, inclusive cancelamentos e correções de notas mais antigas. As duas opções são
+          independentes e podem ficar ativadas juntas.
         </p>
         <div className="grid max-w-xl gap-4 sm:grid-cols-2">
           <InputCombobox

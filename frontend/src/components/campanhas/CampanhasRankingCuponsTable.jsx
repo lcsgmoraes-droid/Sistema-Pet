@@ -1,3 +1,4 @@
+import { obterCodigoPessoaPublico } from "../../utils/codigosPublicos";
 import { Fragment } from "react";
 import CustomerIdentity from "../ui/CustomerIdentity";
 
@@ -162,9 +163,9 @@ export default function CampanhasRankingCuponsTable({
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     <CustomerIdentity
-                      code={cupom.customer_id}
+                      code={obterCodigoPessoaPublico(cupom)}
                       empty={<span className="text-gray-300">-</span>}
-                      fallback={cupom.customer_id ? `Cliente #${cupom.customer_id}` : ""}
+                      fallback={cupom.customer_id ? "Cliente não informado" : ""}
                       name={cupom.nome_cliente}
                       nameClassName="font-medium text-gray-700"
                       record={cupom}

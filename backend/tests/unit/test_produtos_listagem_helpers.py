@@ -1,13 +1,19 @@
 import os
 from datetime import datetime
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import sessionmaker
 
 os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL") or "sqlite:///./test.db"
 os.environ["DEBUG"] = "false"
 
+import app.db.base  # noqa: F401 - registra tambem os relacionamentos de Venda.
+from app.db import Base
+from app.models import Cliente
 from app.produtos import listagem as produtos_listagem
 from app.produtos.listagem import (
     _aplicar_filtro_fornecedor_produto,
@@ -22,6 +28,18 @@ from app.produtos.listagem import (
     _resolver_fornecedor_ids_filtro_produto,
     _tipos_base_listagem,
 )
+from app.produtos_models import (
+    Categoria,
+    Departamento,
+    Marca,
+    Produto,
+    ProdutoBlingSync,
+    ProdutoImagem,
+    ProdutoLote,
+    ProdutoProtocoloDose,
+    ProdutoProtocoloRecorrencia,
+)
+from app.tenancy.context import tenant_context
 
 
 class _FakeQuery:
@@ -397,11 +415,12 @@ def test_buscar_pagina_produtos_listagem_aplica_total_ordenacao_e_paginacao():
     )
 
     assert produtos == [produto]
+    assert produtos is not query.rows
     assert total == 7
     assert query.count_calls == 1
     assert query.offset_arg == 20
     assert query.limit_arg == 10
-    assert len(load_options) == 5
+    assert load_options
     assert query.options_args == load_options
     assert query.order_by_args
 
@@ -714,17 +733,120 @@ def test_load_options_listagem_produtos_monta_lista_nova_com_relacionamentos_bas
     )
 
     assert opcoes is not outra_lista
-    assert len(opcoes) == 5
-    assert all(
-        str(opcao.path).startswith("ORM Path[Mapper[Produto(produtos)]")
-        for opcao in opcoes
+    opcoes.clear()
+    assert outra_lista
+
+
+@pytest.fixture
+def produto_com_relacionamentos_db():
+    engine = create_engine("sqlite://")
+    modelos = [
+        Departamento,
+        Categoria,
+        Marca,
+        Cliente,
+        Produto,
+        ProdutoImagem,
+        ProdutoLote,
+        ProdutoBlingSync,
+        ProdutoProtocoloRecorrencia,
+        ProdutoProtocoloDose,
+    ]
+    Base.metadata.create_all(engine, tables=[modelo.__table__ for modelo in modelos])
+    tenant_id = uuid4()
+    dados = [
+        (Departamento, {"nome": "Racoes", "user_id": 1}),
+        (Categoria, {"nome": "Gatos", "departamento_id": 1, "user_id": 1}),
+        (Marca, {"nome": "Marca de teste", "user_id": 1}),
+        (Cliente, {"nome": "Fornecedor", "tipo_pessoa": "PJ", "user_id": 1}),
+        (
+            Produto,
+            {
+                "codigo": "SKU-1",
+                "nome": "Produto de teste",
+                "categoria_id": 1,
+                "marca_id": 1,
+                "fornecedor_id": 1,
+                "user_id": 1,
+            },
+        ),
+        (ProdutoImagem, {"produto_id": 1, "url": "/uploads/produtos/teste.jpg"}),
+        (
+            ProdutoLote,
+            {
+                "produto_id": 1,
+                "nome_lote": "Lote de teste",
+                "quantidade_inicial": 10,
+                "quantidade_disponivel": 7,
+                "ordem_entrada": 1,
+            },
+        ),
+        (ProdutoBlingSync, {"produto_id": 1, "bling_produto_id": "bling-1"}),
+        (
+            ProdutoProtocoloRecorrencia,
+            {"produto_id": 1, "nome": "Vacinacao", "tipo": "protocolo_doses"},
+        ),
+        (
+            ProdutoProtocoloDose,
+            {"protocolo_id": 1, "numero_dose": 1, "dias_desde_inicio": 0},
+        ),
+    ]
+    with engine.begin() as connection:
+        for modelo, valores in dados:
+            connection.execute(
+                modelo.__table__.insert(), {"id": 1, "tenant_id": tenant_id, **valores}
+            )
+
+    consultas = []
+
+    def registrar_select(_connection, _cursor, statement, _parameters, _context, _many):
+        if statement.lstrip().upper().startswith("SELECT"):
+            consultas.append(statement)
+
+    event.listen(engine, "before_cursor_execute", registrar_select)
+    try:
+        with sessionmaker(bind=engine)() as db, tenant_context(tenant_id):
+            yield db, consultas
+    finally:
+        event.remove(engine, "before_cursor_execute", registrar_select)
+        engine.dispose()
+
+
+@pytest.mark.parametrize("incluir_imagens", [False, True])
+@pytest.mark.parametrize("incluir_lotes", [False, True])
+@pytest.mark.parametrize("incluir_bling_sync", [False, True])
+def test_load_options_listagem_produtos_carrega_dados_e_respeita_flags(
+    produto_com_relacionamentos_db, incluir_imagens, incluir_lotes, incluir_bling_sync
+):
+    db, consultas = produto_com_relacionamentos_db
+    opcoes = _load_options_listagem_produtos(
+        incluir_imagens=incluir_imagens,
+        incluir_lotes=incluir_lotes,
+        incluir_bling_sync=incluir_bling_sync,
     )
+    produto = db.query(Produto).options(*opcoes).one()
+    consultas_apos_carregar = len(consultas)
 
-
-def test_load_options_listagem_produtos_preserva_quantidade_ao_alternar_flags():
-    sem_imagens_com_lotes = _load_options_listagem_produtos(
-        incluir_imagens=False,
-        incluir_lotes=True,
+    assert produto.categoria.nome == "Gatos"
+    assert produto.marca.nome == "Marca de teste"
+    assert [protocolo.nome for protocolo in produto.protocolos_recorrencia] == [
+        "Vacinacao"
+    ]
+    assert [dose.numero_dose for dose in produto.protocolos_recorrencia[0].doses] == [1]
+    assert [imagem.url for imagem in produto.imagens] == (
+        ["/uploads/produtos/teste.jpg"] if incluir_imagens else []
     )
+    assert [lote.nome_lote for lote in produto.lotes] == (
+        ["Lote de teste"] if incluir_lotes else []
+    )
+    if incluir_bling_sync:
+        assert produto.bling_sync.bling_produto_id == "bling-1"
+    else:
+        assert produto.bling_sync is None
+    assert len(consultas) == consultas_apos_carregar
 
-    assert len(sem_imagens_com_lotes) == 5
+    # Departamento e fornecedor conservam o carregamento lazy padrao; o helper
+    # nao deve remover seus dados nem assumir que fazem parte do eager load.
+    assert _nome_area_produto(produto) == "Racoes"
+    assert produto.categoria.departamento.nome == "Racoes"
+    assert _fornecedor_nome_produto(produto) == "Fornecedor"

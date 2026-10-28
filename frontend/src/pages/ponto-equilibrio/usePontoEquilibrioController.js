@@ -11,8 +11,10 @@ import {
 import {
   buildInitialFilters,
   getStatusResumo,
+  indicadoresPontoEquilibrio,
   montarParametrosPontoEquilibrio,
 } from "./pontoEquilibrioUtils";
+import { temRentabilidadePendente } from "../../components/financeiro/vendasFinanceiro/rentabilidadePendente";
 
 export default function usePontoEquilibrioController() {
   const [filtros, setFiltros] = useState(buildInitialFilters);
@@ -26,17 +28,12 @@ export default function usePontoEquilibrioController() {
   const [detalhesLinha, setDetalhesLinha] = useState(null);
   const [loadingDetalhes, setLoadingDetalhes] = useState(false);
 
-  const percentualAtingido = Math.min(Number(dados?.percentual_atingido || 0), 100);
-  const margemUsadaPercentual = Number(
-    dados?.margem_usada_percentual ?? dados?.margem_contribuicao_percentual ?? 0,
-  );
-  const margemPeriodoPercentual = Number(
-    dados?.margem_periodo_percentual ?? dados?.margem_contribuicao_percentual ?? 0,
-  );
+  const { percentualAtingido, margemUsadaPercentual, margemPeriodoPercentual } =
+    indicadoresPontoEquilibrio(dados);
   const impactoValor = Number(impactoForm.valor || 0);
 
   const impactoSimulado = useMemo(() => {
-    if (!dados) return null;
+    if (!dados || temRentabilidadePendente(dados)) return null;
     return calcularImpactoPontoEquilibrio({
       despesasFixas: dados.despesas_fixas,
       pontoEquilibrio: dados.ponto_equilibrio,

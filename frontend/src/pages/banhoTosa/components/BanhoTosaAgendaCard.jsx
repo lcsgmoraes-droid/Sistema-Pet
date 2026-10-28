@@ -1,14 +1,20 @@
-import { CheckCircle2, XCircle } from "lucide-react";
-import ActionButton from "../../../components/ui/ActionButton";
+import { CheckCircle2 } from "lucide-react";
+import BotaoInteracao from "../../../components/v2/BotaoInteracao/BotaoInteracao";
+import BotaoCancelar from "../../../components/v2/BotaoCancelar/BotaoCancelar";
 import CustomerIdentity from "../../../components/ui/CustomerIdentity";
 import PetAvatar from "../../../components/ui/PetAvatar";
 import PetIdentity from "../../../components/ui/PetIdentity";
 import StatusBadge from "../../../components/ui/StatusBadge";
 import { formatCurrency } from "../banhoTosaUtils";
+import { formatarCreditos } from "../banhoTosaPacotesUtils";
 import BanhoTosaVetAlertas from "./BanhoTosaVetAlertas";
 
 export default function BanhoTosaAgendaCard({ agendamento, onCancelar, onCheckIn }) {
   const hora = String(agendamento.data_hora_inicio || "").slice(11, 16);
+  const coberturaPacote = (agendamento.servicos || []).reduce(
+    (total, item) => total + Number(item.pacote_quantidade || 0),
+    0,
+  );
   const podeCheckIn = !["cancelado", "entregue", "no_show", "em_atendimento"].includes(
     agendamento.status,
   );
@@ -36,16 +42,22 @@ export default function BanhoTosaAgendaCard({ agendamento, onCancelar, onCheckIn
             <CustomerIdentity
               className="mt-0.5 text-xs text-slate-500"
               codeLabel="Cod. tutor"
-              fallback={`Tutor #${agendamento.cliente_id || "-"}`}
+              fallback={"Tutor não informado"}
               nameClassName="font-medium text-slate-500"
               record={agendamento}
               showLabel
               label="Tutor"
             />
             <p className="mt-1 text-sm font-medium text-slate-700">
-              {agendamento.servicos?.[0]?.nome_servico_snapshot || "Banho & Tosa"} -{" "}
+              {agendamento.servicos?.[0]?.nome_servico_snapshot || "Banho & Tosa"} - Tabela:{" "}
               {formatCurrency(agendamento.valor_previsto)}
             </p>
+            {coberturaPacote > 0 && (
+              <p className="mt-1 text-xs font-semibold text-cyan-700 dark:text-cyan-300">
+                {formatarCreditos(coberturaPacote)} unidade(s) coberta(s) pelo pacote. Valores não
+                cobertos e táxi dog são cobrados à parte.
+              </p>
+            )}
             <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">
               {agendamento.recurso_nome
                 ? `${agendamento.recurso_nome} (${agendamento.recurso_tipo || "recurso"})`
@@ -63,25 +75,18 @@ export default function BanhoTosaAgendaCard({ agendamento, onCancelar, onCheckIn
 
       <div className="mt-3 flex flex-wrap gap-2">
         {podeCheckIn && (
-          <ActionButton
+          <BotaoInteracao
             icon={CheckCircle2}
-            intent="create"
             onClick={() => onCheckIn(agendamento)}
-            size="xs"
+            tamanho="pequeno"
           >
             Fazer check-in
-          </ActionButton>
+          </BotaoInteracao>
         )}
         {!["cancelado", "entregue", "no_show"].includes(agendamento.status) && (
-          <ActionButton
-            icon={XCircle}
-            intent="delete"
-            onClick={() => onCancelar(agendamento)}
-            size="xs"
-            tone="soft"
-          >
+          <BotaoCancelar onClick={() => onCancelar(agendamento)} tamanho="pequeno">
             Cancelar
-          </ActionButton>
+          </BotaoCancelar>
         )}
       </div>
     </div>

@@ -389,6 +389,17 @@ def obter_produto(
         "estoque_origem_nome": acesso_catalogo.empresa_origem_nome,
         "acesso_catalogo_completo": acesso_catalogo.compartilhado,
     }
+    # Publicacao/precos do iFood sao configuracoes da loja proprietaria.
+    # O acesso ao estoque compartilhado nao cria configuracao local de canal.
+    if acesso_catalogo.compartilhado:
+        response_data.update(
+            anunciar_ifood=False,
+            ifood_pausado=False,
+            preco_ifood=None,
+            preco_ifood_promo=None,
+            preco_ifood_promo_inicio=None,
+            preco_ifood_promo_fim=None,
+        )
 
     # ========================================
     # PROCESSAR PRODUTOS DO TIPO KIT ou VARIACAO-KIT
@@ -526,6 +537,22 @@ def atualizar_produto(
         )
     )
     tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
+    if (
+        acesso_catalogo.compartilhado
+        and {
+            "anunciar_ifood",
+            "ifood_pausado",
+            "preco_ifood",
+            "preco_ifood_promo",
+            "preco_ifood_promo_inicio",
+            "preco_ifood_promo_fim",
+        }
+        & produto_update.model_fields_set
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="O canal iFood pertence à loja de origem. Cadastre o produto nesta loja para configurar sua própria oferta.",
+        )
     set_current_tenant(tenant_id)
     identity_changed = bool(
         {"codigo", "codigo_barras", "codigos_barras_alternativos"}
@@ -817,7 +844,14 @@ def atualizar_produto(
             processar_alteracoes_inerentes,
         )
 
-        processar_alteracoes_inerentes(produto, dados_recebidos, db, current_user.id)
+        campos_inerentes_alterados = {
+            key: getattr(produto, key)
+            for key in dados_recebidos
+            if key in INHERENT_FIELDS and antes_historico[key] != getattr(produto, key)
+        }
+        processar_alteracoes_inerentes(
+            produto, campos_inerentes_alterados, db, current_user.id
+        )
 
         db.commit()
         db.refresh(produto)

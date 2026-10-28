@@ -11,6 +11,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateTable
 
+from app import especie_raca_mestre_models, produto_identidade_models  # noqa: F401
 from app.caixa.auditoria import assinatura_item
 from app.caixa.auditoria_routes import obter_auditoria_caixa
 from app.caixa_models import Caixa, MovimentacaoCaixa
@@ -225,9 +226,18 @@ def test_auditoria_completa_tem_consultas_limitadas_e_preserva_assinaturas(
             "assinatura": assinatura_item(item),
             "conferencia": None,
             "conferido": False,
+            "estado_conferencia": "pendente",
+            "conferencia_alterada": False,
         }
 
-    assert resultado["vendas"] == [com_conferencia(item) for item in esperados]
+    comerciais = {
+        item["venda_id"]: item
+        for item in resultado["resumo"]["vendas_periodo"]["detalhes"]
+    }
+    assert resultado["vendas"] == [
+        com_conferencia({**item, "composicao_comercial": comerciais[item["id"]]})
+        for item in esperados
+    ]
     pagamentos_esperados = [
         {
             **venda["pagamentos"][0],
@@ -240,9 +250,17 @@ def test_auditoria_completa_tem_consultas_limitadas_e_preserva_assinaturas(
         }
         for venda in esperados
     ]
-    assert resultado["pagamentos"] == [
-        com_conferencia(item) for item in pagamentos_esperados
-    ]
+    assert [
+        {campo: valor for campo, valor in item.items() if campo != "identificacao_pix"}
+        for item in resultado["pagamentos"]
+    ] == [com_conferencia(item) for item in pagamentos_esperados]
+    assert all(
+        item["identificacao_pix"]["estado"] == "nao_conferido"
+        and item["identificacao_pix"]["registro_id"] is None
+        and item["identificacao_pix"]["historico"] == []
+        and assinatura_item(item) == item["assinatura"]
+        for item in resultado["pagamentos"]
+    )
     assert resultado["resumo"]["total_vendido"] == quantidade * 10
     assert resultado["resumo"]["total_recebido"] == quantidade * 10
     assert resultado["movimentacoes"] == []
@@ -255,8 +273,8 @@ def test_auditoria_completa_tem_consultas_limitadas_e_preserva_assinaturas(
     assert len(selects) <= 30, (
         f"Auditoria de {quantidade} vendas gerou {len(selects)} SELECTs: {dict(tabelas)}"
     )
-    assert not any("FROM contas_receber" in statement for statement in selects), (
-        "A leitura dos pagamentos do caixa não deve carregar contas a receber."
+    assert sum("FROM contas_receber" in statement for statement in selects) <= 1, (
+        "A composição deve carregar contas em lote, sem uma consulta por venda."
     )
 
 
@@ -307,4 +325,10 @@ def test_resumo_compacto_preserva_valores_e_evitaria_movimentos_duplicados(
     assert len(auditoria["movimentacoes"]) == 1
     assert auditoria["movimentacoes"][0]["id"] == movimentos_completos[0]["id"]
     assert auditoria["vendas"][0]["pagamentos"] == esperados[0]["pagamentos"]
-    assert auditoria["vendas"][0]["assinatura"] == assinatura_item(esperados[0])
+    venda = auditoria["vendas"][0]
+    assert venda["assinatura"] == assinatura_item(venda)
+    assert venda["assinatura"] != assinatura_item(esperados[0])
+    assert (
+        venda["composicao_comercial"]
+        == auditoria["resumo"]["vendas_periodo"]["detalhes"][0]
+    )

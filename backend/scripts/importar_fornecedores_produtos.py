@@ -20,6 +20,7 @@ import re
 import sys
 import unicodedata
 from collections import defaultdict
+from contextlib import ExitStack
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -36,6 +37,8 @@ if str(BACKEND_ROOT) not in sys.path:
 from app.db import SessionLocal
 from app.models import Cliente, User
 from app.produtos_models import Marca, Produto, ProdutoFornecedor
+from app.tenancy.context import tenant_context
+from app.tenancy.rls import sync_rls_tenant
 
 
 PETS_MAR_MARCA = "Pets Mar"
@@ -206,6 +209,7 @@ def run(args: argparse.Namespace) -> None:
         raise RuntimeError(f"Arquivo CSV nao encontrado: {csv_path}")
 
     db = resolve_session(args.database_url)
+    tenant_scope = ExitStack()
     try:
         raw_rows = load_rows(csv_path)
         items = parse_items(raw_rows)
@@ -220,6 +224,8 @@ def run(args: argparse.Namespace) -> None:
         tenant_id = (
             UUID(args.tenant_id) if args.tenant_id else detect_tenant_id(db, items)
         )
+        tenant_scope.enter_context(tenant_context(tenant_id))
+        sync_rls_tenant(db, tenant_id)
 
         user = (
             db.query(User)
@@ -485,6 +491,7 @@ def run(args: argparse.Namespace) -> None:
 
     finally:
         db.close()
+        tenant_scope.close()
 
 
 def build_arg_parser() -> argparse.ArgumentParser:

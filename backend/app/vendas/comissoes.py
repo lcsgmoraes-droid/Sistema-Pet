@@ -29,7 +29,7 @@ def _listar_pagamentos_venda_para_comissao(db: Session, venda_id: int, tenant_id
     ).fetchall()
 
 
-def _pagamentos_liquidos_para_comissao(pagamentos):
+def _pagamentos_liquidos_para_comissao(pagamentos, *, total_venda=None):
     """Compensa o lote sem renumerar as parcelas históricas da comissão."""
     saldos_lotes = {}
     registros = []
@@ -50,12 +50,22 @@ def _pagamentos_liquidos_para_comissao(pagamentos):
             )
         registros.append((parcela, pagamento, valor, chave_lote))
 
+    disponivel = (
+        max(Decimal(str(total_venda)), Decimal("0"))
+        if total_venda is not None
+        else None
+    )
     for parcela, pagamento, valor, chave_lote in registros:
         if valor <= 0:
             continue
         if chave_lote is not None:
             valor = min(valor, max(saldos_lotes[chave_lote], Decimal("0")))
             saldos_lotes[chave_lote] -= valor
+        # O recebimento pode ter excedente justificado. A comissão é da venda,
+        # com teto compartilhado entre todas as parcelas, sem alterar o banco.
+        if disponivel is not None:
+            valor = min(valor, disponivel)
+            disponivel -= valor
         if valor > 0:
             yield parcela, pagamento, valor
 
@@ -101,6 +111,7 @@ def _gerar_comissoes_pendentes_venda(
     venda,
     tenant_id,
     trigger: str,
+    pagamento_ids: set[int] | None = None,
 ) -> dict:
     """Gera comissoes somente para pagamentos ainda sem comissao."""
     if not venda.funcionario_id:
@@ -126,19 +137,26 @@ def _gerar_comissoes_pendentes_venda(
         parcelas_com_comissao = _parcelas_com_comissao_funcionario(
             db, venda.id, venda.funcionario_id, tenant_id
         )
+        pagamentos_efetivos = []
+        recebido_anterior = Decimal("0")
+        for parcela, pagamento, valor in _pagamentos_liquidos_para_comissao(
+            todos_pagamentos, total_venda=venda.total
+        ):
+            pagamentos_efetivos.append((parcela, pagamento, valor, recebido_anterior))
+            recebido_anterior += valor
         pendente = next(
             (
-                (parcela, pagamento, valor)
-                for parcela, pagamento, valor in _pagamentos_liquidos_para_comissao(
-                    todos_pagamentos
-                )
-                if parcela not in parcelas_com_comissao and pagamento[0] not in tentados
+                (parcela, pagamento, valor, anterior)
+                for parcela, pagamento, valor, anterior in pagamentos_efetivos
+                if parcela not in parcelas_com_comissao
+                and pagamento[0] not in tentados
+                and (pagamento_ids is None or pagamento[0] in pagamento_ids)
             ),
             None,
         )
         if pendente is None:
             break
-        parcela_numero, pagamento_row, valor_pagamento = pendente
+        parcela_numero, pagamento_row, valor_pagamento, valor_pago_anterior = pendente
         tentados.add(pagamento_row[0])
         forma_pagamento = pagamento_row[1]
 
@@ -161,6 +179,7 @@ def _gerar_comissoes_pendentes_venda(
             parcela_numero=parcela_numero,
             db=db,
             tenant_id=tenant_id,
+            valor_pago_anterior=valor_pago_anterior,
         )
 
         if resultado and resultado.get("success") and not resultado.get("duplicated"):

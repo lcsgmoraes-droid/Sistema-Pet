@@ -6,7 +6,6 @@ import {
   FiBarChart2,
   FiCreditCard,
   FiDatabase,
-  FiGrid,
   FiHome,
   FiLayout,
   FiLogOut,
@@ -19,55 +18,81 @@ import {
 import { usePlatformAuth } from "../contexts/PlatformAuthContext";
 import ThemeToggle from "./theme/ThemeToggle";
 
-const navItems = [
+// Menu do OPS em grupos: o que cada tela faz fica claro antes de clicar.
+const navSections = [
   {
-    to: "/ops",
-    label: "Cockpit",
-    description: "Saude e alertas",
-    icon: FiHome,
-    end: true,
+    title: "Visão geral",
+    items: [
+      {
+        to: "/ops",
+        label: "Cockpit",
+        description: "Saúde e alertas",
+        icon: FiHome,
+        end: true,
+      },
+    ],
   },
   {
-    to: "/ops/incidentes",
-    label: "Incidentes",
-    description: "Tenant, rota e request",
-    icon: FiAlertTriangle,
+    title: "Clientes",
+    items: [
+      {
+        to: "/ops/lojas",
+        label: "Lojas",
+        description: "Módulos, usuários e agrupamento",
+        icon: FiUsers,
+      },
+      {
+        to: "/ops/tenants",
+        label: "Cobrança e implantação",
+        description: "Planos, propostas e catálogo",
+        icon: FiCreditCard,
+      },
+    ],
   },
   {
-    to: "/ops/tenants",
-    label: "Tenants",
-    description: "Clientes e catalogo",
-    icon: FiUsers,
+    title: "WhatsApp",
+    items: [
+      {
+        to: "/ops/consumo-whatsapp",
+        label: "Consumo de WhatsApp",
+        description: "Mensagens, custo e repasse",
+        icon: FiMessageSquare,
+      },
+      {
+        to: "/ops/creditos-whatsapp",
+        label: "Créditos de WhatsApp",
+        description: "Pacotes, pedidos e limites",
+        icon: FiCreditCard,
+      },
+    ],
   },
   {
-    to: "/ops/lojas",
-    label: "Lojas e módulos",
-    description: "Agrupamento e módulos ativos",
-    icon: FiGrid,
+    title: "Saúde da plataforma",
+    items: [
+      {
+        to: "/ops/incidentes",
+        label: "Incidentes",
+        description: "Loja, rota e requisição",
+        icon: FiAlertTriangle,
+      },
+      {
+        to: "/ops/observabilidade",
+        label: "Observabilidade",
+        description: "Erros e lentidão",
+        icon: FiActivity,
+      },
+    ],
   },
   {
-    to: "/ops/consumo-whatsapp",
-    label: "Consumo de WhatsApp",
-    description: "Mensagens, custo e repasse",
-    icon: FiMessageSquare,
-  },
-  {
-    to: "/ops/creditos-whatsapp",
-    label: "Créditos de WhatsApp",
-    description: "Pacotes, pedidos e limites",
-    icon: FiCreditCard,
-  },
-  {
-    to: "/ops/observabilidade",
-    label: "Observabilidade",
-    description: "Erros, lentidao e tenants",
-    icon: FiActivity,
-  },
-  {
-    to: "/ops/styleguide",
-    label: "Style Guide",
-    description: "Componentes e regras visuais",
-    icon: FiLayout,
+    title: "Desenvolvimento",
+    items: [
+      {
+        to: "/ops/styleguide",
+        label: "Style Guide",
+        description: "Componentes e regras visuais",
+        icon: FiLayout,
+      },
+    ],
   },
 ];
 
@@ -119,33 +144,39 @@ export default function OpsLayout() {
         </div>
 
         <nav className="flex-1 space-y-2 overflow-y-auto px-3 py-4">
-          <div className="px-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Operacao
-          </div>
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={({ isActive }) =>
-                  [
-                    "flex items-center gap-3 rounded-lg px-3 py-3 transition",
-                    isActive
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "text-slate-300 hover:bg-slate-900 hover:text-white",
-                  ].join(" ")
-                }
-              >
-                <Icon className="h-5 w-5 shrink-0" />
-                <span>
-                  <span className="block text-sm font-semibold">{item.label}</span>
-                  <span className="block text-xs text-current opacity-70">{item.description}</span>
-                </span>
-              </NavLink>
-            );
-          })}
+          {navSections.map((secao) => (
+            <div key={secao.title} className="space-y-1">
+              <div className="px-2 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                {secao.title}
+              </div>
+              {secao.items.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    className={({ isActive }) =>
+                      [
+                        "flex items-center gap-3 rounded-lg px-3 py-3 transition",
+                        isActive
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "text-slate-300 hover:bg-slate-900 hover:text-white",
+                      ].join(" ")
+                    }
+                  >
+                    <Icon className="h-5 w-5 shrink-0" />
+                    <span>
+                      <span className="block text-sm font-semibold">{item.label}</span>
+                      <span className="block text-xs text-current opacity-70">
+                        {item.description}
+                      </span>
+                    </span>
+                  </NavLink>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         <div className="border-t border-slate-800 p-4">

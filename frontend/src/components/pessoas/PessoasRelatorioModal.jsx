@@ -1,5 +1,6 @@
+import BuscaPessoa from "../v2/BuscaPessoa/BuscaPessoa";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, FileSpreadsheet, FileText, RefreshCw, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, FileSpreadsheet, FileText, RefreshCw, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { buscarPessoasParaRelatorio } from "../../api/clientes";
 import { useEscapeToClose } from "../../utils/modalEscape";
@@ -198,18 +199,12 @@ export default function PessoasRelatorioModal({
 
             <label className="block text-sm font-medium text-slate-700">
               Buscar dentro dos cadastros
-              <div className="relative mt-1">
-                <Search
-                  className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-                  aria-hidden="true"
-                />
-                <input
-                  className={`${campoClasse} mt-0 pl-9`}
-                  placeholder="Nome, documento ou telefone..."
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                />
-              </div>
+              <BuscaPessoa
+                value={busca}
+                onChange={setBusca}
+                showSuggestions={false}
+                placeholder="Código, nome, documento ou telefone..."
+              />
             </label>
 
             <section>

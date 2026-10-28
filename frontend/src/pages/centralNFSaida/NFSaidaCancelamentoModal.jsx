@@ -1,6 +1,10 @@
 import { XCircle } from "lucide-react";
 
 import CustomerIdentity from "../../components/ui/CustomerIdentity";
+import BotaoCancelar from "../../components/v2/BotaoCancelar/BotaoCancelar";
+import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
+import InputTextoLongo from "../../components/v2/InputTextoLongo/InputTextoLongo";
+import { obterPendenciaCancelamentoFiscal } from "../../utils/pdvFiscalStatus";
 
 export default function NFSaidaCancelamentoModal({
   modalCancelar,
@@ -11,74 +15,75 @@ export default function NFSaidaCancelamentoModal({
   cancelarNota,
 }) {
   if (!modalCancelar) return null;
+  const pendenciaFiscal = obterPendenciaCancelamentoFiscal({
+    ...modalCancelar,
+    status: modalCancelar.venda_status,
+    nfe_status: modalCancelar.status,
+  });
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="cancelar-nota-titulo"
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+    >
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full m-4">
         <div className="bg-red-50 border-b px-6 py-4 flex items-center gap-3">
           <XCircle className="w-6 h-6 text-red-600" />
-          <h3 className="text-xl font-bold text-gray-800">Cancelar Nota Fiscal</h3>
+          <h3 id="cancelar-nota-titulo" className="text-xl font-bold text-gray-800">
+            Cancelar Nota Fiscal
+          </h3>
         </div>
         <div className="p-6 space-y-4">
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
             <strong>Atenção:</strong> O cancelamento é irreversível e será enviado para a SEFAZ.
           </div>
+          {pendenciaFiscal && (
+            <div
+              role="alert"
+              className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-100"
+            >
+              <strong>{pendenciaFiscal.label}</strong>
+              {pendenciaFiscal.detalhe && <p className="mt-1">{pendenciaFiscal.detalhe}</p>}
+            </div>
+          )}
           <div>
             <p className="text-sm text-gray-600">
               <strong>Nota:</strong> #{modalCancelar.numero} — Série {modalCancelar.serie}
             </p>
             <p className="text-sm text-gray-600">
               <strong>Cliente:</strong>{" "}
-              <CustomerIdentity
-                code={
-                  modalCancelar.cliente?.codigo ||
-                  modalCancelar.cliente_id ||
-                  modalCancelar.cliente?.id
-                }
-                customer={modalCancelar.cliente}
-                fallback="N/A"
-                layout="inline"
-              />
+              <CustomerIdentity customer={modalCancelar.cliente} fallback="N/A" layout="inline" />
             </p>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Justificativa *</label>
-            <textarea
-              value={justificativa}
-              onChange={(event) => setJustificativa(event.target.value)}
-              placeholder="Digite o motivo do cancelamento (mínimo 15 caracteres)"
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
-            />
-            <p className="text-xs text-gray-500 mt-1">{justificativa.length}/15 caracteres</p>
-          </div>
+          <InputTextoLongo
+            label="Justificativa"
+            required
+            value={justificativa}
+            onChange={setJustificativa}
+            placeholder="Digite o motivo do cancelamento (mínimo 15 caracteres)"
+            linhas={4}
+            help={`${justificativa.length}/15 caracteres`}
+          />
           <div className="flex gap-2">
-            <button
+            <BotaoCancelar
               onClick={() => {
                 setModalCancelar(null);
                 setJustificativa("");
               }}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
               disabled={cancelando}
             >
               Voltar
-            </button>
-            <button
+            </BotaoCancelar>
+            <BotaoInteracao
               onClick={cancelarNota}
               disabled={cancelando || justificativa.length < 15}
-              className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              icon={XCircle}
+              loading={cancelando}
             >
-              {cancelando ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />{" "}
-                  Cancelando...
-                </>
-              ) : (
-                <>
-                  <XCircle className="w-5 h-5" /> Confirmar Cancelamento
-                </>
-              )}
-            </button>
+              {cancelando ? "Enviando..." : "Confirmar Cancelamento"}
+            </BotaoInteracao>
           </div>
         </div>
       </div>

@@ -1,3 +1,6 @@
+import { parametrosPeriodoDashboard, validarPeriodoDashboard } from "./dashboardPeriod.js";
+import { temRentabilidadePendente } from "../../components/financeiro/vendasFinanceiro/rentabilidadePendente.js";
+
 export function createEmptyDashboardSummary() {
   return {
     saldo_atual: 0,
@@ -38,10 +41,15 @@ export function getPeriodLabel(periodDays) {
 }
 
 export function getDashboardDetailPath(detail, periodDays = 30) {
-  const dias = Math.min(Math.max(Number(periodDays) || 30, 1), 366);
+  const dias = Math.min(Math.max(Number(periodDays?.dias || periodDays) || 30, 1), 366);
+  const params = new URLSearchParams(
+    periodDays && typeof periodDays === "object"
+      ? parametrosPeriodoDashboard(periodDays)
+      : { periodo_dias: dias },
+  );
   const paths = {
-    sales: `/financeiro/vendas?periodo_dias=${dias}`,
-    cashFlow: `/financeiro/fluxo-caixa?periodo_dias=${dias}`,
+    sales: `/financeiro/vendas?${params}`,
+    cashFlow: `/financeiro/fluxo-caixa?${params}`,
     receivableOpen: "/financeiro/contas-receber?filtro=em_aberto",
     payableOpen: "/financeiro/contas-pagar?filtro=em_aberto",
     receivableOverdue: "/financeiro/contas-receber?filtro=vencidas",
@@ -58,6 +66,14 @@ export function getDashboardDetailPath(detail, periodDays = 30) {
 }
 
 export function getDashboardPeriodFromSearch(searchParams, referenceDate = new Date()) {
+  const inicio = searchParams?.get?.("data_inicio");
+  const fim = searchParams?.get?.("data_fim");
+  if (inicio || fim) {
+    const resultado = validarPeriodoDashboard({ inicio, fim });
+    return resultado.erro
+      ? null
+      : { days: resultado.dias, start: inicio, end: fim, quickFilter: "personalizado" };
+  }
   const rawDays = Number(searchParams?.get?.("periodo_dias"));
   if (!Number.isInteger(rawDays) || rawDays < 1 || rawDays > 366) return null;
 
@@ -101,7 +117,8 @@ export function calculateDashboardIndicators(summary = createEmptyDashboardSumma
   const dueTodayPayable = numberValue(summary?.contas_pagar?.vence_hoje);
   const salesCount = numberValue(summary?.vendas_periodo?.quantidade);
   const unitsSold = numberValue(summary?.vendas_periodo?.unidades);
-  const salesProfit = numberValue(summary?.vendas_periodo?.lucro);
+  const salesProfitPending = temRentabilidadePendente(summary?.vendas_periodo);
+  const salesProfit = salesProfitPending ? null : numberValue(summary?.vendas_periodo?.lucro);
 
   return {
     inflows,
@@ -113,6 +130,7 @@ export function calculateDashboardIndicators(summary = createEmptyDashboardSumma
     dueTodayPayable,
     unitsSold,
     salesProfit,
+    salesProfitPending,
     cashMargin: inflows > 0 ? (cashResult / inflows) * 100 : null,
     expenseCoverage: outflows > 0 ? (inflows / outflows) * 100 : null,
     hasMovement: salesCount > 0 || inflows !== 0 || outflows !== 0,

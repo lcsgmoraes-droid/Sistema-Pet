@@ -675,13 +675,13 @@ test("dinheiro distingue recebido do aplicado e calcula troco mesmo sem valor de
   assert.equal(parcial.troco, null);
 });
 
-test("pix excedente nunca compoe valor aplicado e conserva valor recebido para revisao", () => {
+test("pix autorizado preserva valor integral e nao inventa troco nem trunca o recebimento", () => {
   const pagamento = montarPagamentoRecebido({
     formaPagamento: { id: 2, nome: "Pix", tipo: "pix" },
     valor: 29,
     valorRestante: 28.99,
   });
-  assert.equal(pagamento.valor, 28.99);
+  assert.equal(pagamento.valor, 29);
   assert.equal(pagamento.valor_recebido, 29);
   assert.equal(pagamento.troco, null);
 });
@@ -704,7 +704,9 @@ test("nao adiciona recebimento externo acima do restante, inclusive um centavo",
         bandeira: "Visa",
         operadora: { id: 4, max_parcelas: 12 },
       }),
-      "Valor excede o restante da venda (R$ 28,99). Ajuste o valor recebido antes de adicionar.",
+      ["crediario", "boleto"].includes(tipo)
+        ? "Valor excede o restante da venda (R$ 28,99). Ajuste o valor recebido antes de adicionar."
+        : "Valor excede o restante da venda (R$ 28,99). Revise o valor ou confirme a exceção com justificativa no painel antes de adicionar.",
     );
   }
   assert.equal(
@@ -864,7 +866,7 @@ test("monta itens e mensagem para confirmacao de estoque negativo", () => {
   );
 });
 
-test("monta pagamento de cartao com valor efetivo limitado ao restante", () => {
+test("monta pagamento de cartao integral para excecao explicita, sem troco", () => {
   const pagamento = montarPagamentoRecebido({
     formaPagamento: {
       id: 2,
@@ -887,7 +889,7 @@ test("monta pagamento de cartao com valor efetivo limitado ao restante", () => {
     forma_id: 2,
     forma_pagamento_id: 2,
     nome: "Credito",
-    valor: 100,
+    valor: 150,
     bandeira: "Visa",
     nsu_cartao: "123456",
     operadora_id: 7,
@@ -1043,6 +1045,32 @@ test("monta itens e payload para analise de margem", () => {
   );
 });
 
+test("analise do pagamento preserva valor digitado e origens dos descontos", () => {
+  const payload = montarPayloadAnaliseMargem({
+    venda: {
+      itens: [
+        { produto_id: 1, quantidade: 1.538, preco_unitario: 13, subtotal: 19, desconto_valor: 1 },
+      ],
+      desconto_venda_valor: 2,
+      cupom_discount_applied: 1,
+      desconto_valor: 4,
+    },
+  });
+  assert.deepEqual(payload.items, [
+    {
+      produto_id: 1,
+      quantidade: 1.538,
+      preco_venda: 13,
+      subtotal: 19,
+      desconto_item: 1,
+      custo: null,
+    },
+  ]);
+  assert.equal(payload.desconto_venda_valor, 2);
+  assert.equal(payload.cupom_discount_applied, 1);
+  assert.equal(payload.desconto, 4);
+});
+
 test("monta pagamentos de margem ignorando cashback novo", () => {
   const pagamentos = montarPagamentosMargem({
     pagamentosExistentes: [{ id: 1, valor: 20 }],
@@ -1164,6 +1192,51 @@ test("persistencia entrega total do servidor para revisar pagamentos antes da fi
   assert.deepEqual(retornos, [criada, atualizada]);
 });
 
+test("pagamento da venda iFood existente preserva DELIVERY sem PUT previo ou entregador inventado", async () => {
+  const venda = { id: 42, canal: "ifood", tem_entrega: true, entregador_id: null, total: 65 };
+  const chamadas = [];
+  const id = await persistirVendaAbertaParaPagamento({
+    vendaParaPersistir: venda,
+    payloadVenda: { tem_entrega: true, entregador_id: null },
+    criarVenda: async () => chamadas.push("criar"),
+    atualizarVenda: async () => chamadas.push("atualizar"),
+    onVendaPersistida: () => chamadas.push("snapshot"),
+  });
+  assert.equal(id, 42);
+  assert.deepEqual(chamadas, []);
+  assert.equal(venda.tem_entrega, true);
+  assert.equal(venda.entregador_id, null);
+});
+
+test("pagamento iFood sem venda vinculada nao cria venda generica nem reutiliza outro id", async () => {
+  let chamadas = 0;
+  await assert.rejects(
+    persistirVendaAbertaParaPagamento({
+      vendaParaPersistir: { canal: "ifood", tem_entrega: true },
+      vendaIdPersistida: 999,
+      criarVenda: async () => chamadas++,
+      atualizarVenda: async () => chamadas++,
+    }),
+    /Abra a venda existente do pedido iFood/,
+  );
+  assert.equal(chamadas, 0);
+});
+
+test("pagamentos app e ecommerce continuam persistindo a venda antes de finalizar", async () => {
+  const chamadas = [];
+  for (const canal of ["app", "ecommerce"]) {
+    await persistirVendaAbertaParaPagamento({
+      vendaParaPersistir: { id: 42, canal, tem_entrega: true, entregador_id: 77 },
+      payloadVenda: { tem_entrega: true, entregador_id: 77 },
+      atualizarVenda: async (id, payload) => chamadas.push({ id, payload }),
+    });
+  }
+  assert.deepEqual(chamadas, [
+    { id: 42, payload: { tem_entrega: true, entregador_id: 77 } },
+    { id: 42, payload: { tem_entrega: true, entregador_id: 77 } },
+  ]);
+});
+
 test("monta pagamento a vista com a forma cadastrada no tenant", () => {
   assert.deepEqual(montarPagamentoAVista(99.9, 42), [
     { forma_pagamento_id: 42, valor: 99.9, parcelas: 1 },
@@ -1193,7 +1266,7 @@ test("valida pagamento antes de adicionar", () => {
       valor: 179.9,
       valorRestante: 0,
     }),
-    "Esta venda já está totalmente paga",
+    "Esta venda já está totalmente paga. Remova ou revise um pagamento antes de adicionar outro.",
   );
 
   assert.equal(

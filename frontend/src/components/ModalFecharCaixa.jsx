@@ -1,29 +1,23 @@
-import { useState, useEffect } from "react";
+import { useRef, useState } from "react";
 import { AlertCircle, X } from "lucide-react";
-import {
-  baixarPdfCaixa,
-  fecharCaixa,
-  obterResumoCaixa,
-  obterVendasCaixa,
-  validarCaixaAtual,
-} from "../api/caixa";
+import { baixarPdfCaixa, fecharCaixa, obterResumoCaixa, validarCaixaAtual } from "../api/caixa";
 import ModalFecharCaixaContent from "./caixa/ModalFecharCaixaContent";
 import ImpressaoTermicaCaixa from "./caixa/ImpressaoTermicaCaixa";
 import { atualizarObservacaoComContagem } from "../utils/caixaContagem";
+import useConferenciaFechamento from "./caixa/useConferenciaFechamento";
 
 export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
-  const [resumo, setResumo] = useState(null);
+  const [leitura, setLeitura] = useState(null);
+  const resumo = leitura?.id === caixaId ? leitura.resumo : null;
+  const setResumo = (dados) => setLeitura({ id: caixaId, resumo: dados });
   const [valorContado, setValorContado] = useState(0);
   const [observacoes, setObservacoes] = useState("");
-  const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
+  const fechamentoEmAndamento = useRef(false);
   const [erro, setErro] = useState(null);
   const [sucesso, setSucesso] = useState(false);
   const [imprimirRelatorio, setImprimirRelatorio] = useState(false);
   const [mostrarContagem, setMostrarContagem] = useState(false);
-  const [formaExpandida, setFormaExpandida] = useState(null);
-  const [vendasDetalhe, setVendasDetalhe] = useState({});
-  const [loadingVendas, setLoadingVendas] = useState(null);
   const [confirmandoDiferenca, setConfirmandoDiferenca] = useState(false);
   const [mostrarDicasDiferenca, setMostrarDicasDiferenca] = useState(false);
   const [notas, setNotas] = useState({
@@ -36,25 +30,10 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
     moedas: "",
   });
 
-  useEffect(() => {
-    carregarResumo();
-  }, [caixaId]);
-
-  const carregarResumo = async () => {
-    try {
-      setErro(null);
-      await validarCaixaAtual(caixaId);
-      const data = await obterResumoCaixa(caixaId);
-      setResumo(data);
-      // Campo vazio — o funcionário deve contar e preencher manualmente
-      setValorContado(0);
-    } catch (error) {
-      console.error("Erro ao carregar resumo:", error);
-      setErro("Não foi possível carregar os dados do caixa. Feche e tente novamente.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const conferencia = useConferenciaFechamento(caixaId, {
+    onResumo: setResumo,
+    bloqueado: salvando || sucesso,
+  });
 
   const calcularDiferenca = () => {
     if (!resumo || valorContado === null || valorContado === undefined) return 0;
@@ -84,30 +63,6 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
     setNotas((prev) => ({ ...prev, moedas: valor }));
   };
 
-  const carregarVendasForma = async (forma) => {
-    if (formaExpandida === forma) {
-      setFormaExpandida(null);
-      return;
-    }
-    setFormaExpandida(forma);
-    if (vendasDetalhe[forma]) return;
-    setLoadingVendas(forma);
-    try {
-      if (!sucesso) await validarCaixaAtual(caixaId);
-      const data = await obterVendasCaixa(caixaId, forma);
-      setVendasDetalhe((prev) => ({ ...prev, [forma]: data }));
-    } catch (err) {
-      console.error("Erro ao carregar vendas:", err);
-      setVendasDetalhe((prev) => ({ ...prev, [forma]: [] }));
-      setErro(
-        (prev) =>
-          prev || err.response?.data?.detail || err.message || "Erro ao carregar vendas do caixa.",
-      );
-    } finally {
-      setLoadingVendas(null);
-    }
-  };
-
   const aplicarContagem = () => {
     const total = calcularTotalNotas();
     setValorContado(total);
@@ -133,19 +88,36 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
       return;
     }
 
-    const dif = calcularDiferenca();
-    if (Math.abs(dif) > 0.01 && !confirmandoDiferenca) {
-      setConfirmandoDiferenca(true);
-      return;
-    }
-
     await executarFechamento();
   };
 
   const executarFechamento = async () => {
+    if (
+      fechamentoEmAndamento.current ||
+      salvando ||
+      conferencia.salvando ||
+      conferencia.atualizando
+    )
+      return;
+    fechamentoEmAndamento.current = true;
     setSalvando(true);
     setErro(null);
     try {
+      // Conferir o saldo atual antes de confirmar a diferença ou fechar.
+      const leitura = await conferencia.atualizar();
+      if (!leitura) {
+        setErro("Não foi possível atualizar o caixa antes do fechamento. Tente novamente.");
+        return;
+      }
+      const resumoAtual = leitura.resumo;
+      const saldoMudou = resumoAtual.totais.saldo_atual !== resumo.totais.saldo_atual;
+      if (
+        Math.abs(valorContado - resumoAtual.totais.saldo_atual) > 0.01 &&
+        (!confirmandoDiferenca || saldoMudou)
+      ) {
+        setConfirmandoDiferenca(true);
+        return;
+      }
       await validarCaixaAtual(caixaId);
       const caixaFechado = await fecharCaixa(caixaId, {
         valor_informado: valorContado,
@@ -153,7 +125,7 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
       });
 
       const resumoFechado = await obterResumoCaixa(caixaId).catch(() => ({
-        ...resumo,
+        ...resumoAtual,
         caixa: caixaFechado,
       }));
       setResumo(resumoFechado);
@@ -164,11 +136,12 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
         error.response?.data?.detail || error.message || "Erro ao fechar caixa. Tente novamente.";
       setErro(mensagem);
     } finally {
+      fechamentoEmAndamento.current = false;
       setSalvando(false);
     }
   };
 
-  if (loading) {
+  if (conferencia.inicial) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
@@ -184,7 +157,7 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
     const mensagemErroResumo =
       erro && /Ã|â/.test(erro)
         ? "Nao foi possivel carregar os dados do caixa. Feche e tente novamente."
-        : erro;
+        : erro || conferencia.erro;
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -239,18 +212,16 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
       <ModalFecharCaixaContent
         {...{
           calcularTotalNotas,
+          conferencia,
           atualizarQuantidadeNota,
           atualizarValorMoedas,
           aplicarContagem,
           limparContagem,
-          carregarVendasForma,
           confirmandoDiferenca,
           diferenca,
           erro,
           executarFechamento,
-          formaExpandida,
           handleFechar,
-          loadingVendas,
           mostrarContagem,
           mostrarDicasDiferenca,
           notas,
@@ -265,14 +236,12 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
           resumo,
           salvando,
           setConfirmandoDiferenca,
-          setFormaExpandida,
           setMostrarContagem,
           setMostrarDicasDiferenca,
           setObservacoes,
           setValorContado,
           sucesso,
           valorContado,
-          vendasDetalhe,
         }}
       />
       <ImpressaoTermicaCaixa

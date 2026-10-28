@@ -752,6 +752,23 @@ def start_background_jobs() -> None:
         except Exception:
             logger.exception("[ERROR] Erro ao iniciar Campaign Scheduler")
 
+        if _campaign_scheduler is not None and _campaign_scheduler.scheduler.running:
+            try:
+                from app.integrations.ifood.financial_poller import (
+                    register_financial_poll_job,
+                )
+
+                register_financial_poll_job(_campaign_scheduler.scheduler)
+            except Exception:
+                logger.exception("[IFOOD] Falha ao registrar consulta Financial DEV")
+
+            try:
+                from app.integrations.ifood.stock_sync import register_stock_sync_job
+
+                register_stock_sync_job(_campaign_scheduler.scheduler)
+            except Exception:
+                logger.exception("[IFOOD] Falha ao registrar estoque automatico")
+
         if _env_bool("BLING_SYNC_SCHEDULER_ENABLED", True):
             try:
                 from app.schedulers.bling_sync_scheduler import BlingSyncScheduler

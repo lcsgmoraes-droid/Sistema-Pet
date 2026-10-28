@@ -1,6 +1,7 @@
 import { campaignAllowsSaleChannel } from "../utils/campaignChannelScope.js";
 import { formatMoneyBRL } from "../utils/formatters.js";
 import { arredondarDinheiro } from "../utils/pdvCarrinhoItensUtils.js";
+import { CANAL_IFOOD, normalizeSalesChannel } from "../utils/salesChannel.js";
 
 const centavos = (valor) => Math.round(arredondarDinheiro(valor) * 100);
 
@@ -221,6 +222,16 @@ export async function persistirVendaAbertaParaPagamento({
   onVendaPersistida,
 }) {
   const vendaId = vendaParaPersistir.id || vendaIdPersistida;
+
+  if (normalizeSalesChannel(vendaParaPersistir.canal) === CANAL_IFOOD) {
+    const idExistente = Number(vendaParaPersistir.id);
+    if (!Number.isSafeInteger(idExistente) || idExistente <= 0) {
+      throw new Error("Abra a venda existente do pedido iFood antes de registrar o pagamento.");
+    }
+    // O pedido importado e imutavel. O finalizador valida novamente o vinculo,
+    // os itens, a entrega e o pagamento no servidor antes de qualquer baixa.
+    return idExistente;
+  }
 
   if (vendaId) {
     const atualizada = await atualizarVenda(vendaId, payloadVenda);
@@ -540,7 +551,13 @@ export function montarPagamentoRecebido({
   const ehCreditoCliente = formaPagamento.nome === "Crédito Cliente" || tipo === "credito_cliente";
   const ehCashback = formaPagamento.id === "cashback" || tipo === "cashback";
   const recebido = Math.max(0, centavos(valor));
-  const aplicado = Math.min(recebido, Math.max(0, centavos(valorRestante)));
+  // Somente dinheiro separa o valor entregue do aplicado e devolve troco.
+  // Nas demais formas monetárias o valor é integral; a validação exige
+  // autorização explícita para excedentes. Benefícios respeitam o saldo.
+  const aplicado =
+    tipo === "dinheiro" || ehCreditoCliente || ehCashback
+      ? Math.min(recebido, Math.max(0, centavos(valorRestante)))
+      : recebido;
   const troco = tipo === "dinheiro" ? recebido - aplicado : 0;
 
   return {
@@ -587,6 +604,7 @@ export function validarPagamentoParaAdicionar({
   numeroParcelas = 1,
   parcelasDisponiveis = [],
   cliente = null,
+  excedenteAutorizado = false,
 }) {
   if (!formaPagamento) {
     return "Selecione uma forma de pagamento";
@@ -594,21 +612,31 @@ export function validarPagamentoParaAdicionar({
 
   const valorNumerico = Number(valor || 0);
 
-  if (valorNumerico <= 0) {
+  if (!Number.isFinite(valorNumerico) || valorNumerico <= 0) {
     return "Informe o valor recebido";
   }
 
+  const permiteExcecao =
+    !["dinheiro", "credito_cliente", "cashback", "crediario", "boleto"].includes(
+      formaPagamento.tipo,
+    ) && !["credito_cliente", "cashback"].includes(formaPagamento.id);
+  const permiteExcedente = excedenteAutorizado && permiteExcecao;
+  const orientacaoExcecao =
+    "Revise o valor ou confirme a exceção com justificativa no painel antes de adicionar.";
   if (valorRestante !== undefined && Math.round(Number(valorRestante) * 100) <= 0) {
-    return "Esta venda já está totalmente paga";
+    return "Esta venda já está totalmente paga. Remova ou revise um pagamento antes de adicionar outro.";
   }
 
   if (
     formaPagamento.tipo !== "dinheiro" &&
+    !permiteExcedente &&
     valorRestante !== undefined &&
     centavos(valorNumerico) > centavos(valorRestante)
   ) {
     const mensagem = `Valor excede o restante da venda (${formatMoneyBRL(valorRestante)})`;
-    return ["credito_cliente", "cashback"].includes(formaPagamento.id)
+    if (permiteExcecao) return `${mensagem}. ${orientacaoExcecao}`;
+    return ["credito_cliente", "cashback"].includes(formaPagamento.id) ||
+      ["credito_cliente", "cashback"].includes(formaPagamento.tipo)
       ? mensagem
       : `${mensagem}. Ajuste o valor recebido antes de adicionar.`;
   }
@@ -693,6 +721,10 @@ export function montarItensAnaliseMargem(itens = []) {
     produto_id: item.produto_id,
     quantidade: item.quantidade,
     preco_venda: item.preco_unitario || item.preco_venda || 0,
+    ...(item.subtotal != null ? { subtotal: item.subtotal } : {}),
+    ...(item.desconto_valor != null || item.desconto_item != null
+      ? { desconto_item: item.desconto_valor ?? item.desconto_item }
+      : {}),
     custo: item.custo || null,
   }));
 }
@@ -748,6 +780,12 @@ export function montarPagamentosMargem({ pagamentosExistentes = [], pagamentos =
 export function montarPayloadAnaliseMargem({ venda = {}, formasPagamento = [] }) {
   return {
     items: montarItensAnaliseMargem(venda.itens || []),
+    ...(venda.desconto_venda_valor != null
+      ? {
+          desconto_venda_valor: venda.desconto_venda_valor,
+          cupom_discount_applied: venda.cupom_discount_applied ?? null,
+        }
+      : {}),
     formas_pagamento: formasPagamento,
     desconto: venda.desconto_valor || 0,
     taxa_entrega: venda.entrega?.taxa_entrega_total || 0,

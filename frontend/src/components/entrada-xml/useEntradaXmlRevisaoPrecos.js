@@ -31,6 +31,7 @@ export default function useEntradaXmlRevisaoPrecos({
   setMostrarVisualizacao,
   setNotaSelecionada,
   toast,
+  validarPackAntesDeProcessar,
 }) {
   const [mostrarRevisaoPrecos, setMostrarRevisaoPrecos] = useState(false);
   const [previewProcessamento, setPreviewProcessamento] = useState(null);
@@ -113,6 +114,12 @@ export default function useEntradaXmlRevisaoPrecos({
 
   const processarNota = async (notaId) => {
     try {
+      const nota =
+        notaSelecionada?.id === notaId
+          ? notaSelecionada
+          : (await api.get(`/notas-entrada/${notaId}`)).data;
+      if (!validarPackAntesDeProcessar(nota)) return;
+
       if (notaSelecionada?.id === notaId) {
         const conferenciaSalva = await salvarConferenciaAtual({ silencioso: true });
         if (!conferenciaSalva) {
@@ -173,6 +180,14 @@ export default function useEntradaXmlRevisaoPrecos({
   const confirmarProcessamento = async () => {
     setLoading(true);
     try {
+      const nota =
+        notaSelecionada?.id === previewProcessamento?.nota_id
+          ? notaSelecionada
+          : (await api.get(`/notas-entrada/${previewProcessamento.nota_id}`)).data;
+      if (!validarPackAntesDeProcessar(nota)) {
+        setMostrarRevisaoPrecos(false);
+        return;
+      }
       const acoesRealizadas = previewProcessamento?.acoes_processamento_realizadas || {};
       const acaoPendenteSelecionada = (acao) =>
         Boolean(acoesProcessamento[acao]) && !acoesRealizadas[acao];

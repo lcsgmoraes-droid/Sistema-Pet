@@ -15,7 +15,16 @@ function validateSourcePath(path) {
 }
 
 // Execute actual component handlers with isolated hooks and mocked imports, without a DOM.
-export function createControllerHarness(componentPath, { mocks, props, globals = {} }) {
+export function createControllerHarness(
+  componentPath,
+  {
+    mocks,
+    props,
+    globals = {},
+    exportName = "default",
+    invoke = (Controller, currentProps) => Controller(currentProps),
+  },
+) {
   const slots = [];
   const cache = new Map();
   let index = 0;
@@ -29,6 +38,14 @@ export function createControllerHarness(componentPath, { mocks, props, globals =
     previous.length === next.length &&
     previous.every((value, i) => Object.is(value, next[i]));
   const hooks = {
+    createContext(value) {
+      return { Provider: "context-provider", value };
+    },
+    useId() {
+      const slot = index++;
+      if (!slots[slot]) slots[slot] = { value: `controller-id-${slot}` };
+      return slots[slot].value;
+    },
     useState(initial) {
       const slot = index++;
       if (!slots[slot])
@@ -48,6 +65,16 @@ export function createControllerHarness(componentPath, { mocks, props, globals =
       const slot = index++;
       if (!slots[slot]) slots[slot] = { current: initial };
       return slots[slot];
+    },
+    useMemo(calculate, dependencies) {
+      const slot = index++;
+      if (!sameDependencies(slots[slot]?.dependencies, dependencies)) {
+        slots[slot] = { dependencies, value: calculate() };
+      }
+      return slots[slot].value;
+    },
+    useCallback(callback, dependencies) {
+      return hooks.useMemo(() => callback, dependencies);
     },
     useEffect(effect, dependencies) {
       const slot = index++;
@@ -99,12 +126,12 @@ export function createControllerHarness(componentPath, { mocks, props, globals =
     })(requireMock, module, module.exports, ...Object.values(globals));
     return module.exports;
   }
-  const Controller = loadModule(componentPath).default;
+  const Controller = loadModule(componentPath)[exportName];
   function render() {
     index = 0;
     dirty = false;
     effects = [];
-    tree = Controller(currentProps);
+    tree = invoke(Controller, currentProps);
     effects.forEach((effect) => effect());
   }
   async function settle() {
@@ -129,6 +156,12 @@ export function createControllerHarness(componentPath, { mocks, props, globals =
       currentProps = { ...currentProps, ...update };
       render();
       await settle();
+    },
+    unmount() {
+      for (const slot of slots) {
+        slot?.cleanup?.();
+        if (slot) slot.cleanup = undefined;
+      }
     },
   };
 }

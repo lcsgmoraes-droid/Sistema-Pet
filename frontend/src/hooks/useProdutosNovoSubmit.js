@@ -4,6 +4,7 @@ import { createProduto, previewPrecosVendaProdutosCompostos, updateProduto } fro
 import { normalizarCodigosBarrasAlternativosPayload } from "../pages/produtosFormUtils";
 import { debugLog } from "../utils/debug";
 import { normalizeMarkdownContent } from "../utils/safeMarkdown";
+import { serializarDataHoraIfood } from "../components/produto/ifoodProdutoDates";
 import {
   montarProtocolosRecorrenciaPayload,
   validarProtocolosRecorrencia,
@@ -90,7 +91,7 @@ export default function useProdutosNovoSubmit({
       fecharPreviewPrecosCompostos();
     } catch (error) {
       console.error("Erro ao salvar produto:", error);
-      alert(error.response?.data?.detail || "Erro ao salvar produto");
+      alert(error.response?.data?.detail || error.message || "Erro ao salvar produto");
     } finally {
       setSalvando(false);
     }
@@ -154,6 +155,11 @@ export default function useProdutosNovoSubmit({
       setSalvando(true);
       const skuNormalizado = (formData.sku || formData.codigo || "").trim().toUpperCase();
       const descricaoNormalizada = normalizeMarkdownContent(formData.descricao);
+      // O editor exibe texto normalizado, mas abrir/salvar outra aba não deve reescrever o original.
+      const preservarDescricaoOriginal =
+        isEdicao &&
+        formData.descricao_curta !== undefined &&
+        normalizeMarkdownContent(formData.descricao_curta) === descricaoNormalizada;
       const produtoEhServico = formData.tipo === "servico";
 
       const composicaoKitNormalizada = (formData.composicao_kit || []).map((item) => ({
@@ -170,11 +176,32 @@ export default function useProdutosNovoSubmit({
         formData.tipo_produto === "KIT" ||
         (formData.tipo_produto === "VARIACAO" && formData.tipo_kit);
 
+      // O cadastro compartilhado pertence a outra loja: os campos do canal
+      // nunca devem substituir a seleção e os preços da empresa de origem.
+      const camposIfood = formData.estoque_compartilhado
+        ? {}
+        : {
+            anunciar_ifood: Boolean(formData.anunciar_ifood),
+            ifood_pausado: Boolean(formData.ifood_pausado),
+            preco_ifood:
+              formData.preco_ifood === "" || formData.preco_ifood == null
+                ? null
+                : Number(formData.preco_ifood),
+            preco_ifood_promo:
+              formData.preco_ifood_promo === "" || formData.preco_ifood_promo == null
+                ? null
+                : Number(formData.preco_ifood_promo),
+            preco_ifood_promo_inicio: serializarDataHoraIfood(formData.preco_ifood_promo_inicio),
+            preco_ifood_promo_fim: serializarDataHoraIfood(formData.preco_ifood_promo_fim),
+          };
+
       const dados = {
         codigo: skuNormalizado,
         nome: formData.nome,
         tipo: formData.tipo || "produto",
-        descricao_curta: descricaoNormalizada || null,
+        descricao_curta: preservarDescricaoOriginal
+          ? formData.descricao_curta
+          : descricaoNormalizada || null,
         codigo_barras: formData.codigo_barras || null,
         gtin_ean: formData.gtin_ean || null,
         gtin_ean_tributario: formData.gtin_ean_tributario || null,
@@ -201,11 +228,14 @@ export default function useProdutosNovoSubmit({
         preco_app_promo_fim: formData.preco_app_promo_fim || null,
         anunciar_ecommerce: lojaFisicaAtiva ? Boolean(formData.anunciar_ecommerce) : false,
         anunciar_app: lojaFisicaAtiva ? Boolean(formData.anunciar_app) : false,
+        ...camposIfood,
         controle_lote: produtoEhServico ? false : formData.controle_lote || false,
         estoque_minimo:
           !produtoEhServico && formData.estoque_minimo ? parseInt(formData.estoque_minimo) : 0,
         estoque_maximo:
-          !produtoEhServico && formData.estoque_maximo ? parseInt(formData.estoque_maximo) : null,
+          !produtoEhServico && formData.estoque_maximo !== "" && formData.estoque_maximo != null
+            ? parseInt(formData.estoque_maximo)
+            : null,
         participa_sugestao_compra:
           produtoEhServico || produtoEhGranel
             ? false
@@ -310,7 +340,7 @@ export default function useProdutosNovoSubmit({
       navigate("/produtos");
     } catch (error) {
       console.error("Erro ao salvar produto:", error);
-      alert(error.response?.data?.detail || "Erro ao salvar produto");
+      alert(error.response?.data?.detail || error.message || "Erro ao salvar produto");
     } finally {
       setSalvando(false);
     }

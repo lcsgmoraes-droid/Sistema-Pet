@@ -3,6 +3,7 @@ import {
   compararPeriodosDRE,
   dadosCorrespondemParametrosDRE,
   extrairIndicadoresDRE,
+  formatarComparativoDRE,
   obterParametrosMesAnterior,
 } from "./analiseInteligenteUtils.js";
 
@@ -93,3 +94,32 @@ assert.equal(
 );
 
 console.log("Análise Inteligente da DRE canônica validada com sucesso.");
+
+const pendenteIfood = {
+  ...atual,
+  rentabilidade_status: "pending_ifood_financial",
+  vendas_rentabilidade_pendente: 1,
+  totais: { ...atual.totais, lucro_liquido: null, margem_liquida: null },
+};
+const indicadoresPendentes = extrairIndicadoresDRE(pendenteIfood);
+assert.equal(indicadoresPendentes.receitaBruta, 1200);
+assert.equal(indicadoresPendentes.cmv, 300);
+assert.equal(indicadoresPendentes.lucroLiquido, null);
+assert.equal(indicadoresPendentes.lucroBruto, null);
+assert.equal(indicadoresPendentes.margemLiquida, null);
+assert.equal(indicadoresPendentes.despesasOperacionais, null);
+assert.deepEqual(compararPeriodosDRE(atual, pendenteIfood).lucro, {
+  atual: 350,
+  anterior: null,
+  variacao: null,
+});
+assert.deepEqual(compararPeriodosDRE(pendenteIfood, anterior).margem, {
+  atual: null,
+  anterior: 30,
+  variacao: null,
+});
+assert.equal(extrairIndicadoresDRE({ totais: { lucro_liquido: 0 } }).lucroLiquido, 0);
+assert.equal(formatarComparativoDRE(null, "lucro"), "Pendente iFood");
+assert.equal(formatarComparativoDRE(null, "margem"), "Pendente iFood");
+assert.equal(formatarComparativoDRE(0, "lucro"), "R$ 0,00");
+assert.equal(formatarComparativoDRE(0, "margem"), "0,00%");

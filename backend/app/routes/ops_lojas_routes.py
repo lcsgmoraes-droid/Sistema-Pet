@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.db import get_session
 from app.platform_auth import require_platform_admin
 from app.platform_auth_models import PlatformAdmin
+from app.services.ops_lojas_detalhe_service import detalhe_da_loja
 from app.services.ops_lojas_modulos_service import (
     OpsLojaError,
     alterar_modulo,
@@ -48,6 +49,19 @@ def historico_da_loja(
 ) -> dict[str, Any]:
     """Quem alterou o que nesta loja, quando e o valor anterior."""
     return {"items": listar_historico(db, tenant_id=tenant_id, limite=limite)}
+
+
+@router.get("/{tenant_id}")
+def detalhe(
+    tenant_id: str,
+    _admin: PlatformAdmin = Depends(require_platform_admin),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Tudo sobre uma loja: dados, grupo, módulos ativos e quem tem acesso."""
+    try:
+        return detalhe_da_loja(db, tenant_id)
+    except OpsLojaError as erro:
+        raise HTTPException(status_code=erro.status_code, detail=str(erro)) from erro
 
 
 def _alterar(

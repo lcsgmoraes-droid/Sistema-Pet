@@ -1,4 +1,5 @@
-import { RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
+import BuscaProduto from "../../components/v2/BuscaProduto/BuscaProduto";
+import { RefreshCw, SlidersHorizontal, X } from "lucide-react";
 import CurrencyInput from "../../components/CurrencyInput";
 
 const ORDER_OPTIONS = [
@@ -115,19 +116,12 @@ export default function EcommerceCatalogControls({
         }}
       >
         <div style={{ minWidth: 0, position: "relative" }}>
-          <Search
-            size={14}
-            color="#9ca3af"
-            strokeWidth={2}
-            style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}
-          />
-          <input
+          <BuscaProduto
             id="ecommerce-catalog-search"
             name="catalog_search"
             value={search}
-            onChange={(event) => onSearchChange(event.target.value)}
+            onChange={onSearchChange}
             placeholder="Buscar por nome, SKU ou código de barras"
-            style={{ ...S.formInput, paddingLeft: 36, background: "#fff" }}
           />
         </div>
 

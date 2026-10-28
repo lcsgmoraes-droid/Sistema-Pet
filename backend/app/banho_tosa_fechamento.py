@@ -7,8 +7,14 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.banho_tosa_models import BanhoTosaAtendimento
+from app.banho_tosa_entrega import entrega_sem_cobranca_registrada
+from app.banho_tosa_vendas import _montar_itens_venda
 from app.financeiro_models import ContaReceber
 from app.vendas_models import Venda
+
+
+TAMANHO_LOTE_PENDENCIAS = 200
+MAX_PAGINAS_PENDENCIAS = 50
 
 
 def sincronizar_fechamento_atendimento(
@@ -36,8 +42,19 @@ def sincronizar_fechamento_atendimento(
     )
 
 
-def listar_pendencias_fechamento(db: Session, tenant_id, limit: int = 200) -> dict:
-    atendimentos = _query_pendencias(db, tenant_id).limit(limit).all()
+def listar_pendencias_fechamento(
+    db: Session, tenant_id, limit: int = 200, cursor: int | None = None
+) -> dict:
+    if not isinstance(limit, int) or not 1 <= limit <= 500:
+        raise HTTPException(
+            422, "O limite de pendencias deve ser um inteiro entre 1 e 500."
+        )
+    if cursor is not None and (not isinstance(cursor, int) or cursor <= 0):
+        raise HTTPException(422, "O cursor deve ser um inteiro positivo.")
+    query = _query_pendencias(db, tenant_id)
+    atendimentos, proximo_cursor = _buscar_pendencias_limitadas(
+        db, tenant_id, query, limit, cursor
+    )
     contas_por_venda = _contas_por_venda(
         db, tenant_id, [item.venda_id for item in atendimentos if item.venda_id]
     )
@@ -45,11 +62,65 @@ def listar_pendencias_fechamento(db: Session, tenant_id, limit: int = 200) -> di
         _montar_pendencia(item, contas_por_venda.get(item.venda_id, []))
         for item in atendimentos
     ]
-    return {"total": len(itens), "itens": itens}
+    return {
+        "total": len(itens),
+        "itens": itens,
+        "proximo_cursor": proximo_cursor,
+        "busca_incompleta": proximo_cursor is not None,
+    }
 
 
-def sincronizar_pendencias_fechamento(db: Session, tenant_id, limit: int = 200) -> dict:
-    pendencias = listar_pendencias_fechamento(db, tenant_id, limit)["itens"]
+def _buscar_pendencias_limitadas(db, tenant_id, query, limit, cursor):
+    atendimentos = []
+    ultimo_id = cursor
+    # O custo da busca tem limite proprio, independente do parametro da URL.
+    for _ in range(MAX_PAGINAS_PENDENCIAS):
+        pagina = query
+        if ultimo_id is not None:
+            pagina = pagina.filter(BanhoTosaAtendimento.id < ultimo_id)
+        lote = pagina.limit(TAMANHO_LOTE_PENDENCIAS).all()
+        if not lote:
+            return atendimentos, None
+        encontrados, ultimo_id = _filtrar_lote_pendencias(
+            db, tenant_id, lote, limit - len(atendimentos)
+        )
+        atendimentos.extend(encontrados)
+        if len(atendimentos) == limit:
+            return atendimentos, _cursor_pendencias_anteriores(query, ultimo_id)
+        if len(lote) < TAMANHO_LOTE_PENDENCIAS:
+            return atendimentos, None
+    return atendimentos, _cursor_pendencias_anteriores(query, ultimo_id)
+
+
+def _filtrar_lote_pendencias(db, tenant_id, lote, vagas):
+    encontrados = []
+    for item in lote:
+        if _atendimento_tem_pendencia(db, tenant_id, item):
+            encontrados.append(item)
+        if len(encontrados) == vagas:
+            return encontrados, item.id
+    return encontrados, lote[-1].id
+
+
+def _atendimento_tem_pendencia(db, tenant_id, item):
+    if item.venda_id:
+        return True
+    if entrega_sem_cobranca_registrada(item):
+        return False
+    return not (item.pacote_credito_id and not _montar_itens_venda(db, tenant_id, item))
+
+
+def _cursor_pendencias_anteriores(query, ultimo_id):
+    if query.filter(BanhoTosaAtendimento.id < ultimo_id).first() is not None:
+        return ultimo_id
+    return None
+
+
+def sincronizar_pendencias_fechamento(
+    db: Session, tenant_id, limit: int = 200, cursor: int | None = None
+) -> dict:
+    resultado = listar_pendencias_fechamento(db, tenant_id, limit, cursor)
+    pendencias = resultado["itens"]
     sincronizados = 0
     sem_venda = 0
     for item in pendencias:
@@ -62,12 +133,14 @@ def sincronizar_pendencias_fechamento(db: Session, tenant_id, limit: int = 200) 
         if resumo.get("sincronizado"):
             sincronizados += 1
 
-    restantes = listar_pendencias_fechamento(db, tenant_id, limit)["total"]
+    restantes = listar_pendencias_fechamento(db, tenant_id, limit, cursor)["total"]
     return {
         "total_processados": len(pendencias),
         "sincronizados": sincronizados,
         "sem_venda": sem_venda,
         "pendentes_restantes": restantes,
+        "proximo_cursor": resultado["proximo_cursor"],
+        "busca_incompleta": resultado["busca_incompleta"],
     }
 
 
@@ -116,7 +189,6 @@ def _query_pendencias(db: Session, tenant_id):
         .filter(
             BanhoTosaAtendimento.tenant_id == tenant_id,
             BanhoTosaAtendimento.status.in_(["pronto", "entregue"]),
-            BanhoTosaAtendimento.pacote_credito_id.is_(None),
             or_(
                 BanhoTosaAtendimento.venda_id.is_(None),
                 BanhoTosaAtendimento.conta_receber_id.is_(None),
@@ -231,13 +303,15 @@ def _montar_alertas(
 
 
 def _resumo_sem_venda(atendimento) -> dict:
-    if atendimento.pacote_credito_id:
+    if atendimento.pacote_credito_id or entrega_sem_cobranca_registrada(atendimento):
         return {
             "atendimento_id": atendimento.id,
             "venda_id": None,
             "conta_receber_id": atendimento.conta_receber_id,
             "venda_status": None,
-            "status_pagamento": "quitado_pacote",
+            "status_pagamento": "coberto_pacote"
+            if atendimento.pacote_credito_id
+            else "sem_cobranca",
             "total": Decimal("0"),
             "total_pago": Decimal("0"),
             "valor_restante": Decimal("0"),

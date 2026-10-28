@@ -7,8 +7,8 @@ import api from "../api";
 /**
  * Buscar clientes
  */
-export const buscarClientes = async (params = {}) => {
-  const response = await api.get("/clientes/", { params });
+export const buscarClientes = async (params = {}, options = {}) => {
+  const response = await api.get("/clientes/", { ...options, params });
   // API retorna objeto paginado {items: [], total, skip, limit}
   // Retornar apenas o array de clientes
   return response.data.items || response.data.clientes || response.data || [];

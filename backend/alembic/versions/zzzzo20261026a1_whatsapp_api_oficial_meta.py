@@ -1,7 +1,7 @@
 """WhatsApp: campos da API oficial da Meta por loja
 
 Revision ID: zzzzo20261026a1
-Revises: zzzzn20261023a1
+Revises: zzzzn20261023b1
 Create Date: 2026-10-26
 
 Cada loja conecta o proprio numero pela API oficial (Meta Cloud API). O token e o
@@ -14,7 +14,7 @@ import sqlalchemy as sa
 
 
 revision = "zzzzo20261026a1"
-down_revision = "zzzzn20261023a1"
+down_revision = "zzzzn20261023b1"
 branch_labels = None
 depends_on = None
 

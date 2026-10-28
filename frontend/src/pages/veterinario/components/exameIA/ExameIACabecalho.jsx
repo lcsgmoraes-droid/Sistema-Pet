@@ -26,7 +26,7 @@ export default function ExameIACabecalho({
             <span>Tutor:</span>
             <CustomerIdentity
               codeLabel="Cod. tutor"
-              fallback={resumo.tutor_id ? `Tutor #${resumo.tutor_id}` : ""}
+              fallback={resumo.tutor_id ? "Tutor não informado" : ""}
               layout="inline"
               nameClassName="font-medium text-indigo-700"
               record={resumo}

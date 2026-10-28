@@ -77,6 +77,8 @@ class VendaService:
         motivo_liberacao_crediario: Optional[str] = None,
         nao_gerar_beneficios: bool = False,
         justificativa_nao_gerar_beneficios: Optional[str] = None,
+        justificativa_pagamento_excedente: Optional[str] = None,
+        contexto_pagamento_excedente=None,
     ) -> Dict[str, Any]:
         return finalizar_venda_impl(
             venda_id=venda_id,
@@ -94,5 +96,7 @@ class VendaService:
             motivo_liberacao_crediario=motivo_liberacao_crediario,
             nao_gerar_beneficios=nao_gerar_beneficios,
             justificativa_nao_gerar_beneficios=justificativa_nao_gerar_beneficios,
+            justificativa_pagamento_excedente=justificativa_pagamento_excedente,
+            contexto_pagamento_excedente=contexto_pagamento_excedente,
             processar_baixa_estoque_item=VendaService._processar_baixa_estoque_item,
         )

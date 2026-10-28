@@ -1,6 +1,7 @@
 """Cancelamento atomico de vendas."""
 
 import logging
+from decimal import Decimal
 from typing import Any, Dict
 from uuid import UUID
 
@@ -14,6 +15,10 @@ from app.services.venda_rentabilidade_snapshot_service import (
 )
 from app.produtos.tipos import tipo_controla_estoque
 from app.vendas.status_pagamento import pagamento_valido_para_saldo
+from app.vendas.fiscal_status import (
+    nota_fiscal_cancelada,
+    nota_fiscal_requer_regularizacao,
+)
 from app.utils.timezone import now_brasilia
 
 logger = logging.getLogger(__name__)
@@ -22,7 +27,13 @@ __all__ = ["cancelar_venda"]
 
 
 def cancelar_venda(
-    venda_id: int, motivo: str, user_id: int, tenant_id: str, db: Session
+    venda_id: int,
+    motivo: str,
+    user_id: int,
+    tenant_id: str,
+    db: Session,
+    *,
+    commit: bool = True,
 ) -> Dict[str, Any]:
     """
     Cancela uma venda realizando estorno completo de todas as operações.
@@ -92,7 +103,7 @@ def cancelar_venda(
 
     logger.info(f"🔴 Iniciando cancelamento ATÔMICO da venda #{venda_id}")
 
-    with transactional_session(db):
+    with transactional_session(db, commit=commit):
         # ============================================================
         # ETAPA 1: VALIDAR VENDA E PERMISSÕES
         # ============================================================
@@ -142,14 +153,54 @@ def cancelar_venda(
             f"📋 Cancelando venda #{venda.numero_venda} (Status: {venda.status})"
         )
 
+        from app.integrations.ifood.pdv_pilot import prepare_pilot_cancellation
+
+        pilot_bridge = prepare_pilot_cancellation(db, venda)
+
         # ============================================================
         # ETAPA 2: ESTORNAR ESTOQUE DE TODOS OS ITENS
         # ============================================================
 
-        itens = db.query(VendaItem).filter_by(venda_id=venda_id).all()
+        itens = (
+            db.query(VendaItem)
+            .filter_by(venda_id=venda_id, tenant_id=tenant_id)
+            .with_for_update()
+            .populate_existing()
+            .order_by(VendaItem.id)
+            .all()
+        )
+        from app.vendas.cancelamento_estoque import (
+            preparar_cancelamento_estoque,
+            estornar_item_cancelamento,
+        )
+
+        planos_estoque = (
+            preparar_cancelamento_estoque(db, venda, itens, tenant_id)
+            if pilot_bridge is None
+            else {}
+        )
         itens_estornados = 0
+        estornos_fiscais_legados = {}
 
         for item in itens:
+            if pilot_bridge is not None and pilot_bridge.stock_decreased_at is None:
+                # O rascunho reservou, mas nunca teve saida fisica.
+                continue
+            if pilot_bridge is not None:
+                from app.integrations.ifood.pdv_pilot_cancellation import (
+                    estornar_item_piloto,
+                )
+
+                estornar_item_piloto(db, pilot_bridge, venda, item, user_id, motivo)
+                itens_estornados += 1
+                continue
+            if item.id in planos_estoque:
+                resultado = estornar_item_cancelamento(
+                    db, venda, item, planos_estoque[item.id], user_id, motivo
+                )
+                if resultado is not None:
+                    itens_estornados += 1
+                continue
             if item.produto_id and tipo_controla_estoque(item.tipo):
                 try:
                     tenant_estoque, compartilhado = resolver_tenant_estoque_item(
@@ -158,9 +209,51 @@ def cancelar_venda(
                     with contexto_tenant_estoque(
                         tenant_estoque, tenant_id
                     ) as tenant_estoque_uuid:
+                        quantidade_estorno = item.quantidade
+                        if nota_fiscal_cancelada(venda) and isinstance(
+                            getattr(venda, "nfe_bling_id", None), (str, int)
+                        ):
+                            # O webhook fiscal antigo devolvia estoque e marcava
+                            # a própria saída venda_bling como cancelada. Consumir
+                            # esse saldo uma única vez, inclusive em itens repetidos.
+                            from app.produtos_estoque_models import EstoqueMovimentacao
+
+                            chave = (str(tenant_estoque_uuid), item.produto_id)
+                            if chave not in estornos_fiscais_legados:
+                                movimentos = (
+                                    db.query(EstoqueMovimentacao)
+                                    .filter_by(
+                                        tenant_id=tenant_estoque_uuid,
+                                        referencia_id=venda_id,
+                                        referencia_tipo="venda_bling",
+                                        produto_id=item.produto_id,
+                                        tipo="saida",
+                                        status="cancelado",
+                                    )
+                                    .with_for_update()
+                                    .all()
+                                )
+                                estornos_fiscais_legados[chave] = sum(
+                                    (
+                                        Decimal(str(mov.quantidade or 0))
+                                        for mov in movimentos
+                                    ),
+                                    Decimal("0"),
+                                )
+                            ja_estornado = min(
+                                Decimal(str(item.quantidade)),
+                                max(estornos_fiscais_legados[chave], Decimal("0")),
+                            )
+                            estornos_fiscais_legados[chave] -= ja_estornado
+                            quantidade_estorno = (
+                                Decimal(str(item.quantidade)) - ja_estornado
+                            )
+                            if quantidade_estorno <= 0:
+                                continue
+
                         resultado = EstoqueService.estornar_estoque(
                             produto_id=item.produto_id,
-                            quantidade=item.quantidade,
+                            quantidade=quantidade_estorno,
                             motivo="cancelamento_venda",
                             referencia_id=venda_id,
                             referencia_tipo="venda",
@@ -173,12 +266,15 @@ def cancelar_venda(
                                 if compartilhado
                                 else f"Cancelamento: {motivo}"
                             ),
+                            preservar_custo_desconhecido=True,
                         )
                     itens_estornados += 1
                     logger.info(
                         f"  ✅ Estoque estornado: {resultado['produto_nome']} "
-                        f"+{item.quantidade} ({resultado['estoque_anterior']} → {resultado['estoque_novo']})"
+                        f"+{quantidade_estorno} ({resultado['estoque_anterior']} → {resultado['estoque_novo']})"
                     )
+                except HTTPException:
+                    raise
                 except Exception as e:
                     logger.error(f"  ❌ Erro ao estornar estoque: {e}")
                     raise HTTPException(
@@ -388,6 +484,12 @@ def cancelar_venda(
 
         status_anterior = venda.status
         venda.status = "cancelada"
+        # A baixa comercial não altera a situação fiscal. Mantém a pendência
+        # até o emissor confirmar o cancelamento do documento.
+        if nota_fiscal_requer_regularizacao(venda) and getattr(
+            venda, "nfe_cancelamento_status", None
+        ) not in {"solicitado", "recusado"}:
+            venda.nfe_cancelamento_status = "pendente"
         venda.cancelada_por = user_id
         venda.motivo_cancelamento = motivo
         venda.data_cancelamento = now_brasilia()
@@ -426,6 +528,9 @@ def cancelar_venda(
         # pode continuar disponível para um recálculo ou leitura posterior.
         invalidate_venda_rentabilidade_snapshot(venda)
 
+        from app.integrations.ifood.pdv_pilot import complete_pilot_cancellation
+
+        complete_pilot_cancellation(db, pilot_bridge)
         db.flush()
 
         logger.info(
@@ -447,7 +552,9 @@ def cancelar_venda(
                 f"Venda {venda.numero_venda} CANCELADA (ATÔMICO) - "
                 f"Motivo: {motivo} - "
                 f"Itens estornados: {itens_estornados} - "
-                f"Contas canceladas: {contas_canceladas}"
+                f"Contas canceladas: {contas_canceladas} - "
+                f"Situação fiscal preservada: {getattr(venda, 'nfe_status', None) or 'sem nota'} - "
+                f"Pendência fiscal: {'sim' if nota_fiscal_requer_regularizacao(venda) else 'não'}"
             ),
             tenant_id=tenant_id,
             commit=False,

@@ -54,7 +54,7 @@ export default function ProdutosNovoDadosBasicosSection({
 
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
+            <div id="produto-campo-codigo-barras">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 EAN principal (codigo de barras)
               </label>
@@ -72,7 +72,7 @@ export default function ProdutosNovoDadosBasicosSection({
               </div>
             </div>
 
-            <div>
+            <div id="produto-campo-nome">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Nome do Produto *
               </label>
@@ -123,7 +123,7 @@ export default function ProdutosNovoDadosBasicosSection({
               />
             </div>
 
-            <div>
+            <div id="produto-campo-unidade">
               <label className="block text-sm font-medium text-gray-700 mb-1">Unidade</label>
               <select
                 value={formData.unidade}
@@ -142,7 +142,7 @@ export default function ProdutosNovoDadosBasicosSection({
             </div>
           </div>
 
-          <div>
+          <div id="produto-campo-descricao">
             <div className="mb-1 flex items-center justify-between gap-2">
               <label className="block text-sm font-medium text-gray-700">Descricao</label>
               <div className="flex flex-wrap items-center justify-end gap-2">
@@ -199,7 +199,7 @@ export default function ProdutosNovoDadosBasicosSection({
         <h3 className="mb-3 text-sm font-semibold text-gray-700">Dados desta loja</h3>
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
+            <div id="produto-campo-sku">
               <label className="block text-sm font-medium text-gray-700 mb-1">SKU *</label>
               <div className="flex gap-2">
                 <input
@@ -219,7 +219,7 @@ export default function ProdutosNovoDadosBasicosSection({
               </p>
             </div>
 
-            <div>
+            <div id="produto-campo-tipo">
               <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
               <select
                 value={formData.tipo}

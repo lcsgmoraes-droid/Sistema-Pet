@@ -1,9 +1,14 @@
 import { useState, useEffect, useRef } from "react";
-import { X, AlertCircle, Clock, CheckCircle, Bell, Trash2, Search, BarChart3 } from "lucide-react";
+import { X, AlertCircle, Clock, CheckCircle, Bell, Trash2, BarChart3 } from "lucide-react";
 import api from "../../api";
 import toast from "react-hot-toast";
 import { confirmarCorePet } from "../../services/corepetDialog";
 import ModalPendenciasEstoqueRelatorio from "./ModalPendenciasEstoqueRelatorio";
+import BuscaProduto from "../v2/BuscaProduto/BuscaProduto";
+import InputTexto from "../v2/InputTexto/InputTexto";
+import BotaoCancelar from "../v2/BotaoCancelar/BotaoCancelar";
+import { getProdutosVendaveis } from "../../api/produtos";
+import { formatMoneyBRL } from "../../utils/formatters";
 
 export default function ModalPendenciasEstoque({
   isOpen,
@@ -16,6 +21,7 @@ export default function ModalPendenciasEstoque({
   const [pendencias, setPendencias] = useState([]);
   const [produtos, setProdutos] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [buscandoProduto, setBuscandoProduto] = useState(false);
 
   // Estados para busca de produtos
   const [buscaProduto, setBuscaProduto] = useState("");
@@ -42,24 +48,24 @@ export default function ModalPendenciasEstoque({
     }
 
     carregarPendencias();
-    if (!produtoId) {
-      carregarProdutosSemEstoque();
-    }
   }, [isOpen, clienteId, produtoId]);
 
-  // Efeito para filtrar produtos conforme a busca
+  // Consulta o catálogo inteiro pelo termo, sem limitar a busca aos primeiros 1.000.
   useEffect(() => {
-    if (buscaProduto.trim() === "") {
-      setProdutosFiltrados(produtos); // Mostrar todos quando vazio
-    } else {
-      const filtrados = produtos.filter(
-        (prod) =>
-          prod.nome.toLowerCase().includes(buscaProduto.toLowerCase()) ||
-          prod.codigo?.toLowerCase().includes(buscaProduto.toLowerCase()),
-      );
-      setProdutosFiltrados(filtrados);
+    if (!isOpen || !clienteId || produtoId || produtoSelecionado) {
+      setBuscandoProduto(false);
+      return;
     }
-  }, [buscaProduto, produtos]);
+    const controller = new AbortController();
+    setBuscandoProduto(true);
+    const timer = setTimeout(() => {
+      void carregarProdutosSemEstoque(buscaProduto, controller.signal);
+    }, 250);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [isOpen, clienteId, produtoId, produtoSelecionado, buscaProduto]);
 
   // Efeito para fechar a lista ao clicar fora
   useEffect(() => {
@@ -91,27 +97,32 @@ export default function ModalPendenciasEstoque({
     }
   };
 
-  const carregarProdutosSemEstoque = async () => {
+  const carregarProdutosSemEstoque = async (termo, signal) => {
     try {
-      const response = await api.get("/produtos/", {
-        params: {
-          page: 1,
-          page_size: 1000,
-          ativo: true,
+      const response = await getProdutosVendaveis(
+        {
+          busca: termo.trim(),
+          page_size: 50,
+          contar_total: false,
+          incluir_imagens: false,
         },
-      });
+        { signal },
+      );
+      if (signal.aborted) return;
       // A API retorna um objeto com { items, total, page, page_size, pages }
       const produtosData = (Array.isArray(response.data?.items) ? response.data.items : []).filter(
         (produto) => produto.controlar_estoque !== false && produto.tipo !== "servico",
       );
-      console.log("Produtos carregados:", produtosData.length, produtosData);
+
       setProdutos(produtosData);
       setProdutosFiltrados(produtosData); // Inicializar com todos os produtos
     } catch (error) {
-      console.error("Erro ao carregar produtos:", error);
+      if (signal.aborted || error?.code === "ERR_CANCELED") return;
       toast.error("Erro ao carregar produtos");
       setProdutos([]);
       setProdutosFiltrados([]);
+    } finally {
+      if (!signal.aborted) setBuscandoProduto(false);
     }
   };
 
@@ -342,7 +353,7 @@ export default function ModalPendenciasEstoque({
                           )}
                           <p>Quantidade: {pend.quantidade_desejada} un.</p>
                           {pend.valor_referencia && (
-                            <p>Valor ref.: R$ {parseFloat(pend.valor_referencia).toFixed(2)}</p>
+                            <p>Valor ref.: {formatMoneyBRL(pend.valor_referencia)}</p>
                           )}
                           <p>
                             Status: <span className="font-medium">{pend.status}</span>
@@ -394,68 +405,36 @@ export default function ModalPendenciasEstoque({
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Produto *</label>
                 {produtoId ? (
-                  <input
-                    type="text"
-                    value="Produto selecionado"
-                    disabled
-                    className="w-full px-3 py-2 border rounded-lg bg-gray-50"
-                  />
+                  <InputTexto value="Produto selecionado" disabled />
                 ) : (
                   <div ref={buscaRef} className="relative">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <input
-                        type="text"
-                        value={buscaProduto}
-                        onChange={(e) => setBuscaProduto(e.target.value)}
-                        onFocus={() => setMostrarLista(true)}
-                        placeholder="Digite para buscar o produto..."
-                        className="w-full pl-10 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                      {buscaProduto && (
-                        <button
-                          type="button"
-                          onClick={limparSelecao}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+                    <BuscaProduto
+                      value={buscaProduto}
+                      onChange={(valor) => {
+                        setBuscaProduto(valor);
+                        setMostrarLista(true);
+                      }}
+                      onFocus={() => setMostrarLista(true)}
+                      onSelect={selecionarProduto}
+                      showSuggestions={mostrarLista && !produtoSelecionado}
+                      suggestions={produtosFiltrados}
+                      loading={buscandoProduto}
+                      minChars={0}
+                      placeholder="Digite para buscar o produto..."
+                      renderSuggestionContent={(prod) => (
+                        <>
+                          <span className="block font-medium">{prod.nome}</span>
+                          <span className="block text-xs text-slate-500">
+                            Código: {prod.codigo || "Não informado"} • Estoque:{" "}
+                            {prod.estoque_atual || 0} • {formatMoneyBRL(prod.preco_venda || 0)}
+                          </span>
+                        </>
                       )}
-                    </div>
-
-                    {/* Lista de produtos filtrados */}
-                    {mostrarLista && produtosFiltrados.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                        {produtosFiltrados.slice(0, 50).map((prod) => (
-                          <button
-                            key={prod.id}
-                            type="button"
-                            onClick={() => selecionarProduto(prod)}
-                            className="w-full px-4 py-3 text-left hover:bg-blue-50 border-b last:border-b-0 transition-colors"
-                          >
-                            <div className="font-medium text-gray-900">{prod.nome}</div>
-                            <div className="text-sm text-gray-500">
-                              {prod.codigo && `Código: ${prod.codigo} • `}
-                              Estoque: {prod.estoque_atual || 0}
-                              {prod.preco_venda &&
-                                ` • R$ ${parseFloat(prod.preco_venda).toFixed(2)}`}
-                            </div>
-                          </button>
-                        ))}
-                        {produtosFiltrados.length > 50 && (
-                          <div className="px-4 py-2 text-sm text-gray-500 text-center bg-gray-50">
-                            Mostrando 50 de {produtosFiltrados.length} produtos. Continue digitando
-                            para refinar.
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Mensagem quando não há resultados */}
-                    {mostrarLista && buscaProduto && produtosFiltrados.length === 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg p-4">
-                        <p className="text-gray-500 text-center">Nenhum produto encontrado</p>
-                      </div>
+                    />
+                    {buscaProduto && (
+                      <BotaoCancelar tamanho="pequeno" onClick={limparSelecao}>
+                        Limpar produto
+                      </BotaoCancelar>
                     )}
 
                     {/* Produto selecionado */}

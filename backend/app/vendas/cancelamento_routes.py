@@ -111,12 +111,6 @@ def excluir_venda(
     if not venda:
         raise HTTPException(status_code=404, detail="Venda nao encontrada")
 
-    if venda.status == "pago_nf":
-        raise HTTPException(
-            status_code=400,
-            detail="Nao e possivel cancelar/excluir uma venda com NF-e emitida. Cancele a nota fiscal primeiro.",
-        )
-
     rota_vinculada = db.query(RotaEntrega).filter_by(venda_id=venda_id).first()
     if rota_vinculada:
         passos_resolucao = [

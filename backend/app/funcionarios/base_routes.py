@@ -11,6 +11,7 @@ from app.cargo_models import Cargo
 from app.db import get_session
 from app.models import Cliente
 from app.security.permissions_service import check_permission
+from app.services.pessoa_telefone import validar_telefones_pessoa
 from app.services.remuneracao_service import calcular_composicao_remuneracao
 
 from .helpers import (
@@ -199,6 +200,7 @@ async def criar_funcionario(
 
     from app.clientes_routes import gerar_codigo_cliente
 
+    validar_telefones_pessoa(db, tenant_id, telefone=funcionario_data.telefone)
     codigo = gerar_codigo_cliente(db, "PF", tenant_id)
     funcionario = Cliente(
         tenant_id=tenant_id,
@@ -304,6 +306,13 @@ async def atualizar_funcionario(
 
     update_data = funcionario_data.model_dump(exclude_unset=True)
     app_access_profiles = update_data.pop("app_access_profiles", None)
+    if "telefone" in update_data:
+        validar_telefones_pessoa(
+            db,
+            tenant_id,
+            telefone=update_data["telefone"],
+            pessoa_atual=funcionario,
+        )
     for field, value in update_data.items():
         if field == "nome" and value:
             setattr(funcionario, field, value.strip())

@@ -34,10 +34,16 @@ import app.produtos_models  # noqa: F401 - modelo de lembretes e produtos
 import app.idempotency_models  # noqa: F401 - modelo de idempotência
 import app.ecommerce_analytics_models  # noqa: F401 - funil anonimo do ecommerce
 import app.ecommerceai_integration_models  # noqa: F401 - integracao CorePet <-> EcommerceAI
+import app.ecommerceai_fiscal.models  # noqa: F401 - documentos fiscais externos
 import app.ifood_integration_models  # noqa: F401 - integracao CorePet <-> iFood
+import app.ifood_catalog_models  # noqa: F401 - piloto Item por produto
 import app.ifood_order_models  # noqa: F401 - pedidos e eventos do iFood
+import app.ifood_financial_models  # noqa: F401 - evidencias Financial segregadas
+import app.ifood_financial_cost_models  # noqa: F401 - vinculos historicos auditados
+import app.ifood_payout_models  # noqa: F401 - repasses e conciliacao DEV
 import app.ofertas_estudio_models  # noqa: F401 - publicacoes do estudio de ofertas
 import app.intnfe.models  # noqa: F401 - vinculo fiscal por empresa
+import app.nfe.clone_models  # noqa: F401 - rascunhos fiscais independentes
 import app.xml_contabilidade_models  # noqa: F401 - fila fiscal por empresa
 import app.models_configuracao_custo_moto  # noqa: F401 - custos da moto
 import app.pendencia_estoque_models  # noqa: F401 - lista de espera

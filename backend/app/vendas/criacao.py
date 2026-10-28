@@ -72,6 +72,11 @@ def criar_venda(
 
     logger.info(f"📝 Criando nova venda para user_id={user_id}")
 
+    if str(payload.get("canal") or "").strip().lower() == "ifood":
+        raise HTTPException(
+            409, "Pedidos iFood entram somente pelo vinculo assistido do piloto DEV."
+        )
+
     try:
         # ============================================================
         # ETAPA 1: VALIDAÇÕES
@@ -204,12 +209,12 @@ def criar_venda(
             endereco_entrega=payload.get("endereco_entrega") if tem_entrega else None,
             distancia_km=payload.get("distancia_km") if tem_entrega else None,
             valor_por_km=payload.get("valor_por_km") if tem_entrega else None,
-            observacoes_entrega=payload.get("observacoes_entrega")
-            if tem_entrega
-            else None,
-            pagamento_entrega_previsto=payload.get("pagamento_entrega_previsto")
-            if tem_entrega
-            else None,
+            observacoes_entrega=(
+                payload.get("observacoes_entrega") if tem_entrega else None
+            ),
+            pagamento_entrega_previsto=(
+                payload.get("pagamento_entrega_previsto") if tem_entrega else None
+            ),
             status_entrega="pendente" if tem_entrega else None,
             canal=payload.get("canal", "loja_fisica"),  # Canal de venda para DRE
             status="aberta",
@@ -424,9 +429,10 @@ def criar_venda(
             status="previsto",
             categoria_id=categoria_receitas.id,
             documento=f"VENDA-{venda.id}",
-            fornecedor_cliente=venda.cliente.nome
-            if venda.cliente
-            else "Cliente Avulso",
+            gerado_automaticamente=True,
+            fornecedor_cliente=(
+                venda.cliente.nome if venda.cliente else "Cliente Avulso"
+            ),
             user_id=user_id,
             tenant_id=tenant_id,
         )

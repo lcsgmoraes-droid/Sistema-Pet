@@ -1,3 +1,4 @@
+import BuscaProduto from "../v2/BuscaProduto/BuscaProduto";
 import { Info, RefreshCw, Search, X } from "lucide-react";
 import useShiftRangeSelection from "../../hooks/useShiftRangeSelection";
 
@@ -70,12 +71,11 @@ export default function PedidosCompraSugestaoHeader({
               <label className="mb-1 block text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">
                 Buscar por nome ou SKU
               </label>
-              <input
-                type="text"
+              <BuscaProduto
                 placeholder="Ex: Special Dog, SKU 211..."
                 value={filtroSugestao}
-                onChange={(e) => setFiltroSugestao(e.target.value)}
-                className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-slate-800 shadow-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                onChange={(valor) => setFiltroSugestao(valor)}
+                showSuggestions={false}
               />
             </div>
             <div ref={filtroMarcasRef} className="relative sm:col-span-2 xl:col-span-3">

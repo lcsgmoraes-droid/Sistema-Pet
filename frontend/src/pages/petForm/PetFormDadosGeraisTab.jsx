@@ -1,3 +1,5 @@
+import BuscaPessoa from "../../components/v2/BuscaPessoa/BuscaPessoa";
+import useBuscaEntidadeLocal from "../../components/v2/BuscaEntidade/useBuscaEntidadeLocal";
 import { Plus } from "lucide-react";
 import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
 import InputCheckTexto from "../../components/v2/InputCheckTexto/InputCheckTexto";
@@ -26,10 +28,12 @@ export default function PetFormDadosGeraisTab({
   racas,
   setField,
 }) {
-  const opcoesClientes = clientes.map((cliente) => ({
-    value: String(cliente.id),
-    label: `${cliente.nome}${cliente.cpf ? ` - CPF: ${cliente.cpf}` : ""}`,
-  }));
+  const buscaTutor = useBuscaEntidadeLocal({
+    itens: clientes,
+    valueId: formData.cliente_id,
+    onChangeId: setField("cliente_id"),
+    tipo: "pessoa",
+  });
   const opcoesEspecies = especies.map((especie) => ({
     value: String(especie.id),
     label: especie.nome,
@@ -45,12 +49,10 @@ export default function PetFormDadosGeraisTab({
     <div className="space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap">
         <div className="w-full sm:max-w-sm">
-          <InputCombobox
+          <BuscaPessoa
+            {...buscaTutor}
             id="pet-cliente"
             label="Cliente (Tutor)"
-            opcoes={opcoesClientes}
-            value={formData.cliente_id ? String(formData.cliente_id) : ""}
-            onChange={setField("cliente_id")}
             placeholder="Selecione o tutor..."
             required
             error={erros.cliente_id}

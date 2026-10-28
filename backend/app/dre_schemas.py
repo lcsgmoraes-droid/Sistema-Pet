@@ -3,7 +3,7 @@
 from decimal import Decimal
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class DREResponse(BaseModel):
@@ -32,28 +32,33 @@ class DREResponse(BaseModel):
     custo_servicos: Decimal  # Custo direto dos serviços prestados
 
     # LUCRO BRUTO
-    lucro_bruto: Decimal
-    margem_bruta: float
+    lucro_bruto: Optional[Decimal]
+    margem_bruta: Optional[float]
 
     # DESPESAS OPERACIONAIS
-    despesas_operacionais: Decimal
+    despesas_operacionais: Optional[Decimal]
     despesas_pessoal: Decimal
     despesas_administrativas: Decimal
-    taxas_cartao: Decimal
-    outras_despesas: Decimal
+    taxas_cartao: Optional[Decimal]
+    outras_despesas: Optional[Decimal]
 
     # RESULTADO OPERACIONAL
-    resultado_operacional: Decimal
-    margem_operacional: float
+    resultado_operacional: Optional[Decimal]
+    margem_operacional: Optional[float]
 
     # RESULTADO FINANCEIRO
-    resultado_financeiro: Decimal
+    resultado_financeiro: Optional[Decimal]
     receitas_financeiras: Decimal
     despesas_financeiras: Decimal
 
     # LUCRO LÍQUIDO
-    lucro_liquido: Decimal
-    margem_liquida: float
+    lucro_liquido: Optional[Decimal]
+    margem_liquida: Optional[float]
+
+    rentabilidade_status: str = "complete"
+    taxas_ifood_pendentes: bool = False
+    vendas_rentabilidade_pendente: int = 0
+    pendencias_rentabilidade: List[str] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 

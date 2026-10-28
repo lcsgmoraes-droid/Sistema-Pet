@@ -13,6 +13,7 @@ const read = (path) => readFileSync(resolve(root, path), "utf8");
 
 const fila = read("src/pages/banhoTosa/components/BanhoTosaFilaView.jsx");
 const ficha = read("src/pages/banhoTosa/components/BanhoTosaAtendimentoPanel.jsx");
+const fichaFechamento = read("src/pages/banhoTosa/components/BanhoTosaAtendimentoFechamento.jsx");
 const transicao = read("src/pages/banhoTosa/components/BanhoTosaTransicaoPanel.jsx");
 const fechamentos = read("src/pages/banhoTosa/components/BanhoTosaFechamentosView.jsx");
 const relatorios = read("src/pages/banhoTosa/components/BanhoTosaRelatoriosView.jsx");
@@ -40,8 +41,8 @@ assert.match(
 assert.match(ficha, /listarInsumosAtendimento/, "ficha deve carregar consumo");
 assert.match(ficha, /registrarOcorrenciaAtendimento/, "ficha deve registrar ocorrências");
 assert.match(ficha, /uploadFotoAtendimento/, "ficha deve permitir fotos");
-assert.match(ficha, /gerarVendaAtendimento/, "ficha deve gerar cobrança no PDV");
-assert.match(ficha, /observacoes_saida/, "fechamento deve salvar observações de saída");
+assert.match(fichaFechamento, /gerarVendaAtendimento/, "ficha deve gerar cobrança no PDV");
+assert.match(fichaFechamento, /observacoes_saida/, "fechamento deve salvar observações de saída");
 assert.match(
   fechamentos,
   /sincronizarPendenciasFechamento/,

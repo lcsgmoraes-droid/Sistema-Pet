@@ -10,20 +10,30 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models import Tenant, UserSession
-from app.services.billing_access import overdue_grace_state
-from app.services.plan_catalog import PLAN_CATALOG, get_plan
+from app.services.billing_access import (
+    manual_full_access_allowed,
+    operational_access_allowed,
+    trial_access_preserved,
+)
+from app.services.plan_catalog import get_plan
 from app.session_manager import SESSION_SCOPE_ECOMMERCE
 from app.utils.timezone import now_brasilia
 from app.vendas_models import Venda
 
 
 def _trial_is_active(tenant: Tenant, now_utc: datetime | None = None) -> bool:
-    ends_at = getattr(tenant, "trial_ends_at", None)
-    if ends_at is None:
-        return False
-    if ends_at.tzinfo is None:
-        ends_at = ends_at.replace(tzinfo=timezone.utc)
-    return ends_at > (now_utc or datetime.now(timezone.utc))
+    return trial_access_preserved(tenant, now_utc)
+
+
+def _require_operational_access(tenant: Tenant) -> None:
+    if not operational_access_allowed(tenant):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "tenant_inactive",
+                "message": "O acesso da empresa foi suspenso pela administracao.",
+            },
+        )
 
 
 def _month_bounds(now: datetime | None = None) -> tuple[datetime, datetime]:
@@ -61,39 +71,11 @@ def enforce_monthly_sales_limit(
     tenant = (
         db.query(Tenant).filter(Tenant.id == str(tenant_id)).with_for_update().first()
     )
-    if tenant is None or _trial_is_active(tenant, now):
+    if tenant is None:
         return
-
-    raw_plan = str(getattr(tenant, "plan", "") or "").strip().lower()
-    billing_status = str(getattr(tenant, "billing_status", "active") or "active")
-    billing_status = billing_status.strip().lower()
-    assinatura_inativa = billing_status in {
-        "trial",
-        "pending",
-        "past_due",
-        "expired",
-        "blocked",
-        "refunded",
-        "canceled",
-    }
-    tolerancia = overdue_grace_state(tenant, now.date() if now else None)
-    if (
-        raw_plan in PLAN_CATALOG
-        and assinatura_inativa
-        and not tolerancia["access_allowed"]
-    ):
-        mensagem = (
-            "O pagamento esta vencido ha mais de 15 dias. Regularize para registrar novas vendas."
-            if billing_status == "past_due"
-            else "O periodo gratuito terminou. Ative um plano para registrar novas vendas."
-        )
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail={
-                "code": "subscription_inactive",
-                "message": mensagem,
-            },
-        )
+    _require_operational_access(tenant)
+    if manual_full_access_allowed(tenant) or _trial_is_active(tenant, now):
+        return
 
     plan = get_plan(getattr(tenant, "plan", None))
     limit = plan.monthly_sales_limit if plan else None
@@ -149,7 +131,8 @@ def enforce_simultaneous_session_limit(
     """
 
     now = now_utc or datetime.now(timezone.utc)
-    if _trial_is_active(tenant, now):
+    _require_operational_access(tenant)
+    if manual_full_access_allowed(tenant) or _trial_is_active(tenant, now):
         return 0
 
     plan = get_plan(getattr(tenant, "plan", None))

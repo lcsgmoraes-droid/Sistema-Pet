@@ -25,7 +25,14 @@ import MetricGrid from "../ui/MetricGrid";
 import MoneyCell from "../ui/MoneyCell";
 import ModuleTabs from "../ui/ModuleTabs";
 import NumberCell from "../ui/NumberCell";
+import IfoodVendaTaxasResumo from "../ifood/IfoodVendaTaxasResumo.jsx";
+import { formatMoneyBRL } from "../../utils/formatters";
 import { getDreAlertDetail, getDreAlertMetrics } from "./dreAlertMetrics";
+import {
+  PENDENCIA_IFOOD_LABEL,
+  descreverRentabilidadePendente,
+  temRentabilidadePendente,
+} from "../financeiro/vendasFinanceiro/rentabilidadePendente";
 
 export default function DREView({
   DRE_DETAIL_COLUMNS,
@@ -66,6 +73,8 @@ export default function DREView({
   const cmv = dados?.totais?.cmv ?? 0;
   const custoServicos = dados?.totais?.custo_servicos ?? 0;
   const custosDiretos = dados?.totais?.custos_diretos ?? cmv + custoServicos;
+  const rentabilidadePendente =
+    temRentabilidadePendente(dados) || temRentabilidadePendente(dados?.totais);
 
   return (
     <div className="space-y-4 p-3 md:space-y-6 md:p-6">
@@ -174,6 +183,19 @@ export default function DREView({
           {/* Conteúdo do DRE */}
           {dados && (
             <div className="space-y-6">
+              {rentabilidadePendente && (
+                <div
+                  role="status"
+                  className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+                >
+                  <p className="font-semibold">{PENDENCIA_IFOOD_LABEL}</p>
+                  <p>{descreverRentabilidadePendente(dados)}</p>
+                  <p>
+                    Receitas e custos conhecidos continuam visíveis. Cobranças ausentes não
+                    equivalem a taxa zero.
+                  </p>
+                </div>
+              )}
               {/* Cards de Resumo */}
               <MetricGrid>
                 <MetricCard
@@ -206,7 +228,13 @@ export default function DREView({
                   intent="blue"
                   icon={<DollarSign className="h-5 w-5" />}
                   label="Lucro Bruto"
-                  value={<MoneyCell value={dados.totais?.lucro_bruto || 0} />}
+                  value={
+                    rentabilidadePendente ? (
+                      PENDENCIA_IFOOD_LABEL
+                    ) : (
+                      <MoneyCell value={dados.totais?.lucro_bruto || 0} />
+                    )
+                  }
                   subtitle="Após custos"
                 />
                 <MetricCard
@@ -214,7 +242,11 @@ export default function DREView({
                   icon={<Percent className="h-5 w-5" />}
                   label="Margem Bruta"
                   value={
-                    <NumberCell value={dados.totais?.margem_bruta || 0} decimals={2} suffix="%" />
+                    rentabilidadePendente ? (
+                      PENDENCIA_IFOOD_LABEL
+                    ) : (
+                      <NumberCell value={dados.totais?.margem_bruta || 0} decimals={2} suffix="%" />
+                    )
                   }
                   subtitle="Rentabilidade"
                 />
@@ -235,15 +267,17 @@ export default function DREView({
                     key={`${alerta.codigo}-${alerta.canal}`}
                     className={`rounded-lg border p-4 ${
                       critico
-                        ? "border-red-300 bg-red-50 text-red-900"
-                        : "border-amber-300 bg-amber-50 text-amber-950"
+                        ? "border-red-300 bg-red-50 text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
+                        : "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
                     }`}
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex items-start gap-3">
                         <AlertTriangle
                           className={`mt-0.5 h-5 w-5 flex-shrink-0 ${
-                            critico ? "text-red-600" : "text-amber-600"
+                            critico
+                              ? "text-red-600 dark:text-red-300"
+                              : "text-amber-600 dark:text-amber-300"
                           }`}
                         />
                         <div>
@@ -330,6 +364,9 @@ export default function DREView({
                       indigo: selecionado
                         ? "bg-indigo-600 text-white border-indigo-600"
                         : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100",
+                      red: selecionado
+                        ? "bg-red-600 text-white border-red-600"
+                        : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100",
                     };
 
                     return (
@@ -439,7 +476,18 @@ export default function DREView({
       {tabAtiva === "extrato" && <ExtratoBancario />}
 
       {/* Conteúdo da Tab Análise Inteligente */}
-      {tabAtiva === "analise" && <AnaliseInteligente dados={dados} parametrosDRE={parametrosDRE} />}
+      {tabAtiva === "analise" &&
+        (rentabilidadePendente ? (
+          <div
+            role="status"
+            className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+          >
+            {descreverRentabilidadePendente(dados)} A análise de rentabilidade será exibida após a
+            conferência.
+          </div>
+        ) : (
+          <AnaliseInteligente dados={dados} parametrosDRE={parametrosDRE} />
+        ))}
 
       {/* Modal Chat IA */}
       <ChatIAModal
@@ -495,8 +543,22 @@ export default function DREView({
                   <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                     <p className="text-xs font-medium uppercase text-gray-500">Total da linha</p>
                     <p className="mt-1 text-lg font-bold text-gray-900">
-                      <MoneyCell value={detalhesLinha?.total ?? linhaDetalhe.valor} />
+                      {(detalhesLinha ? detalhesLinha.total : linhaDetalhe.valor) == null &&
+                      (temRentabilidadePendente(detalhesLinha) ||
+                        temRentabilidadePendente(linhaDetalhe)) ? (
+                        PENDENCIA_IFOOD_LABEL
+                      ) : (
+                        <MoneyCell
+                          value={detalhesLinha ? detalhesLinha.total : linhaDetalhe.valor}
+                        />
+                      )}
                     </p>
+                    {detalhesLinha?.total == null && linhaDetalhe.valor_conhecido != null && (
+                      <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">
+                        Subtotal conhecido: {formatMoneyBRL(linhaDetalhe.valor_conhecido)}. Apuração
+                        pendente.
+                      </p>
+                    )}
                   </div>
                   <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                     <p className="text-xs font-medium uppercase text-gray-500">Lancamentos</p>
@@ -562,11 +624,32 @@ export default function DREView({
                               )}
                             </div>
                             <p className="shrink-0 text-sm font-bold text-gray-900">
-                              <MoneyCell value={item.valor} zeroAsDash />
+                              {item.valor == null &&
+                              (temRentabilidadePendente(item) ||
+                                temRentabilidadePendente(item.meta)) ? (
+                                PENDENCIA_IFOOD_LABEL
+                              ) : (
+                                <MoneyCell
+                                  value={item.valor}
+                                  zeroAsDash={!item.meta?.ifood_financial}
+                                />
+                              )}
                             </p>
                           </div>
                         </div>
                       ))}
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      {detalhesLinha.items
+                        .filter((item) => item.meta?.ifood_financial)
+                        .map((item) => (
+                          <div key={`ifood-${item.id}`}>
+                            <p className="mb-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                              {item.descricao}
+                            </p>
+                            <IfoodVendaTaxasResumo financeiro={item.meta.ifood_financial} />
+                          </div>
+                        ))}
                     </div>
                   </>
                 )}

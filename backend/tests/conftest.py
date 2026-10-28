@@ -71,6 +71,7 @@ def _create_engine_kwargs(database_url: str) -> dict:
 
 def _create_sqlite_schema(engine) -> None:
     from app.db import Base
+    from app.campaigns import models as campaign_models  # noqa: F401 - FK notification_queue dos lembretes
     from app import (  # noqa: F401
         caixa_models,
         dre_plano_contas_models,

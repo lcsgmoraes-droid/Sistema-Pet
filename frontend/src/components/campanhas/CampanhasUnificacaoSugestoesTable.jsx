@@ -1,3 +1,4 @@
+import { obterCodigoPessoaPublico } from "../../utils/codigosPublicos";
 function MotivoBadge({ motivo }) {
   const isMesmoCpf = motivo === "mesmo_cpf";
 
@@ -18,7 +19,9 @@ function ClienteCell({ cliente }) {
       <p className="font-medium text-gray-900">{cliente.nome}</p>
       {cliente.cpf && <p className="text-xs text-gray-400">CPF: {cliente.cpf}</p>}
       {cliente.telefone && <p className="text-xs text-gray-400">Tel: {cliente.telefone}</p>}
-      <p className="text-xs text-gray-300">ID #{cliente.id}</p>
+      <p className="text-xs text-gray-300">
+        Código {obterCodigoPessoaPublico(cliente) || "Não informado"}
+      </p>
     </>
   );
 }

@@ -34,6 +34,9 @@ RATE_LIMIT_CLEANUP_WINDOW = max(RATE_LIMIT_AUTH_WINDOW, RATE_LIMIT_API_WINDOW) *
 
 # Rotas de autenticação (limite mais restritivo)
 AUTH_ROUTES = [
+    "/adm/auth/login",
+    "/adm/auth/change-password",
+    "/platform-auth/login",
     "/auth/login-multitenant",
     "/auth/login",
     "/auth/register",

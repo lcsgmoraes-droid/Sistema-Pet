@@ -20,6 +20,7 @@ import ModalAuditoriaCaixa from "../components/caixa/ModalAuditoriaCaixa";
 import ModalReabrirCaixa from "../components/caixa/ModalReabrirCaixa";
 import { getAccessToken } from "../auth/tokenStorage";
 import { useAuth } from "../contexts/AuthContext";
+import BotaoInteracao from "../components/v2/BotaoInteracao/BotaoInteracao";
 import { formatMoneyBRL } from "../utils/formatters";
 import {
   iniciarConsultaCaixas,
@@ -453,7 +454,7 @@ export default function MeusCaixas() {
                   </button>
                   {caixa.status === "fechado" && (
                     <div className="border-t pt-4 flex flex-wrap gap-3">
-                      <button
+                      <BotaoInteracao
                         onClick={() => {
                           if (reaberturaPermitida) setCaixaReabertura(caixa);
                         }}
@@ -461,15 +462,13 @@ export default function MeusCaixas() {
                         title={
                           statusCaixaAberto !== "pronto"
                             ? "Aguarde a verificação do caixa aberto antes de reabrir."
-                            : caixaAberto
-                              ? "Feche o caixa atual antes de reabrir este caixa."
-                              : undefined
+                            : "O caixa poderá receber junto com os demais. Selecione o destino em cada recebimento."
                         }
                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <RefreshCw className="w-4 h-4" />
                         Reabrir Caixa
-                      </button>
+                      </BotaoInteracao>
                       {user?.is_admin && (
                         <button
                           onClick={() => {

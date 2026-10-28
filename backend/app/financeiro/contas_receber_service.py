@@ -90,7 +90,12 @@ class ContasReceberService:
 
     @staticmethod
     def criar_de_venda(
-        venda: Any, pagamentos: List[Any], user_id: int, db: Session
+        venda: Any,
+        pagamentos: List[Any],
+        user_id: int,
+        db: Session,
+        *,
+        manter_repasses_pendentes: bool = False,
     ) -> Dict[str, Any]:
         """
         Cria contas a receber automaticamente a partir de uma venda.
@@ -103,6 +108,7 @@ class ContasReceberService:
         REGRA IMPORTANTE:
         - prazo_dias = 0 → À vista, cria ContaReceber e baixa imediatamente
         - prazo_dias > 0 → A prazo, cria ContaReceber pendente
+        - manter_repasses_pendentes → cartão aguarda liquidação mesmo com prazo zero
 
         Args:
             venda: Objeto Venda (deve ter: id, numero_venda, cliente_id, cliente)
@@ -148,13 +154,17 @@ class ContasReceberService:
             .filter(
                 CategoriaFinanceira.nome.ilike("%vendas%"),
                 CategoriaFinanceira.tipo == "receita",
+                CategoriaFinanceira.tenant_id == venda.tenant_id,
             )
             .first()
         )
 
         if not categoria_receitas:
             categoria_receitas = CategoriaFinanceira(
-                nome="Receitas de Vendas", tipo="receita", user_id=user_id
+                nome="Receitas de Vendas",
+                tipo="receita",
+                user_id=user_id,
+                tenant_id=venda.tenant_id,
             )
             db.add(categoria_receitas)
             db.flush()
@@ -224,6 +234,7 @@ class ContasReceberService:
                     categoria_receitas=categoria_receitas,
                     user_id=user_id,
                     db=db,
+                    manter_repasse_pendente=manter_repasses_pendentes,
                 )
 
                 # Sempre adicionar conta (agora todas as vendas geram contas)
@@ -368,6 +379,7 @@ class ContasReceberService:
         categoria_receitas: Any,
         user_id: int,
         db: Session,
+        manter_repasse_pendente: bool = False,
     ) -> Dict[str, Any]:
         """
         Cria conta a receber para pagamento simples (à vista ou a prazo).
@@ -433,7 +445,16 @@ class ContasReceberService:
 
         # Crediário continua pendente mesmo quando vence hoje. Nos demais meios,
         # prazo zero representa recebimento imediato.
-        if prazo_dias == 0 and not eh_crediario:
+        eh_repasse_cartao = bool(
+            forma_pag
+            and forma_pag.tipo in {"cartao_credito", "cartao_debito", "link_pagamento"}
+        )
+        baixar_imediatamente = (
+            prazo_dias == 0
+            and not eh_crediario
+            and not (manter_repasse_pendente and eh_repasse_cartao)
+        )
+        if baixar_imediatamente:
             status_conta = "recebido"
             valor_recebido = valor
             data_recebimento = data_base
@@ -483,7 +504,7 @@ class ContasReceberService:
 
         # Se for à vista, criar registro de recebimento imediato
         recebimento_id = None
-        if prazo_dias == 0 and not eh_crediario:
+        if baixar_imediatamente:
             from app.financeiro_models import Recebimento
 
             recebimento = Recebimento(

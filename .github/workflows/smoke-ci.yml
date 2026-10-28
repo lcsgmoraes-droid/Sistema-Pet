@@ -73,6 +73,26 @@ jobs:
         working-directory: frontend
         run: npm run format:core:check
 
+      - name: Faturamento presentation regression
+        working-directory: frontend
+        run: npm run test:faturamento
+
+      - name: Billing notices and suspension authorization regression
+        working-directory: frontend
+        run: node src/utils/billingNotice.test.mjs && node src/pages/opsTenantsUtils.test.mjs && node --test src/contexts/ModulosContext.test.mjs
+
       - name: Frontend production build
         working-directory: frontend
         run: npm run build
+
+      - name: iFood and product regression tests
+        working-directory: frontend
+        run: npm run test:ifood
+
+      - name: Operational regression tests
+        working-directory: frontend
+        run: npm run test:operacional
+
+      - name: Banho e tosa packages and delivery regression
+        working-directory: frontend
+        run: npm run test:banho-tosa-fluxo

@@ -7,7 +7,9 @@ from sqlalchemy import (
     DateTime,
     Index,
     Integer,
+    JSON,
     LargeBinary,
+    ForeignKeyConstraint,
     String,
     UniqueConstraint,
 )
@@ -47,6 +49,9 @@ class XmlContabilidadeEnvio(BaseTenantModel):
             "tenant_id",
             "status",
             "proxima_tentativa_em",
+        ),
+        Index(
+            "uq_xml_contabilidade_envios_tenant_id_id", "tenant_id", "id", unique=True
         ),
     )
 
@@ -115,3 +120,40 @@ class XmlContabilidadeEvento(BaseTenantModel):
     registrado_em = Column(DateTime(timezone=True), nullable=False)
     nome_arquivo = Column(String(100), nullable=False)
     xml = Column(LargeBinary, nullable=False)
+
+
+class XmlContabilidadeTentativa(BaseTenantModel):
+    """Relatório final por tentativa; inserção única, sem reescrever o histórico."""
+
+    __tablename__ = "xml_contabilidade_tentativas"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "envio_id",
+            "numero_tentativa",
+            name="uq_xml_contabilidade_tentativa_numero",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "envio_id"],
+            ["xml_contabilidade_envios.tenant_id", "xml_contabilidade_envios.id"],
+            ondelete="RESTRICT",
+        ),
+        Index("ix_xml_contabilidade_tentativas_envio", "tenant_id", "envio_id", "id"),
+    )
+
+    envio_id = Column(Integer, nullable=False)
+    numero_tentativa = Column(Integer, nullable=False)
+    iniciado_em = Column(DateTime(timezone=True), nullable=False)
+    concluido_em = Column(DateTime(timezone=True), nullable=False)
+    resultado = Column(String(30), nullable=False)
+    resumo = Column(JSON, nullable=False)
+    snapshot = Column(JSON, nullable=False)
+
+
+from sqlalchemy import event  # noqa: E402
+
+
+@event.listens_for(XmlContabilidadeTentativa, "before_update")
+@event.listens_for(XmlContabilidadeTentativa, "before_delete")
+def _preservar_tentativa(_mapper, _connection, _target):
+    raise ValueError("Relatórios de tentativas são imutáveis.")

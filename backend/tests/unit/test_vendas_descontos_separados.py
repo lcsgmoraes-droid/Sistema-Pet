@@ -14,7 +14,14 @@ from app.services.venda_rentabilidade_snapshot_service import (
     build_venda_rentabilidade_snapshot,
     get_or_build_venda_rentabilidade_snapshot,
 )
-from app.services.venda_descontos import ratear_descontos_venda, resumo_descontos_venda
+from app.services.venda_descontos import (
+    bruto_compativel_com_quantidade,
+    bruto_item,
+    liquido_item,
+    normalizar_item_venda,
+    ratear_descontos_venda,
+    resumo_descontos_venda,
+)
 from app.vendas.devolucao_valores import ratear_valor_pago_por_item
 from app.vendas.regras import calcular_totais_venda
 from app.vendas.regras import resolver_descontos_atualizacao
@@ -84,6 +91,130 @@ def test_totais_nao_confiam_no_subtotal_cliente_e_separam_di_g_c():
         venda.itens, 999, 99, 10, desconto_venda_valor=9, cupom_discount_applied=9
     )
     assert totais == {"subtotal": 90, "desconto_valor": 28, "total": 82}
+
+
+@pytest.mark.parametrize(
+    "quantidade,preco,subtotal,desconto",
+    [
+        (1.538, 13, 20, 0),
+        (1.457, 19.9, 29, 0),
+        (1.167, 29.9, 34.9, 0),
+        (1.061, 178.9, 189.9, 0),
+        (1, 130, 129.99, 0),
+        (12.813, 0.16, 2.05, 0),
+        (1.508, 19.9, 29, 1),
+    ],
+)
+def test_valor_digitado_preserva_centavos_com_o_peso_que_sera_salvo(
+    quantidade, preco, subtotal, desconto
+):
+    dados = CriarVendaRequest(
+        desconto_venda_valor=0,
+        itens=[
+            dict(
+                tipo="produto",
+                quantidade=quantidade,
+                preco_unitario=preco,
+                desconto_item=desconto,
+                subtotal=subtotal,
+            )
+        ],
+    )
+    item = dados.itens[0]
+    assert item.quantidade == quantidade
+    assert item.preco_unitario == preco
+    assert item.subtotal == subtotal
+    assert bruto_item(item) == Decimal(str(subtotal)) + Decimal(str(desconto))
+    assert liquido_item(item) == Decimal(str(subtotal))
+    assert calcular_totais_venda(dados.itens, 999, 99, 0, desconto_venda_valor=0) == {
+        "subtotal": subtotal,
+        "desconto_valor": desconto,
+        "total": subtotal,
+    }
+
+
+@pytest.mark.parametrize(
+    "quantidade,preco,subtotal,esperado",
+    [
+        (1.538, 13, 200, "19.99"),
+        (1.538, 13, 19.98, "19.99"),
+        (1, 130, 129.90, "130.00"),
+        (0.001, 100, 0.01, "0.10"),
+    ],
+)
+def test_subtotal_incompativel_nao_substitui_calculo_por_quantidade(
+    quantidade, preco, subtotal, esperado
+):
+    item = dict(quantidade=quantidade, preco_unitario=preco, subtotal=subtotal)
+    assert not bruto_compativel_com_quantidade(item, subtotal)
+    assert bruto_item(item) == Decimal(esperado)
+
+
+def test_rateio_e_devolucao_preservam_o_valor_informado_e_descontos_separados():
+    venda = _venda(global_valor=3, cupom=2)
+    venda.tem_entrega = False
+    venda.taxa_entrega = 0
+    venda.itens[0].quantidade = 1.538
+    venda.itens[0].preco_unitario = 13
+    venda.itens[0].desconto_item = 0
+    venda.itens[0].subtotal = 20
+    venda.itens[1].quantidade = 1.508
+    venda.itens[1].preco_unitario = 19.9
+    venda.itens[1].desconto_item = 1
+    venda.itens[1].subtotal = 29
+    totais = calcular_totais_venda(
+        venda.itens, 0, 0, 0, desconto_venda_valor=3, cupom_discount_applied=2
+    )
+    venda.total = totais["total"]
+    venda.desconto_valor = totais["desconto_valor"]
+    assert totais == {"subtotal": 49, "desconto_valor": 6, "total": 44}
+    partes = ratear_descontos_venda(venda)
+    assert sum(parte["desconto_venda"] for parte in partes) == Decimal("3.00")
+    assert sum(parte["cupom"] for parte in partes) == Decimal("2.00")
+    assert sum(parte["total"] for parte in partes) == Decimal("6.00")
+    pagos = ratear_valor_pago_por_item(venda, venda.itens)
+    assert sum(pagos.values()) == Decimal("44.00")
+
+
+def test_subtotal_exato_sobrevive_ao_registro_e_a_nova_normalizacao():
+    from sqlalchemy import select
+    from app.vendas_models import VendaItem
+
+    engine = create_engine("sqlite://")
+    tabela = VendaItem.__table__
+    tabela.create(engine)
+    tenant = uuid4()
+    item = dict(quantidade=1.538, preco_unitario=13, desconto_item=0, subtotal=20)
+    with engine.begin() as conn:
+        registro_id = conn.execute(
+            tabela.insert().values(
+                tenant_id=tenant,
+                venda_id=1,
+                tipo="produto",
+                **normalizar_item_venda(item),
+            )
+        ).inserted_primary_key[0]
+        salvo = dict(
+            conn.execute(select(tabela).where(tabela.c.id == registro_id))
+            .mappings()
+            .one()
+        )
+        assert salvo["quantidade"] == Decimal("1.538")
+        assert salvo["subtotal"] == Decimal("20.00")
+        editado = normalizar_item_venda({**salvo, "desconto_item": 1, "subtotal": 19})
+        conn.execute(
+            tabela.update().where(tabela.c.id == registro_id).values(**editado)
+        )
+        salvo = dict(
+            conn.execute(select(tabela).where(tabela.c.id == registro_id))
+            .mappings()
+            .one()
+        )
+        assert salvo["quantidade"] == Decimal("1.538")
+        assert salvo["subtotal"] == Decimal("19.00")
+        assert bruto_item(salvo) == Decimal("20.00")
+        assert normalizar_item_venda(salvo)["subtotal"] == 19
+    engine.dispose()
 
 
 def test_desconto_exclusivo_do_item_nao_vaza_para_outra_linha():
@@ -423,6 +554,7 @@ def test_comissao_recebe_liquido_do_proprio_item_sem_ratear_di(
                     g,
                     c,
                     1,
+                    datetime(2026, 10, 9),
                 )
             )
         if "COUNT(*)" in sql:
@@ -442,11 +574,15 @@ def test_comissao_recebe_liquido_do_proprio_item_sem_ratear_di(
             "valor_comissao": liquido / 10,
             "tipo_calculo": "percentual",
             "percentual": 10,
+            "valor_fixo": 0,
             "valor_liquido": liquido,
             "custo_item": 0,
         }
 
     monkeypatch.setattr(comissoes, "execute_tenant_safe", executar)
+    monkeypatch.setattr(
+        comissoes, "carregar_configuracoes_vigentes", lambda *a, **kw: {}
+    )
     monkeypatch.setattr(
         comissoes,
         "buscar_configuracao_comissao",
@@ -584,3 +720,63 @@ def test_canonico_rejeita_zero_apos_arredondamento_e_limites_do_decimal(qty, pre
                 dict(tipo="produto", quantidade=qty, preco_unitario=preco, subtotal=0)
             ],
         )
+
+
+@pytest.mark.parametrize("di,g,cupom", [(0, 0, 0), (1, 2, 1)])
+def test_analise_pdv_preserva_valor_digitado_nos_totais_e_na_comissao(
+    monkeypatch, di, g, cupom
+):
+    from app.formas_pagamento_routes_parts.analise_routes import analisar_venda
+    from app.formas_pagamento_routes_parts.schemas import AnaliseVendaRequest
+    from app.produtos_models import Produto
+
+    dados = AnaliseVendaRequest(
+        items=[
+            dict(
+                produto_id=10,
+                quantidade=1.538,
+                preco_venda=13,
+                subtotal=20 - di,
+                desconto_item=di,
+            )
+        ],
+        desconto_venda_valor=g,
+        cupom_discount_applied=cupom,
+        vendedor_id=1,
+    )
+    recebidos = []
+
+    def query(model):
+        valor = (
+            SimpleNamespace(preco_custo=0, nome="Racao a granel")
+            if model is Produto
+            else None
+        )
+        return SimpleNamespace(filter=lambda *a: SimpleNamespace(first=lambda: valor))
+
+    def calculo(**kw):
+        recebidos.append((kw["valor_bruto_item"], kw["valor_liquido_item"]))
+        return {
+            "valor_comissao": float(kw["valor_liquido_item"]) / 10,
+            "percentual": 10,
+        }
+
+    monkeypatch.setattr(
+        "app.comissoes_service.buscar_configuracao_comissao",
+        lambda *a, **kw: {"percentual": 10},
+    )
+    monkeypatch.setattr("app.comissoes_service.calcular_comissao_item", calculo)
+
+    resposta = analisar_venda.__wrapped__(
+        dados=dados,
+        db=SimpleNamespace(query=query),
+        user_and_tenant=(SimpleNamespace(id=1), uuid4()),
+    )
+
+    liquido = 20 - di - g - cupom
+    assert dados.items[0].subtotal == 20 - di
+    assert resposta.composicao["total_produtos"] == 20
+    assert resposta.composicao["subtotal"] == liquido
+    assert recebidos == [(Decimal("20.00"), Decimal(str(liquido)))]
+    assert resposta.deducoes["comissao"]["valor"] == pytest.approx(liquido / 10)
+    assert resposta.resultado["lucro_liquido"] == pytest.approx(liquido * 0.9)

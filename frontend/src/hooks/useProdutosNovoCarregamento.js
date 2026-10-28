@@ -12,6 +12,7 @@ import {
   getProduto,
 } from "../api/produtos";
 import { calcularMargemSobreVenda } from "../utils/produtoMargem";
+import { dataHoraIfoodParaFormulario } from "../components/produto/ifoodProdutoDates";
 import {
   montarEstadoProdutoClonado,
   montarEstadoProdutoPreCadastroGrupo,
@@ -65,15 +66,18 @@ export default function useProdutosNovoCarregamento({
   setImagens,
   setLotes,
   setFornecedores,
+  setGranelVinculos,
 }) {
   const produtoRequestRef = useRef(0);
+  const fiscalCarregadoRef = useRef(null);
 
-  const carregarOpcoesRacao = async () => {
+  const carregarOpcoesRacao = async (requestAindaAtiva) => {
     try {
       const { data } = await api.get("/opcoes-racao/resumo", {
         params: { apenas_ativos: true },
       });
 
+      if (!requestAindaAtiva()) return;
       setOpcoesLinhas(Array.isArray(data?.linhas) ? data.linhas : []);
       setOpcoesPortes(Array.isArray(data?.portes) ? data.portes : []);
       setOpcoesFases(Array.isArray(data?.fases) ? data.fases : []);
@@ -85,8 +89,8 @@ export default function useProdutosNovoCarregamento({
     }
   };
 
-  const carregarDadosAuxiliares = async () => {
-    const [categoriasResult, marcasResult, departamentosResult, clientesResult] =
+  const carregarDadosAuxiliares = async (requestAindaAtiva = () => true) => {
+    const [categoriasResult, marcasResult, departamentosResult, clientesResult, racaoResult] =
       await Promise.allSettled([
         getCategorias(),
         getMarcas(),
@@ -94,8 +98,12 @@ export default function useProdutosNovoCarregamento({
         api.get("/clientes/", {
           params: { is_fornecedor: true, apenas_ativos: true },
         }),
-        carregarOpcoesRacao(),
+        carregarOpcoesRacao(requestAindaAtiva),
       ]);
+
+    if (!requestAindaAtiva()) return;
+    if (racaoResult.status === "rejected")
+      console.error("Erro ao carregar opções de ração:", racaoResult.reason);
 
     if (categoriasResult.status === "fulfilled") {
       const categoriasCarregadas = categoriasResult.value.data || [];
@@ -133,23 +141,29 @@ export default function useProdutosNovoCarregamento({
         : await api.get(`/produtos/${produto.id}/fiscal`);
 
       if (requestAindaAtiva()) {
+        const tributacao = {
+          origem: data.origem,
+          herdado_da_empresa: data.herdado_da_empresa,
+          origem_mercadoria: data.origem_mercadoria ?? "0",
+          ncm: data.ncm ?? "",
+          cest: data.cest ?? "",
+          cfop: data.cfop ?? data.cfop_venda ?? "",
+          cst_icms: data.cst_icms ?? "",
+          icms_aliquota: data.icms_aliquota ?? "",
+          icms_st: data.icms_st ?? false,
+          pis_cst: data.pis_cst ?? "",
+          pis_aliquota: data.pis_aliquota ?? "",
+          cofins_cst: data.cofins_cst ?? "",
+          cofins_aliquota: data.cofins_aliquota ?? "",
+        };
+        fiscalCarregadoRef.current = {
+          id: produto.id,
+          tipo_produto: produto.tipo_produto,
+          tributacao,
+        };
         setFormData((prev) => ({
           ...prev,
-          tributacao: {
-            origem: data.origem,
-            herdado_da_empresa: data.herdado_da_empresa,
-            origem_mercadoria: data.origem_mercadoria ?? "0",
-            ncm: data.ncm ?? "",
-            cest: data.cest ?? "",
-            cfop: data.cfop ?? data.cfop_venda ?? "",
-            cst_icms: data.cst_icms ?? "",
-            icms_aliquota: data.icms_aliquota ?? "",
-            icms_st: data.icms_st ?? false,
-            pis_cst: data.pis_cst ?? "",
-            pis_aliquota: data.pis_aliquota ?? "",
-            cofins_cst: data.cofins_cst ?? "",
-            cofins_aliquota: data.cofins_aliquota ?? "",
-          },
+          tributacao,
         }));
       }
     } catch (error) {
@@ -159,7 +173,9 @@ export default function useProdutosNovoCarregamento({
 
   const carregarProduto = async () => {
     const requestId = ++produtoRequestRef.current;
+    fiscalCarregadoRef.current = null;
     const requestAindaAtiva = () => produtoRequestRef.current === requestId;
+    const auxiliares = carregarDadosAuxiliares(requestAindaAtiva);
 
     try {
       setLoading(true);
@@ -212,10 +228,16 @@ export default function useProdutosNovoCarregamento({
         preco_app_promo_fim: produto.preco_app_promo_fim ?? "",
         anunciar_ecommerce: produto.anunciar_ecommerce ?? true,
         anunciar_app: produto.anunciar_app ?? true,
+        anunciar_ifood: produto.anunciar_ifood ?? false,
+        ifood_pausado: produto.ifood_pausado ?? false,
+        preco_ifood: produto.preco_ifood ?? null,
+        preco_ifood_promo: produto.preco_ifood_promo ?? null,
+        preco_ifood_promo_inicio: dataHoraIfoodParaFormulario(produto.preco_ifood_promo_inicio),
+        preco_ifood_promo_fim: dataHoraIfoodParaFormulario(produto.preco_ifood_promo_fim),
         ativo: produto.ativo ?? true,
         situacao: produto.situacao ?? true,
         estoque_minimo: produto.estoque_minimo || "",
-        estoque_maximo: produto.estoque_maximo || "",
+        estoque_maximo: produto.estoque_maximo ?? "",
         participa_sugestao_compra: produto.participa_sugestao_compra ?? true,
         controle_lote: produto.controle_lote ?? true,
         margem,
@@ -272,8 +294,6 @@ export default function useProdutosNovoCarregamento({
         sabor_proteina_id: produto.sabor_proteina_id || "",
         apresentacao_peso_id: produto.apresentacao_peso_id || "",
       });
-      setLoading(false);
-
       const carregarPredecessor = async () => {
         if (!produto.produto_predecessor_id) return;
         const predecessorRes = await getProduto(produto.produto_predecessor_id);
@@ -328,6 +348,11 @@ export default function useProdutosNovoCarregamento({
         if (requestAindaAtiva()) setFornecedores(fornecedoresResponse.data || []);
       };
 
+      const carregarVinculosGranel = async () => {
+        const { data } = await api.get(`/estoque/granel/vinculos/granel/${id}`);
+        if (requestAindaAtiva()) setGranelVinculos(Array.isArray(data) ? data : []);
+      };
+
       const resultadosComplementares = await Promise.allSettled([
         carregarPredecessor(),
         carregarSucessor(),
@@ -335,6 +360,7 @@ export default function useProdutosNovoCarregamento({
         carregarLotesProduto(),
         carregarFornecedoresProduto(),
         carregarFiscal(produto, requestAindaAtiva),
+        carregarVinculosGranel(),
       ]);
 
       resultadosComplementares.forEach((resultado, indice) => {
@@ -349,11 +375,15 @@ export default function useProdutosNovoCarregamento({
         error.response?.data?.detail || error.message || "Produto não encontrado.",
       );
     } finally {
+      await auxiliares;
       if (requestAindaAtiva()) setLoading(false);
     }
   };
 
   const carregarProdutoParaClone = async () => {
+    const requestId = ++produtoRequestRef.current;
+    const requestAindaAtiva = () => produtoRequestRef.current === requestId;
+    const auxiliares = carregarDadosAuxiliares(requestAindaAtiva);
     try {
       setLoading(true);
       setErroCarregamento(null);
@@ -364,6 +394,7 @@ export default function useProdutosNovoCarregamento({
       setFornecedores([]);
 
       const response = await getProduto(cloneId);
+      if (!requestAindaAtiva()) return;
       const produto = response.data;
       const clone = montarEstadoProdutoClonado(produto);
 
@@ -379,19 +410,35 @@ export default function useProdutosNovoCarregamento({
       setFormData((prev) => ({
         ...prev,
         ...clone,
+        id: undefined,
+        estoque_compartilhado: false,
+        estoque_origem_empresa_id: null,
+        estoque_origem_nome: null,
+        imagem_principal: null,
+        anunciar_ifood: false,
+        ifood_pausado: false,
+        preco_ifood: produto.preco_ifood ?? null,
+        preco_ifood_promo: produto.preco_ifood_promo ?? null,
+        preco_ifood_promo_inicio: dataHoraIfoodParaFormulario(produto.preco_ifood_promo_inicio),
+        preco_ifood_promo_fim: dataHoraIfoodParaFormulario(produto.preco_ifood_promo_fim),
         margem,
       }));
     } catch (error) {
+      if (!requestAindaAtiva()) return;
       console.error("Erro ao carregar produto para clone:", error);
       setErroCarregamento(
         error.response?.data?.detail || error.message || "Produto não encontrado.",
       );
     } finally {
-      setLoading(false);
+      await auxiliares;
+      if (requestAindaAtiva()) setLoading(false);
     }
   };
 
   const carregarProdutoParaPreCadastroGrupo = async () => {
+    const requestId = ++produtoRequestRef.current;
+    const requestAindaAtiva = () => produtoRequestRef.current === requestId;
+    const auxiliares = carregarDadosAuxiliares(requestAindaAtiva);
     try {
       setLoading(true);
       setErroCarregamento(null);
@@ -405,13 +452,26 @@ export default function useProdutosNovoCarregamento({
         preCadastroGrupoId,
         preCadastroGrupoTenantOrigem,
       );
+      if (!requestAindaAtiva()) return;
       const pre = montarEstadoProdutoPreCadastroGrupo(response.data);
 
       setFormData((prev) => ({
         ...prev,
         ...pre,
+        id: undefined,
+        estoque_compartilhado: false,
+        estoque_origem_empresa_id: null,
+        estoque_origem_nome: null,
+        imagem_principal: null,
+        anunciar_ifood: false,
+        ifood_pausado: false,
+        preco_ifood: null,
+        preco_ifood_promo: null,
+        preco_ifood_promo_inicio: "",
+        preco_ifood_promo_fim: "",
       }));
     } catch (error) {
+      if (!requestAindaAtiva()) return;
       console.error("Erro ao carregar produto de outra loja do grupo:", error);
       setErroCarregamento(
         error.response?.data?.detail ||
@@ -419,11 +479,27 @@ export default function useProdutosNovoCarregamento({
           "Não foi possível trazer os dados desse produto.",
       );
     } finally {
-      setLoading(false);
+      await auxiliares;
+      if (requestAindaAtiva()) setLoading(false);
     }
   };
 
   const salvarFiscal = async (produto) => {
+    if (isEdicao) {
+      const fiscalCarregado = fiscalCarregadoRef.current;
+      if (!fiscalCarregado || String(fiscalCarregado.id) !== String(produto.id)) {
+        throw new Error("Recarregue o produto para conferir os dados fiscais antes de salvar.");
+      }
+      // Defaults de exibição não devem virar uma personalização fiscal ao salvar outra aba.
+      if (
+        fiscalCarregado.tipo_produto === produto.tipo_produto &&
+        Object.entries(fiscalCarregado.tributacao).every(([campo, valor]) =>
+          Object.is(formData.tributacao?.[campo], valor),
+        )
+      ) {
+        return;
+      }
+    }
     const payload = {
       origem_mercadoria: formData.tributacao.origem_mercadoria,
       ncm: formData.tributacao.ncm,
@@ -443,11 +519,12 @@ export default function useProdutosNovoCarregamento({
     } else {
       await api.put(`/produtos/${produto.id}/fiscal`, payload);
     }
+    fiscalCarregadoRef.current = {
+      id: produto.id,
+      tipo_produto: produto.tipo_produto,
+      tributacao: { ...formData.tributacao },
+    };
   };
-
-  useEffect(() => {
-    carregarDadosAuxiliares();
-  }, []);
 
   useEffect(() => {
     if (isEdicao) {
@@ -456,6 +533,13 @@ export default function useProdutosNovoCarregamento({
       carregarProdutoParaClone();
     } else if (preCadastroGrupoId && preCadastroGrupoTenantOrigem) {
       carregarProdutoParaPreCadastroGrupo();
+    } else {
+      const requestId = ++produtoRequestRef.current;
+      const requestAindaAtiva = () => produtoRequestRef.current === requestId;
+      setLoading(true);
+      carregarDadosAuxiliares(requestAindaAtiva).finally(() => {
+        if (requestAindaAtiva()) setLoading(false);
+      });
     }
 
     return () => {

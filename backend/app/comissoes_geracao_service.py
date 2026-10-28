@@ -12,11 +12,13 @@ from app.tenancy.context import set_tenant_context
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal
 from app.utils.tenant_safe_sql import execute_tenant_safe
 from app.services.venda_descontos import bruto_item, ratear_descontos_venda
+from app.comissoes_vigencia import carregar_configuracoes_vigentes
 
 from app.comissoes_config_service import (
     _require_tenant_id,
     buscar_configuracao_comissao,
     calcular_comissao_item,
+    calcular_comissao_fixa_parcela,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,6 +33,7 @@ def gerar_comissoes_venda(
     parcela_numero: int = 1,
     db=None,
     tenant_id=None,
+    valor_pago_anterior: Optional[Decimal] = None,
 ):
     """
     Gera comissões para uma venda
@@ -52,6 +55,7 @@ def gerar_comissoes_venda(
         forma_pagamento: Forma de pagamento específica (para calcular taxa correta)
         parcela_numero: Número da parcela de pagamento (para idempotência)
         db: Sessão do SQLAlchemy (OBRIGATÓRIO para PostgreSQL)
+        valor_pago_anterior: Cumulativo anterior do pagamento, quando conhecido.
     """
     if db is None:
         logger.error("❌ Sessão db é obrigatória para gerar_comissoes_venda")
@@ -65,7 +69,7 @@ def gerar_comissoes_venda(
             db,
             """
             SELECT id, total, status, desconto_valor, taxa_entrega, tem_entrega, data_venda, tenant_id, entregador_id,
-                   desconto_venda_valor, cupom_discount_applied, funcionario_id
+                   desconto_venda_valor, cupom_discount_applied, funcionario_id, comissao_ancora_em
             FROM vendas
             WHERE id = :venda_id
               AND {tenant_filter}
@@ -93,6 +97,7 @@ def gerar_comissoes_venda(
             "desconto_venda_valor": venda_row[9] if len(venda_row) > 9 else None,
             "cupom_discount_applied": venda_row[10] if len(venda_row) > 10 else None,
             "funcionario_id": venda_row[11],
+            "comissao_ancora_em": venda_row[12],
         }
 
         # O vendedor informado na venda não implica autorização para comissão.
@@ -478,6 +483,9 @@ def gerar_comissoes_venda(
         # ETAPAS 4, 5, 6: PARA CADA ITEM
         # ═══════════════════════════════════════════════════════════
 
+        configuracoes_vigentes = carregar_configuracoes_vigentes(
+            db, funcionario_id, venda["comissao_ancora_em"], tenant_id=tenant_id
+        )
         for item_norm in itens_normalizados:
             # Buscar configuração de comissão
             config = buscar_configuracao_comissao(
@@ -485,6 +493,8 @@ def gerar_comissoes_venda(
                 funcionario_id,
                 item_norm["produto_id"],
                 tenant_id=tenant_id,
+                criada_em=venda["comissao_ancora_em"],
+                configuracoes_vigentes=configuracoes_vigentes,
             )
 
             if not config:
@@ -542,16 +552,39 @@ def gerar_comissoes_venda(
                 # Proporção do pagamento em relação ao total da venda
                 total_venda_decimal = Decimal(str(venda["total"]))
                 if total_venda_decimal > 0:
-                    percentual_proporcional = (
-                        valor_pago_decimal / total_venda_decimal
-                    ) * Decimal("100")
-                    proporcao_pagamento = valor_pago_decimal / total_venda_decimal
+                    proporcao_pagamento = min(
+                        Decimal("1"), valor_pago_decimal / total_venda_decimal
+                    )
+                    percentual_proporcional = proporcao_pagamento * Decimal("100")
 
                     # Aplicar proporção na base de cálculo E na comissão
                     valor_base_calculo_final = (
                         Decimal(str(calculo["base_calculo"])) * proporcao_pagamento
                     )
                     valor_base_comissionada = valor_base_original * proporcao_pagamento
+                    if calculo["tipo_calculo"] == "fixo":
+                        recebimentos_anteriores = valor_pago_anterior
+                        if recebimentos_anteriores is None:
+                            recebimentos_anteriores = execute_tenant_safe(
+                                db,
+                                """SELECT COALESCE(SUM(valor_pago_referencia), 0)
+                                FROM comissoes_itens
+                                WHERE venda_id = :venda_id AND venda_item_id = :item_id
+                                  AND funcionario_id = :funcionario_id
+                                  AND status <> 'estornado' AND {tenant_filter}""",
+                                {
+                                    "venda_id": venda_id,
+                                    "item_id": item_norm["item_id"],
+                                    "funcionario_id": funcionario_id,
+                                },
+                                tenant_id=tenant_id,
+                            ).scalar()
+                        valor_base_comissionada = calcular_comissao_fixa_parcela(
+                            valor_base_original,
+                            valor_pago_decimal,
+                            total_venda_decimal,
+                            recebimentos_anteriores,
+                        )
                     calculo["valor_comissao"] = float(valor_base_comissionada)
 
                     logger.info("💰 COMISSÃO PROPORCIONAL:")
@@ -580,7 +613,7 @@ def gerar_comissoes_venda(
                 INSERT INTO comissoes_itens (
                     venda_id, venda_item_id, funcionario_id, produto_id,
                     data_venda, quantidade, valor_venda, valor_custo,
-                    tipo_calculo, valor_base_calculo, percentual_comissao, 
+                    tipo_calculo, valor_base_calculo, percentual_comissao, valor_fixo,
                     valor_comissao, valor_comissao_gerada, percentual_pago, status,
                     valor_base_original, valor_base_comissionada, percentual_aplicado,
                     valor_pago_referencia, parcela_numero, tenant_id,
@@ -590,7 +623,7 @@ def gerar_comissoes_venda(
                 ) VALUES (
                     :venda_id, :venda_item_id, :funcionario_id, :produto_id,
                     :data_venda, :quantidade, :valor_venda, :valor_custo,
-                    :tipo_calculo, :valor_base_calculo, :percentual_comissao,
+                    :tipo_calculo, :valor_base_calculo, :percentual_comissao, :valor_fixo,
                     :valor_comissao, :valor_comissao_gerada, :percentual_pago, 'pendente',
                     :valor_base_original, :valor_base_comissionada, :percentual_aplicado,
                     :valor_pago_referencia, :parcela_numero, :tenant_id,
@@ -615,6 +648,7 @@ def gerar_comissoes_venda(
                         valor_base_calculo_final
                     ),  # ✅ Base proporcional ao pagamento
                     "percentual_comissao": calculo["percentual"],
+                    "valor_fixo": calculo["valor_fixo"],
                     "valor_comissao": calculo["valor_comissao"],
                     "valor_comissao_gerada": calculo["valor_comissao"],
                     "percentual_pago": float(percentual_proporcional),

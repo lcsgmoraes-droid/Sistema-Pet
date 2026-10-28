@@ -6,11 +6,21 @@ from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy import Enum
+from sqlalchemy.schema import CreateTable
 
+from app.financeiro_models import ContaReceber, MovimentacaoFinanceira, Recebimento
+from app.grupo_comercial_models import (
+    GrupoComercial,
+    GrupoComercialEstoqueCompartilhado,
+    GrupoComercialMembro,
+)
+from app.ia.aba5_models import FluxoCaixa
 from app.vendas import VendaService, crud_routes, finalizacao, pagamentos_routes
 from app.vendas import status_routes
 from app.vendas.schemas import CriarVendaRequest
 from app.vendas_models import VendaPagamento
+from app.veterinario_models import VetPartnerLink
 from tests.unit import test_finalizacao_recebiveis_atomicidade as recebiveis
 
 cenario = recebiveis.cenario
@@ -49,6 +59,19 @@ def spies(cenario, monkeypatch):
 def test_put_com_funcionario_e_recebimentos_suficientes_mantem_aberta(
     cenario, spies, monkeypatch
 ):
+    # A serialização do vendedor executa a política de compartilhamento no PG.
+    # O catálogo vazio fica no schema descartável, nunca no catálogo público.
+    if cenario.db.get_bind().dialect.name == "postgresql":
+        with cenario.db.get_bind().begin() as conn:
+            for model in (
+                VetPartnerLink,
+                GrupoComercial,
+                GrupoComercialMembro,
+                GrupoComercialEstoqueCompartilhado,
+            ):
+                conn.execute(
+                    CreateTable(model.__table__, include_foreign_key_constraints=[])
+                )
     cenario.finalizar(135)
     cenario.venda.status = "aberta"
     cenario.venda.funcionario_id = 77
@@ -75,6 +98,15 @@ def test_put_com_funcionario_e_recebimentos_suficientes_mantem_aberta(
             }
         ],
     )
+    with pytest.raises(HTTPException) as erro:
+        crud_routes.atualizar_venda(1, dados, cenario.db, _usuario(cenario))
+    assert erro.value.status_code == 409
+    dados.justificativa_pagamento_excedente = (
+        "Desconto autorizado após recebimento; excedente será conferido pelo gestor."
+    )
+    dados.contexto_pagamento_excedente = erro.value.detail[
+        "contexto_pagamento_excedente"
+    ]
     resultado = crud_routes.atualizar_venda(1, dados, cenario.db, _usuario(cenario))
     assert resultado["status"] == cenario.venda.status == "aberta"
     assert cenario.venda.total == Decimal("100")
@@ -206,6 +238,47 @@ def test_excluir_pagamento_mantem_venda_aberta_independente_do_saldo(
             )
         )
     cenario.venda.rentabilidade_snapshot = {"snapshot_version": 6}
+    cenario.db.flush()
+    # A exclusão segura exige a partida do pagamento; esta fixture testa o
+    # estado da venda sem depender de vínculos financeiros antigos ambíguos.
+    conta = ContaReceber(
+        tenant_id=cenario.tenant,
+        venda_id=1,
+        forma_pagamento_id=1,
+        descricao="Recebível do pagamento a excluir",
+        valor_original=20,
+        valor_final=20,
+        valor_recebido=20,
+        status="recebido",
+        user_id=1,
+        dre_subcategoria_id=1,
+        canal="loja_fisica",
+        data_emissao=excluido.data_pagamento.date(),
+        data_vencimento=excluido.data_pagamento.date(),
+        observacoes=f"[venda_pagamento:{excluido.id}]",
+    )
+    cenario.db.add(conta)
+    cenario.db.flush()
+    cenario.db.add(
+        Recebimento(
+            tenant_id=cenario.tenant,
+            conta_receber_id=conta.id,
+            forma_pagamento_id=1,
+            valor_recebido=20,
+            data_recebimento=excluido.data_pagamento.date(),
+            user_id=1,
+            observacoes=f"[venda_pagamento:{excluido.id}]",
+        )
+    )
+    engine = cenario.db.get_bind()
+    for model in (MovimentacaoFinanceira, FluxoCaixa):
+        for coluna in model.__table__.columns:
+            if isinstance(coluna.type, Enum):
+                coluna.type.create(engine, checkfirst=True)
+        with engine.begin() as connection:
+            connection.execute(
+                CreateTable(model.__table__, include_foreign_key_constraints=[])
+            )
     cenario.db.commit()
     resultado = pagamentos_routes.excluir_pagamento(
         excluido.id, cenario.db, _usuario(cenario)

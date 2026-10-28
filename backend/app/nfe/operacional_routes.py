@@ -1,4 +1,5 @@
 import traceback
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
@@ -15,7 +16,7 @@ from app.nfe.documentos import (
     obter_xml_documento,
     validar_link_documento,
 )
-from app.produtos_models import EstoqueMovimentacao, Produto
+from app.produtos_models import EstoqueMovimentacao
 from app.services.bling_sync_service import BlingSyncService
 from app.services.bling_tenant_guard import (
     bling_tenant_id_configurado,
@@ -27,6 +28,10 @@ from app.services.nfe_authorized_reconciliation_service import (
 from app.tenancy.rls import sync_rls_tenant
 from app.utils.logger import logger
 from app.vendas_models import Venda
+from app.vendas.fiscal_status import (
+    nota_fiscal_requer_regularizacao,
+    sincronizar_venda_apos_cancelamento_fiscal,
+)
 
 router = APIRouter()
 
@@ -225,38 +230,56 @@ async def cancelar_nfe(
         bling = BlingAPI()
         resultado = bling.cancelar_nfe(nfe_id, request.justificativa)
 
-        # Atualizar status na venda
+        # A solicitação aceita não significa que o emissor já confirmou o
+        # cancelamento. O estado comercial da venda é independente.
         venda = (
             db.query(Venda)
             .filter(Venda.nfe_bling_id == nfe_id, Venda.tenant_id == tenant_id)
             .first()
         )
         if venda:
-            venda.nfe_status = "cancelada"
-            venda.nfe_motivo_rejeicao = request.justificativa
-            # Voltar status para 'finalizada' quando NF for cancelada
-            venda.status = "finalizada"
-            _registrar_status_contabil_bling(
-                db,
-                tenant_id,
-                venda,
-                {
-                    "id": nfe_id,
-                    "situacao": 4,
-                    "numero": venda.nfe_numero,
-                    "dataEmissao": (
-                        venda.nfe_data_emissao.isoformat()
-                        if venda.nfe_data_emissao
-                        else None
-                    ),
-                    "chaveAcesso": venda.nfe_chave,
-                },
-            )
+            venda.nfe_cancelamento_status = "solicitado"
+            venda.nfe_cancelamento_codigo = None
+            venda.nfe_cancelamento_motivo = None
+            venda.nfe_cancelamento_solicitado_em = datetime.now(timezone.utc)
             db.commit()
+        confirmado = False
+        try:
+            nfe_routes = _nfe_routes()
+            consulta = (
+                bling.consultar_nfce(nfe_id)
+                if venda and nfe_routes._venda_usa_nfce(venda)
+                else bling.consultar_nfe(nfe_id)
+            )
+            dados_nota = (
+                consulta.get("data", consulta) if isinstance(consulta, dict) else {}
+            )
+            confirmado = nfe_routes._nota_cancelada_bling(dados_nota)
+            if venda:
+                venda.nfe_status = nfe_routes._status_nota_bling(dados_nota)
+                sincronizar_venda_apos_cancelamento_fiscal(db, venda)
+                _registrar_status_contabil_bling(db, tenant_id, venda, dados_nota)
+                db.commit()
+        except Exception as exc:
+            db.rollback()
+            confirmado = False
+            logger.warning(
+                "cancelar_nfe",
+                f"Cancelamento solicitado; confirmação pendente; erro={type(exc).__name__}",
+            )
 
         return {
-            "success": True,
-            "message": "NF-e cancelada com sucesso",
+            "success": confirmado,
+            "processando": not confirmado,
+            "cancelamento_solicitado": not confirmado,
+            "cancelamento_status": "confirmado" if confirmado else "solicitado",
+            "cancelamento_codigo": None,
+            "cancelamento_motivo": None,
+            "message": (
+                "NF-e cancelada com sucesso"
+                if confirmado
+                else "Cancelamento solicitado. Aguarde a confirmação do emissor."
+            ),
             "data": resultado,
         }
     except ValueError as e:
@@ -303,6 +326,8 @@ async def excluir_nota(
         venda = (
             db.query(Venda)
             .filter(Venda.id == venda_id, Venda.tenant_id == tenant_id)
+            .populate_existing()
+            .with_for_update()
             .first()
         )
 
@@ -315,6 +340,14 @@ async def excluir_nota(
         # Validar status - só permite excluir notas que não foram autorizadas
         status_normalizado = str(venda.nfe_status or "").strip().casefold()
         status_permitidos = {"", "pendente", "erro", "rejeitada"}
+        if venda.status == "cancelada" and nota_fiscal_requer_regularizacao(venda):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "A venda está cancelada e possui pendência fiscal. "
+                    "Confirme a situação da nota no emissor antes de remover seus dados."
+                ),
+            )
         if status_normalizado not in status_permitidos:
             raise HTTPException(
                 status_code=400,
@@ -340,9 +373,14 @@ async def excluir_nota(
         venda.nfe_data_emissao = None
         venda.nfe_data_autorizacao = None
         venda.nfe_motivo_rejeicao = None
+        venda.nfe_cancelamento_status = None
+        venda.nfe_cancelamento_codigo = None
+        venda.nfe_cancelamento_motivo = None
+        venda.nfe_cancelamento_solicitado_em = None
 
-        # Voltar status para finalizada
-        venda.status = "finalizada"
+        # Remover uma tentativa fiscal não reativa uma venda já cancelada.
+        if venda.status == "pago_nf":
+            venda.status = "finalizada"
 
         db.commit()
 
@@ -423,6 +461,7 @@ async def webhook_bling(request: Request, db: Session = Depends(get_session)):
 
         # Atualizar venda
         venda.nfe_status = novo_status
+        sincronizar_venda_apos_cancelamento_fiscal(db, venda)
         venda.nfe_chave = dados_nota.get("chaveAcesso") or venda.nfe_chave
 
         # ✅ Se NF foi AUTORIZADA, confirmar o estoque reservado e sincronizar o saldo final.
@@ -463,53 +502,13 @@ async def webhook_bling(request: Request, db: Session = Depends(get_session)):
                         f"  ⚠️ Erro ao enfileirar sync do produto {mov.produto_id}: {e}",
                     )
 
-        # Se NF foi CANCELADA, revert estoque
+        # Cancelar a nota apenas remove a trava fiscal. O estoque permanece
+        # baixado até a decisão de cancelar a venda, evitando estorno duplicado.
         elif nfe_routes._nota_cancelada_bling(dados_nota):
-            logger.warning(
+            logger.info(
                 "webhook_bling",
-                f"⚠️ NF CANCELADA - Revertendo estoque da Venda #{venda.id}",
+                f"NF cancelada da Venda #{venda.id}; aguardando decisão sobre a venda",
             )
-
-            movimentacoes = (
-                db.query(EstoqueMovimentacao)
-                .filter(
-                    EstoqueMovimentacao.referencia_id == venda.id,
-                    EstoqueMovimentacao.referencia_tipo == "venda_bling",
-                )
-                .all()
-            )
-
-            for mov in movimentacoes:
-                if mov.status != "cancelado":
-                    produto = (
-                        db.query(Produto)
-                        .filter(
-                            Produto.id == mov.produto_id,
-                            Produto.tenant_id == tenant_id,
-                        )
-                        .first()
-                    )
-                    if produto:
-                        produto.estoque_atual = (
-                            produto.estoque_atual or 0
-                        ) + mov.quantidade
-                        mov.status = "cancelado"
-                        logger.info(
-                            "webhook_bling", f"  ↩️ Estoque revertido: {produto.codigo}"
-                        )
-                        try:
-                            BlingSyncService.queue_product_sync(
-                                db,
-                                produto_id=produto.id,
-                                motivo="nf_cancelada",
-                                origem="webhook_nf",
-                                force=True,
-                            )
-                        except Exception as e:
-                            logger.warning(
-                                "webhook_bling",
-                                f"  ⚠️ Erro ao enfileirar estorno do produto {produto.id}: {e}",
-                            )
 
         _registrar_status_contabil_bling(db, tenant_id, venda, dados_nota)
         db.commit()
@@ -574,6 +573,7 @@ async def sincronizar_status_nota(
 
         # Atualizar venda
         venda.nfe_status = novo_status
+        sincronizar_venda_apos_cancelamento_fiscal(db, venda)
         venda.nfe_chave = dados_nota.get("chaveAcesso") or venda.nfe_chave
 
         _registrar_status_contabil_bling(db, tenant_id, venda, dados_nota)
@@ -637,6 +637,7 @@ async def sincronizar_todos_status(
                     venda.nfe_status = novo_status
                     venda.nfe_chave = dados_nota.get("chaveAcesso") or venda.nfe_chave
                     atualizados += 1
+                sincronizar_venda_apos_cancelamento_fiscal(db, venda)
                 _registrar_status_contabil_bling(db, tenant_id, venda, dados_nota)
 
             except Exception as e:

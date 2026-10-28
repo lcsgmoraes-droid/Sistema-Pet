@@ -38,14 +38,16 @@ class _FakeSession:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("visao", ["venda", "recebimento"])
+@pytest.mark.parametrize("canal", ["loja_fisica", "ifood"])
 async def test_resumo_dashboard_normaliza_decimais_antes_dos_calculos(
-    visao, monkeypatch
+    visao, canal, monkeypatch
 ):
     monkeypatch.setattr(
         "app.dashboard_routes.montar_relatorio_recebimentos",
         lambda *args: {"resumo": {"total": 280, "recebimentos": 300, "devolucoes": 20}},
     )
     venda = SimpleNamespace(
+        canal=canal,
         total=Decimal("150.00"),
         subtotal=Decimal("160.00"),
         desconto_valor=Decimal("10.00"),
@@ -91,7 +93,10 @@ async def test_resumo_dashboard_normaliza_decimais_antes_dos_calculos(
         "vence_hoje": 25.0,
     }
     assert resumo["vendas_periodo"]["unidades"] == 2.5
-    assert resumo["vendas_periodo"]["lucro"] == 33.75
+    assert resumo["vendas_periodo"]["lucro"] == (None if canal == "ifood" else 33.75)
+    assert resumo["vendas_periodo"]["vendas_rentabilidade_pendente"] == (
+        1 if canal == "ifood" else 0
+    )
     assert resumo["visao_comercial"] == visao
     assert resumo["indicador_comercial"] == (280 if visao == "recebimento" else 160)
     assert resumo["fluxo_periodo"] == (

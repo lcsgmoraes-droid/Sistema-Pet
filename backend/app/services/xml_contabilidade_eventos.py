@@ -105,7 +105,7 @@ def _validar_evento(root, xml, chave, cnpj, metadados=None):
         raise XmlContabilidadeError(
             "Um evento fiscal não possui data de registro válida.", 409
         ) from None
-    return EventoFiscal(
+    evento = EventoFiscal(
         identidade,
         tipo,
         int(seq),
@@ -114,6 +114,11 @@ def _validar_evento(root, xml, chave, cnpj, metadados=None):
         xml,
         data,
     )
+    from app.services.xml_contabilidade_relatorios import atual
+
+    if atual():
+        atual().evento_encontrado(chave, evento)
+    return evento
 
 
 def obter_eventos_intnfe(db, tenant_id, doc):
@@ -121,6 +126,14 @@ def obter_eventos_intnfe(db, tenant_id, doc):
     from app.intnfe.client import IntNFeClient
     from app.intnfe.emission import _access_token, _connection
 
+    correlation_id = getattr(doc.venda, "nfe_correlation_id", None)
+    if not isinstance(correlation_id, str) or not re.fullmatch(
+        r"[A-Za-z0-9_-]{1,128}", correlation_id
+    ):
+        raise XmlContabilidadeError(
+            "Uma nota emitida no CorePet não possui referência fiscal válida para confirmar todos os eventos. Nenhum lote parcial foi preparado.",
+            409,
+        )
     api = None
     try:
         api = IntNFeClient()
@@ -141,8 +154,6 @@ def obter_eventos_intnfe(db, tenant_id, doc):
 
 def coletar_eventos(root, detalhe, chave, cnpj, *, cancelada=False, xml_original=None):
     """Inclui todos os eventos confirmados e rejeita comprovantes ausentes."""
-    from app.nfe.documentos import baixar_link_documento
-
     eventos, faltantes = {}, []
     for node in root.findall(".//n:procEventoNFe", NS):
         evento = _validar_evento(node, None, chave, cnpj)
@@ -151,24 +162,6 @@ def coletar_eventos(root, detalhe, chave, cnpj, *, cancelada=False, xml_original
         evento.xml = xml_original
         eventos[evento.identidade] = evento
     candidatos = []
-    for key in ("xmlCancelamento", "xmlCartaCorrecao", "xmlEvento"):
-        # Campos disponíveis no detalhe; não há endpoint de eventos documentado
-        # no OpenAPI Bling. Nunca inventar uma URL de cancelamento/CC-e.
-        value = detalhe.get(key)
-        if value:
-            values = value if isinstance(value, list) else [value]
-            for item in values:
-                candidatos.append(
-                    (
-                        (
-                            item
-                            if isinstance(item, bytes)
-                            or str(item).lstrip().startswith("<")
-                            else baixar_link_documento(item)
-                        ),
-                        None,
-                    )
-                )
     for row in detalhe.get("_eventos_persistidos", []) + detalhe.get(
         "_eventos_intnfe", []
     ):

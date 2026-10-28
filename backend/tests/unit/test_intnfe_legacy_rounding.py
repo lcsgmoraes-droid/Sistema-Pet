@@ -73,6 +73,58 @@ def test_legacy_quantity_from_four_decimals_preserves_saved_subtotal(
 
 
 @pytest.mark.parametrize("document_type", ["nfe", "nfce"])
+@pytest.mark.parametrize(
+    "quantity,price,subtotal,item_discount",
+    [
+        ("1.538", "13.00", "20.00", "0.00"),
+        ("1.061", "178.90", "189.90", "0.00"),
+        ("1.000", "130.00", "129.99", "0.00"),
+        ("1.508", "19.90", "29.00", "1.00"),
+    ],
+)
+def test_current_amount_entry_preserves_exact_fiscal_total_and_document_details(
+    document_type, quantity, price, subtotal, item_discount
+):
+    tenant, connection, sale = _sale(
+        [(quantity, price, item_discount, subtotal)],
+        total=subtotal,
+        discount=item_discount,
+        new_contract=True,
+    )
+    sale.id = 123
+    sale.nfe_tipo = document_type
+    sale.nfe_modelo = "55" if document_type == "nfe" else "65"
+    sale.nfe_status = "rejeitada"
+    for field in (
+        "nfe_numero",
+        "nfe_serie",
+        "nfe_chave",
+        "nfe_codigo_erro",
+        "nfe_motivo_rejeicao",
+        "nfe_protocolo",
+        "nfe_ambiente",
+        "nfe_data_emissao",
+    ):
+        setattr(sale, field, None)
+    original = deepcopy(sale)
+    payload = emission.build_payload(None, tenant, connection, sale, document_type)
+    gross = Decimal(subtotal) + Decimal(item_discount)
+    product = payload["produtos"][0]
+    assert Decimal(str(product["valorTotal"])) == gross
+    assert Decimal(str(product["quantidade"])) == Decimal(quantity)
+    assert (
+        Decimal(str(product["quantidade"])) * Decimal(str(product["valorUnitario"]))
+    ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) == gross
+    assert Decimal(str(product.get("desconto", 0))) == Decimal(item_discount)
+    assert payload["pagamentos"] == [{"formaPagamento": "17", "valor": float(subtotal)}]
+    details = emission.local_document_details(None, tenant, sale)
+    assert details["itens"][0]["valor_total"] == product["valorTotal"]
+    assert details["itens"][0]["valor_unitario"] == product["valorUnitario"]
+    assert details["itens"][0]["desconto"] == product.get("desconto", 0)
+    assert sale == original
+
+
+@pytest.mark.parametrize("document_type", ["nfe", "nfce"])
 def test_legacy_raw_aggregate_preserves_recorded_discounts_and_final_tax_base(
     document_type, monkeypatch
 ):

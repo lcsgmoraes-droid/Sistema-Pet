@@ -135,6 +135,84 @@ def test_entrega_salva_observacao_gera_venda_e_recalcula(monkeypatch):
     assert chamadas["recalculo"] == 1
 
 
+def test_entrega_zero_exige_confirmacao_explicita_e_nao_gera_venda(monkeypatch):
+    atendimento = SimpleNamespace(
+        id=14,
+        status="pronto",
+        etapas=[],
+        pacote_credito_id=None,
+        observacoes_saida=None,
+    )
+    chamadas = _preparar_rota(monkeypatch, atendimento)
+    registros = []
+    monkeypatch.setattr(
+        atendimentos_routes,
+        "registrar_entrega_sem_cobranca",
+        lambda db, tenant_id, user_id, item, motivo: registros.append(
+            (tenant_id, user_id, item.status, motivo)
+        ),
+    )
+    db = _DbFake()
+
+    resposta = atendimentos_routes.mover_etapa_atendimento(
+        atendimento_id=14,
+        body=BanhoTosaMoverEtapaInput(
+            tipo="entregue",
+            iniciar_timer=False,
+            entrega_sem_cobranca=True,
+            motivo_sem_cobranca="Cortesia autorizada",
+        ),
+        db=db,
+        current=object(),
+    )
+
+    assert resposta["status"] == "entregue"
+    assert registros == [("tenant-dev", 91, "pronto", "Cortesia autorizada")]
+    assert chamadas["venda"] == 0
+    assert chamadas["recalculo"] == 1
+    assert db.commits == 1
+
+
+def test_pacote_com_extra_na_entrega_gera_venda_do_extra(monkeypatch):
+    atendimento = SimpleNamespace(
+        id=15,
+        status="pronto",
+        etapas=[],
+        pacote_credito_id=22,
+        observacoes_saida=None,
+    )
+    chamadas = _preparar_rota(monkeypatch, atendimento)
+    monkeypatch.setattr(
+        atendimentos_routes, "_montar_itens_venda", lambda *args: [{"subtotal": 15}]
+    )
+    atendimentos_routes.mover_etapa_atendimento(
+        atendimento_id=15,
+        body=BanhoTosaMoverEtapaInput(tipo="entregue", iniciar_timer=False),
+        db=_DbFake(),
+        current=object(),
+    )
+    assert chamadas["venda"] == 1
+
+
+def test_pacote_sem_extra_na_entrega_nao_duplica_cobranca(monkeypatch):
+    atendimento = SimpleNamespace(
+        id=16,
+        status="pronto",
+        etapas=[],
+        pacote_credito_id=22,
+        observacoes_saida=None,
+    )
+    chamadas = _preparar_rota(monkeypatch, atendimento)
+    monkeypatch.setattr(atendimentos_routes, "_montar_itens_venda", lambda *args: [])
+    atendimentos_routes.mover_etapa_atendimento(
+        atendimento_id=16,
+        body=BanhoTosaMoverEtapaInput(tipo="entregue", iniciar_timer=False),
+        db=_DbFake(),
+        current=object(),
+    )
+    assert chamadas["venda"] == 0
+
+
 def test_relatorio_calcula_previa_quando_snapshot_historico_nao_existe(monkeypatch):
     atendimento = SimpleNamespace(id=22)
     snapshot = SimpleNamespace(as_dict=lambda: {"valor_cobrado": 90, "custo_total": 30})

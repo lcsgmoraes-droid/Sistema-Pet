@@ -181,10 +181,10 @@ test("histórico aparece enquanto caixa aberto está pendente e sua falha não a
   assert.deepEqual(caixas, [{ id: 9 }]);
 });
 
-test("reabertura só libera após confirmar que não há caixa aberto", () => {
+test("reabertura libera após consultar caixas mesmo que outro já esteja aberto", () => {
   assert.equal(podeReabrirCaixa("carregando", null), false);
   assert.equal(podeReabrirCaixa("erro", null), false);
-  assert.equal(podeReabrirCaixa("pronto", { id: 1 }), false);
+  assert.equal(podeReabrirCaixa("pronto", { id: 1 }), true);
   assert.equal(podeReabrirCaixa("pronto", null), true);
 });
 

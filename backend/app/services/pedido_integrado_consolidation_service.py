@@ -194,9 +194,9 @@ def registrar_alias_bling_no_payload(
                 "pedido_bling_numero": pedido_bling_numero,
                 "numero_pedido_loja": numero_pedido_loja,
                 "loja_id": loja_id,
-                "merged_at": merged_at.isoformat()
-                if isinstance(merged_at, datetime)
-                else None,
+                "merged_at": (
+                    merged_at.isoformat() if isinstance(merged_at, datetime) else None
+                ),
                 "motivo": motivo,
             }
         )
@@ -330,7 +330,10 @@ def listar_pedidos_por_numero_loja(
     loja_id = _text(loja_id)
     pedidos = (
         db.query(PedidoIntegrado)
-        .filter(PedidoIntegrado.tenant_id == tenant_id)
+        .filter(
+            PedidoIntegrado.tenant_id == tenant_id,
+            PedidoIntegrado.pedido_bling_id.isnot(None),
+        )
         .order_by(PedidoIntegrado.created_at.desc(), PedidoIntegrado.id.desc())
         .limit(max(int(limite_scan or 0), 1))
         .all()

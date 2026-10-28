@@ -1,123 +1,74 @@
-import { AlertTriangle, Building2, History, SearchX, UserRound } from "lucide-react";
-import { useState } from "react";
+import { Building2, SearchX } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
 import EstadoVazio from "../../components/v2/EstadoVazio/EstadoVazio";
-import InputCheckGroup from "../../components/v2/InputCheckGroup/InputCheckGroup";
 import InputTexto from "../../components/v2/InputTexto/InputTexto";
-import { MODULOS_INFO, MODULOS_PREMIUM } from "../../contexts/ModulosContext";
-import { modulosAlterados, modulosAtivos, modulosDoPlano, nomeDoModulo } from "./opsLojasUtils";
-import OpsLojasHistoricoModal from "./OpsLojasHistoricoModal";
+import { MODULOS_INFO } from "../../contexts/ModulosContext";
+import {
+  nomesDosModulosAtivos,
+  rotuloDoStatus,
+  rotuloDoUltimoAcesso,
+  totaisDasLojas,
+} from "./opsLojasUtils";
 import useOpsLojas from "./useOpsLojas";
 
-const OPCOES_DE_MODULO = [...MODULOS_PREMIUM]
-  .sort((a, b) =>
-    nomeDoModulo(a, MODULOS_INFO).localeCompare(nomeDoModulo(b, MODULOS_INFO), "pt-BR"),
-  )
-  .map((codigo) => ({ value: codigo, label: nomeDoModulo(codigo, MODULOS_INFO) }));
+const MODULOS_VISIVEIS = 4;
 
-const ROTULO_DE_STATUS = {
-  active: "Ativa",
-  ativo: "Ativa",
-  trial: "Em teste",
-  inactive: "Inativa",
-  suspended: "Suspensa",
-};
-
-function CartaoDaLoja({ loja, onAlternar, onHistorico, salvando }) {
-  const ativos = modulosAtivos(loja);
-  const doPlano = modulosDoPlano(loja);
-  const responsavel = loja.principal;
-
+function ModulosDaLoja({ loja }) {
+  const nomes = nomesDosModulosAtivos(loja, MODULOS_INFO);
+  if (nomes.length === 0) {
+    return <span className="text-slate-500 dark:text-slate-400">Nenhum módulo ativo</span>;
+  }
+  const extras = nomes.length - MODULOS_VISIVEIS;
   return (
-    <li className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h3 className="text-base font-bold text-slate-950 dark:text-slate-100">{loja.nome}</h3>
-          <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-            <UserRound className="h-3.5 w-3.5" aria-hidden="true" />
-            {responsavel
-              ? `${responsavel.nome || "Sem nome"} · ${responsavel.email || "sem e-mail"}`
-              : "Nenhum usuário cadastrado"}
-          </p>
-          <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">ID {loja.id}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="rounded-full border border-slate-300 px-2 py-0.5 text-xs font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200">
-            {ROTULO_DE_STATUS[String(loja.status || "").toLowerCase()] ||
-              loja.status ||
-              "Sem status"}
-          </span>
-          <BotaoInteracao icon={History} tamanho="pequeno" onClick={() => onHistorico(loja)}>
-            Histórico
-          </BotaoInteracao>
-        </div>
-      </div>
-
-      {loja.acesso_bloqueado_por_cobranca ? (
-        <p className="mt-3 flex items-center gap-1 text-sm font-medium text-red-700 dark:text-red-300">
-          <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-          Cobrança com problema: a loja está sem acesso aos módulos, mesmo os ativados.
-        </p>
-      ) : null}
-
-      <div className="mt-3">
-        <InputCheckGroup
-          name={`modulos-${loja.id}`}
-          label={`Módulos ativos: ${ativos.length} de ${OPCOES_DE_MODULO.length}`}
-          opcoes={OPCOES_DE_MODULO}
-          value={ativos}
-          disabled={salvando}
-          onChange={(proximos) => {
-            const mudanca = modulosAlterados(ativos, proximos);
-            if (mudanca) onAlternar(loja, mudanca.modulo, mudanca.ativar);
-          }}
-        />
-      </div>
-
-      {doPlano.length > 0 ? (
-        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-          Vêm do plano ou do teste grátis (não se desligam aqui):{" "}
-          {doPlano.map((codigo) => nomeDoModulo(codigo, MODULOS_INFO)).join(", ")}.
-        </p>
-      ) : null}
-    </li>
+    <span title={nomes.join(", ")}>
+      <strong>{nomes.length}</strong>{" "}
+      <span className="text-slate-600 dark:text-slate-300">
+        {nomes.slice(0, MODULOS_VISIVEIS).join(", ")}
+        {extras > 0 ? ` e mais ${extras}` : ""}
+      </span>
+    </span>
   );
 }
 
 export default function OpsLojasPage() {
-  const { alternarModulo, busca, carregando, cortou, erro, grupos, lojas, salvando, setBusca } =
-    useOpsLojas();
-  const [historico, setHistorico] = useState(null); // { loja } ou { loja: null } (geral)
-  const nomesPorId = Object.fromEntries(lojas.map((loja) => [loja.id, loja.nome]));
+  const navigate = useNavigate();
+  const { busca, carregando, cortou, erro, grupos, lojas, setBusca } = useOpsLojas();
+  const totais = totaisDasLojas(lojas);
 
   return (
-    <div className="mx-auto w-full max-w-6xl p-4 sm:p-6">
-      <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="m-0 text-xs font-bold uppercase tracking-[0.18em] text-teal-700 dark:text-teal-300">
-            Plataforma
-          </p>
-          <h1 className="mt-1 text-2xl font-bold text-slate-950 dark:text-slate-100 sm:text-3xl">
-            Lojas e módulos
-          </h1>
-          <p className="mt-1 max-w-3xl text-sm text-slate-600 dark:text-slate-400">
-            Veja cada loja, o agrupamento dela e os módulos ativos. Clique em um módulo para ativar
-            ou desativar.
-          </p>
-        </div>
-        <BotaoInteracao icon={History} onClick={() => setHistorico({ loja: null })}>
-          Histórico geral
-        </BotaoInteracao>
+    <div className="mx-auto w-full max-w-7xl p-4 sm:p-6">
+      <header className="mb-4">
+        <p className="m-0 text-xs font-bold uppercase tracking-[0.18em] text-teal-700 dark:text-teal-300">
+          Clientes
+        </p>
+        <h1 className="mt-1 text-2xl font-bold text-slate-950 dark:text-slate-100 sm:text-3xl">
+          Lojas
+        </h1>
+        <p className="mt-1 max-w-3xl text-sm text-slate-600 dark:text-slate-400">
+          Cada loja com o agrupamento, os módulos ativos e quantos usuários têm acesso. Abra uma
+          loja para ver os usuários, ativar ou desativar módulos e consultar o histórico.
+        </p>
       </header>
 
-      <div className="mb-4 max-w-md">
-        <InputTexto
-          id="ops-lojas-busca"
-          label="Buscar loja"
-          placeholder="Nome ou ID da loja"
-          value={busca}
-          onChange={setBusca}
-        />
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <div className="w-full max-w-md">
+          <InputTexto
+            id="ops-lojas-busca"
+            label="Buscar loja"
+            placeholder="Nome ou ID da loja"
+            value={busca}
+            onChange={setBusca}
+          />
+        </div>
+        {!carregando && lojas.length > 0 ? (
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            {totais.lojas} loja(s) · {totais.usuarios} usuário(s)
+            {totais.semUsuarioAtivo > 0
+              ? ` · ${totais.semUsuarioAtivo} sem nenhum usuário ativo`
+              : ""}
+          </p>
+        ) : null}
       </div>
 
       {erro ? (
@@ -131,7 +82,7 @@ export default function OpsLojasPage() {
           {[0, 1, 2].map((item) => (
             <div
               key={item}
-              className="h-40 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-900"
+              className="h-24 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-900"
             />
           ))}
         </div>
@@ -142,7 +93,7 @@ export default function OpsLojasPage() {
           descricao={busca.trim() ? "Tente outro nome ou limpe a busca." : undefined}
         />
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-5">
           {grupos.map((grupo) => (
             <section key={grupo.chave} aria-label={`Agrupamento ${grupo.nome}`}>
               <h2 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
@@ -152,17 +103,67 @@ export default function OpsLojasPage() {
                   ({grupo.lojas.length} {grupo.lojas.length === 1 ? "loja" : "lojas"})
                 </span>
               </h2>
-              <ul className="space-y-3">
-                {grupo.lojas.map((loja) => (
-                  <CartaoDaLoja
-                    key={loja.id}
-                    loja={loja}
-                    salvando={Boolean(salvando[loja.id])}
-                    onAlternar={alternarModulo}
-                    onHistorico={(alvo) => setHistorico({ loja: alvo })}
-                  />
-                ))}
-              </ul>
+              <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+                <table className="w-full min-w-[820px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                      <th className="p-3 font-semibold">Ações</th>
+                      <th className="p-3 font-semibold">Loja</th>
+                      <th className="p-3 font-semibold">Situação</th>
+                      <th className="p-3 font-semibold">Plano</th>
+                      <th className="p-3 font-semibold">Usuários</th>
+                      <th className="p-3 font-semibold">Módulos ativos</th>
+                      <th className="p-3 font-semibold">Último acesso</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {grupo.lojas.map((loja) => (
+                      <tr
+                        key={loja.id}
+                        className="border-b border-slate-100 align-top last:border-0 dark:border-slate-800"
+                      >
+                        <td className="p-3">
+                          <BotaoInteracao
+                            tamanho="pequeno"
+                            onClick={() => navigate(`/ops/lojas/${loja.id}`)}
+                          >
+                            Abrir
+                          </BotaoInteracao>
+                        </td>
+                        <td className="p-3">
+                          <span className="font-semibold text-slate-950 dark:text-slate-100">
+                            {loja.nome}
+                          </span>
+                          <span className="block text-xs text-slate-500 dark:text-slate-400">
+                            {loja.principal?.email || "Sem responsável cadastrado"}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          {rotuloDoStatus(loja.status)}
+                          {loja.acesso_bloqueado_por_cobranca ? (
+                            <span className="block text-xs font-medium text-red-700 dark:text-red-300">
+                              Cobrança com problema
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="p-3">{loja.plano || "—"}</td>
+                        <td className="p-3">
+                          <strong>{loja.usuarios.ativos}</strong> ativo(s)
+                          <span className="block text-xs text-slate-500 dark:text-slate-400">
+                            de {loja.usuarios.total}
+                          </span>
+                        </td>
+                        <td className="max-w-xs p-3">
+                          <ModulosDaLoja loja={loja} />
+                        </td>
+                        <td className="whitespace-nowrap p-3">
+                          {rotuloDoUltimoAcesso(loja.usuarios.ultimo_acesso)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </section>
           ))}
           {cortou ? (
@@ -172,13 +173,6 @@ export default function OpsLojasPage() {
           ) : null}
         </div>
       )}
-      {historico ? (
-        <OpsLojasHistoricoModal
-          loja={historico.loja}
-          nomesPorId={nomesPorId}
-          onFechar={() => setHistorico(null)}
-        />
-      ) : null}
     </div>
   );
 }

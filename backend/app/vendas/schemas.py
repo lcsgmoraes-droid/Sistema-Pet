@@ -3,7 +3,8 @@
 from datetime import date, datetime
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, field_validator
+from app.vendas.pagamento_excedente import ContextoPagamentoExcedenteSchema
 
 from app.services.venda_descontos import moeda, normalizar_item_venda
 
@@ -56,7 +57,19 @@ class VendaPagamentoSchema(BaseModel):
     intervalo_crediario: Optional[Literal["7_dias", "15_dias", "mensal"]] = None
 
 
-class CriarVendaRequest(BaseModel):
+class PagamentoExcedenteRequest(BaseModel):
+    justificativa_pagamento_excedente: Optional[str] = Field(
+        default=None, min_length=10, max_length=1000
+    )
+    contexto_pagamento_excedente: ContextoPagamentoExcedenteSchema | None = None
+
+    @field_validator("justificativa_pagamento_excedente", mode="before")
+    @classmethod
+    def limpar_justificativa_excedente(cls, valor):
+        return valor.strip() if isinstance(valor, str) else valor
+
+
+class CriarVendaRequest(PagamentoExcedenteRequest):
     caixa_revisao_id: Optional[int] = None
     data_ocorrencia: Optional[datetime] = None
     motivo_revisao: Optional[str] = None
@@ -95,7 +108,8 @@ class CriarVendaRequest(BaseModel):
         return self
 
 
-class FinalizarVendaRequest(BaseModel):
+class FinalizarVendaRequest(PagamentoExcedenteRequest):
+    caixa_id: Optional[int] = Field(default=None, gt=0)
     caixa_revisao_id: Optional[int] = None
     data_ocorrencia: Optional[datetime] = None
     motivo_revisao: Optional[str] = None

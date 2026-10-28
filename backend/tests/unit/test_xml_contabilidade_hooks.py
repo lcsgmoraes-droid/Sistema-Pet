@@ -7,7 +7,6 @@ import pytest
 
 import app.financeiro_models  # noqa: F401 - relacionamentos da Venda usada nas rotas
 from app.intnfe import emission
-from app.nfe import operacional_routes
 from app.services import (
     email_service,
     nfe_cache_service,
@@ -34,9 +33,14 @@ def test_intnfe_autorizada_e_cancelada_priorizam_fila_sem_smtp(monkeypatch, stat
         nfe_protocolo=None,
         nfe_xml="<xml />",
         nfe_ambiente=1,
+        nfe_status="processando",
+        status="finalizada",
     )
-    db = SimpleNamespace(commit=Mock())
-    api = SimpleNamespace(document_status=Mock(return_value={"status": status}))
+    db = MagicMock()
+    api = SimpleNamespace(
+        document_status=Mock(return_value={"status": status}),
+        document_events=Mock(return_value=[]),
+    )
 
     emission.reconcile(db, venda, api, connection=object(), token="test-token")
 
@@ -56,10 +60,12 @@ def test_intnfe_autorizada_e_cancelada_priorizam_fila_sem_smtp(monkeypatch, stat
         ("intnfe", "autorizada"),
     ],
 )
-def test_cache_bling_prioriza_fila_sem_smtp(monkeypatch, provider, status):
+def test_cache_importado_nao_prioriza_fila_contabil_nem_envia_email(
+    monkeypatch, provider, status
+):
     fila = Mock()
     smtp = Mock()
-    monkeypatch.setattr(nfe_cache_service, "tentar_enfileirar_documento", fila)
+    monkeypatch.setattr(xml_contabilidade_service, "enfileirar_documento", fila)
     monkeypatch.setattr(email_service, "send_email", smtp)
     consulta = SimpleNamespace(filter=lambda *_args: consulta, first=lambda: None)
     db = SimpleNamespace(new=set(), query=lambda *_args: consulta)
@@ -72,49 +78,19 @@ def test_cache_bling_prioriza_fila_sem_smtp(monkeypatch, provider, status):
         source="bling_api",
     )
 
-    assert fila.call_count == int(
-        provider != "intnfe" and status.lower() in {"autorizada", "cancelada"}
-    )
+    fila.assert_not_called()
     smtp.assert_not_called()
 
 
-@pytest.mark.parametrize(
-    "status,esperado", [("Autorizada", True), ("Cancelada", True), ("Pendente", False)]
-)
-def test_fluxo_legado_bling_preserva_status_no_cache(monkeypatch, status, esperado):
-    upsert = Mock()
-    fachada = SimpleNamespace(
-        _status_nota_bling=lambda _dados: status,
-        _venda_usa_nfce=lambda _venda: True,
-        _normalizar_nota_bling=lambda dados, modelo: {**dados, "modelo": modelo},
-        upsert_nota_cache=upsert,
-    )
-    monkeypatch.setattr(operacional_routes, "_nfe_routes", lambda: fachada)
+@pytest.mark.parametrize("provider", [None, "bling", "outro"])
+def test_hook_recusa_origem_importada_antes_de_tocar_transacao(monkeypatch, provider):
+    enfileirar = Mock()
+    monkeypatch.setattr(xml_contabilidade_service, "enfileirar_documento", enfileirar)
     db = MagicMock()
-    venda = SimpleNamespace(nfe_bling_id=1234)
-    dados = {"situacao": 5, "numero": 123}
-
-    operacional_routes._registrar_status_contabil_bling(db, "empresa-a", venda, dados)
-
-    assert upsert.call_count == int(esperado)
-    if esperado:
-        assert upsert.call_args.args[2]["id"] == 1234
-        assert upsert.call_args.args[2]["modelo"] == 65
-    db.commit.assert_not_called()
-
-
-def test_falha_cache_contabil_nao_bloqueia_status_legado_bling(monkeypatch):
-    fachada = SimpleNamespace(
-        _status_nota_bling=lambda _dados: "Autorizada",
-        _venda_usa_nfce=lambda _venda: False,
-        _normalizar_nota_bling=lambda dados, modelo: dados,
-        upsert_nota_cache=Mock(side_effect=RuntimeError("cache indisponivel")),
-    )
-    monkeypatch.setattr(operacional_routes, "_nfe_routes", lambda: fachada)
-
-    operacional_routes._registrar_status_contabil_bling(
-        MagicMock(), "empresa-a", SimpleNamespace(nfe_bling_id=1234), {"situacao": 5}
-    )
+    xml_contabilidade_hook.tentar_enfileirar_documento(db, "empresa-a", provider, 87)
+    enfileirar.assert_not_called()
+    db.begin_nested.assert_not_called()
+    db.flush.assert_not_called()
 
 
 def test_hook_savepoint_preserva_transacao_fiscal_se_fila_falha(monkeypatch):

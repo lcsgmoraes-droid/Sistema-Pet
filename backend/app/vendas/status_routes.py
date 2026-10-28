@@ -24,6 +24,7 @@ from app.vendas.routes_common import (
     _validar_tenant_e_obter_usuario,
 )
 from app.vendas_models import Venda
+from app.vendas.fiscal_status import nota_fiscal_cancelada
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -49,15 +50,22 @@ def reabrir_venda(
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
 
+    from app.integrations.ifood.pdv_pilot import block_pilot_sale_edit
+
+    block_pilot_sale_edit(db, venda)
+
     # Impedir reabertura de vendas com NF emitida
-    if venda.status == "pago_nf":
+    cancelamento_fiscal_confirmado = nota_fiscal_cancelada(venda)
+    if venda.status == "pago_nf" and not cancelamento_fiscal_confirmado:
         raise HTTPException(
             status_code=400,
             detail="Não é possível reabrir uma venda com NF-e emitida. Cancele a nota fiscal primeiro.",
         )
 
     # Permitir reabrir vendas finalizadas ou parcialmente pagas
-    if venda.status not in ["finalizada", "baixa_parcial"]:
+    if venda.status not in ["finalizada", "baixa_parcial"] and not (
+        venda.status == "pago_nf" and cancelamento_fiscal_confirmado
+    ):
         raise HTTPException(
             status_code=400,
             detail="Apenas vendas finalizadas ou com baixa parcial podem ser reabertas",
@@ -65,6 +73,12 @@ def reabrir_venda(
 
     # Guardar status anterior para log
     status_anterior = venda.status
+    from app.vendas.cancelamento_reabertura import (
+        preparar_restauracao_legada,
+        registrar_estado_reaberto,
+    )
+
+    restauracao_legada = preparar_restauracao_legada(db, venda, tenant_id)
 
     # ============================================================================
     # 🧹 CANCELAR/REMOVER COMISSÕES EXISTENTES
@@ -159,7 +173,9 @@ def reabrir_venda(
         venda_id=venda.id,
         reason="Venda reaberta para edicao",
     )
-    void_quick_repurchase_coupons_for_sale(db, tenant_id=tenant_id, venda_id=venda.id)
+    quick_coupons_voided = void_quick_repurchase_coupons_for_sale(
+        db, tenant_id=tenant_id, venda_id=venda.id
+    )
     remover_pagamentos_cashback_venda(db, tenant_id=tenant_id, venda_id=venda.id)
     if venda.cliente_id:
         reverse_cashback_for_sale(
@@ -168,10 +184,24 @@ def reabrir_venda(
             sale_id=venda.id,
             customer_id=venda.cliente_id,
         )
-    cancelar_despesas_cashback_venda(
+    cashback_expenses_cancelled = cancelar_despesas_cashback_venda(
         db, tenant_id=tenant_id, numero_venda=venda.numero_venda
     )
 
+    metadata = build_sale_reopened_metadata(
+        venda=venda,
+        previous_status=status_anterior,
+        commissions_removed=comissoes_removidas,
+        coupon_reversal=coupon_reversal_result,
+        loyalty_void=loyalty_void_result,
+    )
+    metadata.update(
+        legacy_restoration=registrar_estado_reaberto(
+            db, venda, tenant_id, restauracao_legada
+        ),
+        quick_repurchase_coupons_voided=quick_coupons_voided,
+        cashback_expenses_cancelled=cashback_expenses_cancelled,
+    )
     log_business_event(
         db=db,
         tenant_id=tenant_id,
@@ -180,13 +210,7 @@ def reabrir_venda(
         entity_type="vendas",
         entity_id=venda.id,
         old_value={"status": status_anterior},
-        metadata=build_sale_reopened_metadata(
-            venda=venda,
-            previous_status=status_anterior,
-            commissions_removed=comissoes_removidas,
-            coupon_reversal=coupon_reversal_result,
-            loyalty_void=loyalty_void_result,
-        ),
+        metadata=metadata,
         details=f"Venda #{venda.id} reaberta para edicao",
         commit=False,
     )
@@ -234,6 +258,10 @@ def atualizar_status_venda(
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
 
+    from app.integrations.ifood.pdv_pilot import block_pilot_sale_edit
+
+    block_pilot_sale_edit(db, venda)
+
     # Extrair status do body
     novo_status = status_data.get("status")
     if not novo_status:
@@ -241,17 +269,24 @@ def atualizar_status_venda(
 
     status_anterior = venda.status
     status_cashback_ativos = {"finalizada", "baixa_parcial", "pago_nf"}
-    if status_anterior == "cancelada" and novo_status in status_cashback_ativos:
+    if status_anterior == "cancelada" and novo_status != "cancelada":
         raise HTTPException(
             status_code=400,
-            detail="Venda cancelada não pode ser reativada como paga.",
+            detail="Venda cancelada não pode ser reativada.",
         )
+    if status_anterior == "cancelada":
+        return {"success": True, "status": "cancelada"}
 
     if novo_status == "finalizada":
         # Compatibilidade com clientes que restauram uma venda reaberta via
         # PATCH: fechar precisa reaplicar cupons e benefícios, sem novo pagamento.
         if status_anterior == "finalizada":
             return {"success": True, "status": "finalizada"}
+        if status_data.get("cancelar_reabertura") is True:
+            from app.vendas.cancelamento_reabertura import restaurar_reabertura_legada
+
+            if restaurar_reabertura_legada(db, venda, tenant_id, current_user.id):
+                return {"success": True, "status": "finalizada"}
         if venda.tem_entrega and not venda.entregador_id:
             raise HTTPException(
                 status_code=400,

@@ -7,10 +7,7 @@ import ClienteBaixasLotePanel from "../clientes/ClienteBaixasLotePanel";
 import BotaoCancelar from "../v2/BotaoCancelar/BotaoCancelar";
 import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
 import InputCheckbox from "../v2/InputCheckbox/InputCheckbox";
-import InputCombobox from "../v2/InputCombobox/InputCombobox";
-import InputMoeda from "../v2/InputMoeda/InputMoeda";
-import InputTexto from "../v2/InputTexto/InputTexto";
-import InputTextoLongo from "../v2/InputTextoLongo/InputTextoLongo";
+import RecebimentoCampos from "../v2/RecebimentoCampos/RecebimentoCampos";
 import { campaignAllowsSaleChannel } from "../../utils/campaignChannelScope";
 import { useModulos } from "../../contexts/ModulosContext";
 import CustomerIdentity from "../ui/CustomerIdentity";
@@ -27,6 +24,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
   const [valorPagamento, setValorPagamento] = useState(0);
   const [formaPagamento, setFormaPagamento] = useState("dinheiro");
   const [numeroTransacao, setNumeroTransacao] = useState("");
+  const [extrasRecebimento, setExtrasRecebimento] = useState({ numero_parcelas: 1 });
   const [observacoes, setObservacoes] = useState("");
   const [resumo, setResumo] = useState({ total_vendas: 0, total_em_aberto: 0 });
   const [ordenacao, setOrdenacao] = useState("antiga"); // 'antiga' ou 'recente'
@@ -40,7 +38,15 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
 
   useEffect(() => {
     requestId.current = null;
-  }, [clienteId, vendasSelecionadas, valorPagamento, formaPagamento, numeroTransacao, observacoes]);
+  }, [
+    clienteId,
+    vendasSelecionadas,
+    valorPagamento,
+    formaPagamento,
+    numeroTransacao,
+    observacoes,
+    extrasRecebimento,
+  ]);
 
   useEffect(() => {
     let ativo = true;
@@ -285,6 +291,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
 
       const response = await api.post(`/clientes/${clienteId}/baixar-vendas-lote`, {
         request_id: requestId.current,
+        ...extrasRecebimento,
         vendas_ids: vendasSelecionadas,
         valor_total: valorPagamentoCentavos / 100,
         forma_pagamento: formaPagamento,
@@ -367,7 +374,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
                 <CustomerIdentity
                   className="max-w-full"
                   customer={cliente}
-                  fallback={clienteNome || `Cliente #${clienteId}`}
+                  fallback={clienteNome || "Cliente não informado"}
                   nameClassName="text-sm font-medium text-gray-700"
                   nameWrapperClassName="max-w-full"
                 />
@@ -542,69 +549,42 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Registrar Pagamento</h3>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Valor Total Selecionado
-                      </label>
-                      <div className="text-2xl font-bold text-blue-600">
-                        {formatMoneyBRL(totalSelecionado)}
-                      </div>
-                    </div>
-
-                    <div>
-                      <InputMoeda
-                        label="Valor do pagamento"
-                        required
-                        disabled={processando}
-                        value={valorPagamento}
-                        onChange={setValorPagamento}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <InputCombobox
-                        label="Forma de pagamento"
-                        required
-                        disabled={processando}
-                        value={formaPagamento}
-                        onChange={setFormaPagamento}
-                        permitirLimpar={false}
-                        opcoes={[
-                          { value: "dinheiro", label: "Dinheiro" },
-                          { value: "pix", label: "PIX" },
-                          { value: "debito", label: "Cartão de débito" },
-                          { value: "credito", label: "Cartão de crédito" },
-                          { value: "transferencia", label: "Transferência" },
-                        ]}
-                      />
-                    </div>
-
-                    {(formaPagamento === "pix" || formaPagamento === "transferencia") && (
-                      <div>
-                        <InputTexto
-                          label="Número da transação"
-                          disabled={processando}
-                          value={numeroTransacao}
-                          onChange={setNumeroTransacao}
-                          placeholder="Código/ID da transação"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mb-4">
-                    <InputTextoLongo
-                      label="Observações"
-                      disabled={processando}
-                      value={observacoes}
-                      onChange={setObservacoes}
-                      linhas={2}
-                      placeholder="Informações adicionais sobre o pagamento..."
-                    />
-                  </div>
+                  <p className="mb-4 text-lg font-semibold text-blue-700 dark:text-blue-300">
+                    Total selecionado: {formatMoneyBRL(totalSelecionado)}
+                  </p>
+                  <RecebimentoCampos
+                    value={{
+                      ...extrasRecebimento,
+                      valor_recebido: valorPagamento,
+                      forma_pagamento: formaPagamento,
+                      observacoes,
+                      nsu_cartao: numeroTransacao,
+                    }}
+                    mostrarData={false}
+                    disabled={processando}
+                    onChange={(mudar) => {
+                      const atual = {
+                        ...extrasRecebimento,
+                        valor_recebido: valorPagamento,
+                        forma_pagamento: formaPagamento,
+                        observacoes,
+                        nsu_cartao: numeroTransacao,
+                      };
+                      const proximo = typeof mudar === "function" ? mudar(atual) : mudar;
+                      const {
+                        valor_recebido,
+                        forma_pagamento,
+                        observacoes: obs,
+                        nsu_cartao,
+                        ...extras
+                      } = proximo;
+                      setValorPagamento(valor_recebido || 0);
+                      setFormaPagamento(forma_pagamento || "dinheiro");
+                      setObservacoes(obs || "");
+                      setNumeroTransacao(nsu_cartao || "");
+                      setExtrasRecebimento(extras);
+                    }}
+                  />
 
                   <div className="flex items-start space-x-2 mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />

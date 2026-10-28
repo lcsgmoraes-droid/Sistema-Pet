@@ -1,4 +1,4 @@
-"""Lotes reaproveitam consultas e não varrem o legado Bling por HTTP."""
+"""Lotes CorePet reaproveitam consultas e excluem dados importados do Bling."""
 
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
@@ -9,10 +9,11 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from tests.helpers.signed_nfe import make_key, sign_nfe
+
 from app.db import base as _registry  # noqa: F401
 from app.models import Tenant
 from app.nfe_cache_models import BlingNotaFiscalCache
-from app.services import xml_contabilidade_bling as bling
 from app.services import xml_contabilidade_documentos as documentos
 from app.services import xml_contabilidade_individual as individual
 from app.services import xml_contabilidade_service as service
@@ -24,6 +25,7 @@ from app.xml_contabilidade_models import (
     XmlContabilidadeEnvio,
     XmlContabilidadeEvento,
     XmlContabilidadeMonitor,
+    XmlContabilidadeTentativa,
 )
 
 CNPJ = "33590794000140"
@@ -40,12 +42,12 @@ def banco(monkeypatch):
         BlingNotaFiscalCache,
         XmlContabilidadeConfig,
         XmlContabilidadeEnvio,
+        XmlContabilidadeTentativa,
         XmlContabilidadeEvento,
         XmlContabilidadeMonitor,
     ):
         model.__table__.create(engine)
     monkeypatch.setattr(service, "_agora", lambda: NOW)
-    monkeypatch.setattr(bling, "sincronizar_periodo_bling", lambda *_: None)
     with tenant_context(tenant), Session(engine, expire_on_commit=False) as db:
         db.add(
             Tenant(
@@ -62,7 +64,7 @@ def banco(monkeypatch):
 
 def nota(db, tenant, numero, *, provider="intnfe", antiga=False):
     data = datetime(2026, 9 if antiga else 10, 3, 12)
-    key = f"35{data:%y%m}{CNPJ}55003{numero:09d}1000000010"
+    key = make_key(f"35{data:%y%m}{CNPJ}55003{numero:09d}1000000010")
     if provider == "intnfe":
         obj = Venda(
             tenant_id=tenant,
@@ -72,6 +74,8 @@ def nota(db, tenant, numero, *, provider="intnfe", antiga=False):
             subtotal=1,
             total=1,
             nfe_provider="intnfe",
+            nfe_correlation_id=f"corepet-{numero}",
+            nfe_tipo="nfe",
             nfe_ambiente=1,
             nfe_modelo="55",
             nfe_status="autorizada",
@@ -94,7 +98,9 @@ def nota(db, tenant, numero, *, provider="intnfe", antiga=False):
 
 
 def xml_nota(key, data):
-    return f"""<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe{key}"><ide><mod>55</mod><dhEmi>{data.replace(tzinfo=BRASILIA).isoformat()}</dhEmi><tpAmb>1</tpAmb><tpNF>1</tpNF></ide><emit><CNPJ>{CNPJ}</CNPJ></emit></infNFe></NFe><protNFe><infProt><chNFe>{key}</chNFe><cStat>100</cStat></infProt></protNFe></nfeProc>""".encode()
+    return sign_nfe(
+        f"""<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe{key}"><ide><mod>55</mod><dhEmi>{data.replace(tzinfo=BRASILIA).isoformat()}</dhEmi><tpAmb>1</tpAmb><tpNF>1</tpNF></ide><emit><CNPJ>{CNPJ}</CNPJ></emit></infNFe></NFe><protNFe><infProt><chNFe>{key}</chNFe><cStat>100</cStat></infProt></protNFe></nfeProc>"""
+    )
 
 
 def evento(key, *, seq=1, data="2026-10-19T12:01:00-03:00", cnpj=CNPJ):
@@ -116,11 +122,11 @@ def evento(key, *, seq=1, data="2026-10-19T12:01:00-03:00", cnpj=CNPJ):
     }
 
 
-def guardar_evento(db, tenant, key, ev, *, documento_id="999", seq=1):
+def guardar_evento(db, tenant, key, ev, *, documento_id="999", seq=1, provider="bling"):
     db.add(
         XmlContabilidadeEvento(
             tenant_id=tenant,
-            provider="bling",
+            provider=provider,
             documento_id=documento_id,
             chave=key,
             identidade=ev["identidade"],
@@ -142,10 +148,11 @@ def test_periodo_consulta_cada_documento_uma_vez_e_inclui_evento_intnfe_antigo(
     modelos = [
         nota(db, tenant, 1),
         nota(db, tenant, 2),
-        nota(db, tenant, 3, provider="bling"),
+        nota(db, tenant, 3),
         nota(db, tenant, 4, antiga=True),
     ]
     _, key_alheio, _ = nota(db, tenant, 5, provider="bling", antiga=True)
+    _, key_alheio_atual, _ = nota(db, tenant, 6, provider="bling")
     xmls = {key: xml_nota(key, data) for _, key, data in modelos}
     eventos = {
         modelos[0][1]: evento(modelos[0][1]),
@@ -173,7 +180,7 @@ def test_periodo_consulta_cada_documento_uma_vez_e_inclui_evento_intnfe_antigo(
     assert (
         Counter(xml_calls) == Counter(event_calls) == Counter({key: 1 for key in xmls})
     )
-    assert key_alheio not in xml_calls
+    assert key_alheio not in xml_calls and key_alheio_atual not in xml_calls
     assert {n["chave"] for n in notas} == set(xmls)
     assert (
         dict(arquivos)[eventos[modelos[3][1]]["nome"]] == eventos[modelos[3][1]]["xml"]
@@ -182,7 +189,7 @@ def test_periodo_consulta_cada_documento_uma_vez_e_inclui_evento_intnfe_antigo(
     assert db.query(XmlContabilidadeEvento).count() == 2
 
 
-def test_bling_antigo_recebido_sem_cache_preserva_xml_e_data_civil_sem_http(
+def test_bling_antigo_recebido_mesmo_cnpj_fica_fora_do_lote_sem_http(
     banco, monkeypatch
 ):
     db, tenant = banco
@@ -197,39 +204,48 @@ def test_bling_antigo_recebido_sem_cache_preserva_xml_e_data_civil_sem_http(
     arquivos, notas = individual.coletar_eventos_periodo(
         db, tenant, date(2026, 9, 1), date(2026, 9, 30)
     )
-    assert arquivos == [(fim_mes["nome"], fim_mes["xml"])]
-    assert notas[0]["data_emissao"] is None
-    assert notas[0]["emitente_nome"] == "Empresa fictícia"
-    assert notas[0]["eventos"][0]["sequencia"] == 2
+    assert arquivos == notas == []
     http.assert_not_called()
 
 
-def test_evento_persistido_de_outra_empresa_bloqueia_lote(banco):
+@pytest.mark.parametrize("provider", ["bling", "intnfe"])
+def test_evento_importado_ou_sem_venda_corepet_nao_e_incluido_no_lote(banco, provider):
     db, tenant = banco
     key = "35260912345678000195550030000009991000000010"
     ev = evento(key, data="2026-09-03T12:00:00-03:00", cnpj="12345678000195")
-    guardar_evento(db, tenant, key, ev)
-    with pytest.raises(documentos.XmlContabilidadeError, match="empresa ou ambiente"):
-        individual.coletar_eventos_periodo(
-            db, tenant, date(2026, 9, 1), date(2026, 9, 30)
-        )
+    guardar_evento(db, tenant, key, ev, provider=provider)
+    assert individual.coletar_eventos_periodo(
+        db, tenant, date(2026, 9, 1), date(2026, 9, 30)
+    ) == ([], [])
 
 
-def test_monitor_e_referencias_priorizam_intnfe_sobre_bling(banco, monkeypatch):
+def test_monitor_e_referencias_excluem_bling_mesmo_cnpj(banco, monkeypatch):
     db, tenant = banco
     bling_obj, _, _ = nota(db, tenant, 1, provider="bling", antiga=True)
     int_obj, _, _ = nota(db, tenant, 2, antiga=True)
     service.salvar_config(
         db, tenant, {"email_contador": "contador@example.com", "envio_automatico": True}
     )
-    individual.priorizar_documento(
-        db, tenant, "bling", bling_obj.bling_id, NOW - timedelta(days=1)
+    assert (
+        individual.priorizar_documento(
+            db, tenant, "bling", bling_obj.bling_id, NOW - timedelta(days=1)
+        )
+        is None
+    )
+    db.add(
+        XmlContabilidadeMonitor(
+            tenant_id=tenant,
+            provider="bling",
+            documento_id=str(bling_obj.bling_id),
+            proxima_consulta_em=NOW - timedelta(days=1),
+        )
     )
     db.commit()
     consultar = Mock(return_value=([], []))
     monkeypatch.setattr(individual, "consultar_documento", consultar)
-    assert individual._referencias(db, tenant)[0] == ("intnfe", str(int_obj.id))
-    assert individual.capturar_novos_eventos(db, tenant, NOW, limite=1) == 1
+    assert individual._referencias(db, tenant) == [("intnfe", str(int_obj.id))]
+    assert individual.capturar_novos_eventos(db, tenant, NOW, limite=50) == 1
+    consultar.assert_called_once()
     assert consultar.call_args.args[2:4] == ("intnfe", str(int_obj.id))
 
 

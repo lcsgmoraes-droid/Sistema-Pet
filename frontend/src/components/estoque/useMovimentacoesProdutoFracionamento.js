@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
 import api from "../../api";
@@ -18,6 +18,7 @@ export function useMovimentacoesProdutoFracionamento({ carregarDados, id, produt
   const [aberto, setAberto] = useState(false);
   const [loading, setLoading] = useState(false);
   const [busca, setBusca] = useState("");
+  const buscaController = useRef(null);
   const [produtosDestino, setProdutosDestino] = useState([]);
   const [vinculos, setVinculos] = useState([]);
   const [lotes, setLotes] = useState([]);
@@ -59,10 +60,18 @@ export function useMovimentacoesProdutoFracionamento({ carregarDados, id, produt
   const buscarProdutos = useCallback(
     async (termo = "") => {
       if (!id) return;
-      const response = await api.get("/estoque/fracionamento-clinico/produtos", {
-        params: { produto_origem_id: Number(id), busca: termo || undefined, limite: 40 },
-      });
-      setProdutosDestino(response.data || []);
+      buscaController.current?.abort();
+      const controller = new AbortController();
+      buscaController.current = controller;
+      try {
+        const response = await api.get("/estoque/fracionamento-clinico/produtos", {
+          params: { produto_origem_id: Number(id), busca: termo || undefined, limite: 40 },
+          signal: controller.signal,
+        });
+        if (!controller.signal.aborted) setProdutosDestino(response.data || []);
+      } catch (error) {
+        if (!controller.signal.aborted) throw error;
+      }
     },
     [id],
   );
@@ -149,13 +158,20 @@ export function useMovimentacoesProdutoFracionamento({ carregarDados, id, produt
   }
 
   useEffect(() => {
-    if (!aberto) return undefined;
+    if (!aberto) {
+      buscaController.current?.abort();
+      return undefined;
+    }
+    setProdutosDestino([]);
     const timer = window.setTimeout(() => {
       buscarProdutos(busca).catch((error) => {
         toast.error(extrairMensagemErroApi(error, "Erro ao buscar produtos clinicos"));
       });
     }, 300);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      buscaController.current?.abort();
+    };
   }, [aberto, busca, buscarProdutos]);
 
   return {

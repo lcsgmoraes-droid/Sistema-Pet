@@ -68,6 +68,7 @@ export function usePDVPageComposition({
   atualizarPetDoItem,
   atualizarProtocoloDoItem,
   atualizarQuantidadeItem,
+  atualizarSubtotalItem,
   handleBuscarProdutoChange,
   handleBuscarProdutoFocus,
   handleBuscarProdutoKeyDown,
@@ -265,6 +266,12 @@ export function usePDVPageComposition({
     onCopiarCampoCliente: copiarCampoCliente,
     onRemoverCliente: limparClienteSelecionado,
     onSelecionarCliente: selecionarCliente,
+    onAtualizarCliente: (cliente) =>
+      setVendaAtual((prev) =>
+        prev.cliente?.id === cliente?.id
+          ? { ...prev, cliente: { ...prev.cliente, ...cliente } }
+          : prev,
+      ),
     onSelecionarPet: selecionarPet,
     saldoCampanhas,
     vendasEmAbertoInfo,
@@ -280,6 +287,7 @@ export function usePDVPageComposition({
     onAtualizarPetItem: atualizarPetDoItem,
     onAtualizarProtocoloItem: atualizarProtocoloDoItem,
     onAtualizarQuantidadeItem: atualizarQuantidadeItem,
+    onAtualizarSubtotalItem: atualizarSubtotalItem,
     onAtualizarPrevisaoFimRacao: (itemIndex, previsao) =>
       setVendaAtual((prev) => ({
         ...prev,

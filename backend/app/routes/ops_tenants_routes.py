@@ -44,6 +44,10 @@ from app.services.ops_tenant_log_service import (
     registrar_alteracoes,
 )
 from app.services.plan_catalog import PLAN_CATALOG
+from app.services.manual_full_access_service import (
+    ManualFullAccessError,
+    grant_manual_full_access,
+)
 
 router = APIRouter(prefix="/admin/tenants", tags=["Admin - Tenants"])
 
@@ -73,6 +77,41 @@ class CommercialStateRequest(BaseModel):
     plan: str | None = None
     billing_status: str | None = None
     subscription_source: str | None = None
+    blocking_authorized_by_lucas: bool = False
+    blocking_authorization_reason: str | None = Field(default=None, max_length=880)
+
+
+class ManualFullAccessRequest(BaseModel):
+    motivo: str = Field(min_length=10, max_length=1000)
+
+
+@router.post("/{tenant_id}/acesso-completo/liberar")
+def liberar_acesso_completo_manual(
+    tenant_id: UUID,
+    payload: ManualFullAccessRequest,
+    current_admin: PlatformAdmin = Depends(require_platform_admin),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Concede FULL operacional sem registrar pagamento ou contratar plano."""
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="Empresa nao encontrada")
+    try:
+        result = grant_manual_full_access(
+            db,
+            tenant=tenant,
+            actor_platform_admin_id=current_admin.id,
+            motivo=payload.motivo,
+            commit=False,
+        )
+        db.commit()
+        return result
+    except ManualFullAccessError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except Exception:
+        db.rollback()
+        raise
 
 
 class OnboardingFollowUpRequest(BaseModel):
@@ -243,6 +282,7 @@ def atualizar_estado_comercial_tenant(
             db,
             tenant_id=tenant_id,
             changes=mudancas,
+            actor_platform_admin_id=_current_admin.id,
         )
         registrar_alteracoes(
             db,

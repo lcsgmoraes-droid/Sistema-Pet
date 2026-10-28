@@ -9,6 +9,7 @@
     "build:dev": "vite build --mode development",
     "audit:dependencies": "node scripts/audit-dependencies.mjs",
     "test:e2e": "playwright test",
+    "test:operacional": "node --test src/utils/buscaEntidades.test.mjs src/components/v2/BuscaEntidade/BuscaEntidade.test.mjs src/components/v2/BuscaEntidade/useBuscaEntidadeLocal.test.mjs src/components/v2/BuscaPessoa/useBuscaPessoaResultados.test.mjs src/components/TutorAutocomplete.test.mjs src/components/veterinario/ProdutoEstoqueAutocomplete.test.mjs src/components/estoque/estoqueBuscasConcorrencia.test.mjs src/components/fornecedores/FornecedorSelector.test.mjs src/components/ui/FornecedorIdentity.test.mjs src/components/entrada-xml/useEntradaXmlProdutos.test.mjs src/components/pdv/HistoricoCliente.test.mjs src/hooks/usePDVClienteContexto.test.mjs src/components/pdv/VendasEmAberto.test.mjs src/components/contasReceber/ContasReceber.test.mjs src/utils/financeiroStatus.test.mjs src/utils/meusCaixasUtils.test.mjs src/components/financeiro/vendasPorVendedorRelatorio.test.mjs scripts/test-pdv-produto-busca.mjs scripts/test-pdv-card-fee-visibility.mjs src/components/clientes/PessoaFormulario.test.mjs src/components/pdv/HistoricoRecebimentosVenda.test.mjs src/utils/historicoFinanceiro.test.mjs src/pages/clienteFinanceiro/ClienteFinanceiroView.test.mjs src/pages/clienteFinanceiro/clienteFinanceiroPdf.test.mjs src/pages/Financeiro/HistoricoVendasClienteTab.test.mjs",
     "lint:core": "eslint \"src/**/*.{js,jsx,ts,tsx,mjs,cjs}\" scripts --max-warnings=0",
     "format:core:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,mjs,cjs,css,md}\" scripts",
     "test:theme-preference": "node scripts/test-theme-preference.mjs",
@@ -43,6 +44,7 @@
     "test:oferta-publica-navigation": "node src/pages/ofertas/ofertaPublicaNavigation.test.mjs",
     "test:bling-oauth-reconnect": "node scripts/test-bling-oauth-reconnect.mjs",
     "test:app-routes-refactor": "node scripts/test-app-routes-refactor.mjs",
+    "test:ifood": "node --test src/components/ifood/IfoodVendaTaxasResumo.test.mjs src/utils/ifoodFinancialRefresh.test.mjs src/components/financeiro/ifoodFinancialReportController.test.mjs src/components/financeiro/rentabilidadePendente.test.mjs src/components/dre/DREIfoodPendente.test.mjs src/components/dre/analiseInteligenteUtils.test.mjs src/pages/ponto-equilibrio/pontoEquilibrioIfoodPendente.test.mjs src/components/pdv/PDVHeaderBar.test.mjs src/utils/ifoodPdvPilot.test.mjs src/components/ifood/IfoodPdvOnlineResumo.test.mjs src/components/ifood/IfoodPdvOnlineVendaCard.test.mjs src/components/ModalPagamento.test.mjs src/hooks/usePDVVendaAcoes.test.mjs src/components/pdv/PDVMainArea.test.mjs src/components/pdv/PDVEntregaCard.test.mjs src/hooks/usePDVEntregadores.test.mjs src/components/pdv/PDVModoVisualizacaoBanner.test.mjs src/hooks/usePDVVendaCarregamento.test.mjs src/hooks/usePDVVendaFinalizacao.test.mjs src/components/modalPagamentoUtils.test.mjs src/components/modalPagamento/useModalPagamentoActions.test.mjs src/utils/salesChannel.test.mjs src/components/ifood/IfoodPedidoPdvPilot.test.mjs src/pages/configuracoes/IfoodPedidosPanel.test.mjs src/components/ifood/useIfoodPublicacaoProduto.test.mjs src/components/ifood/IfoodPublicacaoProduto.test.mjs src/components/ifood/ifoodPublicacaoDraft.test.mjs src/components/produto/IfoodProdutoSection.test.mjs src/utils/ifoodPromotionRefresh.test.mjs src/components/ifood/useIfoodSimulacaoPreco.test.mjs src/components/ifood/useIfoodFinanceiro.test.mjs src/components/ifood/IfoodFinanceiro.test.mjs src/components/ifood/IfoodCentralFinanceiro.test.mjs src/components/ifood/useIfoodRepasses.test.mjs src/components/ifood/IfoodRepasses.test.mjs src/components/ifood/useIfoodVinculoVenda.test.mjs src/components/ifood/IfoodCustosHistoricos.test.mjs src/components/produto/ifoodProdutoDates.test.mjs src/pages/produtosFormUtils.test.mjs src/hooks/useProdutosNovoPreservacao.test.mjs src/utils/produtoMargem.test.mjs src/utils/produtoRecorrencia.test.mjs scripts/helpers/reactControllerHarness.test.mjs",
     "test:lgpd-operacional-refactor": "node scripts/test-lgpd-operacional-refactor.mjs",
     "test:ponto-equilibrio-refactor": "node scripts/test-ponto-equilibrio-refactor.mjs",
     "test:comissoes-refactor": "node scripts/test-comissoes-refactor.mjs",
@@ -78,13 +80,14 @@
     "test:balanco": "node scripts/test-produtos-balanco-utils.mjs",
     "test:vendas-reprocessamento-feedback": "node scripts/test-vendas-reprocessamento-feedback.mjs",
     "test:onboarding-inicial": "node scripts/test-onboarding-inicial-contract.mjs",
-    "test:banho-tosa-fluxo": "node scripts/test-banho-tosa-fluxo.mjs",
+    "test:banho-tosa-fluxo": "node --test src/pages/banhoTosa/banhoTosaPacotesUtils.test.mjs src/pages/banhoTosa/components/BanhoTosaFechamentosView.test.mjs && node scripts/test-banho-tosa-fluxo.mjs",
     "test:pessoas-duplicidade-central": "node scripts/test-pessoas-duplicidade-central.mjs",
     "test:pessoas-relatorio": "node scripts/test-pessoas-relatorio.mjs",
     "test:pessoa-app-login": "node src/utils/pessoaAppLogin.test.mjs",
     "test:usuario-acesso-inicial": "node src/utils/usuarioAcessoInicial.test.mjs",
     "test:usuarios-pessoa-vinculo": "node scripts/test-usuarios-pessoa-vinculo.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:faturamento": "node --test src/components/v2/ResumoFaturamento/faturamentoPresentation.test.mjs src/components/v2/ResumoFaturamento/totaisFormasPagamento.test.mjs src/components/caixa/caixaImpressaoResumo.test.mjs src/components/caixa/RecebimentosCaixaPanel.test.mjs src/utils/auditoriaCaixaUtils.test.mjs src/pages/dashboard/dashboardRefresh.test.mjs src/pages/dashboard/dashboardRefreshController.test.mjs src/pages/dashboard/dashboardPeriod.test.mjs src/pages/AlertasGestor.test.mjs src/utils/conferenciaFechamentoUtils.test.mjs src/components/caixa/ConferenciaCaixaItem.test.mjs src/components/caixa/IdentificacaoPixItem.test.mjs src/components/caixa/ModalFecharCaixaPix.test.mjs src/components/caixa/useConferenciaFechamento.test.mjs src/components/caixa/ModalFecharCaixaConferencia.test.mjs src/components/modalPagamentoUtils.test.mjs src/components/modalPagamento/ExcecaoPagamentoPanel.test.mjs src/components/modalPagamento/useModalPagamentoActions.test.mjs src/components/modalPagamento/useModalPagamentoController.test.mjs src/utils/pdvSalvarEdicaoVenda.test.mjs && node scripts/test-dashboard-executive-layout.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -114,7 +117,8 @@
   "overrides": {
     "brace-expansion": "5.0.12",
     "minimatch": "10.2.6",
-    "dompurify": "3.4.13",
+    "dompurify": "3.4.17",
+    "follow-redirects": "1.16.1",
     "nanoid": "3.3.18",
     "socket.io-parser": "4.2.7",
     "ws": "8.21.0",
@@ -136,6 +140,6 @@
     "tailwindcss": "^3.4.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.61.1",
-    "vite": "^8.0.16"
+    "vite": "8.3.3"
   }
 }

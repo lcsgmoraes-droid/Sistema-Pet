@@ -73,7 +73,7 @@ assert.match(
 
 assert.match(
   notesList,
-  /title={`Tentar novamente como \$\{Number\(nota\.modelo\) === 55 \? "NF-e" : "NFC-e"\}`}/,
+  /label: `Tentar novamente como \$\{Number\(nota\.modelo\) === 55 \? "NF-e" : "NFC-e"\}`/,
   "Central de NF deve disponibilizar a recuperação para notas rejeitadas",
 );
 
@@ -85,7 +85,7 @@ assert.match(
 
 assert.match(
   notesList,
-  /Liberar venda para escolher outro modelo de nota/,
+  /Escolher outro modelo de nota/,
   "Central de NF deve permitir liberar a venda sem retransmitir o modelo errado",
 );
 
@@ -326,6 +326,8 @@ try {
       let mensagem = "";
       const resultado = await emitirNotaFiscalAssistida({
         vendaId: 123,
+        tipoNota: resumo.modelo === 55 ? "nfe" : "nfce",
+        revisarDadosAdicionais: async () => true,
         confirmar: (texto) => {
           mensagem = texto;
           return false;
@@ -334,7 +336,10 @@ try {
       assert.equal(resultado.cancelado, true);
       assert.notEqual(mensagem, "", "o fluxo deve solicitar confirmação antes de emitir");
       assert.deepEqual(chamadas, [
-        { url: "/nfe/prevalidar", payload: { venda_id: 123, tipo_nota: "nfce" } },
+        {
+          url: "/nfe/prevalidar",
+          payload: { venda_id: 123, tipo_nota: resumo.modelo === 55 ? "nfe" : "nfce" },
+        },
       ]);
       return mensagem;
     } finally {
@@ -381,6 +386,48 @@ try {
   assert.match(confirmacaoEntregaGratuita, /^Entrega própria$/m);
   assert.ok(confirmacaoEntregaGratuita.includes("Taxa de entrega: R$ 0,00"));
   assert.ok(confirmacaoEntregaGratuita.includes("Rua de Teste, 123, Casa 2"));
+
+  const textoManual =
+    "Pedido MARKETPLACE-QA-8372 | Informações complementares conferidas antes da emissão.";
+  const confirmacaoManual = await obterConfirmacao({
+    ...resumoBalcao,
+    modelo: 55,
+    contexto_comercial: {
+      canal: "amazon",
+      numero_pedido: "MARKETPLACE-QA-8372",
+      codigo_rastreamento: "RASTREIO-QA-2123",
+    },
+    informacoes_adicionais: textoManual,
+  });
+  assert.match(confirmacaoManual, /^Canal da operação: Amazon$/m);
+  assert.match(confirmacaoManual, /^Número do pedido: MARKETPLACE-QA-8372$/m);
+  assert.match(confirmacaoManual, /^Rastreamento: RASTREIO-QA-2123$/m);
+  assert.ok(confirmacaoManual.includes(`Informações adicionais no DANFE:\n${textoManual}`));
+
+  const observacaoSemVinculo = await obterConfirmacao({
+    ...resumoBalcao,
+    informacoes_adicionais: "Amazon citada em observação livre, sem vínculo de pedido.",
+  });
+  assert.match(observacaoSemVinculo, /Informações adicionais no DANFE/);
+  assert.doesNotMatch(observacaoSemVinculo, /Canal da operação:|Número do pedido:/);
+
+  const postOriginal = api.post;
+  const chamadasSemRevisao = [];
+  api.post = async (...args) => {
+    chamadasSemRevisao.push(args);
+    throw new Error("Nenhuma requisição fiscal é esperada antes de concluir a revisão.");
+  };
+  try {
+    const resultado = await emitirNotaFiscalAssistida({
+      vendaId: 123,
+      tipoNota: "nfe",
+      revisarDadosAdicionais: async () => false,
+    });
+    assert.equal(resultado.cancelado, true);
+    assert.deepEqual(chamadasSemRevisao, [], "fechar a revisão impede prevalidar e emitir");
+  } finally {
+    api.post = postOriginal;
+  }
 
   assert.equal(
     await obterConfirmacao(resumoBalcao),

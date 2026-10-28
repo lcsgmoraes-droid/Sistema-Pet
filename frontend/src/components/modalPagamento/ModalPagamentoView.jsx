@@ -1,11 +1,17 @@
 import { X, CreditCard, CheckCircle, AlertCircle } from "lucide-react";
 
+import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
+import InputTextoLongo from "../v2/InputTextoLongo/InputTextoLongo";
 import StatusMargemIndicador from "../StatusMargemIndicador";
 import ModalPagamentoResumoLateral from "../ModalPagamentoResumoLateral";
 import ModalPagamentoFormaPanel from "./ModalPagamentoFormaPanel";
+import ExcecaoPagamentoPanel from "./ExcecaoPagamentoPanel";
+import SeletorCaixaRecebimento from "../v2/SeletorCaixaRecebimento/SeletorCaixaRecebimento";
 
 export default function ModalPagamentoView({
   venda,
+  caixaRecebimentoId,
+  setCaixaRecebimentoId,
   onClose,
   modalPagamentoContentRef,
   formaPagamentoSelecionada,
@@ -70,6 +76,9 @@ export default function ModalPagamentoView({
   bandeirasDisponiveis,
   parcelasDisponiveis,
   taxaCartaoSelecionada,
+  composicaoExcedente,
+  autorizacaoExcedente,
+  setAutorizacaoExcedente,
 }) {
   return (
     <>
@@ -87,17 +96,24 @@ export default function ModalPagamentoView({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button
+              <BotaoInteracao
                 onClick={onClose}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <X className="w-6 h-6" />
-              </button>
+              </BotaoInteracao>
             </div>
           </div>
 
           {/* Content */}
           <div ref={modalPagamentoContentRef} className="flex-1 overflow-y-auto p-6">
+            <div className="mb-5">
+              <SeletorCaixaRecebimento
+                value={caixaRecebimentoId}
+                onChange={setCaixaRecebimentoId}
+                disabled={loading}
+              />
+            </div>
             <div className="grid grid-cols-2 gap-6">
               <ModalPagamentoFormaPanel
                 venda={venda}
@@ -132,6 +148,12 @@ export default function ModalPagamentoView({
 
               {/* Coluna Direita - Resumo */}
               <div className="space-y-6">
+                <ExcecaoPagamentoPanel
+                  composicao={composicaoExcedente}
+                  autorizacao={autorizacaoExcedente}
+                  onConfirmar={setAutorizacaoExcedente}
+                  disabled={loading}
+                />
                 <ModalPagamentoResumoLateral
                   venda={venda}
                   valorTotal={valorTotal}
@@ -322,12 +344,12 @@ export default function ModalPagamentoView({
                       </div>
                     </div>
 
-                    <textarea
+                    <InputTextoLongo
                       ref={justificativaTextareaRef}
                       value={justificativaTexto}
-                      onChange={(e) => {
-                        setJustificativaTexto(e.target.value);
-                        if (e.target.value.trim().length >= 10) {
+                      onChange={(texto) => {
+                        setJustificativaTexto(texto);
+                        if (texto.trim().length >= 10) {
                           setErroJustificativa("");
                           setErro("");
                         }
@@ -340,7 +362,7 @@ export default function ModalPagamentoView({
                       className={`w-full px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-red-500 resize-none ${
                         erroJustificativa ? "border-red-500" : "border-red-300"
                       }`}
-                      rows={3}
+                      linhas={3}
                     />
 
                     {erroJustificativa && (
@@ -366,17 +388,17 @@ export default function ModalPagamentoView({
             )}
 
             <div className="flex items-center justify-between gap-3">
-              <button
+              <BotaoInteracao
                 onClick={onClose}
                 disabled={loading}
                 className="px-6 py-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50"
               >
                 Cancelar
-              </button>
+              </BotaoInteracao>
 
               <div className="flex items-center gap-3">
                 {mostrarBotaoAdicionarRodape && (
-                  <button
+                  <BotaoInteracao
                     type="button"
                     data-testid="modal-pagamento-footer-adicionar"
                     onClick={adicionarPagamento}
@@ -385,10 +407,10 @@ export default function ModalPagamentoView({
                   >
                     <CheckCircle className="w-5 h-5" />
                     <span>Adicionar Pagamento</span>
-                  </button>
+                  </BotaoInteracao>
                 )}
 
-                <button
+                <BotaoInteracao
                   onClick={handleFinalizar}
                   disabled={loading || !podeConfirmarFinalizacao}
                   className="flex items-center space-x-2 px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -406,7 +428,7 @@ export default function ModalPagamentoView({
                       </span>
                     </>
                   )}
-                </button>
+                </BotaoInteracao>
               </div>
             </div>
           </div>

@@ -10,6 +10,7 @@ import {
 import { toast } from "react-hot-toast";
 import api from "../../api";
 import { formatMoneyBRL } from "../../utils/formatters";
+import { formatarDataHistorico } from "../../utils/historicoFinanceiro";
 import BotaoCancelar from "../v2/BotaoCancelar/BotaoCancelar";
 import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
 import EstadoVazio from "../v2/EstadoVazio/EstadoVazio";
@@ -26,9 +27,7 @@ const FORMAS_PAGAMENTO = {
 };
 
 function formatarData(value) {
-  if (!value) return "—";
-  const data = new Date(value);
-  return Number.isNaN(data.getTime()) ? "—" : data.toLocaleString("pt-BR");
+  return formatarDataHistorico(value, { comHora: true });
 }
 
 function mensagemErro(error, fallback) {

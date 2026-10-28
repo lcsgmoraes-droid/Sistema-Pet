@@ -24,8 +24,8 @@ def test_gestor_route_is_read_only_and_checks_active_profile():
 def test_gestor_summary_reuses_financial_sources_of_truth():
     source = read_repo("backend/app/routes/app_mobile_gestor_routes.py")
 
-    assert "_valores_operacionais_venda" in source
-    assert "_total_recebido_venda" in source
+    assert "montar_composicao_vendas" in source
+    assert "composicao=composicao" in source
     assert "get_fluxo_caixa" in source
     assert "gerar_dre_por_canais" in source
     assert "ContaPagar" in source
@@ -34,15 +34,13 @@ def test_gestor_summary_reuses_financial_sources_of_truth():
 
 def test_mobile_gestor_screen_has_requested_periods_and_indicators():
     screen = read_repo("app-mobile/src/screens/gestor/GestorDashboardScreen.tsx")
+    revenue_card = read_repo("app-mobile/src/screens/gestor/GestorFaturamentoCard.tsx")
     utils = read_repo("app-mobile/src/screens/gestor/GestorDashboardUtils.ts")
     service = read_repo("app-mobile/src/services/gestor.service.ts")
 
     for label in ["Hoje", "Ontem", "7 dias", "Este mes", "Mes anterior"]:
         assert label in utils
     for label in [
-        "Bruto",
-        "Liquido",
-        "Recebido",
         "Vendas",
         "Unidades",
         "Fluxo de caixa de hoje",
@@ -55,7 +53,25 @@ def test_mobile_gestor_screen_has_requested_periods_and_indicators():
         "Despesas fixas e operacionais",
         "Custo dos serviços prestados",
     ]:
-        assert label in screen
+        assert label in screen + revenue_card
+    for label in [
+        "Faturamento líquido",
+        "Vendas − descontos",
+        "Produtos diferentes",
+        "Ticket médio",
+    ]:
+        assert label in revenue_card
+    for label in [
+        "Ver detalhes",
+        "Ocultar detalhes",
+        "Vendas que compõem o total",
+        "Pagamentos e formas de quitação",
+    ]:
+        assert label not in revenue_card
+    assert "composicao?.avisos" in revenue_card
+    assert (
+        "composicao?.faturamento_liquido ?? vendas.faturamento_liquido" in revenue_card
+    )
     assert '"/app/gestor/resumo"' in service
     for field in [
         "saldo_inicial",

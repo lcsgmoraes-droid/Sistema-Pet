@@ -6,6 +6,8 @@ import NFSaidaList from "./NFSaidaList";
 import SefazConsultasSessao from "./SefazConsultasSessao";
 import SefazToolsPanel from "./SefazToolsPanel";
 import VendasSemNotaPanel from "./VendasSemNotaPanel";
+import NFSaidaClonagem from "./NFSaidaClonagem";
+import NFSaidaFiscalExterna from "./NFSaidaFiscalExterna";
 
 export default function CentralNFSaidaView({
   painelSefazAberto,
@@ -50,6 +52,9 @@ export default function CentralNFSaidaView({
   erro,
   notasFiltradas,
   setModalCancelar,
+  clonarNota,
+  notaParaClonar,
+  fecharClonagem,
   excluirNota,
   reconciliarFluxoNota,
   reconciliandoNotaId,
@@ -104,6 +109,12 @@ export default function CentralNFSaidaView({
 
       <VendasSemNotaPanel onEmissaoConcluida={() => carregarNotas(true)} />
 
+      <NFSaidaClonagem
+        nota={notaParaClonar}
+        aoFechar={fecharClonagem}
+        aoAtualizar={() => carregarNotas(true)}
+      />
+
       <NFSaidaFilters
         filtroCanal={filtroCanal}
         setFiltroCanal={setFiltroCanal}
@@ -137,6 +148,7 @@ export default function CentralNFSaidaView({
         dataInicial={dataInicial}
         dataFinal={dataFinal}
         setModalCancelar={setModalCancelar}
+        clonarNota={clonarNota}
         excluirNota={excluirNota}
         reconciliarFluxoNota={reconciliarFluxoNota}
         reconciliandoNotaId={reconciliandoNotaId}
@@ -151,21 +163,29 @@ export default function CentralNFSaidaView({
         abrirDetalhes={abrirDetalhes}
       />
 
-      <NFSaidaDetalhesModal
-        notaSelecionada={notaSelecionada}
-        detalheNota={detalheNota}
-        carregandoDetalhe={carregandoDetalhe}
-        erroDetalhe={erroDetalhe}
-        fecharDetalhes={fecharDetalhes}
-        baixarDanfe={baixarDanfe}
-        baixarXml={baixarXml}
-        corrigirEReemitir={corrigirEReemitir}
-        corrigindoNotaId={corrigindoNotaId}
-        abrirCorrecao={abrirCorrecao}
-        diagnosticandoNotaId={diagnosticandoNotaId}
-        liberarVendaComRejeicao={liberarVendaComRejeicao}
-        liberandoVendaId={liberandoVendaId}
-      />
+      {notaSelecionada?.fiscal_order_id ? (
+        <NFSaidaFiscalExterna
+          nota={notaSelecionada}
+          aoFechar={fecharDetalhes}
+          aoAtualizar={() => carregarNotas(false)}
+        />
+      ) : (
+        <NFSaidaDetalhesModal
+          notaSelecionada={notaSelecionada}
+          detalheNota={detalheNota}
+          carregandoDetalhe={carregandoDetalhe}
+          erroDetalhe={erroDetalhe}
+          fecharDetalhes={fecharDetalhes}
+          baixarDanfe={baixarDanfe}
+          baixarXml={baixarXml}
+          corrigirEReemitir={corrigirEReemitir}
+          corrigindoNotaId={corrigindoNotaId}
+          abrirCorrecao={abrirCorrecao}
+          diagnosticandoNotaId={diagnosticandoNotaId}
+          liberarVendaComRejeicao={liberarVendaComRejeicao}
+          liberandoVendaId={liberandoVendaId}
+        />
+      )}
 
       <NFSaidaCancelamentoModal
         modalCancelar={modalCancelar}

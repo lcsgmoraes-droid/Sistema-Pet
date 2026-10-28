@@ -15,6 +15,12 @@ import { confirmarCorePet, perguntarCorePet } from "../services/corepetDialog";
 import { obterTotalRecebidoExistente } from "../components/modalPagamentoUtils";
 import { normalizarDescontosVenda } from "../utils/pdvDescontosUtils";
 import { cancelarEdicaoVenda } from "../utils/pdvCancelarEdicaoVenda";
+import { CANAL_IFOOD, normalizeSalesChannel } from "../utils/salesChannel";
+import {
+  extrairCamposFiscaisVenda,
+  temNotaFiscalAtiva,
+  obterPendenciaCancelamentoFiscal,
+} from "../utils/pdvFiscalStatus";
 
 async function carregarPagamentosDaVenda(vendaId) {
   try {
@@ -66,7 +72,11 @@ function montarMensagemErroExclusao(errorData) {
 }
 
 function montarVendaReaberta(vendaAtualizada, clienteCompleto, { pagamentos, totalPago }) {
+  const entregaAtualizada = vendaAtualizada.entrega || {};
+  const statusEntrega =
+    vendaAtualizada.status_entrega || entregaAtualizada.status_entrega || "pendente";
   return {
+    ...extrairCamposFiscaisVenda(vendaAtualizada),
     id: vendaAtualizada.id,
     numero_venda: vendaAtualizada.numero_venda,
     data_venda: vendaAtualizada.data_venda,
@@ -84,21 +94,43 @@ function montarVendaReaberta(vendaAtualizada, clienteCompleto, { pagamentos, tot
     cupons_detalhes: vendaAtualizada.cupons_detalhes || [],
     total: parseFloat(vendaAtualizada.total),
     observacoes: vendaAtualizada.observacoes || "",
+    nao_gerar_beneficios: Boolean(vendaAtualizada.nao_gerar_beneficios),
+    justificativa_nao_gerar_beneficios: vendaAtualizada.justificativa_nao_gerar_beneficios ?? null,
+    beneficios_bloqueados_em: vendaAtualizada.beneficios_bloqueados_em ?? null,
+    beneficios_bloqueados_por_id: vendaAtualizada.beneficios_bloqueados_por_id ?? null,
     status: "aberta",
+    funcionario_id: vendaAtualizada.funcionario_id || null,
+    vendedor_funcionario_id:
+      vendaAtualizada.vendedor_funcionario_id || vendaAtualizada.funcionario_id || null,
+    entregador_id: vendaAtualizada.entregador_id || entregaAtualizada.entregador_id || null,
+    pagamento_entrega_previsto: vendaAtualizada.pagamento_entrega_previsto || null,
+    status_entrega: statusEntrega,
     pagamentos,
     total_pago: totalPago,
     tem_entrega: vendaAtualizada.tem_entrega || false,
     entrega: {
-      endereco_completo: vendaAtualizada.endereco_entrega || "",
-      endereco_id: vendaAtualizada.endereco_id || null,
-      taxa_entrega_total: parseFloat(parseFloat(vendaAtualizada.taxa_entrega || 0).toFixed(2)),
-      taxa_loja: parseFloat(parseFloat(vendaAtualizada.taxa_loja || 0).toFixed(2)),
-      taxa_entregador: parseFloat(parseFloat(vendaAtualizada.taxa_entregador || 0).toFixed(2)),
-      observacoes_entrega: vendaAtualizada.observacoes_entrega || "",
-      distancia_km: vendaAtualizada.distancia_km || 0,
-      valor_por_km: vendaAtualizada.valor_por_km || 0,
-      loja_origem: vendaAtualizada.loja_origem || "",
-      status_entrega: vendaAtualizada.status_entrega || "pendente",
+      endereco_completo:
+        entregaAtualizada.endereco_completo ?? vendaAtualizada.endereco_entrega ?? "",
+      endereco_id: entregaAtualizada.endereco_id ?? vendaAtualizada.endereco_id ?? null,
+      taxa_entrega_total: parseFloat(
+        parseFloat(
+          entregaAtualizada.taxa_entrega_total ?? vendaAtualizada.taxa_entrega ?? 0,
+        ).toFixed(2),
+      ),
+      taxa_loja: parseFloat(
+        parseFloat(entregaAtualizada.taxa_loja ?? vendaAtualizada.taxa_loja ?? 0).toFixed(2),
+      ),
+      taxa_entregador: parseFloat(
+        parseFloat(
+          entregaAtualizada.taxa_entregador ?? vendaAtualizada.taxa_entregador ?? 0,
+        ).toFixed(2),
+      ),
+      observacoes_entrega:
+        entregaAtualizada.observacoes_entrega ?? vendaAtualizada.observacoes_entrega ?? "",
+      distancia_km: entregaAtualizada.distancia_km ?? vendaAtualizada.distancia_km ?? 0,
+      valor_por_km: entregaAtualizada.valor_por_km ?? vendaAtualizada.valor_por_km ?? 0,
+      loja_origem: entregaAtualizada.loja_origem ?? vendaAtualizada.loja_origem ?? "",
+      status_entrega: statusEntrega,
     },
   };
 }
@@ -126,6 +158,10 @@ export function usePDVVendaFinalizacao({
   }, [vendaAtual.id, vendaAtual.status]);
 
   const habilitarEdicao = () => {
+    if (vendaAtual.id && normalizeSalesChannel(vendaAtual.canal) === CANAL_IFOOD) {
+      alert("Itens e valores vêm do pedido iFood. Use as ações de finalizar ou cancelar a venda.");
+      return;
+    }
     setModoVisualizacao(false);
   };
 
@@ -135,7 +171,8 @@ export function usePDVVendaFinalizacao({
       await cancelarEdicaoVenda({
         vendaAtual,
         restauracao: statusOriginalVenda,
-        restaurarStatus: (vendaId, status) => api.patch(`/vendas/${vendaId}/status`, { status }),
+        restaurarStatus: (vendaId, status) =>
+          api.patch(`/vendas/${vendaId}/status`, { status, cancelar_reabertura: true }),
         recarregarContextoCliente: recarregarContextoClienteAtual,
         limparRestauracao: () => setStatusOriginalVenda(null),
         limparVenda,
@@ -160,7 +197,10 @@ export function usePDVVendaFinalizacao({
     const confirmar = await confirmarCorePet({
       titulo: "Cancelar venda?",
       mensagem:
-        "A venda continuará rastreável no histórico e os itens serão devolvidos ao estoque.",
+        "A venda continuará rastreável no histórico e os itens serão devolvidos ao estoque." +
+        (temNotaFiscalAtiva(vendaAtual)
+          ? " Os efeitos comerciais e financeiros serão estornados, mas a nota fiscal continuará válida até o emissor confirmar seu cancelamento. Será necessário regularizar essa pendência fiscal."
+          : ""),
       confirmarTexto: "Cancelar venda",
       variante: "danger",
     });
@@ -184,10 +224,21 @@ export function usePDVVendaFinalizacao({
     const motivoNormalizado = motivo.trim();
     try {
       setLoading(true);
-      await cancelarVenda(vendaAtual.id, motivoNormalizado);
-      limparVenda();
+      const resultado = await cancelarVenda(vendaAtual.id, motivoNormalizado);
+      const vendaCancelada = { ...vendaAtual, ...resultado, status: "cancelada" };
+      setVendaAtual((atual) =>
+        String(atual.id) === String(vendaAtual.id)
+          ? { ...atual, ...vendaCancelada, cliente: atual.cliente || vendaCancelada.cliente }
+          : atual,
+      );
+      setModoVisualizacao(true);
       carregarVendasRecentes();
-      alert("Venda cancelada com sucesso e mantida no historico.");
+      const pendenciaFiscal = obterPendenciaCancelamentoFiscal(vendaCancelada);
+      alert(
+        pendenciaFiscal
+          ? `Venda cancelada e mantida no histórico. ${pendenciaFiscal.label}. A nota fiscal ainda precisa de regularização.`
+          : "Venda cancelada com sucesso e mantida no historico.",
+      );
     } catch (error) {
       console.error("Erro ao excluir venda:", error);
       alert(montarMensagemErroExclusao(error.response?.data?.detail));

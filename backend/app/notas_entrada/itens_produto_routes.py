@@ -57,7 +57,14 @@ def _buscar_nota_item_por_tenant(
     return nota, item
 
 
-@router.post("/{nota_id}/itens/{item_id}/vincular")
+@router.post(
+    "/{nota_id}/itens/{item_id}/vincular",
+    responses={
+        400: {
+            "description": "Produto incompatível: o vínculo exige produto simples ou variação."
+        },
+    },
+)
 def vincular_produto(
     nota_id: int,
     item_id: int,
@@ -67,21 +74,19 @@ def vincular_produto(
 ):
     """Vincula item a um produto manualmente."""
     _, tenant_id = user_and_tenant
-    item = (
-        db.query(NotaEntradaItem)
-        .filter(
-            NotaEntradaItem.id == item_id,
-            NotaEntradaItem.nota_entrada_id == nota_id,
-        )
+    nota, item = _buscar_nota_item_por_tenant(nota_id, item_id, tenant_id, db)
+    produto = (
+        db.query(Produto)
+        .filter(Produto.id == produto_id, Produto.tenant_id == tenant_id)
         .first()
     )
-
-    if not item:
-        raise HTTPException(status_code=404, detail="Item nao encontrado")
-
-    produto = db.query(Produto).filter(Produto.id == produto_id).first()
     if not produto:
         raise HTTPException(status_code=404, detail="Produto nao encontrado")
+    if (produto.tipo_produto or "SIMPLES") not in {"SIMPLES", "VARIACAO"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Vincule a nota a um produto simples ou a uma variacao.",
+        )
 
     foi_nao_vinculado = not item.vinculado
 
@@ -97,7 +102,6 @@ def vincular_produto(
         )
     _aplicar_codigos_barras_item_no_produto(produto, item)
 
-    nota = db.query(NotaEntrada).filter(NotaEntrada.id == nota_id).first()
     custo_item_vinculo = item.valor_unitario
     if nota:
         composicao_custo = calcular_composicao_custos_nota(nota).get(item.id, {})

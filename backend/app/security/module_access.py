@@ -67,13 +67,6 @@ def _load_active_modules(
     )
 
     assinatura_resumo = _assinatura_resumo_tenant(tenant, agora)
-    if not assinatura_resumo["acesso_operacional_ativo"]:
-        assinaturas = [
-            assinatura
-            for assinatura in assinaturas
-            if assinatura.gateway != "asaas_offer"
-        ]
-
     return _resolver_modulos_ativos(
         tenant.modulos_ativos,
         assinaturas,
@@ -81,6 +74,7 @@ def _load_active_modules(
         _planos_segmento_tenant(tenant),
         liberar_trial_completo=_trial_completo_ativo(tenant, agora),
         acesso_liberado=assinatura_resumo["acesso_operacional_ativo"],
+        liberar_completo_manual=assinatura_resumo["acesso_completo_manual"],
     )
 
 
@@ -93,12 +87,13 @@ def _load_active_entitlements(
         return []
 
     assinatura = _assinatura_resumo_tenant(tenant, agora)
-    if assinatura["acesso_completo_durante_trial"]:
+    if (
+        assinatura["acesso_completo_manual"]
+        or assinatura["acesso_completo_durante_trial"]
+    ):
         return sorted(ALL_PUBLIC_ENTITLEMENTS)
     if not assinatura["acesso_operacional_ativo"]:
-        # Cobranca com problema (fora da tolerancia de 15 dias) bloqueia
-        # entitlements tambem, sem excecao para plano legado — esses tenants
-        # serao reatribuidos a planos reais via o fluxo de aditivo comercial.
+        # Suspensao cadastral administrativa, independente da cobranca.
         return []
 
     planos = _planos_catalogo_segmento(tenant)

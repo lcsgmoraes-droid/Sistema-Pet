@@ -1,9 +1,16 @@
 import { FiEdit3 } from "react-icons/fi";
 
-import { buildOpsTenantCommercialForm, buildOpsTenantCommercialPayload } from "../opsTenantsUtils";
+import {
+  buildOpsTenantCommercialForm,
+  buildOpsTenantCommercialPayload,
+  getOpsTenantBlockingAuthorizationError,
+  requiresOpsTenantBlockingAuthorization,
+} from "../opsTenantsUtils";
 
 import BotaoSalva from "../../components/v2/BotaoSalva/BotaoSalva";
 import InputCombobox from "../../components/v2/InputCombobox/InputCombobox";
+import InputCheckTexto from "../../components/v2/InputCheckTexto/InputCheckTexto";
+import InputTextoLongo from "../../components/v2/InputTextoLongo/InputTextoLongo";
 import OpsTenantsBadge from "./OpsTenantsBadge";
 import { BILLING_EDIT_OPTIONS, TENANT_STATUS_EDIT_OPTIONS } from "./opsTenantsConstants";
 import { billingBadge } from "./opsTenantsFormatters";
@@ -34,6 +41,8 @@ export default function OpsTenantsCommercialEditPanel({
   const original = buildOpsTenantCommercialForm(tenant);
   const payload = buildOpsTenantCommercialPayload(original, form);
   const hasChanges = Object.keys(payload).length > 0;
+  const requiresBlockingAuthorization = requiresOpsTenantBlockingAuthorization(original, form);
+  const authorizationError = getOpsTenantBlockingAuthorizationError(original, form);
   const planosSegmento = Object.entries(ROTULO_PLANO_SEGMENTO).filter(([campo]) => tenant[campo]);
 
   return (
@@ -84,6 +93,10 @@ export default function OpsTenantsCommercialEditPanel({
       </div>
 
       <form id="tenant-comercial-form" onSubmit={onSubmit} noValidate className="mt-4 space-y-3">
+        <p className="text-xs leading-5 text-slate-600 dark:text-slate-300">
+          Fim do teste e pendências de cobrança mantêm o acesso liberado. Somente um status
+          cadastral não ativo interrompe a operação e exige autorização explícita do Lucas.
+        </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <InputCombobox
             id="tenant-comercial-status"
@@ -103,6 +116,33 @@ export default function OpsTenantsCommercialEditPanel({
           />
         </div>
 
+        {requiresBlockingAuthorization && (
+          <div className="space-y-3 rounded-lg border border-rose-200 bg-rose-50 p-3 dark:border-rose-900 dark:bg-rose-950">
+            <p className="text-sm font-semibold text-rose-800 dark:text-rose-200">
+              Esta alteração interromperá o acesso da loja ao sistema.
+            </p>
+            <InputCheckTexto
+              id="tenant-comercial-autorizacao"
+              checked={form.blocking_authorized_by_lucas === true}
+              onChange={(checked) => onChange("blocking_authorized_by_lucas", checked)}
+              disabled={saving}
+              required
+            >
+              Tenho autorização explícita do Lucas para interromper esta operação
+            </InputCheckTexto>
+            <InputTextoLongo
+              id="tenant-comercial-autorizacao-motivo"
+              label="Motivo e referência da autorização do Lucas"
+              value={form.blocking_authorization_reason || ""}
+              onChange={(value) => onChange("blocking_authorization_reason", value)}
+              help="Registre quando e por qual meio o Lucas autorizou, além do motivo. Mínimo de 10 caracteres."
+              maxLength={880}
+              disabled={saving}
+              required
+            />
+          </div>
+        )}
+
         {error ? (
           <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
             {error}
@@ -116,7 +156,7 @@ export default function OpsTenantsCommercialEditPanel({
 
         <BotaoSalva
           form="tenant-comercial-form"
-          disabled={!hasChanges}
+          disabled={!hasChanges || Boolean(authorizationError)}
           loading={saving}
           larguraTotal
         >

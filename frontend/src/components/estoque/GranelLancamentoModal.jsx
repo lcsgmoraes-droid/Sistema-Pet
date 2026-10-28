@@ -1,3 +1,4 @@
+import BuscaProduto from "../v2/BuscaProduto/BuscaProduto";
 import { X } from "lucide-react";
 import ActionButton from "../ui/ActionButton";
 
@@ -171,40 +172,29 @@ export default function GranelLancamentoModal({
             <label className="mb-1 block text-sm font-medium text-slate-700">
               Buscar outro produto a granel
             </label>
-            <input
-              type="text"
+            <BuscaProduto
               value={buscaGranel}
-              onChange={(event) => setBuscaGranel(event.target.value)}
-              placeholder="Ex: Special Dog Carne Granel"
-              className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-orange-500"
-            />
-            <div className="mt-2 max-h-36 overflow-y-auto rounded-lg border border-slate-200">
-              {granelProdutos.length === 0 ? (
-                <div className="px-3 py-2 text-sm text-slate-500">
-                  {loadingGranel ? "Buscando..." : "Nenhum granel encontrado"}
-                </div>
-              ) : (
-                granelProdutos.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => handleSelecionarGranel(item.id, item.preco_venda)}
-                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-orange-50 ${
-                      String(granelSelecionadoId) === String(item.id)
-                        ? "bg-orange-50 text-orange-800"
-                        : "text-slate-700"
-                    }`}
-                  >
-                    <span className="min-w-0 truncate">
-                      <span className="font-semibold">{item.codigo}</span> - {item.nome}
-                    </span>
-                    <span className="ml-3 shrink-0 text-xs text-slate-500">
-                      {formatarQuantidade(item.estoque_atual)} kg
-                    </span>
-                  </button>
-                ))
+              onChange={setBuscaGranel}
+              minChars={0}
+              suggestions={granelProdutos}
+              showSuggestions
+              loading={loadingGranel}
+              onSelect={(item) => {
+                handleSelecionarGranel(item.id, item.preco_venda);
+                setBuscaGranel(item.nome || "");
+              }}
+              renderSuggestionContent={(item) => (
+                <>
+                  <span className="block font-medium">
+                    {item.codigo || "Sem código"} - {item.nome}
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    {formatarQuantidade(item.estoque_atual)} kg
+                  </span>
+                </>
               )}
-            </div>
+              placeholder="Código ou nome do produto a granel"
+            />
             {nomeGranelSelecionado && (
               <p className="mt-1 text-xs text-orange-700">Selecionado: {nomeGranelSelecionado}</p>
             )}

@@ -1,3 +1,5 @@
+import BuscaProduto from "../../../components/v2/BuscaProduto/BuscaProduto";
+import useBuscaEntidadeLocal from "../../../components/v2/BuscaEntidade/useBuscaEntidadeLocal";
 export default function ProcedimentoInsumoRow({
   atualizarInsumo,
   index,
@@ -5,20 +7,29 @@ export default function ProcedimentoInsumoRow({
   produtos,
   removerInsumo,
 }) {
+  const buscaProduto = useBuscaEntidadeLocal({
+    itens: produtos,
+    valueId: item.produto_id,
+    onChangeId: (valor) => atualizarInsumo(index, "produto_id", valor),
+    tipo: "produto",
+  });
   return (
     <div className="grid gap-2 md:grid-cols-12">
-      <select
-        value={item.produto_id}
-        onChange={(event) => atualizarInsumo(index, "produto_id", event.target.value)}
-        className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm md:col-span-7"
-      >
-        <option value="">Selecione um produto</option>
-        {produtos.map((produto) => (
-          <option key={produto.id} value={produto.id}>
-            {produto.nome} - estoque {produto.estoque_atual} {produto.unidade || "UN"}
-          </option>
-        ))}
-      </select>
+      <BuscaProduto
+        {...buscaProduto}
+        className="md:col-span-7"
+        placeholder="Código ou nome do insumo"
+        renderSuggestionContent={(produto) => (
+          <>
+            <span className="block font-medium">
+              {produto.codigo || "Sem código"} - {produto.nome}
+            </span>
+            <span className="text-xs text-slate-500">
+              Estoque: {produto.estoque_atual} {produto.unidade || "UN"}
+            </span>
+          </>
+        )}
+      />
       <input
         type="number"
         min="0"

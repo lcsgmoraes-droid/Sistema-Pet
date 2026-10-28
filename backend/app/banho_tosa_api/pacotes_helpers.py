@@ -2,7 +2,7 @@ from typing import Optional
 
 from fastapi import HTTPException
 from sqlalchemy import func
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.banho_tosa_api.utils import validar_cliente_pet
 from app.banho_tosa_models import (
@@ -12,6 +12,7 @@ from app.banho_tosa_models import (
     BanhoTosaServico,
 )
 from app.models import Cliente
+from app.vendas_models import Venda
 
 
 def query_creditos(db: Session, tenant_id):
@@ -23,6 +24,9 @@ def query_creditos(db: Session, tenant_id):
             ),
             joinedload(BanhoTosaPacoteCredito.cliente),
             joinedload(BanhoTosaPacoteCredito.pet),
+            joinedload(BanhoTosaPacoteCredito.venda).selectinload(Venda.pagamentos),
+            joinedload(BanhoTosaPacoteCredito.venda).selectinload(Venda.contas_receber),
+            selectinload(BanhoTosaPacoteCredito.movimentos),
         )
         .filter(BanhoTosaPacoteCredito.tenant_id == tenant_id)
     )
@@ -86,6 +90,8 @@ def validar_servico(db: Session, tenant_id, servico_id: Optional[int]) -> None:
 def validar_nome_pacote_disponivel(
     db: Session, tenant_id, nome: str, ignorar_id: Optional[int] = None
 ) -> None:
+    if not (nome or "").strip():
+        raise HTTPException(status_code=422, detail="Informe o nome do pacote.")
     query = db.query(BanhoTosaPacote.id).filter(
         BanhoTosaPacote.tenant_id == tenant_id,
         func.lower(BanhoTosaPacote.nome) == nome.lower(),

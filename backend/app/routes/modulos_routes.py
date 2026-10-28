@@ -20,7 +20,14 @@ from app.services.business_audit_service import (
     build_plan_activation_metadata,
     log_business_event,
 )
-from app.services.billing_access import overdue_grace_state
+from app.services.billing_access import (
+    billing_warning_state,
+    manual_full_access_allowed,
+    normalize_billing_status,
+    operational_access_allowed,
+    overdue_grace_state,
+    trial_access_preserved,
+)
 from app.services.modulo_activation_service import (
     ModuloActivationError,
     ativar_modulo_manual,
@@ -128,14 +135,14 @@ def _dias_restantes_trial(
 
 
 def _assinatura_resumo_tenant(tenant: Tenant, agora: datetime) -> dict:
-    status_raw = (getattr(tenant, "billing_status", None) or "active").strip().lower()
+    status_raw = normalize_billing_status(getattr(tenant, "billing_status", None))
     if status_raw not in ASSINATURA_STATUS_VALIDOS:
         status_raw = "active"
 
     trial_ends_at = _datetime_utc(getattr(tenant, "trial_ends_at", None))
-    trial_completo_ativo = trial_ends_at is not None and trial_ends_at > agora
+    trial_completo_ativo = trial_access_preserved(tenant, agora)
     status_efetivo = status_raw
-    if status_raw == "trial" and trial_ends_at and trial_ends_at < agora:
+    if status_raw == "trial" and trial_ends_at and trial_ends_at <= agora:
         status_efetivo = "expired"
 
     data_brasilia = (
@@ -144,9 +151,7 @@ def _assinatura_resumo_tenant(tenant: Tenant, agora: datetime) -> dict:
         else agora.date()
     )
     tolerancia = overdue_grace_state(tenant, data_brasilia)
-    acesso_operacional_ativo = (
-        status_efetivo in {"active", "trial"} or tolerancia["access_allowed"]
-    )
+    acesso_operacional_ativo = operational_access_allowed(tenant)
 
     origem = getattr(tenant, "subscription_source", None) or "manual"
     pagamento_integrado = bool(
@@ -158,6 +163,11 @@ def _assinatura_resumo_tenant(tenant: Tenant, agora: datetime) -> dict:
         "status": status_raw,
         "status_efetivo": status_efetivo,
         "acesso_operacional_ativo": acesso_operacional_ativo,
+        "acesso_completo_manual": manual_full_access_allowed(tenant),
+        "bloqueio_automatico": False,
+        "avisos_cobranca": billing_warning_state(
+            tenant, data_brasilia, effective_status=status_efetivo
+        ),
         "tolerancia_atraso": {
             "em_vigor": tolerancia["in_grace"],
             "dias_restantes": tolerancia["days_until_block"],
@@ -168,7 +178,7 @@ def _assinatura_resumo_tenant(tenant: Tenant, agora: datetime) -> dict:
         "trial_fim": _iso_datetime(trial_ends_at),
         "dias_restantes_trial": _dias_restantes_trial(trial_ends_at, agora),
         "trial_expirado": status_efetivo == "expired",
-        # Os 30 dias completos continuam mesmo se o cliente pagar antes do fim.
+        # O trial vencido continua completo ate ativacao ou decisao administrativa.
         "acesso_completo_durante_trial": trial_completo_ativo,
         "ativada_em": _iso_datetime(getattr(tenant, "subscription_activated_at", None)),
         "pagamento_integrado": pagamento_integrado,
@@ -233,11 +243,11 @@ def _resolver_modulos_ativos(
     planos: tuple[str | None, ...] = (),
     liberar_trial_completo: bool = False,
     acesso_liberado: bool = True,
+    liberar_completo_manual: bool = False,
 ) -> list[str]:
     """Une as 3 fontes de modulo liberado (manual, AssinaturaModulo, planos de
-    segmento). Quando `acesso_liberado` e False (cobranca com problema), nenhuma
-    das 3 fontes libera nada — so o trial completo (ortogonal a billing) segue
-    valendo. `planos` e a lista dos ate-3 codigos de segmento do tenant
+    segmento). Suspensao cadastral interrompe todas as fontes, incluindo trial
+    e concessao FULL manual. `planos` sao os ate-3 codigos de segmento do tenant
     (plan_pet/plan_vet/plan_grooming), filtrando os vazios.
     """
     modulos_do_tenant: set[str] = set()
@@ -265,7 +275,7 @@ def _resolver_modulos_ativos(
             if plano_catalogo:
                 modulos_do_tenant.update(plano_catalogo.modules)
 
-    if liberar_trial_completo:
+    if (liberar_trial_completo or liberar_completo_manual) and acesso_liberado:
         modulos_do_tenant.update(MODULOS_TRIAL_COMPLETO)
 
     return sorted(modulo for modulo in modulos_do_tenant if modulo in MODULOS_PREMIUM)
@@ -366,9 +376,8 @@ def get_modulos_status(
     )
 
     assinatura_resumo = _assinatura_resumo_tenant(tenant, agora)
-    # acesso_operacional_ativo ja incorpora a tolerancia de 15 dias pra
-    # cobranca em atraso (ver billing_access.overdue_grace_state) — e esse,
-    # nao o status_efetivo cru, que deve gatear as 3 fontes de modulo.
+    # Cobranca informa avisos. Somente suspensao cadastral administrativa
+    # interrompe as tres fontes de acesso aos modulos.
     acesso_liberado = assinatura_resumo["acesso_operacional_ativo"]
     planos_segmento = _planos_segmento_tenant(tenant)
 
@@ -379,11 +388,13 @@ def get_modulos_status(
         planos_segmento,
         liberar_trial_completo=_trial_completo_ativo(tenant, agora),
         acesso_liberado=acesso_liberado,
+        liberar_completo_manual=assinatura_resumo["acesso_completo_manual"],
     )
 
     planos_catalogo = _planos_catalogo_segmento(tenant)
     plano_catalogo = planos_catalogo[0] if planos_catalogo else None
     trial_completo = assinatura_resumo["acesso_completo_durante_trial"]
+    acesso_completo = trial_completo or assinatura_resumo["acesso_completo_manual"]
     plano_ativo = acesso_liberado
     recursos_trial = sorted(
         {recurso for plano in PLAN_CATALOG.values() for recurso in plano.entitlements}
@@ -394,7 +405,7 @@ def get_modulos_status(
     entitlements_legado = _entitlements_plano_legado(planos_segmento)
     recursos_ativos = (
         recursos_trial
-        if trial_completo
+        if acesso_completo
         else sorted(entitlements_catalogo | entitlements_legado)
         if plano_ativo
         else []
@@ -425,7 +436,7 @@ def get_modulos_status(
     }
     limites_aplicados = (
         {"vendas_mensais": None, "acessos_simultaneos": None}
-        if trial_completo
+        if acesso_completo
         else limites_apos_trial
     )
 

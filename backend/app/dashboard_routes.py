@@ -11,6 +11,7 @@ from sqlalchemy import func, and_, or_
 from datetime import date, datetime, timedelta
 from typing import Optional
 import logging
+import re
 
 from .db import get_session
 from .auth.dependencies import get_current_user_and_tenant
@@ -27,6 +28,17 @@ from .relatorio_vendas_common import (
 )
 from .utils.serialization import safe_decimal_to_float_zero
 from .utils.timezone import now_brasilia
+from .services.faturamento_service import (
+    montar_composicao_vendas,
+    opcoes_composicao_vendas,
+)
+from .services.rentabilidade_pendencias import (
+    PENDING_IFOOD_FINANCIAL,
+    PENDENCIA_IFOOD,
+    aplicar_pendencia_ifood,
+)
+from .services.ifood_rentabilidade_contexto import carregar_snapshots_ifood_vendas
+from .caixa.conferencia import moeda
 from .utils.tenant_safe_sql import execute_tenant_safe
 from .dashboard.ponto_equilibrio_routes import (
     router as ponto_equilibrio_router,
@@ -77,6 +89,7 @@ router = APIRouter()
 router.include_router(ponto_equilibrio_router)
 
 DASHBOARD_OPEN_ACCOUNT_STATUSES = ("pendente", "parcial", "vencido", "vencida")
+DASHBOARD_MAX_DIAS_PERSONALIZADO = 90
 
 
 def _dashboard_fetchone(db: Session, sql: str, tenant_id, params=None):
@@ -91,6 +104,51 @@ def _intervalo_dias_calendario(periodo_dias: int, agora: datetime | None = None)
     inicio_periodo = inicio_hoje - timedelta(days=quantidade_dias - 1)
     fim_periodo = inicio_hoje + timedelta(days=1)
     return inicio_periodo, fim_periodo
+
+
+def _intervalo_dashboard(
+    periodo_dias: int,
+    data_inicio: str | None = None,
+    data_fim: str | None = None,
+    agora: datetime | None = None,
+):
+    """Valida o filtro antes das consultas, usando dias civis de Brasília."""
+    if data_inicio is None and data_fim is None:
+        return _intervalo_dias_calendario(periodo_dias, agora)
+    if data_inicio is None or data_fim is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Informe data_inicio e data_fim para o período personalizado.",
+        )
+
+    datas = []
+    for campo, valor in (("data_inicio", data_inicio), ("data_fim", data_fim)):
+        try:
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", valor):
+                raise ValueError
+            datas.append(date.fromisoformat(valor))
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=400,
+                detail=f"{campo} deve ser uma data válida em AAAA-MM-DD.",
+            ) from None
+    inicio, fim = datas
+    if inicio > fim:
+        raise HTTPException(
+            status_code=400, detail="A data inicial deve ser anterior ou igual à final."
+        )
+    if (fim - inicio).days + 1 > DASHBOARD_MAX_DIAS_PERSONALIZADO:
+        raise HTTPException(
+            status_code=400,
+            detail="O período personalizado deve ter no máximo 90 dias, incluindo as duas datas.",
+        )
+    if fim == date.max:
+        raise HTTPException(
+            status_code=400, detail="A data final está fora do intervalo permitido."
+        )
+    return datetime.combine(inicio, datetime.min.time()), datetime.combine(
+        fim + timedelta(days=1), datetime.min.time()
+    )
 
 
 def _classificar_data_vencimento_dashboard(
@@ -117,15 +175,19 @@ async def obter_resumo_dashboard(
     periodo_dias: int = Query(30, ge=1, le=366),
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
+    data_inicio: str | None = None,
+    data_fim: str | None = None,
 ):
     """
     Retorna resumo consolidado para o dashboard financeiro
     """
     current_user, tenant_id = user_and_tenant
+    agora = now_brasilia()
+    inicio_periodo, fim_periodo = _intervalo_dashboard(
+        periodo_dias, data_inicio, data_fim, agora
+    )
     try:
-        agora = now_brasilia()
         hoje = agora.date()
-        inicio_periodo, fim_periodo = _intervalo_dias_calendario(periodo_dias, agora)
 
         # ========================================
         # 1. SALDO ATUAL (Baseado em vendas pagas)
@@ -227,7 +289,7 @@ async def obter_resumo_dashboard(
         # ========================================
         vendas_periodo = (
             db.query(Venda)
-            .options(selectinload(Venda.pagamentos), selectinload(Venda.itens))
+            .options(*opcoes_composicao_vendas())
             .filter(
                 and_(
                     Venda.tenant_id == tenant_id,
@@ -239,23 +301,42 @@ async def obter_resumo_dashboard(
             .all()
         )
 
-        total_vendas_periodo = sum(float(venda.total or 0) for venda in vendas_periodo)
-        quantidade_vendas_periodo = len(vendas_periodo)
-        faturamento_bruto_periodo = sum(
-            _valores_operacionais_venda(venda)["valor_bruto"]
-            for venda in vendas_periodo
+        composicao_vendas = montar_composicao_vendas(
+            db,
+            tenant_id,
+            vendas_periodo,
+            inicio_periodo.date(),
+            (fim_periodo - timedelta(days=1)).date(),
         )
-        valor_recebido_periodo = sum(
-            _total_recebido_venda(venda) for venda in vendas_periodo
-        )
+        total_vendas_periodo = composicao_vendas["total_vendas"]
+        quantidade_vendas_periodo = composicao_vendas["quantidade"]
+        faturamento_bruto_periodo = composicao_vendas["faturamento_bruto"]
+        valor_recebido_periodo = composicao_vendas["valor_pago"]
         unidades_vendidas_periodo = sum(
             safe_decimal_to_float_zero(getattr(item, "quantidade", 0))
             for venda in vendas_periodo
             for item in list(getattr(venda, "itens", []) or [])
         )
-        lucro_vendas_periodo = sum(
-            safe_decimal_to_float_zero(_snapshot_dict(venda).get("lucro", 0))
+        snapshots_ifood = carregar_snapshots_ifood_vendas(db, tenant_id, vendas_periodo)
+        snapshots_periodo = [
+            snapshots_ifood.get(getattr(venda, "id", None))
+            or aplicar_pendencia_ifood(venda, _snapshot_dict(venda))
             for venda in vendas_periodo
+        ]
+        vendas_rentabilidade_pendente = sum(
+            bool(snapshot.get("taxas_ifood_pendentes"))
+            for snapshot in snapshots_periodo
+        )
+        lucro_vendas_periodo = (
+            None
+            if vendas_rentabilidade_pendente
+            else round(
+                sum(
+                    safe_decimal_to_float_zero(snapshot.get("lucro", 0))
+                    for snapshot in snapshots_periodo
+                ),
+                2,
+            )
         )
 
         # Vendas finalizadas
@@ -289,7 +370,7 @@ async def obter_resumo_dashboard(
         # 7. TICKET MÉDIO
         # ========================================
         ticket_medio = (
-            (faturamento_bruto_periodo / quantidade_vendas_periodo)
+            (composicao_vendas["faturamento_liquido"] / quantidade_vendas_periodo)
             if quantidade_vendas_periodo > 0
             else 0
         )
@@ -312,6 +393,7 @@ async def obter_resumo_dashboard(
         # RETORNO
         # ========================================
         return {
+            "composicao_vendas": composicao_vendas,
             "visao_comercial": visao_comercial,
             "indicador_comercial": indicador_comercial,
             "saldo_atual": round(saldo_atual, 2),
@@ -330,8 +412,19 @@ async def obter_resumo_dashboard(
                 "unidades": round(unidades_vendidas_periodo, 3),
                 "valor_total": round(total_vendas_periodo, 2),
                 "faturamento_bruto": round(float(faturamento_bruto_periodo), 2),
+                "faturamento_liquido": composicao_vendas["faturamento_liquido"],
                 "valor_recebido": round(valor_recebido_periodo, 2),
-                "lucro": round(lucro_vendas_periodo, 2),
+                "lucro": lucro_vendas_periodo,
+                "rentabilidade_status": (
+                    PENDING_IFOOD_FINANCIAL
+                    if vendas_rentabilidade_pendente
+                    else "complete"
+                ),
+                "taxas_ifood_pendentes": bool(vendas_rentabilidade_pendente),
+                "vendas_rentabilidade_pendente": vendas_rentabilidade_pendente,
+                "pendencias_rentabilidade": (
+                    [PENDENCIA_IFOOD] if vendas_rentabilidade_pendente else []
+                ),
                 "finalizadas": int(vendas_finalizadas),
                 "ticket_medio": round(ticket_medio, 2),
             },
@@ -340,7 +433,9 @@ async def obter_resumo_dashboard(
                 "saidas": round(saidas_periodo, 2),
                 "lucro": round(lucro_periodo, 2),
             },
-            "periodo_dias": periodo_dias,
+            "periodo_dias": (fim_periodo - inicio_periodo).days,
+            "data_inicio": inicio_periodo.date().isoformat(),
+            "data_fim": (fim_periodo - timedelta(days=1)).date().isoformat(),
         }
 
     except Exception as e:
@@ -353,18 +448,21 @@ async def obter_entradas_saidas_por_dia(
     periodo_dias: int = Query(30, ge=0, le=366),
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
+    data_inicio: str | None = None,
+    data_fim: str | None = None,
 ):
     """
     Retorna entradas e saídas agrupadas por dia para gráfico
     """
     current_user, tenant_id = user_and_tenant
+    inicio_periodo, fim_periodo = _intervalo_dashboard(
+        periodo_dias, data_inicio, data_fim
+    )
     try:
-        inicio_periodo, fim_periodo = _intervalo_dias_calendario(periodo_dias)
-
         # Buscar vendas por dia
         vendas = (
             db.query(Venda)
-            .options(selectinload(Venda.pagamentos))
+            .options(*opcoes_composicao_vendas())
             .filter(
                 and_(
                     Venda.tenant_id == tenant_id,
@@ -397,15 +495,9 @@ async def obter_entradas_saidas_por_dia(
         dados_por_dia = {}
 
         # Inicializar todos os dias com zero
-        for i in range(max(periodo_dias, 1)):
+        for i in range((fim_periodo - inicio_periodo).days):
             data = (inicio_periodo + timedelta(days=i)).strftime("%Y-%m-%d")
             dados_por_dia[data] = {"data": data, "entradas": 0, "saidas": 0}
-
-        # Preencher com vendas
-        for venda in vendas:
-            data_str = venda.data_venda.strftime("%Y-%m-%d")
-            if data_str in dados_por_dia:
-                dados_por_dia[data_str]["entradas"] += _total_recebido_venda(venda)
 
         # Preencher com pagamentos
         for pagamento in pagamentos:
@@ -429,6 +521,21 @@ async def obter_entradas_saidas_por_dia(
                 if dia["data"] in dados_por_dia:
                     dados_por_dia[dia["data"]]["entradas"] = dia["entradas"]
                     dados_por_dia[dia["data"]]["saidas"] += dia["devolucoes"]
+        else:
+            composicao = montar_composicao_vendas(
+                db,
+                tenant_id,
+                vendas,
+                inicio_periodo.date(),
+                (fim_periodo - timedelta(days=1)).date(),
+            )
+            for venda in composicao["detalhes"]:
+                data_str = (venda["data_venda"] or "")[:10]
+                if data_str in dados_por_dia:
+                    dia = dados_por_dia[data_str]
+                    dia["entradas"] = float(
+                        moeda(dia["entradas"]) + moeda(venda["valor_pago"])
+                    )
 
         # Converter para lista ordenada
         resultado = sorted(dados_por_dia.values(), key=lambda x: x["data"])
@@ -445,14 +552,17 @@ async def obter_vendas_por_dia(
     periodo_dias: int = Query(30, ge=0, le=366),
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
+    data_inicio: str | None = None,
+    data_fim: str | None = None,
 ):
     """
     Retorna vendas agrupadas por dia para gráfico
     """
     current_user, tenant_id = user_and_tenant
+    inicio_periodo, fim_periodo = _intervalo_dashboard(
+        periodo_dias, data_inicio, data_fim
+    )
     try:
-        inicio_periodo, fim_periodo = _intervalo_dias_calendario(periodo_dias)
-
         # Buscar vendas do período
         vendas = (
             db.query(
@@ -476,7 +586,7 @@ async def obter_vendas_por_dia(
         dados_por_dia = {}
 
         # Inicializar todos os dias com zero
-        for i in range(max(periodo_dias, 1)):
+        for i in range((fim_periodo - inicio_periodo).days):
             data = (inicio_periodo + timedelta(days=i)).strftime("%Y-%m-%d")
             dados_por_dia[data] = {"data": data, "quantidade": 0, "valor_total": 0}
 
@@ -587,12 +697,12 @@ async def obter_contas_vencidas(
                         "valor_total": valor_final,
                         "valor_pago": valor_recebido,
                         "saldo": valor_final - valor_recebido,
-                        "data_vencimento": c.data_vencimento.isoformat()
-                        if c.data_vencimento
-                        else None,
-                        "dias_vencido": (hoje - c.data_vencimento).days
-                        if c.data_vencimento
-                        else 0,
+                        "data_vencimento": (
+                            c.data_vencimento.isoformat() if c.data_vencimento else None
+                        ),
+                        "dias_vencido": (
+                            (hoje - c.data_vencimento).days if c.data_vencimento else 0
+                        ),
                         "status": c.status,
                     }
                 )
@@ -625,12 +735,12 @@ async def obter_contas_vencidas(
                         "valor_total": valor_final,
                         "valor_pago": valor_pago,
                         "saldo": valor_final - valor_pago,
-                        "data_vencimento": c.data_vencimento.isoformat()
-                        if c.data_vencimento
-                        else None,
-                        "dias_vencido": (hoje - c.data_vencimento).days
-                        if c.data_vencimento
-                        else 0,
+                        "data_vencimento": (
+                            c.data_vencimento.isoformat() if c.data_vencimento else None
+                        ),
+                        "dias_vencido": (
+                            (hoje - c.data_vencimento).days if c.data_vencimento else 0
+                        ),
                         "status": c.status,
                     }
                 )
@@ -797,20 +907,23 @@ async def obter_metricas_gerencial(
 
 @router.get("/dashboard/top-produtos")
 async def obter_top_produtos(
-    periodo_dias: int = 30,
+    periodo_dias: int = Query(30, ge=0, le=366),
     limite: int = 10,
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
+    data_inicio: str | None = None,
+    data_fim: str | None = None,
 ):
     """
     Retorna os produtos mais vendidos no período
     """
     current_user, tenant_id = user_and_tenant
+    inicio_periodo, fim_periodo = _intervalo_dashboard(
+        periodo_dias, data_inicio, data_fim
+    )
     try:
         from .vendas_models import VendaItem
         from .produtos_models import Produto
-
-        inicio_periodo, fim_periodo = _intervalo_dias_calendario(periodo_dias)
 
         # Buscar produtos mais vendidos
         top_produtos = (

@@ -7,6 +7,8 @@ logger = logging.getLogger(__name__)
 
 def tentar_enfileirar_documento(db, tenant_id, provider, documento_id):
     """Só persistência local; o fluxo fiscal mantém o commit e nunca usa SMTP."""
+    if provider != "intnfe":
+        return
     try:
         from app.services.xml_contabilidade_service import enfileirar_documento
 

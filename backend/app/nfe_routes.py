@@ -50,6 +50,8 @@ from app.intnfe.recovery import (
 from app.bling_integration_fiscal import prevalidar_produtos_fiscais_venda
 from app.nfe.danfe_nfce import gerar_danfe_nfce
 from app.nfe.correcao_routes import router as correcao_router
+from app.nfe.clone_routes import router as clone_router
+from app.nfe.commercial_context_routes import router as commercial_context_router
 from app.nfe.operacional_routes import (
     CancelarNFeRequest as CancelarNFeRequest,
     CartaCorrecaoRequest as CartaCorrecaoRequest,
@@ -215,6 +217,8 @@ def _direct_failure(exc):
     }
     if exc.validation:
         detail["validacao"] = exc.validation
+    if exc.cancelamento:
+        detail.update(exc.cancelamento)
     return HTTPException(
         exc.status,
         detail,
@@ -653,7 +657,7 @@ def cancel_intnfe_venda(
         raise HTTPException(404, "Venda não encontrada")
     api = _intnfe_client()
     try:
-        return cancel_intnfe(db, venda, api, body.justificativa)
+        return cancel_intnfe(db, venda, api, body.justificativa, user_id=_user.id)
     except DirectEmissionError as exc:
         raise _direct_failure(exc) from None
     finally:
@@ -688,6 +692,7 @@ async def listar_nfes(
         payload_cache["cache_idade_segundos"] = int(
             max(agora_cache - cache_atual.get("ts_monotonic", 0), 0)
         )
+        _enriquecer_notas_com_vendas(db, tenant_id, payload_cache.get("notas", []))
         return payload_cache
 
     estado_cache = obter_estado_cache_notas(
@@ -823,5 +828,7 @@ async def reconciliar_pendentes_nfe(
 
 router.include_router(listagem_rapida_router)
 router.include_router(vendas_sem_nota_router)
+router.include_router(clone_router)
+router.include_router(commercial_context_router)
 router.include_router(operacional_router)
 router.include_router(correcao_router)

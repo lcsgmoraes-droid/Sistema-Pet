@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, time, timedelta
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, case, func, or_
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.dre_canais.base import CANAIS_CONFIG
@@ -17,10 +17,6 @@ from app.dre_canais.routes import gerar_dre_por_canais
 from app.financeiro.fluxo_caixa_routes import get_fluxo_caixa
 from app.financeiro_models import ContaPagar, ContaReceber
 from app.models import User
-from app.relatorio_vendas_common import (
-    _total_recebido_venda,
-    _valores_operacionais_venda,
-)
 from app.routes.ecommerce_auth import (
     _activate_user_tenant_context,
     _get_current_ecommerce_user,
@@ -29,6 +25,11 @@ from app.services.app_access_profile_service import resolve_user_app_profiles
 from app.utils.serialization import safe_decimal_to_float_zero
 from app.utils.timezone import now_brasilia
 from app.vendas_models import Venda
+from app.services.faturamento_composicao import compor_vendas
+from app.services.faturamento_service import (
+    montar_composicao_vendas,
+    opcoes_composicao_vendas,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/gestor", tags=["App Mobile - Gestor"])
@@ -51,6 +52,7 @@ class GestorVendasResumo(BaseModel):
     unidades_vendidas: float = 0
     produtos_distintos: int = 0
     ticket_medio: float = 0
+    composicao: dict[str, Any] | None = None
 
 
 class GestorContaResumo(BaseModel):
@@ -90,14 +92,18 @@ class GestorDREResumo(BaseModel):
     receita_liquida: float = 0
     cmv: float = 0
     custo_servicos: float = 0
-    despesas_variaveis: float = 0
-    despesas_operacionais: float = 0
-    despesas_fixas_operacionais: float = 0
-    lucro_bruto: float = 0
-    resultado_operacional: float = 0
-    lucro_liquido: float = 0
-    margem_bruta: float = 0
-    margem_liquida: float = 0
+    despesas_variaveis: Optional[float] = 0
+    despesas_operacionais: Optional[float] = 0
+    despesas_fixas_operacionais: Optional[float] = 0
+    lucro_bruto: Optional[float] = 0
+    resultado_operacional: Optional[float] = 0
+    lucro_liquido: Optional[float] = 0
+    margem_bruta: Optional[float] = 0
+    margem_liquida: Optional[float] = 0
+    rentabilidade_status: str = "complete"
+    taxas_ifood_pendentes: bool = False
+    vendas_rentabilidade_pendente: int = 0
+    pendencias_rentabilidade: list[str] = Field(default_factory=list)
 
 
 class GestorResumoResponse(BaseModel):
@@ -139,36 +145,33 @@ def _date_bounds(data_inicio: date, data_fim: date) -> tuple[datetime, datetime]
     )
 
 
-def _resumir_vendas(vendas: list[Venda]) -> GestorVendasResumo:
-    bruto = 0.0
-    liquido = 0.0
-    recebido = 0.0
-    descontos = 0.0
+def _resumir_vendas(vendas: list[Venda], composicao=None) -> GestorVendasResumo:
     unidades = 0.0
     produtos_ids: set[int] = set()
 
     for venda in vendas:
-        valores = _valores_operacionais_venda(venda)
-        bruto += valores["valor_bruto"]
-        liquido += valores["valor_liquido"]
-        recebido += _total_recebido_venda(venda)
-        descontos += valores["desconto"]
         for item in list(getattr(venda, "itens", []) or []):
             unidades += safe_decimal_to_float_zero(getattr(item, "quantidade", 0))
             produto_id = getattr(item, "produto_id", None)
             if produto_id is not None:
                 produtos_ids.add(int(produto_id))
 
-    quantidade = len(vendas)
+    composicao = composicao or compor_vendas(vendas, data_inicio="", data_fim="")
+    quantidade = composicao["quantidade"]
     return GestorVendasResumo(
-        faturamento_bruto=round(bruto, 2),
-        faturamento_liquido=round(liquido, 2),
-        recebido=round(recebido, 2),
-        descontos=round(descontos, 2),
+        faturamento_bruto=composicao["faturamento_bruto"],
+        faturamento_liquido=composicao["faturamento_liquido"],
+        recebido=composicao["valor_pago"],
+        descontos=composicao["descontos"],
         quantidade_vendas=quantidade,
         unidades_vendidas=round(unidades, 3),
         produtos_distintos=len(produtos_ids),
-        ticket_medio=round(liquido / quantidade, 2) if quantidade else 0,
+        ticket_medio=(
+            round(composicao["faturamento_liquido"] / quantidade, 2)
+            if quantidade
+            else 0
+        ),
+        composicao=composicao,
     )
 
 
@@ -302,9 +305,22 @@ def _resumo_dre(
         user_and_tenant=(current_user, tenant_id),
     )
     totais = dre.totais
-    despesas_variaveis = float(totais.get("despesas_variaveis", 0))
-    despesas_operacionais = float(totais.get("despesas_operacionais", 0))
+    pendente = bool(getattr(dre, "taxas_ifood_pendentes", False))
+
+    def valor(campo):
+        bruto = totais.get(campo, 0)
+        return round(float(bruto), 2) if bruto is not None else None
+
+    despesas_variaveis = valor("despesas_variaveis")
+    despesas_operacionais = valor("despesas_operacionais")
     return GestorDREResumo(
+        # Os apps instalados ja respeitam disponivel. Evita que um cliente
+        # antigo formate null como zero ate receber apresentacao de pendencias.
+        disponivel=not pendente,
+        rentabilidade_status=getattr(dre, "rentabilidade_status", "complete"),
+        taxas_ifood_pendentes=pendente,
+        vendas_rentabilidade_pendente=getattr(dre, "vendas_rentabilidade_pendente", 0),
+        pendencias_rentabilidade=getattr(dre, "pendencias_rentabilidade", []),
         periodo=dre.periodo,
         criterio=criterio,
         receita_bruta=round(float(totais.get("receita_bruta", 0)), 2),
@@ -315,16 +331,18 @@ def _resumo_dre(
         receita_liquida=round(float(totais.get("receita_liquida", 0)), 2),
         cmv=round(float(totais.get("cmv", 0)), 2),
         custo_servicos=round(float(totais.get("custo_servicos", 0)), 2),
-        despesas_variaveis=round(despesas_variaveis, 2),
-        despesas_operacionais=round(despesas_operacionais, 2),
-        despesas_fixas_operacionais=round(
-            max(despesas_operacionais - despesas_variaveis, 0), 2
+        despesas_variaveis=despesas_variaveis,
+        despesas_operacionais=despesas_operacionais,
+        despesas_fixas_operacionais=(
+            round(max(despesas_operacionais - despesas_variaveis, 0), 2)
+            if despesas_operacionais is not None and despesas_variaveis is not None
+            else None
         ),
-        lucro_bruto=round(float(totais.get("lucro_bruto", 0)), 2),
-        resultado_operacional=round(float(totais.get("resultado_operacional", 0)), 2),
-        lucro_liquido=round(float(totais.get("lucro_liquido", 0)), 2),
-        margem_bruta=round(float(totais.get("margem_bruta", 0)), 2),
-        margem_liquida=round(float(totais.get("margem_liquida", 0)), 2),
+        lucro_bruto=valor("lucro_bruto"),
+        resultado_operacional=valor("resultado_operacional"),
+        lucro_liquido=valor("lucro_liquido"),
+        margem_bruta=valor("margem_bruta"),
+        margem_liquida=valor("margem_liquida"),
     )
 
 
@@ -350,7 +368,7 @@ def obter_resumo_gestor_mobile(
     inicio, fim_exclusivo = _date_bounds(data_inicio, data_fim)
     vendas = (
         db.query(Venda)
-        .options(selectinload(Venda.pagamentos), selectinload(Venda.itens))
+        .options(*opcoes_composicao_vendas())
         .filter(
             and_(
                 Venda.tenant_id == tenant_id,
@@ -373,6 +391,8 @@ def obter_resumo_gestor_mobile(
 
     try:
         dre = _resumo_dre(db, current_user, tenant_id, data_inicio, data_fim)
+        if dre.taxas_ifood_pendentes:
+            avisos.extend(dre.pendencias_rentabilidade)
     except Exception:
         logger.exception("Erro ao calcular DRE no resumo Gestor")
         avisos.append("A DRE nao pode ser atualizada agora.")
@@ -386,7 +406,10 @@ def obter_resumo_gestor_mobile(
         data_inicio=data_inicio,
         data_fim=data_fim,
         atualizado_em=now_brasilia(),
-        vendas=_resumir_vendas(vendas),
+        vendas=_resumir_vendas(
+            vendas,
+            montar_composicao_vendas(db, tenant_id, vendas, data_inicio, data_fim),
+        ),
         fluxo_hoje=fluxo_hoje,
         contas_pagar=_resumir_contas(
             db,

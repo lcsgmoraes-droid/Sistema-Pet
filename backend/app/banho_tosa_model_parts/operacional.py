@@ -66,6 +66,14 @@ class BanhoTosaAtendimento(BaseTenantModel):
     pacote_movimento = relationship(
         "BanhoTosaPacoteMovimento", foreign_keys=[pacote_movimento_id]
     )
+    pacote_consumos = relationship(
+        "BanhoTosaPacoteMovimento",
+        primaryjoin="and_(BanhoTosaAtendimento.id == BanhoTosaPacoteMovimento.atendimento_id, "
+        "BanhoTosaAtendimento.tenant_id == BanhoTosaPacoteMovimento.tenant_id, "
+        "BanhoTosaPacoteMovimento.tipo == 'consumo')",
+        foreign_keys="BanhoTosaPacoteMovimento.atendimento_id",
+        viewonly=True,
+    )
     avaliacoes = relationship(
         "BanhoTosaAvaliacao", back_populates="atendimento", cascade="all, delete-orphan"
     )

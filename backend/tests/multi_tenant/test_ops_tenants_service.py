@@ -65,6 +65,11 @@ def ops_tenants_session():
             is_active BOOLEAN
         )
         """,
+        """
+        CREATE TABLE platform_admins (
+            id INTEGER PRIMARY KEY, name TEXT, email TEXT, is_active BOOLEAN
+        )
+        """,
         "CREATE TABLE produtos (id INTEGER PRIMARY KEY, tenant_id TEXT NOT NULL)",
         "CREATE TABLE clientes (id INTEGER PRIMARY KEY, tenant_id TEXT NOT NULL)",
         "CREATE TABLE pets (id INTEGER PRIMARY KEY, tenant_id TEXT NOT NULL)",
@@ -110,6 +115,12 @@ def ops_tenants_session():
     ]
     for statement in ddl:
         session.execute(text(statement))
+
+    session.execute(
+        text(
+            "INSERT INTO platform_admins (id,name,email,is_active) VALUES (7,'Lucas Operacoes','lucas@ops.test',1)"
+        )
+    )
 
     session.execute(
         text("""
@@ -419,7 +430,10 @@ def test_update_ops_tenant_commercial_state_changes_safe_fields(ops_tenants_sess
         changes={
             "status": "suspended",
             "billing_status": "past_due",
+            "blocking_authorized_by_lucas": True,
+            "blocking_authorization_reason": "Lucas autorizou suspensao apos contato com o titular.",
         },
+        actor_platform_admin_id=7,
     )
 
     assert tenant["id"] == TARGET_TENANT
@@ -458,6 +472,204 @@ def test_update_ops_tenant_commercial_state_rejects_invalid_values(ops_tenants_s
         )
 
 
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"status": "suspended"},
+        {
+            "status": "inactive",
+            "blocking_authorized_by_lucas": False,
+            "blocking_authorization_reason": "Pedido recebido por atendimento.",
+        },
+        {
+            "status": "trial",
+            "blocking_authorized_by_lucas": True,
+            "blocking_authorization_reason": "curto",
+        },
+    ],
+)
+def test_suspensao_sem_autorizacao_nao_muda_tenant_nem_cria_nota(
+    ops_tenants_session, changes
+):
+    from app.services.ops_tenants_service import (
+        OpsTenantActionError,
+        update_ops_tenant_commercial_state,
+    )
+
+    with pytest.raises(OpsTenantActionError, match="autorizacao explicita do Lucas"):
+        update_ops_tenant_commercial_state(
+            ops_tenants_session,
+            tenant_id=TARGET_TENANT,
+            changes=changes,
+            actor_platform_admin_id=7,
+        )
+
+    assert (
+        ops_tenants_session.execute(
+            text("SELECT status FROM tenants WHERE id=:id"), {"id": TARGET_TENANT}
+        ).scalar()
+        == "active"
+    )
+    assert (
+        ops_tenants_session.execute(
+            text("SELECT count(*) FROM ops_tenant_onboarding_notes")
+        ).scalar()
+        == 0
+    )
+
+
+def test_suspensao_autorizada_registra_autor_motivo_e_preserva_outro_tenant(
+    ops_tenants_session,
+):
+    from app.services.ops_tenants_service import update_ops_tenant_commercial_state
+
+    update_ops_tenant_commercial_state(
+        ops_tenants_session,
+        tenant_id=TARGET_TENANT,
+        changes={
+            "status": "suspended",
+            "blocking_authorized_by_lucas": True,
+            "blocking_authorization_reason": "Lucas autorizou apos aviso ao titular e revisao humana.",
+        },
+        actor_platform_admin_id=7,
+    )
+
+    row = (
+        ops_tenants_session.execute(
+            text(
+                "SELECT tenant_id,note,created_by_platform_admin_id,created_by_label,created_at FROM ops_tenant_onboarding_notes"
+            )
+        )
+        .mappings()
+        .one()
+    )
+    assert row["tenant_id"] == TARGET_TENANT
+    assert row["created_by_platform_admin_id"] == 7
+    assert row["created_by_label"] == "Lucas Operacoes"
+    assert row["created_at"]
+    assert "Suspensao comercial autorizada por Lucas" in row["note"]
+    assert "active->suspended" in row["note"]
+    assert (
+        ops_tenants_session.execute(
+            text("SELECT status FROM tenants WHERE id=:id"), {"id": SOURCE_TENANT}
+        ).scalar()
+        == "active"
+    )
+    # O servico nao commita: a nota e a suspensao revertem juntas.
+    ops_tenants_session.rollback()
+    assert (
+        ops_tenants_session.execute(
+            text("SELECT status FROM tenants WHERE id=:id"), {"id": TARGET_TENANT}
+        ).scalar()
+        == "active"
+    )
+    assert (
+        ops_tenants_session.execute(
+            text("SELECT count(*) FROM ops_tenant_onboarding_notes")
+        ).scalar()
+        == 0
+    )
+
+
+@pytest.mark.parametrize("actor", [None, 999])
+def test_suspensao_exige_administrador_valido(ops_tenants_session, actor):
+    from app.services.ops_tenants_service import (
+        OpsTenantActionError,
+        update_ops_tenant_commercial_state,
+    )
+
+    with pytest.raises(OpsTenantActionError, match="Administrador responsavel"):
+        update_ops_tenant_commercial_state(
+            ops_tenants_session,
+            tenant_id=TARGET_TENANT,
+            changes={
+                "status": "inactive",
+                "blocking_authorized_by_lucas": True,
+                "blocking_authorization_reason": "Autorizacao confirmada pelo Lucas nesta conversa.",
+            },
+            actor_platform_admin_id=actor,
+        )
+    assert (
+        ops_tenants_session.execute(
+            text("SELECT status FROM tenants WHERE id=:id"), {"id": TARGET_TENANT}
+        ).scalar()
+        == "active"
+    )
+
+
+def test_ativacao_manual_marca_decisao_sem_exigir_autorizacao_de_bloqueio(
+    ops_tenants_session,
+):
+    from app.services.ops_tenants_service import update_ops_tenant_commercial_state
+
+    ops_tenants_session.execute(
+        text("UPDATE tenants SET subscription_activated_at=NULL WHERE id=:id"),
+        {"id": TARGET_TENANT},
+    )
+    update_ops_tenant_commercial_state(
+        ops_tenants_session,
+        tenant_id=TARGET_TENANT,
+        changes={"status": "active", "billing_status": "active"},
+    )
+    assert (
+        ops_tenants_session.execute(
+            text("SELECT subscription_activated_at FROM tenants WHERE id=:id"),
+            {"id": TARGET_TENANT},
+        ).scalar()
+        is not None
+    )
+    assert (
+        ops_tenants_session.execute(
+            text("SELECT count(*) FROM ops_tenant_onboarding_notes")
+        ).scalar()
+        == 0
+    )
+
+
+def test_rota_comercial_rejeita_bloqueio_sem_confirmacao_e_aceita_autorizado(
+    ops_tenants_session,
+):
+    from types import SimpleNamespace
+    from fastapi import HTTPException
+    from app.routes.ops_tenants_routes import (
+        CommercialStateRequest,
+        atualizar_estado_comercial_tenant,
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        atualizar_estado_comercial_tenant(
+            TARGET_TENANT,
+            CommercialStateRequest(status="suspended"),
+            _current_admin=SimpleNamespace(id=7),
+            db=ops_tenants_session,
+        )
+    assert exc.value.status_code == 400
+    assert (
+        ops_tenants_session.execute(
+            text("SELECT status FROM tenants WHERE id=:id"), {"id": TARGET_TENANT}
+        ).scalar()
+        == "active"
+    )
+
+    result = atualizar_estado_comercial_tenant(
+        TARGET_TENANT,
+        CommercialStateRequest(
+            status="suspended",
+            blocking_authorized_by_lucas=True,
+            blocking_authorization_reason="Lucas autorizou esta suspensao apos contato com o titular.",
+        ),
+        _current_admin=SimpleNamespace(id=7),
+        db=ops_tenants_session,
+    )
+    assert result["status"] == "suspended"
+    assert (
+        ops_tenants_session.execute(
+            text("SELECT count(*) FROM ops_tenant_onboarding_notes")
+        ).scalar()
+        == 1
+    )
+
+
 def test_update_ops_tenant_commercial_state_ignores_plan_and_source_fields(
     ops_tenants_session,
 ):
@@ -470,13 +682,13 @@ def test_update_ops_tenant_commercial_state_ignores_plan_and_source_fields(
         ops_tenants_session,
         tenant_id=TARGET_TENANT,
         changes={
-            "status": "suspended",
+            "status": "active",
             "plan": "premium",
             "subscription_source": "manual",
         },
     )
 
-    assert tenant["status"] == "suspended"
+    assert tenant["status"] == "active"
     assert tenant["plan"] == "basico"  # valor original, nao foi tocado
 
 

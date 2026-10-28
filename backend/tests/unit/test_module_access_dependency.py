@@ -97,7 +97,7 @@ def test_load_active_modules_libera_experiencia_completa_durante_trial():
     assert "bling" not in ativos
 
 
-def test_modulo_extra_da_proposta_vence_apos_quinze_dias():
+def test_modulo_extra_da_proposta_continua_apos_quinze_dias():
     tenant = SimpleNamespace(
         plan="pet-start",
         modulos_ativos="[]",
@@ -111,9 +111,46 @@ def test_modulo_extra_da_proposta_vence_apos_quinze_dias():
     assert "veterinario" in module_access._load_active_modules(
         db, "tenant-1", datetime(2026, 7, 16, 12, tzinfo=timezone.utc)
     )
-    assert "veterinario" not in module_access._load_active_modules(
+    assert "veterinario" in module_access._load_active_modules(
         db, "tenant-1", datetime(2026, 7, 17, 12, tzinfo=timezone.utc)
     )
+
+
+@pytest.mark.parametrize("billing", ["trial", "expired"])
+def test_trial_vencido_preserva_todos_modulos_ate_revisao(billing):
+    now = datetime(2026, 7, 18, tzinfo=timezone.utc)
+    tenant = SimpleNamespace(
+        status="active",
+        plan="pet-start",
+        modulos_ativos="[]",
+        billing_status=billing,
+        trial_started_at=now - timedelta(days=31),
+        trial_ends_at=now - timedelta(days=1),
+    )
+
+    active = module_access._load_active_modules(_TrialDb(tenant), "tenant-1", now)
+
+    assert "veterinario" in active
+    assert "banho_tosa" in active
+    assert "compras" in active
+
+
+@pytest.mark.parametrize("status", ["suspended", "inactive"])
+def test_suspensao_manual_retira_modulos_inclusive_trial_e_extra(status):
+    now = datetime(2026, 7, 18, tzinfo=timezone.utc)
+    tenant = SimpleNamespace(
+        status=status,
+        plan="pet-gestao",
+        modulos_ativos='["entregas"]',
+        billing_status="trial",
+        trial_started_at=now,
+        trial_ends_at=now + timedelta(days=30),
+    )
+    extra = SimpleNamespace(modulo="veterinario", gateway="asaas_offer", data_fim=None)
+    db = _TrialDb(tenant, [extra])
+
+    assert module_access._load_active_modules(db, "tenant-1", now) == []
+    assert module_access._load_active_entitlements(db, "tenant-1", now) == []
 
 
 @pytest.mark.parametrize(

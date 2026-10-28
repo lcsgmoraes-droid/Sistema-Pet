@@ -44,6 +44,12 @@ import app.variacao_config_fiscal_models  # variacao_config_fiscal (top-level, s
 import app.produtos_models
 import app.vendas_models
 import app.vendas_devolucoes_models
+import app.ifood_integration_models
+import app.ifood_catalog_models
+import app.ifood_order_models
+import app.ifood_financial_models
+import app.ifood_financial_cost_models
+import app.ifood_payout_models
 import app.caixa_models
 import app.financeiro_models
 import app.financeiro.models_imobilizado
@@ -68,6 +74,8 @@ import app.veterinario_models
 import app.ecommerce_payment_models
 import app.billing_models
 import app.intnfe.models
+import app.nfe.clone_models
+import app.ecommerceai_fiscal.models
 import app.xml_contabilidade_models
 import app.catalogo_mestre_models
 import app.orcamentos_grupo_models

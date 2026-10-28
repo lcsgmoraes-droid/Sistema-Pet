@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import api from "../api";
 import { buscarClientePorId } from "../api/clientes";
-import { buscarVenda, listarVendas } from "../api/vendas";
+import { buscarVendaComSituacaoFiscal, listarVendas } from "../api/vendas";
 import { debugLog } from "../utils/debug";
 import { extrairCamposFiscaisVenda } from "../utils/pdvFiscalStatus";
 import { perguntarCorePet } from "../services/corepetDialog";
@@ -46,6 +46,7 @@ export function usePDVVendaCarregamento({
   recarregarContextoClientePorId,
 }) {
   const carregamentosEmAndamentoRef = useRef(new Map());
+  const selecaoAtualRef = useRef(null);
 
   const carregarVendaEspecifica = async (vendaId, abrirModalPagamento = false) => {
     const vendaIdNormalizado = Number.parseInt(vendaId, 10);
@@ -58,19 +59,29 @@ export function usePDVVendaCarregamento({
     const carregamentoExistente = carregamentosEmAndamentoRef.current.get(chaveCarregamento);
 
     if (carregamentoExistente) {
-      await carregamentoExistente;
+      selecaoAtualRef.current = carregamentoExistente;
+      setLoading(true);
+      await carregamentoExistente.promise;
+      if (selecaoAtualRef.current !== carregamentoExistente) return;
+      setLoading(false);
       if (abrirModalPagamento) {
         setTimeout(() => {
-          setMostrarModalPagamento(true);
+          if (selecaoAtualRef.current === carregamentoExistente) setMostrarModalPagamento(true);
         }, 500);
       }
       return;
     }
 
+    const selecao = {};
+    selecaoAtualRef.current = selecao;
+    const atual = () => selecaoAtualRef.current === selecao;
     const carregamento = (async () => {
       try {
         setLoading(true);
-        const venda = normalizarDescontosVenda(await buscarVenda(vendaIdNormalizado));
+        const venda = normalizarDescontosVenda(
+          await buscarVendaComSituacaoFiscal(vendaIdNormalizado),
+        );
+        if (!atual()) return;
 
         if (!venda) {
           alert("Venda nao encontrada");
@@ -85,13 +96,16 @@ export function usePDVVendaCarregamento({
             console.error("Erro ao buscar cliente:", error);
           }
         }
+        if (!atual()) return;
 
         const { pagamentos, totalPago } = await carregarPagamentosVenda(vendaIdNormalizado);
+        if (!atual()) return;
 
         await sincronizarComissaoDaVenda(
           venda.vendedor_funcionario_id || venda.funcionario_id,
           venda.funcionario_id,
         );
+        if (!atual()) return;
 
         const vendaCarregada = {
           id: venda.id,
@@ -99,6 +113,7 @@ export function usePDVVendaCarregamento({
           status: venda.status,
           data_venda: venda.data_venda,
           canal: venda.canal || "loja_fisica",
+          ifood_pdv_pilot: venda.ifood_pdv_pilot || null,
           cliente: clienteCompleto,
           pet: null,
           itens: venda.itens || [],
@@ -121,20 +136,24 @@ export function usePDVVendaCarregamento({
           pagamentos,
           total_pago: totalPago,
           ...extrairCamposFiscaisVenda(venda),
+          nfe_atualizacao_falhou: Boolean(venda.nfe_atualizacao_falhou),
         };
 
         setVendaAtual(vendaCarregada);
         setModoVisualizacao(true);
 
         await sincronizarEntregadorDaVenda(venda.entregador_id);
+        if (!atual()) return;
         await recarregarContextoClientePorId?.(clienteCompleto?.id || venda.cliente_id);
+        if (!atual()) return;
 
         if (abrirModalPagamento) {
           setTimeout(() => {
-            setMostrarModalPagamento(true);
+            if (atual()) setMostrarModalPagamento(true);
           }, 500);
         }
       } catch (error) {
+        if (!atual()) return;
         console.error("Erro ao carregar venda:", error);
         if (error.response?.status === 404) {
           alert("Venda nao encontrada. Pode ter sido cancelada ou excluida.");
@@ -142,11 +161,12 @@ export function usePDVVendaCarregamento({
           alert("Erro ao carregar venda: " + (error.message || "Erro desconhecido"));
         }
       } finally {
-        setLoading(false);
+        if (atual()) setLoading(false);
       }
     })();
 
-    carregamentosEmAndamentoRef.current.set(chaveCarregamento, carregamento);
+    selecao.promise = carregamento;
+    carregamentosEmAndamentoRef.current.set(chaveCarregamento, selecao);
 
     try {
       await carregamento;
@@ -157,6 +177,9 @@ export function usePDVVendaCarregamento({
 
   const handleBuscarVenda = async () => {
     if (!searchVendaQuery.trim()) return;
+    const selecao = {};
+    selecaoAtualRef.current = selecao;
+    const atual = () => selecaoAtualRef.current === selecao;
 
     try {
       setLoading(true);
@@ -175,6 +198,7 @@ export function usePDVVendaCarregamento({
         busca: numeroLimpo,
         per_page: 50,
       });
+      if (!atual()) return;
 
       debugLog("Vendas encontradas:", resultado.vendas?.length);
 
@@ -201,6 +225,7 @@ export function usePDVVendaCarregamento({
       const numeroEscolhido = await perguntarCorePet(
         `Encontradas ${resultado.vendas.length} vendas. Digite o numero da opcao:\n\n${escolha}`,
       );
+      if (!atual()) return;
 
       if (!numeroEscolhido) {
         setLoading(false);
@@ -216,34 +241,44 @@ export function usePDVVendaCarregamento({
         alert("Opcao invalida");
       }
     } catch (error) {
+      if (!atual()) return;
       console.error("Erro ao buscar venda:", error);
       alert("Erro ao buscar venda");
     } finally {
-      setLoading(false);
+      if (atual()) setLoading(false);
     }
   };
 
   const reabrirVenda = async (venda) => {
+    const selecao = {};
+    selecaoAtualRef.current = selecao;
+    const atual = () => selecaoAtualRef.current === selecao;
     try {
-      const vendaCompleta = normalizarDescontosVenda(await buscarVenda(venda.id));
+      setLoading(true);
+      const vendaCompleta = normalizarDescontosVenda(await buscarVendaComSituacaoFiscal(venda.id));
+      if (!atual()) return;
 
       let clienteCompleto = null;
       if (vendaCompleta.cliente_id) {
         clienteCompleto = await buscarClientePorId(vendaCompleta.cliente_id);
       }
+      if (!atual()) return;
 
       const { pagamentos, totalPago } = await carregarPagamentosVenda(venda.id);
+      if (!atual()) return;
 
       await sincronizarComissaoDaVenda(
         vendaCompleta.vendedor_funcionario_id || vendaCompleta.funcionario_id,
         vendaCompleta.funcionario_id,
       );
+      if (!atual()) return;
 
       const vendaParaSetar = {
         id: vendaCompleta.id,
         numero_venda: vendaCompleta.numero_venda,
         data_venda: vendaCompleta.data_venda,
         canal: vendaCompleta.canal || "loja_fisica",
+        ifood_pdv_pilot: vendaCompleta.ifood_pdv_pilot || null,
         cliente: clienteCompleto,
         pet: null,
         itens: vendaCompleta.itens || [],
@@ -281,15 +316,20 @@ export function usePDVVendaCarregamento({
         pagamentos,
         total_pago: totalPago,
         ...extrairCamposFiscaisVenda(vendaCompleta),
+        nfe_atualizacao_falhou: Boolean(vendaCompleta.nfe_atualizacao_falhou),
       };
 
       setVendaAtual(vendaParaSetar);
       setModoVisualizacao(true);
       await recarregarContextoClientePorId?.(clienteCompleto?.id || vendaCompleta.cliente_id);
+      if (!atual()) return;
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
+      if (!atual()) return;
       console.error("Erro ao reabrir venda:", error);
       alert("Erro ao carregar os dados da venda");
+    } finally {
+      if (atual()) setLoading(false);
     }
   };
 

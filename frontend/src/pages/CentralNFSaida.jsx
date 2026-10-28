@@ -24,6 +24,11 @@ import {
   rejeicaoResponsavelTecnico,
 } from "../utils/fiscalRejectionGuidance.mjs";
 import NFSaidaCompartilharModal from "./centralNFSaida/NFSaidaCompartilharModal";
+import { resumirCancelamentoNota } from "../utils/nfeCancelamentoFeedback";
+import {
+  atalhoDiretoCorePet,
+  carregarNotaDiretaCorePet,
+} from "./centralNFSaida/notaDiretaCorePet.mjs";
 
 function salvarArquivo(blob, nome) {
   const url = URL.createObjectURL(blob);
@@ -53,6 +58,7 @@ export default function CentralNFSaida() {
   const buscaInicial = searchParams.get("busca") || "";
   const vendaIdInicial = searchParams.get("venda_id") || "";
   const abrirNotaInicial = searchParams.get("abrir") === "1";
+  const abrirCorePetDireto = atalhoDiretoCorePet(vendaIdInicial, abrirNotaInicial);
   const corrigirNotaInicial = searchParams.get("corrigir") === "1";
   const [notas, setNotas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -78,6 +84,7 @@ export default function CentralNFSaida() {
   const [carregandoDetalhe, setCarregandoDetalhe] = useState(false);
   const [erroDetalhe, setErroDetalhe] = useState("");
   const [modalCancelar, setModalCancelar] = useState(null);
+  const [notaParaClonar, setNotaParaClonar] = useState(null);
   const [justificativa, setJustificativa] = useState("");
   const [cancelando, setCancelando] = useState(false);
   const [reconciliandoNotaId, setReconciliandoNotaId] = useState("");
@@ -124,7 +131,7 @@ export default function CentralNFSaida() {
   }, [busca]);
 
   useEffect(() => {
-    atualizarLista(false);
+    if (!abrirCorePetDireto) atualizarLista(false);
   }, []);
 
   useEffect(() => {
@@ -140,14 +147,43 @@ export default function CentralNFSaida() {
 
   async function abrirNotaDiretaSeSolicitada(notasRecebidas) {
     if (!abrirNotaInicial || notaDiretaAbertaRef.current) return;
+    if (abrirCorePetDireto) {
+      notaDiretaAbertaRef.current = true;
+      try {
+        const nota = await carregarNotaDiretaCorePet(api, vendaIdInicial);
+        if (corrigirNotaInicial && nota.status?.toLowerCase() === "rejeitada") {
+          await abrirCorrecao(nota);
+          return;
+        }
+        setNotaSelecionada(nota);
+        setDetalheNota(nota);
+        setCarregandoDetalhe(true);
+        const resultado = await carregarDetalheIntNFe(api, nota);
+        setNotaSelecionada(resultado.nota);
+        setDetalheNota(resultado.detalhe);
+        setErroDetalhe(resultado.aviso);
+      } catch (error_) {
+        setErro(
+          error_.response?.data?.detail ||
+            error_.message ||
+            "Não foi possível abrir a nota solicitada.",
+        );
+      } finally {
+        setCarregandoDetalhe(false);
+      }
+      return;
+    }
+    if (vendaIdInicial) return;
     const notaDireta = notasRecebidas.find(
-      (nota) =>
-        (vendaIdInicial && String(nota.venda_id || "") === vendaIdInicial) ||
-        (buscaInicial && String(nota.numero || "") === buscaInicial),
+      (nota) => buscaInicial && String(nota.numero || "") === buscaInicial,
     );
     if (!notaDireta) return;
     notaDiretaAbertaRef.current = true;
-    if (corrigirNotaInicial && notaDireta.status?.toLowerCase() === "rejeitada") {
+    if (
+      !notaDireta.fiscal_order_id &&
+      corrigirNotaInicial &&
+      notaDireta.status?.toLowerCase() === "rejeitada"
+    ) {
       await abrirCorrecao(notaDireta);
     } else {
       await abrirDetalhes(notaDireta);
@@ -181,7 +217,6 @@ export default function CentralNFSaida() {
       if (requisicao === requisicaoListaRef.current) setLoading(false);
     }
   }
-
   async function atualizarLista(forceRefresh) {
     if (atualizacaoEmCursoRef.current) return;
     atualizacaoEmCursoRef.current = true;
@@ -202,7 +237,6 @@ export default function CentralNFSaida() {
       setAtualizandoNotas(false);
     }
   }
-
   async function baixarDanfe(nota) {
     const documentoId = identificadorDocumentoFiscal(nota);
     const endpoint = rotaDocumentoFiscal(nota, "danfe");
@@ -245,12 +279,16 @@ export default function CentralNFSaida() {
 
     try {
       setReconciliandoNotaId(notaId);
-      const response =
-        nota.provedor === "intnfe"
+      const response = nota.fiscal_order_id
+        ? await api.post(
+            `/integracoes/ecommerceai/fiscal/manage/orders/${nota.fiscal_order_id}/consultar`,
+            {},
+          )
+        : nota.provedor === "intnfe"
           ? await api.get(`/nfe/vendas/${nota.venda_id}/status`)
           : await api.post(`/nfe/${notaId}/reconciliar-fluxo`);
       const numero = response.data?.numero || response.data?.nf_numero || nota.numero || notaId;
-      const situacao = response.data?.situacao;
+      const situacao = response.data?.situacao || response.data?.status;
       const rejeicao = rejeicaoResponsavelTecnico({
         codigo: response.data?.codigo_erro,
         motivo: response.data?.motivo_rejeicao,
@@ -395,6 +433,10 @@ export default function CentralNFSaida() {
   }
 
   async function abrirDetalhes(nota) {
+    if (nota.fiscal_order_id) {
+      setNotaSelecionada(nota);
+      return;
+    }
     if (nota.provedor === "intnfe" && nota.status?.toLowerCase() === "rejeitada") {
       await abrirCorrecao(nota);
       return;
@@ -455,16 +497,30 @@ export default function CentralNFSaida() {
           ? `/nfe/vendas/${modalCancelar.venda_id}/cancelar`
           : `/nfe/${modalCancelar.id}/cancelar`;
       const response = await api.post(endpoint, { justificativa });
-      alert(
-        response.data?.cancelamento_solicitado
-          ? "Solicitação de cancelamento enviada. A nota só estará cancelada quando a situação mudar para Cancelada; atualize a lista para acompanhar a confirmação da SEFAZ."
-          : "Nota fiscal cancelada com sucesso!",
-      );
-      setModalCancelar(null);
-      setJustificativa("");
+      const feedback = resumirCancelamentoNota(response.data);
+      alert(feedback.mensagem);
+      if (feedback.confirmado || feedback.solicitado) {
+        setModalCancelar(null);
+        setJustificativa("");
+      } else {
+        setModalCancelar((nota) => ({
+          ...nota,
+          nfe_cancelamento_status: feedback.status,
+          nfe_cancelamento_codigo: feedback.codigo,
+          nfe_cancelamento_motivo: feedback.motivo,
+        }));
+      }
       carregarNotas(true);
     } catch (error) {
-      alert(error.response?.data?.detail || "Erro ao cancelar nota fiscal");
+      const feedback = resumirCancelamentoNota(error.response?.data || { mensagem: error.message });
+      alert(feedback.mensagem);
+      setModalCancelar((nota) => ({
+        ...nota,
+        nfe_cancelamento_status: feedback.status,
+        nfe_cancelamento_codigo: feedback.codigo,
+        nfe_cancelamento_motivo: feedback.motivo,
+      }));
+      carregarNotas(true);
     } finally {
       setCancelando(false);
     }
@@ -635,6 +691,9 @@ export default function CentralNFSaida() {
         erro={erro}
         notasFiltradas={notas}
         setModalCancelar={setModalCancelar}
+        clonarNota={setNotaParaClonar}
+        notaParaClonar={notaParaClonar}
+        fecharClonagem={() => setNotaParaClonar(null)}
         excluirNota={excluirNota}
         reconciliarFluxoNota={reconciliarFluxoNota}
         reconciliandoNotaId={reconciliandoNotaId}

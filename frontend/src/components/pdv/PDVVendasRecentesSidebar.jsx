@@ -10,9 +10,17 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { formatMoneyBRL } from "../../utils/formatters";
-import { obterSituacaoFiscalVenda } from "../../utils/pdvFiscalStatus";
+import {
+  obterSituacaoFiscalVenda,
+  obterPendenciaCancelamentoFiscal,
+} from "../../utils/pdvFiscalStatus";
 import { getTipoDevolucaoVenda } from "../../utils/pdvReturnEligibility";
-import { getSalesChannelInfo, isOnlineSalesChannel } from "../../utils/salesChannel";
+import {
+  CANAL_IFOOD,
+  getSalesChannelInfo,
+  isCorepetOnlineSalesChannel,
+  normalizeSalesChannel,
+} from "../../utils/salesChannel";
 import CopyableCode from "../ui/CopyableCode";
 import CustomerIdentity, { getCustomerIdentityCode } from "../ui/CustomerIdentity";
 import IconActionButton from "../ui/IconActionButton";
@@ -50,7 +58,7 @@ function getCanalInfo(canal) {
 }
 
 function isCanalOnline(canal) {
-  return isOnlineSalesChannel(canal);
+  return isCorepetOnlineSalesChannel(canal);
 }
 
 function isRetiradaOnlineSemEntrega(venda) {
@@ -76,6 +84,7 @@ function isPedidoOnlinePendente(venda) {
 
 function canConfirmarRetirada(venda) {
   if (getTipoDevolucaoVenda(venda)) return false;
+  if (normalizeSalesChannel(venda?.canal) === CANAL_IFOOD) return false;
   return (
     !isVendaCancelada(venda) &&
     venda?.status_entrega !== "entregue" &&
@@ -329,6 +338,7 @@ export default function PDVVendasRecentesSidebar({
                     : "text-amber-800"
                   : "text-green-600";
                 const situacaoFiscal = obterSituacaoFiscalVenda(venda);
+                const pendenciaFiscal = obterPendenciaCancelamentoFiscal(venda);
                 const canalInfo = getCanalInfo(venda.canal);
                 const CanalIcon = canalInfo.Icon;
                 const entregaStatus = getEntregaStatusInfo(venda);
@@ -504,6 +514,15 @@ export default function PDVVendasRecentesSidebar({
                               .join(" — ")}
                           >
                             {situacaoFiscal.label}
+                          </StatusBadge>
+                        )}
+                        {pendenciaFiscal && (
+                          <StatusBadge
+                            intent={pendenciaFiscal.intent}
+                            size="xs"
+                            title={pendenciaFiscal.detalhe}
+                          >
+                            {pendenciaFiscal.label}
                           </StatusBadge>
                         )}
                       </div>

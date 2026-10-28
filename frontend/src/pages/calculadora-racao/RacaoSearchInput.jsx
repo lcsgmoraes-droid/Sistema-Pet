@@ -1,5 +1,7 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import BuscaProduto from "../../components/v2/BuscaProduto/BuscaProduto";
+import BotaoCancelar from "../../components/v2/BotaoCancelar/BotaoCancelar";
 import {
   camposIncompletosTexto,
   formatarMoeda,
@@ -25,35 +27,7 @@ export default function RacaoSearchInput({
   warning,
 }) {
   const [aberto, setAberto] = useState(false);
-  const [dropdown, setDropdown] = useState({
-    direction: "down",
-    maxHeight: 320,
-  });
-  const controlRef = useRef(null);
   const termo = normalizarTexto(value);
-
-  const abrirDropdown = () => {
-    if (disabled) return;
-
-    if (typeof window === "undefined" || !controlRef.current) {
-      setAberto(true);
-      return;
-    }
-
-    const rect = controlRef.current.getBoundingClientRect();
-    const margemTela = 16;
-    const espacoAbaixo = window.innerHeight - rect.bottom - margemTela;
-    const espacoAcima = rect.top - margemTela;
-    const direction = espacoAbaixo < 260 && espacoAcima > espacoAbaixo ? "up" : "down";
-    const espacoDisponivel = direction === "up" ? espacoAcima : espacoAbaixo;
-
-    setDropdown({
-      direction,
-      maxHeight: Math.max(140, Math.min(320, Math.floor(espacoDisponivel))),
-    });
-    setAberto(true);
-  };
-
   const opcoes = useMemo(() => {
     const filtradas = produtos
       .map((produto) => ({
@@ -85,81 +59,49 @@ export default function RacaoSearchInput({
 
   return (
     <div className="racao-search-field">
-      <label htmlFor={id}>{label}</label>
-      <div className="racao-search-control" ref={controlRef}>
-        <input
-          id={id}
-          name={name}
-          type="text"
-          value={value || ""}
-          onChange={(event) => {
-            onChange(event.target.value);
-            abrirDropdown();
-          }}
-          onFocus={abrirDropdown}
-          onClick={abrirDropdown}
-          onBlur={() => setTimeout(() => setAberto(false), 160)}
-          placeholder={placeholder}
-          disabled={disabled}
-          autoComplete="off"
-        />
-        {value && onClear && (
-          <button
-            type="button"
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={onClear}
-            className="btn-clear btn-clear-compact"
-            title="Limpar selecao"
-          >
-            x
-          </button>
+      <BuscaProduto
+        id={id}
+        name={name}
+        label={label}
+        value={value || ""}
+        disabled={disabled}
+        onChange={(texto) => {
+          onChange(texto);
+          setAberto(true);
+        }}
+        onFocus={() => setAberto(true)}
+        suggestions={opcoes}
+        showSuggestions={aberto}
+        minChars={0}
+        loading={loading}
+        onSelect={selecionar}
+        placeholder={placeholder}
+        renderSuggestionContent={(produto) => (
+          <>
+            <span className="block font-medium">
+              {produto.codigo || "Sem código"} - {produto.nome}
+            </span>
+            <span className="block text-xs text-slate-500">
+              {produto.aptidao.apta ? "Apta" : "Cadastro incompleto"} |{" "}
+              {formatarPeso(produto.peso_embalagem)} | {formatarMoeda(produto.preco_venda)} |{" "}
+              {formatarPrecoPorKg(produto)} {produto.classificacao_racao || ""}
+            </span>
+            {!produto.aptidao.apta && (
+              <span className="text-xs text-amber-700">
+                {camposIncompletosTexto(produto.aptidao.faltantes)}
+              </span>
+            )}
+          </>
         )}
-      </div>
-
-      {aberto && !disabled && (
-        <div
-          className={`racao-options open-${dropdown.direction}`}
-          role="listbox"
-          style={{
-            "--racao-options-max-height": `${dropdown.maxHeight}px`,
-          }}
-        >
-          {loading && <div className="racao-empty">Buscando no cadastro...</div>}
-          {!loading && opcoes.length === 0 ? (
-            <div className="racao-empty">Nenhuma racao encontrada.</div>
-          ) : (
-            opcoes.map((produto) => (
-              <button
-                key={produto.id}
-                type="button"
-                className={`racao-option ${produto.aptidao.apta ? "is-ready" : "is-incomplete"}`}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => selecionar(produto)}
-                aria-disabled={!produto.aptidao.apta}
-              >
-                <div className="racao-option-main">
-                  <span className="racao-option-name">{produto.nome}</span>
-                  <span className={`racao-status ${produto.aptidao.apta ? "ready" : "incomplete"}`}>
-                    {produto.aptidao.apta ? "Apta" : "Cadastro incompleto"}
-                  </span>
-                </div>
-                <div className="racao-option-meta">
-                  <span>{formatarPeso(produto.peso_embalagem)}</span>
-                  <span>{formatarMoeda(produto.preco_venda)}</span>
-                  {formatarPrecoPorKg(produto) && <span>{formatarPrecoPorKg(produto)}</span>}
-                  {produto.classificacao_racao && <span>{produto.classificacao_racao}</span>}
-                </div>
-                {!produto.aptidao.apta && (
-                  <div className="racao-option-missing">
-                    {camposIncompletosTexto(produto.aptidao.faltantes)}
-                  </div>
-                )}
-              </button>
-            ))
-          )}
-        </div>
+      />
+      {value && onClear && (
+        <BotaoCancelar tamanho="pequeno" onClick={onClear}>
+          Limpar seleção
+        </BotaoCancelar>
       )}
-
+      {aberto && !loading && opcoes.length === 0 && (
+        <p className="text-sm text-slate-500">Nenhuma ração encontrada.</p>
+      )}
       {warning && <small className="form-warning">{warning}</small>}
       {hint && <small className="form-hint">{hint}</small>}
     </div>

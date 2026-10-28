@@ -255,30 +255,54 @@ def _enriquecer_itens_promocionais(
 
     for indice, item_snapshot in enumerate(itens_snapshot):
         item_modelo = None
+        venda_item_id = item_snapshot.get("venda_item_id")
         produto_id_snapshot = item_snapshot.get("produto_id")
 
-        if indice < len(itens_venda):
-            candidato = itens_venda[indice]
-            if (
-                not produto_id_snapshot
-                or getattr(candidato, "produto_id", None) == produto_id_snapshot
-            ):
-                item_modelo = candidato
-                usados.add(indice)
-
-        if item_modelo is None:
+        if venda_item_id is not None:
             for idx, candidato in enumerate(itens_venda):
                 if idx in usados:
                     continue
-                if getattr(candidato, "produto_id", None) == produto_id_snapshot:
+                if getattr(candidato, "id", None) == venda_item_id:
                     item_modelo = candidato
                     usados.add(idx)
                     break
+        else:
+            # Snapshots antigos nao possuem o ID do item: manter o casamento
+            # por posicao/produto, sem reutilizar um item ja associado.
+            if indice < len(itens_venda) and indice not in usados:
+                candidato = itens_venda[indice]
+                if (
+                    not produto_id_snapshot
+                    or getattr(candidato, "produto_id", None) == produto_id_snapshot
+                ):
+                    item_modelo = candidato
+                    usados.add(indice)
+
+            if item_modelo is None:
+                for idx, candidato in enumerate(itens_venda):
+                    if idx in usados:
+                        continue
+                    if getattr(candidato, "produto_id", None) == produto_id_snapshot:
+                        item_modelo = candidato
+                        usados.add(idx)
+                        break
 
         produto = getattr(item_modelo, "produto", None) if item_modelo else None
         info_promocao = _detectar_promocao_item(
             produto, item_modelo, venda, item_snapshot
         )
-        resultado.append({**item_snapshot, **info_promocao})
+        item_enriquecido = {**item_snapshot, **info_promocao}
+        if produto is not None:
+            # Produto já vem carregado em lote pelo relatório. Snapshots antigos
+            # não guardavam o código público, mas continuam pesquisáveis por ele.
+            codigo_publico = str(getattr(produto, "codigo", None) or "").strip()
+            if codigo_publico:
+                item_enriquecido["produto_codigo"] = codigo_publico
+        quantidade_original = getattr(item_modelo, "quantidade", None)
+        if quantidade_original is not None:
+            # O snapshot financeiro arredonda quantidades a duas casas. A
+            # consulta comercial deve preservar as tres casas do item vendido.
+            item_enriquecido["quantidade"] = float(quantidade_original)
+        resultado.append(item_enriquecido)
 
     return resultado

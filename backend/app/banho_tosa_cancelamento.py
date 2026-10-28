@@ -7,13 +7,28 @@ from fastapi import HTTPException
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.banho_tosa_models import BanhoTosaAtendimento, BanhoTosaEtapa
-from app.banho_tosa_pacotes import estornar_consumo_atendimento
+from app.banho_tosa_models import (
+    BanhoTosaAgendamento,
+    BanhoTosaAtendimento,
+    BanhoTosaEtapa,
+)
+from app.banho_tosa_pacote_reservas import devolver_creditos_atendimento
+from app.banho_tosa_vendas import venda_identifica_atendimento
+from app.db.transaction import transactional_session
 from app.vendas.service import VendaService
 from app.vendas_models import Venda
 
 
 def cancelar_processo_atendimento(
+    db: Session, tenant_id, user_id: int, atendimento_id: int, motivo: str
+) -> dict:
+    with transactional_session(db):
+        return _cancelar_processo_atendimento(
+            db, tenant_id, user_id, atendimento_id, motivo
+        )
+
+
+def _cancelar_processo_atendimento(
     db: Session, tenant_id, user_id: int, atendimento_id: int, motivo: str
 ) -> dict:
     motivo_limpo = (motivo or "").strip()
@@ -25,6 +40,17 @@ def cancelar_processo_atendimento(
     atendimento = _obter_atendimento(db, tenant_id, atendimento_id)
     if not atendimento:
         raise HTTPException(status_code=404, detail="Atendimento nao encontrado.")
+    if atendimento.agendamento_id:
+        (
+            db.query(BanhoTosaAgendamento)
+            .filter(
+                BanhoTosaAgendamento.id == atendimento.agendamento_id,
+                BanhoTosaAgendamento.tenant_id == tenant_id,
+            )
+            .with_for_update(of=BanhoTosaAgendamento)
+            .first()
+        )
+        db.refresh(atendimento)
 
     vendas = _listar_vendas_vinculadas(db, tenant_id, atendimento)
     vendas_canceladas = 0
@@ -42,23 +68,20 @@ def cancelar_processo_atendimento(
             user_id=venda.user_id or user_id,
             tenant_id=tenant_id,
             db=db,
+            commit=False,
         )
         vendas_canceladas += 1
 
     pacote_estornado = False
     atendimento = _obter_atendimento(db, tenant_id, atendimento_id)
-    if atendimento.pacote_credito_id and atendimento.pacote_movimento_id:
-        estornar_consumo_atendimento(
+    if atendimento.pacote_credito_id:
+        pacote_estornado = devolver_creditos_atendimento(
             db,
             tenant_id,
-            atendimento.pacote_credito_id,
-            atendimento_id=atendimento.id,
-            movimento_id=atendimento.pacote_movimento_id,
+            atendimento,
             user_id=user_id,
-            observacoes=f"Cancelamento do atendimento: {motivo_limpo}",
+            motivo=f"Cancelamento do atendimento: {motivo_limpo}",
         )
-        pacote_estornado = True
-        atendimento = _obter_atendimento(db, tenant_id, atendimento_id)
 
     agora = datetime.now()
     atendimento.status = "cancelado"
@@ -76,7 +99,7 @@ def cancelar_processo_atendimento(
             f"Processo cancelado pelo atendimento #{atendimento.id}: {motivo_limpo}",
         )
 
-    db.commit()
+    db.flush()
     db.refresh(atendimento)
 
     return {
@@ -126,7 +149,14 @@ def _listar_vendas_vinculadas(
         .order_by(Venda.id.asc())
         .all()
     )
-    return _deduplicar_vendas(vendas)
+    return _deduplicar_vendas(
+        [
+            venda
+            for venda in vendas
+            if venda.id == atendimento.venda_id
+            or venda_identifica_atendimento(venda, atendimento.id)
+        ]
+    )
 
 
 def _deduplicar_vendas(vendas: Iterable[Venda]) -> list[Venda]:

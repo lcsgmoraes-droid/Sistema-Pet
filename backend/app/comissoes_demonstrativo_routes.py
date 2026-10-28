@@ -129,9 +129,12 @@ async def listar_comissoes(
                 ci.tipo_calculo,
                 ci.quantidade,
                 ci.valor_pago,
-                ci.saldo_restante
+                ci.saldo_restante,
+                ci.valor_fixo,
+                p.codigo as produto_codigo
             FROM comissoes_itens ci
             INNER JOIN vendas v ON v.id = ci.venda_id AND v.tenant_id = ci.tenant_id
+            LEFT JOIN produtos p ON p.id = ci.produto_id AND p.tenant_id = ci.tenant_id
             WHERE ci.{tenant_filter}
         """
 
@@ -139,7 +142,7 @@ async def listar_comissoes(
 
         # Aplicar filtros
         if funcionario_id is not None:
-            query += " AND funcionario_id = :funcionario_id"
+            query += " AND ci.funcionario_id = :funcionario_id"
             params["funcionario_id"] = funcionario_id
 
         if data_inicio:
@@ -151,11 +154,11 @@ async def listar_comissoes(
             params["data_fim"] = data_fim
 
         if status:
-            query += " AND status = :status"
+            query += " AND ci.status = :status"
             params["status"] = status.lower()
 
         if venda_id is not None:
-            query += " AND venda_id = :venda_id"
+            query += " AND ci.venda_id = :venda_id"
             params["venda_id"] = venda_id
 
         # Ordenar por mais recente
@@ -186,6 +189,8 @@ async def listar_comissoes(
                     "quantidade": decimal_to_float(row[14]),
                     "valor_pago": decimal_to_float(row[15]),
                     "saldo_restante": decimal_to_float(row[16]),
+                    "valor_fixo": decimal_to_float(row[17]),
+                    "produto_codigo": row[18],
                 }
             )
 
@@ -547,7 +552,8 @@ def listar_comissoes_funcionario_para_fechamento(
                     ci.tipo_calculo,
                     ci.parcela_numero,
                     p.nome as nome_produto,
-                    v.cliente_id
+                    v.cliente_id,
+                    ci.valor_fixo
                 FROM comissoes_itens ci
                 LEFT JOIN produtos p ON ci.produto_id = p.id AND p.{tenant_filter}
                 LEFT JOIN vendas v ON ci.venda_id = v.id AND v.{tenant_filter}
@@ -607,6 +613,7 @@ def listar_comissoes_funcionario_para_fechamento(
                     "percentual_comissao": float(row[6]) if row[6] else 0.0,
                     "valor_comissao_gerada": float(row[7]) if row[7] else 0.0,
                     "tipo_calculo": row[8],
+                    "valor_fixo": float(row[12] or 0),
                     "parcela_numero": row[9],
                 }
 
@@ -718,6 +725,7 @@ async def detalhe_comissao(
                 ci.valor_base_comissionada,
                 -- Cálculo da comissão
                 ci.tipo_calculo,
+                ci.valor_fixo,
                 ci.valor_base_calculo,
                 ci.percentual_comissao,
                 ci.percentual_aplicado,
@@ -746,10 +754,12 @@ async def detalhe_comissao(
                 ci.taxa_entregador_item,
                 ci.custo_operacional_item,
                 ci.receita_taxa_entrega_item,
-                ci.percentual_impostos
+                ci.percentual_impostos,
+                p.codigo as produto_codigo
             FROM comissoes_itens ci
             INNER JOIN vendas v ON v.id = ci.venda_id AND v.tenant_id = ci.tenant_id
             LEFT JOIN venda_itens vi ON vi.id = ci.venda_item_id AND vi.tenant_id = ci.tenant_id
+            LEFT JOIN produtos p ON p.id = ci.produto_id AND p.tenant_id = ci.tenant_id
             LEFT JOIN (
                 SELECT
                     vp.*,

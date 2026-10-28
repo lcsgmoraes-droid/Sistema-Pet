@@ -25,6 +25,11 @@ from app.banho_tosa_agendamento_notificacoes import (
     sincronizar_lembretes_agendamento_banho_tosa,
 )
 from app.banho_tosa_custos import validar_transicao_status
+from app.banho_tosa_pacote_reservas import (
+    reservar_creditos_agendamento,
+    confirmar_reservas_checkin,
+    devolver_reservas_agendamento,
+)
 from app.banho_tosa_models import (
     BanhoTosaAgendamento,
     BanhoTosaAgendamentoServico,
@@ -94,6 +99,7 @@ def criar_agendamento(
     current=Depends(get_current_user_and_tenant),
 ):
     current_user, tenant_id = _get_tenant(current)
+    config = obter_ou_criar_configuracao(db, tenant_id)
     cliente, pet = validar_cliente_pet(db, tenant_id, body.cliente_id, body.pet_id)
     servicos_snapshot: list[BanhoTosaAgendamentoServico] = []
     duracao_total = 0
@@ -194,7 +200,9 @@ def criar_agendamento(
     db.add(agendamento)
     db.flush()
     agendamento.pet = pet
-    config = obter_ou_criar_configuracao(db, tenant_id)
+    reservar_creditos_agendamento(
+        db, tenant_id, agendamento, getattr(current_user, "id", None)
+    )
     sincronizar_lembretes_agendamento_banho_tosa(
         db, tenant_id=tenant_id, agendamento=agendamento, config=config
     )
@@ -213,8 +221,10 @@ def atualizar_status_agendamento(
     db: Session = Depends(get_session),
     current=Depends(get_current_user_and_tenant),
 ):
-    _, tenant_id = _get_tenant(current)
-    agendamento = buscar_agendamento_completo(db, tenant_id, agendamento_id)
+    current_user, tenant_id = _get_tenant(current)
+    agendamento = buscar_agendamento_completo(
+        db, tenant_id, agendamento_id, bloquear=True
+    )
     if not agendamento:
         raise HTTPException(status_code=404, detail="Agendamento nao encontrado")
 
@@ -245,6 +255,21 @@ def atualizar_status_agendamento(
     if body.observacoes is not None:
         agendamento.observacoes = body.observacoes
 
+    if novo_status in {"cancelado", "no_show"}:
+        if agendamento.atendimento:
+            if agendamento.atendimento.status not in {"cancelado", "no_show"}:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Cancele o processo pela fila para preservar vendas e o histórico do atendimento.",
+                )
+        devolver_reservas_agendamento(
+            db,
+            tenant_id,
+            agendamento,
+            getattr(current_user, "id", None),
+            body.observacoes,
+        )
+
     sincronizar_lembretes_agendamento_banho_tosa(
         db, tenant_id=tenant_id, agendamento=agendamento, config=config
     )
@@ -262,7 +287,7 @@ def realizar_checkin_agendamento(
     db: Session = Depends(get_session),
     current=Depends(get_current_user_and_tenant),
 ):
-    _, tenant_id = _get_tenant(current)
+    current_user, tenant_id = _get_tenant(current)
     agendamento = (
         db.query(BanhoTosaAgendamento)
         .options(
@@ -273,6 +298,7 @@ def realizar_checkin_agendamento(
             BanhoTosaAgendamento.id == agendamento_id,
             BanhoTosaAgendamento.tenant_id == tenant_id,
         )
+        .with_for_update(of=BanhoTosaAgendamento)
         .first()
     )
     if not agendamento:
@@ -327,6 +353,10 @@ def realizar_checkin_agendamento(
         )
         db.add(atendimento)
 
+    db.flush()
+    confirmar_reservas_checkin(
+        db, tenant_id, agendamento, atendimento, getattr(current_user, "id", None)
+    )
     agendamento.status = "em_atendimento"
     db.commit()
     db.refresh(atendimento)

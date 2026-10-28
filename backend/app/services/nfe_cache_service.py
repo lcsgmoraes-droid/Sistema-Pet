@@ -8,10 +8,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.nfe_cache_models import BlingNotaFiscalCache
-from app.services.xml_contabilidade_hook import tentar_enfileirar_documento
 
 
 _SOURCE_PRIORITY = {
+    "ecommerceai_fiscal": 50,
     "pedido_integrado": 10,
     "local_venda": 40,
     "runtime": 70,
@@ -22,7 +22,7 @@ _SOURCE_PRIORITY = {
     "bling_detail": 110,
 }
 
-FONTES_NFE_LOCAIS = ("local_venda", "pedido_integrado")
+FONTES_NFE_LOCAIS = ("local_venda", "pedido_integrado", "ecommerceai_fiscal")
 
 _STATUS_PRIORITY = {
     "pendente": 10,
@@ -171,7 +171,20 @@ def serializar_nota_cache(registro: BlingNotaFiscalCache) -> dict:
         "origem_canal_venda": registro.origem_canal_venda,
         "numero_pedido_loja": registro.numero_pedido_loja,
         "pedido_bling_id_ref": registro.pedido_bling_id_ref,
-        "origem": "intnfe"
+        **(
+            {
+                "situacao": registro.status,
+                "fiscal_order_id": int(
+                    str(registro.bling_id).removeprefix("fiscal-externa-")
+                ),
+            }
+            if registro.source == "ecommerceai_fiscal"
+            and str(registro.bling_id).removeprefix("fiscal-externa-").isdigit()
+            else {}
+        ),
+        "origem": "fiscal_externa"
+        if registro.source == "ecommerceai_fiscal"
+        else "intnfe"
         if registro.provider == "intnfe"
         else registro.source or "cache_local",
         "provedor": registro.provider or "bling",
@@ -430,10 +443,4 @@ def upsert_nota_cache(
 
     registro.last_synced_at = datetime.utcnow()
     db.add(registro)
-    if registro.provider != "intnfe" and str(registro.status or "").strip().lower() in {
-        "autorizada",
-        "cancelada",
-        "cancelado",
-    }:
-        tentar_enfileirar_documento(db, tenant_id, "bling", registro.bling_id)
     return registro

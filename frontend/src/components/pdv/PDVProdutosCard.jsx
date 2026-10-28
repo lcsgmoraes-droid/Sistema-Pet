@@ -170,6 +170,7 @@ export default function PDVProdutosCard({
   onAtualizarPetItem,
   onAtualizarProtocoloItem,
   onAtualizarQuantidadeItem,
+  onAtualizarSubtotalItem,
   onAtualizarPrevisaoFimRacao,
   onBuscarProdutoChange,
   onBuscarProdutoFocus,
@@ -514,8 +515,8 @@ export default function PDVProdutosCard({
                         subtotal={item.subtotal}
                         precoUnitario={item.preco_unitario}
                         disabled={modoVisualizacao || Boolean(item.etiqueta_balanca)}
-                        onQuantidadeChange={(novaQuantidade) =>
-                          onAtualizarQuantidadeItem(index, novaQuantidade)
+                        onSubtotalChange={(novoSubtotal) =>
+                          onAtualizarSubtotalItem(index, novoSubtotal)
                         }
                       />
                     </div>

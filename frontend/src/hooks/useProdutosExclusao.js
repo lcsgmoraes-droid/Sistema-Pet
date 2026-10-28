@@ -20,7 +20,7 @@ export default function useProdutosExclusao({
 
   const obterNomeProduto = (id) => {
     const produto = produtosBrutos.find((item) => item.id === id);
-    return corrigirTextoQuebrado(produto?.nome || `Produto #${id}`);
+    return corrigirTextoQuebrado(produto?.nome || "Produto não informado");
   };
 
   const extrairErroExclusao = (error) => {

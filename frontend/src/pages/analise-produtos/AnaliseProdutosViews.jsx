@@ -13,7 +13,9 @@ import {
   YAxis,
 } from "recharts";
 import { formatMoneyBRL, formatPercent } from "../../utils/formatters";
+import SeletorOpcoes from "../../components/v2/SeletorOpcoes/SeletorOpcoes";
 import AnaliseProdutosKpis from "./AnaliseProdutosKpis";
+import AnaliseProdutosTabela from "./AnaliseProdutosTabela";
 import { agruparProdutos, resumirCurvaAbc } from "./analiseProdutosUtils";
 
 const formatarQuantidade = (valor) =>
@@ -67,86 +69,6 @@ function TooltipGrafico({ active, payload, label }) {
               : formatarQuantidade(item.value)}
         </p>
       ))}
-    </div>
-  );
-}
-
-function TabelaProdutos({ produtos }) {
-  const [ordenacao, setOrdenacao] = useState("faturamento");
-  const ordenados = useMemo(
-    () => [...produtos].sort((a, b) => Number(b[ordenacao] || 0) - Number(a[ordenacao] || 0)),
-    [ordenacao, produtos],
-  );
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <TituloBloco
-        titulo="Resultado por produto"
-        descricao={`${produtos.length} produto(s) com venda no filtro aplicado.`}
-        complemento={
-          <select
-            value={ordenacao}
-            onChange={(event) => setOrdenacao(event.target.value)}
-            className="rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-700"
-            aria-label="Ordenar produtos"
-          >
-            <option value="faturamento">Maior faturamento</option>
-            <option value="quantidade">Maior quantidade</option>
-            <option value="lucro_estimado">Maior lucro estimado</option>
-            <option value="margem_estimada_pct">Maior margem estimada</option>
-          </select>
-        }
-      />
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-            <tr>
-              <th className="px-5 py-3 text-left">Produto</th>
-              <th className="px-5 py-3 text-left">Grupo</th>
-              <th className="px-5 py-3 text-right">Quantidade</th>
-              <th className="px-5 py-3 text-right">Faturamento</th>
-              <th className="px-5 py-3 text-right">Lucro estimado</th>
-              <th className="px-5 py-3 text-right">Margem</th>
-              <th className="px-5 py-3 text-right">Estoque / cobertura</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {ordenados.map((item) => (
-              <tr key={item.produto_id} className="hover:bg-slate-50">
-                <td className="px-5 py-3">
-                  <p className="font-semibold text-slate-900">{item.produto_nome}</p>
-                  <p className="text-xs text-slate-500">{item.codigo || "Sem código"}</p>
-                </td>
-                <td className="px-5 py-3 text-sm text-slate-600">
-                  <p>{item.categoria_nome || "Sem categoria"}</p>
-                  <p className="text-xs text-slate-400">{item.marca_nome || "Sem marca"}</p>
-                </td>
-                <td className="px-5 py-3 text-right text-sm font-semibold text-slate-800">
-                  {formatarQuantidade(item.quantidade)}
-                </td>
-                <td className="px-5 py-3 text-right text-sm font-semibold text-slate-900">
-                  {formatMoneyBRL(item.faturamento)}
-                </td>
-                <td
-                  className={`px-5 py-3 text-right text-sm font-semibold ${Number(item.lucro_estimado) < 0 ? "text-rose-700" : "text-emerald-700"}`}
-                >
-                  {formatMoneyBRL(item.lucro_estimado)}
-                </td>
-                <td className="px-5 py-3 text-right text-sm text-slate-700">
-                  {formatPercent(item.margem_estimada_pct)}
-                </td>
-                <td className="px-5 py-3 text-right text-sm text-slate-700">
-                  <p>{formatarQuantidade(item.estoque_atual)} un.</p>
-                  <p className="text-xs text-slate-500">
-                    {item.cobertura_estoque_dias == null
-                      ? "Sem giro para estimar"
-                      : `${formatarQuantidade(item.cobertura_estoque_dias)} dias`}
-                  </p>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }
@@ -248,7 +170,7 @@ export function VisaoGeralProdutos({ dados }) {
           </div>
         ))}
       </div>
-      <TabelaProdutos produtos={dados.produtos} />
+      <AnaliseProdutosTabela produtos={dados.produtos} />
     </div>
   );
 }
@@ -282,21 +204,15 @@ export function CurvaAbcProdutos({ produtos }) {
           os 5% restantes. O item que cruza cada limite permanece na classe anterior.
         </p>
       </div>
-      <div className="flex flex-wrap gap-2">
-        {[
-          { id: "faturamento", label: "Por faturamento" },
-          { id: "quantidade", label: "Por quantidade" },
-        ].map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => setBase(item.id)}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold ${base === item.id ? "bg-blue-600 text-white" : "border border-slate-300 bg-white text-slate-700"}`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+      <SeletorOpcoes
+        rotulo="Base da Curva ABC"
+        valorSelecionado={base}
+        aoSelecionar={setBase}
+        opcoes={[
+          { valor: "faturamento", rotulo: "Por faturamento" },
+          { valor: "quantidade", rotulo: "Por quantidade" },
+        ]}
+      />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {resumo.map((item) => (
           <div
@@ -431,18 +347,12 @@ export function GruposProdutos({ produtos }) {
   if (!produtos.length) return <EstadoVazio />;
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap gap-2">
-        {Object.entries(rotulos).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setDimensao(id)}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold ${dimensao === id ? "bg-blue-600 text-white" : "border border-slate-300 bg-white text-slate-700"}`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <SeletorOpcoes
+        rotulo="Agrupar produtos por"
+        valorSelecionado={dimensao}
+        aoSelecionar={setDimensao}
+        opcoes={Object.entries(rotulos).map(([valor, rotulo]) => ({ valor, rotulo }))}
+      />
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <TituloBloco
           titulo={`Faturamento por ${rotulos[dimensao].toLowerCase()}`}

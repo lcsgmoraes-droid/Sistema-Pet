@@ -1,3 +1,5 @@
+import BuscaProduto from "../v2/BuscaProduto/BuscaProduto";
+import { formatMoneyBRL } from "../../utils/formatters";
 import { deveMostrarTipoProdutoNoFormulario } from "../../pages/produtosFormUtils";
 
 export default function ProdutosNovoEstruturaSection({
@@ -61,30 +63,23 @@ export default function ProdutosNovoEstruturaSection({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Buscar Produto Anterior
                   </label>
-                  <input
-                    type="text"
-                    placeholder="Digite o nome ou codigo do produto..."
+                  <BuscaProduto
                     value={buscaPredecessor}
-                    onChange={(e) => handleBuscaPredecessorChange(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    onChange={handleBuscaPredecessorChange}
+                    suggestions={produtosBusca}
+                    showSuggestions={!predecessorSelecionado}
+                    onSelect={handleSelecionarPredecessor}
+                    renderSuggestionContent={(produto) => (
+                      <>
+                        <span className="block font-medium">{produto.nome}</span>
+                        <span className="text-xs text-slate-500">
+                          Código: {produto.codigo || "Não informado"} | Preço:{" "}
+                          {formatMoneyBRL(produto.preco_venda)}
+                        </span>
+                      </>
+                    )}
+                    placeholder="Código, nome ou código de barras do produto anterior"
                   />
-
-                  {produtosBusca.length > 0 && (
-                    <div className="mt-2 max-h-48 overflow-y-auto border border-gray-300 rounded-lg">
-                      {produtosBusca.map((produto) => (
-                        <div
-                          key={produto.id}
-                          onClick={() => handleSelecionarPredecessor(produto)}
-                          className="p-3 hover:bg-amber-50 cursor-pointer border-b border-gray-200 last:border-0"
-                        >
-                          <div className="font-medium text-gray-900">{produto.nome}</div>
-                          <div className="text-sm text-gray-600">
-                            SKU: {produto.codigo} | Preco: R$ {produto.preco_venda?.toFixed(2)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
 
                   {predecessorSelecionado && (
                     <div className="mt-3 p-3 bg-green-50 border border-green-300 rounded-lg">

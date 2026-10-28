@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -15,7 +15,13 @@ from app.models import Cliente
 from app.partner_utils import get_all_accessible_tenant_ids
 from app.produtos.relatorios import _parse_relatorio_datetime
 from app.produtos.validators import _validar_tenant_e_obter_usuario
-from app.produtos_models import Categoria, Departamento, Marca, Produto
+from app.produtos_models import (
+    Categoria,
+    Departamento,
+    Marca,
+    Produto,
+    ProdutoFornecedor,
+)
 from app.security.permissions_decorator import require_permission
 from app.vendas_models import Venda, VendaItem
 
@@ -145,7 +151,20 @@ def _filtros_base(
     if departamento_id:
         query = query.filter(Produto.departamento_id == departamento_id)
     if fornecedor_id:
-        query = query.filter(Produto.fornecedor_id == fornecedor_id)
+        # Um produto pode ter fornecedor ativo sem ele ser o principal.
+        # EXISTS preserva os totais mesmo com mais de um vinculo cadastrado.
+        query = query.filter(
+            or_(
+                Produto.fornecedor_id == fornecedor_id,
+                Produto.fornecedores_alternativos.any(
+                    and_(
+                        ProdutoFornecedor.fornecedor_id == fornecedor_id,
+                        ProdutoFornecedor.ativo.is_(True),
+                        ProdutoFornecedor.tenant_id == Produto.tenant_id,
+                    )
+                ),
+            )
+        )
     if canal:
         query = query.filter(Venda.canal == canal)
     if busca and busca.strip():
@@ -173,6 +192,13 @@ def _consultar_produtos(
     faturamento = func.coalesce(func.sum(VendaItem.subtotal), 0)
     custo = func.coalesce(
         func.sum(VendaItem.quantidade * func.coalesce(Produto.preco_custo, 0)), 0
+    )
+    # No recorte de um fornecedor, o agrupamento deve identificar quem foi
+    # selecionado, inclusive quando o vinculo e alternativo no cadastro.
+    fornecedor_relatorio = (
+        filtros["fornecedor_id"]
+        if filtros.get("fornecedor_id")
+        else Produto.fornecedor_id
     )
 
     query = (
@@ -204,7 +230,7 @@ def _consultar_produtos(
         .outerjoin(Categoria, Categoria.id == Produto.categoria_id)
         .outerjoin(Marca, Marca.id == Produto.marca_id)
         .outerjoin(Departamento, Departamento.id == Produto.departamento_id)
-        .outerjoin(Cliente, Cliente.id == Produto.fornecedor_id)
+        .outerjoin(Cliente, Cliente.id == fornecedor_relatorio)
     )
     query = _filtros_base(
         query,
@@ -275,6 +301,76 @@ def _resumir(produtos: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _consultar_vendedores_por_produto(
+    db: Session,
+    *,
+    tenant_id,
+    access_ids,
+    inicio: datetime,
+    fim: datetime,
+    filtros: dict[str, Any],
+) -> dict[int, list[dict[str, Any]]]:
+    """Agrega os mesmos itens do relatorio pelo vendedor comercial da venda."""
+
+    # vendedor_id identifica o usuario operador. O vendedor escolhido no PDV
+    # fica em vendedor_funcionario_id; funcionario_id e o registro legado.
+    vendedor_registrado = func.coalesce(
+        Venda.vendedor_funcionario_id, Venda.funcionario_id
+    )
+    query = (
+        db.query(
+            Produto.id.label("produto_id"),
+            Cliente.id.label("vendedor_id"),
+            Cliente.nome.label("vendedor_nome"),
+            func.coalesce(func.sum(VendaItem.quantidade), 0).label("quantidade"),
+            func.coalesce(func.sum(VendaItem.subtotal), 0).label("faturamento"),
+        )
+        .select_from(VendaItem)
+        .join(Venda, Venda.id == VendaItem.venda_id)
+        .join(Produto, Produto.id == VendaItem.produto_id)
+        .outerjoin(
+            Cliente,
+            and_(
+                Cliente.id == vendedor_registrado,
+                Cliente.tenant_id == Venda.tenant_id,
+            ),
+        )
+    )
+    query = _filtros_base(
+        query,
+        tenant_id=tenant_id,
+        access_ids=access_ids,
+        inicio=inicio,
+        fim=fim,
+        **filtros,
+    )
+    por_produto: dict[int, list[dict[str, Any]]] = {}
+    rows = query.group_by(Produto.id, Cliente.id, Cliente.nome).all()
+    for row in rows:
+        por_produto.setdefault(row.produto_id, []).append(
+            {
+                "vendedor_id": row.vendedor_id,
+                "vendedor_nome": row.vendedor_nome or "Sem vendedor informado",
+                "quantidade": round(float(row.quantidade or 0), 3),
+                "faturamento": round(float(row.faturamento or 0), 2),
+            }
+        )
+    for vendedores in por_produto.values():
+        total = sum(item["faturamento"] for item in vendedores)
+        for vendedor in vendedores:
+            vendedor["participacao_faturamento_pct"] = round(
+                vendedor["faturamento"] / total * 100 if total else 0, 2
+            )
+        vendedores.sort(
+            key=lambda item: (
+                -item["faturamento"],
+                item["vendedor_nome"],
+                item["vendedor_id"] or 0,
+            )
+        )
+    return por_produto
+
+
 def _contar_vendas(
     db: Session,
     *,
@@ -342,6 +438,20 @@ def relatorio_analise_vendas(
         fim=fim,
         filtros=filtros,
     )
+    vendedores_por_produto = (
+        _consultar_vendedores_por_produto(
+            db,
+            tenant_id=tenant_id,
+            access_ids=access_ids,
+            inicio=inicio,
+            fim=fim,
+            filtros=filtros,
+        )
+        if produtos
+        else {}
+    )
+    for produto in produtos:
+        produto["vendedores"] = vendedores_por_produto.get(produto["produto_id"], [])
     anteriores = _consultar_produtos(
         db,
         tenant_id=tenant_id,

@@ -1,3 +1,4 @@
+import BuscaProduto from "../components/v2/BuscaProduto/BuscaProduto";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
@@ -299,12 +300,11 @@ export default function ProdutosValorizacaoEstoque() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
           <div className="xl:col-span-2">
             <label className="mb-1 block text-sm font-medium text-gray-700">Busca</label>
-            <input
-              type="text"
+            <BuscaProduto
               value={filtrosForm.busca}
-              onChange={(event) => atualizarFiltro("busca", event.target.value)}
+              onChange={(valor) => atualizarFiltro("busca", valor)}
               placeholder="Nome, codigo, SKU ou codigo de barras"
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              showSuggestions={false}
             />
           </div>
 

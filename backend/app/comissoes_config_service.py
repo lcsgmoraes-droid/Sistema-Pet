@@ -4,12 +4,32 @@ Chamado ao finalizar vendas para calcular e registrar comissões
 """
 
 import logging
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional, Dict
 from app.tenancy.context import get_current_tenant_id
 from app.utils.tenant_safe_sql import TenantSafeSQLError, execute_tenant_safe
+from app.comissoes_vigencia import carregar_configuracoes_vigentes
 
 logger = logging.getLogger(__name__)
+
+
+def calcular_comissao_fixa_parcela(
+    valor_comissao_total, valor_pago, total_venda, valor_pago_anterior=0
+):
+    """Distribui centavos pelo recebimento acumulado, sem pagar centavos extras."""
+    total = Decimal(str(total_venda))
+    comissao = Decimal(str(valor_comissao_total))
+    if total <= 0:
+        return max(Decimal("0"), comissao)
+    anterior = min(total, max(Decimal("0"), Decimal(str(valor_pago_anterior or 0))))
+    atual = min(total, anterior + max(Decimal("0"), Decimal(str(valor_pago or 0))))
+    antes = (comissao * anterior / total).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    depois = (comissao * atual / total).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    return max(Decimal("0"), depois - antes)
 
 
 CONFIGURACAO_COMISSAO_COLUMNS = """
@@ -26,7 +46,8 @@ CONFIGURACAO_COMISSAO_COLUMNS = """
             comissao_venda_parcial,
             permite_edicao_venda,
             observacoes,
-            ativo
+            ativo,
+            valor_fixo
 """
 
 
@@ -46,6 +67,7 @@ def _configuracao_row_to_dict(config) -> Dict:
         "permite_edicao_venda": config[11] if config[11] is not None else True,
         "observacoes": config[12] or "",
         "ativo": config[13],
+        "valor_fixo": config[14] if len(config) > 14 else 0,
     }
 
 
@@ -64,6 +86,8 @@ def buscar_configuracao_comissao(
     funcionario_id: int,
     produto_id: int,
     tenant_id=None,
+    criada_em=None,
+    configuracoes_vigentes=None,
 ) -> Optional[Dict]:
     """
     Busca configuração de comissão seguindo hierarquia:
@@ -74,28 +98,33 @@ def buscar_configuracao_comissao(
     Retorna: dict com config ou None
     """
     tenant_id = _require_tenant_id(tenant_id)
+    temporal = criada_em is not None or configuracoes_vigentes is not None
+    if temporal and configuracoes_vigentes is None:
+        configuracoes_vigentes = carregar_configuracoes_vigentes(
+            db, funcionario_id, criada_em, tenant_id=tenant_id
+        )
+
+    def buscar_escopo(tipo, referencia_id):
+        if temporal:
+            config = configuracoes_vigentes.get((tipo, int(referencia_id)))
+            return config if config and config.get("ativo") is True else None
+        result = execute_tenant_safe(
+            db,
+            f"""SELECT {CONFIGURACAO_COMISSAO_COLUMNS}
+            FROM comissoes_configuracao
+            WHERE funcionario_id = :func_id AND tipo = :tipo
+              AND referencia_id = :ref_id AND ativo = true AND {{tenant_filter}}""",
+            {"func_id": funcionario_id, "tipo": tipo, "ref_id": referencia_id},
+            tenant_id=tenant_id,
+        ).fetchone()
+        return _configuracao_row_to_dict(result) if result else None
 
     try:
         # 1. Tentar buscar config de PRODUTO
-        result = execute_tenant_safe(
-            db,
-            f"""
-            SELECT {CONFIGURACAO_COMISSAO_COLUMNS}
-            FROM comissoes_configuracao
-            WHERE funcionario_id = :func_id
-              AND tipo = 'produto'
-              AND referencia_id = :ref_id
-              AND ativo = true
-              AND {{tenant_filter}}
-        """,
-            {"func_id": funcionario_id, "ref_id": produto_id},
-            tenant_id=tenant_id,
-        )
-
-        config = result.fetchone()
+        config = buscar_escopo("produto", produto_id)
         if config:
             logger.info(f"✅ Config encontrada: PRODUTO {produto_id}")
-            return _configuracao_row_to_dict(config)
+            return config
 
         # 2. Buscar categoria do produto
         result = execute_tenant_safe(
@@ -123,27 +152,12 @@ def buscar_configuracao_comissao(
 
         while categoria_atual_id and depth < max_depth:
             # Tentar buscar config para esta categoria
-            result = execute_tenant_safe(
-                db,
-                f"""
-                SELECT {CONFIGURACAO_COMISSAO_COLUMNS}
-                FROM comissoes_configuracao
-                WHERE funcionario_id = :func_id
-                  AND tipo = 'categoria'
-                  AND referencia_id = :ref_id
-                  AND ativo = true
-                  AND {{tenant_filter}}
-            """,
-                {"func_id": funcionario_id, "ref_id": categoria_atual_id},
-                tenant_id=tenant_id,
-            )
-
-            config = result.fetchone()
+            config = buscar_escopo("categoria", categoria_atual_id)
             if config:
                 logger.info(
                     f"✅ Config encontrada: CATEGORIA {categoria_atual_id} (nível {depth})"
                 )
-                return _configuracao_row_to_dict(config)
+                return config
 
             # Buscar categoria pai
             result = execute_tenant_safe(
@@ -163,27 +177,12 @@ def buscar_configuracao_comissao(
             depth += 1
 
         # 4. Usar regra geral do funcionario como fallback para todos os itens
-        result = execute_tenant_safe(
-            db,
-            f"""
-            SELECT {CONFIGURACAO_COMISSAO_COLUMNS}
-            FROM comissoes_configuracao
-            WHERE funcionario_id = :func_id
-              AND tipo = 'geral'
-              AND referencia_id = 0
-              AND ativo = true
-              AND {{tenant_filter}}
-        """,
-            {"func_id": funcionario_id},
-            tenant_id=tenant_id,
-        )
-
-        config = result.fetchone()
+        config = buscar_escopo("geral", 0)
         if config:
             logger.info(
                 f"✅ Config encontrada: REGRA GERAL para funcionario {funcionario_id}"
             )
-            return _configuracao_row_to_dict(config)
+            return config
 
         logger.warning(
             f"⚠️ Nenhuma config encontrada para funcionário {funcionario_id} e produto {produto_id} (verificou {depth} níveis)"
@@ -274,8 +273,15 @@ def calcular_comissao_item(
         base -= taxa_entregador_item
         base -= custo_operacional_item
 
-    # ETAPA 5: APLICAR PERCENTUAL
-    comissao_bruta = base * (percentual / 100)
+    # Valor fixo é por unidade; não sofre deduções de taxas nem muda regras antigas.
+    if tipo_calculo == "fixo":
+        base = quantidade
+        percentual = Decimal("0")
+        comissao_bruta = (
+            Decimal(str(config.get("valor_fixo") or 0)) * quantidade
+        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    else:
+        comissao_bruta = base * (percentual / 100)
     comissao_final = max(Decimal("0"), comissao_bruta)
 
     return {
@@ -283,6 +289,7 @@ def calcular_comissao_item(
         "base_calculo": float(base),
         "tipo_calculo": tipo_calculo,
         "percentual": float(percentual),
+        "valor_fixo": float(config.get("valor_fixo") or 0),
         "valor_bruto": float(valor_bruto_item),
         "valor_liquido": float(valor_liquido_item),
         "custo_item": float(custo_total),

@@ -94,6 +94,46 @@ export const styleGuideCatalog = [
         descricao: "Busca, teclado, limpar seleção, ghost selection (Tab confirma)",
       },
       {
+        nome: "BuscaPessoa / BuscaProduto",
+        status: "pronto",
+        arquivo:
+          "components/v2/BuscaPessoa/BuscaPessoa.jsx, components/v2/BuscaProduto/BuscaProduto.jsx",
+        descricao:
+          "Células de busca compartilhadas do PDV e demais telas; código público, relevância, teclado, label/error/help e modo escuro. Consultas controladas preservam o escopo e filtros de cada operação.",
+      },
+      {
+        nome: "BuscaProdutoMultiplo",
+        status: "pronto",
+        arquivo: "components/v2/BuscaProdutoMultiplo/BuscaProdutoMultiplo.jsx",
+        descricao:
+          "Busca do PDV com seleção de vários produtos e chips removíveis; aceita produtos históricos do relatório.",
+      },
+      {
+        nome: "SeletorFormaRecebimento",
+        status: "pronto",
+        arquivo: "components/v2/SeletorFormaRecebimento/SeletorFormaRecebimento.jsx",
+        descricao: "Formas de recebimento compartilhadas pelo PDV e financeiro.",
+      },
+      {
+        nome: "CamposCartaoRecebimento",
+        status: "pronto",
+        arquivo: "components/v2/CamposCartaoRecebimento/CamposCartaoRecebimento.jsx",
+        descricao: "Operadora, bandeira, NSU e parcelas com as mesmas regras do PDV.",
+      },
+      {
+        nome: "SeletorCaixaRecebimento",
+        status: "pronto",
+        arquivo: "components/v2/SeletorCaixaRecebimento/SeletorCaixaRecebimento.jsx",
+        descricao: "Escolha explícita entre caixas permitidos ao registrar recebimentos.",
+      },
+      {
+        nome: "RecebimentoCampos",
+        status: "pronto",
+        arquivo: "components/v2/RecebimentoCampos/RecebimentoCampos.jsx",
+        descricao:
+          "Célula comum de pagamento e parcelamento para contas a receber e vendas abertas.",
+      },
+      {
         nome: "InputComboboxMultiplo",
         status: "pronto",
         arquivo: "components/v2/InputComboboxMultiplo/InputComboboxMultiplo.jsx",
@@ -171,6 +211,27 @@ export const styleGuideCatalog = [
         arquivo: "components/v2/CartaoIndicador/CartaoIndicador.jsx",
         descricao:
           'Substitui MetricCard/CompactMetricCard/PriorityCard do dashboard financeiro — tom (mesmo vocabulário de BotaoBase.variante) colore o ícone, "aoClicar" decide se vira botão ou div estática',
+      },
+      {
+        nome: "ResumoFaturamento",
+        status: "pronto",
+        arquivo: "components/v2/ResumoFaturamento/ResumoFaturamento.jsx",
+        descricao:
+          "Faturamento líquido por empresa ou caixa, conforme o escopo da composição do backend. Detalhes expansíveis de vendas e formas de quitação no dashboard, fechamento e auditoria do caixa. Aceita expansão controlada, detalhes em largura total, totais por forma com mostrarTotaisPorForma e modo escuro, sem recalcular métricas na tela.",
+      },
+      {
+        nome: "TotaisFormasPagamento",
+        status: "pronto",
+        arquivo: "components/v2/ResumoFaturamento/TotaisFormasPagamento.jsx",
+        descricao:
+          "Totais por forma das mesmas vendas do faturamento, agregados pelo backend. Mostra os pagamentos registrados, o total aplicado às vendas e a origem de cada diferença, com consulta da venda em outra aba. Disponível também como export nomeado em ResumoFaturamento; o escopo acompanha a data da venda.",
+      },
+      {
+        nome: "AvisoPagamentoVenda",
+        status: "pronto",
+        arquivo: "components/v2/ResumoFaturamento/AvisoPagamentoVenda.jsx",
+        descricao:
+          "Destaca pagamentos acima do valor da venda ou sem histórico completo no dashboard e no fechamento. Corrigir abre consulta no PDV em outra aba pelo procedimento normal.",
       },
       {
         nome: "EstadoVazio",
@@ -259,7 +320,7 @@ export const styleGuideCatalog = [
         status: "pronto",
         arquivo: "components/v2/ModalPadrao/ModalPadrao.jsx",
         descricao:
-          "Casca padrão de modal — título, corpo (children) e rodapé de ações (prop rodape); fechar sempre pelo X no mesmo lugar, nunca clicando fora.",
+          "Casca padrão de modal — título, corpo (children) e rodapé de ações (prop rodape); tamanhos pequena, normal, grande e ampla (duas colunas de conteúdo). Fechar sempre pelo X no mesmo lugar, nunca clicando fora.",
       },
     ],
   },

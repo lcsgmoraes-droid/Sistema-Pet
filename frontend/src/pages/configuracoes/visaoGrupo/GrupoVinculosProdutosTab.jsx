@@ -1,6 +1,8 @@
+import BuscaProduto from "../../../components/v2/BuscaProduto/BuscaProduto";
+import InputCombobox from "../../../components/v2/InputCombobox/InputCombobox";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { FiLink, FiSearch, FiTrash2 } from "react-icons/fi";
+import { FiLink, FiTrash2 } from "react-icons/fi";
 import ActionButton from "../../../components/ui/ActionButton";
 import EmptyState from "../../../components/ui/EmptyState";
 import Panel from "../../../components/ui/Panel";
@@ -13,7 +15,6 @@ import {
   removerVinculoProdutosGrupo,
   vincularProdutosGrupo,
 } from "../../../services/gruposComerciais";
-import { campoClasses } from "./GrupoAnaliseFiltros";
 
 function ProdutoResultado({ produto, selecionado, onSelect }) {
   return (
@@ -62,66 +63,84 @@ function ProdutoBusca({
   const [resultados, setResultados] = useState([]);
   const [carregando, setCarregando] = useState(false);
 
-  async function pesquisar(event) {
-    event.preventDefault();
-    if (busca.trim().length < 2) {
-      toast.error("Digite ao menos 2 caracteres do nome, SKU ou código de barras.");
-      return;
+  useEffect(() => {
+    let ativo = true;
+    const termo = busca.trim();
+    if (!termo) {
+      setResultados([]);
+      setCarregando(false);
+      return undefined;
     }
     setCarregando(true);
-    try {
-      const dados = await buscarProdutosGrupo(grupoId, {
-        empresa_id: empresaId,
-        busca: busca.trim(),
-      });
-      setResultados(dados.itens || []);
-    } catch (error) {
-      toast.error(error?.response?.data?.detail || "Não foi possível pesquisar os produtos.");
-    } finally {
-      setCarregando(false);
-    }
-  }
+    const timer = setTimeout(async () => {
+      try {
+        const dados = await buscarProdutosGrupo(grupoId, { empresa_id: empresaId, busca: termo });
+        if (ativo) setResultados(dados.itens || []);
+      } catch (error) {
+        if (ativo) {
+          setResultados([]);
+          toast.error(error?.response?.data?.detail || "Não foi possível pesquisar os produtos.");
+        }
+      } finally {
+        if (ativo) setCarregando(false);
+      }
+    }, 220);
+    return () => {
+      ativo = false;
+      clearTimeout(timer);
+    };
+  }, [busca, empresaId, grupoId]);
 
   return (
     <Panel title={label} subtitle="Pesquise e escolha um cadastro desta empresa.">
-      <form className="space-y-3" onSubmit={pesquisar}>
-        <select
+      <div className="space-y-3">
+        <InputCombobox
+          label="Empresa"
           value={empresaId}
-          onChange={(event) => {
-            onEmpresaChange(event.target.value);
+          permitirLimpar={false}
+          opcoes={empresas.map((empresa) => ({
+            value: empresa.empresa_id,
+            label: empresa.empresa_nome,
+          }))}
+          onChange={(valor) => {
+            onEmpresaChange(valor);
             onSelect(null);
             setResultados([]);
+            setBusca("");
           }}
-          className={`w-full ${campoClasses}`}
-        >
-          {empresas.map((empresa) => (
-            <option key={empresa.empresa_id} value={empresa.empresa_id}>
-              {empresa.empresa_nome}
-            </option>
-          ))}
-        </select>
-        <div className="flex gap-2">
-          <input
-            value={busca}
-            onChange={(event) => setBusca(event.target.value)}
-            placeholder="Nome, SKU ou EAN"
-            className={`min-w-0 flex-1 ${campoClasses}`}
-          />
-          <ActionButton type="submit" icon={FiSearch} intent="info" loading={carregando}>
-            Buscar
-          </ActionButton>
-        </div>
-      </form>
-      <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
-        {resultados.map((produto) => (
-          <ProdutoResultado
-            key={`${produto.empresa_id}-${produto.produto_id}`}
-            produto={produto}
-            selecionado={selecionado?.produto_id === produto.produto_id}
-            onSelect={onSelect}
-          />
-        ))}
+        />
+        <BuscaProduto
+          value={busca}
+          onChange={(valor) => {
+            setBusca(valor);
+            onSelect(null);
+          }}
+          suggestions={resultados.map((produto) => ({
+            ...produto,
+            id: produto.produto_id,
+            nome: produto.produto_nome,
+            codigo: produto.sku,
+          }))}
+          showSuggestions
+          loading={carregando}
+          onSelect={onSelect}
+          renderSuggestionContent={(produto) => (
+            <>
+              <span className="block font-medium">{produto.produto_nome}</span>
+              <span className="text-xs text-slate-500">
+                {produto.sku || "Sem código"} | {produto.empresa_nome} | EAN{" "}
+                {produto.ean || "Não informado"} | Estoque {produto.estoque}
+              </span>
+            </>
+          )}
+          placeholder="Código, nome, SKU ou EAN do produto"
+        />
       </div>
+      {selecionado && (
+        <div className="mt-3">
+          <ProdutoResultado produto={selecionado} selecionado onSelect={onSelect} />
+        </div>
+      )}
     </Panel>
   );
 }

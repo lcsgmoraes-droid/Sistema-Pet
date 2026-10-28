@@ -10,6 +10,8 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from tests.helpers.signed_nfe import make_key, sign_nfe
+
 from app.db import base as _registry  # noqa: F401
 from app.nfe_cache_models import BlingNotaFiscalCache
 from app.services import xml_contabilidade_service as service
@@ -21,9 +23,10 @@ from app.xml_contabilidade_models import (
     XmlContabilidadeEnvio,
     XmlContabilidadeEvento,
     XmlContabilidadeMonitor,
+    XmlContabilidadeTentativa,
 )
 
-CHAVE = "35261033590794000140650030000000441241595909"
+CHAVE = make_key("35261033590794000140650030000000441241595909")
 CNPJ = "33590794000140"
 NOW = datetime(2026, 10, 19, 15, 0, tzinfo=timezone.utc)
 
@@ -36,7 +39,9 @@ def xml_nota(
     cnpj=CNPJ,
     status="100",
 ):
-    return f"""<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe{chave}"><ide><mod>65</mod><dhEmi>{emissao}</dhEmi><tpAmb>{ambiente}</tpAmb><tpNF>{saida}</tpNF></ide><emit><CNPJ>{cnpj}</CNPJ><xNome>Empresa teste</xNome></emit></infNFe></NFe><protNFe><infProt><chNFe>{chave}</chNFe><cStat>{status}</cStat></infProt></protNFe></nfeProc>""".encode()
+    return sign_nfe(
+        f"""<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe{chave}"><ide><mod>65</mod><dhEmi>{emissao}</dhEmi><tpAmb>{ambiente}</tpAmb><tpNF>{saida}</tpNF></ide><emit><CNPJ>{cnpj}</CNPJ><xNome>Empresa teste</xNome></emit></infNFe></NFe><protNFe><infProt><chNFe>{chave}</chNFe><cStat>{status}</cStat></infProt></protNFe></nfeProc>"""
+    )
 
 
 def documento(xml=None, chave=CHAVE, status="autorizada", identificador="1"):
@@ -67,6 +72,7 @@ def fila(monkeypatch):
     engine = create_engine("sqlite://")
     XmlContabilidadeConfig.__table__.create(engine)
     XmlContabilidadeEnvio.__table__.create(engine)
+    XmlContabilidadeTentativa.__table__.create(engine)
     XmlContabilidadeEvento.__table__.create(engine)
     XmlContabilidadeMonitor.__table__.create(engine)
     Venda.__table__.create(engine)
@@ -130,17 +136,15 @@ def test_periodo_inclusivo_xml_preservado_e_deduplicado(xml_context):
         assert manifesto["emitente_cnpj"] == CNPJ
 
 
-def test_saida_fornecedor_nao_e_saida_da_empresa(xml_context):
-    arquivos, notas = service._coletar_arquivos(
-        Mock(),
-        uuid4(),
-        [documento(xml_nota(cnpj="11111111000111"))],
-        date(2026, 10, 19),
-        date(2026, 10, 19),
-    )
-    assert not arquivos and not notas
-    with pytest.raises(service.XmlContabilidadeError, match="Nenhuma"):
-        documentos._zip(arquivos, notas, date(2026, 10, 19), date(2026, 10, 19))
+def test_xml_com_emitente_divergente_bloqueia_sem_arquivo_parcial(xml_context):
+    with pytest.raises(service.XmlContabilidadeError, match="integridade.*parcial"):
+        service._coletar_arquivos(
+            Mock(),
+            uuid4(),
+            [documento(xml_nota(cnpj="11111111000111"))],
+            date(2026, 10, 19),
+            date(2026, 10, 19),
+        )
 
 
 def test_xml_ausente_nunca_gera_zip_parcial(xml_context, monkeypatch):
@@ -175,19 +179,17 @@ def test_cancelada_sem_evento_bloqueia_pacote_incompleto(xml_context):
         )
 
 
-def test_evento_embutido_preserva_assinatura_sem_reserializar(xml_context):
+def test_evento_acrescentado_fora_do_perfil_nfeproc_bloqueia(xml_context):
     evento = f"""<procEventoNFe><evento><infEvento Id="ID110111{CHAVE}01"><tpAmb>1</tpAmb><CNPJ>{CNPJ}</CNPJ><chNFe>{CHAVE}</chNFe><tpEvento>110111</tpEvento><nSeqEvento>1</nSeqEvento></infEvento></evento><retEvento><infEvento><tpAmb>1</tpAmb><chNFe>{CHAVE}</chNFe><tpEvento>110111</tpEvento><nSeqEvento>1</nSeqEvento><cStat>135</cStat><nProt>135260000000001</nProt><dhRegEvento>2026-10-19T13:00:00-03:00</dhRegEvento></infEvento></retEvento></procEventoNFe>""".encode()
     xml = xml_nota().replace(b"</nfeProc>", evento + b"</nfeProc>")
-    arquivos, notas = service._coletar_arquivos(
-        Mock(),
-        uuid4(),
-        [documento(xml, status="cancelada")],
-        date(2026, 10, 19),
-        date(2026, 10, 19),
-    )
-    assert arquivos == [(f"{CHAVE}-nfe.xml", xml), (f"ID110111{CHAVE}01.xml", xml)]
-    assert notas[0]["eventos_incluidos"] == 1
-    assert "aviso" not in notas[0]
+    with pytest.raises(service.XmlContabilidadeError, match="integridade.*parcial"):
+        service._coletar_arquivos(
+            Mock(),
+            uuid4(),
+            [documento(xml, status="cancelada")],
+            date(2026, 10, 19),
+            date(2026, 10, 19),
+        )
 
 
 def test_limite_tamanho_impede_pacote(xml_context, monkeypatch):
@@ -456,7 +458,7 @@ def test_fila_cancela_legados_sem_enviar_e_preserva_historico(
     ]
     assert len(service.listar_envios(db, tenant)) == 4
     processar.assert_not_called()
-    with pytest.raises(service.XmlContabilidadeError, match="lote manual"):
+    with pytest.raises(service.XmlContabilidadeError, match="lote manual|CorePet"):
         service.reenviar_envio(db, tenant, rows[-1].id)
 
 
@@ -484,7 +486,7 @@ def test_legado_interrompido_nunca_e_retomado_automaticamente(
     assert "interrompido" in envio.ultimo_erro
     assert service.processar_fila_tenant(db, tenant) == 0
     processar.assert_not_called()
-    with pytest.raises(service.XmlContabilidadeError, match="lote manual"):
+    with pytest.raises(service.XmlContabilidadeError, match="lote manual|CorePet"):
         service.reenviar_envio(db, tenant, envio.id)
 
 
@@ -492,9 +494,53 @@ def test_legado_interrompido_nunca_e_retomado_automaticamente(
 def test_processamento_direto_legado_nao_chega_ao_smtp(monkeypatch, origem):
     enviar = Mock()
     monkeypatch.setattr(service.email_service, "send_email", enviar)
-    with pytest.raises(service.XmlContabilidadeError, match="mensal"):
-        service._processar_envio(Mock(), uuid4(), SimpleNamespace(origem=origem))
+    with pytest.raises(service.XmlContabilidadeError, match="mensal|CorePet"):
+        service._processar_envio(
+            Mock(), uuid4(), SimpleNamespace(origem=origem, provider=None)
+        )
     enviar.assert_not_called()
+
+
+@pytest.mark.parametrize("provider", [None, "bling"])
+@pytest.mark.parametrize("tipo", ["nota", "evento"])
+def test_fila_cancela_xml_importado_mesmo_com_identidade_individual_valida(
+    fila, xml_context, monkeypatch, provider, tipo
+):
+    db, tenant = fila
+    db.add(
+        XmlContabilidadeConfig(
+            tenant_id=tenant,
+            email_contador="contador@example.com",
+            envio_automatico=True,
+            envio_automatico_desde=NOW - timedelta(days=1),
+        )
+    )
+    envio = XmlContabilidadeEnvio(
+        tenant_id=tenant,
+        origem="automatico",
+        status="pendente",
+        provider=provider,
+        documento_id="123",
+        documento_status=tipo,
+        idempotency_key=f"{tipo}:{CHAVE}",
+        email_destino="contador@example.com",
+        data_inicio=NOW.date(),
+        data_fim=NOW.date(),
+        proxima_tentativa_em=NOW,
+    )
+    db.add(envio)
+    db.commit()
+    processar = Mock(side_effect=AssertionError("Não processar XML importado"))
+    enviar = Mock()
+    monkeypatch.setattr(service, "_processar_envio", processar)
+    monkeypatch.setattr(service.email_service, "send_email", enviar)
+    assert service.processar_fila_tenant(db, tenant) == 0
+    assert envio.status == "cancelado"
+    assert "CorePet" in envio.ultimo_erro
+    processar.assert_not_called()
+    enviar.assert_not_called()
+    with pytest.raises(service.XmlContabilidadeError, match="CorePet"):
+        service.reenviar_envio(db, tenant, envio.id)
 
 
 def test_manual_anexa_zip_identifica_empresa_e_nunca_simula(xml_context, monkeypatch):
@@ -538,6 +584,7 @@ def _venda(tenant, numero="V1", **kwargs):
         subtotal=1,
         total=1,
         nfe_tipo="nfce",
+        nfe_correlation_id="emissao-corepet-1",
         nfe_modelo="65",
         nfe_chave=CHAVE,
         nfe_data_emissao=datetime(2026, 10, 19, 12),
@@ -578,12 +625,12 @@ def test_busca_documentos_aplica_tenant_status_e_ambiente(fila, xml_context):
     docs = documentos._listar_documentos(
         db, tenant, date(2026, 10, 19), date(2026, 10, 19)
     )
-    assert len(docs) == 2
-    assert {doc.provider for doc in docs} == {"intnfe", "bling"}
-    assert {doc.status for doc in docs} == {"autorizada", "cancelada"}
+    assert len(docs) == 1
+    assert {doc.provider for doc in docs} == {"intnfe"}
+    assert {doc.status for doc in docs} == {"autorizada"}
 
 
-def test_nota_processando_impede_zip_incompleto(fila, monkeypatch):
+def test_nota_processando_e_informada_sem_bloquear_as_autorizadas(fila, monkeypatch):
     from app.services import xml_contabilidade_reconciliation as reconciliacao
 
     db, tenant = fila
@@ -593,10 +640,11 @@ def test_nota_processando_impede_zip_incompleto(fila, monkeypatch):
     db.commit()
     consultar = Mock()
     monkeypatch.setattr(reconciliacao, "reconciliar_pendentes", consultar)
-    with pytest.raises(service.XmlContabilidadeError, match="sem confirmação"):
-        documentos._confirmar_emissoes_periodo(
-            db, tenant, date(2026, 10, 1), date(2026, 10, 19)
-        )
+    restantes = documentos._confirmar_emissoes_periodo(
+        db, tenant, date(2026, 10, 1), date(2026, 10, 19)
+    )
+    assert len(restantes) == 1
+    assert db.info["xml_contabilidade_pendencias"][0]["status_fiscal"] == "processando"
     consultar.assert_called_once()
 
 

@@ -28,6 +28,14 @@ class PlatformAdmin(Base):
     last_login_at = Column(DateTime(timezone=True), nullable=True)
     last_login_ip = Column(String(50), nullable=True)
     password_changed_at = Column(DateTime(timezone=True), nullable=True)
+    # Acesso ao painel adm.corepet.com.br: so quem foi liberado pelo script de administradores.
+    painel_adm_ativo = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    # Senha provisoria: o painel obriga a trocar antes de liberar qualquer dado.
+    must_change_password = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
 
     created_at = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

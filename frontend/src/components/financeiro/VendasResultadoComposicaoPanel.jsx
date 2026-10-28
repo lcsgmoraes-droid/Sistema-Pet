@@ -1,3 +1,9 @@
+import {
+  PENDENCIA_IFOOD_LABEL,
+  temRentabilidadePendente,
+} from "./vendasFinanceiro/rentabilidadePendente.js";
+import IfoodVendaTaxasResumo from "../ifood/IfoodVendaTaxasResumo.jsx";
+
 export default function VendasResultadoComposicaoPanel({
   abaAtiva,
   abrirVendasEmAberto,
@@ -16,9 +22,12 @@ export default function VendasResultadoComposicaoPanel({
           </p>
         </div>
         <div className="self-start rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 sm:self-auto">
-          {formatarMoeda(resumo.venda_liquida || 0)} liquido antes do CMV
+          {temRentabilidadePendente(resumo)
+            ? `${PENDENCIA_IFOOD_LABEL}: líquido antes do CMV`
+            : `${formatarMoeda(resumo.venda_liquida || 0)} liquido antes do CMV`}
         </div>
       </div>
+      <IfoodVendaTaxasResumo financeiro={resumo.ifood_financial_resumo} resumo />
       <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
         {fluxoResultadoCards.map((card) => {
           const clicavel = card.acao === "vendas_em_aberto";
@@ -43,7 +52,11 @@ export default function VendasResultadoComposicaoPanel({
                 </span>
               </div>
               <div className="text-xl font-bold">
-                {card.percentual ? `${card.valor}%` : formatarMoeda(card.valor)}
+                {card.pendente
+                  ? PENDENCIA_IFOOD_LABEL
+                  : card.percentual
+                    ? `${card.valor}%`
+                    : formatarMoeda(card.valor)}
               </div>
               <p className="mt-2 text-xs opacity-75">{card.detalhe}</p>
               {clicavel ? (

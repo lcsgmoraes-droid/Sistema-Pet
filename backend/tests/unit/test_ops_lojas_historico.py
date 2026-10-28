@@ -7,6 +7,7 @@ from uuid import uuid4
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+import app.db.base  # noqa: F401  (carrega todos os modelos antes de usar a sessão)
 from app.db import Base
 from app.ops_tenant_log_models import OpsTenantChangeLog
 from app.services.ops_tenant_log_service import (

@@ -2,6 +2,7 @@
 
 from sqlalchemy import case
 from sqlalchemy.orm import Query, Session
+from fastapi import HTTPException
 
 from app.caixa_models import Caixa
 from app.empresa_config_geral_models import EmpresaConfigGeral
@@ -75,3 +76,47 @@ def buscar_caixa_acessivel(
     if bloquear_caixa:
         query = query.populate_existing().with_for_update()
     return query.first(), compartilhado
+
+
+def buscar_caixa_para_recebimento(
+    db: Session,
+    *,
+    tenant_id,
+    usuario_id: int,
+    caixa_id: int | None = None,
+    bloquear_caixa: bool = False,
+) -> tuple[Caixa | None, bool]:
+    """Seleciona um caixa acessível; exige escolha quando houver mais de um."""
+    if caixa_id is not None:
+        caixa, compartilhado = buscar_caixa_acessivel(
+            db,
+            caixa_id=caixa_id,
+            tenant_id=tenant_id,
+            usuario_id=usuario_id,
+            bloquear_caixa=bloquear_caixa,
+        )
+        if caixa is None:
+            raise HTTPException(
+                404, "Caixa não encontrado ou não disponível para seu usuário."
+            )
+        if caixa.status != "aberto":
+            raise HTTPException(
+                409, "O caixa selecionado está fechado. Escolha um caixa aberto."
+            )
+        return caixa, compartilhado
+
+    compartilhado = caixa_compartilhado_habilitado(db, tenant_id)
+    query = aplicar_escopo_caixa(
+        db.query(Caixa).filter(Caixa.status == "aberto"),
+        tenant_id=tenant_id,
+        usuario_id=usuario_id,
+        compartilhado=compartilhado,
+    ).order_by(Caixa.id)
+    if bloquear_caixa:
+        query = query.populate_existing().with_for_update()
+    caixas = query.limit(2).all()
+    if len(caixas) > 1:
+        raise HTTPException(
+            400, "Há mais de um caixa aberto. Selecione o caixa deste recebimento."
+        )
+    return (caixas[0] if caixas else None), compartilhado

@@ -5,6 +5,7 @@ from math import asin, cos, radians, sin, sqrt
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, case, distinct, func, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -24,6 +25,10 @@ from app.services.ecommerce_catalog_health import (
     catalog_price_expression,
     catalog_public_visibility_filters,
     catalog_stock_expression,
+)
+from app.services.ecommerce_product_share import (
+    product_share_public_base_url,
+    render_product_share_html,
 )
 from app.tenant_identity import normalize_tenant_name
 from app.tenancy.context import set_current_tenant
@@ -806,6 +811,28 @@ def obter_produto_publico_por_id(
         canal_normalizado,
         oferta,
         tenant=tenant,
+    )
+
+
+@router.get("/compartilhar/produtos/{produto_id}", response_class=HTMLResponse)
+def compartilhar_produto_publico(
+    produto_id: int,
+    tenant_ref: tuple[str, str] = Depends(_resolve_tenant_ref),
+    db: Session = Depends(get_session),
+):
+    # Usa exatamente a disponibilidade do catalogo web, mesmo com headers do app.
+    product = obter_produto_publico_por_id(
+        produto_id=produto_id,
+        tenant_ref=tenant_ref,
+        canal="ecommerce",
+        x_canal_venda=None,
+        authorization=None,
+        db=db,
+    )
+    tenant = _get_active_tenant(db, tenant_ref)
+    return HTMLResponse(
+        render_product_share_html(tenant, product, product_share_public_base_url()),
+        headers={"Cache-Control": "no-store"},
     )
 
 
