@@ -9,7 +9,13 @@ from app.services.bling_sync_service import BlingSyncService
 
 
 @pytest.fixture
-def transaction_case():
+def transaction_case(monkeypatch):
+    # Estes testes isolam o savepoint; os kits e consultas reais sao cobertos
+    # por test_bling_sync_virtual_stock.py.
+    monkeypatch.setattr(
+        "app.services.bling_sync_stock.agendar_kits_dependentes",
+        lambda *args, **kwargs: [],
+    )
     engine = create_engine("sqlite:///:memory:")
     metadata = MetaData()
     stock = Table(

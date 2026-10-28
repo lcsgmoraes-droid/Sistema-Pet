@@ -12,6 +12,24 @@ from app.models import Cliente
 logger = logging.getLogger(__name__)
 
 
+def buscar_fornecedor_ativo_no_grupo(db: Session, *, cnpj: str, tenant_id):
+    """Reutiliza a pessoa compartilhada sem copiar ou alterar seu cadastro."""
+    from app.models import Cliente as Pessoa
+    from app.tenancy.filters import pessoa_visivel_no_grupo
+
+    return (
+        db.query(Pessoa)
+        .filter(
+            Pessoa.cnpj == cnpj,
+            Pessoa.tenant_id != tenant_id,
+            Pessoa.is_fornecedor.is_(True),
+            Pessoa.ativo.is_(True),
+            pessoa_visivel_no_grupo(Pessoa, str(tenant_id)),
+        )
+        .first()
+    )
+
+
 def gerar_prefixo_fornecedor(nome: str) -> str:
     """
     Gera um prefixo baseado no nome do fornecedor.
@@ -114,6 +132,10 @@ def criar_fornecedor_automatico(
             db.refresh(fornecedor)
 
         return (fornecedor, False)
+
+    compartilhado = buscar_fornecedor_ativo_no_grupo(db, cnpj=cnpj, tenant_id=tenant_id)
+    if compartilhado:
+        return compartilhado, False
 
     codigo = gerar_codigo_cliente(db, "PJ", tenant_id)
 

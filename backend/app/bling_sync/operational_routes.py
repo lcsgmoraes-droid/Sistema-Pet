@@ -28,6 +28,7 @@ from app.produtos_models import (
     ProdutoBlingSyncQueue,
 )
 from app.services.bling_sync_service import BlingSyncService
+from app.services.bling_sync_stock import estoques_produtos_bling
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -192,7 +193,11 @@ def status_sincronizacao(
 
     resultados = []
 
-    for produto, sync in query.all():
+    linhas = query.all()
+    estoques = estoques_produtos_bling(
+        db, [produto for produto, _sync in linhas], tenant_id=tenant_id
+    )
+    for produto, sync in linhas:
         fila = (
             db.query(ProdutoBlingSyncQueue)
             .filter(
@@ -216,7 +221,7 @@ def status_sincronizacao(
                 produto_id=produto.id,
                 produto_nome=produto.nome,
                 sku=produto.codigo,
-                estoque_sistema=produto.estoque_atual or 0,
+                estoque_sistema=estoques[produto.id],
                 estoque_bling=estoque_bling,
                 divergencia=divergencia,
                 sincronizado=sync.sincronizar,
@@ -266,18 +271,22 @@ def status_sincronizacao_problemas(
     )
 
     resultados = []
-    for produto, sync, fila in (
+    linhas = (
         query.order_by(ProdutoBlingSync.updated_at.desc(), Produto.id.asc())
         .offset(offset)
         .limit(limit)
         .all()
-    ):
+    )
+    estoques = estoques_produtos_bling(
+        db, [produto for produto, _sync, _fila in linhas], tenant_id=tenant_id
+    )
+    for produto, sync, fila in linhas:
         resultados.append(
             SyncStatusResponse(
                 produto_id=produto.id,
                 produto_nome=produto.nome,
                 sku=produto.codigo,
-                estoque_sistema=produto.estoque_atual or 0,
+                estoque_sistema=estoques[produto.id],
                 estoque_bling=sync.ultimo_estoque_bling,
                 divergencia=sync.ultima_divergencia,
                 sincronizado=sync.sincronizar,

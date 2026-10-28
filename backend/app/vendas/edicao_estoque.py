@@ -16,6 +16,7 @@ from app.grupo_comercial_estoque_compartilhado_service import (
 from app.estoque.service import EstoqueService
 from app.produtos_models import ProdutoKitComponente
 from app.vendas.estoque_baixa import processar_baixa_estoque_item
+from app.vendas.kit_estoque import tipo_kit_estoque
 
 logger = logging.getLogger(__name__)
 
@@ -46,10 +47,13 @@ def _estornar_quantidade_reduzida(
     tenant_id,
     db: Session,
 ) -> None:
-    if produto.tipo_produto == "KIT" and produto.tipo_kit == "VIRTUAL":
+    if tipo_kit_estoque(produto) == "VIRTUAL":
         componentes = (
             db.query(ProdutoKitComponente)
-            .filter(ProdutoKitComponente.kit_id == produto.id)
+            .filter(
+                ProdutoKitComponente.kit_id == produto.id,
+                ProdutoKitComponente.tenant_id == tenant_id,
+            )
             .all()
         )
         if not componentes:

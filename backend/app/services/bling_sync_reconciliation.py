@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.bling_integration import BlingAPI
 from app.db import SessionLocal
 from app.produtos_models import ProdutoBlingSync
+from app.services.bling_sync_stock import estoque_produto_bling
 from app.tenancy.context import tenant_context
 
 from .bling_sync_shared import (
@@ -43,7 +44,7 @@ class BlingSyncReconciliationMixin:
 
             saldo = BlingAPI().consultar_saldo_estoque(sync.bling_produto_id)
             estoque_bling = float(saldo.get("saldoFisicoTotal", 0) or 0)
-            estoque_sistema = float(produto.estoque_atual or 0)
+            estoque_sistema = estoque_produto_bling(db, produto)
             divergencia = estoque_sistema - estoque_bling
             now = utc_now()
 

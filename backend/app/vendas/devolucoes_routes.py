@@ -32,6 +32,7 @@ from app.financeiro.recebiveis_operadora import TIPOS_RECEBIVEL_OPERADORA
 from app.produtos_models import EstoqueMovimentacao, Produto
 from app.utils.timezone import now_brasilia
 from app.vendas.devolucao_dre import custo_original_item_devolvido
+from app.vendas.kit_estoque import tipo_kit_estoque
 from app.vendas.devolucao_restituicao import (
     cotar_restituicao,
     registrar_restituicao_cashback,
@@ -218,10 +219,8 @@ def _validar_produto_devolucao(produto):
                 "Concilie a devolucao e o estoque manualmente."
             ),
         )
-    if (
-        getattr(produto, "tipo_produto", None) == "KIT"
-        and (getattr(produto, "tipo_kit", None) or "VIRTUAL") != "FISICO"
-    ):
+    tipo_kit = tipo_kit_estoque(produto)
+    if tipo_kit and tipo_kit != "FISICO":
         raise HTTPException(
             status_code=409,
             detail="KIT virtual exige devolucao e recomposicao manual dos componentes.",
