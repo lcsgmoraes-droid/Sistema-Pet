@@ -81,18 +81,22 @@ export default function VendasFinanceiroGraficosResumo({
         <h3 className="mb-4 text-base font-semibold text-gray-800 sm:text-lg">
           Formas de Pagamento
         </h3>
-        <ResponsiveContainer width="100%" height={350}>
+        <ResponsiveContainer
+          width="100%"
+          height={Math.max(350, formasRecebimentoFiltradas.length * 32 + 40)}
+        >
           <BarChart
             data={formasRecebimentoFiltradas}
             layout="vertical"
-            margin={{ top: 5, right: 30, left: 120, bottom: 5 }}
+            margin={{ top: 5, right: 45, left: 5, bottom: 5 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis type="number" tickFormatter={(value) => formatarMoeda(value)} />
             <YAxis
               type="category"
               dataKey="forma_pagamento"
-              width={110}
+              width="auto"
+              interval={0}
               style={{ fontSize: "12px" }}
             />
             <Tooltip
