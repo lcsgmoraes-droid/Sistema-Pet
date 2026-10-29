@@ -63,5 +63,12 @@ if ($SemFrontend) {
 }
 
 Write-Host ''
+Write-Host '=== Enderecos ===' -ForegroundColor Cyan
+Write-Host '  Sistema:  http://localhost:5173' -ForegroundColor Green
+if (-not $SemAdm) {
+    Write-Host '  Painel adm: http://localhost:5176  (admin@teste.com)' -ForegroundColor Green
+}
+Write-Host '  API:      http://localhost:8000' -ForegroundColor Green
+Write-Host ''
 Write-Host 'Iniciando o frontend (Ctrl+C encerra so o frontend; os containers continuam rodando)...' -ForegroundColor Yellow
 & (Join-Path $root 'scripts/iniciar_frontend_dev.ps1')
