@@ -79,7 +79,7 @@ export default function CrmCard({ card, mostrarLoja, movendo, onAbrir }) {
       </div>
 
       {card.sem_cadastro ? (
-        <p className="mt-1 flex items-center gap-1 text-xs text-blue-700 dark:text-blue-300">
+        <p className="mt-1 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300">
           <UserRoundX className="h-3.5 w-3.5" aria-hidden="true" />
           Lead novo · sem cadastro
         </p>

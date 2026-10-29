@@ -8,7 +8,7 @@ export default function CrmIconeDeVinculo({ semCadastro, nome, tamanho = "h-4 w-
     : `Ligado ao cadastro de ${nome}`;
   const Icone = semCadastro ? UserRoundX : UserRoundCheck;
   const cor = semCadastro
-    ? "text-blue-700 dark:text-blue-300"
+    ? "text-amber-700 dark:text-amber-300"
     : "text-emerald-700 dark:text-emerald-300";
   return (
     <span
