@@ -5,7 +5,7 @@
   "scripts": {
     "start": "expo start",
     "start:clear": "expo start --clear",
-    "postinstall": "node scripts/patch-node-forge.mjs && node scripts/patch-metro-image-size.mjs",
+    "postinstall": "node scripts/patch-node-forge.mjs && node scripts/patch-metro-image-size.mjs && node scripts/patch-query-string.mjs",
     "audit:dependencies": "node scripts/audit-dependencies.mjs",
     "prepare:firebase": "node scripts/prepare-google-services.js",
     "eas-build-post-install": "npm run prepare:firebase",
@@ -75,7 +75,7 @@
     },
     "brace-expansion": "5.0.12",
     "compression": "1.8.2",
-    "decode-uri-component": "0.5.0",
+    "decode-uri-component": "0.5.1",
     "follow-redirects": "1.16.1",
     "image-size": "2.0.3",
     "js-yaml": "4.3.2",
