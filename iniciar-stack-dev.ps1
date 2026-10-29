@@ -1,5 +1,6 @@
 param(
-    [switch]$SemFrontend
+    [switch]$SemFrontend,
+    [switch]$SemAdm
 )
 
 $ErrorActionPreference = 'Stop'
@@ -48,6 +49,12 @@ if (-not $ok) {
 Write-Host 'Backend saudavel.' -ForegroundColor Green
 Write-Host ''
 docker compose -f $composeFile ps
+
+if (-not $SemAdm) {
+    Write-Host ''
+    Write-Host 'Iniciando o painel adm em outra janela (http://localhost:5176)...' -ForegroundColor Yellow
+    Start-Process powershell -ArgumentList '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $root 'scripts/iniciar_adm_dev.ps1')
+}
 
 if ($SemFrontend) {
     Write-Host ''
