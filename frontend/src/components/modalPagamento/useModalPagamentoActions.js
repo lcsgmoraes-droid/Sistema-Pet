@@ -271,6 +271,12 @@ export function useModalPagamentoActions({
       return;
     }
     if (bloqueado || finalizacaoEmAndamentoRef.current) return;
+    if (formaPagamentoSelecionada && Number(valorRecebido) > 0) {
+      setErro(
+        'O pagamento selecionado ainda não foi adicionado. Clique em "Adicionar Pagamento" antes de registrar o recebimento.',
+      );
+      return;
+    }
     const erroTipos = validarTiposPagamentoExcedente({
       valorTotal: venda.total,
       totalPagoExistente,

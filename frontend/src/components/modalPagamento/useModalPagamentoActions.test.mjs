@@ -77,8 +77,9 @@ function preparar({ props = {}, persistir, finalizar, buscar, recebido = 0 } = {
     venda: baseVenda,
     pagamentos: [],
     totalPagoExistente: 0,
-    formaPagamentoSelecionada: cartao,
-    valorRecebido: 119.9,
+    // Adicionar um pagamento limpa a selecao e o valor no modal real.
+    formaPagamentoSelecionada: props.pagamentos?.length ? null : cartao,
+    valorRecebido: props.pagamentos?.length ? 0 : 119.9,
     valorRestante: 119.9,
     bandeira: "Visa",
     nsuCartao: "",
@@ -202,7 +203,7 @@ test("DELIVERY iFood finaliza a venda existente sem PUT, entregador local ou dup
     entrega: { taxa_entrega_total: 0 },
   };
   const c = preparar({
-    props: { venda, pagamentos: [pagamento], formaPagamentoSelecionada: dinheiro },
+    props: { venda, pagamentos: [pagamento] },
     finalizar: async (id, pagamentos) => ({
       id,
       status: "finalizada",
@@ -238,9 +239,7 @@ test("DELIVERY iFood com frete positivo recebe o total exato sem sobrescrever a 
     props: {
       venda,
       pagamentos: [montar(dinheiro, 73.9, 73.9)],
-      formaPagamentoSelecionada: dinheiro,
-      valorRecebido: 73.9,
-      valorRestante: 73.9,
+      valorRestante: 0,
     },
     finalizar: async (id, pagamentos) => ({
       id,
@@ -322,6 +321,7 @@ test("pagamento misto e parcial usa saldo e parcelas do cartao sem criar plano c
     props: {
       venda: { ...baseVenda, total: 109.9 },
       pagamentos: [entrada],
+      formaPagamentoSelecionada: cartao,
       numeroParcelas: 3,
       valorRecebido: 69.9,
       valorRestante: 69.9,
@@ -421,6 +421,73 @@ test("recebimento parcial e registrado sem exigir quitar todo saldo nem justific
   assert.equal(c.chamadas.finalizar.length, 1);
   assert.equal(c.chamadas.finalizar[0].pagamentos[0].valor, 50);
   assert.equal(c.chamadas.finalizar[0].options.contexto_pagamento_excedente, undefined);
+});
+
+test("cashback selecionado nao e ignorado ao registrar pagamento misto de R$ 93,90", async () => {
+  const pix = montar({ id: 4, nome: "Pix", tipo: "pix" }, 87, 93.9);
+  const c = preparar({
+    props: {
+      venda: { ...baseVenda, total: 93.9 },
+      pagamentos: [pix],
+      formaPagamentoSelecionada: { id: "cashback", nome: "Cashback", tipo: "cashback" },
+      valorRecebido: 6.9,
+      valorRestante: 6.9,
+      saldoCashback: 6.9,
+    },
+  });
+  await c.h.act(() => c.h.tree.handleFinalizar());
+  assert.match(c.alteracoes.Erro, /pagamento selecionado ainda não foi adicionado/);
+  assert.match(c.alteracoes.Erro, /Adicionar Pagamento/);
+  assert.deepEqual(c.chamadas, { persistir: [], finalizar: [], leituras: [] });
+  assert.equal(c.alteracoes.Pagamentos, undefined);
+
+  await c.h.act(() => c.h.tree.adicionarPagamento());
+  assert.equal(c.alteracoes.Pagamentos.length, 2);
+  assert.equal(c.alteracoes.Pagamentos[1].valor, 6.9);
+  assert.equal(c.alteracoes.Pagamentos[1].is_cashback, true);
+  await c.h.update({
+    pagamentos: c.alteracoes.Pagamentos,
+    formaPagamentoSelecionada: c.alteracoes.FormaPagamentoSelecionada,
+    valorRecebido: c.alteracoes.ValorRecebido,
+    valorRestante: 0,
+  });
+  await c.h.act(() => c.h.tree.handleFinalizar());
+  assert.equal(c.chamadas.finalizar.length, 1);
+  assert.deepEqual(
+    c.chamadas.finalizar[0].pagamentos.map((p) => p.valor),
+    [87, 6.9],
+  );
+  assert.equal(c.alteracoes.Erro, "");
+});
+
+test("pagamento integral com cashback adicionado e enviado sem criar outro recebimento", async () => {
+  const cashback = montar({ id: "cashback", nome: "Cashback", tipo: "cashback" }, 93.9, 93.9);
+  const c = preparar({
+    props: { venda: { ...baseVenda, total: 93.9 }, pagamentos: [cashback], valorRestante: 0 },
+  });
+  await c.h.act(() => c.h.tree.handleFinalizar());
+  assert.equal(c.chamadas.finalizar.length, 1);
+  assert.deepEqual(c.chamadas.finalizar[0].pagamentos, [cashback]);
+  assert.equal(c.alteracoes.Erro, "");
+});
+
+test("selecao pendente exige adicionar antes de registrar mesmo sem outro pagamento", async () => {
+  for (const forma of [
+    { id: "cashback", nome: "Cashback", tipo: "cashback" },
+    { id: "credito_cliente", nome: "Crédito Cliente", tipo: "credito_cliente" },
+    { id: 4, nome: "Pix", tipo: "pix" },
+  ]) {
+    const c = preparar({
+      props: {
+        formaPagamentoSelecionada: forma,
+        valorRecebido: 10,
+        podeConfirmarFinalizacao: false,
+      },
+    });
+    await c.h.act(() => c.h.tree.handleFinalizar());
+    assert.match(c.alteracoes.Erro, /Adicionar Pagamento/);
+    assert.deepEqual(c.chamadas, { persistir: [], finalizar: [], leituras: [] });
+  }
 });
 
 test("complementa80mais120 numa venda parcial200 sem tentar editar a venda", async () => {
