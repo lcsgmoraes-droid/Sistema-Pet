@@ -25,9 +25,15 @@ from app.crm.models import (
     CrmMovimentacao,
     CrmOportunidade,
     CrmProximoPasso,
+    CrmVinculoIgnorado,
 )
 from app.models import Cliente
-from app.whatsapp.customer_lookup import somente_digitos
+from app.whatsapp.customer_lookup import (
+    SITUACAO_AMBIGUO,
+    SITUACAO_UNICO,
+    resolver_tutor_por_telefone,
+    somente_digitos,
+)
 
 
 def _agora() -> datetime:
@@ -328,3 +334,76 @@ def vincular_a_cadastro(
     )
     db.flush()
     return lead
+
+
+def sugerir_vinculo(db: Session, lead: CrmLead) -> dict[str, Any] | None:
+    """Pessoa que passou a ter o mesmo telefone de um card sem cadastro, ou None.
+
+    So sugere quem ainda pode ser ligado: a pessoa precisa estar ativa, nao ter outro
+    card no funil e nao ter sido recusada para este card ("nao perguntar novamente").
+    """
+    if lead.cliente_id is not None or not lead.telefone:
+        return None
+    resolucao = resolver_tutor_por_telefone(db, lead.tenant_id, lead.telefone)
+    if resolucao.situacao not in (SITUACAO_UNICO, SITUACAO_AMBIGUO):
+        return None
+    ignorados = {
+        linha[0]
+        for linha in db.query(CrmVinculoIgnorado.cliente_id).filter(
+            CrmVinculoIgnorado.tenant_id == lead.tenant_id,
+            CrmVinculoIgnorado.lead_id == lead.id,
+        )
+    }
+    for cliente_id in resolucao.candidatos:
+        if cliente_id in ignorados:
+            continue
+        cliente = (
+            db.query(Cliente)
+            .filter(Cliente.id == cliente_id, Cliente.tenant_id == lead.tenant_id)
+            .first()
+        )
+        if cliente is None or cliente.ativo is False:
+            continue
+        if _lead_principal(db, lead.tenant_id, cliente_id=cliente.id) is not None:
+            continue
+        return {
+            "cliente_id": cliente.id,
+            "nome": cliente.nome,
+            "telefone": cliente.celular or cliente.telefone,
+        }
+    return None
+
+
+def ignorar_sugestao_de_vinculo(
+    db: Session, lead: CrmLead, cliente_id: int, user_id: int | None = None
+) -> None:
+    """Registra que esta pessoa nao deve mais ser sugerida como vinculo deste card."""
+    if lead.cliente_id is not None:
+        raise RegraDoCrm("Este card já está ligado a um cadastro.")
+    existe = (
+        db.query(CrmVinculoIgnorado.id)
+        .filter(
+            CrmVinculoIgnorado.tenant_id == lead.tenant_id,
+            CrmVinculoIgnorado.lead_id == lead.id,
+            CrmVinculoIgnorado.cliente_id == cliente_id,
+        )
+        .first()
+    )
+    if existe is not None:
+        return
+    cliente = (
+        db.query(Cliente.id)
+        .filter(Cliente.id == cliente_id, Cliente.tenant_id == lead.tenant_id)
+        .first()
+    )
+    if cliente is None:
+        raise RegraDoCrm("Pessoa não encontrada nesta loja.")
+    db.add(
+        CrmVinculoIgnorado(
+            tenant_id=lead.tenant_id,
+            lead_id=lead.id,
+            cliente_id=cliente_id,
+            user_id=user_id,
+        )
+    )
+    db.flush()

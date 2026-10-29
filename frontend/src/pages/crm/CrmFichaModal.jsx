@@ -9,6 +9,7 @@ import InputDataHora from "../../components/v2/InputDataHora/InputDataHora";
 import InputTextoLongo from "../../components/v2/InputTextoLongo/InputTextoLongo";
 import ModalPadrao from "../../components/v2/ModalPadrao/ModalPadrao";
 import CrmBuscaTutor from "./CrmBuscaTutor";
+import CrmSugestaoDeVinculo from "./CrmSugestaoDeVinculo";
 import { formatarReais } from "../../utils/consumoWhatsapp";
 import { whatsappUrl } from "../lembretes/lembretesUtils";
 import { rotuloDaOportunidade } from "./crmUtils";
@@ -161,6 +162,16 @@ export default function CrmFichaModal({ card, onAlterado, onFechar }) {
             <BotaoInteracao icon={MessageCircle} onClick={conversarNoWhatsapp} loading={enviando}>
               Conversar no WhatsApp
             </BotaoInteracao>
+          ) : null}
+
+          {ficha.sem_cadastro ? (
+            <CrmSugestaoDeVinculo
+              card={card}
+              onVinculado={async () => {
+                await carregar();
+                onAlterado();
+              }}
+            />
           ) : null}
 
           {ficha.sem_cadastro ? (

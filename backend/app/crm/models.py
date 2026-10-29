@@ -228,6 +228,25 @@ class CrmProximoPasso(BaseTenantModel):
     concluido_em = Column(DateTime(timezone=True), nullable=True)
 
 
+class CrmVinculoIgnorado(BaseTenantModel):
+    """Pessoa cadastrada que o usuario pediu para nao sugerir mais como vinculo deste card."""
+
+    __tablename__ = "crm_vinculos_ignorados"
+    __table_args__ = (
+        Index(
+            "uq_crm_vinculos_ignorados",
+            "tenant_id",
+            "lead_id",
+            "cliente_id",
+            unique=True,
+        ),
+    )
+
+    lead_id = Column(Integer, ForeignKey("crm_leads.id"), nullable=False)
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+
 TABELAS_DO_CRM = (
     CrmFunil.__tablename__,
     CrmColuna.__tablename__,

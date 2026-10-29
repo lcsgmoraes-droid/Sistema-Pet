@@ -215,6 +215,46 @@ async def vincular_a_cadastro(
     return _executar(db, user_and_tenant, dados.loja_id, PERM_LEADS, _vincular)
 
 
+@router.get("/leads/{lead_id}/sugestao-vinculo")
+async def sugestao_de_vinculo(
+    lead_id: int,
+    loja_id: str | None = None,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Pessoa cadastrada depois com o mesmo telefone do card (ou `sugestao: null`)."""
+    return _executar(
+        db,
+        user_and_tenant,
+        loja_id,
+        "crm.visualizar",
+        lambda tenant_id: {
+            "sugestao": acoes_service.sugerir_vinculo(
+                db, acoes_service.obter_lead(db, tenant_id, lead_id)
+            )
+        },
+        gravar=False,
+    )
+
+
+@router.post("/leads/{lead_id}/sugestao-vinculo/ignorar")
+async def ignorar_sugestao_de_vinculo(
+    lead_id: int,
+    dados: Vinculo,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Opção "Não perguntar novamente": a pessoa nunca mais é sugerida para este card."""
+    usuario, _ = user_and_tenant
+
+    def _ignorar(tenant_id):
+        lead = acoes_service.obter_lead(db, tenant_id, lead_id)
+        acoes_service.ignorar_sugestao_de_vinculo(db, lead, dados.cliente_id, usuario.id)
+        return {"ok": True}
+
+    return _executar(db, user_and_tenant, dados.loja_id, PERM_LEADS, _ignorar)
+
+
 @router.post("/leads", status_code=201)
 async def criar_lead(
     dados: LeadNovo,
