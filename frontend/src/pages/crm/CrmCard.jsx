@@ -1,13 +1,6 @@
 import { useDraggable } from "@dnd-kit/core";
-import {
-  AlertTriangle,
-  CalendarClock,
-  Clock,
-  GripVertical,
-  Store,
-  UserRoundCheck,
-  UserRoundX,
-} from "lucide-react";
+import { AlertTriangle, CalendarClock, Clock, GripVertical, Store, UserRoundX } from "lucide-react";
+import CrmIconeDeVinculo from "./CrmIconeDeVinculo";
 import {
   formatarValor,
   precisaDeAtencaoPorTempo,
@@ -75,25 +68,7 @@ export default function CrmCard({ card, mostrarLoja, movendo, onAbrir }) {
           onClick={() => onAbrir?.(card)}
           className="min-h-[44px] flex-1 text-left font-semibold text-slate-900 hover:underline dark:text-slate-100 sm:min-h-0"
         >
-          {card.sem_cadastro ? (
-            <span
-              title="Sem cadastro: ainda não está ligado a nenhuma pessoa"
-              role="img"
-              aria-label="Sem cadastro: ainda não está ligado a nenhuma pessoa"
-              className="mr-1.5 inline-block align-text-bottom text-blue-700 dark:text-blue-300"
-            >
-              <UserRoundX className="h-4 w-4" aria-hidden="true" />
-            </span>
-          ) : (
-            <span
-              title={`Ligado ao cadastro de ${card.nome}`}
-              role="img"
-              aria-label={`Ligado ao cadastro de ${card.nome}`}
-              className="mr-1.5 inline-block align-text-bottom text-emerald-700 dark:text-emerald-300"
-            >
-              <UserRoundCheck className="h-4 w-4" aria-hidden="true" />
-            </span>
-          )}
+          <CrmIconeDeVinculo semCadastro={card.sem_cadastro} nome={card.nome} />
           {card.nome}
         </button>
         {card.ciclo > 1 ? (

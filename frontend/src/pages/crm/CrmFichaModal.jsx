@@ -9,6 +9,7 @@ import InputDataHora from "../../components/v2/InputDataHora/InputDataHora";
 import InputTextoLongo from "../../components/v2/InputTextoLongo/InputTextoLongo";
 import ModalPadrao from "../../components/v2/ModalPadrao/ModalPadrao";
 import CrmBuscaTutor from "./CrmBuscaTutor";
+import CrmIconeDeVinculo from "./CrmIconeDeVinculo";
 import CrmSugestaoDeVinculo from "./CrmSugestaoDeVinculo";
 import { formatarReais } from "../../utils/consumoWhatsapp";
 import { whatsappUrl } from "../lembretes/lembretesUtils";
@@ -133,7 +134,16 @@ export default function CrmFichaModal({ card, onAlterado, onFechar }) {
 
   return (
     <ModalPadrao
-      titulo={card.nome}
+      titulo={
+        <>
+          <CrmIconeDeVinculo
+            semCadastro={ficha ? ficha.sem_cadastro : card.sem_cadastro}
+            nome={ficha?.nome || card.nome}
+            tamanho="h-5 w-5"
+          />
+          {ficha?.nome || card.nome}
+        </>
+      }
       tamanho="grande"
       onFechar={onFechar}
       rodape={<BotaoCancelar onClick={onFechar}>Fechar</BotaoCancelar>}
