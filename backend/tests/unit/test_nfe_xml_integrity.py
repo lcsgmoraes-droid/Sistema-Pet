@@ -98,9 +98,69 @@ def test_valid_nfce_with_supplementary_qr_code_is_supported():
     assert ensure_signed_xml(signed, document_type="nfce", expected_key=key) == signed
 
 
+@pytest.mark.parametrize("document_type,model", [("nfe", "55"), ("nfce", "65")])
+@pytest.mark.parametrize("protocol", ["135260000000001", "13526000000000001"])
+def test_authorization_protocol_preserves_verified_xml(document_type, model, protocol):
+    key = make_key("352610" + CNPJ + model + "001000001650112345678")
+    signed = sign_nfe(raw_nfe().replace(KEY.encode(), key.encode()))
+    content = changed_xml(
+        signed,
+        lambda root: setattr(
+            find(root, "n:protNFe/n:infProt/n:nProt"), "text", protocol
+        ),
+    )
+
+    assert (
+        ensure_signed_xml(
+            content, expected_cnpj=CNPJ, expected_key=key, document_type=document_type
+        )
+        is content
+    )
+
+
+@pytest.mark.parametrize(
+    "protocol",
+    ["1" * 14, "1" * 16, "1" * 18, "1" * 16 + "A", "١" * 17],
+)
+def test_invalid_authorization_protocol_is_rejected(signed_xml, protocol):
+    assert_invalid(
+        changed_xml(
+            signed_xml,
+            lambda root: setattr(
+                find(root, "n:protNFe/n:infProt/n:nProt"), "text", protocol
+            ),
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    "path,value",
+    [
+        ("n:NFe/n:infNFe/n:total/n:ICMSTot/n:vNF", "146.90"),
+        ("n:NFe/ds:Signature/ds:SignatureValue", "AAAAAAAAAAAAAAAAAAAAAA=="),
+        ("n:protNFe/n:infProt/n:digVal", "AAAAAAAAAAAAAAAAAAAAAAAAAAA="),
+    ],
+)
+def test_long_protocol_still_rejects_content_signature_or_digest_tampering(
+    signed_xml, path, value
+):
+    def tamper(root):
+        find(root, "n:protNFe/n:infProt/n:nProt").text = "13526000000000001"
+        find(root, path).text = value
+
+    assert_invalid(changed_xml(signed_xml, tamper))
+
+
 @pytest.mark.parametrize("sha256", [False, True])
-def test_only_original_signature_can_prove_restored_text(sha256):
+@pytest.mark.parametrize("protocol", ["135260000000001", "13526000000000001"])
+def test_only_original_signature_can_prove_restored_text(sha256, protocol):
     original = sign_nfe(raw_nfe(), sha256=sha256)
+    original = changed_xml(
+        original,
+        lambda root: setattr(
+            find(root, "n:protNFe/n:infProt/n:nProt"), "text", protocol
+        ),
+    )
     damaged = original.replace(b"Condominio Ficticio", "Condomínio Fictício".encode())
     damaged = damaged.replace(b"Bairro Botanico", "Bairro Botânico".encode())
     assert damaged != original

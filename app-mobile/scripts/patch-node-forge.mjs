@@ -4,7 +4,8 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 // Backport de https://github.com/digitalbazaar/forge/pull/1152 (ceba344).
-// Remover quando node-forge publicar a correção de CVE-2026-85393.
+// node-forge 1.4.1 ja inclui a correcao oficial. Conferir seus bytes publicados
+// sem reaplicar o backport, mantido apenas para a distribuicao 1.4.0 conhecida.
 const mobileRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
@@ -17,6 +18,8 @@ const rsaPath = path.join(mobileRoot, "node_modules/node-forge/lib/rsa.js");
 const lockPath = path.join(mobileRoot, "package-lock.json");
 const originalHash =
   "fd4740238145ec26470eb3f06a627c72039538ce1307dbdce40521f94dfd0a50";
+const upstreamFixedHash =
+  "6632e195295ce76f6bb9131ee770dcd6cc1ee4ffac7906302208b00faf95a87f";
 
 const originalBlock = [
   "          // validate DigestInfo structure and element count",
@@ -49,19 +52,21 @@ function expectedDependencyTree() {
     /(?:^|\/)node_modules\/node-forge$/.test(name),
   );
   const installed = JSON.parse(readFileSync(packagePath, "utf8"));
-  return (
+  const expected =
     copies.length === 1 &&
     copies[0] === "node_modules/node-forge" &&
-    lock.packages[copies[0]].version === "1.4.0" &&
-    installed.version === "1.4.0" &&
-    installed.main === "lib/index.js"
-  );
+    lock.packages[copies[0]].version === installed.version &&
+    ["1.4.0", "1.4.1"].includes(installed.version) &&
+    installed.main === "lib/index.js";
+  return expected ? installed.version : null;
 }
 
 export function isNodeForgePatched() {
   try {
-    if (!expectedDependencyTree()) return false;
+    const version = expectedDependencyTree();
+    if (!version) return false;
     const source = readFileSync(rsaPath, "utf8");
+    if (version === "1.4.1") return sha256(source) === upstreamFixedHash;
     if (source.split(patchedBlock).length !== 2) return false;
     return sha256(source.replace(patchedBlock, originalBlock)) === originalHash;
   } catch {
@@ -71,7 +76,7 @@ export function isNodeForgePatched() {
 
 export function patchNodeForge() {
   if (isNodeForgePatched()) return;
-  if (!expectedDependencyTree()) {
+  if (expectedDependencyTree() !== "1.4.0") {
     throw new Error("node-forge mudou; revisar o backport antes de instalar.");
   }
   const source = readFileSync(rsaPath, "utf8");

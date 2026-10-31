@@ -185,7 +185,11 @@ def _identity(info, protocol, *, expected_cnpj, expected_key, document_type):
         environment in {"1", "2"} and _text(protocol, f"{{{NFE}}}tpAmb") == environment
     )
     _require(_text(protocol, f"{{{NFE}}}cStat") in {"100", "150"})
-    _require(re.fullmatch(r"[0-9]{15}", _text(protocol, f"{{{NFE}}}nProt")) is not None)
+    # NT 2025.002: o protocolo pode ter 15 ou 17 digitos, conforme o autorizador.
+    _require(
+        re.fullmatch(r"(?:[0-9]{15}|[0-9]{17})", _text(protocol, f"{{{NFE}}}nProt"))
+        is not None
+    )
     return issuer, issued
 
 
