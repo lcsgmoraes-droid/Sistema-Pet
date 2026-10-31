@@ -7,6 +7,7 @@ import { formatMoneyBRL } from "../utils/formatters";
 import { confirmarCorePet } from "../services/corepetDialog";
 import EntradaXmlCriarProdutoModal from "./entrada-xml/EntradaXmlCriarProdutoModal";
 import EntradaXmlDetalhesModal from "./entrada-xml/EntradaXmlDetalhesModal";
+import EntradaXmlDocumentosSefaz from "./entrada-xml/EntradaXmlDocumentosSefaz";
 import EntradaPdfUploadModal from "./entrada-xml/EntradaPdfUploadModal";
 import EntradaXmlHistoricoPrecosModal from "./entrada-xml/EntradaXmlHistoricoPrecosModal";
 import EntradaXmlHeader from "./entrada-xml/EntradaXmlHeader";
@@ -524,6 +525,12 @@ const EntradaXML = () => {
         setChaveSefaz={setChaveSefaz}
         setConsultaExpandidaId={setConsultaExpandidaId}
         usarNaEntrada={usarNaEntrada}
+      />
+
+      <EntradaXmlDocumentosSefaz
+        api={api}
+        abrirDetalhes={abrirDetalhes}
+        formatMoneyBRL={formatMoneyBRL}
       />
 
       <EntradaXmlMetricas

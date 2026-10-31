@@ -69,7 +69,7 @@ Não há Celery em uso (apesar de estar no `requirements.txt`). Três mecanismos
    - Sync de evidência clínica veterinária via PubMed (semanal, flag `VET_EVIDENCE_SYNC_ENABLED`, desligado por padrão)
    - Sync de catálogo regulatório DailyMed/VMD (semanal, flag `VET_REGULATORY_SYNC_ENABLED`, desligado por padrão)
    - Polling de pedidos iFood (30s, 2 flags de ativação)
-   - Sync SEFAZ — **código presente mas inerte**: `_loop_sefaz_sync` retorna imediatamente (`main_background_jobs.py:251-260`), preservado como histórico
+   - Sync SEFAZ — agendador em `main_background_jobs.py`, executado apenas para empresas com `importacao_automatica` habilitada; consulta por NSU e guarda os documentos antes de avançar o cursor. Ver `docs/SEFAZ_DISTRIBUICAO_ENTRADAS.md`.
 3. **APScheduler dentro do processo líder**: `CampaignScheduler` (`campaigns/scheduler.py`) e `BlingSyncScheduler` (`schedulers/bling_sync_scheduler.py`, flag `BLING_SYNC_SCHEDULER_ENABLED`).
 
 Filas de processamento assíncrono (`campaign_event_queue`, `notification_queue`, fila de webhook de pedido Bling) são **tabelas PostgreSQL** com padrão `SELECT FOR UPDATE SKIP LOCKED`, não Redis/Celery.
