@@ -105,7 +105,9 @@ def test_authorization_protocol_preserves_verified_xml(document_type, model, pro
     signed = sign_nfe(raw_nfe().replace(KEY.encode(), key.encode()))
     content = changed_xml(
         signed,
-        lambda root: setattr(find(root, "n:protNFe/n:infProt/n:nProt"), "text", protocol),
+        lambda root: setattr(
+            find(root, "n:protNFe/n:infProt/n:nProt"), "text", protocol
+        ),
     )
 
     assert (
@@ -155,7 +157,9 @@ def test_only_original_signature_can_prove_restored_text(sha256, protocol):
     original = sign_nfe(raw_nfe(), sha256=sha256)
     original = changed_xml(
         original,
-        lambda root: setattr(find(root, "n:protNFe/n:infProt/n:nProt"), "text", protocol),
+        lambda root: setattr(
+            find(root, "n:protNFe/n:infProt/n:nProt"), "text", protocol
+        ),
     )
     damaged = original.replace(b"Condominio Ficticio", "Condomínio Fictício".encode())
     damaged = damaged.replace(b"Bairro Botanico", "Bairro Botânico".encode())
